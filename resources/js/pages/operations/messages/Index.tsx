@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -14,6 +15,7 @@ import {
     CheckCheck,
     FileText,
     Hash,
+    MessageSquare,
     MessageSquareText,
     Mic,
     MicOff,
@@ -406,19 +408,48 @@ export default function MessagesChat({
         [currentUserId],
     );
 
+    const unreadTotal = conversations.reduce(
+        (sum, c) => sum + (c.unread_count ?? 0),
+        0,
+    );
+
     return (
         <AppLayout>
             <Head title="Messages" />
-            <div className="flex h-[calc(100vh-4rem)] overflow-hidden">
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={MessageSquare}
+                        title="Messages"
+                        description="Secure team conversations and client coordination."
+                        stats={[
+                            { label: 'Conversations', value: conversations.length },
+                            { label: 'Unread', value: unreadTotal },
+                        ]}
+                        actions={
+                            <Button
+                                size="sm"
+                                onClick={() => {
+                                    setShowNewChat(true);
+                                    setSelectedId(null);
+                                }}
+                            >
+                                <Plus className="mr-1.5 h-4 w-4" />
+                                New Conversation
+                            </Button>
+                        }
+                    />
+                }
+            >
+            <div className="flex h-[calc(100vh-20rem)] min-h-[480px] overflow-hidden rounded-2xl border">
                 {/* Left Panel - Conversation List */}
                 <div className="flex w-80 flex-col border-r bg-background">
                     {/* Header */}
                     <div className="flex items-center justify-between border-b px-4 py-3">
                         <div>
-                            <h1 className="text-lg font-semibold">Messages</h1>
+                            <h2 className="text-sm font-semibold">Conversations</h2>
                             <p className="text-xs text-muted-foreground">
-                                Secure team conversations and client
-                                coordination.
+                                {conversations.length} total
                             </p>
                         </div>
                         <Button
@@ -1169,6 +1200,7 @@ export default function MessagesChat({
                     )}
                 </div>
             </div>
+            </PageLayout>
 
             {/* Context Menu — WhatsApp style */}
             {ctxMenu && (

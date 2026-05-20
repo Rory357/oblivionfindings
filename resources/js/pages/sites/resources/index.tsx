@@ -1,11 +1,12 @@
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, useForm } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
-import { DoorOpen, Plus, ArrowLeft, Users, Calendar, Trash2 } from 'lucide-react';
+import { DoorOpen, Folder, Plus, Users, Calendar, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { ConfirmAction } from '../_confirm-action';
 
@@ -111,28 +112,30 @@ export default function SiteResources({ site, resources }: Props) {
         ]}>
             <Head title={`${site.name} - Resources`} />
 
-            <div className="m-4 max-w-4xl mx-auto space-y-4">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div>
-                        <Button asChild variant="ghost" size="sm" className="mb-2">
-                            <Link href={`/sites/${site.id}`}>
-                                <ArrowLeft className="w-4 h-4 mr-1" />
-                                Back
-                            </Link>
-                        </Button>
-                        <h1 className="text-lg font-semibold flex items-center gap-2">
-                            <DoorOpen className="w-5 h-5" />
-                            Rooms & Resources
-                        </h1>
-                        <p className="text-sm text-muted-foreground">{site.name}</p>
-                    </div>
-                    <Button onClick={() => setShowForm(true)}>
-                        <Plus className="w-4 h-4 mr-1" />
-                        Add Resource
-                    </Button>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Folder}
+                        title="Rooms & Resources"
+                        description={site.name}
+                        backHref={`/sites/${site.id}`}
+                        stats={[
+                            { label: 'Total', value: resources.length },
+                            { label: 'Active', value: activeResources.length },
+                            {
+                                label: 'Bookable',
+                                value: activeResources.filter((r) => r.is_bookable).length,
+                            },
+                        ]}
+                        actions={
+                            <Button size="sm" onClick={() => setShowForm(true)}>
+                                <Plus className="w-4 h-4 mr-1" />
+                                Add Resource
+                            </Button>
+                        }
+                    />
+                }
+            >
                 {/* Stats */}
                 <div className="grid gap-4 sm:grid-cols-3">
                     <Card>
@@ -305,7 +308,7 @@ export default function SiteResources({ site, resources }: Props) {
                         )}
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

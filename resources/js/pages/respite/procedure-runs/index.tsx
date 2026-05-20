@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -7,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import RespiteSubnav from '@/components/respite-subnav';
 import { formatDateTime } from '@/lib/date-format';
 import { Head, Link, router } from '@inertiajs/react';
+import { Activity, Plus } from 'lucide-react';
 
 type Props = {
     runs: { data: any[]; links: any[] };
@@ -34,16 +36,28 @@ export default function ProcedureRunsIndex({ runs, templates, filters }: Props) 
         <AppLayout breadcrumbs={[{ title: 'Respite', href: '/respite' }, { title: 'Procedure Runs', href: '/respite/procedure-runs' }]}>
             <Head title="Procedure Runs" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">Procedure Runs</h1>
-                        <div className="mt-1 text-sm text-muted-foreground">Track execution of procedure templates.</div>
-                    </div>
-                    <Link href="/respite/procedure-runs/create" className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
-                        New Run
-                    </Link>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Activity}
+                        title="Procedure Runs"
+                        description="Track execution of procedure templates."
+                        stats={[
+                            { label: 'Total runs', value: runs.data.length },
+                            { label: 'In progress', value: runs.data.filter((r: any) => r.status === 'in_progress').length },
+                            { label: 'Completed', value: runs.data.filter((r: any) => r.status === 'completed').length },
+                        ]}
+                        actions={
+                            <Link href="/respite/procedure-runs/create">
+                                <Button size="sm" variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    New Run
+                                </Button>
+                            </Link>
+                        }
+                    />
+                }
+            >
                 <RespiteSubnav />
 
                 <Card>
@@ -128,7 +142,7 @@ export default function ProcedureRunsIndex({ runs, templates, filters }: Props) 
                         ))}
                     </div>
                 ) : null}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

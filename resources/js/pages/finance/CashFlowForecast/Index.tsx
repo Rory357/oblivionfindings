@@ -1,5 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -72,22 +73,34 @@ export default function CashFlowForecastIndex({ forecasts }: PageProps) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Cash Flow Forecast" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Cash Flow Forecast</h1>
-                        <p className="text-muted-foreground">
-                            Project future cash positions based on outstanding invoices, bills, and recurring transactions
-                        </p>
-                    </div>
-                    <Link href="/finance/cash-flow-forecast/create">
-                        <Button>
-                            <Plus className="mr-2 h-4 w-4" />
-                            New Forecast
-                        </Button>
-                    </Link>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={TrendingUp}
+                        title="Cash Flow Forecast"
+                        description="Project future cash positions based on outstanding invoices, bills, and recurring transactions"
+                        stats={[
+                            { label: 'Total', value: forecasts.data.length },
+                            {
+                                label: 'Final',
+                                value: forecasts.data.filter((f) => f.status === 'final').length,
+                            },
+                            {
+                                label: 'Draft',
+                                value: forecasts.data.filter((f) => f.status === 'draft').length,
+                            },
+                        ]}
+                        actions={
+                            <Link href="/finance/cash-flow-forecast/create">
+                                <Button>
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    New Forecast
+                                </Button>
+                            </Link>
+                        }
+                    />
+                }
+            >
                 <Card>
                     <CardHeader>
                         <div className="flex items-center gap-2">
@@ -199,7 +212,7 @@ export default function CashFlowForecastIndex({ forecasts }: PageProps) {
                         )}
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

@@ -1,5 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -12,6 +13,7 @@ import {
     BatteryLow,
     BatteryWarning,
     Camera,
+    Cctv,
     Cpu,
     DoorOpen,
     Locate,
@@ -246,20 +248,31 @@ export default function DevicesIndex({ devices, stats, filters, sites }: Props) 
         ]}>
             <Head title="Device Monitoring" />
 
-            <div className="flex flex-col gap-4 p-6">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold">Device Monitoring</h1>
-                        <p className="text-sm text-muted-foreground">
-                            Monitor IoT device health and connectivity status
-                        </p>
-                    </div>
-                    <Button variant="outline" size="sm" asChild>
-                        <Link href="/control-room">Dashboard</Link>
-                    </Button>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Cctv}
+                        title="Device Monitoring"
+                        description="Monitor IoT device health and connectivity status"
+                        stats={[
+                            { label: 'Total', value: stats.total },
+                            { label: 'Online', value: stats.online },
+                            { label: 'Offline', value: stats.offline },
+                            { label: 'Low battery', value: stats.low_battery },
+                        ]}
+                        actions={
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                asChild
+                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                            >
+                                <Link href="/control-room">Dashboard</Link>
+                            </Button>
+                        }
+                    />
+                }
+            >
                 {/* Stats Cards */}
                 <div className="grid grid-cols-2 gap-3 md:grid-cols-4">
                     <Card>
@@ -414,7 +427,7 @@ export default function DevicesIndex({ devices, stats, filters, sites }: Props) 
                         ))}
                     </div>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

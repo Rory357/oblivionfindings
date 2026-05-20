@@ -1,6 +1,7 @@
 import { Head, useForm, router } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -62,20 +63,30 @@ export default function DocumentsIndex({ auth, documents, categories }: Props) {
 
   const getCategoryLabel = (value: string) => categories.find(c => c.value === value)?.label ?? value;
 
+  const confidentialCount = documents.data.filter(d => d.is_confidential).length;
+
   return (
     <AppLayout>
       <Head title="Governance Documents" />
-      <div className="flex flex-col gap-6 p-4 md:p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Governance Documents</h1>
-            <p className="text-muted-foreground mt-1">Board documents, templates, and archives</p>
-          </div>
-          <Button onClick={() => setShowUpload(!showUpload)}>
-            <Upload className="w-4 h-4 mr-2" /> Upload Document
-          </Button>
-        </div>
-
+      <PageLayout
+        hero={
+          <PageHero
+            icon={FolderOpen}
+            title="Governance Documents"
+            description="Board documents, templates, and archives"
+            stats={[
+              { label: 'Total', value: documents.data.length },
+              { label: 'Categories', value: categories.length },
+              { label: 'Confidential', value: confidentialCount },
+            ]}
+            actions={
+              <Button size="sm" onClick={() => setShowUpload(!showUpload)}>
+                <Upload className="w-4 h-4 mr-2" /> Upload Document
+              </Button>
+            }
+          />
+        }
+      >
         {showUpload && (
           <Card className="mb-6">
             <CardHeader><CardTitle>Upload Document</CardTitle></CardHeader>
@@ -140,7 +151,7 @@ export default function DocumentsIndex({ auth, documents, categories }: Props) {
             <Card><CardContent className="p-8 text-center text-muted-foreground">No documents uploaded yet.</CardContent></Card>
           )}
         </div>
-      </div>
+      </PageLayout>
     </AppLayout>
   );
 }

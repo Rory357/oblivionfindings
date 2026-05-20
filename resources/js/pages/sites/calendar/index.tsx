@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -14,7 +15,7 @@ import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm, usePage } from '@inertiajs/react';
 import {
-    Calendar as CalendarIcon,
+    Calendar,
     ChevronLeft,
     ChevronRight,
     Plus,
@@ -212,36 +213,48 @@ export default function SiteCalendar({ site, canCreate }: Props) {
         >
             <Head title={`${site.name} - Calendar`} />
 
-            <div className="m-4 space-y-4">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="flex items-center gap-2 text-lg font-semibold">
-                            <CalendarIcon className="h-5 w-5" />
-                            Site Calendar
-                        </h1>
-                        <p className="text-sm text-muted-foreground">
-                            {site.name}
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Button variant="outline" size="sm" onClick={prevMonth}>
-                            <ChevronLeft className="h-4 w-4" />
-                        </Button>
-                        <span className="min-w-[140px] text-center font-medium">
-                            {monthName}
-                        </span>
-                        <Button variant="outline" size="sm" onClick={nextMonth}>
-                            <ChevronRight className="h-4 w-4" />
-                        </Button>
-                        {canCreate && (
-                            <Button className="ml-4" onClick={openCreateDialog}>
-                                <Plus className="mr-1 h-4 w-4" />
-                                Add Event
-                            </Button>
-                        )}
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Calendar}
+                        title="Site Calendar"
+                        description={site.name}
+                        backHref={`/sites/${site.id}`}
+                        stats={[
+                            { label: 'Events this month', value: events.length },
+                        ]}
+                        actions={
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={prevMonth}
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                >
+                                    <ChevronLeft className="h-4 w-4" />
+                                </Button>
+                                <span className="min-w-[140px] text-center text-sm font-medium">
+                                    {monthName}
+                                </span>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={nextMonth}
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                >
+                                    <ChevronRight className="h-4 w-4" />
+                                </Button>
+                                {canCreate && (
+                                    <Button size="sm" onClick={openCreateDialog}>
+                                        <Plus className="mr-1 h-4 w-4" />
+                                        Add Event
+                                    </Button>
+                                )}
+                            </div>
+                        }
+                    />
+                }
+            >
                 <Card>
                     <CardContent className="p-4">
                         {/* Calendar Grid */}
@@ -365,7 +378,7 @@ export default function SiteCalendar({ site, canCreate }: Props) {
                         Loading events...
                     </div>
                 )}
-            </div>
+            </PageLayout>
 
             <Dialog open={createOpen} onOpenChange={handleCreateOpenChange}>
                 <DialogContent>

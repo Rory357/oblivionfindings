@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -31,6 +32,7 @@ import {
     MoreVertical,
     Plus,
     Search,
+    ShieldAlert,
     User,
     UserPlus,
 } from 'lucide-react';
@@ -178,30 +180,30 @@ export default function SiteHazards({
         >
             <Head title={`${site.name} - Hazards`} />
 
-            <div className="space-y-4">
-                {/* Header */}
-                <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-status-warning-bg">
-                            <AlertTriangle className="h-5 w-5 text-status-warning" />
-                        </div>
-                        <div>
-                            <h1 className="text-lg font-semibold">
-                                Hazards - {site.name}
-                            </h1>
-                            <div className="text-sm text-muted-foreground">
-                                Hazard register for this site
-                            </div>
-                        </div>
-                    </div>
-                    <Link href={`/sites/${site.id}/hazards/create`}>
-                        <Button size="sm">
-                            <Plus className="mr-1 h-4 w-4" />
-                            Log Hazard
-                        </Button>
-                    </Link>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={ShieldAlert}
+                        title={`Hazards - ${site.name}`}
+                        description="Hazard register for this site"
+                        backHref={`/sites/${site.id}`}
+                        stats={[
+                            { label: 'Open', value: openCount },
+                            { label: 'Critical', value: criticalCount },
+                            { label: 'Overdue', value: overdueCount },
+                            { label: 'Closed', value: closedCount },
+                        ]}
+                        actions={
+                            <Link href={`/sites/${site.id}/hazards/create`}>
+                                <Button size="sm">
+                                    <Plus className="mr-1 h-4 w-4" />
+                                    Log Hazard
+                                </Button>
+                            </Link>
+                        }
+                    />
+                }
+            >
                 {/* Stats */}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
                     <Card className="gap-0 rounded-lg p-3 shadow-sm">
@@ -623,7 +625,7 @@ export default function SiteHazards({
                         ))}
                     </div>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

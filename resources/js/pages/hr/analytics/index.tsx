@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import {
     Card,
@@ -11,6 +12,7 @@ import { type BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/react';
 import {
     BarChart2,
+    BarChart3,
     Clock,
     ShieldCheck,
     TrendingDown,
@@ -103,17 +105,30 @@ export default function AnalyticsDashboard({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Workforce Analytics" />
-            <div className="flex flex-col gap-6 p-6">
-                <div className="flex flex-wrap items-end justify-between gap-2">
-                    <h1 className="text-2xl font-bold">Workforce Analytics</h1>
-                    <Badge
-                        variant="outline"
-                        className="text-xs font-normal text-muted-foreground"
-                    >
-                        Showing last 12 months
-                    </Badge>
-                </div>
 
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={BarChart3}
+                        title="Workforce Analytics"
+                        description="Showing last 12 months of workforce trends and compliance metrics."
+                        stats={[
+                            { label: 'Headcount', value: currentHeadcount },
+                            { label: 'Turnover', value: `${turnoverRate.rate}%` },
+                            { label: 'Avg Tenure', value: avgTenure },
+                            { label: 'Compliance', value: `${complianceScore.score}%` },
+                        ]}
+                        actions={
+                            <Badge
+                                variant="outline"
+                                className="border-primary-foreground/30 bg-primary-foreground/10 text-xs font-normal text-primary-foreground backdrop-blur-sm"
+                            >
+                                Showing last 12 months
+                            </Badge>
+                        }
+                    />
+                }
+            >
                 {/* KPI Cards */}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <Card>
@@ -394,7 +409,7 @@ export default function AnalyticsDashboard({
                         </CardContent>
                     </Card>
                 </div>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

@@ -1,5 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -75,24 +76,26 @@ export default function HsEventsIndex({ events, filters }: Props) {
         return new Date(iso).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
     };
 
+    const notifiableCount = events.data.filter(e => e.worksafe_notifiable).length;
+    const openActionsCount = events.data.filter(e => e.has_open_actions).length;
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="H&S Events" />
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-status-info text-white">
-                            <Shield className="h-5 w-5" />
-                        </div>
-                        <div>
-                            <h1 className="text-2xl font-bold tracking-tight">H&S Events</h1>
-                            <p className="text-sm text-muted-foreground">{events.total} event{events.total !== 1 ? 's' : ''} recorded</p>
-                        </div>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={AlertTriangle}
+                        title="H&S Events"
+                        description="Incidents, near-misses, hazards, and other health and safety reports"
+                        stats={[
+                            { label: 'Total', value: events.total },
+                            { label: 'WorkSafe', value: notifiableCount },
+                            { label: 'Open actions', value: openActionsCount },
+                        ]}
+                    />
+                }
+            >
                 {/* Filters */}
                 <Card>
                     <CardContent className="flex flex-wrap items-center gap-3 py-4">
@@ -225,7 +228,7 @@ export default function HsEventsIndex({ events, filters }: Props) {
                         <LaravelPagination links={events.links} />
                     </div>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

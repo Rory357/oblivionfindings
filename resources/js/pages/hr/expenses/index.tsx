@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -14,7 +15,7 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
-import { Eye, Plus } from 'lucide-react';
+import { Eye, Plus, Receipt } from 'lucide-react';
 
 type ExpenseClaim = {
     id: number;
@@ -86,27 +87,46 @@ export default function ExpenseIndex({ claims, filters, can }: Props) {
         );
     };
 
+    const totalClaimValue = claims.data.reduce(
+        (sum, claim) => sum + (claim.total_amount || 0),
+        0,
+    );
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Expense Claims" />
-            <div className="flex flex-col gap-6 p-6">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-2xl font-bold">Expense Claims</h1>
-                        <p className="text-sm text-muted-foreground">
-                            Manage employee expense claims and reimbursements
-                        </p>
-                    </div>
-                    {can.create && (
-                        <Button asChild size="sm">
-                            <Link href="/hr/expenses/create">
-                                <Plus className="mr-1.5 h-4 w-4" />
-                                New Claim
-                            </Link>
-                        </Button>
-                    )}
-                </div>
 
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Receipt}
+                        title="Expense Claims"
+                        description="Manage employee expense claims and reimbursements"
+                        stats={[
+                            { label: 'Total', value: claims.data.length },
+                            {
+                                label: 'Submitted',
+                                value: claims.data.filter((c) => c.status === 'submitted').length,
+                            },
+                            {
+                                label: 'Approved',
+                                value: claims.data.filter((c) => c.status === 'approved').length,
+                            },
+                            { label: 'Value', value: formatCurrency(totalClaimValue) },
+                        ]}
+                        actions={
+                            can.create && (
+                                <Button asChild size="sm">
+                                    <Link href="/hr/expenses/create">
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        New Claim
+                                    </Link>
+                                </Button>
+                            )
+                        }
+                    />
+                }
+            >
                 {/* Filters */}
                 <div className="flex flex-wrap gap-2">
                     {[
@@ -236,7 +256,7 @@ export default function ExpenseIndex({ claims, filters, can }: Props) {
                 {claims.links?.length > 3 && (
                     <LaravelPagination links={claims.links} />
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

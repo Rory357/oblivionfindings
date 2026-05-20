@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
@@ -17,6 +18,7 @@ import {
     CheckCircle2,
     ChevronRight,
     ClipboardList,
+    Wrench,
     X,
 } from 'lucide-react';
 import { useCallback, useState } from 'react';
@@ -117,30 +119,20 @@ export default function CorrectiveActionsIndex({ actions, filters }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Corrective Actions" />
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-status-warning text-white">
-                            <ClipboardList className="h-5 w-5" />
-                        </div>
-                        <div>
-                            <h1 className="text-2xl font-bold tracking-tight">
-                                Corrective Actions
-                            </h1>
-                            <p className="text-sm text-muted-foreground">
-                                {actions.total} action
-                                {actions.total !== 1 ? 's' : ''}
-                                {overdueCount > 0 && (
-                                    <span className="ml-2 font-medium text-status-critical">
-                                        {overdueCount} overdue
-                                    </span>
-                                )}
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Wrench}
+                        title="Corrective Actions"
+                        description="Track and verify safety actions across all events"
+                        stats={[
+                            { label: 'Total', value: actions.total },
+                            { label: 'Overdue', value: overdueCount },
+                            { label: 'Selected', value: selected.size },
+                        ]}
+                    />
+                }
+            >
                 {/* Bulk selection banner */}
                 {selected.size > 0 && (
                     <div className="flex items-center justify-between rounded-lg border border-status-info/30 bg-status-info-bg px-4 py-2.5 text-sm dark:border-status-info/30">
@@ -383,7 +375,7 @@ export default function CorrectiveActionsIndex({ actions, filters }: Props) {
                         <LaravelPagination links={actions.links} />
                     </div>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

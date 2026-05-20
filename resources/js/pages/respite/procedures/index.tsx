@@ -1,8 +1,10 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import RespiteSubnav from '@/components/respite-subnav';
 import { Head, Link } from '@inertiajs/react';
+import { BookOpen, Plus } from 'lucide-react';
 
 type Props = {
     templates: any;
@@ -16,18 +18,26 @@ export default function RespiteProceduresIndex({ templates }: Props) {
         ]}>
             <Head title="Respite Procedures" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">Procedure Templates</h1>
-                        <div className="mt-1 text-sm text-muted-foreground">
-                            Define procedure steps for respite workflows.
-                        </div>
-                    </div>
-                    <Link href="/respite/procedures/create">
-                        <Button size="sm">New Template</Button>
-                    </Link>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={BookOpen}
+                        title="Procedure Templates"
+                        description="Define procedure steps for respite workflows."
+                        stats={[
+                            { label: 'Templates', value: templates.data.length },
+                        ]}
+                        actions={
+                            <Link href="/respite/procedures/create">
+                                <Button size="sm" variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    New Template
+                                </Button>
+                            </Link>
+                        }
+                    />
+                }
+            >
                 <RespiteSubnav />
 
                 <div className="space-y-2">
@@ -49,7 +59,7 @@ export default function RespiteProceduresIndex({ templates }: Props) {
                         </div>
                     )}
                 </div>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

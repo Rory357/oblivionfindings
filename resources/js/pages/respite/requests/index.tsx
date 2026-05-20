@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -8,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import RespiteSubnav from '@/components/respite-subnav';
 import { formatDateTime } from '@/lib/date-format';
 import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Inbox, Plus } from 'lucide-react';
 
 type Props = {
     requests: any;
@@ -38,50 +40,37 @@ export default function RespiteRequestsIndex({ requests, filters, stats }: Props
         ]}>
             <Head title="Respite Booking Requests" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">Booking Requests</h1>
-                        <div className="mt-1 text-sm text-muted-foreground">
-                            Requests are reviewed and approved before bookings are created.
-                        </div>
-                    </div>
-                    {can.create && (
-                        <Link href="/respite/requests/create">
-                            <Button size="sm">New Request</Button>
-                        </Link>
-                    )}
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Inbox}
+                        title="Booking Requests"
+                        description="Requests are reviewed and approved before bookings are created."
+                        stats={
+                            stats
+                                ? [
+                                      { label: 'Submitted', value: stats.submitted },
+                                      { label: 'Approved', value: stats.approved },
+                                      { label: 'Rejected', value: stats.rejected },
+                                  ]
+                                : [
+                                      { label: 'Total', value: requests.data.length },
+                                  ]
+                        }
+                        actions={
+                            can.create ? (
+                                <Link href="/respite/requests/create">
+                                    <Button size="sm" variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        New Request
+                                    </Button>
+                                </Link>
+                            ) : null
+                        }
+                    />
+                }
+            >
                 <RespiteSubnav />
-
-                {stats && (
-                    <div className="grid gap-4 sm:grid-cols-3">
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-sm font-medium text-muted-foreground">Submitted</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold">{stats.submitted}</div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-sm font-medium text-muted-foreground">Approved</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold">{stats.approved}</div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-sm font-medium text-muted-foreground">Rejected</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold">{stats.rejected}</div>
-                            </CardContent>
-                        </Card>
-                    </div>
-                )}
 
                 <Card>
                     <CardHeader>
@@ -163,7 +152,7 @@ export default function RespiteRequestsIndex({ requests, filters, stats }: Props
                         ))}
                     </div>
                 ) : null}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

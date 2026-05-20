@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -7,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import RespiteSubnav from '@/components/respite-subnav';
 import { formatDateTime } from '@/lib/date-format';
 import { Head, Link, router } from '@inertiajs/react';
+import { ListChecks } from 'lucide-react';
 
 type Props = {
     tasks: { data: any[]; links: any[] };
@@ -42,11 +44,20 @@ export default function TasksIndex({ tasks, staff, filters }: Props) {
         <AppLayout breadcrumbs={[{ title: 'Respite', href: '/respite' }, { title: 'Tasks', href: '/respite/tasks' }]}>
             <Head title="Respite Tasks" />
 
-            <div className="space-y-4">
-                <div>
-                    <h1 className="text-lg font-semibold">Tasks</h1>
-                    <div className="mt-1 text-sm text-muted-foreground">Tasks linked to procedure runs and respite stays.</div>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={ListChecks}
+                        title="Tasks"
+                        description="Tasks linked to procedure runs and respite stays."
+                        stats={[
+                            { label: 'Total', value: tasks.data.length },
+                            { label: 'In progress', value: tasks.data.filter((t: any) => t.status === 'in_progress').length },
+                            { label: 'Urgent', value: tasks.data.filter((t: any) => t.priority === 'urgent').length },
+                        ]}
+                    />
+                }
+            >
                 <RespiteSubnav />
 
                 <Card>
@@ -146,7 +157,7 @@ export default function TasksIndex({ tasks, staff, filters }: Props) {
                         ))}
                     </div>
                 ) : null}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

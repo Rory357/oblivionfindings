@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -7,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import RespiteSubnav from '@/components/respite-subnav';
 import { formatDateTime } from '@/lib/date-format';
 import { Head, router, useForm } from '@inertiajs/react';
+import { Folder } from 'lucide-react';
 
 type Props = {
     allocations: any;
@@ -37,13 +39,19 @@ export default function RespiteResourcesIndex({ allocations, filters, assets }: 
         ]}>
             <Head title="Respite Resources" />
 
-            <div className="space-y-4">
-                <div>
-                    <h1 className="text-lg font-semibold">Resource Allocations</h1>
-                    <div className="mt-1 text-sm text-muted-foreground">
-                        Track bed/room/equipment allocations.
-                    </div>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Folder}
+                        title="Resource Allocations"
+                        description="Track bed/room/equipment allocations."
+                        stats={[
+                            { label: 'Allocations', value: allocations.data.length },
+                            { label: 'Assets', value: assets.length },
+                        ]}
+                    />
+                }
+            >
                 <RespiteSubnav />
 
                 <form
@@ -161,7 +169,7 @@ export default function RespiteResourcesIndex({ allocations, filters, assets }: 
                         ))}
                     </div>
                 ) : null}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
 import { useState } from 'react';
@@ -192,63 +193,29 @@ export default function UsersIndex({ users, filters, roles, stats }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="User Management" />
 
-            <div className="space-y-6">
-                {/* Header */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div>
-                        <h1 className="text-2xl font-semibold tracking-tight">User Management</h1>
-                        <p className="text-muted-foreground">
-                            Manage system users and their organization assignments.
-                        </p>
-                    </div>
-                    <Link href="/system/users/create">
-                        <Button>
-                            <Plus className="h-4 w-4 mr-2" />
-                            Create User
-                        </Button>
-                    </Link>
-                </div>
-
-                {/* Stats */}
-                <div className="grid gap-4 md:grid-cols-4">
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Total Users</CardTitle>
-                            <Users className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">{stats.total}</div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Active</CardTitle>
-                            <UserCheck className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">{stats.active}</div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Pending</CardTitle>
-                            <UserX className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">{stats.pending}</div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="flex flex-row items-center justify-between space-y-0 pb-2">
-                            <CardTitle className="text-sm font-medium">Staff</CardTitle>
-                            <Users className="h-4 w-4 text-muted-foreground" />
-                        </CardHeader>
-                        <CardContent>
-                            <div className="text-2xl font-bold">{stats.staff}</div>
-                        </CardContent>
-                    </Card>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Users}
+                        title="User Management"
+                        description="Manage system users and their organization assignments."
+                        stats={[
+                            { label: 'Total', value: stats.total },
+                            { label: 'Active', value: stats.active },
+                            { label: 'Pending', value: stats.pending },
+                            { label: 'Staff', value: stats.staff },
+                        ]}
+                        actions={
+                            <Link href="/system/users/create">
+                                <Button size="sm">
+                                    <Plus className="h-4 w-4 mr-2" />
+                                    Create User
+                                </Button>
+                            </Link>
+                        }
+                    />
+                }
+            >
                 {/* Main Content */}
                 <Card>
                     <CardHeader>
@@ -583,7 +550,7 @@ export default function UsersIndex({ users, filters, roles, stats }: Props) {
                         )}
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
 
             {/* Delete Dialog */}
             <Dialog open={!!deletingUser} onOpenChange={() => setDeletingUser(null)}>

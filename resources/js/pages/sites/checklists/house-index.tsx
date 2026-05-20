@@ -1,5 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm, router } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -31,6 +32,7 @@ import {
 import { Checkbox } from '@/components/ui/checkbox';
 import {
     ClipboardCheck,
+    Home,
     Plus,
     PlayCircle,
     CheckCircle2,
@@ -285,24 +287,31 @@ export default function HouseChecklists({ site, templates, runs, rooms, canManag
         ]}>
             <Head title={`${site.name} - Daily Checklists`} />
 
-            <div className="m-4 space-y-6">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-lg font-semibold flex items-center gap-2">
-                            <ClipboardCheck className="w-5 h-5" />
-                            Daily Checklists
-                        </h1>
-                        <p className="text-sm text-muted-foreground">{site.name}</p>
-                    </div>
-                    {canManage && (
-                        <Button onClick={() => setCreateTemplateOpen(true)}>
-                            <Plus className="w-4 h-4 mr-1" />
-                            Create Template
-                        </Button>
-                    )}
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Home}
+                        title="Daily Checklists"
+                        description={site.name}
+                        backHref={`/sites/${site.id}`}
+                        stats={[
+                            { label: 'Templates', value: templates.length },
+                            { label: 'Recent runs', value: runs.length },
+                        ]}
+                        actions={
+                            canManage && (
+                                <Button
+                                    size="sm"
+                                    onClick={() => setCreateTemplateOpen(true)}
+                                >
+                                    <Plus className="w-4 h-4 mr-1" />
+                                    Create Template
+                                </Button>
+                            )
+                        }
+                    />
+                }
+            >
                 {/* Templates Section */}
                 <div>
                     <h2 className="text-base font-semibold flex items-center gap-2 mb-3">
@@ -930,7 +939,7 @@ export default function HouseChecklists({ site, templates, runs, rooms, canManag
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -14,7 +15,7 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
-import { Plus } from 'lucide-react';
+import { Plus, UserMinus } from 'lucide-react';
 
 interface Checklist {
     id: number;
@@ -101,21 +102,32 @@ export default function OffboardingIndex({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Offboarding" />
-            <div className="flex flex-col gap-6 p-6">
-                <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold">
-                        Offboarding Checklists
-                    </h1>
-                    {can.manage && (
-                        <Button asChild>
-                            <Link href="/hr/offboarding/create">
-                                <Plus className="mr-2 h-4 w-4" />
-                                Start Offboarding
-                            </Link>
-                        </Button>
-                    )}
-                </div>
 
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={UserMinus}
+                        title="Offboarding Checklists"
+                        description="Manage employee exits with structured checklists and progress tracking."
+                        stats={[
+                            { label: 'Pending', value: summary.pending },
+                            { label: 'In progress', value: summary.in_progress },
+                            { label: 'Overdue', value: summary.overdue },
+                            { label: 'Completed', value: summary.completed },
+                        ]}
+                        actions={
+                            can.manage && (
+                                <Button asChild>
+                                    <Link href="/hr/offboarding/create">
+                                        <Plus className="mr-2 h-4 w-4" />
+                                        Start Offboarding
+                                    </Link>
+                                </Button>
+                            )
+                        }
+                    />
+                }
+            >
                 <div className="grid gap-3 md:grid-cols-5">
                     <Card>
                         <CardHeader className="pb-2">
@@ -341,7 +353,7 @@ export default function OffboardingIndex({
                         <LaravelPagination links={checklists.links} />
                     </div>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

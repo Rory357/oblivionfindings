@@ -1,15 +1,21 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import RespiteSubnav from '@/components/respite-subnav';
 import { formatDateTime } from '@/lib/date-format';
 import { Head, Link } from '@inertiajs/react';
+import { CalendarCheck } from 'lucide-react';
 
 type Props = {
     bookings: any;
 };
 
 export default function RespiteBookingsIndex({ bookings }: Props) {
+    const totalBookings = bookings.data.length;
+    const confirmedCount = bookings.data.filter((b: any) => b.status === 'confirmed').length;
+    const inProgressCount = bookings.data.filter((b: any) => b.status === 'in_progress').length;
+
     return (
         <AppLayout breadcrumbs={[
             { title: 'Respite', href: '/respite' },
@@ -17,13 +23,20 @@ export default function RespiteBookingsIndex({ bookings }: Props) {
         ]}>
             <Head title="Respite Bookings" />
 
-            <div className="space-y-4">
-                <div>
-                    <h1 className="text-lg font-semibold">Approved Bookings</h1>
-                    <div className="mt-1 text-sm text-muted-foreground">
-                        Central list of bookings created from approved requests.
-                    </div>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={CalendarCheck}
+                        title="Approved Bookings"
+                        description="Central list of bookings created from approved requests."
+                        stats={[
+                            { label: 'Total', value: totalBookings },
+                            { label: 'Confirmed', value: confirmedCount },
+                            { label: 'In progress', value: inProgressCount },
+                        ]}
+                    />
+                }
+            >
                 <RespiteSubnav />
 
                 <div className="space-y-2">
@@ -62,7 +75,7 @@ export default function RespiteBookingsIndex({ bookings }: Props) {
                         </div>
                     )}
                 </div>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

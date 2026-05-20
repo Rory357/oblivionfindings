@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,7 +23,7 @@ import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
-import { AlertTriangle, Grid3X3, Plus } from 'lucide-react';
+import { AlertTriangle, Grid3X3, Plus, Star } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
 type Skill = {
@@ -100,30 +101,42 @@ export default function SkillsIndex({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Skills" />
-            <div className="flex flex-col gap-6 p-6">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-2xl font-bold">Skills</h1>
-                        <p className="text-sm text-muted-foreground">
-                            Manage organisational skills and competencies
-                        </p>
-                    </div>
-                    <div className="flex gap-2">
-                        <Button variant="outline" size="sm" asChild>
-                            <Link href="/hr/skills/matrix">
-                                <Grid3X3 className="mr-1.5 h-4 w-4" />
-                                Skills Matrix
-                            </Link>
-                        </Button>
-                        {can.create && (
-                            <Button size="sm" onClick={() => setOpen(true)}>
-                                <Plus className="mr-1.5 h-4 w-4" />
-                                New Skill
-                            </Button>
-                        )}
-                    </div>
-                </div>
 
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Star}
+                        title="Skills"
+                        description="Manage organisational skills and competencies"
+                        stats={[
+                            { label: 'Skills', value: skills.data.length },
+                            { label: 'Categories', value: categories.length },
+                            { label: 'Gaps', value: skillGaps.length },
+                        ]}
+                        actions={
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    asChild
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                >
+                                    <Link href="/hr/skills/matrix">
+                                        <Grid3X3 className="mr-1.5 h-4 w-4" />
+                                        Skills Matrix
+                                    </Link>
+                                </Button>
+                                {can.create && (
+                                    <Button size="sm" onClick={() => setOpen(true)}>
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        New Skill
+                                    </Button>
+                                )}
+                            </div>
+                        }
+                    />
+                }
+            >
                 {/* Filters */}
                 <div className="flex flex-wrap gap-2">
                     <Button
@@ -251,7 +264,7 @@ export default function SkillsIndex({
                 {skills.links?.length > 3 && (
                     <LaravelPagination links={skills.links} />
                 )}
-            </div>
+            </PageLayout>
 
             {/* Create Skill Dialog */}
             <Dialog open={open} onOpenChange={setOpen}>

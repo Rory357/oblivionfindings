@@ -1,6 +1,7 @@
 import { Head, useForm, router } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -72,20 +73,37 @@ export default function TeTiritiIndex({ auth, obligationsByPrinciple, principles
     return { total, progress: total > 0 ? Math.round(((embedded + implemented) / total) * 100) : 0 };
   };
 
+  const totalObligations = Object.values(obligationsByPrinciple).reduce(
+    (sum, arr) => sum + arr.length,
+    0,
+  );
+  const embeddedCount = Object.values(obligationsByPrinciple).reduce(
+    (sum, arr) => sum + arr.filter(o => o.implementation_status === 'embedded').length,
+    0,
+  );
+
   return (
     <AppLayout>
       <Head title="Te Tiriti o Waitangi" />
-      <div className="flex flex-col gap-6 p-4 md:p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Te Tiriti o Waitangi Framework</h1>
-            <p className="text-muted-foreground mt-1">Obligations and implementation tracking across Te Tiriti principles</p>
-          </div>
-          <Button onClick={() => setShowForm(!showForm)}>
-            <Plus className="w-4 h-4 mr-2" /> New Obligation
-          </Button>
-        </div>
-
+      <PageLayout
+        hero={
+          <PageHero
+            icon={Landmark}
+            title="Te Tiriti o Waitangi Framework"
+            description="Obligations and implementation tracking across Te Tiriti principles"
+            stats={[
+              { label: 'Principles', value: principles.length },
+              { label: 'Obligations', value: totalObligations },
+              { label: 'Embedded', value: embeddedCount },
+            ]}
+            actions={
+              <Button size="sm" onClick={() => setShowForm(!showForm)}>
+                <Plus className="w-4 h-4 mr-2" /> New Obligation
+              </Button>
+            }
+          />
+        }
+      >
         {showForm && (
           <Card className="mb-6">
             <CardHeader><CardTitle>New Te Tiriti Obligation</CardTitle></CardHeader>
@@ -178,7 +196,7 @@ export default function TeTiritiIndex({ auth, obligationsByPrinciple, principles
             </Card>
           );
         })}
-      </div>
+      </PageLayout>
     </AppLayout>
   );
 }

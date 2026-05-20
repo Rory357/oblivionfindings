@@ -1,6 +1,7 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -39,20 +40,33 @@ export default function PolicyIndex({ auth, policies, categories }: Props) {
   const getCategoryLabel = (value: string) =>
     categories.find(c => c.value === value)?.label ?? value;
 
+  const activeCount = policies.data.filter(p => p.status === 'active').length;
+  const needsAttestation = policies.data.filter(p => p.requires_attestation).length;
+
   return (
     <AppLayout>
       <Head title="Governance Policies" />
-      <div className="flex flex-col gap-6 p-4 md:p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Governance Policies</h1>
-            <p className="text-muted-foreground mt-1">Board policies, procedures, and attestation tracking</p>
-          </div>
-          <Link href="/governance/policies/create">
-            <Button><Plus className="w-4 h-4 mr-2" /> New Policy</Button>
-          </Link>
-        </div>
-
+      <PageLayout
+        hero={
+          <PageHero
+            icon={BookOpen}
+            title="Governance Policies"
+            description="Board policies, procedures, and attestation tracking"
+            stats={[
+              { label: 'Total', value: policies.data.length },
+              { label: 'Active', value: activeCount },
+              { label: 'Attestation', value: needsAttestation },
+            ]}
+            actions={
+              <Link href="/governance/policies/create">
+                <Button size="sm">
+                  <Plus className="w-4 h-4 mr-2" /> New Policy
+                </Button>
+              </Link>
+            }
+          />
+        }
+      >
         <div className="grid gap-4">
           {policies.data.map(policy => (
             <Card key={policy.id}>
@@ -110,7 +124,7 @@ export default function PolicyIndex({ auth, policies, categories }: Props) {
             ))}
           </div>
         )}
-      </div>
+      </PageLayout>
     </AppLayout>
   );
 }

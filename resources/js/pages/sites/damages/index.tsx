@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -35,7 +36,6 @@ import {
     Eye,
     Pencil,
     Plus,
-    ShieldAlert,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { ConfirmAction } from '../_confirm-action';
@@ -256,26 +256,35 @@ export default function SiteDamages({
         >
             <Head title={`${site.name} - Damages`} />
 
-            <div className="m-4 space-y-4">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="flex items-center gap-2 text-lg font-semibold">
-                            <ShieldAlert className="h-5 w-5" />
-                            Damage Tracking
-                        </h1>
-                        <p className="text-sm text-muted-foreground">
-                            {site.name}
-                        </p>
-                    </div>
-                    {canCreate && (
-                        <Button onClick={() => setCreateOpen(true)}>
-                            <Plus className="mr-1 h-4 w-4" />
-                            Report Damage
-                        </Button>
-                    )}
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={AlertTriangle}
+                        title="Damage Tracking"
+                        description={site.name}
+                        backHref={`/sites/${site.id}`}
+                        stats={[
+                            { label: 'Open', value: openDamages.length },
+                            { label: 'Total', value: damages.length },
+                            {
+                                label: 'Est. cost',
+                                value: formatCurrency(totalEstimatedCost),
+                            },
+                        ]}
+                        actions={
+                            canCreate && (
+                                <Button
+                                    size="sm"
+                                    onClick={() => setCreateOpen(true)}
+                                >
+                                    <Plus className="mr-1 h-4 w-4" />
+                                    Report Damage
+                                </Button>
+                            )
+                        }
+                    />
+                }
+            >
                 {/* Summary Cards */}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <Card>
@@ -873,7 +882,7 @@ export default function SiteDamages({
                         </form>
                     </DialogContent>
                 </Dialog>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

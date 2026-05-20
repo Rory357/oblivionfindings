@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -208,37 +209,54 @@ export default function SiteLedger({
         >
             <Head title={`${site.name} - Ledger`} />
 
-            <div className="m-4 space-y-4">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="flex items-center gap-2 text-lg font-semibold">
-                            <BookOpen className="h-5 w-5" />
-                            House Ledger
-                        </h1>
-                        <p className="text-sm text-muted-foreground">
-                            {site.name}
-                        </p>
-                    </div>
-                    <div className="flex gap-2">
-                        {canManage && (
-                            <Button
-                                variant="secondary"
-                                onClick={handleReconcile}
-                            >
-                                <CalendarCheck className="mr-1 h-4 w-4" />
-                                Reconcile
-                            </Button>
-                        )}
-                        {canCreate && (
-                            <Button onClick={() => setCreateOpen(true)}>
-                                <Plus className="mr-1 h-4 w-4" />
-                                Add Entry
-                            </Button>
-                        )}
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={BookOpen}
+                        title="House Ledger"
+                        description={site.name}
+                        backHref={`/sites/${site.id}`}
+                        stats={[
+                            {
+                                label: 'Current balance',
+                                value: formatCurrency(ledger.current_balance),
+                            },
+                            {
+                                label: 'Income',
+                                value: formatCurrency(incomeTotal),
+                            },
+                            {
+                                label: 'Expenses',
+                                value: formatCurrency(expenseTotal),
+                            },
+                        ]}
+                        actions={
+                            <div className="flex flex-wrap gap-2">
+                                {canManage && (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={handleReconcile}
+                                        className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                    >
+                                        <CalendarCheck className="mr-1 h-4 w-4" />
+                                        Reconcile
+                                    </Button>
+                                )}
+                                {canCreate && (
+                                    <Button
+                                        size="sm"
+                                        onClick={() => setCreateOpen(true)}
+                                    >
+                                        <Plus className="mr-1 h-4 w-4" />
+                                        Add Entry
+                                    </Button>
+                                )}
+                            </div>
+                        }
+                    />
+                }
+            >
                 {/* Balance Summary Cards */}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <Card className="border-primary/20 bg-primary/5">
@@ -678,7 +696,7 @@ export default function SiteLedger({
                         </form>
                     </DialogContent>
                 </Dialog>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

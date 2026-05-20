@@ -1,9 +1,11 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import RespiteSubnav from '@/components/respite-subnav';
 import { formatDateTime } from '@/lib/date-format';
 import { Head, Link } from '@inertiajs/react';
+import { Home } from 'lucide-react';
 
 type Props = {
     stays: any;
@@ -17,13 +19,20 @@ export default function RespiteStaysIndex({ stays }: Props) {
         ]}>
             <Head title="Respite Stays" />
 
-            <div className="space-y-4">
-                <div>
-                    <h1 className="text-lg font-semibold">Stays</h1>
-                    <div className="mt-1 text-sm text-muted-foreground">
-                        Active and past respite stays.
-                    </div>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Home}
+                        title="Stays"
+                        description="Active and past respite stays."
+                        stats={[
+                            { label: 'Total', value: stays.data.length },
+                            { label: 'Active', value: stays.data.filter((s: any) => s.status === 'active' || s.status === 'in_progress').length },
+                            { label: 'Completed', value: stays.data.filter((s: any) => s.status === 'completed').length },
+                        ]}
+                    />
+                }
+            >
                 <RespiteSubnav />
 
                 <div className="space-y-2">
@@ -58,7 +67,7 @@ export default function RespiteStaysIndex({ stays }: Props) {
                         </div>
                     )}
                 </div>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

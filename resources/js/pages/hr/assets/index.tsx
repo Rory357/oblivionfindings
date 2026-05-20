@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,7 +23,7 @@ import {
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
-import { Plus } from 'lucide-react';
+import { Box, Plus } from 'lucide-react';
 
 interface SelectOption {
     value: string;
@@ -122,27 +123,36 @@ export default function AssetsIndex({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Assets" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">
-                            Asset Management
-                        </h1>
-                        <div className="mt-1 text-sm text-muted-foreground">
-                            Track company assets and their assignments
-                        </div>
-                    </div>
-
-                    {can.manage && (
-                        <Button size="sm" asChild>
-                            <Link href="/hr/assets/create">
-                                <Plus className="mr-1.5 h-4 w-4" />
-                                New Asset
-                            </Link>
-                        </Button>
-                    )}
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Box}
+                        title="Asset Management"
+                        description="Track company assets and their assignments"
+                        stats={[
+                            { label: 'Total', value: assets.data.length },
+                            {
+                                label: 'Assigned',
+                                value: assets.data.filter((a) => a.status === 'assigned').length,
+                            },
+                            {
+                                label: 'Available',
+                                value: assets.data.filter((a) => a.status === 'available').length,
+                            },
+                        ]}
+                        actions={
+                            can.manage && (
+                                <Button size="sm" asChild>
+                                    <Link href="/hr/assets/create">
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        New Asset
+                                    </Link>
+                                </Button>
+                            )
+                        }
+                    />
+                }
+            >
                 {/* Filters */}
                 <Card>
                     <CardHeader>
@@ -307,7 +317,7 @@ export default function AssetsIndex({
                 {assets?.links?.length ? (
                     <LaravelPagination links={assets.links} />
                 ) : null}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

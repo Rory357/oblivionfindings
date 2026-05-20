@@ -1,9 +1,10 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { Home, Building2, Warehouse, FileText } from 'lucide-react';
+import { BarChart3, Home, Building2, Warehouse } from 'lucide-react';
 
 type Site = {
     id: number;
@@ -31,20 +32,21 @@ export default function SiteReportsIndex({ sites }: Props) {
         <AppLayout breadcrumbs={[{ title: 'Reports', href: '/sites/reports' }]}>
             <Head title="Site Reports" />
 
-            <div className="m-4 space-y-4">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-lg font-semibold flex items-center gap-2">
-                            <FileText className="w-5 h-5" />
-                            Site Reports
-                        </h1>
-                        <p className="text-sm text-muted-foreground">
-                            Reporting packs for Houses, Facilities, and Head Office
-                        </p>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={BarChart3}
+                        title="Site Reports"
+                        description="Reporting packs for Houses, Facilities, and Head Office"
+                        stats={[
+                            { label: 'Total sites', value: sites.length },
+                            { label: 'Houses', value: houseCount },
+                            { label: 'Facilities', value: facilityCount },
+                            { label: 'Head office', value: officeCount },
+                        ]}
+                    />
+                }
+            >
                 {/* Report Packs */}
                 <div className="grid gap-4 sm:grid-cols-3">
                     {/* Houses Report Pack */}
@@ -167,7 +169,7 @@ export default function SiteReportsIndex({ sites }: Props) {
                         </div>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

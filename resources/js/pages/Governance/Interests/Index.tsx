@@ -1,6 +1,7 @@
 import { Head, useForm } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -58,20 +59,34 @@ export default function InterestsIndex({ auth, interestsByMember, boardMembers }
     return member?.user?.name ?? 'Unknown';
   };
 
+  const totalInterests = Object.values(interestsByMember).reduce((sum, arr) => sum + arr.length, 0);
+  const activeInterests = Object.values(interestsByMember).reduce(
+    (sum, arr) => sum + arr.filter(i => i.is_active).length,
+    0,
+  );
+
   return (
     <AppLayout>
       <Head title="Interests Register" />
-      <div className="flex flex-col gap-6 p-4 md:p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Board Interests Register</h1>
-            <p className="text-muted-foreground mt-1">Declarations of interests for all board members</p>
-          </div>
-          <Button onClick={() => setShowForm(!showForm)}>
-            <Plus className="w-4 h-4 mr-2" /> Declare Interest
-          </Button>
-        </div>
-
+      <PageLayout
+        hero={
+          <PageHero
+            icon={ClipboardList}
+            title="Board Interests Register"
+            description="Declarations of interests for all board members"
+            stats={[
+              { label: 'Members', value: boardMembers.length },
+              { label: 'Total declarations', value: totalInterests },
+              { label: 'Active', value: activeInterests },
+            ]}
+            actions={
+              <Button size="sm" onClick={() => setShowForm(!showForm)}>
+                <Plus className="w-4 h-4 mr-2" /> Declare Interest
+              </Button>
+            }
+          />
+        }
+      >
         {showForm && (
           <Card className="mb-6">
             <CardHeader><CardTitle>Declare New Interest</CardTitle></CardHeader>
@@ -173,7 +188,7 @@ export default function InterestsIndex({ auth, interestsByMember, boardMembers }
             </Card>
           ))
         )}
-      </div>
+      </PageLayout>
     </AppLayout>
   );
 }

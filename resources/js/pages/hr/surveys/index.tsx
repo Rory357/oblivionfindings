@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -5,7 +6,7 @@ import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
-import { BarChart3, Eye, Plus } from 'lucide-react';
+import { BarChart3, ClipboardList, Eye, Plus } from 'lucide-react';
 
 type Survey = {
     id: number;
@@ -67,27 +68,42 @@ export default function SurveyIndex({ surveys, filters, can }: Props) {
         );
     };
 
+    const totalResponses = surveys.data.reduce(
+        (sum, s) => sum + (s.responses_count || 0),
+        0,
+    );
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Surveys" />
-            <div className="flex flex-col gap-6 p-6">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-2xl font-bold">Employee Surveys</h1>
-                        <p className="text-sm text-muted-foreground">
-                            Create and manage satisfaction surveys
-                        </p>
-                    </div>
-                    {can.create && (
-                        <Button asChild size="sm">
-                            <Link href="/hr/surveys/create">
-                                <Plus className="mr-1.5 h-4 w-4" />
-                                New Survey
-                            </Link>
-                        </Button>
-                    )}
-                </div>
 
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={ClipboardList}
+                        title="Employee Surveys"
+                        description="Create and manage satisfaction surveys"
+                        stats={[
+                            { label: 'Total', value: surveys.data.length },
+                            {
+                                label: 'Active',
+                                value: surveys.data.filter((s) => s.status === 'active').length,
+                            },
+                            { label: 'Responses', value: totalResponses },
+                        ]}
+                        actions={
+                            can.create && (
+                                <Button asChild size="sm">
+                                    <Link href="/hr/surveys/create">
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        New Survey
+                                    </Link>
+                                </Button>
+                            )
+                        }
+                    />
+                }
+            >
                 {/* Status Filter */}
                 <div className="flex gap-2">
                     {['all', 'draft', 'active', 'closed'].map((s) => (
@@ -206,7 +222,7 @@ export default function SurveyIndex({ surveys, filters, can }: Props) {
                 {surveys.links?.length > 3 && (
                     <LaravelPagination links={surveys.links} />
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

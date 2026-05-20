@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -7,6 +8,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import RespiteSubnav from '@/components/respite-subnav';
 import { formatDateTime } from '@/lib/date-format';
 import { Head, Link, router } from '@inertiajs/react';
+import { ShieldAlert, Plus } from 'lucide-react';
 
 type Props = {
     activations: { data: any[]; links: any[] };
@@ -42,16 +44,28 @@ export default function RiskPlanActivationsIndex({ activations, filters, planTyp
         <AppLayout breadcrumbs={[{ title: 'Respite', href: '/respite' }, { title: 'Risk Plan Activations', href: '/respite/risk-plan-activations' }]}>
             <Head title="Risk Plan Activations" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">Risk Plan Activations</h1>
-                        <div className="mt-1 text-sm text-muted-foreground">Activated risk plans for respite stays.</div>
-                    </div>
-                    <Link href="/respite/risk-plan-activations/create">
-                        <Button size="sm">New Activation</Button>
-                    </Link>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={ShieldAlert}
+                        title="Risk Plan Activations"
+                        description="Activated risk plans for respite stays."
+                        stats={[
+                            { label: 'Total', value: activations.data.length },
+                            { label: 'Active', value: activations.data.filter((a: any) => a.status === 'active').length },
+                            { label: 'Pending review', value: activations.data.filter((a: any) => a.status === 'pending_review').length },
+                        ]}
+                        actions={
+                            <Link href="/respite/risk-plan-activations/create">
+                                <Button size="sm" variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    New Activation
+                                </Button>
+                            </Link>
+                        }
+                    />
+                }
+            >
                 <RespiteSubnav />
 
                 <Card>
@@ -133,7 +147,7 @@ export default function RiskPlanActivationsIndex({ activations, filters, planTyp
                         ))}
                     </div>
                 ) : null}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

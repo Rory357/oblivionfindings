@@ -1,8 +1,10 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import RespiteSubnav from '@/components/respite-subnav';
 import { formatDateTime } from '@/lib/date-format';
 import { Head } from '@inertiajs/react';
+import { Calendar } from 'lucide-react';
 
 type Props = {
     events: any[];
@@ -17,13 +19,19 @@ export default function RespiteCalendar({ events, bookings }: Props) {
         ]}>
             <Head title="Respite Calendar" />
 
-            <div className="space-y-4">
-                <div>
-                    <h1 className="text-lg font-semibold">Respite Calendar</h1>
-                    <div className="mt-1 text-sm text-muted-foreground">
-                        Respite bookings and stays (module view).
-                    </div>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Calendar}
+                        title="Respite Calendar"
+                        description="Respite bookings and stays (module view)."
+                        stats={[
+                            { label: 'Events', value: events.length },
+                            { label: 'Bookings', value: bookings.length },
+                        ]}
+                    />
+                }
+            >
                 <RespiteSubnav />
 
                 <Card>
@@ -58,7 +66,7 @@ export default function RespiteCalendar({ events, bookings }: Props) {
                         </CardContent>
                     </Card>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

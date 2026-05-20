@@ -1,12 +1,13 @@
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, useForm } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Badge } from '@/components/ui/badge';
-import { LayoutGrid, Plus, ArrowLeft, MapPin, Trash2 } from 'lucide-react';
+import { LayoutGrid, Map, MapPin, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { ConfirmAction } from '../_confirm-action';
 
@@ -83,28 +84,26 @@ export default function SiteZones({ site, zones }: Props) {
         ]}>
             <Head title={`${site.name} - Zones`} />
 
-            <div className="m-4 max-w-4xl mx-auto space-y-4">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div>
-                        <Button asChild variant="ghost" size="sm" className="mb-2">
-                            <Link href={`/sites/${site.id}`}>
-                                <ArrowLeft className="w-4 h-4 mr-1" />
-                                Back
-                            </Link>
-                        </Button>
-                        <h1 className="text-lg font-semibold flex items-center gap-2">
-                            <LayoutGrid className="w-5 h-5" />
-                            Areas & Zones
-                        </h1>
-                        <p className="text-sm text-muted-foreground">{site.name}</p>
-                    </div>
-                    <Button onClick={() => setShowForm(true)}>
-                        <Plus className="w-4 h-4 mr-1" />
-                        Add Zone
-                    </Button>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Map}
+                        title="Areas & Zones"
+                        description={site.name}
+                        backHref={`/sites/${site.id}`}
+                        stats={[
+                            { label: 'Total', value: zones.length },
+                            { label: 'Active', value: activeZones.length },
+                        ]}
+                        actions={
+                            <Button size="sm" onClick={() => setShowForm(true)}>
+                                <Plus className="w-4 h-4 mr-1" />
+                                Add Zone
+                            </Button>
+                        }
+                    />
+                }
+            >
                 {/* Stats */}
                 <div className="grid gap-4 sm:grid-cols-2">
                     <Card>
@@ -225,7 +224,7 @@ export default function SiteZones({ site, zones }: Props) {
                         )}
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

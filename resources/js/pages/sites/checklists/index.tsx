@@ -1,5 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, useForm, router } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -134,46 +135,27 @@ export default function SiteChecklists({
         <AppLayout breadcrumbs={[{ title: 'Sites', href: '/sites' }, { title: site.name, href: `/sites/${site.id}` }, { title: 'Checklists', href: `/sites/${site.id}/checklists` }]}>
             <Head title={`${site.name} - Checklists`} />
 
-            <div className="m-4 space-y-4">
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-primary-foreground md:p-8">
-                    <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-primary-foreground/5" />
-                    <div className="pointer-events-none absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-primary-foreground/5" />
-                    <div className="pointer-events-none absolute top-1/4 right-1/3 h-24 w-24 rounded-full bg-primary-foreground/5" />
-
-                    <div className="relative flex flex-col items-center gap-6 md:flex-row md:items-start">
-                        {/* Icon avatar */}
-                        <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full border-4 border-primary-foreground/20 bg-primary-foreground/10 shadow-xl md:h-28 md:w-28">
-                            <ClipboardCheck className="h-12 w-12 text-primary-foreground md:h-14 md:w-14" />
-                        </div>
-
-                        {/* Info */}
-                        <div className="min-w-0 flex-1 text-center md:text-left">
-                            <h1 className="text-2xl font-bold md:text-3xl">
-                                Checklists &amp; Walkthroughs
-                            </h1>
-                            <p className="mt-0.5 text-sm text-primary-foreground/70">
-                                {site.name}
-                            </p>
-
-                            <div className="mt-3 flex flex-wrap items-center justify-center gap-2 md:justify-start">
-                                <Badge className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground">
-                                    {assignments.length} assigned
-                                </Badge>
-                                <Badge className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground">
-                                    {availableTemplates.length} available to
-                                    add
-                                </Badge>
-                            </div>
-                        </div>
-
-                        {/* Right: actions */}
-                        <div className="flex flex-col items-center gap-3 md:items-end">
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={ClipboardCheck}
+                        title="Checklists & Walkthroughs"
+                        description={site.name}
+                        backHref={`/sites/${site.id}`}
+                        stats={[
+                            { label: 'Assigned', value: assignments.length },
+                            {
+                                label: 'Available',
+                                value: availableTemplates.length,
+                            },
+                        ]}
+                        actions={
                             <div className="flex flex-wrap gap-2">
                                 <Button
                                     asChild
                                     size="sm"
                                     variant="outline"
-                                    className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
                                 >
                                     <Link
                                         href={`/sites/${site.id}/checklists/runs`}
@@ -183,18 +165,16 @@ export default function SiteChecklists({
                                 </Button>
                                 <Button
                                     size="sm"
-                                    variant="outline"
-                                    className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
                                     onClick={() => setAssignOpen(true)}
                                 >
                                     <Plus className="mr-1 h-4 w-4" />
                                     Assign checklist
                                 </Button>
                             </div>
-                        </div>
-                    </div>
-                </div>
-
+                        }
+                    />
+                }
+            >
                 {/* Assign Dialog */}
                 <Dialog open={assignOpen} onOpenChange={setAssignOpen}>
                     <DialogContent>
@@ -381,7 +361,7 @@ export default function SiteChecklists({
                         ))
                     )}
                 </div>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

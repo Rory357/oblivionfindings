@@ -1,6 +1,7 @@
 import { Head, Link } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -30,20 +31,33 @@ export default function CeoReportsIndex({ auth, reports }: Props) {
     presented: 'bg-status-success-bg text-status-success',
   }[status] || 'bg-muted text-foreground');
 
+  const submittedCount = reports.data.filter(r => r.status === 'submitted').length;
+  const presentedCount = reports.data.filter(r => r.status === 'presented').length;
+
   return (
     <AppLayout>
       <Head title="CEO Board Reports" />
-      <div className="flex flex-col gap-6 p-4 md:p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">CEO Board Reports</h1>
-            <p className="text-muted-foreground mt-1">Monthly CEO reports to the board</p>
-          </div>
-          <Link href="/governance/ceo-reports/create">
-            <Button><Plus className="w-4 h-4 mr-2" /> New Report</Button>
-          </Link>
-        </div>
-
+      <PageLayout
+        hero={
+          <PageHero
+            icon={FileText}
+            title="CEO Board Reports"
+            description="Monthly CEO reports to the board"
+            stats={[
+              { label: 'Total', value: reports.data.length },
+              { label: 'Submitted', value: submittedCount },
+              { label: 'Presented', value: presentedCount },
+            ]}
+            actions={
+              <Link href="/governance/ceo-reports/create">
+                <Button size="sm">
+                  <Plus className="w-4 h-4 mr-2" /> New Report
+                </Button>
+              </Link>
+            }
+          />
+        }
+      >
         <div className="grid gap-4">
           {reports.data.map(report => (
             <Card key={report.id}>
@@ -73,7 +87,7 @@ export default function CeoReportsIndex({ auth, reports }: Props) {
             <Card><CardContent className="p-8 text-center text-muted-foreground">No CEO reports yet.</CardContent></Card>
           )}
         </div>
-      </div>
+      </PageLayout>
     </AppLayout>
   );
 }

@@ -1,8 +1,9 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import { useState } from 'react';
-import { ArrowLeft, User, Users, UserCircle } from 'lucide-react';
+import { User, UserCircle, UserPlus, Users } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -109,24 +110,18 @@ export default function CreateUser({ clients, roles, can }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Create User" />
 
-            <div className="space-y-6 max-w-3xl">
-                {/* Header */}
-                <div>
-                    <div className="flex items-center gap-2 mb-2">
-                        <Link href="/system/users">
-                            <Button variant="ghost" size="sm">
-                                <ArrowLeft className="h-4 w-4 mr-1" />
-                                Back
-                            </Button>
-                        </Link>
-                    </div>
-                    <h1 className="text-2xl font-semibold tracking-tight">Create User</h1>
-                    <p className="text-muted-foreground">
-                        Create a new user account and assign their organization role.
-                    </p>
-                </div>
-
-                <form onSubmit={handleSubmit} className="space-y-6">
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/system/users"
+                        icon={UserPlus}
+                        title="Create User"
+                        description="Create a new user account and assign their organization role."
+                    />
+                }
+            >
+                <form onSubmit={handleSubmit} className="space-y-6 max-w-3xl">
                     {/* User Type Selection */}
                     <Card>
                         <CardHeader>
@@ -583,7 +578,7 @@ export default function CreateUser({ clients, roles, can }: Props) {
                         </Button>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

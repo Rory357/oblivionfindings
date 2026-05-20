@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -383,29 +384,32 @@ export default function GoalsIndex({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Goals & OKRs" />
-            <div className="flex flex-col gap-6 p-6">
-                {/* Header — clean and simple */}
-                <div className="flex items-start justify-between gap-4">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">
-                            Goals & OKRs
-                        </h1>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            {analytics.active} active · {analytics.completed}{' '}
-                            completed · {analytics.completion_rate}% completion
-                            rate
-                        </p>
-                    </div>
-                    {can.manage && (
-                        <Button asChild>
-                            <Link href="/hr/goals/create">
-                                <Plus className="mr-1.5 h-4 w-4" /> New
-                                Objective
-                            </Link>
-                        </Button>
-                    )}
-                </div>
 
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Target}
+                        title="Goals & OKRs"
+                        description="Track objectives, key results, and team alignment across the organisation."
+                        stats={[
+                            { label: 'Active', value: analytics.active },
+                            { label: 'Completed', value: analytics.completed },
+                            { label: 'Completion', value: `${analytics.completion_rate}%` },
+                            { label: 'Overdue', value: analytics.overdue },
+                        ]}
+                        actions={
+                            can.manage && (
+                                <Button asChild>
+                                    <Link href="/hr/goals/create">
+                                        <Plus className="mr-1.5 h-4 w-4" /> New
+                                        Objective
+                                    </Link>
+                                </Button>
+                            )
+                        }
+                    />
+                }
+            >
                 {/* Tabs */}
                 <Tabs defaultValue="all">
                     <TabsList className="flex h-auto w-full flex-wrap gap-1">
@@ -845,7 +849,7 @@ export default function GoalsIndex({
                         </div>
                     </TabsContent>
                 </Tabs>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

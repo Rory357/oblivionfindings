@@ -1,5 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -95,21 +96,26 @@ export default function SiteInspections({ site, schedules, records }: Props) {
         <AppLayout breadcrumbs={[{ title: 'Sites', href: '/sites' }, { title: site.name, href: `/sites/${site.id}` }, { title: 'Inspections', href: `/sites/${site.id}/inspections` }]}>
             <Head title={`${site.name} - Inspections`} />
 
-            <div className="m-4 space-y-4">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-lg font-semibold flex items-center gap-2">
-                            <ClipboardCheck className="w-5 h-5" />
-                            Inspections & Maintenance
-                        </h1>
-                        <p className="text-sm text-muted-foreground">{site.name}</p>
-                    </div>
-                    <Button onClick={() => setShowForm(true)}>
-                        <Plus className="w-4 h-4 mr-1" />
-                        Schedule Inspection
-                    </Button>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={ClipboardCheck}
+                        title="Inspections & Maintenance"
+                        description={site.name}
+                        backHref={`/sites/${site.id}`}
+                        stats={[
+                            { label: 'Schedules', value: schedules.length },
+                            { label: 'Recent records', value: records.data.length },
+                        ]}
+                        actions={
+                            <Button size="sm" onClick={() => setShowForm(true)}>
+                                <Plus className="w-4 h-4 mr-1" />
+                                Schedule Inspection
+                            </Button>
+                        }
+                    />
+                }
+            >
                 {/* Add Form */}
                 {showForm && (
                     <Card>
@@ -268,7 +274,7 @@ export default function SiteInspections({ site, schedules, records }: Props) {
                         )}
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

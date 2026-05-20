@@ -1,6 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
 import { type BreadcrumbItem } from '@/types';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -23,7 +24,7 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowDownToLine, ArrowUpFromLine, Download, Plus } from 'lucide-react';
+import { ArrowDownToLine, ArrowUpFromLine, Banknote, Download, Plus } from 'lucide-react';
 import { ChangeEvent, FormEvent, useMemo, useState } from 'react';
 
 type BankAccount = {
@@ -162,22 +163,29 @@ export default function BankTransactionsIndex({ transactions, bankAccounts, filt
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Bank Transactions" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-center lg:justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Bank Transactions</h1>
-                        <p className="text-muted-foreground">
-                            Review imported activity, filter reconciliation queues, and record manual transactions.
-                        </p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                        <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
-                            <DialogTrigger asChild>
-                                <Button variant="outline">
-                                    <Download className="mr-2 h-4 w-4" />
-                                    Import CSV
-                                </Button>
-                            </DialogTrigger>
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Banknote}
+                        title="Bank Transactions"
+                        description="Review imported activity, filter reconciliation queues, and record manual transactions."
+                        stats={[
+                            { label: 'On this page', value: summary.count },
+                            { label: 'Unreconciled', value: summary.unreconciled },
+                            { label: 'Accounts', value: bankAccounts.length },
+                        ]}
+                        actions={
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Dialog open={showImportDialog} onOpenChange={setShowImportDialog}>
+                                    <DialogTrigger asChild>
+                                        <Button
+                                            variant="outline"
+                                            className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                        >
+                                            <Download className="mr-2 h-4 w-4" />
+                                            Import CSV
+                                        </Button>
+                                    </DialogTrigger>
                             <DialogContent className="sm:max-w-lg">
                                 <form onSubmit={handleImportSubmit}>
                                     <DialogHeader>
@@ -353,9 +361,11 @@ export default function BankTransactionsIndex({ transactions, bankAccounts, filt
                                 </form>
                             </DialogContent>
                         </Dialog>
-                    </div>
-                </div>
-
+                            </div>
+                        }
+                    />
+                }
+            >
                 <div className="grid gap-4 md:grid-cols-3">
                     <Card>
                         <CardContent className="pt-6">
@@ -534,7 +544,7 @@ export default function BankTransactionsIndex({ transactions, bankAccounts, filt
                         )}
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

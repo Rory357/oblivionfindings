@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -29,7 +30,7 @@ import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, usePage } from '@inertiajs/react';
-import { Plus, ShieldCheck } from 'lucide-react';
+import { Heart, Plus, ShieldCheck } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
 interface BenefitPlan {
@@ -155,29 +156,40 @@ export default function BenefitsIndex({
     const set = (key: string, value: string) =>
         setForm((prev) => ({ ...prev, [key]: value }));
 
+    const totalEnrolled = Object.values(summary).reduce(
+        (sum, data) => sum + data.total_enrolled,
+        0,
+    );
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Benefits Enrollments" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">
-                            Benefits Enrollments
-                        </h1>
-                        <div className="mt-1 text-sm text-muted-foreground">
-                            Overview of employee benefit plan enrollments
-                        </div>
-                    </div>
-
-                    {can.manage && (
-                        <Button size="sm" onClick={() => setOpen(true)}>
-                            <Plus className="mr-1.5 h-4 w-4" />
-                            Enroll Employee
-                        </Button>
-                    )}
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Heart}
+                        title="Benefits Enrollments"
+                        description="Overview of employee benefit plan enrollments"
+                        stats={[
+                            { label: 'Total enrolled', value: totalEnrolled },
+                            { label: 'Plans', value: plans.length },
+                            {
+                                label: 'Active',
+                                value: enrollments.data.filter((e) => e.status === 'active').length,
+                            },
+                        ]}
+                        actions={
+                            can.manage && (
+                                <Button size="sm" onClick={() => setOpen(true)}>
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    Enroll Employee
+                                </Button>
+                            )
+                        }
+                    />
+                }
+            >
                 {/* Summary Cards */}
                 {Object.keys(summary).length > 0 && (
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -382,7 +394,7 @@ export default function BenefitsIndex({
                 {enrollments?.links?.length ? (
                     <LaravelPagination links={enrollments.links} />
                 ) : null}
-            </div>
+            </PageLayout>
 
             {/* Enroll Dialog */}
             <Dialog open={open} onOpenChange={setOpen}>

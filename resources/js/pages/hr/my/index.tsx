@@ -4,7 +4,7 @@ import { ClockWidget } from '@/components/dashboard/clock-widget';
 import { DonutChart } from '@/components/dashboard/donut-chart';
 import { MiniSparkline } from '@/components/dashboard/mini-sparkline';
 import { WeeklyHoursChart } from '@/components/dashboard/weekly-hours-chart';
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
@@ -15,9 +15,7 @@ import {
     CalendarDays,
     ChevronRight,
     ClipboardList,
-    DollarSign,
     FileCheck,
-    Heart,
     Megaphone,
     MessageSquare,
     Receipt,
@@ -193,106 +191,60 @@ export default function MyHrIndex({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="My HR" />
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                {/* ============================================= */}
-                {/* ZONE A — Hero Banner                            */}
-                {/* ============================================= */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-primary-foreground shadow-lg md:p-8">
-                    {/* Decorative shapes */}
-                    <div className="absolute -top-12 -right-12 h-48 w-48 rounded-full bg-white/5" />
-                    <div className="absolute -bottom-8 -left-8 h-32 w-32 rounded-full bg-white/5" />
-                    <div className="absolute right-24 bottom-0 h-20 w-20 rounded-full bg-white/5" />
 
-                    <div className="relative grid items-center gap-6 lg:grid-cols-[1fr_auto_1fr]">
-                        {/* Left — Greeting */}
-                        <div className="flex items-center gap-4">
-                            <Avatar className="h-16 w-16 border-2 border-white/30 shadow-md">
-                                <AvatarImage
-                                    src={
-                                        profile?.user?.profile_photo_path ??
-                                        undefined
-                                    }
-                                />
-                                <AvatarFallback className="bg-white/20 text-xl font-bold text-white">
-                                    {userInitials}
-                                </AvatarFallback>
-                            </Avatar>
-                            <div>
-                                <h1 className="text-2xl font-bold md:text-3xl">
-                                    {getGreeting()}, {userName.split(' ')[0]}
-                                </h1>
-                                <p className="text-sm text-white/70">
-                                    {new Date().toLocaleDateString('en-NZ', {
-                                        weekday: 'long',
-                                        day: 'numeric',
-                                        month: 'long',
-                                        year: 'numeric',
-                                    })}
-                                </p>
-                                {profile && (
-                                    <p className="mt-0.5 text-xs text-white/50">
-                                        {profile.position_title}
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Centre — Clock Widget */}
-                        <div className="rounded-xl bg-white/10 px-8 py-5 backdrop-blur-sm">
-                            <ClockWidget
-                                activeClock={activeClock}
-                                todayTotal={todayTotal}
-                            />
-                        </div>
-
-                        {/* Right — Quick Stats */}
-                        <div className="flex items-center justify-end gap-5">
-                            <div className="flex flex-col items-center gap-1 rounded-lg bg-white/10 px-4 py-3">
-                                <Timer className="h-5 w-5 text-white/70" />
-                                <span className="text-xl font-bold">
-                                    {(weeklySummary?.total_hours ?? 0).toFixed(
-                                        1,
-                                    )}
-                                    h
-                                </span>
-                                <span className="text-[10px] text-white/60">
-                                    This Week
-                                </span>
-                                {weeklySparkline.length > 1 && (
+            <PageLayout
+                hero={
+                    <PageHero
+                        avatar={{
+                            src: profile?.user?.profile_photo_path ?? undefined,
+                            fallback: userInitials,
+                        }}
+                        title={`${getGreeting()}, ${userName.split(' ')[0]}`}
+                        description={new Date().toLocaleDateString('en-NZ', {
+                            weekday: 'long',
+                            day: 'numeric',
+                            month: 'long',
+                            year: 'numeric',
+                        })}
+                        stats={[
+                            {
+                                label: 'This Week',
+                                value: `${(weeklySummary?.total_hours ?? 0).toFixed(1)}h`,
+                            },
+                            {
+                                label: 'Latest Pay',
+                                value: latestPayslip
+                                    ? formatNzd(latestPayslip.net_pay)
+                                    : '--',
+                            },
+                            { label: 'Kudos', value: kudosReceived },
+                        ]}
+                    >
+                        <div className="flex flex-wrap items-center gap-3 text-xs text-primary-foreground/70">
+                            {profile && (
+                                <span>{profile.position_title}</span>
+                            )}
+                            {weeklySparkline.length > 1 && (
+                                <span className="inline-flex items-center gap-2">
+                                    <Timer className="h-3.5 w-3.5" />
                                     <MiniSparkline
                                         data={weeklySparkline}
                                         width={64}
                                         height={20}
                                         color="rgba(255,255,255,0.8)"
                                     />
-                                )}
-                            </div>
-
-                            <div className="flex flex-col items-center gap-1 rounded-lg bg-white/10 px-4 py-3">
-                                <DollarSign className="h-5 w-5 text-white/70" />
-                                <span className="text-xl font-bold">
-                                    {latestPayslip
-                                        ? formatNzd(latestPayslip.net_pay)
-                                        : '--'}
                                 </span>
-                                <span className="text-[10px] text-white/60">
-                                    Latest Pay
-                                </span>
-                            </div>
-
-                            <div className="flex flex-col items-center gap-1 rounded-lg bg-white/10 px-4 py-3">
-                                <Heart className="h-5 w-5 text-status-critical" />
-                                <span className="text-xl font-bold">
-                                    {kudosReceived}
-                                </span>
-                                <span className="text-[10px] text-white/60">
-                                    Kudos
-                                </span>
-                            </div>
+                            )}
                         </div>
-                    </div>
-                </div>
-
+                        <div className="mt-3 inline-flex rounded-xl bg-primary-foreground/10 px-6 py-3 backdrop-blur-sm">
+                            <ClockWidget
+                                activeClock={activeClock}
+                                todayTotal={todayTotal}
+                            />
+                        </div>
+                    </PageHero>
+                }
+            >
                 {/* ============================================= */}
                 {/* ZONE B — KPI Metrics                           */}
                 {/* ============================================= */}
@@ -842,7 +794,7 @@ export default function MyHrIndex({
                         </CardContent>
                     </Card>
                 </div>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

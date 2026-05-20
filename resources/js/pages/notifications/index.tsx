@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -287,34 +288,33 @@ export default function NotificationsIndex({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Notification Centre" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                {/* Header */}
-                <div className="mb-6 flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 dark:bg-primary/30">
-                            <Bell className="h-5 w-5 text-primary dark:text-primary" />
-                        </div>
-                        <div>
-                            <h1 className="text-2xl font-bold tracking-tight">
-                                Notification Centre
-                            </h1>
-                            <p className="text-sm text-muted-foreground">
-                                Stay on top of what matters
-                            </p>
-                        </div>
-                    </div>
-                    <Button
-                        variant="default"
-                        size="sm"
-                        disabled={!unread}
-                        className="bg-primary hover:bg-primary"
-                        onClick={markAllRead}
-                    >
-                        <CheckCircle2 className="mr-1.5 h-4 w-4" />
-                        Mark All Read
-                    </Button>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Bell}
+                        title="Notification Centre"
+                        description="Stay on top of what matters"
+                        stats={[
+                            { label: 'Total', value: totalNotifs },
+                            { label: 'Unread', value: unread },
+                            { label: 'Acknowledged', value: acknowledged },
+                            { label: 'Action required', value: requiresAction },
+                        ]}
+                        actions={
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                disabled={!unread}
+                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                onClick={markAllRead}
+                            >
+                                <CheckCircle2 className="mr-1.5 h-4 w-4" />
+                                Mark All Read
+                            </Button>
+                        }
+                    />
+                }
+            >
                 {/* Stats Row */}
                 <div className="mb-6 grid grid-cols-2 gap-3 lg:grid-cols-4">
                     <Card className="border-primary dark:border-primary/30">
@@ -928,7 +928,7 @@ export default function NotificationsIndex({
                         </Card>
                     </div>
                 </div>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

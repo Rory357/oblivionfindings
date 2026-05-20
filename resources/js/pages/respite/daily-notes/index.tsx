@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -9,6 +10,7 @@ import RespiteSubnav from '@/components/respite-subnav';
 import { formatDateTime } from '@/lib/date-format';
 import { Head, Link, router } from '@inertiajs/react';
 import { useState } from 'react';
+import { NotebookPen, Plus } from 'lucide-react';
 
 type Props = {
     notes: { data: any[]; links: any[] };
@@ -48,18 +50,28 @@ export default function DailyNotesIndex({ notes, filters, shiftPeriods }: Props)
         ]}>
             <Head title="Daily Notes" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">Daily Notes</h1>
-                        <div className="mt-1 text-sm text-muted-foreground">
-                            Shift-by-shift wellbeing and activity records for respite stays.
-                        </div>
-                    </div>
-                    <Link href="/respite/daily-notes/create" className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
-                        New Note
-                    </Link>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={NotebookPen}
+                        title="Daily Notes"
+                        description="Shift-by-shift wellbeing and activity records for respite stays."
+                        stats={[
+                            { label: 'Total notes', value: notes.data.length },
+                            { label: 'With concerns', value: notes.data.filter((n: any) => n.has_concerns).length },
+                            { label: 'Incidents', value: notes.data.filter((n: any) => n.incident_occurred).length },
+                        ]}
+                        actions={
+                            <Link href="/respite/daily-notes/create">
+                                <Button size="sm" variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    New Note
+                                </Button>
+                            </Link>
+                        }
+                    />
+                }
+            >
                 <RespiteSubnav />
 
                 <Card>
@@ -170,7 +182,7 @@ export default function DailyNotesIndex({ notes, filters, shiftPeriods }: Props)
                         ))}
                     </div>
                 ) : null}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

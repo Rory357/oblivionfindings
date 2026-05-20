@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -8,6 +9,7 @@ import RespiteSubnav from '@/components/respite-subnav';
 import { formatDateTime } from '@/lib/date-format';
 import { Head, Link, router } from '@inertiajs/react';
 import { useState } from 'react';
+import { Files, Plus } from 'lucide-react';
 
 type Props = {
     packs: { data: any[]; links: any[] };
@@ -33,18 +35,28 @@ export default function EvidencePacksIndex({ packs, filters }: Props) {
         ]}>
             <Head title="Evidence Packs" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">Evidence Packs</h1>
-                        <div className="mt-1 text-sm text-muted-foreground">
-                            Bundled evidence collections for respite stays.
-                        </div>
-                    </div>
-                    <Link href="/respite/evidence-packs/create" className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
-                        New Pack
-                    </Link>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Files}
+                        title="Evidence Packs"
+                        description="Bundled evidence collections for respite stays."
+                        stats={[
+                            { label: 'Total', value: packs.data.length },
+                            { label: 'Sealed', value: packs.data.filter((p: any) => p.sealed_at).length },
+                            { label: 'Draft', value: packs.data.filter((p: any) => p.status === 'draft').length },
+                        ]}
+                        actions={
+                            <Link href="/respite/evidence-packs/create">
+                                <Button size="sm" variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    New Pack
+                                </Button>
+                            </Link>
+                        }
+                    />
+                }
+            >
                 <RespiteSubnav />
 
                 <Card>
@@ -123,7 +135,7 @@ export default function EvidencePacksIndex({ packs, filters }: Props) {
                         ))}
                     </div>
                 ) : null}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

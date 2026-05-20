@@ -1,6 +1,7 @@
 import { Head, Link } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -39,20 +40,33 @@ export default function EvaluationsIndex({ auth, evaluations }: Props) {
     individual: 'Individual',
   }[type] || type);
 
+  const activeCount = evaluations.data.filter(e => e.status === 'active').length;
+  const closedCount = evaluations.data.filter(e => e.status === 'closed').length;
+
   return (
     <AppLayout>
       <Head title="Board Evaluations" />
-      <div className="flex flex-col gap-6 p-4 md:p-6">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <h1 className="text-2xl font-bold text-foreground">Board Evaluations</h1>
-            <p className="text-muted-foreground mt-1">Board and committee performance evaluations</p>
-          </div>
-          <Link href="/governance/evaluations/create">
-            <Button><Plus className="w-4 h-4 mr-2" /> New Evaluation</Button>
-          </Link>
-        </div>
-
+      <PageLayout
+        hero={
+          <PageHero
+            icon={Star}
+            title="Board Evaluations"
+            description="Board and committee performance evaluations"
+            stats={[
+              { label: 'Total', value: evaluations.data.length },
+              { label: 'Active', value: activeCount },
+              { label: 'Closed', value: closedCount },
+            ]}
+            actions={
+              <Link href="/governance/evaluations/create">
+                <Button size="sm">
+                  <Plus className="w-4 h-4 mr-2" /> New Evaluation
+                </Button>
+              </Link>
+            }
+          />
+        }
+      >
         <div className="grid gap-4">
           {evaluations.data.map(evaluation => (
             <Card key={evaluation.id}>
@@ -81,7 +95,7 @@ export default function EvaluationsIndex({ auth, evaluations }: Props) {
             <Card><CardContent className="p-8 text-center text-muted-foreground">No evaluations yet.</CardContent></Card>
           )}
         </div>
-      </div>
+      </PageLayout>
     </AppLayout>
   );
 }

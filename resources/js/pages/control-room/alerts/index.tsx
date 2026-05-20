@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
@@ -377,22 +378,31 @@ export default function AlertsIndex({
                 }
             />
 
-            <div className="flex flex-col gap-4 p-4 md:p-6">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">
-                            {pageTitle}
-                        </h1>
-                        <p className="text-sm text-muted-foreground">
-                            {pageDescription}
-                        </p>
-                    </div>
-                    <Button variant="outline" size="sm" asChild>
-                        <Link href="/control-room">Dashboard</Link>
-                    </Button>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Bell}
+                        title={pageTitle}
+                        description={pageDescription}
+                        stats={[
+                            { label: 'Total', value: stats.total },
+                            { label: 'Open', value: stats.open },
+                            { label: 'Critical', value: stats.critical },
+                            { label: 'Unassigned', value: stats.unassigned },
+                        ]}
+                        actions={
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                asChild
+                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                            >
+                                <Link href="/control-room">Dashboard</Link>
+                            </Button>
+                        }
+                    />
+                }
+            >
                 {/* Quick filter tabs */}
                 <div className="flex flex-wrap gap-1 rounded-lg border bg-muted/40 p-1">
                     {tabs.map((tab) => (
@@ -855,7 +865,7 @@ export default function AlertsIndex({
                         </div>
                     </div>
                 )}
-            </div>
+            </PageLayout>
 
             {/* Bulk assign dialog */}
             <Dialog open={assignDialogOpen} onOpenChange={setAssignDialogOpen}>

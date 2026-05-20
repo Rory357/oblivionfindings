@@ -1,7 +1,9 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Head, Link } from '@inertiajs/react';
+import { FileText } from 'lucide-react';
 
 type Props = {
     auth: any;
@@ -9,24 +11,32 @@ type Props = {
 };
 
 export default function IncidentTemplateIndex({ auth, templates }: Props) {
+    const activeCount = templates.filter((t) => t.is_active).length;
+
     return (
         <AppLayout breadcrumbs={[{ title: 'Incidents', href: '/incidents' }, { title: 'Templates', href: '/incidents/templates' }]}>
             <Head title="Incident templates" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">Incident templates</h1>
-                        <div className="mt-1 text-sm text-muted-foreground">Prefill incident reporting fields</div>
-                    </div>
-
-                    {(auth.can as any)?.incidents?.templatesManage && (
-                        <Link href="/incidents/templates/create">
-                            <Button size="sm">New template</Button>
-                        </Link>
-                    )}
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={FileText}
+                        title="Incident templates"
+                        description="Prefill incident reporting fields"
+                        stats={[
+                            { label: 'Total', value: templates.length },
+                            { label: 'Active', value: activeCount },
+                        ]}
+                        actions={
+                            (auth.can as any)?.incidents?.templatesManage ? (
+                                <Link href="/incidents/templates/create">
+                                    <Button size="sm">New template</Button>
+                                </Link>
+                            ) : null
+                        }
+                    />
+                }
+            >
                 <div className="space-y-2">
                     {templates.map((t) => (
                         <Card key={t.id}>
@@ -51,7 +61,7 @@ export default function IncidentTemplateIndex({ auth, templates }: Props) {
                     ))}
                     {!templates.length && <div className="text-sm text-muted-foreground">No templates yet.</div>}
                 </div>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }
