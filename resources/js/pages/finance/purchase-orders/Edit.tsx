@@ -6,6 +6,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero, PageLayout } from '@/components/page';
 import { useState, useCallback } from 'react';
 
 type Option = { id: number; name: string; code?: string };
@@ -137,9 +138,16 @@ export default function PurchaseOrderEdit() {
     return (
         <AppLayout breadcrumbs={[{ title: 'Finance', href: '/finance/dashboard' }, { title: 'Purchase Orders', href: '/finance/purchase-orders' }, { title: po.po_number, href: `/finance/purchase-orders/${po.id}` }, { title: 'Edit', href: '#' }]}>
             <Head title={`Edit ${po.po_number}`} />
-            <div className="space-y-4 p-4">
-                <h1 className="text-xl font-semibold">Edit {po.po_number}</h1>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref={`/finance/purchase-orders/${po.id}`}
+                        title={`Edit ${po.po_number}`}
+                        description="Update purchase order details"
+                    />
+                }
+            >
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <Card>
                         <CardHeader>
@@ -341,7 +349,7 @@ export default function PurchaseOrderEdit() {
                         </Button>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -448,80 +449,78 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
         >
             <Head title={`Safeguarding ${concern.reference_number}`} />
 
-            <div className="space-y-6">
-                {/* ------------------------------------------------------------------ */}
-                {/* Header                                                              */}
-                {/* ------------------------------------------------------------------ */}
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-xl font-semibold flex items-center gap-2">
-                            {concern.severity === 'critical' && (
-                                <AlertTriangle className="h-5 w-5 text-status-critical" />
-                            )}
-                            {concern.reference_number}
-                        </h1>
-                        <div className="mt-2 flex flex-wrap gap-2">
-                            <Badge className={severityColor(concern.severity)}>
-                                {label(concern.severity)}
-                            </Badge>
-                            <Badge className={statusColor(concern.status)}>
-                                {label(concern.status)}
-                            </Badge>
-                            {concern.requires_external_referral && (
-                                <Badge
-                                    variant="outline"
-                                    className="border-primary bg-primary/10 text-primary"
-                                >
-                                    <ExternalLink className="mr-1 h-3 w-3" />
-                                    External Referral Required
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Shield}
+                        backHref="/safeguarding"
+                        backLabel="Back to list"
+                        title={
+                            <span className="flex items-center gap-2">
+                                {concern.severity === 'critical' && (
+                                    <AlertTriangle className="h-5 w-5 text-primary-foreground" />
+                                )}
+                                {concern.reference_number}
+                            </span>
+                        }
+                        description={
+                            <span className="flex flex-wrap gap-2">
+                                <Badge className={severityColor(concern.severity)}>
+                                    {label(concern.severity)}
                                 </Badge>
-                            )}
-                            {concern.subject_informed === false && (
-                                <Badge
-                                    variant="outline"
-                                    className="border-status-warning/30 bg-status-warning-bg text-status-warning"
-                                >
-                                    Subject Not Informed
+                                <Badge className={statusColor(concern.status)}>
+                                    {label(concern.status)}
                                 </Badge>
-                            )}
-                        </div>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                        <Link
-                            href="/safeguarding"
-                            className="inline-flex items-center rounded-md border px-3 py-2 text-xs font-medium hover:bg-muted"
-                        >
-                            Back to list
-                        </Link>
-                        {canUpdate && !isClosed && (
-                            <>
-                                <Link href={`/safeguarding/${concern.id}/edit`}>
-                                    <Button size="sm" variant="outline">
-                                        <Pencil className="mr-1 h-3.5 w-3.5" />
-                                        Edit
+                                {concern.requires_external_referral && (
+                                    <Badge
+                                        variant="outline"
+                                        className="border-primary bg-primary/10 text-primary"
+                                    >
+                                        <ExternalLink className="mr-1 h-3 w-3" />
+                                        External Referral Required
+                                    </Badge>
+                                )}
+                                {concern.subject_informed === false && (
+                                    <Badge
+                                        variant="outline"
+                                        className="border-status-warning/30 bg-status-warning-bg text-status-warning"
+                                    >
+                                        Subject Not Informed
+                                    </Badge>
+                                )}
+                            </span>
+                        }
+                        actions={
+                            canUpdate && !isClosed ? (
+                                <>
+                                    <Link href={`/safeguarding/${concern.id}/edit`}>
+                                        <Button size="sm" variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                            <Pencil className="mr-1 h-3.5 w-3.5" />
+                                            Edit
+                                        </Button>
+                                    </Link>
+                                    <Button size="sm" variant="outline" onClick={() => setAssignOpen(true)} className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                        <UserCheck className="mr-1 h-3.5 w-3.5" />
+                                        Assign
                                     </Button>
-                                </Link>
-                                <Button size="sm" variant="outline" onClick={() => setAssignOpen(true)}>
-                                    <UserCheck className="mr-1 h-3.5 w-3.5" />
-                                    Assign
-                                </Button>
-                                <Button size="sm" variant="outline" onClick={() => setStatusOpen(true)}>
-                                    <Clock className="mr-1 h-3.5 w-3.5" />
-                                    Update Status
-                                </Button>
-                                <Button
-                                    size="sm"
-                                    variant="destructive"
-                                    onClick={() => setCloseOpen(true)}
-                                >
-                                    <XCircle className="mr-1 h-3.5 w-3.5" />
-                                    Close
-                                </Button>
-                            </>
-                        )}
-                    </div>
-                </div>
-
+                                    <Button size="sm" variant="outline" onClick={() => setStatusOpen(true)} className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                        <Clock className="mr-1 h-3.5 w-3.5" />
+                                        Update Status
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        variant="destructive"
+                                        onClick={() => setCloseOpen(true)}
+                                    >
+                                        <XCircle className="mr-1 h-3.5 w-3.5" />
+                                        Close
+                                    </Button>
+                                </>
+                            ) : undefined
+                        }
+                    />
+                }
+            >
                 {/* ------------------------------------------------------------------ */}
                 {/* Concern Details                                                     */}
                 {/* ------------------------------------------------------------------ */}
@@ -1107,7 +1106,7 @@ export default function SafeguardingShow({ concern, canUpdate, canInvestigate, c
                         )}
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
 
             {/* ================================================================== */}
             {/* DIALOGS                                                             */}

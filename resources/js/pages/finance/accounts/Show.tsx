@@ -13,7 +13,8 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { ArrowLeft, Filter } from 'lucide-react';
+import { PageHero, PageLayout } from '@/components/page';
+import { Filter } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
 type LedgerLine = {
@@ -96,19 +97,15 @@ export default function AccountShow({ account, ledger, filters }: PageProps) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${account.code} - ${account.name}`} />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <Link href={'/finance/accounts'}>
-                            <Button variant="ghost" size="icon">
-                                <ArrowLeft className="h-4 w-4" />
-                            </Button>
-                        </Link>
-                        <div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/finance/accounts"
+                        title={`${account.code} - ${account.name}`}
+                        description={account.description ?? undefined}
+                        actions={
                             <div className="flex items-center gap-3">
-                                <h1 className="text-2xl font-bold tracking-tight">
-                                    {account.code} - {account.name}
-                                </h1>
                                 <Badge variant="outline" className={typeColors[account.type]}>
                                     {typeLabels[account.type]}
                                 </Badge>
@@ -118,20 +115,17 @@ export default function AccountShow({ account, ledger, filters }: PageProps) {
                                 {!account.is_active && (
                                     <Badge variant="secondary">Inactive</Badge>
                                 )}
+                                <div className="text-right">
+                                    <p className="text-xs text-muted-foreground">Current Balance</p>
+                                    <p className="text-xl font-bold font-mono tabular-nums">
+                                        {formatNZD(account.balance)}
+                                    </p>
+                                </div>
                             </div>
-                            {account.description && (
-                                <p className="text-muted-foreground mt-1">{account.description}</p>
-                            )}
-                        </div>
-                    </div>
-                    <div className="text-right">
-                        <p className="text-sm text-muted-foreground">Current Balance</p>
-                        <p className="text-2xl font-bold font-mono tabular-nums">
-                            {formatNZD(account.balance)}
-                        </p>
-                    </div>
-                </div>
-
+                        }
+                    />
+                }
+            >
                 {/* Date Filter */}
                 <Card>
                     <CardContent className="pt-6">
@@ -233,7 +227,7 @@ export default function AccountShow({ account, ledger, filters }: PageProps) {
                         </Table>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

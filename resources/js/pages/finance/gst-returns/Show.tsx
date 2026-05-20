@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { CheckCircle, FileText, Printer } from 'lucide-react';
+import { PageHero, PageLayout } from '@/components/page';
 
 type TaxRate = {
     id: number;
@@ -211,42 +212,49 @@ export default function GstReturnShow({ gstReturn, summary, irdFormData }: PageP
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`GST Return - ${irdFormData.ird_period}`} />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                {/* Header */}
-                <div className="flex items-start justify-between">
-                    <div>
-                        <div className="flex items-center gap-3">
-                            <h1 className="text-2xl font-bold tracking-tight">GST Return</h1>
-                            <Badge variant="outline" className={status.className}>
-                                {status.label}
-                            </Badge>
-                        </div>
-                        <p className="text-muted-foreground">
-                            {formatDate(gstReturn.period_start)} &ndash; {formatDate(gstReturn.period_end)}
-                            {' | '}
-                            {frequencyLabels[gstReturn.filing_frequency]} |{' '}
-                            {basisLabels[gstReturn.basis]} Basis | IRD Period: {gstReturn.ird_period}
-                        </p>
-                        {gstReturn.filed_at && gstReturn.filed_by && (
-                            <p className="mt-1 text-sm text-muted-foreground">
-                                Filed on {formatDateTime(gstReturn.filed_at)} by {gstReturn.filed_by.name}
-                            </p>
-                        )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Button variant="outline" onClick={handlePrint}>
-                            <Printer className="mr-2 h-4 w-4" />
-                            Print
-                        </Button>
-                        {isDraft && (
-                            <Button onClick={handleFile}>
-                                <CheckCircle className="mr-2 h-4 w-4" />
-                                Mark as Filed
-                            </Button>
-                        )}
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/finance/gst-returns"
+                        title={
+                            <span className="flex flex-wrap items-center gap-3">
+                                GST Return
+                                <Badge variant="outline" className={status.className}>
+                                    {status.label}
+                                </Badge>
+                            </span>
+                        }
+                        description={
+                            <>
+                                {formatDate(gstReturn.period_start)} &ndash; {formatDate(gstReturn.period_end)}
+                                {' | '}
+                                {frequencyLabels[gstReturn.filing_frequency]} |{' '}
+                                {basisLabels[gstReturn.basis]} Basis | IRD Period: {gstReturn.ird_period}
+                                {gstReturn.filed_at && gstReturn.filed_by && (
+                                    <span className="mt-1 block text-sm">
+                                        Filed on {formatDateTime(gstReturn.filed_at)} by {gstReturn.filed_by.name}
+                                    </span>
+                                )}
+                            </>
+                        }
+                        actions={
+                            <>
+                                <Button variant="outline" onClick={handlePrint}>
+                                    <Printer className="mr-2 h-4 w-4" />
+                                    Print
+                                </Button>
+                                {isDraft && (
+                                    <Button onClick={handleFile}>
+                                        <CheckCircle className="mr-2 h-4 w-4" />
+                                        Mark as Filed
+                                    </Button>
+                                )}
+                            </>
+                        }
+                    />
+                }
+            >
                 {/* GST101A Form Layout */}
                 <Card>
                     <CardHeader>
@@ -412,7 +420,7 @@ export default function GstReturnShow({ gstReturn, summary, irdFormData }: PageP
                         )}
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

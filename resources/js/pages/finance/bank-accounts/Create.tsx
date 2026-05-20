@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { PageHero, PageLayout } from '@/components/page';
 
 interface GlAccount {
     id: number;
@@ -44,12 +45,16 @@ export default function BankAccountCreate({ glAccounts }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Add Bank Account" />
 
-            <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="mb-6">
-                    <h1 className="text-3xl font-bold text-foreground">Add Bank Account</h1>
-                    <p className="text-muted-foreground mt-1">Register a new bank account for reconciliation</p>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/finance/bank-accounts"
+                        title="Add Bank Account"
+                        description="Register a new bank account for reconciliation"
+                    />
+                }
+            >
                 <Card>
                     <CardHeader>
                         <CardTitle>Account Details</CardTitle>
@@ -177,7 +182,7 @@ export default function BankAccountCreate({ glAccounts }: Props) {
                         </form>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

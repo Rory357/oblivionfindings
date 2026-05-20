@@ -13,7 +13,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { ArrowLeft } from 'lucide-react';
+import { PageHero, PageLayout } from '@/components/page';
 import { FormEvent } from 'react';
 
 type ParentAccount = {
@@ -123,19 +123,16 @@ export default function AccountCreate({ parentAccounts, taxRates, fundingStreams
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Create Account" />
 
-            <div className="mx-auto max-w-3xl space-y-6 p-6">
-                <div className="flex items-center gap-4">
-                    <Link href={'/finance/accounts'}>
-                        <Button variant="ghost" size="icon">
-                            <ArrowLeft className="h-4 w-4" />
-                        </Button>
-                    </Link>
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Create Account</h1>
-                        <p className="text-muted-foreground">Add a new account to the chart of accounts</p>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/finance/accounts"
+                        title="Create Account"
+                        description="Add a new account to the chart of accounts"
+                    />
+                }
+            >
                 <Card>
                     <CardHeader>
                         <CardTitle>Account Details</CardTitle>
@@ -338,7 +335,7 @@ export default function AccountCreate({ parentAccounts, taxRates, fundingStreams
                         </form>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

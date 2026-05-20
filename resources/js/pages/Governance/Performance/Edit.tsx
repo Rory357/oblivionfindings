@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { UserCheck } from 'lucide-react';
+import { PageHero, PageLayout } from '@/components/page';
 
 interface Review {
     id: number;
@@ -48,11 +49,16 @@ export default function EditPerformance({ auth, review }: { auth: any; review: R
             ]}
         >
             <Head title={`Edit: ${review.review_cycle} Review`} />
-            <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex items-center gap-3 mb-6">
-                    <UserCheck className="w-8 h-8 text-status-info" />
-                    <h1 className="text-3xl font-bold text-foreground">Edit Performance Review</h1>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref={`/governance/performance/${review.id}`}
+                        title="Edit Performance Review"
+                        description={`${review.review_cycle} Review`}
+                    />
+                }
+            >
                 <Card>
                     <CardHeader><CardTitle>Review Details</CardTitle></CardHeader>
                     <CardContent>
@@ -112,7 +118,7 @@ export default function EditPerformance({ auth, review }: { auth: any; review: R
                         </form>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

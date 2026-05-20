@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { store as storePerformance } from '@/routes/governance/performance';
 import { Gavel } from 'lucide-react';
+import { PageHero, PageLayout } from '@/components/page';
 
 interface BoardMember {
   id: number;
@@ -47,12 +48,16 @@ export default function CreatePerformance({ auth, boardMembers }: Props) {
     >
       <Head title="New Performance Review" />
 
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3 mb-6">
-            <Gavel className="w-8 h-8 text-primary" />
-            <h1 className="text-3xl font-bold text-foreground">New Performance Review</h1>
-          </div>
-
+      <PageLayout
+        hero={
+          <PageHero
+            variant="compact"
+            backHref="/governance/performance"
+            title="New Performance Review"
+            description="Set up a performance review cycle"
+          />
+        }
+      >
           <Card>
             <CardHeader>
               <CardTitle>Review Details</CardTitle>
@@ -142,7 +147,7 @@ export default function CreatePerformance({ auth, boardMembers }: Props) {
               </form>
             </CardContent>
           </Card>
-      </div>
+      </PageLayout>
     </AppLayout>
   );
 }

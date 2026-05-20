@@ -7,7 +7,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2 } from 'lucide-react';
+import { PageHero, PageLayout } from '@/components/page';
 
 interface ExpenseAccount {
     id: number;
@@ -144,20 +145,16 @@ export default function VendorsEdit({ vendor, expenseAccounts }: Props) {
         >
             <Head title={`Edit ${vendor.name}`} />
 
-            <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex items-center gap-4 mb-6">
-                    <Button variant="ghost" size="sm" asChild>
-                        <Link href={`/finance/vendors/${vendor.id}`}>
-                            <ArrowLeft className="w-4 h-4 mr-1" />
-                            Back
-                        </Link>
-                    </Button>
-                    <div>
-                        <h1 className="text-3xl font-bold text-foreground">Edit Vendor</h1>
-                        <p className="text-muted-foreground mt-1">{vendor.name}</p>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref={`/finance/vendors/${vendor.id}`}
+                        title="Edit Vendor"
+                        description={vendor.name}
+                    />
+                }
+            >
                 <form onSubmit={handleSubmit} className="space-y-6">
                     {/* Details */}
                     <Card>
@@ -523,7 +520,7 @@ export default function VendorsEdit({ vendor, expenseAccounts }: Props) {
                         </Button>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

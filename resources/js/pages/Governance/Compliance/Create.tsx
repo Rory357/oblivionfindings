@@ -9,6 +9,7 @@ import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { store as storeCompliance } from '@/routes/governance/compliance';
 import { Shield } from 'lucide-react';
+import { PageHero, PageLayout } from '@/components/page';
 
 interface Props extends PageProps {
   frameworks: Array<{ value: string; label: string }>;
@@ -42,12 +43,16 @@ export default function CreateCompliance({ auth }: Props) {
     >
       <Head title="New Compliance Obligation" />
 
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-          <div className="flex items-center gap-3 mb-6">
-            <Shield className="w-8 h-8 text-status-info" />
-            <h1 className="text-3xl font-bold text-foreground">New Compliance Obligation</h1>
-          </div>
-
+      <PageLayout
+        hero={
+          <PageHero
+            variant="compact"
+            backHref="/governance/compliance"
+            title="New Compliance Obligation"
+            description="Register a regulatory or framework obligation"
+          />
+        }
+      >
           <Card>
             <CardHeader>
               <CardTitle>Obligation Details</CardTitle>
@@ -150,7 +155,7 @@ export default function CreateCompliance({ auth }: Props) {
               </form>
             </CardContent>
           </Card>
-      </div>
+      </PageLayout>
     </AppLayout>
   );
 }

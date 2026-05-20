@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Head, Link, router } from '@inertiajs/react';
 import { Banknote, CheckCircle, Download, FileText, Play } from 'lucide-react';
+import { PageHero, PageLayout } from '@/components/page';
 import { useState } from 'react';
 
 type PaymentRunItem = {
@@ -85,37 +86,40 @@ export default function PaymentRunShow({ paymentRun }: PageProps) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Payment Run ${paymentRun.run_number}`} />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                {/* Header */}
-                <div className="flex items-start justify-between">
-                    <div>
-                        <h1 className="text-3xl font-bold tracking-tight text-foreground">{paymentRun.run_number}</h1>
-                        <p className="text-muted-foreground mt-1">Payment run details and items</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        {paymentRun.status === 'draft' && (
-                            <Button onClick={handleApprove} disabled={approving} variant="outline">
-                                <CheckCircle className="mr-2 h-4 w-4" />
-                                {approving ? 'Approving...' : 'Approve'}
-                            </Button>
-                        )}
-                        {paymentRun.status === 'approved' && (
-                            <Button onClick={handleProcess} disabled={processingRun}>
-                                <Play className="mr-2 h-4 w-4" />
-                                {processingRun ? 'Processing...' : 'Process'}
-                            </Button>
-                        )}
-                        {paymentRun.status === 'completed' && paymentRun.file_path && (
-                            <a href={`/finance/payment-runs/${paymentRun.id}/download`}>
-                                <Button variant="outline">
-                                    <Download className="mr-2 h-4 w-4" />
-                                    Download Bank File
-                                </Button>
-                            </a>
-                        )}
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/finance/payment-runs"
+                        title={paymentRun.run_number}
+                        description="Payment run details and items"
+                        actions={
+                            <>
+                                {paymentRun.status === 'draft' && (
+                                    <Button onClick={handleApprove} disabled={approving} variant="outline">
+                                        <CheckCircle className="mr-2 h-4 w-4" />
+                                        {approving ? 'Approving...' : 'Approve'}
+                                    </Button>
+                                )}
+                                {paymentRun.status === 'approved' && (
+                                    <Button onClick={handleProcess} disabled={processingRun}>
+                                        <Play className="mr-2 h-4 w-4" />
+                                        {processingRun ? 'Processing...' : 'Process'}
+                                    </Button>
+                                )}
+                                {paymentRun.status === 'completed' && paymentRun.file_path && (
+                                    <a href={`/finance/payment-runs/${paymentRun.id}/download`}>
+                                        <Button variant="outline">
+                                            <Download className="mr-2 h-4 w-4" />
+                                            Download Bank File
+                                        </Button>
+                                    </a>
+                                )}
+                            </>
+                        }
+                    />
+                }
+            >
                 {/* Summary Card */}
                 <Card>
                     <CardHeader>
@@ -264,7 +268,7 @@ export default function PaymentRunShow({ paymentRun }: PageProps) {
                         )}
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

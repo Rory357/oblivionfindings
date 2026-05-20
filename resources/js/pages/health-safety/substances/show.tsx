@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -155,23 +156,24 @@ export default function SubstanceShow({ substance, sites, staff }: Props) {
         >
             <Head title={substance.name} />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">{substance.name}</h1>
-                        <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                            {substance.common_name && <span>{substance.common_name}</span>}
-                            <Badge className={statusColor(substance.status)}>{substance.status}</Badge>
-                            {substance.is_controlled_substance && (
-                                <Badge variant="destructive">Controlled</Badge>
-                            )}
-                        </div>
-                    </div>
-                    <Link href="/health-safety/substances" className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
-                        Back
-                    </Link>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/health-safety/substances"
+                        title={substance.name}
+                        description={
+                            <span className="flex flex-wrap items-center gap-2">
+                                {substance.common_name && <span>{substance.common_name}</span>}
+                                <Badge className={statusColor(substance.status)}>{substance.status}</Badge>
+                                {substance.is_controlled_substance && (
+                                    <Badge variant="destructive">Controlled</Badge>
+                                )}
+                            </span>
+                        }
+                    />
+                }
+            >
                 {/* Basic Info */}
                 <Card>
                     <CardHeader>
@@ -403,7 +405,7 @@ export default function SubstanceShow({ substance, sites, staff }: Props) {
                         </div>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
 
             {/* Upload SDS Dialog */}
             <Dialog open={sdsOpen} onOpenChange={setSdsOpen}>

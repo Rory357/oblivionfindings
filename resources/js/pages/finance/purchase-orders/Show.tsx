@@ -4,6 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { PageHero, PageLayout } from '@/components/page';
 
 type Account = { id: number; code: string; name: string };
 type Vendor = { id: number; name: string };
@@ -83,32 +84,36 @@ export default function PurchaseOrderShow() {
     return (
         <AppLayout breadcrumbs={[{ title: 'Finance', href: '/finance/dashboard' }, { title: 'Purchase Orders', href: '/finance/purchase-orders' }, { title: po.po_number, href: '#' }]}>
             <Head title={`PO ${po.po_number}`} />
-            <div className="space-y-4 p-4">
-                <div className="flex items-start justify-between">
-                    <div>
-                        <div className="flex items-center gap-3">
-                            <h1 className="text-xl font-semibold">{po.po_number}</h1>
-                            <StatusBadge status={po.status} />
-                        </div>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            Vendor: {po.vendor?.name ?? '—'}
-                        </p>
-                    </div>
-                    <div className="flex gap-2">
-                        {canEdit && (
-                            <Link href={`/finance/purchase-orders/${po.id}/edit`}>
-                                <Button variant="outline">Edit</Button>
-                            </Link>
-                        )}
-                        {canApprove && (
-                            <Button onClick={handleApprove}>Approve</Button>
-                        )}
-                        {canConvert && (
-                            <Button variant="outline" onClick={handleConvertToBill}>Convert to Bill</Button>
-                        )}
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/finance/purchase-orders"
+                        title={
+                            <span className="flex flex-wrap items-center gap-3">
+                                {po.po_number}
+                                <StatusBadge status={po.status} />
+                            </span>
+                        }
+                        description={`Vendor: ${po.vendor?.name ?? '—'}`}
+                        actions={
+                            <>
+                                {canEdit && (
+                                    <Link href={`/finance/purchase-orders/${po.id}/edit`}>
+                                        <Button variant="outline">Edit</Button>
+                                    </Link>
+                                )}
+                                {canApprove && (
+                                    <Button onClick={handleApprove}>Approve</Button>
+                                )}
+                                {canConvert && (
+                                    <Button variant="outline" onClick={handleConvertToBill}>Convert to Bill</Button>
+                                )}
+                            </>
+                        }
+                    />
+                }
+            >
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-base">Order Details</CardTitle>
@@ -238,7 +243,7 @@ export default function PurchaseOrderShow() {
                         </CardContent>
                     </Card>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

@@ -9,7 +9,8 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Receipt } from 'lucide-react';
+import { Receipt } from 'lucide-react';
+import { PageHero, PageLayout } from '@/components/page';
 import { FormEvent } from 'react';
 
 interface FundDetails {
@@ -90,24 +91,26 @@ export default function PettyCashShow({ summary, expenseAccounts }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Petty Cash - ${fund.name}`} />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center gap-4">
-                    <Button asChild variant="ghost" size="sm">
-                        <Link href={'/finance/petty-cash'}>
-                            <ArrowLeft className="mr-1 h-4 w-4" />
-                            Back
-                        </Link>
-                    </Button>
-                    <h1 className="text-2xl font-bold tracking-tight">{fund.name}</h1>
-                    {fund.is_active ? (
-                        <Badge variant="outline" className="border-status-success/30 text-status-success">
-                            Active
-                        </Badge>
-                    ) : (
-                        <Badge variant="secondary">Inactive</Badge>
-                    )}
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/finance/petty-cash"
+                        title={
+                            <span className="flex flex-wrap items-center gap-3">
+                                {fund.name}
+                                {fund.is_active ? (
+                                    <Badge variant="outline" className="border-status-success/30 text-status-success">
+                                        Active
+                                    </Badge>
+                                ) : (
+                                    <Badge variant="secondary">Inactive</Badge>
+                                )}
+                            </span>
+                        }
+                    />
+                }
+            >
                 {/* Fund Details */}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <Card>
@@ -299,7 +302,7 @@ export default function PettyCashShow({ summary, expenseAccounts }: Props) {
                         )}
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

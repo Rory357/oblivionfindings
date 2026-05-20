@@ -10,6 +10,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { Head, useForm } from '@inertiajs/react';
 import { Banknote, FileText } from 'lucide-react';
+import { PageHero, PageLayout } from '@/components/page';
 import { useMemo } from 'react';
 
 type BankAccount = {
@@ -87,12 +88,16 @@ export default function PaymentRunCreate({ bankAccounts, bills }: PageProps) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="New Payment Run" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div>
-                    <h1 className="text-2xl font-bold tracking-tight">New Payment Run</h1>
-                    <p className="text-muted-foreground">Select bills to include in a batch payment</p>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/finance/payment-runs"
+                        title="New Payment Run"
+                        description="Select bills to include in a batch payment"
+                    />
+                }
+            >
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <Card>
                         <CardHeader>
@@ -256,7 +261,7 @@ export default function PaymentRunCreate({ bankAccounts, bills }: PageProps) {
                         </Button>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

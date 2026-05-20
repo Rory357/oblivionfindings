@@ -18,6 +18,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { PageProps } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
@@ -244,18 +245,16 @@ export default function BillCreate({
         >
             <Head title="New Bill" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="mb-6 flex items-center justify-between">
-                    <div>
-                        <h1 className="text-3xl font-bold text-foreground">
-                            New Bill
-                        </h1>
-                        <p className="mt-1 text-muted-foreground">
-                            Create a new accounts payable bill
-                        </p>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/finance/bills"
+                        title="New Bill"
+                        description="Create a new accounts payable bill"
+                    />
+                }
+            >
                 <form onSubmit={handleSubmit}>
                     {/* Bill Details */}
                     <Card className="mb-6">
@@ -729,7 +728,7 @@ export default function BillCreate({
                         </Button>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

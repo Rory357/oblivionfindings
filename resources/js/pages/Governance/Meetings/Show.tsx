@@ -38,6 +38,7 @@ import {
   Pencil,
   Send,
 } from 'lucide-react';
+import { PageHero, PageLayout } from '@/components/page';
 import { cn } from '@/lib/utils';
 import { useEffect, useState, FormEvent } from 'react';
 import axios from 'axios';
@@ -352,17 +353,21 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
     >
       <Head title={meeting.title} />
 
-      <div className="flex flex-col gap-6 p-4 md:p-6">
-          {/* Header */}
-          <div className="flex items-start justify-between mb-6">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <h1 className="text-3xl font-bold text-foreground" dusk="meeting-title">{meeting.title}</h1>
+      <PageLayout
+        hero={
+          <PageHero
+            variant="compact"
+            backHref="/governance/meetings"
+            title={
+              <span className="flex flex-wrap items-center gap-3" dusk="meeting-title">
+                {meeting.title}
                 <Badge className={cn(getStatusColor(meeting.status))}>
                   {meeting.status.replace('_', ' ')}
                 </Badge>
-              </div>
-              <div className="flex items-center gap-4 text-muted-foreground">
+              </span>
+            }
+            description={
+              <div className="flex flex-wrap items-center gap-4 text-sm">
                 <span className="flex items-center gap-1">
                   <Calendar className="w-4 h-4" />
                   {formatDate(meeting.scheduled_at)}
@@ -378,27 +383,31 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
                   </span>
                 )}
               </div>
-            </div>
-            <div className="flex gap-2">
-              {canEdit && (
-                <Button variant="outline" asChild>
-                  <Link href={`/governance/meetings/${meeting.id}/edit`}>Edit</Link>
-                </Button>
-              )}
-              {meeting.board_pack ? (
-                <Button asChild>
-                  <Link href={showPack.url({ pack: meeting.board_pack.id })} dusk="view-pack">
-                    <FileDown className="w-4 h-4 mr-2" />
-                    View Pack
-                  </Link>
-                </Button>
-              ) : canEdit ? (
-                <Button onClick={generatePack} disabled={generatingPack} dusk="generate-pack">
-                  {generatingPack ? 'Generating...' : 'Generate Pack'}
-                </Button>
-              ) : null}
-            </div>
-          </div>
+            }
+            actions={
+              <>
+                {canEdit && (
+                  <Button variant="outline" asChild>
+                    <Link href={`/governance/meetings/${meeting.id}/edit`}>Edit</Link>
+                  </Button>
+                )}
+                {meeting.board_pack ? (
+                  <Button asChild>
+                    <Link href={showPack.url({ pack: meeting.board_pack.id })} dusk="view-pack">
+                      <FileDown className="w-4 h-4 mr-2" />
+                      View Pack
+                    </Link>
+                  </Button>
+                ) : canEdit ? (
+                  <Button onClick={generatePack} disabled={generatingPack} dusk="generate-pack">
+                    {generatingPack ? 'Generating...' : 'Generate Pack'}
+                  </Button>
+                ) : null}
+              </>
+            }
+          />
+        }
+      >
           {packMessage && (
             <div className="mb-4 rounded-lg border border-status-info/30 bg-status-info-bg px-4 py-2 text-sm text-status-info">
               {packMessage}
@@ -966,7 +975,7 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
               </div>
             </div>
           </div>
-      </div>
+      </PageLayout>
     </AppLayout>
   );
 }

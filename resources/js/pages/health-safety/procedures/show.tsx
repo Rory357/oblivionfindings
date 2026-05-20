@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -75,32 +76,30 @@ export default function ProcedureShow({ procedure, versions, canApprove, canEdit
         ]}>
             <Head title={procedure.title} />
 
-            <div className="space-y-6">
-                {/* Header */}
-                <Card>
-                    <CardContent className="pt-6">
-                        <div className="flex flex-wrap items-start justify-between gap-4">
-                            <div>
-                                <div className="flex items-center gap-2">
-                                    <FileText className="h-5 w-5 text-status-info" />
-                                    <h1 className="text-xl font-semibold">{procedure.title}</h1>
-                                </div>
-                                <div className="mt-2 flex flex-wrap items-center gap-2">
-                                    {procedure.reference_number && (
-                                        <span className="rounded bg-muted px-2 py-0.5 font-mono text-xs">{procedure.reference_number}</span>
-                                    )}
-                                    <Badge className={categoryBadge(procedure.category)}>
-                                        {procedure.category?.replace(/_/g, ' ')}
-                                    </Badge>
-                                    <Badge className={statusBadge(procedure.status)}>
-                                        {procedure.status?.replace(/_/g, ' ')}
-                                    </Badge>
-                                    <span className="text-xs text-muted-foreground">Version {procedure.version}</span>
-                                </div>
-                            </div>
-                            <div className="flex flex-wrap gap-2">
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={FileText}
+                        backHref="/health-safety/procedures"
+                        title={procedure.title}
+                        description={
+                            <span className="flex flex-wrap items-center gap-2">
+                                {procedure.reference_number && (
+                                    <span className="rounded bg-primary-foreground/10 px-2 py-0.5 font-mono text-xs">{procedure.reference_number}</span>
+                                )}
+                                <Badge className={categoryBadge(procedure.category)}>
+                                    {procedure.category?.replace(/_/g, ' ')}
+                                </Badge>
+                                <Badge className={statusBadge(procedure.status)}>
+                                    {procedure.status?.replace(/_/g, ' ')}
+                                </Badge>
+                                <span className="text-xs text-primary-foreground/70">Version {procedure.version}</span>
+                            </span>
+                        }
+                        actions={
+                            <>
                                 {canSubmitForReview && (
-                                    <Button size="sm" variant="outline" onClick={submitForReview}>
+                                    <Button size="sm" variant="outline" onClick={submitForReview} className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
                                         <Clock className="mr-1.5 h-4 w-4" />
                                         Submit for Review
                                     </Button>
@@ -113,14 +112,14 @@ export default function ProcedureShow({ procedure, versions, canApprove, canEdit
                                 )}
                                 {canEdit && (
                                     <Link href={`/health-safety/procedures/${procedure.id}/edit`}>
-                                        <Button size="sm" variant="outline">Edit</Button>
+                                        <Button size="sm" variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">Edit</Button>
                                     </Link>
                                 )}
-                            </div>
-                        </div>
-                    </CardContent>
-                </Card>
-
+                            </>
+                        }
+                    />
+                }
+            >
                 {/* Purpose & Scope */}
                 <div className="grid gap-4 lg:grid-cols-2">
                     <Card>
@@ -302,7 +301,7 @@ export default function ProcedureShow({ procedure, versions, canApprove, canEdit
                         </div>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

@@ -38,6 +38,7 @@ import {
   BarChart3,
   ArrowUpDown,
 } from 'lucide-react';
+import { PageHero, PageLayout } from '@/components/page';
 import { cn } from '@/lib/utils';
 import { useState, FormEvent } from 'react';
 
@@ -286,37 +287,28 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
     >
       <Head title={`Budget - ${budget.title || budget.fiscal_year}`} />
 
-      <div className="flex flex-col gap-6 p-4 md:p-6">
-        {/* Back Link */}
-        <div className="mb-4">
-          <Link href={budgetsIndex.url()} className="text-sm text-status-info hover:underline">
-            &larr; Back to Budgets
-          </Link>
-        </div>
-
-        {/* Header */}
-        <div className="flex items-start justify-between mb-6">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <Wallet className="w-8 h-8 text-status-success" />
-              <div>
-                <h1 className="text-2xl font-bold text-foreground">{budget.title || `FY${budget.fiscal_year} Budget`}</h1>
-                <p className="text-muted-foreground">Fiscal Year {budget.fiscal_year}</p>
-              </div>
-            </div>
-            <div className="flex items-center gap-2 mt-2">
-              <Badge className={getStatusColor(budget.status)}>{budget.status.replace('_', ' ')}</Badge>
-              <Badge variant="outline">v{budget.version_number}</Badge>
-              {budget.created_by && (
-                <span className="text-sm text-muted-foreground">Created by {budget.created_by.name}</span>
-              )}
-            </div>
-            {budget.description && (
-              <p className="text-muted-foreground mt-2 text-sm">{budget.description}</p>
-            )}
-          </div>
-          <div className="flex gap-2">
-            {canEdit && (
+      <PageLayout
+        hero={
+          <PageHero
+            variant="compact"
+            backHref={budgetsIndex.url()}
+            title={
+              <span className="flex flex-wrap items-center gap-3">
+                {budget.title || `FY${budget.fiscal_year} Budget`}
+                <Badge className={getStatusColor(budget.status)}>{budget.status.replace('_', ' ')}</Badge>
+                <Badge variant="outline">v{budget.version_number}</Badge>
+              </span>
+            }
+            description={
+              <>
+                Fiscal Year {budget.fiscal_year}
+                {budget.created_by && ` · Created by ${budget.created_by.name}`}
+                {budget.description && <span className="mt-2 block text-sm">{budget.description}</span>}
+              </>
+            }
+            actions={
+              <>
+                {canEdit && (
               <Button variant="outline" asChild>
                 <Link href={`/governance/budgets/${budget.id}/edit`}>
                   <Pencil className="w-4 h-4 mr-1" />
@@ -378,9 +370,11 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
                 </Button>
               )
             )}
-          </div>
-        </div>
-
+              </>
+            }
+          />
+        }
+      >
         {/* Summary Cards */}
         <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
           <Card>
@@ -1079,7 +1073,7 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
             </form>
           </DialogContent>
         </Dialog>
-      </div>
+      </PageLayout>
     </AppLayout>
   );
 }

@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -11,7 +12,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, useForm } from '@inertiajs/react';
 
 type Props = {
     sites: Array<{ id: number; name: string }>;
@@ -36,19 +37,16 @@ export default function DrillCreate({ sites }: Props) {
         >
             <Head title="Schedule Drill" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">Schedule Drill</h1>
-                        <div className="mt-1 text-sm text-muted-foreground">
-                            Schedule a new emergency drill for a site
-                        </div>
-                    </div>
-                    <Link href="/health-safety/drills" className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
-                        Back
-                    </Link>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/health-safety/drills"
+                        title="Schedule Drill"
+                        description="Schedule a new emergency drill for a site"
+                    />
+                }
+            >
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-base">Drill Details</CardTitle>
@@ -142,7 +140,7 @@ export default function DrillCreate({ sites }: Props) {
                         </div>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

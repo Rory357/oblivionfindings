@@ -8,6 +8,7 @@ import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import { Play, Lock, CheckCircle } from 'lucide-react';
+import { PageHero, PageLayout } from '@/components/page';
 import { cn } from '@/lib/utils';
 
 interface Question {
@@ -64,23 +65,27 @@ export default function EvaluationShow({ auth, evaluation, boardMembers, myRespo
   return (
     <AppLayout>
       <Head title={evaluation.title} />
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <div>
-            <div className="flex items-center gap-3">
-              <h1 className="text-2xl font-bold" dusk="evaluation-title">{evaluation.title}</h1>
-              <Badge className={cn('text-xs', getStatusColor(evaluation.status))}>{evaluation.status}</Badge>
-            </div>
-            <p className="text-muted-foreground mt-1">
-              Period: {new Date(evaluation.period_start).toLocaleDateString('en-NZ')} - {new Date(evaluation.period_end).toLocaleDateString('en-NZ')}
-            </p>
-          </div>
-          <div className="flex gap-2">
-            {evaluation.status === 'draft' && <Button onClick={handleLaunch}><Play className="w-4 h-4 mr-2" /> Launch</Button>}
-            {evaluation.status === 'active' && <Button variant="outline" onClick={handleClose}><Lock className="w-4 h-4 mr-2" /> Close</Button>}
-          </div>
-        </div>
-
+      <PageLayout
+        hero={
+          <PageHero
+            variant="compact"
+            backHref="/governance/evaluations"
+            title={
+              <span className="flex flex-wrap items-center gap-3" dusk="evaluation-title">
+                {evaluation.title}
+                <Badge className={cn('text-xs', getStatusColor(evaluation.status))}>{evaluation.status}</Badge>
+              </span>
+            }
+            description={`Period: ${new Date(evaluation.period_start).toLocaleDateString('en-NZ')} - ${new Date(evaluation.period_end).toLocaleDateString('en-NZ')}`}
+            actions={
+              <>
+                {evaluation.status === 'draft' && <Button onClick={handleLaunch}><Play className="w-4 h-4 mr-2" /> Launch</Button>}
+                {evaluation.status === 'active' && <Button variant="outline" onClick={handleClose}><Lock className="w-4 h-4 mr-2" /> Close</Button>}
+              </>
+            }
+          />
+        }
+      >
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           <div className="lg:col-span-2">
             {evaluation.status === 'active' && (
@@ -169,7 +174,7 @@ export default function EvaluationShow({ auth, evaluation, boardMembers, myRespo
             </Card>
           </div>
         </div>
-      </div>
+      </PageLayout>
     </AppLayout>
   );
 }

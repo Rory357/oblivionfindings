@@ -14,7 +14,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { ArrowLeft, AlertTriangle } from 'lucide-react';
+import { PageHero, PageLayout } from '@/components/page';
+import { AlertTriangle } from 'lucide-react';
 import { FormEvent } from 'react';
 
 type Account = {
@@ -144,21 +145,16 @@ export default function AccountEdit({ account, parentAccounts, taxRates, funding
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Edit Account - ${account.code}`} />
 
-            <div className="mx-auto max-w-3xl space-y-6 p-6">
-                <div className="flex items-center gap-4">
-                    <Link href={'/finance/accounts'}>
-                        <Button variant="ghost" size="icon">
-                            <ArrowLeft className="h-4 w-4" />
-                        </Button>
-                    </Link>
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Edit Account</h1>
-                        <p className="text-muted-foreground">
-                            Update account {account.code} - {account.name}
-                        </p>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/finance/accounts"
+                        title="Edit Account"
+                        description={`Update account ${account.code} - ${account.name}`}
+                    />
+                }
+            >
                 {account.is_system && (
                     <div className="flex items-center gap-3 rounded-lg border border-status-warning/30 bg-status-warning p-4">
                         <AlertTriangle className="h-5 w-5 text-status-warning shrink-0" />
@@ -387,7 +383,7 @@ export default function AccountEdit({ account, parentAccounts, taxRates, funding
                         </form>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Plus, Trash2 } from 'lucide-react';
+import { PageHero, PageLayout } from '@/components/page';
 
 interface Question {
   text: string;
@@ -40,8 +41,16 @@ export default function EvaluationCreate({ auth }: PageProps) {
   return (
     <AppLayout>
       <Head title="Create Evaluation" />
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <h1 className="text-2xl font-bold text-foreground mb-6">Create Board Evaluation</h1>
+      <PageLayout
+        hero={
+          <PageHero
+            variant="compact"
+            backHref="/governance/evaluations"
+            title="Create Board Evaluation"
+            description="Configure questions and the evaluation period"
+          />
+        }
+      >
         <form onSubmit={handleSubmit}>
           <Card className="mb-6">
             <CardContent className="p-6 space-y-4">
@@ -104,7 +113,7 @@ export default function EvaluationCreate({ auth }: PageProps) {
             </CardContent>
           </Card>
         </form>
-      </div>
+      </PageLayout>
     </AppLayout>
   );
 }

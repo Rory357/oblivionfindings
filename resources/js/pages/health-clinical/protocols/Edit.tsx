@@ -1,8 +1,8 @@
 import ProtocolForm from '@/components/clinical/protocol-form';
-import { Button } from '@/components/ui/button';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link } from '@inertiajs/react';
-import { ArrowLeft } from 'lucide-react';
+import { Head } from '@inertiajs/react';
+import { Stethoscope } from 'lucide-react';
 
 type ClientOption = {
     id: number;
@@ -57,21 +57,17 @@ export default function EditProtocol({
         <AppLayout>
             <Head title="Edit Protocol — Health & Clinical" />
 
-            <div className="mx-auto max-w-4xl space-y-6 p-4 sm:p-6">
-                <div className="flex items-center gap-4">
-                    <Link href="/health-clinical/protocols">
-                        <Button variant="ghost" size="icon">
-                            <ArrowLeft className="h-4 w-4" />
-                        </Button>
-                    </Link>
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Edit Protocol</h1>
-                        <p className="text-sm text-muted-foreground">
-                            Update frontline guidance and monitoring settings for {protocol.name}.
-                        </p>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/health-clinical/protocols"
+                        icon={Stethoscope}
+                        title="Edit Protocol"
+                        description={`Update frontline guidance and monitoring settings for ${protocol.name}.`}
+                    />
+                }
+            >
                 <ProtocolForm
                     mode="edit"
                     submitUrl={`/health-clinical/protocols/${protocol.id}`}
@@ -82,7 +78,7 @@ export default function EditProtocol({
                     protocol={protocol}
                     canEditStructure={can_edit_structure}
                 />
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

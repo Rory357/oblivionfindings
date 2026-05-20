@@ -104,7 +104,7 @@ export default function CateringRecipeEdit({ recipe, tags, products }: Props) {
                 <div className="flex items-start gap-3">
                     <div className="rounded-full bg-primary/10 p-3 text-primary"><ChefHat className="h-6 w-6" /></div>
                     <div>
-                        <h1 className="text-2xl font-semibold">{isNew ? 'New recipe' : `Edit ${recipe!.name}`}</h1>
+                        <h2 className="text-2xl font-semibold">{isNew ? 'New recipe' : `Edit ${recipe!.name}`}</h2>
                         <p className="text-sm text-muted-foreground">Recipes are reusable across all sites for meal planning.</p>
                     </div>
                 </div>

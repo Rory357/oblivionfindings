@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Trash2 } from 'lucide-react';
+import { PageHero, PageLayout } from '@/components/page';
 
 interface Vendor {
     id: number;
@@ -122,14 +123,16 @@ export default function CreditNoteCreate({ auth, vendors, clients, accounts }: P
         >
             <Head title="New Credit Note" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center justify-between mb-6">
-                    <div>
-                        <h1 className="text-3xl font-bold text-foreground">New Credit Note</h1>
-                        <p className="text-muted-foreground mt-1">Create a credit note</p>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/finance/credit-notes"
+                        title="New Credit Note"
+                        description="Create a credit note"
+                    />
+                }
+            >
                 <form onSubmit={handleSubmit}>
                     {/* Credit Note Details */}
                     <Card className="mb-6">
@@ -346,7 +349,7 @@ export default function CreditNoteCreate({ auth, vendors, clients, accounts }: P
                         </Button>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Head, Link } from '@inertiajs/react';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -220,18 +221,15 @@ export default function DeviceShow({ device, signals, alerts }: Props) {
         ]}>
             <Head title={`Device: ${device.name || device.device_uid}`} />
 
-            <div className="flex flex-col gap-4 p-6">
-                {/* Header */}
-                <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-start gap-3">
-                        <div className="mt-1 flex items-center justify-center h-10 w-10 rounded-lg bg-muted">
-                            {typeIcons[device.type] ?? <Cpu className="h-5 w-5" />}
-                        </div>
-                        <div>
-                            <div className="flex items-center gap-2 flex-wrap">
-                                <h1 className="text-2xl font-bold">
-                                    {device.name || device.device_uid}
-                                </h1>
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/control-room/devices"
+                        icon={Cpu}
+                        title={
+                            <span className="flex items-center gap-2 flex-wrap">
+                                <span>{device.name || device.device_uid}</span>
                                 <Badge variant="outline" className={statusBadgeColors[device.status] ?? ''}>
                                     {device.status === 'online' && <Wifi className="h-3 w-3 mr-1" />}
                                     {device.status === 'offline' && <WifiOff className="h-3 w-3 mr-1" />}
@@ -242,8 +240,10 @@ export default function DeviceShow({ device, signals, alerts }: Props) {
                                         Stale
                                     </Badge>
                                 )}
-                            </div>
-                            <div className="flex items-center gap-2 mt-1 text-sm text-muted-foreground">
+                            </span>
+                        }
+                        description={
+                            <span className="flex items-center gap-2">
                                 <Badge variant="secondary" className="text-xs">
                                     {device.type_label}
                                 </Badge>
@@ -252,17 +252,11 @@ export default function DeviceShow({ device, signals, alerts }: Props) {
                                         {[device.vendor, device.model].filter(Boolean).join(' ')}
                                     </span>
                                 )}
-                            </div>
-                        </div>
-                    </div>
-                    <Button variant="outline" size="sm" asChild>
-                        <Link href="/control-room/devices">
-                            <ArrowLeft className="h-4 w-4 mr-1" />
-                            Back
-                        </Link>
-                    </Button>
-                </div>
-
+                            </span>
+                        }
+                    />
+                }
+            >
                 {/* Info Grid */}
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                     {/* Device Info Card */}
@@ -492,7 +486,7 @@ export default function DeviceShow({ device, signals, alerts }: Props) {
                         )}
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

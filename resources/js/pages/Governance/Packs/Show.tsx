@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { CheckCircle, Clock, FileDown, Files, ShieldAlert, Users } from 'lucide-react';
+import { PageHero, PageLayout } from '@/components/page';
 import { cn } from '@/lib/utils';
 import axios from 'axios';
 
@@ -76,32 +77,39 @@ export default function PackShow({ auth, pack, is_distributed, manifestSections,
     >
       <Head title="Board Pack" />
 
-      <div className="mx-auto max-w-5xl px-4 sm:px-6 lg:px-8">
-        <div className="mb-6 flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-          <div className="space-y-2">
-            <h1 className="text-3xl font-bold text-foreground" dusk="pack-heading">Board Pack</h1>
-            <p className="text-sm text-muted-foreground">{pack.meeting.title}</p>
-            <p className="text-xs text-muted-foreground">
-              Generated {new Date(pack.generated_at).toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland' })}
-            </p>
-          </div>
-
-          <div className="flex flex-wrap gap-2">
-            {canManagePack && !is_distributed && (
-              <Button variant="outline" onClick={distributePack} disabled={distributing} dusk="distribute-pack">
-                <Users className="mr-2 h-4 w-4" />
-                {distributing ? 'Distributing...' : 'Distribute Pack'}
-              </Button>
-            )}
-            <Button asChild>
-              <Link href={downloadPack.url({ pack: pack.id })} dusk="download-pack">
-                <FileDown className="mr-2 h-4 w-4" />
-                Download Pack
-              </Link>
-            </Button>
-          </div>
-        </div>
-
+      <PageLayout
+        hero={
+          <PageHero
+            variant="compact"
+            backHref="/governance/meetings"
+            title={<span dusk="pack-heading">Board Pack</span>}
+            description={
+              <>
+                {pack.meeting.title}
+                <span className="mt-1 block text-xs">
+                  Generated {new Date(pack.generated_at).toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland' })}
+                </span>
+              </>
+            }
+            actions={
+              <>
+                {canManagePack && !is_distributed && (
+                  <Button variant="outline" onClick={distributePack} disabled={distributing} dusk="distribute-pack">
+                    <Users className="mr-2 h-4 w-4" />
+                    {distributing ? 'Distributing...' : 'Distribute Pack'}
+                  </Button>
+                )}
+                <Button asChild>
+                  <Link href={downloadPack.url({ pack: pack.id })} dusk="download-pack">
+                    <FileDown className="mr-2 h-4 w-4" />
+                    Download Pack
+                  </Link>
+                </Button>
+              </>
+            }
+          />
+        }
+      >
         <Card className={cn(is_distributed ? 'border-status-success/30 bg-status-success-bg' : 'border-status-warning/30 bg-status-warning-bg')}>
           <CardContent className="flex items-start gap-3 pt-6">
             {is_distributed ? <CheckCircle className="mt-0.5 h-6 w-6 text-status-success" /> : <Clock className="mt-0.5 h-6 w-6 text-status-warning" />}
@@ -213,7 +221,7 @@ export default function PackShow({ auth, pack, is_distributed, manifestSections,
             </div>
           </CardContent>
         </Card>
-      </div>
+      </PageLayout>
     </AppLayout>
   );
 }

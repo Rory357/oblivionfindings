@@ -196,7 +196,7 @@ export default function GovernanceDashboard({ auth, isBoardMember, boardRole }: 
         hero={
           <PageHero
             icon={Landmark}
-            title="Executive & Board Cockpit"
+            title={<span dusk="governance-cockpit-heading">Executive & Board Cockpit</span>}
             description="A single governance map for meetings, plans, risk, compliance, workforce, finance, safety, privacy, and operational control."
             stats={[
               { label: 'Open actions', value: workflow?.summary.total ?? 0 },

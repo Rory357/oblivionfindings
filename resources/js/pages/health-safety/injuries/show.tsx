@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -19,7 +20,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import { ClipboardList, Stethoscope, Briefcase } from 'lucide-react';
 
@@ -228,25 +229,26 @@ export default function InjuryShow({ injury, staff }: Props) {
         >
             <Head title={`Injury #${injury.id}`} />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">Injury #{injury.id}</h1>
-                        <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                            <span>{injury.user?.name ?? 'Unknown'}</span>
-                            <span>{injury.site?.name}</span>
-                            <Badge className={severityColor(injury.severity)}>{injury.severity}</Badge>
-                            <Badge className={statusColor(injury.status)}>{injury.status}</Badge>
-                            {injury.worksafe_notifiable && (
-                                <Badge variant="destructive">WorkSafe Notifiable</Badge>
-                            )}
-                        </div>
-                    </div>
-                    <Link href="/health-safety/injuries" className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
-                        Back
-                    </Link>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/health-safety/injuries"
+                        title={`Injury #${injury.id}`}
+                        description={
+                            <span className="flex flex-wrap items-center gap-2">
+                                <span>{injury.user?.name ?? 'Unknown'}</span>
+                                <span>{injury.site?.name}</span>
+                                <Badge className={severityColor(injury.severity)}>{injury.severity}</Badge>
+                                <Badge className={statusColor(injury.status)}>{injury.status}</Badge>
+                                {injury.worksafe_notifiable && (
+                                    <Badge variant="destructive">WorkSafe Notifiable</Badge>
+                                )}
+                            </span>
+                        }
+                    />
+                }
+            >
                 {/* Injury Details */}
                 <Card>
                     <CardHeader>
@@ -574,7 +576,7 @@ export default function InjuryShow({ injury, staff }: Props) {
                         </div>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
 
             {/* Create RTW Plan Dialog */}
             <Dialog open={rtwOpen} onOpenChange={setRtwOpen}>

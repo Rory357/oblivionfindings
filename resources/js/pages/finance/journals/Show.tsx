@@ -23,7 +23,8 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { CheckCircle, RotateCcw, ArrowLeft, Calendar, User, FileText } from 'lucide-react';
+import { CheckCircle, RotateCcw, Calendar, User, FileText } from 'lucide-react';
+import { PageHero, PageLayout } from '@/components/page';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 
@@ -160,36 +161,26 @@ export default function JournalsShow({ auth, journal }: Props) {
         >
             <Head title={`Journal ${journal.journal_number}`} />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                {/* Back link */}
-                <div className="mb-4">
-                    <Button variant="ghost" size="sm" asChild>
-                        <Link href="/finance/journals">
-                            <ArrowLeft className="w-4 h-4 mr-1" />
-                            Back to Journals
-                        </Link>
-                    </Button>
-                </div>
-
-                {/* Header */}
-                <div className="flex flex-col sm:flex-row items-start sm:items-center justify-between mb-6 gap-4">
-                    <div>
-                        <div className="flex items-center gap-3 mb-1">
-                            <h1 className="text-3xl font-bold text-foreground">{journal.journal_number}</h1>
-                            <Badge className={statusBadge(journal.status)}>
-                                {journal.status.charAt(0).toUpperCase() + journal.status.slice(1)}
-                            </Badge>
-                            <Badge className={typeBadge(journal.type)}>
-                                {journal.type.charAt(0).toUpperCase() + journal.type.slice(1)}
-                            </Badge>
-                        </div>
-                        {journal.description && (
-                            <p className="text-muted-foreground">{journal.description}</p>
-                        )}
-                    </div>
-
-                    <div className="flex gap-2">
-                        {journal.status === 'draft' && (
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/finance/journals"
+                        title={
+                            <span className="flex flex-wrap items-center gap-3">
+                                {journal.journal_number}
+                                <Badge className={statusBadge(journal.status)}>
+                                    {journal.status.charAt(0).toUpperCase() + journal.status.slice(1)}
+                                </Badge>
+                                <Badge className={typeBadge(journal.type)}>
+                                    {journal.type.charAt(0).toUpperCase() + journal.type.slice(1)}
+                                </Badge>
+                            </span>
+                        }
+                        description={journal.description ?? undefined}
+                        actions={
+                            <>
+                                {journal.status === 'draft' && (
                             <Button onClick={handlePost} disabled={posting}>
                                 <CheckCircle className="w-4 h-4 mr-2" />
                                 Post Journal
@@ -234,9 +225,11 @@ export default function JournalsShow({ auth, journal }: Props) {
                                 </DialogContent>
                             </Dialog>
                         )}
-                    </div>
-                </div>
-
+                            </>
+                        }
+                    />
+                }
+            >
                 {/* Meta info */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                     <Card>
@@ -386,7 +379,7 @@ export default function JournalsShow({ auth, journal }: Props) {
                         </Table>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

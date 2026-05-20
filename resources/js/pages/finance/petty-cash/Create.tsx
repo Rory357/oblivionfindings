@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { PageHero, PageLayout } from '@/components/page';
 import { FormEvent } from 'react';
 
 interface Account {
@@ -41,11 +42,16 @@ export default function PettyCashCreate({ accounts, users }: Props) {
         <AppLayout>
             <Head title="New Petty Cash Fund" />
 
-            <div className="mx-auto max-w-2xl space-y-6">
-                <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold">New Petty Cash Fund</h1>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/finance/petty-cash"
+                        title="New Petty Cash Fund"
+                        description="Set up a new petty cash float"
+                    />
+                }
+            >
                 <Card>
                     <CardHeader>
                         <CardTitle>Fund Details</CardTitle>
@@ -134,7 +140,7 @@ export default function PettyCashCreate({ accounts, users }: Props) {
                         </form>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

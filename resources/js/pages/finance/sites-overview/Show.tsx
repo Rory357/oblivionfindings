@@ -25,6 +25,7 @@ import {
     Percent,
     TrendingUp,
 } from 'lucide-react';
+import { PageHero, PageLayout } from '@/components/page';
 import { useMemo, useState } from 'react';
 import {
     Bar,
@@ -205,47 +206,46 @@ export default function SitesFinancialOverview({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Site Financials" />
 
-            <div className="space-y-6 p-6">
-                <div className="flex flex-col gap-4 lg:flex-row lg:items-end lg:justify-between">
-                    <div>
-                        <div className="flex items-center gap-2 text-sm text-muted-foreground">
-                            <BarChart3 className="h-4 w-4" />
-                            Site Financials
-                        </div>
-                        <h1 className="mt-1 text-2xl font-semibold">
-                            All-Sites Comparison
-                        </h1>
-                    </div>
-
-                    <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
-                        <div className="space-y-1.5">
-                            <Label>From</Label>
-                            <Input
-                                type="date"
-                                value={from}
-                                onChange={(event) =>
-                                    setFrom(event.target.value)
-                                }
-                            />
-                        </div>
-                        <div className="space-y-1.5">
-                            <Label>To</Label>
-                            <Input
-                                type="date"
-                                value={to}
-                                onChange={(event) => setTo(event.target.value)}
-                            />
-                        </div>
-                        <Button
-                            type="button"
-                            className="self-end"
-                            onClick={submitFilters}
-                        >
-                            <CalendarDays className="h-4 w-4" />
-                            Apply
-                        </Button>
-                    </div>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/finance/dashboard"
+                        title="All-Sites Comparison"
+                        description="Site Financials"
+                        actions={
+                            <div className="grid gap-2 sm:grid-cols-[1fr_1fr_auto]">
+                                <div className="space-y-1.5">
+                                    <Label>From</Label>
+                                    <Input
+                                        type="date"
+                                        value={from}
+                                        onChange={(event) =>
+                                            setFrom(event.target.value)
+                                        }
+                                    />
+                                </div>
+                                <div className="space-y-1.5">
+                                    <Label>To</Label>
+                                    <Input
+                                        type="date"
+                                        value={to}
+                                        onChange={(event) => setTo(event.target.value)}
+                                    />
+                                </div>
+                                <Button
+                                    type="button"
+                                    className="self-end"
+                                    onClick={submitFilters}
+                                >
+                                    <CalendarDays className="h-4 w-4" />
+                                    Apply
+                                </Button>
+                            </div>
+                        }
+                    />
+                }
+            >
 
                 <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-4">
                     <KpiCard
@@ -510,7 +510,7 @@ export default function SitesFinancialOverview({
                         </div>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

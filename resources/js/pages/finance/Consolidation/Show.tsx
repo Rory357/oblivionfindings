@@ -32,6 +32,7 @@ import {
 import { Building2, Plus, Trash2, Play, Eye, ArrowLeftRight, Calendar, Hash } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 import { Link } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { type BreadcrumbItem } from '@/types';
 
 type Entity = {
@@ -300,26 +301,32 @@ export default function ConsolidationShow({ group, entities, recentRuns, mapping
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Consolidation - ${group.name}`} />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">{group.name}</h1>
-                        {group.description && (
-                            <p className="text-muted-foreground">{group.description}</p>
-                        )}
-                        <p className="text-sm text-muted-foreground mt-1">Base currency: {group.base_currency_code}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Link href={`/finance/intercompany/${group.id}`}>
-                            <Button variant="outline" size="sm">
-                                <ArrowLeftRight className="mr-2 h-4 w-4" />
-                                Intercompany
-                            </Button>
-                        </Link>
-                        <RunConsolidationDialog groupId={group.id} />
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/finance/consolidation"
+                        title={group.name}
+                        description={
+                            <>
+                                {group.description && <span className="block">{group.description}</span>}
+                                <span className="text-sm">Base currency: {group.base_currency_code}</span>
+                            </>
+                        }
+                        actions={
+                            <>
+                                <Link href={`/finance/intercompany/${group.id}`}>
+                                    <Button variant="outline" size="sm">
+                                        <ArrowLeftRight className="mr-2 h-4 w-4" />
+                                        Intercompany
+                                    </Button>
+                                </Link>
+                                <RunConsolidationDialog groupId={group.id} />
+                            </>
+                        }
+                    />
+                }
+            >
                 {/* KPI Summary Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <Card>
@@ -489,7 +496,7 @@ export default function ConsolidationShow({ group, entities, recentRuns, mapping
                         </Table>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

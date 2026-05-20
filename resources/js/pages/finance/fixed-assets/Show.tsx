@@ -23,7 +23,8 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { ArrowLeft, Cpu, Edit, Trash2 } from 'lucide-react';
+import { Cpu, Edit, Trash2 } from 'lucide-react';
+import { PageHero, PageLayout } from '@/components/page';
 import { FormEvent, useState } from 'react';
 
 interface GlAccount {
@@ -172,32 +173,26 @@ export default function FixedAssetShow({ asset, depreciationSchedule, linkedAsse
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={asset.asset_name} />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <Link href={'/finance/fixed-assets'}>
-                            <Button variant="ghost" size="icon">
-                                <ArrowLeft className="h-4 w-4" />
-                            </Button>
-                        </Link>
-                        <div>
-                            <div className="flex items-center gap-3">
-                                <h1 className="text-2xl font-bold tracking-tight">{asset.asset_name}</h1>
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/finance/fixed-assets"
+                        title={
+                            <span className="flex flex-wrap items-center gap-3">
+                                {asset.asset_name}
                                 <Badge variant="secondary" className={categoryColors[asset.category] || ''}>
                                     {categoryLabels[asset.category] || asset.category}
                                 </Badge>
                                 <Badge variant="secondary" className={statusColors[asset.status] || ''}>
                                     {statusLabels[asset.status] || asset.status}
                                 </Badge>
-                            </div>
-                            {asset.asset_tag && (
-                                <p className="text-muted-foreground font-mono text-sm mt-1">Tag: {asset.asset_tag}</p>
-                            )}
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        {asset.status === 'active' && (
+                            </span>
+                        }
+                        description={asset.asset_tag ? `Tag: ${asset.asset_tag}` : undefined}
+                        actions={
+                            <>
+                                {asset.status === 'active' && (
                             <>
                                 <Link href={`/finance/fixed-assets/${asset.id}/edit`}>
                                     <Button variant="outline">
@@ -281,9 +276,11 @@ export default function FixedAssetShow({ asset, depreciationSchedule, linkedAsse
                                 </Dialog>
                             </>
                         )}
-                    </div>
-                </div>
-
+                            </>
+                        }
+                    />
+                }
+            >
                 {/* Asset Details + Book Value */}
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     <Card className="lg:col-span-2">
@@ -561,7 +558,7 @@ export default function FixedAssetShow({ asset, depreciationSchedule, linkedAsse
                         </CardContent>
                     </Card>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

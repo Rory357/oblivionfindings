@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -20,7 +21,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import { Users, AlertTriangle, CheckCircle2 } from 'lucide-react';
 
@@ -138,33 +139,34 @@ export default function DrillShow({ drill, staff }: Props) {
         >
             <Head title={drill.title} />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">{drill.title}</h1>
-                        <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                            <span>{drill.site?.name ?? 'Unknown Site'}</span>
-                            <span className="capitalize">{drill.drill_type.replace(/_/g, ' ')}</span>
-                            <Badge className={statusColor(drill.status)}>{drill.status}</Badge>
-                        </div>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        {drill.status === 'scheduled' && (
-                            <Button
-                                size="sm"
-                                onClick={() =>
-                                    router.post(`/health-safety/drills/${drill.id}/start`, {}, { preserveScroll: true })
-                                }
-                            >
-                                Start Drill
-                            </Button>
-                        )}
-                        <Link href="/health-safety/drills" className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
-                            Back
-                        </Link>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/health-safety/drills"
+                        title={drill.title}
+                        description={
+                            <span className="flex flex-wrap items-center gap-2">
+                                <span>{drill.site?.name ?? 'Unknown Site'}</span>
+                                <span className="capitalize">{drill.drill_type.replace(/_/g, ' ')}</span>
+                                <Badge className={statusColor(drill.status)}>{drill.status}</Badge>
+                            </span>
+                        }
+                        actions={
+                            drill.status === 'scheduled' ? (
+                                <Button
+                                    size="sm"
+                                    onClick={() =>
+                                        router.post(`/health-safety/drills/${drill.id}/start`, {}, { preserveScroll: true })
+                                    }
+                                >
+                                    Start Drill
+                                </Button>
+                            ) : undefined
+                        }
+                    />
+                }
+            >
                 {/* Drill Details */}
                 <Card>
                     <CardHeader>
@@ -463,7 +465,7 @@ export default function DrillShow({ drill, staff }: Props) {
                         </div>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
 
             {/* Add Participant Dialog */}
             <Dialog open={participantOpen} onOpenChange={setParticipantOpen}>

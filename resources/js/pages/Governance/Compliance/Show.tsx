@@ -11,6 +11,7 @@ import { Label } from '@/components/ui/label';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger, DialogFooter } from '@/components/ui/dialog';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { FileText, Calendar, User, Upload, CheckCircle, Clock, AlertTriangle, FileCheck } from 'lucide-react';
+import { PageHero, PageLayout } from '@/components/page';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import axios from 'axios';
@@ -156,30 +157,23 @@ export default function ComplianceShow({ auth, obligation }: Props) {
     >
       <Head title={obligation.obligation_title} />
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Back Link */}
-          <div className="mb-4">
-            <Link href={complianceIndex.url()} className="text-sm text-status-info hover:underline">
-              ← Back to Compliance
-            </Link>
-          </div>
-
-          {/* Header */}
-          <div className="flex items-start justify-between mb-6">
-            <div>
-              <div className="flex items-center gap-3 mb-2">
-                <FileText className="w-8 h-8 text-primary" />
-                <h1 className="text-2xl font-bold text-foreground">{obligation.obligation_title}</h1>
-              </div>
-              <div className="flex items-center gap-2">
+      <PageLayout
+        hero={
+          <PageHero
+            variant="compact"
+            backHref={complianceIndex.url()}
+            title={
+              <span className="flex flex-wrap items-center gap-3">
+                {obligation.obligation_title}
                 <Badge variant="outline">{getFrameworkLabel(obligation.framework)}</Badge>
                 {obligation.obligation_code && (
                   <Badge variant="outline">{obligation.obligation_code}</Badge>
                 )}
                 <Badge className={getStatusColor(obligation.status)}>{obligation.status}</Badge>
-              </div>
-            </div>
-            <div className="flex gap-2">
+              </span>
+            }
+            actions={
+              <div className="flex gap-2">
               <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>
                 <DialogTrigger asChild>
                   <Button variant="outline">
@@ -248,8 +242,10 @@ export default function ComplianceShow({ auth, obligation }: Props) {
                 </Button>
               )}
             </div>
-          </div>
-
+            }
+          />
+        }
+      >
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Main Content */}
             <div className="lg:col-span-2 space-y-6">
@@ -435,7 +431,7 @@ export default function ComplianceShow({ auth, obligation }: Props) {
               </Card>
             </div>
           </div>
-      </div>
+      </PageLayout>
     </AppLayout>
   );
 }

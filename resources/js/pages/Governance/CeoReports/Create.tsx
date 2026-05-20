@@ -7,6 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { PageHero, PageLayout } from '@/components/page';
 
 interface Meeting {
   id: number;
@@ -32,9 +33,16 @@ export default function CeoReportCreate({ auth, meetings }: Props) {
   return (
     <AppLayout>
       <Head title="Create CEO Report" />
-      <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <h1 className="text-2xl font-bold text-foreground mb-6">Create CEO Board Report</h1>
-
+      <PageLayout
+        hero={
+          <PageHero
+            variant="compact"
+            backHref="/governance/ceo-reports"
+            title="Create CEO Board Report"
+            description="Compose a new CEO update for the board"
+          />
+        }
+      >
         <form onSubmit={handleSubmit}>
           <Card>
             <CardContent className="p-6 space-y-6">
@@ -71,7 +79,7 @@ export default function CeoReportCreate({ auth, meetings }: Props) {
             </CardContent>
           </Card>
         </form>
-      </div>
+      </PageLayout>
     </AppLayout>
   );
 }

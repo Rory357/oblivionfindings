@@ -1,10 +1,11 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import { useI18n } from '@/lib/i18n';
 import { Head, Link, router } from '@inertiajs/react';
-import { Check, Send, X } from 'lucide-react';
+import { CalendarCheck, Check, Send, X } from 'lucide-react';
 import { useEffect } from 'react';
 
 type SuggestionRun = {
@@ -134,58 +135,62 @@ export default function Show({ run, suggestions }: Props) {
                 )}
             />
 
-            <div className="space-y-4 p-4" data-test="roster-suggestions-page">
-                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div>
-                        <h1 className="text-2xl font-semibold">
-                            {t(
-                                'rostering.suggestions.head_title',
-                                'Roster suggestions',
-                            )}
-                        </h1>
-                        <p className="text-sm text-muted-foreground">
-                            {run.site?.name ??
-                                t(
-                                    'rostering.publish.selected_site',
-                                    'Selected site',
-                                )}{' '}
-                            · {run.week_start} to {run.week_end}
-                        </p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                        <Badge
-                            variant={run.is_expired ? 'destructive' : 'outline'}
-                        >
-                            {t(
-                                `rostering.suggestions.status.${run.status}`,
-                                run.status,
-                            )}
-                        </Badge>
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={!canApply}
-                            onClick={applyAccepted}
-                            data-test="suggestions-apply-accepted"
-                        >
-                            <Send className="mr-1 h-4 w-4" />
-                            {t(
-                                'rostering.suggestions.apply_accepted',
-                                'Apply accepted',
-                            )}
-                        </Button>
-                        <Link
-                            href={`/operations/rostering?week=${run.week_start}${run.site ? `&site_id=${run.site.id}` : ''}`}
-                        >
-                            <Button size="sm" variant="outline">
-                                {t(
-                                    'rostering.publish.back_to_roster',
-                                    'Back to roster',
-                                )}
-                            </Button>
-                        </Link>
-                    </div>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={CalendarCheck}
+                        title={t(
+                            'rostering.suggestions.head_title',
+                            'Roster suggestions',
+                        )}
+                        description={`${
+                            run.site?.name ??
+                            t(
+                                'rostering.publish.selected_site',
+                                'Selected site',
+                            )
+                        } · ${run.week_start} to ${run.week_end}`}
+                        actions={
+                            <>
+                                <Badge
+                                    variant={run.is_expired ? 'destructive' : 'outline'}
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground"
+                                >
+                                    {t(
+                                        `rostering.suggestions.status.${run.status}`,
+                                        run.status,
+                                    )}
+                                </Badge>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={!canApply}
+                                    onClick={applyAccepted}
+                                    data-test="suggestions-apply-accepted"
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                >
+                                    <Send className="mr-1 h-4 w-4" />
+                                    {t(
+                                        'rostering.suggestions.apply_accepted',
+                                        'Apply accepted',
+                                    )}
+                                </Button>
+                                <Link
+                                    href={`/operations/rostering?week=${run.week_start}${run.site ? `&site_id=${run.site.id}` : ''}`}
+                                >
+                                    <Button size="sm" variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                        {t(
+                                            'rostering.publish.back_to_roster',
+                                            'Back to roster',
+                                        )}
+                                    </Button>
+                                </Link>
+                            </>
+                        }
+                    />
+                }
+            >
+                <div className="space-y-4" data-test="roster-suggestions-page">
 
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
                     <Card>
@@ -444,7 +449,8 @@ export default function Show({ run, suggestions }: Props) {
                         },
                     )}
                 </div>
-            </div>
+                </div>
+            </PageLayout>
         </AppLayout>
     );
 }

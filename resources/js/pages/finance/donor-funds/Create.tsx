@@ -9,6 +9,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
+import { PageHero, PageLayout } from '@/components/page';
 import { FormEvent } from 'react';
 
 interface Account {
@@ -60,11 +61,16 @@ export default function DonorFundCreate({ glAccounts, fundingStreams }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="New Donor Fund" />
 
-            <div className="mx-auto max-w-3xl space-y-6 p-6">
-                <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold tracking-tight">New Donor Fund</h1>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/finance/donor-funds"
+                        title="New Donor Fund"
+                        description="Add a new donor-restricted fund for tracking grants and donations"
+                    />
+                }
+            >
                 <form onSubmit={handleSubmit} className="space-y-6">
                     {/* Basic Information */}
                     <Card>
@@ -276,7 +282,7 @@ export default function DonorFundCreate({ glAccounts, fundingStreams }: Props) {
                         </Button>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
 import { AlertTriangle, CheckCircle, Edit, XCircle, FileText } from 'lucide-react';
+import { PageHero, PageLayout } from '@/components/page';
 import { cn } from '@/lib/utils';
 
 interface BillLine {
@@ -99,51 +100,58 @@ export default function BillShow({ auth, bill }: Props) {
         >
             <Head title={`Bill ${bill.bill_number}`} />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                {/* Header */}
-                <div className="flex items-start justify-between mb-6">
-                    <div>
-                        <div className="flex items-center gap-3">
-                            <h1 className="text-3xl font-bold text-foreground">{bill.bill_number}</h1>
-                            <Badge className={statusConfig[bill.status]?.className ?? 'bg-muted text-foreground'}>
-                                {statusConfig[bill.status]?.label ?? bill.status}
-                            </Badge>
-                            {isOverdue && (
-                                <Badge className="bg-status-critical-bg text-status-critical">
-                                    <AlertTriangle className="w-3 h-3 mr-1" />
-                                    Overdue
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/finance/bills"
+                        title={
+                            <span className="flex flex-wrap items-center gap-3">
+                                {bill.bill_number}
+                                <Badge className={statusConfig[bill.status]?.className ?? 'bg-muted text-foreground'}>
+                                    {statusConfig[bill.status]?.label ?? bill.status}
                                 </Badge>
-                            )}
-                        </div>
-                        <p className="text-muted-foreground mt-1">
-                            {bill.vendor?.name ?? 'Unknown vendor'}
-                            {bill.vendor_reference && <span> - Ref: {bill.vendor_reference}</span>}
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        {isDraft && (
+                                {isOverdue && (
+                                    <Badge className="bg-status-critical-bg text-status-critical">
+                                        <AlertTriangle className="w-3 h-3 mr-1" />
+                                        Overdue
+                                    </Badge>
+                                )}
+                            </span>
+                        }
+                        description={
                             <>
-                                <Button variant="outline" asChild>
-                                    <Link href={`/finance/bills/${bill.id}/edit`}>
-                                        <Edit className="w-4 h-4 mr-2" />
-                                        Edit
-                                    </Link>
-                                </Button>
-                                <Button onClick={handleApprove}>
-                                    <CheckCircle className="w-4 h-4 mr-2" />
-                                    Approve
-                                </Button>
+                                {bill.vendor?.name ?? 'Unknown vendor'}
+                                {bill.vendor_reference && <span> - Ref: {bill.vendor_reference}</span>}
                             </>
-                        )}
-                        {canCancel && (
-                            <Button variant="destructive" onClick={handleCancel}>
-                                <XCircle className="w-4 h-4 mr-2" />
-                                Cancel
-                            </Button>
-                        )}
-                    </div>
-                </div>
-
+                        }
+                        actions={
+                            <>
+                                {isDraft && (
+                                    <>
+                                        <Button variant="outline" asChild>
+                                            <Link href={`/finance/bills/${bill.id}/edit`}>
+                                                <Edit className="w-4 h-4 mr-2" />
+                                                Edit
+                                            </Link>
+                                        </Button>
+                                        <Button onClick={handleApprove}>
+                                            <CheckCircle className="w-4 h-4 mr-2" />
+                                            Approve
+                                        </Button>
+                                    </>
+                                )}
+                                {canCancel && (
+                                    <Button variant="destructive" onClick={handleCancel}>
+                                        <XCircle className="w-4 h-4 mr-2" />
+                                        Cancel
+                                    </Button>
+                                )}
+                            </>
+                        }
+                    />
+                }
+            >
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
                     {/* Bill Info */}
                     <Card>
@@ -325,7 +333,7 @@ export default function BillShow({ auth, bill }: Props) {
                         </Table>
                     </Card>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

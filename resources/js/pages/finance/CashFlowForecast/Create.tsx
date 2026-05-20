@@ -6,6 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TrendingUp, CalendarRange, Info } from 'lucide-react';
+import { PageHero, PageLayout } from '@/components/page';
 import { type BreadcrumbItem } from '@/types';
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -34,15 +35,16 @@ export default function CashFlowForecastCreate() {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="New Cash Flow Forecast" />
 
-            <div className="mx-auto max-w-2xl space-y-6 p-6">
-                <div>
-                    <h1 className="text-2xl font-bold tracking-tight">New Cash Flow Forecast</h1>
-                    <p className="text-muted-foreground">
-                        Select a forecast period and granularity. The system will project cash flows based on
-                        outstanding invoices, bills, recurring transactions, and bank balances.
-                    </p>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/finance/cash-flow-forecast"
+                        title="New Cash Flow Forecast"
+                        description="Select a forecast period and granularity. The system will project cash flows based on outstanding invoices, bills, recurring transactions, and bank balances."
+                    />
+                }
+            >
                 <Card>
                     <CardHeader>
                         <div className="flex items-center gap-2">
@@ -139,7 +141,7 @@ export default function CashFlowForecastCreate() {
                         </form>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

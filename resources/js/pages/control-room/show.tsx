@@ -1,5 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
-import PageShell from '@/components/page-shell';
+import { PageHero, PageLayout } from '@/components/page';
 import { Head, Link, router } from '@inertiajs/react';
 import { TabsRoot as Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
 import { Badge } from '@/components/ui/badge';
@@ -521,24 +521,17 @@ export default function ControlRoomAlertShow({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Alert #${alert.id}`} />
-            <PageShell>
-                {/* ============================================================ */}
-                {/* HERO BANNER                                                  */}
-                {/* ============================================================ */}
-                <div
-                    className={`rounded-xl border border-l-4 bg-card p-6 shadow-sm ${
-                        SEVERITY_BORDER[alert.severity] ?? 'border-l-gray-400'
-                    }`}
-                >
-                    <div className="flex flex-col gap-4 lg:flex-row lg:items-start lg:justify-between">
-                        {/* Left side */}
-                        <div className="space-y-1">
-                            <h1 className="text-2xl font-bold tracking-tight">
-                                {alert.alert_type
-                                    .replace(/_/g, ' ')
-                                    .replace(/\b\w/g, (c) => c.toUpperCase())}
-                            </h1>
-                            <div className="flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/control-room"
+                        icon={AlertTriangle}
+                        title={alert.alert_type
+                            .replace(/_/g, ' ')
+                            .replace(/\b\w/g, (c) => c.toUpperCase())}
+                        description={
+                            <span className="flex flex-wrap items-center gap-2">
                                 <span className="font-mono text-xs">#{alert.id}</span>
                                 <Badge variant="outline" className="text-xs capitalize">
                                     {alert.source}
@@ -548,41 +541,45 @@ export default function ControlRoomAlertShow({
                                     {fmtDate(alert.triggered_at)}
                                 </span>
                                 {alert.triggered_at && (
-                                    <span className="text-xs text-muted-foreground">
-                                        ({timeAgo(alert.triggered_at)})
-                                    </span>
+                                    <span className="text-xs">({timeAgo(alert.triggered_at)})</span>
                                 )}
-                            </div>
-                        </div>
-
-                        {/* Right side */}
-                        <div className="flex items-center gap-3">
-                            <Badge
-                                className={`px-3 py-1 text-sm font-semibold capitalize ${
-                                    STATUS_BADGE[alert.status] ?? ''
-                                }`}
-                            >
-                                {alert.status}
-                            </Badge>
-                            <Badge
-                                className={`px-3 py-1 text-sm font-semibold capitalize ${
-                                    SEVERITY_BADGE[alert.severity] ?? 'bg-muted-foreground/80 text-white'
-                                }`}
-                            >
-                                {alert.severity}
-                            </Badge>
-                            {alert.escalation_level > 0 && (
+                            </span>
+                        }
+                        actions={
+                            <>
                                 <Badge
-                                    variant="destructive"
-                                    className="px-3 py-1 text-sm font-semibold"
+                                    className={`px-3 py-1 text-sm font-semibold capitalize ${
+                                        STATUS_BADGE[alert.status] ?? ''
+                                    }`}
                                 >
-                                    <ShieldAlert className="mr-1 h-3.5 w-3.5" />
-                                    L{alert.escalation_level}
+                                    {alert.status}
                                 </Badge>
-                            )}
-                        </div>
-                    </div>
-
+                                <Badge
+                                    className={`px-3 py-1 text-sm font-semibold capitalize ${
+                                        SEVERITY_BADGE[alert.severity] ?? 'bg-muted-foreground/80 text-white'
+                                    }`}
+                                >
+                                    {alert.severity}
+                                </Badge>
+                                {alert.escalation_level > 0 && (
+                                    <Badge
+                                        variant="destructive"
+                                        className="px-3 py-1 text-sm font-semibold"
+                                    >
+                                        <ShieldAlert className="mr-1 h-3.5 w-3.5" />
+                                        L{alert.escalation_level}
+                                    </Badge>
+                                )}
+                            </>
+                        }
+                    />
+                }
+            >
+                <div
+                    className={`rounded-xl border border-l-4 bg-card p-6 shadow-sm ${
+                        SEVERITY_BORDER[alert.severity] ?? 'border-l-gray-400'
+                    }`}
+                >
                     {/* Status Stepper */}
                     <StatusStepper alert={alert} />
                 </div>
@@ -1735,7 +1732,7 @@ export default function ControlRoomAlertShow({
                         </DialogFooter>
                     </DialogContent>
                 </Dialog>
-            </PageShell>
+            </PageLayout>
         </AppLayout>
     );
 }

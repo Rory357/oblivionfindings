@@ -9,6 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Plus, Trash2 } from 'lucide-react';
+import { PageHero, PageLayout } from '@/components/page';
 
 interface Account {
     id: number;
@@ -171,14 +172,16 @@ export default function InvoiceEdit({ auth, invoice, accounts, taxRates, bills }
         <AppLayout user={auth.user} breadcrumbs={breadcrumbs}>
             <Head title={`Edit Invoice ${invoice.invoice_number}`} />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center justify-between mb-6">
-                    <div>
-                        <h1 className="text-3xl font-bold text-foreground">Edit {invoice.invoice_number}</h1>
-                        <p className="text-muted-foreground mt-1">Update invoice details</p>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref={`/finance/invoices/${invoice.id}`}
+                        title={`Edit ${invoice.invoice_number}`}
+                        description="Update invoice details"
+                    />
+                }
+            >
                 <form onSubmit={handleSubmit}>
                     {/* Invoice Details */}
                     <Card className="mb-6">
@@ -457,7 +460,7 @@ export default function InvoiceEdit({ auth, invoice, accounts, taxRates, bills }
                         </Button>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

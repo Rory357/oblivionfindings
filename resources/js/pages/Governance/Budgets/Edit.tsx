@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { DollarSign } from 'lucide-react';
+import { PageHero, PageLayout } from '@/components/page';
 
 interface Budget {
     id: number;
@@ -42,11 +43,16 @@ export default function EditBudget({ auth, budget }: { auth: any; budget: Budget
             ]}
         >
             <Head title={`Edit: ${budget.title}`} />
-            <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex items-center gap-3 mb-6">
-                    <DollarSign className="w-8 h-8 text-status-success" />
-                    <h1 className="text-3xl font-bold text-foreground">Edit Budget</h1>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref={`/governance/budgets/${budget.id}`}
+                        title="Edit Budget"
+                        description={budget.title || `FY${budget.fiscal_year}`}
+                    />
+                }
+            >
                 <Card>
                     <CardHeader><CardTitle>Budget Details</CardTitle></CardHeader>
                     <CardContent>
@@ -87,7 +93,7 @@ export default function EditBudget({ auth, budget }: { auth: any; budget: Budget
                         </form>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

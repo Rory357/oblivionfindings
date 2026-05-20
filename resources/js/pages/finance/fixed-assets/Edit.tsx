@@ -12,7 +12,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { ArrowLeft, AlertTriangle, Calculator } from 'lucide-react';
+import { AlertTriangle, Calculator } from 'lucide-react';
+import { PageHero, PageLayout } from '@/components/page';
 import { FormEvent, useMemo } from 'react';
 
 interface GlAccount {
@@ -116,19 +117,16 @@ export default function FixedAssetEdit({ asset, hasDepreciations, assetAccounts,
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Edit ${asset.asset_name}`} />
 
-            <div className="mx-auto max-w-3xl space-y-6 p-6">
-                <div className="flex items-center gap-4">
-                    <Link href={`/finance/fixed-assets/${asset.id}`}>
-                        <Button variant="ghost" size="icon">
-                            <ArrowLeft className="h-4 w-4" />
-                        </Button>
-                    </Link>
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Edit Fixed Asset</h1>
-                        <p className="text-muted-foreground">Update details for {asset.asset_name}</p>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref={`/finance/fixed-assets/${asset.id}`}
+                        title="Edit Fixed Asset"
+                        description={`Update details for ${asset.asset_name}`}
+                    />
+                }
+            >
                 {hasDepreciations && (
                     <div className="rounded-lg bg-status-warning-bg border border-status-warning/30 p-4 flex items-start gap-3">
                         <AlertTriangle className="h-5 w-5 text-status-warning mt-0.5 shrink-0" />
@@ -419,7 +417,7 @@ export default function FixedAssetEdit({ asset, hasDepreciations, assetAccounts,
                         </Button>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

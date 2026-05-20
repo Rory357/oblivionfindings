@@ -6,6 +6,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import { CheckCircle, Clock, AlertTriangle, User } from 'lucide-react';
+import { PageHero, PageLayout } from '@/components/page';
 import { cn } from '@/lib/utils';
 import { complete as completeAction } from '@/routes/governance/actions';
 
@@ -92,21 +93,22 @@ export default function ActionItemShow({ auth, action }: Props) {
     >
       <Head title={`Action ${action.action_reference}`} />
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-        <div className="flex items-start justify-between mb-6">
-          <div>
-            <div className="flex items-center gap-3 mb-2">
-              <h1 className="text-3xl font-bold text-foreground">{action.action_reference}</h1>
-              <Badge className={cn(getStatusColor(action.status))}>{action.status}</Badge>
-              <Badge className={cn(getPriorityColor(action.priority))}>{action.priority}</Badge>
-            </div>
-            <p className="text-muted-foreground">{action.description}</p>
-          </div>
-          <Button variant="outline" asChild>
-            <Link href="/governance/actions">Back</Link>
-          </Button>
-        </div>
-
+      <PageLayout
+        hero={
+          <PageHero
+            variant="compact"
+            backHref="/governance/actions"
+            title={
+              <span className="flex flex-wrap items-center gap-3">
+                {action.action_reference}
+                <Badge className={cn(getStatusColor(action.status))}>{action.status}</Badge>
+                <Badge className={cn(getPriorityColor(action.priority))}>{action.priority}</Badge>
+              </span>
+            }
+            description={action.description}
+          />
+        }
+      >
         <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
           <Card>
             <CardContent className="pt-6">
@@ -201,7 +203,7 @@ export default function ActionItemShow({ auth, action }: Props) {
             )}
           </CardContent>
         </Card>
-      </div>
+      </PageLayout>
     </AppLayout>
   );
 }

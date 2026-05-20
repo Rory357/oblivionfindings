@@ -1,10 +1,12 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Head } from '@inertiajs/react';
+import { AlertOctagon } from 'lucide-react';
 import { useState } from 'react';
 
 type Props = {
@@ -34,12 +36,15 @@ export default function IncidentReports({ clients, filters }: Props) {
         <AppLayout breadcrumbs={[{ title: 'Reports', href: '/reports' }, { title: 'Incidents', href: '/reports/incidents' }]}>
             <Head title="Incident reports" />
 
-            <div className="space-y-4">
-                <div>
-                    <h1 className="text-lg font-semibold">Incident reports</h1>
-                    <div className="mt-1 text-sm text-muted-foreground">Export CSV with filters</div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={AlertOctagon}
+                        title="Incident reports"
+                        description="Export CSV with filters"
+                    />
+                }
+            >
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-base">Filters</CardTitle>
@@ -99,7 +104,7 @@ export default function IncidentReports({ clients, filters }: Props) {
                         </div>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

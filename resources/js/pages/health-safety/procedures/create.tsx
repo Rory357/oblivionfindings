@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -137,15 +138,17 @@ export default function ProcedureCreate() {
         >
             <Head title="New Safe Work Procedure" />
 
-            <div className="space-y-6">
-                {/* Page Title */}
-                <div className="flex items-center gap-2">
-                    <FileText className="h-5 w-5 text-status-info" />
-                    <h1 className="text-lg font-semibold">
-                        New Safe Work Procedure
-                    </h1>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/health-safety/procedures"
+                        icon={FileText}
+                        title="New Safe Work Procedure"
+                        description="Create a draft safe work procedure with steps, PPE, and applicability"
+                    />
+                }
+            >
                 <form onSubmit={submit} className="space-y-6">
                     {/* Basic Info */}
                     <Card>
@@ -462,7 +465,7 @@ export default function ProcedureCreate() {
                         </Button>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

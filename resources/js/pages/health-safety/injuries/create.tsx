@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -12,7 +13,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, useForm } from '@inertiajs/react';
 
 type Props = {
     staff: Array<{ id: number; name: string }>;
@@ -45,19 +46,16 @@ export default function InjuryCreate({ staff, sites }: Props) {
         >
             <Head title="Record Injury" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">Record Injury</h1>
-                        <div className="mt-1 text-sm text-muted-foreground">
-                            Record a new workplace injury or illness
-                        </div>
-                    </div>
-                    <Link href="/health-safety/injuries" className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
-                        Back
-                    </Link>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/health-safety/injuries"
+                        title="Record Injury"
+                        description="Record a new workplace injury or illness"
+                    />
+                }
+            >
                 {/* Worker & Location */}
                 <Card>
                     <CardHeader>
@@ -259,7 +257,7 @@ export default function InjuryCreate({ staff, sites }: Props) {
                         Record Injury
                     </Button>
                 </div>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

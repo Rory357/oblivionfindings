@@ -9,6 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import { Upload, ArrowRight, FileText, CheckCircle, Clock, AlertCircle } from 'lucide-react';
 import { LineChart, Line, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer } from 'recharts';
+import { PageHero, PageLayout } from '@/components/page';
 import { type BreadcrumbItem } from '@/types';
 import { useState } from 'react';
 
@@ -112,22 +113,23 @@ export default function BankAccountShow({ bankAccount, transactions, reconciliat
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={bankAccount.name} />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-3xl font-bold text-foreground">{bankAccount.name}</h1>
-                        <p className="text-muted-foreground mt-1">{bankAccount.bank_name}</p>
-                    </div>
-                    <div className="flex gap-2">
-                        <Button variant="outline" asChild>
-                            <Link href={`/finance/bank-accounts/${bankAccount.id}/edit`}>
-                                Edit
-                            </Link>
-                        </Button>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/finance/bank-accounts"
+                        title={bankAccount.name}
+                        description={bankAccount.bank_name}
+                        actions={
+                            <Button variant="outline" asChild>
+                                <Link href={`/finance/bank-accounts/${bankAccount.id}/edit`}>
+                                    Edit
+                                </Link>
+                            </Button>
+                        }
+                    />
+                }
+            >
                 {/* Balance Cards */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4">
                     <Card>
@@ -323,7 +325,7 @@ export default function BankAccountShow({ bankAccount, transactions, reconciliat
                         )}
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

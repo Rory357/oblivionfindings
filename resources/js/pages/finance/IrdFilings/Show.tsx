@@ -5,6 +5,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { AlertCircle, CheckCircle, FileText, Send, Shield } from 'lucide-react';
+import { PageHero, PageLayout } from '@/components/page';
 
 type GstReturn = {
     id: number;
@@ -125,43 +126,48 @@ export default function IrdFilingShow({ filing }: PageProps) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`IRD Filing - ${filingTypeLabels[filing.filing_type]}`} />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                {/* Header */}
-                <div className="flex items-start justify-between">
-                    <div>
-                        <div className="flex items-center gap-3">
-                            <h1 className="text-2xl font-bold tracking-tight">
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/finance/ird-filings"
+                        title={
+                            <span className="flex flex-wrap items-center gap-3">
                                 {filingTypeLabels[filing.filing_type] ?? filing.filing_type}
-                            </h1>
-                            <Badge variant="outline" className={status.className}>
-                                {status.label}
-                            </Badge>
-                        </div>
-                        <p className="text-muted-foreground">
-                            {formatDate(filing.period_from)} &ndash; {formatDate(filing.period_to)}
-                        </p>
-                        {filing.created_by && (
-                            <p className="mt-1 text-sm text-muted-foreground">
-                                Created by {filing.created_by.name}
-                            </p>
-                        )}
-                    </div>
-                    <div className="flex items-center gap-2">
-                        {canValidate && (
-                            <Button variant="outline" onClick={handleValidate}>
-                                <CheckCircle className="mr-2 h-4 w-4" />
-                                Validate
-                            </Button>
-                        )}
-                        {canSubmit && (
-                            <Button onClick={handleSubmit}>
-                                <Send className="mr-2 h-4 w-4" />
-                                Submit to IRD
-                            </Button>
-                        )}
-                    </div>
-                </div>
-
+                                <Badge variant="outline" className={status.className}>
+                                    {status.label}
+                                </Badge>
+                            </span>
+                        }
+                        description={
+                            <>
+                                {formatDate(filing.period_from)} &ndash; {formatDate(filing.period_to)}
+                                {filing.created_by && (
+                                    <span className="mt-1 block text-sm">
+                                        Created by {filing.created_by.name}
+                                    </span>
+                                )}
+                            </>
+                        }
+                        actions={
+                            <>
+                                {canValidate && (
+                                    <Button variant="outline" onClick={handleValidate}>
+                                        <CheckCircle className="mr-2 h-4 w-4" />
+                                        Validate
+                                    </Button>
+                                )}
+                                {canSubmit && (
+                                    <Button onClick={handleSubmit}>
+                                        <Send className="mr-2 h-4 w-4" />
+                                        Submit to IRD
+                                    </Button>
+                                )}
+                            </>
+                        }
+                    />
+                }
+            >
                 {/* Error Message */}
                 {filing.error_message && (
                     <Card className="border-destructive/50 bg-destructive/5">
@@ -350,7 +356,7 @@ export default function IrdFilingShow({ filing }: PageProps) {
                         </CardContent>
                     </Card>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

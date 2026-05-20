@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -157,14 +158,17 @@ export default function ProcedureEdit({ procedure }: Props) {
         >
             <Head title={`Edit ${procedure.title}`} />
 
-            <div className="space-y-6">
-                <div className="flex items-center gap-2">
-                    <FileText className="h-5 w-5 text-status-info" />
-                    <h1 className="text-lg font-semibold">
-                        Edit Safe Work Procedure
-                    </h1>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref={`/health-safety/procedures/${procedure.id}`}
+                        icon={FileText}
+                        title="Edit Safe Work Procedure"
+                        description={procedure.title}
+                    />
+                }
+            >
                 <form onSubmit={submit} className="space-y-6">
                     <Card>
                         <CardHeader>
@@ -469,7 +473,7 @@ export default function ProcedureEdit({ procedure }: Props) {
                         </Button>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

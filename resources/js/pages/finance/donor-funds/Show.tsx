@@ -10,7 +10,8 @@ import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { TabsRoot, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { ArrowLeft, Download, TrendingUp, TrendingDown } from 'lucide-react';
+import { Download, TrendingUp, TrendingDown } from 'lucide-react';
+import { PageHero, PageLayout } from '@/components/page';
 import { FormEvent } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
@@ -176,31 +177,33 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${fund.fund_name}`} />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center gap-4">
-                    <Button asChild variant="ghost" size="sm">
-                        <Link href="/finance/donor-funds">
-                            <ArrowLeft className="mr-1 h-4 w-4" />
-                            Back
-                        </Link>
-                    </Button>
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">{fund.fund_name}</h1>
-                        <p className="text-sm text-muted-foreground">
-                            {fund.fund_code} - {fundTypeLabels[fund.fund_type] ?? fund.fund_type}
-                            {fund.donor_name && ` from ${fund.donor_name}`}
-                        </p>
-                    </div>
-                    <Badge variant="outline" className={config.className}>
-                        {config.label}
-                    </Badge>
-                    {fund.is_restricted && (
-                        <Badge variant="outline" className="border-status-warning/30 text-status-warning">
-                            Restricted
-                        </Badge>
-                    )}
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/finance/donor-funds"
+                        title={fund.fund_name}
+                        description={
+                            <>
+                                {fund.fund_code} - {fundTypeLabels[fund.fund_type] ?? fund.fund_type}
+                                {fund.donor_name && ` from ${fund.donor_name}`}
+                            </>
+                        }
+                        actions={
+                            <>
+                                <Badge variant="outline" className={config.className}>
+                                    {config.label}
+                                </Badge>
+                                {fund.is_restricted && (
+                                    <Badge variant="outline" className="border-status-warning/30 text-status-warning">
+                                        Restricted
+                                    </Badge>
+                                )}
+                            </>
+                        }
+                    />
+                }
+            >
                 {/* Fund Balance Cards + Bar Chart */}
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
                     <div className="lg:col-span-2 grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-5">
@@ -655,7 +658,7 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
                         </div>
                     </TabsContent>
                 </TabsRoot>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
 import { CheckCircle, FileText } from 'lucide-react';
+import { PageHero, PageLayout } from '@/components/page';
 
 interface CreditNoteLine {
     id: number;
@@ -79,33 +80,34 @@ export default function CreditNoteShow({ auth, creditNote }: Props) {
         >
             <Head title={`Credit Note ${creditNote.credit_note_number}`} />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                {/* Header */}
-                <div className="flex items-start justify-between mb-6">
-                    <div>
-                        <div className="flex items-center gap-3">
-                            <h1 className="text-3xl font-bold text-foreground">{creditNote.credit_note_number}</h1>
-                            <Badge className={statusConfig[creditNote.status]?.className ?? 'bg-muted text-foreground'}>
-                                {statusConfig[creditNote.status]?.label ?? creditNote.status}
-                            </Badge>
-                            <Badge className={typeConfig[creditNote.type]?.className ?? 'bg-muted text-foreground'}>
-                                {typeConfig[creditNote.type]?.label ?? creditNote.type}
-                            </Badge>
-                        </div>
-                        <p className="text-muted-foreground mt-1">
-                            {creditNote.vendor?.name ?? 'Unknown'}
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        {isDraft && (
-                            <Button onClick={handleApprove}>
-                                <CheckCircle className="w-4 h-4 mr-2" />
-                                Approve
-                            </Button>
-                        )}
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/finance/credit-notes"
+                        title={
+                            <span className="flex flex-wrap items-center gap-3">
+                                {creditNote.credit_note_number}
+                                <Badge className={statusConfig[creditNote.status]?.className ?? 'bg-muted text-foreground'}>
+                                    {statusConfig[creditNote.status]?.label ?? creditNote.status}
+                                </Badge>
+                                <Badge className={typeConfig[creditNote.type]?.className ?? 'bg-muted text-foreground'}>
+                                    {typeConfig[creditNote.type]?.label ?? creditNote.type}
+                                </Badge>
+                            </span>
+                        }
+                        description={creditNote.vendor?.name ?? 'Unknown'}
+                        actions={
+                            isDraft && (
+                                <Button onClick={handleApprove}>
+                                    <CheckCircle className="w-4 h-4 mr-2" />
+                                    Approve
+                                </Button>
+                            )
+                        }
+                    />
+                }
+            >
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
                     {/* Credit Note Info */}
                     <Card>
@@ -233,7 +235,7 @@ export default function CreditNoteShow({ auth, creditNote }: Props) {
                         </TableBody>
                     </Table>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

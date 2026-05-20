@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Separator } from '@/components/ui/separator';
 import { AlertTriangle, CheckCircle, Download, Edit, Mail, Send } from 'lucide-react';
+import { PageHero, PageLayout } from '@/components/page';
 import { cn } from '@/lib/utils';
 
 interface InvoiceLine {
@@ -97,54 +98,59 @@ export default function InvoiceShow({ auth, invoice }: Props) {
         <AppLayout user={auth.user} breadcrumbs={breadcrumbs}>
             <Head title={`Invoice ${invoice.invoice_number}`} />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                {/* Header */}
-                <div className="flex items-start justify-between mb-6">
-                    <div>
-                        <div className="flex items-center gap-3">
-                            <h1 className="text-3xl font-bold text-foreground">{invoice.invoice_number}</h1>
-                            <Badge className={statusConfig[invoice.status]?.className ?? 'bg-muted text-foreground'}>
-                                {statusConfig[invoice.status]?.label ?? invoice.status}
-                            </Badge>
-                            {isOverdue && (
-                                <Badge className="bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical">
-                                    <AlertTriangle className="w-3 h-3 mr-1" />
-                                    Overdue
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/finance/invoices"
+                        title={
+                            <span className="flex flex-wrap items-center gap-3">
+                                {invoice.invoice_number}
+                                <Badge className={statusConfig[invoice.status]?.className ?? 'bg-muted text-foreground'}>
+                                    {statusConfig[invoice.status]?.label ?? invoice.status}
                                 </Badge>
-                            )}
-                        </div>
-                        <p className="text-muted-foreground mt-1">{invoice.client_name}</p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        {isDraft && (
-                            <Button variant="outline" asChild>
-                                <Link href={`/finance/invoices/${invoice.id}/edit`}>
-                                    <Edit className="w-4 h-4 mr-2" />
-                                    Edit
-                                </Link>
-                            </Button>
-                        )}
-                        <Button variant="outline" asChild>
-                            <a href={`/finance/invoices/${invoice.id}/pdf`}>
-                                <Download className="w-4 h-4 mr-2" />
-                                Download PDF
-                            </a>
-                        </Button>
-                        {canSend && (
-                            <Button onClick={handleSend}>
-                                <Send className="w-4 h-4 mr-2" />
-                                Send Email
-                            </Button>
-                        )}
-                        {canMarkPaid && (
-                            <Button variant="secondary" onClick={handleMarkPaid}>
-                                <CheckCircle className="w-4 h-4 mr-2" />
-                                Mark Paid
-                            </Button>
-                        )}
-                    </div>
-                </div>
-
+                                {isOverdue && (
+                                    <Badge className="bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical">
+                                        <AlertTriangle className="w-3 h-3 mr-1" />
+                                        Overdue
+                                    </Badge>
+                                )}
+                            </span>
+                        }
+                        description={invoice.client_name}
+                        actions={
+                            <>
+                                {isDraft && (
+                                    <Button variant="outline" asChild>
+                                        <Link href={`/finance/invoices/${invoice.id}/edit`}>
+                                            <Edit className="w-4 h-4 mr-2" />
+                                            Edit
+                                        </Link>
+                                    </Button>
+                                )}
+                                <Button variant="outline" asChild>
+                                    <a href={`/finance/invoices/${invoice.id}/pdf`}>
+                                        <Download className="w-4 h-4 mr-2" />
+                                        Download PDF
+                                    </a>
+                                </Button>
+                                {canSend && (
+                                    <Button onClick={handleSend}>
+                                        <Send className="w-4 h-4 mr-2" />
+                                        Send Email
+                                    </Button>
+                                )}
+                                {canMarkPaid && (
+                                    <Button variant="secondary" onClick={handleMarkPaid}>
+                                        <CheckCircle className="w-4 h-4 mr-2" />
+                                        Mark Paid
+                                    </Button>
+                                )}
+                            </>
+                        }
+                    />
+                }
+            >
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6 mb-6">
                     {/* Invoice Info */}
                     <Card>
@@ -313,7 +319,7 @@ export default function InvoiceShow({ auth, invoice }: Props) {
                         )}
                     </div>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

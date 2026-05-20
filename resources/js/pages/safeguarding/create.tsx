@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -7,12 +8,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Head, Link, useForm, usePage, router } from '@inertiajs/react';
+import { Head, useForm, router } from '@inertiajs/react';
 import { FormEventHandler, useState } from 'react';
 import {
     Shield,
-    ShieldAlert,
-    AlertTriangle,
     User,
     Users,
     Briefcase,
@@ -21,8 +20,6 @@ import {
     MessageSquare,
     ChevronDown,
     ChevronUp,
-    Eye,
-    FileEdit,
 } from 'lucide-react';
 
 type Props = {
@@ -143,30 +140,21 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
         >
             <Head title={isEdit ? 'Edit Safeguarding Concern' : 'New Safeguarding Concern'} />
 
-            <div className="mx-auto max-w-4xl space-y-6 pb-8">
-                {/* Page header */}
-                <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                            <Shield className="h-5 w-5" />
-                        </div>
-                        <div>
-                            <h1 className="text-xl font-semibold tracking-tight">
-                                {isEdit ? 'Edit safeguarding concern' : 'Report safeguarding concern'}
-                            </h1>
-                            <p className="text-sm text-muted-foreground">
-                                {isEdit
-                                    ? 'Update the details of this safeguarding concern.'
-                                    : 'Record details of the safeguarding concern accurately and promptly.'
-                                }
-                            </p>
-                        </div>
-                    </div>
-                    <Link href="/safeguarding" className="rounded-md border px-3 py-2 text-xs font-medium hover:bg-muted transition-colors">
-                        Back
-                    </Link>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/safeguarding"
+                        icon={Shield}
+                        title={isEdit ? 'Edit safeguarding concern' : 'Report safeguarding concern'}
+                        description={
+                            isEdit
+                                ? 'Update the details of this safeguarding concern.'
+                                : 'Record details of the safeguarding concern accurately and promptly.'
+                        }
+                    />
+                }
+            >
                 <form onSubmit={submit} className="space-y-6">
                     {/* Step 1: Subject */}
                     <Card>
@@ -651,7 +639,7 @@ export default function SafeguardingCreate({ clients = [], staff = [], sites = [
                         </Button>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

@@ -1,4 +1,4 @@
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -260,58 +260,44 @@ export default function UserShow({
     ];
 
     const content = (
-        <div className="space-y-6">
-            {/* Back link */}
-            <Link
-                dusk="user-back-link"
-                href={usersBasePath}
-                className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground"
-            >
-                <ArrowLeft className="h-4 w-4" /> Back to Users
-            </Link>
-
-            {/* Profile Header */}
-            <Card className="relative overflow-hidden bg-white dark:bg-muted">
-                <div className="h-1.5 w-full bg-primary" />
-                <div className="px-6 py-6">
-                    <div className="flex items-center gap-5">
-                        <Avatar className="h-16 w-16 border-2 border-primary/30 shadow-md">
-                            <AvatarImage src={u.avatar} alt={u.name} />
-                            <AvatarFallback className="bg-primary text-lg font-semibold text-white">
-                                {initials}
-                            </AvatarFallback>
-                        </Avatar>
-                        <div className="min-w-0 flex-1">
-                            <div className="flex items-center gap-3">
-                                <h1 className="truncate text-xl font-semibold tracking-tight">
-                                    {u.name}
-                                </h1>
-                                {u.is_active ? (
-                                    <Badge className="bg-status-success-bg text-xs text-status-success">
-                                        Active
-                                    </Badge>
-                                ) : (
-                                    <Badge
-                                        variant="destructive"
-                                        className="text-xs"
-                                    >
-                                        Inactive
-                                    </Badge>
-                                )}
-                                {u.user_type && (
-                                    <Badge
-                                        variant="secondary"
-                                        className="text-xs capitalize"
-                                    >
-                                        {u.user_type}
-                                    </Badge>
-                                )}
-                            </div>
-                            <p className="mt-0.5 flex items-center gap-1.5 text-sm text-muted-foreground">
-                                <Mail className="h-3.5 w-3.5" /> {u.email}
-                            </p>
-                        </div>
-                        <div className="flex shrink-0 items-center gap-2">
+        <PageLayout
+            hero={
+                <PageHero
+                    backHref={usersBasePath}
+                    backLabel="Back to Users"
+                    avatar={{ src: u.avatar, fallback: initials }}
+                    title={
+                        <span className="flex items-center gap-3 flex-wrap">
+                            <span>{u.name}</span>
+                            {u.is_active ? (
+                                <Badge className="bg-status-success-bg text-xs text-status-success">
+                                    Active
+                                </Badge>
+                            ) : (
+                                <Badge
+                                    variant="destructive"
+                                    className="text-xs"
+                                >
+                                    Inactive
+                                </Badge>
+                            )}
+                            {u.user_type && (
+                                <Badge
+                                    variant="secondary"
+                                    className="text-xs capitalize"
+                                >
+                                    {u.user_type}
+                                </Badge>
+                            )}
+                        </span>
+                    }
+                    description={
+                        <span className="flex items-center gap-1.5">
+                            <Mail className="h-3.5 w-3.5" /> {u.email}
+                        </span>
+                    }
+                    actions={
+                        <>
                             {!u.is_active && !isSelf && (
                                 <Button
                                     size="sm"
@@ -333,7 +319,7 @@ export default function UserShow({
                                     size="sm"
                                     variant="outline"
                                     dusk="user-suspend-action"
-                                    className="border-status-warning/30 text-status-warning hover:bg-status-warning-bg"
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
                                     onClick={() =>
                                         router.post(
                                             `${usersBasePath}/${u.id}/suspend`,
@@ -346,11 +332,11 @@ export default function UserShow({
                                     Suspend
                                 </Button>
                             )}
-                        </div>
-                    </div>
-                </div>
-            </Card>
-
+                        </>
+                    }
+                />
+            }
+        >
             {/* Tabs */}
             <Tabs defaultValue="overview">
                 <TabsList>
@@ -1080,7 +1066,7 @@ export default function UserShow({
                     </TabsContent>
                 )}
             </Tabs>
-        </div>
+        </PageLayout>
     );
 
     return (

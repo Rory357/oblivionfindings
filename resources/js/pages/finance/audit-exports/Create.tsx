@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
+import { PageHero, PageLayout } from '@/components/page';
 
 const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Finance', href: '/finance/dashboard' },
@@ -57,12 +58,16 @@ export default function AuditExportCreate() {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="New Audit Export" />
 
-            <div className="mx-auto max-w-3xl space-y-6 p-6">
-                <div>
-                    <h1 className="text-2xl font-bold tracking-tight">New Audit Export</h1>
-                    <p className="text-muted-foreground">Configure and generate an audit trail report for external auditors</p>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/finance/audit-exports"
+                        title="New Audit Export"
+                        description="Configure and generate an audit trail report for external auditors"
+                    />
+                }
+            >
                 <form onSubmit={handleSubmit} className="space-y-6">
                     {/* Export Details */}
                     <Card>
@@ -162,7 +167,7 @@ export default function AuditExportCreate() {
                         </Button>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

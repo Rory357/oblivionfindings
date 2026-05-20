@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Head, router } from '@inertiajs/react';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -27,6 +28,7 @@ import {
 import {
     ChevronDown,
     ChevronRight,
+    ClipboardCheck,
     Download,
     Search,
     Plus,
@@ -146,24 +148,25 @@ export default function MedicationsAudit({ filters, logs }: Props) {
         <AppLayout breadcrumbs={[{ title: 'Medications', href: '/medications' }, { title: 'Audit Log', href: '/medications/audit' }]}>
             <Head title="Medication Audit Log" />
 
-            <div className="space-y-6 p-6">
-                {/* Header */}
-                <div className="flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                    <div>
-                        <h1 className="text-2xl font-semibold tracking-tight">Medication Audit Log</h1>
-                        <p className="text-sm text-muted-foreground mt-1">
-                            Track medication orders, administrations, controlled register updates, and break-glass access.
-                        </p>
-                    </div>
-                    <Button
-                        variant="outline"
-                        onClick={() => window.location.href = `/medications/audit/export?${new URLSearchParams(query).toString()}`}
-                    >
-                        <Download className="mr-2 h-4 w-4" />
-                        Export CSV
-                    </Button>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={ClipboardCheck}
+                        title="Medication Audit Log"
+                        description="Track medication orders, administrations, controlled register updates, and break-glass access."
+                        actions={
+                            <Button
+                                variant="outline"
+                                onClick={() => window.location.href = `/medications/audit/export?${new URLSearchParams(query).toString()}`}
+                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                            >
+                                <Download className="mr-2 h-4 w-4" />
+                                Export CSV
+                            </Button>
+                        }
+                    />
+                }
+            >
                 {/* Filters */}
                 <Card>
                     <CardHeader className="pb-3">
@@ -369,7 +372,7 @@ export default function MedicationsAudit({ filters, logs }: Props) {
                         </Table>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
 
             {/* Full JSON Dialog */}
             <Dialog open={!!selectedLog} onOpenChange={() => setSelectedLog(null)}>

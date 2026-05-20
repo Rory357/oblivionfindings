@@ -6,7 +6,8 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { ArrowLeft, Edit, DollarSign, FileText, ShoppingCart, Users } from 'lucide-react';
+import { Edit, DollarSign, FileText, ShoppingCart, Users } from 'lucide-react';
+import { PageHero, PageLayout } from '@/components/page';
 
 interface Contact {
     id: number;
@@ -130,19 +131,14 @@ export default function VendorsShow({ vendor, bills, purchaseOrders, totalOutsta
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={vendor.name} />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-4">
-                        <Button variant="ghost" size="sm" asChild>
-                            <Link href="/finance/vendors">
-                                <ArrowLeft className="w-4 h-4 mr-1" />
-                                Back
-                            </Link>
-                        </Button>
-                        <div>
-                            <div className="flex items-center gap-3">
-                                <h1 className="text-2xl font-bold tracking-tight">{vendor.name}</h1>
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/finance/vendors"
+                        title={
+                            <span className="flex flex-wrap items-center gap-3">
+                                {vendor.name}
                                 <Badge
                                     variant={vendor.is_active ? 'default' : 'secondary'}
                                     className={
@@ -153,22 +149,20 @@ export default function VendorsShow({ vendor, bills, purchaseOrders, totalOutsta
                                 >
                                     {vendor.is_active ? 'Active' : 'Inactive'}
                                 </Badge>
-                            </div>
-                            {vendor.trading_name && (
-                                <p className="text-muted-foreground mt-1">
-                                    Trading as: {vendor.trading_name}
-                                </p>
-                            )}
-                        </div>
-                    </div>
-                    <Button asChild>
-                        <Link href={`/finance/vendors/${vendor.id}/edit`}>
-                            <Edit className="w-4 h-4 mr-2" />
-                            Edit
-                        </Link>
-                    </Button>
-                </div>
-
+                            </span>
+                        }
+                        description={vendor.trading_name ? `Trading as: ${vendor.trading_name}` : undefined}
+                        actions={
+                            <Button asChild>
+                                <Link href={`/finance/vendors/${vendor.id}/edit`}>
+                                    <Edit className="w-4 h-4 mr-2" />
+                                    Edit
+                                </Link>
+                            </Button>
+                        }
+                    />
+                }
+            >
                 <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
                     {/* Left column */}
                     <div className="lg:col-span-2 space-y-6">
@@ -440,7 +434,7 @@ export default function VendorsShow({ vendor, bills, purchaseOrders, totalOutsta
                         </Card>
                     </div>
                 </div>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

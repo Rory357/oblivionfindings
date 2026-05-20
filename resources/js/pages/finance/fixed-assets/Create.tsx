@@ -12,7 +12,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { ArrowLeft, Calculator } from 'lucide-react';
+import { Calculator } from 'lucide-react';
+import { PageHero, PageLayout } from '@/components/page';
 import { FormEvent, useMemo } from 'react';
 
 interface GlAccount {
@@ -95,19 +96,16 @@ export default function FixedAssetCreate({ assetAccounts, expenseAccounts }: Pro
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Add Fixed Asset" />
 
-            <div className="mx-auto max-w-3xl space-y-6 p-6">
-                <div className="flex items-center gap-4">
-                    <Link href={'/finance/fixed-assets'}>
-                        <Button variant="ghost" size="icon">
-                            <ArrowLeft className="h-4 w-4" />
-                        </Button>
-                    </Link>
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Add Fixed Asset</h1>
-                        <p className="text-muted-foreground">Register a new fixed asset in the asset register</p>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/finance/fixed-assets"
+                        title="Add Fixed Asset"
+                        description="Register a new fixed asset in the asset register"
+                    />
+                }
+            >
                 {generalError && (
                     <div className="rounded-lg bg-destructive/10 p-4 text-sm text-destructive">
                         {generalError}
@@ -388,7 +386,7 @@ export default function FixedAssetCreate({ assetAccounts, expenseAccounts }: Pro
                         </Button>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

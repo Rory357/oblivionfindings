@@ -5,6 +5,7 @@ import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { PageHero, PageLayout } from '@/components/page';
 
 interface BankAccount {
     id: number;
@@ -44,14 +45,16 @@ export default function ReconciliationCreate({ bankAccounts, preselectedBankAcco
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="New Reconciliation" />
 
-            <div className="max-w-2xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="mb-6">
-                    <h1 className="text-3xl font-bold text-foreground">New Bank Reconciliation</h1>
-                    <p className="text-muted-foreground mt-1">
-                        Start reconciling a bank statement against your ledger
-                    </p>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/finance/bank-reconciliation"
+                        title="New Bank Reconciliation"
+                        description="Start reconciling a bank statement against your ledger"
+                    />
+                }
+            >
                 <Card>
                     <CardHeader>
                         <CardTitle>Statement Details</CardTitle>
@@ -128,7 +131,7 @@ export default function ReconciliationCreate({ bankAccounts, preselectedBankAcco
                         </form>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

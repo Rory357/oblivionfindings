@@ -1,3 +1,4 @@
+import { PageHero } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
 import WizardStepper, { type WizardStep } from '@/components/wizard-stepper';
@@ -6,6 +7,7 @@ import AppLayout from '@/layouts/app-layout';
 import { formatDateTime, formatTime } from '@/lib/datetime';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
+    AlertOctagon,
     AlertTriangle,
     ArrowLeft,
     ArrowRight,
@@ -370,25 +372,23 @@ export default function IncidentCreate({ clients, resumeIncident }: Props) {
                 data-test="incident-wizard-root"
                 className="mx-auto w-full max-w-2xl space-y-6 px-4 pt-4 pb-[calc(7rem+env(safe-area-inset-bottom,0px))] lg:max-w-5xl lg:pb-8"
             >
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-xl font-semibold tracking-tight">
-                            Report an incident
-                        </h1>
-                        <p className="text-sm text-muted-foreground">
-                            Three quick steps. You can add more detail later.
-                        </p>
-                    </div>
-                    <Link
-                        href="/incidents"
-                        data-test="incident-wizard-exit"
-                        aria-label="Cancel incident report and return to incidents list"
-                        className="frontline-focus inline-flex min-h-11 shrink-0 items-center rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted lg:min-h-10"
-                    >
-                        <span className="lg:hidden">Exit</span>
-                        <span className="hidden lg:inline">Cancel</span>
-                    </Link>
-                </div>
+                <PageHero
+                    variant="compact"
+                    icon={AlertOctagon}
+                    title="Report an incident"
+                    description="Three quick steps. You can add more detail later."
+                    actions={
+                        <Link
+                            href="/incidents"
+                            data-test="incident-wizard-exit"
+                            aria-label="Cancel incident report and return to incidents list"
+                            className="frontline-focus inline-flex min-h-11 shrink-0 items-center rounded-md border px-4 py-2 text-sm font-medium hover:bg-muted lg:min-h-10"
+                        >
+                            <span className="lg:hidden">Exit</span>
+                            <span className="hidden lg:inline">Cancel</span>
+                        </Link>
+                    }
+                />
 
                 <div className="lg:grid lg:grid-cols-[minmax(0,1fr)_320px] lg:gap-8">
                     <div className="space-y-6 lg:space-y-8">

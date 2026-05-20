@@ -17,6 +17,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { Plus, Trash2 } from 'lucide-react';
+import { PageHero, PageLayout } from '@/components/page';
 import { cn } from '@/lib/utils';
 
 interface Account {
@@ -134,12 +135,16 @@ export default function JournalsCreate({ auth, accounts, costCentres, fundingStr
         >
             <Head title="New Journal Entry" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="mb-6">
-                    <h1 className="text-3xl font-bold text-foreground">New Journal Entry</h1>
-                    <p className="text-muted-foreground mt-1">Create a manual general ledger journal entry</p>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/finance/journals"
+                        title="New Journal Entry"
+                        description="Create a manual general ledger journal entry"
+                    />
+                }
+            >
                 {postingError && (
                     <div className="mb-4 rounded-md bg-status-critical-bg border border-status-critical/30 p-4">
                         <p className="text-sm text-status-critical">{postingError}</p>
@@ -401,7 +406,7 @@ export default function JournalsCreate({ auth, accounts, costCentres, fundingStr
                         </Button>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

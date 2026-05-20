@@ -1,5 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Tabs } from '@/components/ui/tabs';
@@ -7,8 +8,8 @@ import { StatusBadge } from '@/components/ui/status-badge';
 import { RiskMatrix } from '@/components/health-safety/risk-matrix';
 import { EventTimeline } from '@/components/health-safety/event-timeline';
 import {
-    Shield, AlertTriangle, Clock, FileText, CheckCircle2,
-    ShieldAlert, User, MapPin, Calendar, ChevronRight,
+    Shield, AlertTriangle, Clock, CheckCircle2,
+    ShieldAlert, User, Calendar, ChevronRight,
     ClipboardList, Search as SearchIcon, History,
 } from 'lucide-react';
 import { type BreadcrumbItem } from '@/types';
@@ -154,59 +155,64 @@ export default function HsEventShow({ event, investigations, corrective_actions,
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${event.reference_number} - H&S Event`} />
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-
-                {/* ── Hero Summary ── */}
-                <Card>
-                    <CardContent className="p-6">
-                        <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                            <div className="min-w-0">
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <h1 className="text-xl font-bold">{event.reference_number}</h1>
-                                    <StatusBadge status={event.severity} />
-                                    <StatusBadge status={event.status} />
-                                    {event.worksafe_notifiable && (
-                                        <span className="inline-flex items-center gap-1 rounded-full bg-status-critical-bg px-2.5 py-0.5 text-xs font-semibold text-status-critical border border-status-critical/30">
-                                            <ShieldAlert className="h-3 w-3" /> WorkSafe Notifiable
-                                        </span>
-                                    )}
-                                </div>
-                                <p className="mt-2 text-sm text-muted-foreground">
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/health-safety/events"
+                        icon={ShieldAlert}
+                        title={
+                            <span className="flex flex-wrap items-center gap-2">
+                                <span>{event.reference_number}</span>
+                                <StatusBadge status={event.severity} />
+                                <StatusBadge status={event.status} />
+                                {event.worksafe_notifiable && (
+                                    <span className="inline-flex items-center gap-1 rounded-full bg-status-critical-bg px-2.5 py-0.5 text-xs font-semibold text-status-critical border border-status-critical/30">
+                                        <ShieldAlert className="h-3 w-3" /> WorkSafe Notifiable
+                                    </span>
+                                )}
+                            </span>
+                        }
+                        description={
+                            <>
+                                <span>
                                     {CATEGORY_LABELS[event.event_category] ?? event.event_category}
                                     {event.site_name && <> at <Link href={`/sites/${event.site_id}`} className="text-status-info hover:underline">{event.site_name}</Link></>}
                                     {event.client_name && <> involving <Link href={`/clients/${event.client_id}`} className="text-status-info hover:underline">{event.client_name}</Link></>}
-                                </p>
-                                <div className="mt-2 flex flex-wrap gap-4 text-xs text-muted-foreground">
+                                </span>
+                                <span className="mt-2 flex flex-wrap gap-4 text-xs">
                                     {event.occurred_at && <span className="flex items-center gap-1"><Calendar className="h-3 w-3" /> Occurred {fmtDateTime(event.occurred_at)}</span>}
                                     {event.reported_at && <span className="flex items-center gap-1"><Clock className="h-3 w-3" /> Reported {fmtDateTime(event.reported_at)}</span>}
                                     {event.staff_name && <span className="flex items-center gap-1"><User className="h-3 w-3" /> {event.staff_name}</span>}
-                                </div>
+                                </span>
+                            </>
+                        }
+                    />
+                }
+            >
+                {/* Attention indicators */}
+                {(overdueActions.length > 0 || awaitingVerification.length > 0 || (event.investigation_required && !investigations.length)) && (
+                    <div className="flex flex-wrap gap-2">
+                        {overdueActions.length > 0 && (
+                            <div className="rounded-lg border border-status-critical/30 bg-status-critical-bg px-3 py-2 text-sm text-status-critical">
+                                <AlertTriangle className="mr-1 inline h-4 w-4" />
+                                {overdueActions.length} overdue action{overdueActions.length !== 1 ? 's' : ''}
                             </div>
-
-                            {/* Right side: what needs attention */}
-                            <div className="flex shrink-0 flex-col gap-2">
-                                {overdueActions.length > 0 && (
-                                    <div className="rounded-lg border border-status-critical/30 bg-status-critical-bg px-3 py-2 text-sm text-status-critical">
-                                        <AlertTriangle className="mr-1 inline h-4 w-4" />
-                                        {overdueActions.length} overdue action{overdueActions.length !== 1 ? 's' : ''}
-                                    </div>
-                                )}
-                                {awaitingVerification.length > 0 && (
-                                    <div className="rounded-lg border border-status-info/30 bg-status-info-bg px-3 py-2 text-sm text-status-info">
-                                        <CheckCircle2 className="mr-1 inline h-4 w-4" />
-                                        {awaitingVerification.length} awaiting verification
-                                    </div>
-                                )}
-                                {event.investigation_required && !investigations.length && (
-                                    <div className="rounded-lg border border-status-warning/30 bg-status-warning-bg px-3 py-2 text-sm text-status-warning">
-                                        <SearchIcon className="mr-1 inline h-4 w-4" />
-                                        Investigation required
-                                    </div>
-                                )}
+                        )}
+                        {awaitingVerification.length > 0 && (
+                            <div className="rounded-lg border border-status-info/30 bg-status-info-bg px-3 py-2 text-sm text-status-info">
+                                <CheckCircle2 className="mr-1 inline h-4 w-4" />
+                                {awaitingVerification.length} awaiting verification
                             </div>
-                        </div>
-                    </CardContent>
-                </Card>
+                        )}
+                        {event.investigation_required && !investigations.length && (
+                            <div className="rounded-lg border border-status-warning/30 bg-status-warning-bg px-3 py-2 text-sm text-status-warning">
+                                <SearchIcon className="mr-1 inline h-4 w-4" />
+                                Investigation required
+                            </div>
+                        )}
+                    </div>
+                )}
 
                 {/* ── Tabbed Content ── */}
                 <Tabs tabs={[
@@ -491,7 +497,7 @@ export default function HsEventShow({ event, investigations, corrective_actions,
                         ),
                     },
                 ]} />
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

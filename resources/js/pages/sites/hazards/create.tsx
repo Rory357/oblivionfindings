@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -282,30 +283,17 @@ export default function CreateHazard() {
         >
             <Head title={`Log Hazard - ${site.name}`} />
 
-            <div className="mx-auto max-w-4xl space-y-6 pb-8">
-                {/* Header */}
-                <div className="flex items-start justify-between gap-4">
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-status-warning-bg text-status-warning">
-                            <AlertTriangle className="h-5 w-5" />
-                        </div>
-                        <div>
-                            <h1 className="text-xl font-semibold tracking-tight">
-                                Log new hazard
-                            </h1>
-                            <p className="text-sm text-muted-foreground">
-                                Report a hazard at {site.name}
-                            </p>
-                        </div>
-                    </div>
-                    <Link
-                        href={`/sites/${site.id}/hazards`}
-                        className="rounded-md border px-3 py-2 text-xs font-medium transition-colors hover:bg-muted"
-                    >
-                        Back
-                    </Link>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref={`/sites/${site.id}/hazards`}
+                        icon={ShieldAlert}
+                        title="Log new hazard"
+                        description={`Report a hazard at ${site.name}`}
+                    />
+                }
+            >
                 <form onSubmit={handleSubmit} className="space-y-6">
                     {/* Step 1: Hazard Identification */}
                     <Card className="overflow-hidden">
@@ -772,7 +760,7 @@ export default function CreateHazard() {
                         </Button>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

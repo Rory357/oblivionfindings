@@ -6,6 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { ArrowLeftRight, TrendingDown, TrendingUp } from 'lucide-react';
+import { PageHero, PageLayout } from '@/components/page';
 import { useState } from 'react';
 import { router } from '@inertiajs/react';
 
@@ -75,14 +76,16 @@ export default function FxRevaluationCreate({ preview, date }: PageProps) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="New FX Revaluation" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div>
-                    <h1 className="text-2xl font-bold tracking-tight">New FX Revaluation</h1>
-                    <p className="text-muted-foreground">
-                        Preview unrealised foreign exchange gain/loss and create a revaluation record
-                    </p>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/finance/fx-revaluations"
+                        title="New FX Revaluation"
+                        description="Preview unrealised foreign exchange gain/loss and create a revaluation record"
+                    />
+                }
+            >
                 <Card>
                     <CardHeader>
                         <div className="flex items-center gap-2">
@@ -229,7 +232,7 @@ export default function FxRevaluationCreate({ preview, date }: PageProps) {
                         </div>
                     </form>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

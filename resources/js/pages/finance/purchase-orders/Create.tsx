@@ -7,6 +7,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Button } from '@/components/ui/button';
 import { Textarea } from '@/components/ui/textarea';
 import { usePage } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { useState, useCallback } from 'react';
 
 type Option = { id: number; name: string; code?: string };
@@ -103,9 +104,16 @@ export default function PurchaseOrderCreate() {
     return (
         <AppLayout breadcrumbs={[{ title: 'Finance', href: '/finance/dashboard' }, { title: 'Purchase Orders', href: '/finance/purchase-orders' }, { title: 'Create', href: '#' }]}>
             <Head title="Create Purchase Order" />
-            <div className="space-y-4 p-4">
-                <h1 className="text-xl font-semibold">New Purchase Order</h1>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/finance/purchase-orders"
+                        title="New Purchase Order"
+                        description="Raise a purchase order against a vendor"
+                    />
+                }
+            >
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <Card>
                         <CardHeader>
@@ -320,7 +328,7 @@ export default function PurchaseOrderCreate() {
                         </Button>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

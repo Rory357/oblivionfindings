@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { ShieldCheck } from 'lucide-react';
+import { PageHero, PageLayout } from '@/components/page';
 
 interface Obligation {
     id: number;
@@ -43,11 +44,16 @@ export default function EditCompliance({ auth, obligation }: { auth: any; obliga
             ]}
         >
             <Head title={`Edit: ${obligation.obligation_title}`} />
-            <div className="max-w-3xl mx-auto px-4 sm:px-6 lg:px-8">
-                <div className="flex items-center gap-3 mb-6">
-                    <ShieldCheck className="w-8 h-8 text-status-success" />
-                    <h1 className="text-3xl font-bold text-foreground">Edit Obligation</h1>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref={`/governance/compliance/${obligation.id}`}
+                        title="Edit Obligation"
+                        description={obligation.obligation_title}
+                    />
+                }
+            >
                 <Card>
                     <CardHeader><CardTitle>Obligation Details</CardTitle></CardHeader>
                     <CardContent>
@@ -103,7 +109,7 @@ export default function EditCompliance({ auth, obligation }: { auth: any; obliga
                         </form>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }
