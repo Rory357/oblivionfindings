@@ -23,16 +23,22 @@ class SiteTypePlanPdfService
         abort_unless($model['ready'], 409, 'Emergency plan needs an assembly point and at least one exit before export.');
 
         $canvas = $plan->layout['canvas'] ?? [];
-        $orientation = (($canvas['width'] ?? 1000) >= ($canvas['height'] ?? 700)) ? 'landscape' : 'portrait';
+        $storedOrientation = data_get($plan->layout, 'export.orientation');
+        $orientation = in_array($storedOrientation, ['landscape', 'portrait'], true)
+            ? $storedOrientation
+            : ((($canvas['width'] ?? 1000) >= ($canvas['height'] ?? 700)) ? 'landscape' : 'portrait');
         if ($paper === 'a5') {
             $orientation = 'portrait';
         }
 
         $filename = Str::slug($site->name)."-emergency-plan-{$paper}.pdf";
+        $model['paper'] = [
+            'size' => $paper,
+            'orientation' => $orientation,
+        ];
 
         return Pdf::loadView('pdf.site-type-plan.emergency', $model)
             ->setPaper(strtoupper($paper), $orientation)
             ->download($filename);
     }
 }
-

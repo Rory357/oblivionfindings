@@ -7,7 +7,10 @@ export function isSelectMode(kind: string | null): boolean {
     return kind === null || kind === SELECT_TOOL;
 }
 
-export function isEmergencyPlanKind(kind: string, emergencyKinds: string[]): boolean {
+export function isEmergencyPlanKind(
+    kind: string,
+    emergencyKinds: string[],
+): boolean {
     return emergencyKinds.includes(kind);
 }
 
@@ -49,6 +52,9 @@ export type PlanDoor = {
     y: number;
     width?: number;
     rotation_deg?: number;
+    wall_id?: string | null;
+    wall_segment_index?: number | null;
+    wall_t?: number | null;
     subkind?: DoorSubkind;
     swing_side?: DoorSwingSide;
     swing_direction?: DoorSwingDirection;
@@ -67,7 +73,8 @@ export function normaliseDoor(door: PlanDoor): NormalisedDoor {
     return {
         ...door,
         subkind: door.subkind ?? 'single_swing',
-        swing_side: door.swing_side ?? (door.swing === 'left' ? 'left' : 'right'),
+        swing_side:
+            door.swing_side ?? (door.swing === 'left' ? 'left' : 'right'),
         swing_direction: door.swing_direction ?? 'in',
         width: door.width ?? 0.06,
     };
@@ -95,6 +102,9 @@ export type PlanWindow = {
     y: number;
     width?: number;
     rotation_deg?: number;
+    wall_id?: string | null;
+    wall_segment_index?: number | null;
+    wall_t?: number | null;
 };
 
 export type PlanLabel = {
@@ -118,6 +128,10 @@ export type PlanLayout = {
     scale?: null | {
         meters_per_unit?: number;
         calibrated_at?: string;
+    };
+    export?: {
+        paper?: 'a3' | 'a4' | 'a5';
+        orientation?: 'landscape' | 'portrait';
     };
     walls?: PlanWall[];
     rooms?: PlanRoom[];
@@ -213,12 +227,14 @@ export type SelectionRef =
     | { type: 'label'; id: string }
     | { type: 'pin'; id: string | number };
 
-export function normaliseLayout(layout?: PlanLayout | null): Required<
+export function normaliseLayout(
+    layout?: PlanLayout | null,
+): Required<
     Pick<PlanLayout, 'rooms' | 'walls' | 'doors' | 'windows' | 'labels'>
 > &
     PlanLayout {
     return {
-        schema_version: 1,
+        schema_version: 2,
         canvas: {
             width: 1000,
             height: 700,
@@ -228,9 +244,14 @@ export function normaliseLayout(layout?: PlanLayout | null): Required<
         },
         grid: { enabled: true, size: 10, snap: true, ...(layout?.grid ?? {}) },
         scale: layout?.scale ?? null,
+        export: {
+            paper: 'a4',
+            orientation: 'landscape',
+            ...(layout?.export ?? {}),
+        },
         rooms: layout?.rooms ?? [],
         walls: layout?.walls ?? [],
-        doors: layout?.doors ?? [],
+        doors: (layout?.doors ?? []).map((door) => normaliseDoor(door)),
         windows: layout?.windows ?? [],
         labels: layout?.labels ?? [],
     };

@@ -2,7 +2,6 @@
 
 namespace App\Services\Sites;
 
-use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
 use App\Models\Site;
 use App\Models\SiteFacilityZone;
@@ -154,6 +153,7 @@ class SiteTypePlanService
 
                 if ($pinId) {
                     $plan->pins()->whereKey($pinId)->firstOrFail()->update($payload);
+
                     continue;
                 }
 
@@ -390,17 +390,41 @@ class SiteTypePlanService
         $label = in_array($type, ['house', 'residential'], true) ? 'Bedroom 1' : 'Zone 1';
 
         return $this->normaliseLayout([
-            'schema_version' => 1,
+            'schema_version' => 2,
             'canvas' => ['width' => 1000, 'height' => 700, 'unit' => 'rel'],
             'grid' => ['enabled' => true, 'size' => 10, 'snap' => true],
+            'export' => ['paper' => 'a4', 'orientation' => 'landscape'],
             'rooms' => [
                 ['id' => 'room-1', 'label' => $label, 'shape' => 'rect', 'x' => 0.08, 'y' => 0.12, 'width' => 0.28, 'height' => 0.24],
                 ['id' => 'room-2', 'label' => 'Kitchen', 'shape' => 'rect', 'x' => 0.38, 'y' => 0.12, 'width' => 0.24, 'height' => 0.24],
                 ['id' => 'room-3', 'label' => 'Lounge', 'shape' => 'rect', 'x' => 0.08, 'y' => 0.40, 'width' => 0.54, 'height' => 0.28],
             ],
-            'walls' => [],
-            'doors' => [],
-            'windows' => [],
+            'walls' => [
+                ['id' => 'wall-front', 'points' => [['x' => 0.08, 'y' => 0.68], ['x' => 0.62, 'y' => 0.68]], 'thickness' => 4],
+                ['id' => 'wall-back', 'points' => [['x' => 0.08, 'y' => 0.12], ['x' => 0.62, 'y' => 0.12]], 'thickness' => 4],
+                ['id' => 'wall-left', 'points' => [['x' => 0.08, 'y' => 0.12], ['x' => 0.08, 'y' => 0.68]], 'thickness' => 4],
+                ['id' => 'wall-right', 'points' => [['x' => 0.62, 'y' => 0.12], ['x' => 0.62, 'y' => 0.68]], 'thickness' => 4],
+                ['id' => 'wall-hall', 'points' => [['x' => 0.36, 'y' => 0.12], ['x' => 0.36, 'y' => 0.68]], 'thickness' => 3],
+            ],
+            'doors' => [
+                [
+                    'id' => 'door-front',
+                    'x' => 0.44,
+                    'y' => 0.68,
+                    'width' => 0.1,
+                    'rotation_deg' => 0,
+                    'wall_id' => 'wall-front',
+                    'wall_segment_index' => 0,
+                    'wall_t' => 0.75,
+                    'subkind' => 'single_swing',
+                    'swing_side' => 'right',
+                    'swing_direction' => 'in',
+                ],
+            ],
+            'windows' => [
+                ['id' => 'window-lounge', 'x' => 0.2, 'y' => 0.12, 'width' => 0.12, 'rotation_deg' => 0, 'wall_id' => 'wall-back', 'wall_segment_index' => 0, 'wall_t' => 0.28],
+                ['id' => 'window-bedroom', 'x' => 0.02, 'y' => 0.28, 'width' => 0.1, 'rotation_deg' => 90, 'wall_id' => 'wall-left', 'wall_segment_index' => 0, 'wall_t' => 0.3],
+            ],
             'labels' => [],
         ], $type);
     }
@@ -412,6 +436,7 @@ class SiteTypePlanService
         $width = (int) ($canvas['width'] ?? 1000);
         $height = (int) ($canvas['height'] ?? 700);
         $pinList = $pins ?? $plan->pins;
+        $openings = $this->attachedOpenings($layout);
 
         $svg = [];
         $svg[] = sprintf('<svg xmlns="http://www.w3.org/2000/svg" viewBox="0 0 %d %d" role="img">', $width, $height);
@@ -429,17 +454,25 @@ class SiteTypePlanService
         }
 
         foreach (($layout['walls'] ?? []) as $wall) {
-            $points = collect($wall['points'] ?? [])
-                ->map(fn ($point) => sprintf('%.2f,%.2f', (float) ($point['x'] ?? 0) * $width, (float) ($point['y'] ?? 0) * $height))
-                ->implode(' ');
-            if ($points !== '') {
-                $thickness = (int) ($wall['thickness'] ?? 4);
-                $svg[] = sprintf('<polyline points="%s" fill="none" stroke="#111827" stroke-width="%d"/>', $points, $thickness);
+            $thickness = (int) ($wall['thickness'] ?? 4);
+            foreach ($this->wallSegmentsWithOpenings($wall, $openings, $width, $height) as $segment) {
+                $svg[] = sprintf(
+                    '<line x1="%.2f" y1="%.2f" x2="%.2f" y2="%.2f" stroke="#111827" stroke-width="%d" stroke-linecap="round"/>',
+                    $segment['a']['x'] * $width,
+                    $segment['a']['y'] * $height,
+                    $segment['b']['x'] * $width,
+                    $segment['b']['y'] * $height,
+                    $thickness,
+                );
             }
         }
 
         foreach (($layout['doors'] ?? []) as $door) {
-            $svg[] = $this->renderDoorSvg($this->normaliseDoor($door), $width, $height);
+            $svg[] = $this->renderDoorSvg($this->resolveOpening($this->normaliseDoor($door), $layout['walls'] ?? [], $width, $height), $width, $height);
+        }
+
+        foreach (($layout['windows'] ?? []) as $window) {
+            $svg[] = $this->renderWindowSvg($this->resolveOpening($this->normaliseWindow($window), $layout['walls'] ?? [], $width, $height), $width, $height);
         }
 
         foreach ($pinList as $pin) {
@@ -497,8 +530,8 @@ class SiteTypePlanService
 
     private function normaliseLayout(array $layout, string $type): array
     {
-        return array_replace_recursive([
-            'schema_version' => 1,
+        $normalised = array_replace_recursive([
+            'schema_version' => 2,
             'canvas' => [
                 'width' => 1000,
                 'height' => 700,
@@ -508,6 +541,7 @@ class SiteTypePlanService
                 'meters_per_unit' => 0.025,
             ],
             'grid' => ['enabled' => true, 'size' => 10, 'snap' => true],
+            'export' => ['paper' => 'a4', 'orientation' => 'landscape'],
             'scale' => null,
             'walls' => [],
             'rooms' => [],
@@ -516,6 +550,22 @@ class SiteTypePlanService
             'labels' => [],
             'site_type' => $type,
         ], $layout);
+
+        $normalised['schema_version'] = 2;
+        $normalised['doors'] = collect($normalised['doors'] ?? [])
+            ->map(fn ($door) => $this->normaliseDoor(is_array($door) ? $door : []))
+            ->values()
+            ->all();
+        $normalised['windows'] = collect($normalised['windows'] ?? [])
+            ->map(fn ($window) => $this->normaliseWindow(is_array($window) ? $window : []))
+            ->values()
+            ->all();
+        $normalised['export'] = array_replace([
+            'paper' => 'a4',
+            'orientation' => 'landscape',
+        ], is_array($normalised['export'] ?? null) ? $normalised['export'] : []);
+
+        return $normalised;
     }
 
     private function pinPayload(SiteTypePlan $plan, array $pinData, int $index): array
@@ -573,6 +623,157 @@ class SiteTypePlanService
             'width' => 0.06,
             'rotation_deg' => 0,
         ], $door, ['swing_side' => $swingSide]);
+    }
+
+    private function normaliseWindow(array $window): array
+    {
+        return array_merge([
+            'id' => 'window-'.substr(md5(json_encode($window)), 0, 8),
+            'x' => 0.5,
+            'y' => 0.5,
+            'width' => 0.1,
+            'rotation_deg' => 0,
+            'wall_id' => null,
+            'wall_segment_index' => null,
+            'wall_t' => null,
+        ], $window);
+    }
+
+    private function attachedOpenings(array $layout): array
+    {
+        return collect(array_merge($layout['doors'] ?? [], $layout['windows'] ?? []))
+            ->filter(fn ($opening) => is_array($opening) && ! empty($opening['wall_id']) && isset($opening['wall_t']))
+            ->values()
+            ->all();
+    }
+
+    private function openingWidth(array $opening, float $fallback = 0.08): float
+    {
+        $width = (float) ($opening['width'] ?? $fallback);
+
+        return max(0.02, min(0.4, $width));
+    }
+
+    private function wallSegmentsWithOpenings(array $wall, array $openings, int $canvasWidth, int $canvasHeight): array
+    {
+        $points = array_values($wall['points'] ?? []);
+        $segments = [];
+
+        for ($index = 0; $index < count($points) - 1; $index++) {
+            $a = $points[$index];
+            $b = $points[$index + 1];
+            $lengthPx = $this->segmentLengthPx($a, $b, $canvasWidth, $canvasHeight);
+            if ($lengthPx <= 0.0001) {
+                continue;
+            }
+
+            $cuts = collect($openings)
+                ->filter(fn ($opening) => ($opening['wall_id'] ?? null) === ($wall['id'] ?? null)
+                    && (int) ($opening['wall_segment_index'] ?? 0) === $index
+                    && isset($opening['wall_t']))
+                ->map(function ($opening) use ($lengthPx, $canvasWidth) {
+                    $half = (($this->openingWidth($opening) * $canvasWidth) / 2) / $lengthPx;
+                    $t = (float) ($opening['wall_t'] ?? 0);
+
+                    return [
+                        'start' => max(0, min(1, $t - $half)),
+                        'end' => max(0, min(1, $t + $half)),
+                    ];
+                })
+                ->filter(fn ($cut) => $cut['end'] - $cut['start'] > 0.001)
+                ->sortBy('start')
+                ->values()
+                ->all();
+
+            $cursor = 0.0;
+            foreach ($cuts as $cut) {
+                $this->pushWallSegment($segments, $wall, $index, $a, $b, $cursor, $cut['start']);
+                $cursor = max($cursor, (float) $cut['end']);
+            }
+            $this->pushWallSegment($segments, $wall, $index, $a, $b, $cursor, 1.0);
+        }
+
+        return $segments;
+    }
+
+    private function pushWallSegment(array &$segments, array $wall, int $segmentIndex, array $a, array $b, float $start, float $end): void
+    {
+        if ($end - $start <= 0.001) {
+            return;
+        }
+
+        $segments[] = [
+            'id' => ($wall['id'] ?? 'wall').'-'.$segmentIndex.'-'.count($segments),
+            'a' => $this->interpolatePoint($a, $b, $start),
+            'b' => $this->interpolatePoint($a, $b, $end),
+        ];
+    }
+
+    private function interpolatePoint(array $a, array $b, float $t): array
+    {
+        return [
+            'x' => (float) ($a['x'] ?? 0) + ((float) ($b['x'] ?? 0) - (float) ($a['x'] ?? 0)) * $t,
+            'y' => (float) ($a['y'] ?? 0) + ((float) ($b['y'] ?? 0) - (float) ($a['y'] ?? 0)) * $t,
+        ];
+    }
+
+    private function segmentLengthPx(array $a, array $b, int $canvasWidth, int $canvasHeight): float
+    {
+        $dx = ((float) ($b['x'] ?? 0) - (float) ($a['x'] ?? 0)) * $canvasWidth;
+        $dy = ((float) ($b['y'] ?? 0) - (float) ($a['y'] ?? 0)) * $canvasHeight;
+
+        return sqrt($dx * $dx + $dy * $dy);
+    }
+
+    private function resolveOpening(array $opening, array $walls, int $canvasWidth, int $canvasHeight): array
+    {
+        $wallId = $opening['wall_id'] ?? null;
+        $segmentIndex = isset($opening['wall_segment_index']) ? (int) $opening['wall_segment_index'] : null;
+        $wallT = isset($opening['wall_t']) ? max(0, min(1, (float) $opening['wall_t'])) : null;
+        $width = $this->openingWidth($opening, (isset($opening['subkind']) ? 0.06 : 0.1));
+
+        if ($wallId && $segmentIndex !== null && $wallT !== null) {
+            $wall = collect($walls)->firstWhere('id', $wallId);
+            $points = array_values($wall['points'] ?? []);
+            if (isset($points[$segmentIndex], $points[$segmentIndex + 1])) {
+                $a = $points[$segmentIndex];
+                $b = $points[$segmentIndex + 1];
+                $anchor = $this->interpolatePoint($a, $b, $wallT);
+                $rotation = rad2deg(atan2(
+                    ((float) ($b['y'] ?? 0) - (float) ($a['y'] ?? 0)) * $canvasHeight,
+                    ((float) ($b['x'] ?? 0) - (float) ($a['x'] ?? 0)) * $canvasWidth,
+                ));
+
+                return array_merge($opening, [
+                    'x' => max(0, min(1, $anchor['x'] - $width / 2)),
+                    'y' => max(0, min(1, $anchor['y'])),
+                    'width' => $width,
+                    'rotation_deg' => $rotation,
+                ]);
+            }
+        }
+
+        return array_merge($opening, ['width' => $width]);
+    }
+
+    private function renderWindowSvg(array $window, int $canvasWidth, int $canvasHeight): string
+    {
+        $x = (float) ($window['x'] ?? 0) * $canvasWidth;
+        $y = (float) ($window['y'] ?? 0) * $canvasHeight;
+        $w = (float) ($window['width'] ?? 0.1) * $canvasWidth;
+        $rotation = (float) ($window['rotation_deg'] ?? 0);
+        $cx = $x + $w / 2;
+        $cy = $y;
+        $open = $rotation !== 0.0
+            ? sprintf('<g transform="rotate(%.2f %.2f %.2f)">', $rotation, $cx, $cy)
+            : '<g>';
+
+        return $open
+            .sprintf('<rect x="%.2f" y="%.2f" width="%.2f" height="14" fill="#ffffff"/>', $x - 2, $y - 7, $w + 4)
+            .sprintf('<rect x="%.2f" y="%.2f" width="%.2f" height="10" rx="2" fill="#e0f2fe" stroke="#0284c7" stroke-width="2"/>', $x, $y - 5, $w)
+            .sprintf('<line x1="%.2f" y1="%.2f" x2="%.2f" y2="%.2f" stroke="#0369a1" stroke-width="1.2"/>', $x + 5, $y - 2.5, $x + $w - 5, $y - 2.5)
+            .sprintf('<line x1="%.2f" y1="%.2f" x2="%.2f" y2="%.2f" stroke="#0369a1" stroke-width="1.2"/>', $x + 5, $y + 2.5, $x + $w - 5, $y + 2.5)
+            .'</g>';
     }
 
     /**

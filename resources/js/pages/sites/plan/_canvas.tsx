@@ -17,15 +17,24 @@ import {
     type CSSProperties,
     type Dispatch,
 } from 'react';
+import { toast } from 'sonner';
+import { DoorSymbol } from './_door';
 import {
-    SELECT_TOOL,
-    isEmergencyPlanKind,
-    isSelectMode,
+    openingCentreFromTopLeft,
+    resolveAttachedOpening,
+    snapOpeningToNearestWall,
+    wallSegmentsWithOpenings,
+    type AttachedOpening,
+} from './_geometry';
+import {
     distanceCanvasUnits,
     formatMeters,
+    isEmergencyPlanKind,
+    isSelectMode,
     metersPerUnit,
     normaliseDoor,
     normaliseLayout,
+    type BuilderMode,
     type DoorSubkind,
     type PlanDoor,
     type PlanLabel,
@@ -34,11 +43,9 @@ import {
     type PlanRoom,
     type PlanWall,
     type PlanWindow,
-    type BuilderMode,
     type SelectionRef,
     type Taxonomy,
 } from './_types';
-import { DoorSymbol } from './_door';
 import {
     refKey,
     sameRef,
@@ -62,7 +69,10 @@ type Props = {
     emergencyKinds?: string[];
     validationErrors?: Record<string, string>;
     dispatch: Dispatch<EditorAction>;
-    onRequestCalibration: (firstPoint: { x: number; y: number }, secondPoint: { x: number; y: number }) => void;
+    onRequestCalibration: (
+        firstPoint: { x: number; y: number },
+        secondPoint: { x: number; y: number },
+    ) => void;
 };
 
 type DragBase =
@@ -119,7 +129,16 @@ type MarqueeRef = {
 };
 
 type ResizeHandle = 'nw' | 'n' | 'ne' | 'e' | 'se' | 's' | 'sw' | 'w';
-const RESIZE_HANDLES: ResizeHandle[] = ['nw', 'n', 'ne', 'e', 'se', 's', 'sw', 'w'];
+const RESIZE_HANDLES: ResizeHandle[] = [
+    'nw',
+    'n',
+    'ne',
+    'e',
+    'se',
+    's',
+    'sw',
+    'w',
+];
 
 type IconProps = { className?: string; style?: CSSProperties };
 
@@ -131,13 +150,24 @@ function clamp01(value: number): number {
 }
 
 function resolveIcon(name: string): React.ComponentType<IconProps> {
-    const candidate = (Lucide as unknown as Record<string, React.ComponentType<IconProps>>)[name];
-    return candidate ?? (Lucide.MapPin as unknown as React.ComponentType<IconProps>);
+    const candidate = (
+        Lucide as unknown as Record<string, React.ComponentType<IconProps>>
+    )[name];
+    return (
+        candidate ??
+        (Lucide.MapPin as unknown as React.ComponentType<IconProps>)
+    );
 }
 
-function pinStyle(kind: string, taxonomy: Taxonomy | null): { color: string; icon: string } {
+function pinStyle(
+    kind: string,
+    taxonomy: Taxonomy | null,
+): { color: string; icon: string } {
     if (taxonomy?.kinds?.[kind]) {
-        return { color: taxonomy.kinds[kind].color, icon: taxonomy.kinds[kind].icon };
+        return {
+            color: taxonomy.kinds[kind].color,
+            icon: taxonomy.kinds[kind].icon,
+        };
     }
     return { color: '#475569', icon: 'MapPin' };
 }
@@ -164,10 +194,16 @@ function snapToGrid(
     const gridSize = layout.grid?.size ?? 10;
     const sx = gridSize / canvas.width;
     const sy = gridSize / canvas.height;
-    return { x: Math.round(point.x / sx) * sx, y: Math.round(point.y / sy) * sy };
+    return {
+        x: Math.round(point.x / sx) * sx,
+        y: Math.round(point.y / sy) * sy,
+    };
 }
 
-function constrainAngle(start: { x: number; y: number }, end: { x: number; y: number }): { x: number; y: number } {
+function constrainAngle(
+    start: { x: number; y: number },
+    end: { x: number; y: number },
+): { x: number; y: number } {
     const dx = end.x - start.x;
     const dy = end.y - start.y;
     if (Math.abs(dx) < 1e-6 && Math.abs(dy) < 1e-6) return end;
@@ -175,10 +211,16 @@ function constrainAngle(start: { x: number; y: number }, end: { x: number; y: nu
     const step = Math.PI / 4;
     const snapped = Math.round(angle / step) * step;
     const length = Math.hypot(dx, dy);
-    return { x: start.x + Math.cos(snapped) * length, y: start.y + Math.sin(snapped) * length };
+    return {
+        x: start.x + Math.cos(snapped) * length,
+        y: start.y + Math.sin(snapped) * length,
+    };
 }
 
-function isRefInSelection(selection: SelectionRef[], ref: SelectionRef): boolean {
+function isRefInSelection(
+    selection: SelectionRef[],
+    ref: SelectionRef,
+): boolean {
     return selection.some((s) => sameRef(s, ref));
 }
 
@@ -202,7 +244,12 @@ function refsInsideMarquee(
     const result: SelectionRef[] = [];
     if (showStructure) {
         for (const room of layout.rooms) {
-            if (inside({ x: room.x + room.width / 2, y: room.y + room.height / 2 })) {
+            if (
+                inside({
+                    x: room.x + room.width / 2,
+                    y: room.y + room.height / 2,
+                })
+            ) {
                 result.push({ type: 'room', id: room.id });
             }
         }
@@ -215,13 +262,16 @@ function refsInsideMarquee(
             }
         }
         for (const door of layout.doors) {
-            if (inside({ x: door.x, y: door.y })) result.push({ type: 'door', id: door.id });
+            if (inside({ x: door.x, y: door.y }))
+                result.push({ type: 'door', id: door.id });
         }
         for (const win of layout.windows) {
-            if (inside({ x: win.x, y: win.y })) result.push({ type: 'window', id: win.id });
+            if (inside({ x: win.x, y: win.y }))
+                result.push({ type: 'window', id: win.id });
         }
         for (const label of layout.labels) {
-            if (inside({ x: label.x, y: label.y })) result.push({ type: 'label', id: label.id });
+            if (inside({ x: label.x, y: label.y }))
+                result.push({ type: 'label', id: label.id });
         }
     }
     pins.forEach((pin, index) => {
@@ -244,7 +294,10 @@ function selectionBounds(
         if (ref.type === 'room') {
             const room = layout.rooms.find((item) => item.id === ref.id);
             if (room) {
-                points.push({ x: room.x, y: room.y }, { x: room.x + room.width, y: room.y + room.height });
+                points.push(
+                    { x: room.x, y: room.y },
+                    { x: room.x + room.width, y: room.y + room.height },
+                );
             }
         } else if (ref.type === 'wall') {
             const wall = layout.walls.find((item) => item.id === ref.id);
@@ -259,7 +312,9 @@ function selectionBounds(
             const label = layout.labels.find((item) => item.id === ref.id);
             if (label) points.push({ x: label.x, y: label.y });
         } else if (ref.type === 'pin') {
-            const pin = pins.find((item, index) => pinIdOf(item, index) === String(ref.id));
+            const pin = pins.find(
+                (item, index) => pinIdOf(item, index) === String(ref.id),
+            );
             if (pin) points.push({ x: pin.x, y: pin.y });
         }
     }
@@ -296,6 +351,23 @@ export default function PlanCanvas(props: Props) {
     const canvasWidth = layout.canvas?.width ?? 1000;
     const canvasHeight = layout.canvas?.height ?? 700;
     const mpu = metersPerUnit(layout);
+    const canvasSize = useMemo(
+        () => ({ width: canvasWidth, height: canvasHeight }),
+        [canvasHeight, canvasWidth],
+    );
+    const attachedOpenings = useMemo<AttachedOpening[]>(
+        () => [
+            ...layout.doors.map((door) => ({
+                ...door,
+                width: normaliseDoor(door).width,
+            })),
+            ...layout.windows.map((win) => ({
+                ...win,
+                width: win.width ?? 0.1,
+            })),
+        ],
+        [layout.doors, layout.windows],
+    );
 
     const svgRef = useRef<SVGSVGElement | null>(null);
     const dragRef = useRef<DragRef | null>(null);
@@ -311,8 +383,15 @@ export default function PlanCanvas(props: Props) {
     const [shiftHeld, setShiftHeld] = useState(false);
     const [altHeld, setAltHeld] = useState(false);
     const [groupDragging, setGroupDragging] = useState(false);
-    const [hoverPoint, setHoverPoint] = useState<{ x: number; y: number } | null>(null);
-    const [contextMenu, setContextMenu] = useState<{ x: number; y: number; ref: SelectionRef } | null>(null);
+    const [hoverPoint, setHoverPoint] = useState<{
+        x: number;
+        y: number;
+    } | null>(null);
+    const [contextMenu, setContextMenu] = useState<{
+        x: number;
+        y: number;
+        ref: SelectionRef;
+    } | null>(null);
     const shouldSnap = layout.grid?.snap !== false && !altHeld;
 
     const openContextMenu = useCallback(
@@ -352,7 +431,10 @@ export default function PlanCanvas(props: Props) {
     }, []);
 
     const pointFromEvent = useCallback(
-        (event: { clientX: number; clientY: number }): { x: number; y: number } => {
+        (event: {
+            clientX: number;
+            clientY: number;
+        }): { x: number; y: number } => {
             const svg = svgRef.current;
             if (!svg) return { x: 0, y: 0 };
             const rect = svg.getBoundingClientRect();
@@ -365,12 +447,15 @@ export default function PlanCanvas(props: Props) {
     );
 
     const isEditablePinKind = useCallback(
-        (kind: string) => mode === 'full' || isEmergencyPlanKind(kind, emergencyKinds),
+        (kind: string) =>
+            mode === 'full' || isEmergencyPlanKind(kind, emergencyKinds),
         [emergencyKinds, mode],
     );
 
     const isVisible = useCallback(
-        (kind: string) => layers[layerOfKind(kind, taxonomy)] !== false && (mode === 'full' || isEditablePinKind(kind)),
+        (kind: string) =>
+            layers[layerOfKind(kind, taxonomy)] !== false &&
+            (mode === 'full' || isEditablePinKind(kind)),
         [isEditablePinKind, layers, mode, taxonomy],
     );
 
@@ -389,7 +474,9 @@ export default function PlanCanvas(props: Props) {
             }
             // Start marquee selection
             try {
-                (event.currentTarget as Element).setPointerCapture(event.pointerId);
+                (event.currentTarget as Element).setPointerCapture(
+                    event.pointerId,
+                );
             } catch {
                 // setPointerCapture can fail in some test envs — safe to ignore
             }
@@ -407,7 +494,12 @@ export default function PlanCanvas(props: Props) {
 
     const handleBackgroundMouseDown = useCallback(
         (event: React.MouseEvent<SVGRectElement>) => {
-            if (event.button !== 0 || marqueeRef.current || !isSelectMode(activeKind)) return;
+            if (
+                event.button !== 0 ||
+                marqueeRef.current ||
+                !isSelectMode(activeKind)
+            )
+                return;
 
             const raw = pointFromEvent(event);
             marqueeRef.current = {
@@ -433,11 +525,20 @@ export default function PlanCanvas(props: Props) {
             if (interaction.mode === 'marquee') return;
             if (dragRef.current) return;
             const raw = pointFromEvent(event);
-            const point = snapToGrid(raw, layout, { width: canvasWidth, height: canvasHeight }, shouldSnap);
+            const point = snapToGrid(
+                raw,
+                layout,
+                { width: canvasWidth, height: canvasHeight },
+                shouldSnap,
+            );
 
             if (activeKind === '__scale') {
                 if (interaction.mode !== 'calibrating') {
-                    dispatch({ type: 'begin_calibration', point, rawPoint: raw });
+                    dispatch({
+                        type: 'begin_calibration',
+                        point,
+                        rawPoint: raw,
+                    });
                 } else if (interaction.firstPoint) {
                     onRequestCalibration(interaction.firstPoint, point);
                 }
@@ -446,9 +547,15 @@ export default function PlanCanvas(props: Props) {
 
             if (activeKind === '__wall') {
                 if (interaction.mode !== 'drawing_wall') {
-                    dispatch({ type: 'begin_drawing_wall', point, rawPoint: raw });
+                    dispatch({
+                        type: 'begin_drawing_wall',
+                        point,
+                        rawPoint: raw,
+                    });
                 } else {
-                    const second = shiftHeld ? constrainAngle(interaction.firstPoint, point) : point;
+                    const second = shiftHeld
+                        ? constrainAngle(interaction.firstPoint, point)
+                        : point;
                     dispatch({ type: 'complete_drawing_wall', point: second });
                 }
                 return;
@@ -456,7 +563,11 @@ export default function PlanCanvas(props: Props) {
 
             if (activeKind === 'evacuation_route') {
                 if (interaction.mode !== 'drawing_polyline') {
-                    dispatch({ type: 'begin_drawing_polyline', point, rawPoint: raw });
+                    dispatch({
+                        type: 'begin_drawing_polyline',
+                        point,
+                        rawPoint: raw,
+                    });
                 } else {
                     dispatch({ type: 'append_polyline_vertex', point });
                 }
@@ -483,15 +594,34 @@ export default function PlanCanvas(props: Props) {
             }
             if (activeKind === '__door') {
                 const id = `door-${Date.now()}`;
-                const subkind = (activeSubkind as DoorSubkind | null) ?? 'single_swing';
+                const subkind =
+                    (activeSubkind as DoorSubkind | null) ?? 'single_swing';
+                const snapped = snapOpeningToNearestWall(
+                    point,
+                    layout.walls,
+                    canvasSize,
+                    { width: 0.08, maxDistancePx: 64 },
+                );
+                if (!snapped) {
+                    toast.warning(
+                        layout.walls.length > 0
+                            ? 'Place doors close to a wall so the opening can snap cleanly.'
+                            : 'Draw a wall first, then place doors on the wall.',
+                    );
+                    return;
+                }
                 dispatch({ type: 'commit' });
                 dispatch({
                     type: 'add_door',
                     door: {
                         id,
-                        x: point.x,
-                        y: point.y,
-                        width: 0.08,
+                        x: snapped.x,
+                        y: snapped.y,
+                        width: snapped.width,
+                        rotation_deg: snapped.rotation_deg,
+                        wall_id: snapped.wall_id,
+                        wall_segment_index: snapped.wall_segment_index,
+                        wall_t: snapped.wall_t,
                         swing: 'right',
                         subkind,
                         swing_side: 'right',
@@ -503,10 +633,33 @@ export default function PlanCanvas(props: Props) {
             }
             if (activeKind === '__window') {
                 const id = `win-${Date.now()}`;
+                const snapped = snapOpeningToNearestWall(
+                    point,
+                    layout.walls,
+                    canvasSize,
+                    { width: 0.1, maxDistancePx: 64 },
+                );
+                if (!snapped) {
+                    toast.warning(
+                        layout.walls.length > 0
+                            ? 'Place windows close to a wall so the opening can snap cleanly.'
+                            : 'Draw a wall first, then place windows on the wall.',
+                    );
+                    return;
+                }
                 dispatch({ type: 'commit' });
                 dispatch({
                     type: 'add_window',
-                    window: { id, x: point.x, y: point.y, width: 0.1 },
+                    window: {
+                        id,
+                        x: snapped.x,
+                        y: snapped.y,
+                        width: snapped.width,
+                        rotation_deg: snapped.rotation_deg,
+                        wall_id: snapped.wall_id,
+                        wall_segment_index: snapped.wall_segment_index,
+                        wall_t: snapped.wall_t,
+                    },
                     selectAfter: true,
                 });
                 return;
@@ -516,7 +669,13 @@ export default function PlanCanvas(props: Props) {
                 dispatch({ type: 'commit' });
                 dispatch({
                     type: 'add_label',
-                    label: { id, x: point.x, y: point.y, text: 'Label', size: 16 },
+                    label: {
+                        id,
+                        x: point.x,
+                        y: point.y,
+                        text: 'Label',
+                        size: 16,
+                    },
                     selectAfter: true,
                 });
                 dispatch({ type: 'begin_edit', target: { type: 'label', id } });
@@ -539,25 +698,63 @@ export default function PlanCanvas(props: Props) {
             // No tool, no marquee drag: deselect
             dispatch({ type: 'select', ref: null });
         },
-        [activeKind, activeSubkind, canvasHeight, canvasWidth, dispatch, interaction, layout, onRequestCalibration, pointFromEvent, shiftHeld, shouldSnap],
+        [
+            activeKind,
+            activeSubkind,
+            canvasHeight,
+            canvasSize,
+            canvasWidth,
+            dispatch,
+            interaction,
+            layout,
+            onRequestCalibration,
+            pointFromEvent,
+            shiftHeld,
+            shouldSnap,
+        ],
     );
 
     // ── Drawing modes preview + marquee live update ──────────────────
     const handleMouseMove = useCallback(
         (event: React.MouseEvent<SVGSVGElement>) => {
             const raw = pointFromEvent(event);
-            const snapped = snapToGrid(raw, layout, { width: canvasWidth, height: canvasHeight }, shouldSnap);
+            const snapped = snapToGrid(
+                raw,
+                layout,
+                { width: canvasWidth, height: canvasHeight },
+                shouldSnap,
+            );
             setHoverPoint(snapped);
             if (interaction.mode === 'drawing_wall') {
-                const cursor = shiftHeld ? constrainAngle(interaction.firstPoint, snapped) : snapped;
-                dispatch({ type: 'update_wall_cursor', point: cursor, rawPoint: raw });
+                const cursor = shiftHeld
+                    ? constrainAngle(interaction.firstPoint, snapped)
+                    : snapped;
+                dispatch({
+                    type: 'update_wall_cursor',
+                    point: cursor,
+                    rawPoint: raw,
+                });
             } else if (interaction.mode === 'drawing_polyline') {
-                dispatch({ type: 'update_polyline_cursor', point: snapped, rawPoint: raw });
-            } else if (interaction.mode === 'calibrating' && interaction.firstPoint) {
-                dispatch({ type: 'update_calibration_cursor', point: snapped, rawPoint: raw });
+                dispatch({
+                    type: 'update_polyline_cursor',
+                    point: snapped,
+                    rawPoint: raw,
+                });
+            } else if (
+                interaction.mode === 'calibrating' &&
+                interaction.firstPoint
+            ) {
+                dispatch({
+                    type: 'update_calibration_cursor',
+                    point: snapped,
+                    rawPoint: raw,
+                });
             } else if (interaction.mode === 'marquee' || marqueeRef.current) {
                 const activeMarquee = marqueeRef.current ?? {
-                    firstPoint: interaction.mode === 'marquee' ? interaction.firstPoint : raw,
+                    firstPoint:
+                        interaction.mode === 'marquee'
+                            ? interaction.firstPoint
+                            : raw,
                     cursor: raw,
                     moved: false,
                     pointerId: -1,
@@ -574,37 +771,77 @@ export default function PlanCanvas(props: Props) {
                 const pendingRefs = refsInsideMarquee(
                     layout,
                     pins,
-                    { x1: activeMarquee.firstPoint.x, y1: activeMarquee.firstPoint.y, x2: raw.x, y2: raw.y },
+                    {
+                        x1: activeMarquee.firstPoint.x,
+                        y1: activeMarquee.firstPoint.y,
+                        x2: raw.x,
+                        y2: raw.y,
+                    },
                     isVisible,
                     showStructure && structureInteractive,
                 );
-                dispatch({ type: 'update_marquee_cursor', point: raw, pendingRefs });
+                dispatch({
+                    type: 'update_marquee_cursor',
+                    point: raw,
+                    pendingRefs,
+                });
             }
         },
-        [canvasHeight, canvasWidth, dispatch, interaction, isVisible, layout, pins, pointFromEvent, shiftHeld, shouldSnap, showStructure, structureInteractive],
+        [
+            canvasHeight,
+            canvasWidth,
+            dispatch,
+            interaction,
+            isVisible,
+            layout,
+            pins,
+            pointFromEvent,
+            shiftHeld,
+            shouldSnap,
+            showStructure,
+            structureInteractive,
+        ],
     );
 
     const handleDoubleClick = useCallback(() => {
         if (interaction.mode === 'drawing_polyline') {
-            dispatch({ type: 'complete_polyline', kind: activeKind ?? 'evacuation_route', subkind: activeSubkind ?? null });
+            dispatch({
+                type: 'complete_polyline',
+                kind: activeKind ?? 'evacuation_route',
+                subkind: activeSubkind ?? null,
+            });
         }
     }, [activeKind, activeSubkind, dispatch, interaction.mode]);
 
     // ── Per-item pointer-down: select + begin move ───────────────────
     const beginMoveDrag = useCallback(
-        (event: React.PointerEvent, target: { type: SelectionRef['type']; id: SelectionRef['id'] }) => {
+        (
+            event: React.PointerEvent,
+            target: { type: SelectionRef['type']; id: SelectionRef['id'] },
+        ) => {
             event.stopPropagation();
             if (!structureInteractive && target.type !== 'pin') return;
             if (target.type === 'pin') {
-                const pin = pins.find((candidate, index) => pinIdOf(candidate, index) === String(target.id));
+                const pin = pins.find(
+                    (candidate, index) =>
+                        pinIdOf(candidate, index) === String(target.id),
+                );
                 if (!pin || !isEditablePinKind(pin.kind)) return;
             }
 
             const rawOrigin = pointFromEvent(event);
-            const origin = snapToGrid(rawOrigin, layout, { width: canvasWidth, height: canvasHeight }, shouldSnap);
+            const origin = snapToGrid(
+                rawOrigin,
+                layout,
+                { width: canvasWidth, height: canvasHeight },
+                shouldSnap,
+            );
             (event.target as Element).setPointerCapture(event.pointerId);
 
-            const ref: SelectionRef = { type: target.type, id: target.id } as SelectionRef;
+            const ref: SelectionRef = {
+                type: target.type,
+                id: target.id,
+            } as SelectionRef;
             const additive = event.shiftKey;
             const alreadySelected = isRefInSelection(selection, ref);
 
@@ -623,22 +860,34 @@ export default function PlanCanvas(props: Props) {
             for (const sel of nextSelection) {
                 if (sel.type === 'room') {
                     const room = layout.rooms.find((r) => r.id === sel.id);
-                    if (room) bases.set(refKey(sel), { kind: 'room', base: room });
+                    if (room)
+                        bases.set(refKey(sel), { kind: 'room', base: room });
                 } else if (sel.type === 'wall') {
                     const wall = layout.walls.find((w) => w.id === sel.id);
-                    if (wall) bases.set(refKey(sel), { kind: 'wall', base: wall });
+                    if (wall)
+                        bases.set(refKey(sel), { kind: 'wall', base: wall });
                 } else if (sel.type === 'door') {
                     const door = layout.doors.find((d) => d.id === sel.id);
-                    if (door) bases.set(refKey(sel), { kind: 'door', base: door });
+                    if (door)
+                        bases.set(refKey(sel), { kind: 'door', base: door });
                 } else if (sel.type === 'window') {
                     const win = layout.windows.find((w) => w.id === sel.id);
-                    if (win) bases.set(refKey(sel), { kind: 'window', base: win });
+                    if (win)
+                        bases.set(refKey(sel), { kind: 'window', base: win });
                 } else if (sel.type === 'label') {
                     const label = layout.labels.find((l) => l.id === sel.id);
-                    if (label) bases.set(refKey(sel), { kind: 'label', base: label });
+                    if (label)
+                        bases.set(refKey(sel), { kind: 'label', base: label });
                 } else if (sel.type === 'pin') {
-                    const idx = pins.findIndex((p, i) => pinIdOf(p, i) === String(sel.id));
-                    if (idx !== -1) bases.set(refKey(sel), { kind: 'pin', index: idx, base: pins[idx] });
+                    const idx = pins.findIndex(
+                        (p, i) => pinIdOf(p, i) === String(sel.id),
+                    );
+                    if (idx !== -1)
+                        bases.set(refKey(sel), {
+                            kind: 'pin',
+                            index: idx,
+                            base: pins[idx],
+                        });
                 }
             }
 
@@ -652,15 +901,36 @@ export default function PlanCanvas(props: Props) {
             };
             setGroupDragging(nextSelection.length > 1);
         },
-        [canvasHeight, canvasWidth, dispatch, isEditablePinKind, layout, pins, pointFromEvent, selection, shouldSnap, structureInteractive],
+        [
+            canvasHeight,
+            canvasWidth,
+            dispatch,
+            isEditablePinKind,
+            layout,
+            pins,
+            pointFromEvent,
+            selection,
+            shouldSnap,
+            structureInteractive,
+        ],
     );
 
     const beginResizeDrag = useCallback(
-        (event: React.PointerEvent, roomId: string, base: PlanRoom, handle: ResizeHandle) => {
+        (
+            event: React.PointerEvent,
+            roomId: string,
+            base: PlanRoom,
+            handle: ResizeHandle,
+        ) => {
             event.stopPropagation();
             if (!structureInteractive) return;
             const rawOrigin = pointFromEvent(event);
-            const origin = snapToGrid(rawOrigin, layout, { width: canvasWidth, height: canvasHeight }, shouldSnap);
+            const origin = snapToGrid(
+                rawOrigin,
+                layout,
+                { width: canvasWidth, height: canvasHeight },
+                shouldSnap,
+            );
             (event.target as Element).setPointerCapture(event.pointerId);
             dragRef.current = {
                 mode: 'resize',
@@ -672,15 +942,32 @@ export default function PlanCanvas(props: Props) {
                 committed: false,
             };
         },
-        [canvasHeight, canvasWidth, layout, pointFromEvent, shouldSnap, structureInteractive],
+        [
+            canvasHeight,
+            canvasWidth,
+            layout,
+            pointFromEvent,
+            shouldSnap,
+            structureInteractive,
+        ],
     );
 
     const beginWallEndpointDrag = useCallback(
-        (event: React.PointerEvent, wallId: string, base: PlanWall, index: number) => {
+        (
+            event: React.PointerEvent,
+            wallId: string,
+            base: PlanWall,
+            index: number,
+        ) => {
             event.stopPropagation();
             if (!structureInteractive) return;
             const rawOrigin = pointFromEvent(event);
-            const origin = snapToGrid(rawOrigin, layout, { width: canvasWidth, height: canvasHeight }, shouldSnap);
+            const origin = snapToGrid(
+                rawOrigin,
+                layout,
+                { width: canvasWidth, height: canvasHeight },
+                shouldSnap,
+            );
             (event.target as Element).setPointerCapture(event.pointerId);
             dragRef.current = {
                 mode: 'wall-endpoint',
@@ -692,7 +979,14 @@ export default function PlanCanvas(props: Props) {
                 committed: false,
             };
         },
-        [canvasHeight, canvasWidth, layout, pointFromEvent, shouldSnap, structureInteractive],
+        [
+            canvasHeight,
+            canvasWidth,
+            layout,
+            pointFromEvent,
+            shouldSnap,
+            structureInteractive,
+        ],
     );
 
     const beginRotateDrag = useCallback(
@@ -740,11 +1034,20 @@ export default function PlanCanvas(props: Props) {
                 const pendingRefs = refsInsideMarquee(
                     layout,
                     pins,
-                    { x1: nextMarquee.firstPoint.x, y1: nextMarquee.firstPoint.y, x2: raw.x, y2: raw.y },
+                    {
+                        x1: nextMarquee.firstPoint.x,
+                        y1: nextMarquee.firstPoint.y,
+                        x2: raw.x,
+                        y2: raw.y,
+                    },
                     isVisible,
                     showStructure && structureInteractive,
                 );
-                dispatch({ type: 'update_marquee_cursor', point: raw, pendingRefs });
+                dispatch({
+                    type: 'update_marquee_cursor',
+                    point: raw,
+                    pendingRefs,
+                });
                 return;
             }
 
@@ -756,7 +1059,12 @@ export default function PlanCanvas(props: Props) {
                 drag.committed = true;
             }
             const raw = pointFromEvent(event);
-            const snapped = snapToGrid(raw, layout, { width: canvasWidth, height: canvasHeight }, shouldSnap);
+            const snapped = snapToGrid(
+                raw,
+                layout,
+                { width: canvasWidth, height: canvasHeight },
+                shouldSnap,
+            );
             const dx = drag.mode !== 'rotate' ? snapped.x - drag.origin.x : 0;
             const dy = drag.mode !== 'rotate' ? snapped.y - drag.origin.y : 0;
 
@@ -767,25 +1075,115 @@ export default function PlanCanvas(props: Props) {
                         dispatch({
                             type: 'update_room',
                             id: r.id,
-                            patch: { x: clamp(r.x + dx, 0, 1 - r.width), y: clamp(r.y + dy, 0, 1 - r.height) },
+                            patch: {
+                                x: clamp(r.x + dx, 0, 1 - r.width),
+                                y: clamp(r.y + dy, 0, 1 - r.height),
+                            },
                         });
                     } else if (base.kind === 'wall') {
                         const w = base.base;
-                        const points = w.points.map((p) => ({ x: clamp01(p.x + dx), y: clamp01(p.y + dy) }));
-                        dispatch({ type: 'update_wall', id: w.id, patch: { points } });
+                        const points = w.points.map((p) => ({
+                            x: clamp01(p.x + dx),
+                            y: clamp01(p.y + dy),
+                        }));
+                        dispatch({
+                            type: 'update_wall',
+                            id: w.id,
+                            patch: { points },
+                        });
                     } else if (base.kind === 'door') {
                         const d = base.base;
-                        dispatch({ type: 'update_door', id: d.id, patch: { x: clamp01(d.x + dx), y: clamp01(d.y + dy) } });
+                        const moved = {
+                            ...d,
+                            x: clamp01(d.x + dx),
+                            y: clamp01(d.y + dy),
+                            width: normaliseDoor(d).width,
+                        };
+                        const snapped = snapOpeningToNearestWall(
+                            openingCentreFromTopLeft(moved, canvasSize),
+                            layout.walls,
+                            canvasSize,
+                            { width: moved.width, maxDistancePx: 72 },
+                        );
+                        dispatch({
+                            type: 'update_door',
+                            id: d.id,
+                            patch: snapped
+                                ? {
+                                      x: snapped.x,
+                                      y: snapped.y,
+                                      width: snapped.width,
+                                      rotation_deg: snapped.rotation_deg,
+                                      wall_id: snapped.wall_id,
+                                      wall_segment_index:
+                                          snapped.wall_segment_index,
+                                      wall_t: snapped.wall_t,
+                                  }
+                                : {
+                                      x: moved.x,
+                                      y: moved.y,
+                                      wall_id: null,
+                                      wall_segment_index: null,
+                                      wall_t: null,
+                                  },
+                        });
                     } else if (base.kind === 'window') {
                         const w = base.base;
-                        dispatch({ type: 'update_window', id: w.id, patch: { x: clamp01(w.x + dx), y: clamp01(w.y + dy) } });
+                        const moved = {
+                            ...w,
+                            x: clamp01(w.x + dx),
+                            y: clamp01(w.y + dy),
+                            width: w.width ?? 0.1,
+                        };
+                        const snapped = snapOpeningToNearestWall(
+                            openingCentreFromTopLeft(moved, canvasSize),
+                            layout.walls,
+                            canvasSize,
+                            { width: moved.width, maxDistancePx: 72 },
+                        );
+                        dispatch({
+                            type: 'update_window',
+                            id: w.id,
+                            patch: snapped
+                                ? {
+                                      x: snapped.x,
+                                      y: snapped.y,
+                                      width: snapped.width,
+                                      rotation_deg: snapped.rotation_deg,
+                                      wall_id: snapped.wall_id,
+                                      wall_segment_index:
+                                          snapped.wall_segment_index,
+                                      wall_t: snapped.wall_t,
+                                  }
+                                : {
+                                      x: moved.x,
+                                      y: moved.y,
+                                      wall_id: null,
+                                      wall_segment_index: null,
+                                      wall_t: null,
+                                  },
+                        });
                     } else if (base.kind === 'label') {
                         const l = base.base;
-                        dispatch({ type: 'update_label', id: l.id, patch: { x: clamp01(l.x + dx), y: clamp01(l.y + dy) } });
+                        dispatch({
+                            type: 'update_label',
+                            id: l.id,
+                            patch: {
+                                x: clamp01(l.x + dx),
+                                y: clamp01(l.y + dy),
+                            },
+                        });
                     } else if (base.kind === 'pin') {
                         const p = base.base;
                         const id = pinIdOf(p, base.index);
-                        dispatch({ type: 'update_pin', pinId: id, patch: { x: clamp01(p.x + dx), y: clamp01(p.y + dy) } });
+                        dispatch({
+                            type: 'update_pin',
+                            pinId: id,
+                            patch: {
+                                x: clamp01(p.x + dx),
+                                y: clamp01(p.y + dy),
+                            },
+                        });
                     }
                 }
                 return;
@@ -816,15 +1214,25 @@ export default function PlanCanvas(props: Props) {
                 if (handle.includes('s')) {
                     height = clamp(r.height + dy, minH, 1 - r.y);
                 }
-                dispatch({ type: 'update_room', id: drag.roomId, patch: { x, y, width, height } });
+                dispatch({
+                    type: 'update_room',
+                    id: drag.roomId,
+                    patch: { x, y, width, height },
+                });
                 return;
             }
 
             if (drag.mode === 'wall-endpoint') {
                 const w = drag.base;
                 const idx = drag.index;
-                const points = w.points.map((p, i) => (i === idx ? snapped : p));
-                dispatch({ type: 'update_wall', id: drag.wallId, patch: { points } });
+                const points = w.points.map((p, i) =>
+                    i === idx ? snapped : p,
+                );
+                dispatch({
+                    type: 'update_wall',
+                    id: drag.wallId,
+                    patch: { points },
+                });
                 return;
             }
 
@@ -839,22 +1247,51 @@ export default function PlanCanvas(props: Props) {
                 const rounded = Math.round(next);
                 switch (drag.ref.type) {
                     case 'door':
-                        dispatch({ type: 'update_door', id: String(drag.ref.id), patch: { rotation_deg: rounded } });
+                        dispatch({
+                            type: 'update_door',
+                            id: String(drag.ref.id),
+                            patch: { rotation_deg: rounded },
+                        });
                         break;
                     case 'window':
-                        dispatch({ type: 'update_window', id: String(drag.ref.id), patch: { rotation_deg: rounded } });
+                        dispatch({
+                            type: 'update_window',
+                            id: String(drag.ref.id),
+                            patch: { rotation_deg: rounded },
+                        });
                         break;
                     case 'label':
-                        dispatch({ type: 'update_label', id: String(drag.ref.id), patch: { rotation_deg: rounded } });
+                        dispatch({
+                            type: 'update_label',
+                            id: String(drag.ref.id),
+                            patch: { rotation_deg: rounded },
+                        });
                         break;
                     case 'pin':
-                        dispatch({ type: 'update_pin', pinId: drag.ref.id, patch: { rotation_deg: rounded } });
+                        dispatch({
+                            type: 'update_pin',
+                            pinId: drag.ref.id,
+                            patch: { rotation_deg: rounded },
+                        });
                         break;
                 }
                 return;
             }
         },
-        [canvasHeight, canvasWidth, dispatch, isVisible, layout, pins, pointFromEvent, shiftHeld, shouldSnap, showStructure, structureInteractive],
+        [
+            canvasHeight,
+            canvasSize,
+            canvasWidth,
+            dispatch,
+            isVisible,
+            layout,
+            pins,
+            pointFromEvent,
+            shiftHeld,
+            shouldSnap,
+            showStructure,
+            structureInteractive,
+        ],
     );
 
     const completeMarquee = useCallback(
@@ -881,7 +1318,14 @@ export default function PlanCanvas(props: Props) {
                 dispatch({ type: 'cancel_interaction' });
             }
         },
-        [dispatch, isVisible, layout, pins, showStructure, structureInteractive],
+        [
+            dispatch,
+            isVisible,
+            layout,
+            pins,
+            showStructure,
+            structureInteractive,
+        ],
     );
 
     const handlePointerUp = useCallback(
@@ -892,10 +1336,21 @@ export default function PlanCanvas(props: Props) {
                 return;
             }
 
-            if (dragRef.current && dragRef.current.pointerId === event.pointerId) {
+            if (
+                dragRef.current &&
+                dragRef.current.pointerId === event.pointerId
+            ) {
                 const drag = dragRef.current;
-                if (drag.mode === 'move' && !drag.committed && selection.length > 1) {
-                    dispatch({ type: 'select', ref: drag.target, additive: false });
+                if (
+                    drag.mode === 'move' &&
+                    !drag.committed &&
+                    selection.length > 1
+                ) {
+                    dispatch({
+                        type: 'select',
+                        ref: drag.target,
+                        additive: false,
+                    });
                 }
                 dragRef.current = null;
                 setGroupDragging(false);
@@ -932,7 +1387,17 @@ export default function PlanCanvas(props: Props) {
                 }
             }
         },
-        [completeMarquee, dispatch, interaction, isVisible, layout, pins, selection.length, showStructure, structureInteractive],
+        [
+            completeMarquee,
+            dispatch,
+            interaction,
+            isVisible,
+            layout,
+            pins,
+            selection.length,
+            showStructure,
+            structureInteractive,
+        ],
     );
 
     const handleMouseUp = useCallback(() => {
@@ -942,22 +1407,35 @@ export default function PlanCanvas(props: Props) {
         }
     }, [completeMarquee]);
 
-    const cursor = isSelectMode(activeKind) ? 'cursor-default' : 'cursor-crosshair';
-    const pendingRefs = interaction.mode === 'marquee' ? interaction.pendingRefs : [];
-    const groupBounds = groupDragging ? selectionBounds(layout, pins, selection) : null;
+    const cursor = isSelectMode(activeKind)
+        ? 'cursor-default'
+        : 'cursor-crosshair';
+    const pendingRefs =
+        interaction.mode === 'marquee' ? interaction.pendingRefs : [];
+    const groupBounds = groupDragging
+        ? selectionBounds(layout, pins, selection)
+        : null;
     const orderedPins = useMemo(
         () =>
             pins
                 .map((pin, index) => ({ pin, index }))
-                .sort((a, b) => (a.pin.sort_order ?? a.index) - (b.pin.sort_order ?? b.index)),
+                .sort(
+                    (a, b) =>
+                        (a.pin.sort_order ?? a.index) -
+                        (b.pin.sort_order ?? b.index),
+                ),
         [pins],
     );
     const hasPendingRef = useCallback(
-        (ref: SelectionRef) => pendingRefs.some((pending) => sameRef(pending, ref)),
+        (ref: SelectionRef) =>
+            pendingRefs.some((pending) => sameRef(pending, ref)),
         [pendingRefs],
     );
 
-    function renderSnapPair(raw: { x: number; y: number } | null | undefined, snapped: { x: number; y: number } | null | undefined) {
+    function renderSnapPair(
+        raw: { x: number; y: number } | null | undefined,
+        snapped: { x: number; y: number } | null | undefined,
+    ) {
         if (!raw || !snapped || !shouldSnap) return null;
         const rawX = raw.x * canvasWidth;
         const rawY = raw.y * canvasHeight;
@@ -968,21 +1446,39 @@ export default function PlanCanvas(props: Props) {
         return (
             <g pointerEvents="none">
                 {distance > 3 && (
-                    <line x1={rawX} y1={rawY} x2={snapX} y2={snapY} stroke="#94a3b8" strokeWidth={1} strokeDasharray="3 3" />
+                    <line
+                        x1={rawX}
+                        y1={rawY}
+                        x2={snapX}
+                        y2={snapY}
+                        stroke="#94a3b8"
+                        strokeWidth={1}
+                        strokeDasharray="3 3"
+                    />
                 )}
-                <path d={`M ${rawX - 5} ${rawY} L ${rawX + 5} ${rawY} M ${rawX} ${rawY - 5} L ${rawX} ${rawY + 5}`} stroke="#94a3b8" strokeWidth={1.5} />
+                <path
+                    d={`M ${rawX - 5} ${rawY} L ${rawX + 5} ${rawY} M ${rawX} ${rawY - 5} L ${rawX} ${rawY + 5}`}
+                    stroke="#94a3b8"
+                    strokeWidth={1.5}
+                />
                 <circle cx={snapX} cy={snapY} r={4} fill="#2563eb" />
             </g>
         );
     }
 
     return (
-        <div className="relative h-full min-h-[420px] overflow-hidden rounded-md border bg-white" data-test="site-plan-canvas">
+        <div
+            className="relative h-full min-h-[420px] overflow-hidden rounded-md border bg-white"
+            data-test="site-plan-canvas"
+        >
             <svg
                 ref={svgRef}
                 viewBox={`0 0 ${canvasWidth} ${canvasHeight}`}
                 preserveAspectRatio="none"
-                className={cn('h-full min-h-[420px] w-full select-none', cursor)}
+                className={cn(
+                    'h-full min-h-[420px] w-full select-none',
+                    cursor,
+                )}
                 onMouseMove={handleMouseMove}
                 onMouseUp={handleMouseUp}
                 onPointerMove={handlePointerMove}
@@ -1004,50 +1500,116 @@ export default function PlanCanvas(props: Props) {
 
                 {/* Grid */}
                 {layout.grid?.enabled &&
-                    Array.from({ length: Math.floor(canvasWidth / gridSize) + 1 }).map((_, index) => (
-                        <line key={`gx-${index}`} x1={index * gridSize} y1={0} x2={index * gridSize} y2={canvasHeight} stroke="#e2e8f0" strokeWidth={1} pointerEvents="none" />
+                    Array.from({
+                        length: Math.floor(canvasWidth / gridSize) + 1,
+                    }).map((_, index) => (
+                        <line
+                            key={`gx-${index}`}
+                            x1={index * gridSize}
+                            y1={0}
+                            x2={index * gridSize}
+                            y2={canvasHeight}
+                            stroke="#e2e8f0"
+                            strokeWidth={1}
+                            pointerEvents="none"
+                        />
                     ))}
                 {layout.grid?.enabled &&
-                    Array.from({ length: Math.floor(canvasHeight / gridSize) + 1 }).map((_, index) => (
-                        <line key={`gy-${index}`} x1={0} y1={index * gridSize} x2={canvasWidth} y2={index * gridSize} stroke="#e2e8f0" strokeWidth={1} pointerEvents="none" />
+                    Array.from({
+                        length: Math.floor(canvasHeight / gridSize) + 1,
+                    }).map((_, index) => (
+                        <line
+                            key={`gy-${index}`}
+                            x1={0}
+                            y1={index * gridSize}
+                            x2={canvasWidth}
+                            y2={index * gridSize}
+                            stroke="#e2e8f0"
+                            strokeWidth={1}
+                            pointerEvents="none"
+                        />
                     ))}
 
                 {/* Rooms */}
                 {showStructure &&
                     layout.rooms?.map((room) => {
-                        const selected = isRefInSelection(selection, { type: 'room', id: room.id });
-                        const pending = hasPendingRef({ type: 'room', id: room.id });
+                        const selected = isRefInSelection(selection, {
+                            type: 'room',
+                            id: room.id,
+                        });
+                        const pending = hasPendingRef({
+                            type: 'room',
+                            id: room.id,
+                        });
                         const linked = !!room.room_ref_id;
                         const x = room.x * canvasWidth;
                         const y = room.y * canvasHeight;
                         const w = room.width * canvasWidth;
                         const h = room.height * canvasHeight;
-                        const isEditing = editing?.type === 'room' && String(editing.id) === room.id;
+                        const isEditing =
+                            editing?.type === 'room' &&
+                            String(editing.id) === room.id;
                         const onlySelected = selected && selection.length === 1;
                         return (
-                            <g key={room.id} opacity={structureInteractive ? 1 : 0.45} pointerEvents={structureInteractive ? 'auto' : 'none'}>
+                            <g
+                                key={room.id}
+                                opacity={structureInteractive ? 1 : 0.45}
+                                pointerEvents={
+                                    structureInteractive ? 'auto' : 'none'
+                                }
+                            >
                                 <rect
                                     x={x}
                                     y={y}
                                     width={w}
                                     height={h}
                                     fill={linked ? '#e0f2fe' : '#f8fafc'}
-                                    stroke={selected || pending ? '#2563eb' : '#334155'}
+                                    stroke={
+                                        selected || pending
+                                            ? '#2563eb'
+                                            : '#334155'
+                                    }
                                     strokeWidth={selected ? 4 : 3}
-                                    strokeDasharray={pending && !selected ? '6 4' : undefined}
-                                    onPointerDown={(event) => beginMoveDrag(event, { type: 'room', id: room.id })}
+                                    strokeDasharray={
+                                        pending && !selected ? '6 4' : undefined
+                                    }
+                                    onPointerDown={(event) =>
+                                        beginMoveDrag(event, {
+                                            type: 'room',
+                                            id: room.id,
+                                        })
+                                    }
                                     onClick={(event) => event.stopPropagation()}
                                     onDoubleClick={(event) => {
                                         event.stopPropagation();
                                         if (!linked) {
-                                            dispatch({ type: 'begin_edit', target: { type: 'room', id: room.id } });
+                                            dispatch({
+                                                type: 'begin_edit',
+                                                target: {
+                                                    type: 'room',
+                                                    id: room.id,
+                                                },
+                                            });
                                         }
                                     }}
-                                    onContextMenu={(event) => openContextMenu(event, { type: 'room', id: room.id }, structureInteractive)}
-                                    style={{ cursor: selected ? 'grab' : 'move' }}
+                                    onContextMenu={(event) =>
+                                        openContextMenu(
+                                            event,
+                                            { type: 'room', id: room.id },
+                                            structureInteractive,
+                                        )
+                                    }
+                                    style={{
+                                        cursor: selected ? 'grab' : 'move',
+                                    }}
                                 />
                                 {isEditing ? (
-                                    <foreignObject x={x + 4} y={y + 4} width={Math.max(60, w - 8)} height={28}>
+                                    <foreignObject
+                                        x={x + 4}
+                                        y={y + 4}
+                                        width={Math.max(60, w - 8)}
+                                        height={28}
+                                    >
                                         <input
                                             autoFocus
                                             defaultValue={room.label ?? ''}
@@ -1056,40 +1618,75 @@ export default function PlanCanvas(props: Props) {
                                                 dispatch({
                                                     type: 'update_room',
                                                     id: room.id,
-                                                    patch: { label: event.target.value || null },
+                                                    patch: {
+                                                        label:
+                                                            event.target
+                                                                .value || null,
+                                                    },
                                                 });
                                                 dispatch({ type: 'end_edit' });
                                             }}
                                             onKeyDown={(event) => {
-                                                if (event.key === 'Enter') (event.target as HTMLInputElement).blur();
+                                                if (event.key === 'Enter')
+                                                    (
+                                                        event.target as HTMLInputElement
+                                                    ).blur();
                                                 if (event.key === 'Escape') {
                                                     event.preventDefault();
-                                                    dispatch({ type: 'end_edit' });
+                                                    dispatch({
+                                                        type: 'end_edit',
+                                                    });
                                                 }
                                             }}
                                             className="w-full rounded border border-blue-400 bg-white px-1.5 py-0.5 text-sm text-slate-900 outline-none"
                                         />
                                     </foreignObject>
                                 ) : (
-                                    <text x={x + 12} y={y + 28} fontSize={18} fill="#0f172a" pointerEvents="none">
+                                    <text
+                                        x={x + 12}
+                                        y={y + 28}
+                                        fontSize={18}
+                                        fill="#0f172a"
+                                        pointerEvents="none"
+                                    >
                                         {room.label ?? 'Room'}
                                     </text>
                                 )}
                                 {linked && !isEditing && (
-                                    <text x={x + 12} y={y + 48} fontSize={11} fill="#0369a1" pointerEvents="none">
+                                    <text
+                                        x={x + 12}
+                                        y={y + 48}
+                                        fontSize={11}
+                                        fill="#0369a1"
+                                        pointerEvents="none"
+                                    >
                                         ↳ linked
                                     </text>
                                 )}
                                 {onlySelected && !isEditing && (
                                     <>
-                                        <text x={x + w / 2} y={y - 8} fontSize={11} textAnchor="middle" fill="#2563eb" pointerEvents="none">
-                                            {formatMeters(w, mpu)} × {formatMeters(h, mpu)}
+                                        <text
+                                            x={x + w / 2}
+                                            y={y - 8}
+                                            fontSize={11}
+                                            textAnchor="middle"
+                                            fill="#2563eb"
+                                            pointerEvents="none"
+                                        >
+                                            {formatMeters(w, mpu)} ×{' '}
+                                            {formatMeters(h, mpu)}
                                         </text>
                                         {RESIZE_HANDLES.map((handle) => {
-                                            const hx =
-                                                handle.includes('w') ? x : handle.includes('e') ? x + w : x + w / 2;
-                                            const hy =
-                                                handle.includes('n') ? y : handle.includes('s') ? y + h : y + h / 2;
+                                            const hx = handle.includes('w')
+                                                ? x
+                                                : handle.includes('e')
+                                                  ? x + w
+                                                  : x + w / 2;
+                                            const hy = handle.includes('n')
+                                                ? y
+                                                : handle.includes('s')
+                                                  ? y + h
+                                                  : y + h / 2;
                                             return (
                                                 <rect
                                                     key={handle}
@@ -1100,8 +1697,17 @@ export default function PlanCanvas(props: Props) {
                                                     fill="#ffffff"
                                                     stroke="#2563eb"
                                                     strokeWidth={2}
-                                                    style={{ cursor: `${handle}-resize` }}
-                                                    onPointerDown={(event) => beginResizeDrag(event, room.id, room, handle)}
+                                                    style={{
+                                                        cursor: `${handle}-resize`,
+                                                    }}
+                                                    onPointerDown={(event) =>
+                                                        beginResizeDrag(
+                                                            event,
+                                                            room.id,
+                                                            room,
+                                                            handle,
+                                                        )
+                                                    }
                                                 />
                                             );
                                         })}
@@ -1114,32 +1720,116 @@ export default function PlanCanvas(props: Props) {
                 {/* Walls */}
                 {showStructure &&
                     layout.walls?.map((wall) => {
-                        const selected = isRefInSelection(selection, { type: 'wall', id: wall.id });
-                        const pending = hasPendingRef({ type: 'wall', id: wall.id });
+                        const selected = isRefInSelection(selection, {
+                            type: 'wall',
+                            id: wall.id,
+                        });
+                        const pending = hasPendingRef({
+                            type: 'wall',
+                            id: wall.id,
+                        });
                         const onlySelected = selected && selection.length === 1;
                         if (wall.points.length < 2) return null;
-                        const pts = wall.points.map((p) => `${p.x * canvasWidth},${p.y * canvasHeight}`).join(' ');
+                        const pts = wall.points
+                            .map(
+                                (p) =>
+                                    `${p.x * canvasWidth},${p.y * canvasHeight}`,
+                            )
+                            .join(' ');
+                        const renderSegments = wallSegmentsWithOpenings(
+                            wall,
+                            attachedOpenings,
+                            canvasSize,
+                        );
                         const a = wall.points[0];
                         const b = wall.points[wall.points.length - 1];
-                        const lengthUnits = distanceCanvasUnits(a, b, canvasWidth, canvasHeight);
-                        const mid = { x: ((a.x + b.x) / 2) * canvasWidth, y: ((a.y + b.y) / 2) * canvasHeight };
+                        const lengthUnits = distanceCanvasUnits(
+                            a,
+                            b,
+                            canvasWidth,
+                            canvasHeight,
+                        );
+                        const mid = {
+                            x: ((a.x + b.x) / 2) * canvasWidth,
+                            y: ((a.y + b.y) / 2) * canvasHeight,
+                        };
                         return (
-                            <g key={wall.id} opacity={structureInteractive ? 1 : 0.45} pointerEvents={structureInteractive ? 'auto' : 'none'}>
+                            <g
+                                key={wall.id}
+                                opacity={structureInteractive ? 1 : 0.45}
+                                pointerEvents={
+                                    structureInteractive ? 'auto' : 'none'
+                                }
+                            >
+                                {renderSegments.map((segment) => (
+                                    <line
+                                        key={segment.id}
+                                        x1={segment.a.x * canvasWidth}
+                                        y1={segment.a.y * canvasHeight}
+                                        x2={segment.b.x * canvasWidth}
+                                        y2={segment.b.y * canvasHeight}
+                                        stroke={
+                                            selected || pending
+                                                ? '#2563eb'
+                                                : '#111827'
+                                        }
+                                        strokeWidth={wall.thickness ?? 4}
+                                        strokeDasharray={
+                                            pending && !selected
+                                                ? '8 5'
+                                                : undefined
+                                        }
+                                        strokeLinecap="round"
+                                        pointerEvents="none"
+                                    />
+                                ))}
                                 <polyline
                                     points={pts}
                                     fill="none"
-                                    stroke={selected || pending ? '#2563eb' : '#111827'}
-                                    strokeWidth={wall.thickness ?? 4}
-                                    strokeDasharray={pending && !selected ? '8 5' : undefined}
+                                    stroke="transparent"
+                                    strokeWidth={Math.max(
+                                        14,
+                                        (wall.thickness ?? 4) + 10,
+                                    )}
                                     strokeLinecap="round"
-                                    onPointerDown={(event) => beginMoveDrag(event, { type: 'wall', id: wall.id })}
+                                    onPointerDown={(event) =>
+                                        beginMoveDrag(event, {
+                                            type: 'wall',
+                                            id: wall.id,
+                                        })
+                                    }
                                     onClick={(event) => event.stopPropagation()}
-                                    onContextMenu={(event) => openContextMenu(event, { type: 'wall', id: wall.id }, structureInteractive)}
-                                    style={{ cursor: selected ? 'grab' : 'move' }}
+                                    onContextMenu={(event) =>
+                                        openContextMenu(
+                                            event,
+                                            { type: 'wall', id: wall.id },
+                                            structureInteractive,
+                                        )
+                                    }
+                                    style={{
+                                        cursor: selected ? 'grab' : 'move',
+                                    }}
                                 />
-                                <g transform={`translate(${mid.x} ${mid.y - 8})`} pointerEvents="none">
-                                    <rect x={-26} y={-12} width={52} height={16} rx={3} fill="#ffffff" stroke="#cbd5e1" />
-                                    <text x={0} y={0} textAnchor="middle" fontSize={11} fill="#0f172a">
+                                <g
+                                    transform={`translate(${mid.x} ${mid.y - 8})`}
+                                    pointerEvents="none"
+                                >
+                                    <rect
+                                        x={-26}
+                                        y={-12}
+                                        width={52}
+                                        height={16}
+                                        rx={3}
+                                        fill="#ffffff"
+                                        stroke="#cbd5e1"
+                                    />
+                                    <text
+                                        x={0}
+                                        y={0}
+                                        textAnchor="middle"
+                                        fontSize={11}
+                                        fill="#0f172a"
+                                    >
                                         {formatMeters(lengthUnits, mpu)}
                                     </text>
                                 </g>
@@ -1154,7 +1844,14 @@ export default function PlanCanvas(props: Props) {
                                             stroke="#2563eb"
                                             strokeWidth={2}
                                             style={{ cursor: 'grab' }}
-                                            onPointerDown={(event) => beginWallEndpointDrag(event, wall.id, wall, index)}
+                                            onPointerDown={(event) =>
+                                                beginWallEndpointDrag(
+                                                    event,
+                                                    wall.id,
+                                                    wall,
+                                                    index,
+                                                )
+                                            }
                                         />
                                     ))}
                             </g>
@@ -1164,32 +1861,61 @@ export default function PlanCanvas(props: Props) {
                 {/* Doors */}
                 {showStructure &&
                     layout.doors?.map((door) => {
-                        const selected = isRefInSelection(selection, { type: 'door', id: door.id });
-                        const pending = hasPendingRef({ type: 'door', id: door.id });
+                        const selected = isRefInSelection(selection, {
+                            type: 'door',
+                            id: door.id,
+                        });
+                        const pending = hasPendingRef({
+                            type: 'door',
+                            id: door.id,
+                        });
                         const onlySelected = selected && selection.length === 1;
                         const normalised = normaliseDoor(door);
-                        const x = normalised.x * canvasWidth;
-                        const w = normalised.width * canvasWidth;
-                        const rotation = normalised.rotation_deg ?? 0;
+                        const resolved = resolveAttachedOpening(
+                            normalised,
+                            layout.walls,
+                            canvasSize,
+                        );
+                        const renderDoor = { ...normalised, ...resolved };
+                        const x = resolved.x * canvasWidth;
+                        const w = resolved.width * canvasWidth;
+                        const rotation = resolved.rotation_deg ?? 0;
                         // Rotation pivot: centre of the opening (matches existing rotation-handle math).
                         const cx = x + w / 2;
-                        const cy = normalised.y * canvasHeight;
+                        const cy = resolved.y * canvasHeight;
                         return (
                             <g
                                 key={door.id}
-                                transform={rotation ? `rotate(${rotation} ${cx} ${cy})` : undefined}
+                                transform={
+                                    rotation
+                                        ? `rotate(${rotation} ${cx} ${cy})`
+                                        : undefined
+                                }
                                 opacity={structureInteractive ? 1 : 0.45}
-                                pointerEvents={structureInteractive ? 'auto' : 'none'}
+                                pointerEvents={
+                                    structureInteractive ? 'auto' : 'none'
+                                }
                             >
                                 <DoorSymbol
-                                    door={door}
+                                    door={renderDoor}
                                     canvasWidth={canvasWidth}
                                     canvasHeight={canvasHeight}
                                     selected={selected}
                                     pending={pending}
-                                    onPointerDown={(event) => beginMoveDrag(event, { type: 'door', id: door.id })}
+                                    onPointerDown={(event) =>
+                                        beginMoveDrag(event, {
+                                            type: 'door',
+                                            id: door.id,
+                                        })
+                                    }
                                     onClick={(event) => event.stopPropagation()}
-                                    onContextMenu={(event) => openContextMenu(event, { type: 'door', id: door.id }, structureInteractive)}
+                                    onContextMenu={(event) =>
+                                        openContextMenu(
+                                            event,
+                                            { type: 'door', id: door.id },
+                                            structureInteractive,
+                                        )
+                                    }
                                 />
                                 {onlySelected && structureInteractive && (
                                     <RotationHandle
@@ -1200,7 +1926,12 @@ export default function PlanCanvas(props: Props) {
                                             beginRotateDrag(
                                                 event,
                                                 { type: 'door', id: door.id },
-                                                { x: normalised.x + normalised.width / 2, y: normalised.y },
+                                                {
+                                                    x:
+                                                        resolved.x +
+                                                        resolved.width / 2,
+                                                    y: resolved.y,
+                                                },
                                                 rotation,
                                             )
                                         }
@@ -1213,36 +1944,99 @@ export default function PlanCanvas(props: Props) {
                 {/* Windows */}
                 {showStructure &&
                     layout.windows?.map((win) => {
-                        const selected = isRefInSelection(selection, { type: 'window', id: win.id });
-                        const pending = hasPendingRef({ type: 'window', id: win.id });
+                        const selected = isRefInSelection(selection, {
+                            type: 'window',
+                            id: win.id,
+                        });
+                        const pending = hasPendingRef({
+                            type: 'window',
+                            id: win.id,
+                        });
                         const onlySelected = selected && selection.length === 1;
-                        const x = win.x * canvasWidth;
-                        const y = win.y * canvasHeight;
-                        const w = (win.width ?? 0.08) * canvasWidth;
-                        const h = 8;
-                        const rotation = win.rotation_deg ?? 0;
+                        const resolved = resolveAttachedOpening(
+                            win,
+                            layout.walls,
+                            canvasSize,
+                        );
+                        const x = resolved.x * canvasWidth;
+                        const y = resolved.y * canvasHeight;
+                        const w = resolved.width * canvasWidth;
+                        const h = 12;
+                        const rotation = resolved.rotation_deg ?? 0;
                         const cx = x + w / 2;
-                        const cy = y + h / 2;
+                        const cy = y;
                         return (
                             <g
                                 key={win.id}
-                                transform={rotation ? `rotate(${rotation} ${cx} ${cy})` : undefined}
+                                transform={
+                                    rotation
+                                        ? `rotate(${rotation} ${cx} ${cy})`
+                                        : undefined
+                                }
                                 opacity={structureInteractive ? 1 : 0.45}
-                                pointerEvents={structureInteractive ? 'auto' : 'none'}
+                                pointerEvents={
+                                    structureInteractive ? 'auto' : 'none'
+                                }
                             >
                                 <rect
+                                    x={x - 2}
+                                    y={y - 8}
+                                    width={w + 4}
+                                    height={16}
+                                    fill="#ffffff"
+                                    pointerEvents="none"
+                                />
+                                <rect
                                     x={x}
-                                    y={y}
+                                    y={y - h / 2}
                                     width={w}
                                     height={h}
-                                    fill="#38bdf8"
-                                    stroke={selected || pending ? '#2563eb' : 'none'}
-                                    strokeWidth={selected || pending ? 3 : 0}
-                                    strokeDasharray={pending && !selected ? '6 4' : undefined}
-                                    onPointerDown={(event) => beginMoveDrag(event, { type: 'window', id: win.id })}
+                                    rx={2}
+                                    fill="#e0f2fe"
+                                    stroke={
+                                        selected || pending
+                                            ? '#2563eb'
+                                            : '#0284c7'
+                                    }
+                                    strokeWidth={selected || pending ? 3 : 2}
+                                    strokeDasharray={
+                                        pending && !selected ? '6 4' : undefined
+                                    }
+                                    onPointerDown={(event) =>
+                                        beginMoveDrag(event, {
+                                            type: 'window',
+                                            id: win.id,
+                                        })
+                                    }
                                     onClick={(event) => event.stopPropagation()}
-                                    onContextMenu={(event) => openContextMenu(event, { type: 'window', id: win.id }, structureInteractive)}
-                                    style={{ cursor: selected ? 'grab' : 'move' }}
+                                    onContextMenu={(event) =>
+                                        openContextMenu(
+                                            event,
+                                            { type: 'window', id: win.id },
+                                            structureInteractive,
+                                        )
+                                    }
+                                    style={{
+                                        cursor: selected ? 'grab' : 'move',
+                                    }}
+                                />
+                                <line
+                                    x1={x + 5}
+                                    y1={y - 3}
+                                    x2={x + w - 5}
+                                    y2={y - 3}
+                                    stroke="#0369a1"
+                                    strokeWidth={1.5}
+                                    pointerEvents="none"
+                                />
+                                <line
+                                    x1={x + 5}
+                                    y1={y + 3}
+                                    x2={x + w - 5}
+                                    y2={y + 3}
+                                    stroke="#0369a1"
+                                    strokeWidth={1.5}
+                                    pointerEvents="none"
                                 />
                                 {onlySelected && structureInteractive && (
                                     <RotationHandle
@@ -1253,7 +2047,12 @@ export default function PlanCanvas(props: Props) {
                                             beginRotateDrag(
                                                 event,
                                                 { type: 'window', id: win.id },
-                                                { x: win.x + (win.width ?? 0.08) / 2, y: win.y + h / (2 * canvasHeight) },
+                                                {
+                                                    x:
+                                                        resolved.x +
+                                                        resolved.width / 2,
+                                                    y: resolved.y,
+                                                },
                                                 rotation,
                                             )
                                         }
@@ -1266,14 +2065,28 @@ export default function PlanCanvas(props: Props) {
                 {/* Labels */}
                 {showStructure &&
                     layout.labels?.map((label) => {
-                        const selected = isRefInSelection(selection, { type: 'label', id: label.id });
-                        const pending = hasPendingRef({ type: 'label', id: label.id });
-                        const isEditing = editing?.type === 'label' && String(editing.id) === label.id;
+                        const selected = isRefInSelection(selection, {
+                            type: 'label',
+                            id: label.id,
+                        });
+                        const pending = hasPendingRef({
+                            type: 'label',
+                            id: label.id,
+                        });
+                        const isEditing =
+                            editing?.type === 'label' &&
+                            String(editing.id) === label.id;
                         const x = label.x * canvasWidth;
                         const y = label.y * canvasHeight;
                         if (isEditing) {
                             return (
-                                <foreignObject key={label.id} x={x - 60} y={y - 18} width={140} height={28}>
+                                <foreignObject
+                                    key={label.id}
+                                    x={x - 60}
+                                    y={y - 18}
+                                    width={140}
+                                    height={28}
+                                >
                                     <input
                                         autoFocus
                                         defaultValue={label.text ?? ''}
@@ -1282,12 +2095,19 @@ export default function PlanCanvas(props: Props) {
                                             dispatch({
                                                 type: 'update_label',
                                                 id: label.id,
-                                                patch: { text: event.target.value || 'Label' },
+                                                patch: {
+                                                    text:
+                                                        event.target.value ||
+                                                        'Label',
+                                                },
                                             });
                                             dispatch({ type: 'end_edit' });
                                         }}
                                         onKeyDown={(event) => {
-                                            if (event.key === 'Enter') (event.target as HTMLInputElement).blur();
+                                            if (event.key === 'Enter')
+                                                (
+                                                    event.target as HTMLInputElement
+                                                ).blur();
                                             if (event.key === 'Escape') {
                                                 event.preventDefault();
                                                 dispatch({ type: 'end_edit' });
@@ -1303,23 +2123,52 @@ export default function PlanCanvas(props: Props) {
                         return (
                             <g
                                 key={label.id}
-                                transform={rotation ? `rotate(${rotation} ${x} ${y})` : undefined}
+                                transform={
+                                    rotation
+                                        ? `rotate(${rotation} ${x} ${y})`
+                                        : undefined
+                                }
                                 opacity={structureInteractive ? 1 : 0.45}
-                                pointerEvents={structureInteractive ? 'auto' : 'none'}
+                                pointerEvents={
+                                    structureInteractive ? 'auto' : 'none'
+                                }
                             >
                                 <text
                                     x={x}
                                     y={y}
                                     fontSize={label.size ?? 16}
-                                    fill={selected || pending ? '#2563eb' : '#334155'}
-                                    onPointerDown={(event) => beginMoveDrag(event, { type: 'label', id: label.id })}
+                                    fill={
+                                        selected || pending
+                                            ? '#2563eb'
+                                            : '#334155'
+                                    }
+                                    onPointerDown={(event) =>
+                                        beginMoveDrag(event, {
+                                            type: 'label',
+                                            id: label.id,
+                                        })
+                                    }
                                     onClick={(event) => event.stopPropagation()}
                                     onDoubleClick={(event) => {
                                         event.stopPropagation();
-                                        dispatch({ type: 'begin_edit', target: { type: 'label', id: label.id } });
+                                        dispatch({
+                                            type: 'begin_edit',
+                                            target: {
+                                                type: 'label',
+                                                id: label.id,
+                                            },
+                                        });
                                     }}
-                                    onContextMenu={(event) => openContextMenu(event, { type: 'label', id: label.id }, structureInteractive)}
-                                    style={{ cursor: selected ? 'grab' : 'move' }}
+                                    onContextMenu={(event) =>
+                                        openContextMenu(
+                                            event,
+                                            { type: 'label', id: label.id },
+                                            structureInteractive,
+                                        )
+                                    }
+                                    style={{
+                                        cursor: selected ? 'grab' : 'move',
+                                    }}
                                 >
                                     {label.text}
                                 </text>
@@ -1329,7 +2178,12 @@ export default function PlanCanvas(props: Props) {
                                         cy={y - 12}
                                         offset={20}
                                         onBegin={(event) =>
-                                            beginRotateDrag(event, { type: 'label', id: label.id }, { x: label.x, y: label.y }, rotation)
+                                            beginRotateDrag(
+                                                event,
+                                                { type: 'label', id: label.id },
+                                                { x: label.x, y: label.y },
+                                                rotation,
+                                            )
                                         }
                                     />
                                 )}
@@ -1339,9 +2193,18 @@ export default function PlanCanvas(props: Props) {
 
                 {/* Evacuation route polylines */}
                 {orderedPins.map(({ pin, index }) => {
-                    if (pin.kind !== 'evacuation_route' || !pin.path_points || pin.path_points.length < 2) return null;
+                    if (
+                        pin.kind !== 'evacuation_route' ||
+                        !pin.path_points ||
+                        pin.path_points.length < 2
+                    )
+                        return null;
                     if (!isVisible(pin.kind)) return null;
-                    const points = pin.path_points.map((p) => `${p.x * canvasWidth},${p.y * canvasHeight}`).join(' ');
+                    const points = pin.path_points
+                        .map(
+                            (p) => `${p.x * canvasWidth},${p.y * canvasHeight}`,
+                        )
+                        .join(' ');
                     return (
                         <polyline
                             key={`route-${pinIdOf(pin, index)}`}
@@ -1359,10 +2222,14 @@ export default function PlanCanvas(props: Props) {
                 {orderedPins.map(({ pin, index }) => {
                     if (!isVisible(pin.kind)) return null;
                     const id = pinIdOf(pin, index);
-                    const selected = isRefInSelection(selection, { type: 'pin', id });
+                    const selected = isRefInSelection(selection, {
+                        type: 'pin',
+                        id,
+                    });
                     const onlySelected = selected && selection.length === 1;
                     const pending = hasPendingRef({ type: 'pin', id });
-                    const isEditing = editing?.type === 'pin' && String(editing.id) === id;
+                    const isEditing =
+                        editing?.type === 'pin' && String(editing.id) === id;
                     const style = pinStyle(pin.kind, taxonomy);
                     const Icon = resolveIcon(style.icon);
                     const x = pin.x * canvasWidth;
@@ -1375,25 +2242,74 @@ export default function PlanCanvas(props: Props) {
                         <g
                             key={`pin-${id}`}
                             transform={`translate(${x} ${y})`}
-                            onPointerDown={editable ? (event) => beginMoveDrag(event, { type: 'pin', id }) : undefined}
+                            onPointerDown={
+                                editable
+                                    ? (event) =>
+                                          beginMoveDrag(event, {
+                                              type: 'pin',
+                                              id,
+                                          })
+                                    : undefined
+                            }
                             onClick={(event) => event.stopPropagation()}
                             onDoubleClick={(event) => {
                                 event.stopPropagation();
-                                if (editable) dispatch({ type: 'begin_edit', target: { type: 'pin', id } });
+                                if (editable)
+                                    dispatch({
+                                        type: 'begin_edit',
+                                        target: { type: 'pin', id },
+                                    });
                             }}
-                            onContextMenu={(event) => openContextMenu(event, { type: 'pin', id }, editable)}
-                            style={{ cursor: editable ? (selected ? 'grab' : 'move') : 'default' }}
+                            onContextMenu={(event) =>
+                                openContextMenu(
+                                    event,
+                                    { type: 'pin', id },
+                                    editable,
+                                )
+                            }
+                            style={{
+                                cursor: editable
+                                    ? selected
+                                        ? 'grab'
+                                        : 'move'
+                                    : 'default',
+                            }}
                         >
-                            <g transform={rotation ? `rotate(${rotation})` : undefined}>
+                            <g
+                                transform={
+                                    rotation ? `rotate(${rotation})` : undefined
+                                }
+                            >
                                 <circle
                                     r={selected ? 18 : 14}
                                     fill={style.color}
-                                    stroke={hasError ? '#dc2626' : pending && !selected ? '#2563eb' : '#fff'}
+                                    stroke={
+                                        hasError
+                                            ? '#dc2626'
+                                            : pending && !selected
+                                              ? '#2563eb'
+                                              : '#fff'
+                                    }
                                     strokeWidth={hasError ? 5 : 4}
-                                    strokeDasharray={pending && !selected ? '5 4' : undefined}
+                                    strokeDasharray={
+                                        pending && !selected ? '5 4' : undefined
+                                    }
                                 />
-                                {hasError && <circle r={23} fill="none" stroke="#dc2626" strokeWidth={2} strokeDasharray="4 3" />}
-                                <foreignObject x={-8} y={-8} width={16} height={16}>
+                                {hasError && (
+                                    <circle
+                                        r={23}
+                                        fill="none"
+                                        stroke="#dc2626"
+                                        strokeWidth={2}
+                                        strokeDasharray="4 3"
+                                    />
+                                )}
+                                <foreignObject
+                                    x={-8}
+                                    y={-8}
+                                    width={16}
+                                    height={16}
+                                >
                                     <Icon className="h-4 w-4 text-white" />
                                 </foreignObject>
                                 {onlySelected && editable && canRotate && (
@@ -1402,28 +2318,48 @@ export default function PlanCanvas(props: Props) {
                                         cy={0}
                                         offset={32}
                                         onBegin={(event) =>
-                                            beginRotateDrag(event, { type: 'pin', id }, { x: pin.x, y: pin.y }, rotation)
+                                            beginRotateDrag(
+                                                event,
+                                                { type: 'pin', id },
+                                                { x: pin.x, y: pin.y },
+                                                rotation,
+                                            )
                                         }
                                     />
                                 )}
                             </g>
                             {isEditing ? (
-                                <foreignObject x={20} y={-12} width={180} height={24}>
+                                <foreignObject
+                                    x={20}
+                                    y={-12}
+                                    width={180}
+                                    height={24}
+                                >
                                     <input
                                         autoFocus
                                         defaultValue={pin.label ?? ''}
-                                        placeholder={taxonomy?.kinds?.[pin.kind]?.label ?? pin.kind}
+                                        placeholder={
+                                            taxonomy?.kinds?.[pin.kind]
+                                                ?.label ?? pin.kind
+                                        }
                                         onBlur={(event) => {
                                             dispatch({ type: 'commit' });
                                             dispatch({
                                                 type: 'update_pin',
                                                 pinId: id,
-                                                patch: { label: event.target.value || null },
+                                                patch: {
+                                                    label:
+                                                        event.target.value ||
+                                                        null,
+                                                },
                                             });
                                             dispatch({ type: 'end_edit' });
                                         }}
                                         onKeyDown={(event) => {
-                                            if (event.key === 'Enter') (event.target as HTMLInputElement).blur();
+                                            if (event.key === 'Enter')
+                                                (
+                                                    event.target as HTMLInputElement
+                                                ).blur();
                                             if (event.key === 'Escape') {
                                                 event.preventDefault();
                                                 dispatch({ type: 'end_edit' });
@@ -1433,9 +2369,17 @@ export default function PlanCanvas(props: Props) {
                                     />
                                 </foreignObject>
                             ) : (
-                                <text x={20} y={5} fontSize={13} fill="#111827" pointerEvents="none">
+                                <text
+                                    x={20}
+                                    y={5}
+                                    fontSize={13}
+                                    fill="#111827"
+                                    pointerEvents="none"
+                                >
                                     {pin.label || pin.kind.replaceAll('_', ' ')}
-                                    {pin.subkind ? ` · ${pin.subkind.replaceAll('_', ' ')}` : ''}
+                                    {pin.subkind
+                                        ? ` · ${pin.subkind.replaceAll('_', ' ')}`
+                                        : ''}
                                 </text>
                             )}
                         </g>
@@ -1454,17 +2398,46 @@ export default function PlanCanvas(props: Props) {
                             strokeWidth={3}
                             strokeDasharray="6 4"
                         />
-                        <circle cx={interaction.firstPoint.x * canvasWidth} cy={interaction.firstPoint.y * canvasHeight} r={5} fill="#2563eb" />
-                        {renderSnapPair(interaction.rawCursor, interaction.cursor)}
+                        <circle
+                            cx={interaction.firstPoint.x * canvasWidth}
+                            cy={interaction.firstPoint.y * canvasHeight}
+                            r={5}
+                            fill="#2563eb"
+                        />
+                        {renderSnapPair(
+                            interaction.rawCursor,
+                            interaction.cursor,
+                        )}
                         <g
                             transform={`translate(${
-                                ((interaction.firstPoint.x + interaction.cursor.x) / 2) * canvasWidth
+                                ((interaction.firstPoint.x +
+                                    interaction.cursor.x) /
+                                    2) *
+                                canvasWidth
                             } ${((interaction.firstPoint.y + interaction.cursor.y) / 2) * canvasHeight - 14})`}
                         >
-                            <rect x={-34} y={-12} width={68} height={18} rx={3} fill="#2563eb" />
-                            <text x={0} y={1} fill="#ffffff" fontSize={11} textAnchor="middle">
+                            <rect
+                                x={-34}
+                                y={-12}
+                                width={68}
+                                height={18}
+                                rx={3}
+                                fill="#2563eb"
+                            />
+                            <text
+                                x={0}
+                                y={1}
+                                fill="#ffffff"
+                                fontSize={11}
+                                textAnchor="middle"
+                            >
                                 {formatMeters(
-                                    distanceCanvasUnits(interaction.firstPoint, interaction.cursor, canvasWidth, canvasHeight),
+                                    distanceCanvasUnits(
+                                        interaction.firstPoint,
+                                        interaction.cursor,
+                                        canvasWidth,
+                                        canvasHeight,
+                                    ),
                                     mpu,
                                 )}
                             </text>
@@ -1472,65 +2445,141 @@ export default function PlanCanvas(props: Props) {
                     </g>
                 )}
 
-                {interaction.mode === 'drawing_polyline' && interaction.points.length >= 1 && (
-                    <g pointerEvents="none">
-                        <polyline
-                            points={[
-                                ...interaction.points.map((p) => `${p.x * canvasWidth},${p.y * canvasHeight}`),
-                                interaction.cursor ? `${interaction.cursor.x * canvasWidth},${interaction.cursor.y * canvasHeight}` : '',
-                            ]
-                                .filter(Boolean)
-                                .join(' ')}
-                            fill="none"
-                            stroke="#d97706"
-                            strokeWidth={3}
-                            strokeDasharray="6 4"
-                        />
-                        {interaction.points.map((p, i) => (
-                            <circle key={i} cx={p.x * canvasWidth} cy={p.y * canvasHeight} r={4} fill="#d97706" />
-                        ))}
-                        {renderSnapPair(interaction.rawCursor, interaction.cursor)}
-                    </g>
-                )}
-
-                {interaction.mode === 'calibrating' && interaction.firstPoint && (
-                    <g pointerEvents="none">
-                        <circle cx={interaction.firstPoint.x * canvasWidth} cy={interaction.firstPoint.y * canvasHeight} r={6} fill="#2563eb" />
-                        {interaction.secondPoint && (
-                            <>
-                                <line
-                                    x1={interaction.firstPoint.x * canvasWidth}
-                                    y1={interaction.firstPoint.y * canvasHeight}
-                                    x2={interaction.secondPoint.x * canvasWidth}
-                                    y2={interaction.secondPoint.y * canvasHeight}
-                                    stroke="#2563eb"
-                                    strokeWidth={3}
+                {interaction.mode === 'drawing_polyline' &&
+                    interaction.points.length >= 1 && (
+                        <g pointerEvents="none">
+                            <polyline
+                                points={[
+                                    ...interaction.points.map(
+                                        (p) =>
+                                            `${p.x * canvasWidth},${p.y * canvasHeight}`,
+                                    ),
+                                    interaction.cursor
+                                        ? `${interaction.cursor.x * canvasWidth},${interaction.cursor.y * canvasHeight}`
+                                        : '',
+                                ]
+                                    .filter(Boolean)
+                                    .join(' ')}
+                                fill="none"
+                                stroke="#d97706"
+                                strokeWidth={3}
+                                strokeDasharray="6 4"
+                            />
+                            {interaction.points.map((p, i) => (
+                                <circle
+                                    key={i}
+                                    cx={p.x * canvasWidth}
+                                    cy={p.y * canvasHeight}
+                                    r={4}
+                                    fill="#d97706"
                                 />
-                                <g
-                                    transform={`translate(${
-                                        ((interaction.firstPoint.x + interaction.secondPoint.x) / 2) * canvasWidth
-                                    } ${((interaction.firstPoint.y + interaction.secondPoint.y) / 2) * canvasHeight - 12})`}
-                                >
-                                    <rect x={-50} y={-12} width={100} height={18} rx={3} fill="#2563eb" />
-                                    <text x={0} y={1} fill="#ffffff" fontSize={11} textAnchor="middle">
-                                        Calibrating: {formatMeters(
-                                            distanceCanvasUnits(interaction.firstPoint, interaction.secondPoint, canvasWidth, canvasHeight),
-                                            mpu,
-                                        )}
-                                    </text>
-                                </g>
-                                {renderSnapPair(interaction.rawSecondPoint, interaction.secondPoint)}
-                            </>
-                        )}
-                    </g>
-                )}
+                            ))}
+                            {renderSnapPair(
+                                interaction.rawCursor,
+                                interaction.cursor,
+                            )}
+                        </g>
+                    )}
+
+                {interaction.mode === 'calibrating' &&
+                    interaction.firstPoint && (
+                        <g pointerEvents="none">
+                            <circle
+                                cx={interaction.firstPoint.x * canvasWidth}
+                                cy={interaction.firstPoint.y * canvasHeight}
+                                r={6}
+                                fill="#2563eb"
+                            />
+                            {interaction.secondPoint && (
+                                <>
+                                    <line
+                                        x1={
+                                            interaction.firstPoint.x *
+                                            canvasWidth
+                                        }
+                                        y1={
+                                            interaction.firstPoint.y *
+                                            canvasHeight
+                                        }
+                                        x2={
+                                            interaction.secondPoint.x *
+                                            canvasWidth
+                                        }
+                                        y2={
+                                            interaction.secondPoint.y *
+                                            canvasHeight
+                                        }
+                                        stroke="#2563eb"
+                                        strokeWidth={3}
+                                    />
+                                    <g
+                                        transform={`translate(${
+                                            ((interaction.firstPoint.x +
+                                                interaction.secondPoint.x) /
+                                                2) *
+                                            canvasWidth
+                                        } ${((interaction.firstPoint.y + interaction.secondPoint.y) / 2) * canvasHeight - 12})`}
+                                    >
+                                        <rect
+                                            x={-50}
+                                            y={-12}
+                                            width={100}
+                                            height={18}
+                                            rx={3}
+                                            fill="#2563eb"
+                                        />
+                                        <text
+                                            x={0}
+                                            y={1}
+                                            fill="#ffffff"
+                                            fontSize={11}
+                                            textAnchor="middle"
+                                        >
+                                            Calibrating:{' '}
+                                            {formatMeters(
+                                                distanceCanvasUnits(
+                                                    interaction.firstPoint,
+                                                    interaction.secondPoint,
+                                                    canvasWidth,
+                                                    canvasHeight,
+                                                ),
+                                                mpu,
+                                            )}
+                                        </text>
+                                    </g>
+                                    {renderSnapPair(
+                                        interaction.rawSecondPoint,
+                                        interaction.secondPoint,
+                                    )}
+                                </>
+                            )}
+                        </g>
+                    )}
 
                 {interaction.mode === 'marquee' && (
                     <rect
-                        x={Math.min(interaction.firstPoint.x, interaction.cursor.x) * canvasWidth}
-                        y={Math.min(interaction.firstPoint.y, interaction.cursor.y) * canvasHeight}
-                        width={Math.abs(interaction.cursor.x - interaction.firstPoint.x) * canvasWidth}
-                        height={Math.abs(interaction.cursor.y - interaction.firstPoint.y) * canvasHeight}
+                        x={
+                            Math.min(
+                                interaction.firstPoint.x,
+                                interaction.cursor.x,
+                            ) * canvasWidth
+                        }
+                        y={
+                            Math.min(
+                                interaction.firstPoint.y,
+                                interaction.cursor.y,
+                            ) * canvasHeight
+                        }
+                        width={
+                            Math.abs(
+                                interaction.cursor.x - interaction.firstPoint.x,
+                            ) * canvasWidth
+                        }
+                        height={
+                            Math.abs(
+                                interaction.cursor.y - interaction.firstPoint.y,
+                            ) * canvasHeight
+                        }
                         fill="rgba(37, 99, 235, 0.08)"
                         stroke="#2563eb"
                         strokeWidth={1}
@@ -1553,53 +2602,116 @@ export default function PlanCanvas(props: Props) {
                     />
                 )}
 
-                {!isSelectMode(activeKind) && activeKind && hoverPoint && interaction.mode === 'idle' && (
-                    <g transform={`translate(${hoverPoint.x * canvasWidth} ${hoverPoint.y * canvasHeight})`} pointerEvents="none" opacity={0.42}>
-                        {activeKind === '__room' ? (
-                            <rect x={-90} y={-55} width={180} height={110} fill="#dbeafe" stroke="#2563eb" strokeWidth={2} strokeDasharray="6 4" />
-                        ) : activeKind === '__wall' ? (
-                            <line x1={-48} y1={0} x2={48} y2={0} stroke="#2563eb" strokeWidth={4} strokeDasharray="6 4" />
-                        ) : activeKind === '__door' || activeKind === '__window' ? (
-                            <rect x={-35} y={-5} width={70} height={10} fill="#2563eb" />
-                        ) : activeKind === '__label' ? (
-                            <text x={0} y={4} textAnchor="middle" fontSize={16} fill="#2563eb">
-                                Label
-                            </text>
-                        ) : activeKind !== '__scale' ? (
-                            <circle r={14} fill={pinStyle(activeKind, taxonomy).color} />
-                        ) : null}
-                    </g>
-                )}
+                {!isSelectMode(activeKind) &&
+                    activeKind &&
+                    hoverPoint &&
+                    interaction.mode === 'idle' && (
+                        <g
+                            transform={`translate(${hoverPoint.x * canvasWidth} ${hoverPoint.y * canvasHeight})`}
+                            pointerEvents="none"
+                            opacity={0.42}
+                        >
+                            {activeKind === '__room' ? (
+                                <rect
+                                    x={-90}
+                                    y={-55}
+                                    width={180}
+                                    height={110}
+                                    fill="#dbeafe"
+                                    stroke="#2563eb"
+                                    strokeWidth={2}
+                                    strokeDasharray="6 4"
+                                />
+                            ) : activeKind === '__wall' ? (
+                                <line
+                                    x1={-48}
+                                    y1={0}
+                                    x2={48}
+                                    y2={0}
+                                    stroke="#2563eb"
+                                    strokeWidth={4}
+                                    strokeDasharray="6 4"
+                                />
+                            ) : activeKind === '__door' ||
+                              activeKind === '__window' ? (
+                                <rect
+                                    x={-35}
+                                    y={-5}
+                                    width={70}
+                                    height={10}
+                                    fill="#2563eb"
+                                />
+                            ) : activeKind === '__label' ? (
+                                <text
+                                    x={0}
+                                    y={4}
+                                    textAnchor="middle"
+                                    fontSize={16}
+                                    fill="#2563eb"
+                                >
+                                    Label
+                                </text>
+                            ) : activeKind !== '__scale' ? (
+                                <circle
+                                    r={14}
+                                    fill={pinStyle(activeKind, taxonomy).color}
+                                />
+                            ) : null}
+                        </g>
+                    )}
             </svg>
 
             <div className="pointer-events-none absolute right-2 bottom-2 flex flex-col items-end gap-1">
                 <div className="rounded-md border bg-white/90 px-2 py-1 text-xs text-slate-600 shadow-sm">
-                    Scale: 1 m ≈ {(1 / mpu).toFixed(0)} units · grid {layout.grid?.size ?? 10}
-                    {layout.grid?.snap === false ? ' · snap off' : altHeld ? ' · Alt unsnapped' : ''}
+                    Scale: 1 m ≈ {(1 / mpu).toFixed(0)} units · grid{' '}
+                    {layout.grid?.size ?? 10}
+                    {layout.grid?.snap === false
+                        ? ' · snap off'
+                        : altHeld
+                          ? ' · Alt unsnapped'
+                          : ''}
                     {selection.length > 1 && ` · ${selection.length} selected`}
                 </div>
                 {selection.length > 1 && (
-                    <div className="rounded-md border bg-blue-50 px-2 py-1 text-xs text-blue-900 shadow-sm" data-test="site-plan-marquee-count">
-                        {selection.length} items selected - drag any selected item to move all - Delete removes
+                    <div
+                        className="rounded-md border bg-blue-50 px-2 py-1 text-xs text-blue-900 shadow-sm"
+                        data-test="site-plan-marquee-count"
+                    >
+                        {selection.length} items selected - drag any selected
+                        item to move all - Delete removes
                     </div>
                 )}
                 {!isSelectMode(activeKind) && activeKind && (
-                    <div className="rounded-md border bg-blue-50 px-2 py-1 text-xs text-blue-900 shadow-sm" data-test="site-plan-tool-hint">
-                        Tool: <strong>{toolHint(activeKind, activeSubkind, taxonomy)}</strong>
+                    <div
+                        className="rounded-md border bg-blue-50 px-2 py-1 text-xs text-blue-900 shadow-sm"
+                        data-test="site-plan-tool-hint"
+                    >
+                        Tool:{' '}
+                        <strong>
+                            {toolHint(activeKind, activeSubkind, taxonomy)}
+                        </strong>
                         {activeKind === '__wall' ? ' (click two points)' : ''}
-                        {activeKind === '__scale' ? ' (click two points to calibrate)' : ''}
-                        {activeKind === 'evacuation_route' ? ' (click vertices, double-click to finish)' : ''}
+                        {activeKind === '__scale'
+                            ? ' (click two points to calibrate)'
+                            : ''}
+                        {activeKind === 'evacuation_route'
+                            ? ' (click vertices, double-click to finish)'
+                            : ''}
                     </div>
                 )}
                 {isSelectMode(activeKind) && selection.length === 0 && (
                     <div className="rounded-md border bg-slate-50 px-2 py-1 text-xs text-slate-700 shadow-sm">
-                        Drag on empty canvas to select multiple items · Shift-click to add · Double-click to edit text
+                        Drag on empty canvas to select multiple items ·
+                        Shift-click to add · Double-click to edit text
                     </div>
                 )}
             </div>
 
             {contextMenu && (
-                <DropdownMenu open onOpenChange={(next) => !next && setContextMenu(null)}>
+                <DropdownMenu
+                    open
+                    onOpenChange={(next) => !next && setContextMenu(null)}
+                >
                     <DropdownMenuTrigger asChild>
                         <span
                             aria-hidden
@@ -1613,11 +2725,15 @@ export default function PlanCanvas(props: Props) {
                             }}
                         />
                     </DropdownMenuTrigger>
-                    <DropdownMenuContent align="start" data-test="site-plan-context-menu">
-                        <DropdownMenuLabel className="text-[10px] uppercase tracking-wider text-slate-500">
+                    <DropdownMenuContent
+                        align="start"
+                        data-test="site-plan-context-menu"
+                    >
+                        <DropdownMenuLabel className="text-[10px] tracking-wider text-slate-500 uppercase">
                             {contextMenu.ref.type === 'pin'
                                 ? 'Pin'
-                                : contextMenu.ref.type.charAt(0).toUpperCase() + contextMenu.ref.type.slice(1)}
+                                : contextMenu.ref.type.charAt(0).toUpperCase() +
+                                  contextMenu.ref.type.slice(1)}
                         </DropdownMenuLabel>
                         <DropdownMenuSeparator />
                         {contextMenu.ref.type === 'pin' && (
@@ -1625,7 +2741,10 @@ export default function PlanCanvas(props: Props) {
                                 <DropdownMenuItem
                                     data-test="site-plan-context-bring-to-front"
                                     onSelect={() => {
-                                        dispatch({ type: 'bring_to_front', ref: contextMenu.ref });
+                                        dispatch({
+                                            type: 'bring_to_front',
+                                            ref: contextMenu.ref,
+                                        });
                                         setContextMenu(null);
                                     }}
                                 >
@@ -1635,7 +2754,10 @@ export default function PlanCanvas(props: Props) {
                                 <DropdownMenuItem
                                     data-test="site-plan-context-send-to-back"
                                     onSelect={() => {
-                                        dispatch({ type: 'send_to_back', ref: contextMenu.ref });
+                                        dispatch({
+                                            type: 'send_to_back',
+                                            ref: contextMenu.ref,
+                                        });
                                         setContextMenu(null);
                                     }}
                                 >
@@ -1646,10 +2768,28 @@ export default function PlanCanvas(props: Props) {
                             </>
                         )}
                         <DropdownMenuItem
+                            data-test="site-plan-context-duplicate"
+                            onSelect={() => {
+                                dispatch({ type: 'commit' });
+                                dispatch({
+                                    type: 'set_selection',
+                                    refs: [contextMenu.ref],
+                                });
+                                dispatch({ type: 'duplicate_selected' });
+                                setContextMenu(null);
+                            }}
+                        >
+                            <Lucide.Copy className="mr-2 h-4 w-4" />
+                            Duplicate
+                        </DropdownMenuItem>
+                        <DropdownMenuItem
                             data-test="site-plan-context-delete"
                             onSelect={() => {
                                 dispatch({ type: 'commit' });
-                                dispatch({ type: 'set_selection', refs: [contextMenu.ref] });
+                                dispatch({
+                                    type: 'set_selection',
+                                    refs: [contextMenu.ref],
+                                });
                                 dispatch({ type: 'delete_selected' });
                                 setContextMenu(null);
                             }}
@@ -1677,7 +2817,15 @@ function RotationHandle({
 }) {
     return (
         <g pointerEvents="auto">
-            <line x1={cx} y1={cy} x2={cx} y2={cy - offset} stroke="#2563eb" strokeWidth={1.5} pointerEvents="none" />
+            <line
+                x1={cx}
+                y1={cy}
+                x2={cx}
+                y2={cy - offset}
+                stroke="#2563eb"
+                strokeWidth={1.5}
+                pointerEvents="none"
+            />
             <circle
                 cx={cx}
                 cy={cy - offset}
@@ -1693,7 +2841,11 @@ function RotationHandle({
     );
 }
 
-function toolHint(kind: string, subkind: string | null, taxonomy: Taxonomy | null): string {
+function toolHint(
+    kind: string,
+    subkind: string | null,
+    taxonomy: Taxonomy | null,
+): string {
     if (kind === '__room') return 'Room';
     if (kind === '__wall') return 'Wall';
     if (kind === '__door') return 'Door';

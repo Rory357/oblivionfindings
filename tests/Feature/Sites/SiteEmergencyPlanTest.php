@@ -4,13 +4,14 @@ use App\Models\Role;
 use App\Models\Site;
 use App\Models\SiteContact;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
 });
 
 function siteEmergencyPlanUser(): User
@@ -119,6 +120,20 @@ test('emergency plan pdf renders for supported paper sizes when plan is ready', 
             ->assertOk()
             ->assertHeader('content-type', 'application/pdf');
     }
+});
+
+test('emergency plan pdf rejects unsupported paper sizes', function () {
+    $user = siteEmergencyPlanUser();
+    $site = Site::factory()->create(['type' => 'house']);
+
+    publishedPlanForSite($site, [
+        ['kind' => 'assembly_point', 'label' => 'Front driveway', 'x' => 0.82, 'y' => 0.88],
+        ['kind' => 'emergency_exit', 'label' => 'Kitchen exit', 'x' => 0.18, 'y' => 0.92],
+    ]);
+
+    $this->actingAs($user)
+        ->get("/sites/{$site->id}/emergency-plan.pdf?paper=letter")
+        ->assertStatus(422);
 });
 
 test('emergency plan pdf refuses export until assembly point and exit exist', function () {

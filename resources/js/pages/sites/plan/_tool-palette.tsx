@@ -1,9 +1,20 @@
 import { Button } from '@/components/ui/button';
-import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
 import { cn } from '@/lib/utils';
 import * as Lucide from 'lucide-react';
 import { useMemo, type CSSProperties } from 'react';
-import { DOOR_SUBKIND_LABELS, SELECT_TOOL, isEmergencyPlanKind, type BuilderMode, type DoorSubkind, type Taxonomy } from './_types';
+import {
+    DOOR_SUBKIND_LABELS,
+    SELECT_TOOL,
+    isEmergencyPlanKind,
+    type BuilderMode,
+    type DoorSubkind,
+    type Taxonomy,
+} from './_types';
 
 export type ToolValue = string; // '__room' | '__wall' | ... | kind value
 // Re-exported for legacy consumers (sites/show.tsx); the type is now permissive.
@@ -30,7 +41,7 @@ const SHORTCUTS: Record<string, string> = {
 function ShortcutChip({ keyName }: { keyName: string | undefined }) {
     if (!keyName) return null;
     return (
-        <kbd className="ml-auto hidden rounded border bg-slate-100 px-1 text-[10px] font-mono leading-none text-slate-600 sm:inline">
+        <kbd className="ml-auto hidden rounded border bg-slate-100 px-1 font-mono text-[10px] leading-none text-slate-600 sm:inline">
             {keyName}
         </kbd>
     );
@@ -49,8 +60,13 @@ type Props = {
 type IconProps = { className?: string; style?: CSSProperties };
 
 function resolveIcon(name: string): React.ComponentType<IconProps> {
-    const candidate = (Lucide as unknown as Record<string, React.ComponentType<IconProps>>)[name];
-    return candidate ?? (Lucide.Circle as unknown as React.ComponentType<IconProps>);
+    const candidate = (
+        Lucide as unknown as Record<string, React.ComponentType<IconProps>>
+    )[name];
+    return (
+        candidate ??
+        (Lucide.Circle as unknown as React.ComponentType<IconProps>)
+    );
 }
 
 export default function ToolPalette({
@@ -80,7 +96,8 @@ export default function ToolPalette({
     if (!taxonomy) {
         return (
             <div className="rounded-md border bg-amber-50 p-3 text-xs text-amber-900">
-                Taxonomy unavailable — the plan builder needs server-provided configuration.
+                Taxonomy unavailable — the plan builder needs server-provided
+                configuration.
             </div>
         );
     }
@@ -88,14 +105,22 @@ export default function ToolPalette({
     return (
         <div className="space-y-2 rounded-md border bg-white p-2">
             <div>
-                <div className="mb-1 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                <div className="mb-1 px-1 text-[11px] font-semibold tracking-wider text-slate-500 uppercase">
                     Selection
                 </div>
                 <Button
                     type="button"
                     size="sm"
-                    variant={activeKind === SELECT_TOOL || activeKind === null ? 'default' : 'outline'}
-                    className={cn('h-8 gap-1.5 px-2', (activeKind === SELECT_TOOL || activeKind === null) && 'ring-2 ring-blue-300')}
+                    variant={
+                        activeKind === SELECT_TOOL || activeKind === null
+                            ? 'default'
+                            : 'outline'
+                    }
+                    className={cn(
+                        'h-8 gap-1.5 px-2',
+                        (activeKind === SELECT_TOOL || activeKind === null) &&
+                            'ring-2 ring-blue-300',
+                    )}
                     onClick={() => onPickTool(SELECT_TOOL)}
                     title="Select and marquee (Q)"
                     data-test="site-plan-select-tool"
@@ -107,7 +132,7 @@ export default function ToolPalette({
             </div>
             {groups.map((group) => (
                 <div key={group.id}>
-                    <div className="mb-1 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                    <div className="mb-1 px-1 text-[11px] font-semibold tracking-wider text-slate-500 uppercase">
                         {group.label}
                     </div>
                     <div className="flex flex-wrap gap-1.5">
@@ -119,9 +144,13 @@ export default function ToolPalette({
                                 const active = activeKind === kindKey;
 
                                 if (kindKey === '__door') {
-                                    const activeDoorSubkind = (activeSubkind as DoorSubkind | null) ?? 'single_swing';
+                                    const activeDoorSubkind =
+                                        (activeSubkind as DoorSubkind | null) ??
+                                        'single_swing';
                                     const tileLabel = active
-                                        ? DOOR_SUBKIND_LABELS[activeDoorSubkind] ?? shape.label
+                                        ? (DOOR_SUBKIND_LABELS[
+                                              activeDoorSubkind
+                                          ] ?? shape.label)
                                         : shape.label;
                                     return (
                                         <Popover key={kindKey}>
@@ -129,37 +158,70 @@ export default function ToolPalette({
                                                 <Button
                                                     type="button"
                                                     size="sm"
-                                                    variant={active ? 'default' : 'outline'}
-                                                    className={cn('h-8 gap-1.5 px-2', active && 'ring-2 ring-blue-300')}
+                                                    variant={
+                                                        active
+                                                            ? 'default'
+                                                            : 'outline'
+                                                    }
+                                                    className={cn(
+                                                        'h-8 gap-1.5 px-2',
+                                                        active &&
+                                                            'ring-2 ring-blue-300',
+                                                    )}
                                                     title={`${shape.label}${SHORTCUTS[kindKey] ? ` (${SHORTCUTS[kindKey]})` : ''}`}
+                                                    onClick={() =>
+                                                        onPickTool(
+                                                            kindKey,
+                                                            activeDoorSubkind,
+                                                        )
+                                                    }
                                                     data-test="site-plan-door-tool"
                                                 >
                                                     <Icon className="h-3.5 w-3.5" />
-                                                    <span className="text-xs">{tileLabel}</span>
-                                                    <ShortcutChip keyName={SHORTCUTS[kindKey]} />
+                                                    <span className="text-xs">
+                                                        {tileLabel}
+                                                    </span>
+                                                    <ShortcutChip
+                                                        keyName={
+                                                            SHORTCUTS[kindKey]
+                                                        }
+                                                    />
                                                     <Lucide.ChevronDown className="h-3 w-3 opacity-60" />
                                                 </Button>
                                             </PopoverTrigger>
-                                            <PopoverContent className="w-56 p-1" align="start">
-                                                <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                                            <PopoverContent
+                                                className="w-56 p-1"
+                                                align="start"
+                                            >
+                                                <div className="px-2 py-1 text-[11px] font-semibold tracking-wider text-slate-500 uppercase">
                                                     Door style
                                                 </div>
-                                                {(Object.entries(DOOR_SUBKIND_LABELS) as [DoorSubkind, string][]).map(
-                                                    ([value, label]) => (
-                                                        <button
-                                                            key={value}
-                                                            type="button"
-                                                            className={cn(
-                                                                'w-full rounded px-2 py-1.5 text-left text-xs hover:bg-slate-100',
-                                                                active && activeDoorSubkind === value && 'bg-slate-100 font-medium',
-                                                            )}
-                                                            onClick={() => onPickTool(kindKey, value)}
-                                                            data-test={`site-plan-door-subkind-${value}`}
-                                                        >
-                                                            {label}
-                                                        </button>
-                                                    ),
-                                                )}
+                                                {(
+                                                    Object.entries(
+                                                        DOOR_SUBKIND_LABELS,
+                                                    ) as [DoorSubkind, string][]
+                                                ).map(([value, label]) => (
+                                                    <button
+                                                        key={value}
+                                                        type="button"
+                                                        className={cn(
+                                                            'w-full rounded px-2 py-1.5 text-left text-xs hover:bg-slate-100',
+                                                            active &&
+                                                                activeDoorSubkind ===
+                                                                    value &&
+                                                                'bg-slate-100 font-medium',
+                                                        )}
+                                                        onClick={() =>
+                                                            onPickTool(
+                                                                kindKey,
+                                                                value,
+                                                            )
+                                                        }
+                                                        data-test={`site-plan-door-subkind-${value}`}
+                                                    >
+                                                        {label}
+                                                    </button>
+                                                ))}
                                             </PopoverContent>
                                         </Popover>
                                     );
@@ -171,14 +233,25 @@ export default function ToolPalette({
                                         type="button"
                                         size="sm"
                                         variant={active ? 'default' : 'outline'}
-                                        className={cn('h-8 gap-1.5 px-2', active && 'ring-2 ring-blue-300')}
+                                        className={cn(
+                                            'h-8 gap-1.5 px-2',
+                                            active && 'ring-2 ring-blue-300',
+                                        )}
                                         onClick={() => onPickTool(kindKey)}
                                         title={`${shape.label}${SHORTCUTS[kindKey] ? ` (${SHORTCUTS[kindKey]})` : ''}`}
-                                        data-test={kindKey === '__wall' ? 'site-plan-wall-tool' : undefined}
+                                        data-test={
+                                            kindKey === '__wall'
+                                                ? 'site-plan-wall-tool'
+                                                : undefined
+                                        }
                                     >
                                         <Icon className="h-3.5 w-3.5" />
-                                        <span className="text-xs">{shape.label}</span>
-                                        <ShortcutChip keyName={SHORTCUTS[kindKey]} />
+                                        <span className="text-xs">
+                                            {shape.label}
+                                        </span>
+                                        <ShortcutChip
+                                            keyName={SHORTCUTS[kindKey]}
+                                        />
                                     </Button>
                                 );
                             }
@@ -196,21 +269,41 @@ export default function ToolPalette({
                                         type="button"
                                         size="sm"
                                         variant={active ? 'default' : 'outline'}
-                                        className={cn('h-8 gap-1.5 px-2', active && 'ring-2 ring-blue-300')}
-                                        style={active ? undefined : { borderColor: kind.color }}
+                                        className={cn(
+                                            'h-8 gap-1.5 px-2',
+                                            active && 'ring-2 ring-blue-300',
+                                        )}
+                                        style={
+                                            active
+                                                ? undefined
+                                                : { borderColor: kind.color }
+                                        }
                                         onClick={() => onPickTool(kindKey)}
                                         title={`${kind.label}${SHORTCUTS[kindKey] ? ` (${SHORTCUTS[kindKey]})` : ''}`}
                                     >
-                                        <Icon className="h-3.5 w-3.5" style={{ color: active ? undefined : kind.color }} />
-                                        <span className="text-xs">{kind.label}</span>
-                                        <ShortcutChip keyName={SHORTCUTS[kindKey]} />
+                                        <Icon
+                                            className="h-3.5 w-3.5"
+                                            style={{
+                                                color: active
+                                                    ? undefined
+                                                    : kind.color,
+                                            }}
+                                        />
+                                        <span className="text-xs">
+                                            {kind.label}
+                                        </span>
+                                        <ShortcutChip
+                                            keyName={SHORTCUTS[kindKey]}
+                                        />
                                     </Button>
                                 );
                             }
 
                             const subLabel =
                                 active && activeSubkind
-                                    ? subkinds.find((s) => s.value === activeSubkind)?.label ?? kind.label
+                                    ? (subkinds.find(
+                                          (s) => s.value === activeSubkind,
+                                      )?.label ?? kind.label)
                                     : kind.label;
 
                             return (
@@ -219,28 +312,59 @@ export default function ToolPalette({
                                         <Button
                                             type="button"
                                             size="sm"
-                                            variant={active ? 'default' : 'outline'}
-                                            className={cn('h-8 gap-1.5 px-2', active && 'ring-2 ring-blue-300')}
-                                            style={active ? undefined : { borderColor: kind.color }}
+                                            variant={
+                                                active ? 'default' : 'outline'
+                                            }
+                                            className={cn(
+                                                'h-8 gap-1.5 px-2',
+                                                active &&
+                                                    'ring-2 ring-blue-300',
+                                            )}
+                                            style={
+                                                active
+                                                    ? undefined
+                                                    : {
+                                                          borderColor:
+                                                              kind.color,
+                                                      }
+                                            }
                                             title={`${kind.label}${SHORTCUTS[kindKey] ? ` (${SHORTCUTS[kindKey]})` : ''}`}
                                         >
-                                            <Icon className="h-3.5 w-3.5" style={{ color: active ? undefined : kind.color }} />
-                                            <span className="text-xs">{subLabel}</span>
-                                            <ShortcutChip keyName={SHORTCUTS[kindKey]} />
+                                            <Icon
+                                                className="h-3.5 w-3.5"
+                                                style={{
+                                                    color: active
+                                                        ? undefined
+                                                        : kind.color,
+                                                }}
+                                            />
+                                            <span className="text-xs">
+                                                {subLabel}
+                                            </span>
+                                            <ShortcutChip
+                                                keyName={SHORTCUTS[kindKey]}
+                                            />
                                             <Lucide.ChevronDown className="h-3 w-3 opacity-60" />
                                         </Button>
                                     </PopoverTrigger>
-                                    <PopoverContent className="w-56 p-1" align="start">
-                                        <div className="px-2 py-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">
+                                    <PopoverContent
+                                        className="w-56 p-1"
+                                        align="start"
+                                    >
+                                        <div className="px-2 py-1 text-[11px] font-semibold tracking-wider text-slate-500 uppercase">
                                             {kind.label} type
                                         </div>
                                         <button
                                             type="button"
                                             className={cn(
                                                 'w-full rounded px-2 py-1.5 text-left text-xs hover:bg-slate-100',
-                                                active && !activeSubkind && 'bg-slate-100 font-medium',
+                                                active &&
+                                                    !activeSubkind &&
+                                                    'bg-slate-100 font-medium',
                                             )}
-                                            onClick={() => onPickTool(kindKey, null)}
+                                            onClick={() =>
+                                                onPickTool(kindKey, null)
+                                            }
                                         >
                                             Generic
                                         </button>
@@ -250,9 +374,17 @@ export default function ToolPalette({
                                                 type="button"
                                                 className={cn(
                                                     'w-full rounded px-2 py-1.5 text-left text-xs hover:bg-slate-100',
-                                                    active && activeSubkind === sub.value && 'bg-slate-100 font-medium',
+                                                    active &&
+                                                        activeSubkind ===
+                                                            sub.value &&
+                                                        'bg-slate-100 font-medium',
                                                 )}
-                                                onClick={() => onPickTool(kindKey, sub.value)}
+                                                onClick={() =>
+                                                    onPickTool(
+                                                        kindKey,
+                                                        sub.value,
+                                                    )
+                                                }
                                             >
                                                 {sub.label}
                                             </button>
@@ -266,26 +398,30 @@ export default function ToolPalette({
             ))}
 
             {mode === 'full' && (
-            <div className="border-t pt-2">
-                <div className="mb-1 px-1 text-[11px] font-semibold uppercase tracking-wider text-slate-500">Measure</div>
-                <div className="flex flex-wrap gap-1.5">
-                    <Button
-                        type="button"
-                        size="sm"
-                        variant={activeKind === '__scale' ? 'default' : 'outline'}
-                        className="h-8 gap-1.5 px-2"
-                        title="Set scale (S)"
-                        onClick={() => {
-                            onPickTool('__scale');
-                            onRequestCalibration();
-                        }}
-                    >
-                        <Lucide.Ruler className="h-3.5 w-3.5" />
-                        <span className="text-xs">Set scale</span>
-                        <ShortcutChip keyName={SHORTCUTS['__scale']} />
-                    </Button>
+                <div className="border-t pt-2">
+                    <div className="mb-1 px-1 text-[11px] font-semibold tracking-wider text-slate-500 uppercase">
+                        Measure
+                    </div>
+                    <div className="flex flex-wrap gap-1.5">
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant={
+                                activeKind === '__scale' ? 'default' : 'outline'
+                            }
+                            className="h-8 gap-1.5 px-2"
+                            title="Set scale (S)"
+                            onClick={() => {
+                                onPickTool('__scale');
+                                onRequestCalibration();
+                            }}
+                        >
+                            <Lucide.Ruler className="h-3.5 w-3.5" />
+                            <span className="text-xs">Set scale</span>
+                            <ShortcutChip keyName={SHORTCUTS['__scale']} />
+                        </Button>
+                    </div>
                 </div>
-            </div>
             )}
         </div>
     );

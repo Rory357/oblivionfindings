@@ -3,31 +3,38 @@
 <head>
     <meta charset="utf-8">
     <title>{{ $site['name'] }} Emergency Plan</title>
+    @php
+        $paperSize = $paper['size'] ?? 'a4';
+        $orientation = $paper['orientation'] ?? 'landscape';
+        $compact = $paperSize === 'a5';
+        $planHeight = $paperSize === 'a3' ? '650px' : ($compact ? '280px' : '460px');
+        $pageMargin = $compact ? '14px' : '24px';
+    @endphp
     <style>
-        @page { margin: 24px; }
+        @page { margin: {{ $pageMargin }}; }
         body {
             font-family: DejaVu Sans, Arial, sans-serif;
             color: #0f172a;
-            font-size: 12px;
-            line-height: 1.4;
+            font-size: {{ $compact ? '9px' : '12px' }};
+            line-height: {{ $compact ? '1.25' : '1.4' }};
         }
         .header {
             border-bottom: 3px solid #0f172a;
-            padding-bottom: 12px;
-            margin-bottom: 14px;
+            padding-bottom: {{ $compact ? '7px' : '12px' }};
+            margin-bottom: {{ $compact ? '8px' : '14px' }};
         }
         .brand {
-            font-size: 13px;
+            font-size: {{ $compact ? '9px' : '13px' }};
             color: #475569;
             text-transform: uppercase;
             letter-spacing: .04em;
         }
         h1 {
-            font-size: 28px;
-            margin: 4px 0 6px;
+            font-size: {{ $compact ? '19px' : '28px' }};
+            margin: 4px 0 {{ $compact ? '3px' : '6px' }};
         }
         h2 {
-            font-size: 15px;
+            font-size: {{ $compact ? '11px' : '15px' }};
             margin: 0 0 8px;
         }
         .meta {
@@ -49,12 +56,12 @@
         }
         .panel {
             border: 1px solid #cbd5e1;
-            padding: 10px;
-            margin-bottom: 10px;
+            padding: {{ $compact ? '6px' : '10px' }};
+            margin-bottom: {{ $compact ? '6px' : '10px' }};
         }
         .plan {
             border: 2px solid #334155;
-            height: 520px;
+            height: {{ $planHeight }};
             overflow: hidden;
         }
         .plan svg {
@@ -80,16 +87,16 @@
         .footer {
             position: fixed;
             bottom: 0;
-            left: 24px;
-            right: 24px;
+            left: {{ $pageMargin }};
+            right: {{ $pageMargin }};
             border-top: 1px solid #cbd5e1;
             padding-top: 6px;
-            font-size: 10px;
+            font-size: {{ $compact ? '8px' : '10px' }};
             color: #64748b;
         }
     </style>
 </head>
-<body>
+<body class="paper-{{ $paperSize }} {{ $orientation }}">
     <div class="header">
         <div class="brand">{{ $organisation['name'] }}</div>
         <h1>Emergency Plan</h1>
@@ -173,4 +180,3 @@
     <div class="footer">{{ $footer }}</div>
 </body>
 </html>
-

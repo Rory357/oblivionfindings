@@ -6,8 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Models\Site;
 use App\Models\SiteTypePlanPin;
 use App\Services\Sites\SiteEmergencyPlanService;
-use App\Services\Sites\SiteTypePlanPinPayloadValidator;
 use App\Services\Sites\SiteTypePlanPdfService;
+use App\Services\Sites\SiteTypePlanPinPayloadValidator;
 use App\Services\Sites\SiteTypePlanService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -62,6 +62,6 @@ class SiteEmergencyPlanController extends Controller
         $plan = $this->plans->currentPublished($site);
         abort_unless($plan, 404);
 
-        return $this->pdfs->download($site, $plan, (string) $request->query('paper', 'a4'));
+        return $this->pdfs->download($site, $plan, (string) $request->query('paper', data_get($plan->layout, 'export.paper', 'a4')));
     }
 }

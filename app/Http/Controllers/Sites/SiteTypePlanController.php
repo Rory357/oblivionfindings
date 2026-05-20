@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Site;
 use App\Services\Sites\SiteTypePlanService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 
 class SiteTypePlanController extends Controller
@@ -107,6 +108,21 @@ class SiteTypePlanController extends Controller
     {
         return $request->validate([
             'layout' => ['required', 'array'],
+            'layout.schema_version' => ['nullable', 'integer', 'min:1', 'max:2'],
+            'layout.canvas' => ['nullable', 'array'],
+            'layout.canvas.width' => ['nullable', 'numeric', 'min:100', 'max:5000'],
+            'layout.canvas.height' => ['nullable', 'numeric', 'min:100', 'max:5000'],
+            'layout.grid' => ['nullable', 'array'],
+            'layout.grid.size' => ['nullable', 'numeric', 'min:2', 'max:200'],
+            'layout.grid.snap' => ['nullable', 'boolean'],
+            'layout.export' => ['nullable', 'array'],
+            'layout.export.paper' => ['nullable', Rule::in(['a3', 'a4', 'a5'])],
+            'layout.export.orientation' => ['nullable', Rule::in(['landscape', 'portrait'])],
+            'layout.rooms' => ['nullable', 'array'],
+            'layout.walls' => ['nullable', 'array'],
+            'layout.doors' => ['nullable', 'array'],
+            'layout.windows' => ['nullable', 'array'],
+            'layout.labels' => ['nullable', 'array'],
             'notes' => ['nullable', 'string', 'max:5000'],
         ]);
     }
@@ -120,4 +136,3 @@ class SiteTypePlanController extends Controller
         return back()->with('success', $message);
     }
 }
-

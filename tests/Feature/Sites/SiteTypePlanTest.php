@@ -1,17 +1,20 @@
 <?php
 
-use App\Models\Role;
-use App\Models\Site;
-use App\Models\User;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Models\DeviceAssignment;
+use App\Models\Role;
+use App\Models\Site;
+use App\Models\SiteTypePlan;
+use App\Models\User;
+use App\Services\Sites\SiteTypePlanService;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\DB;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
 });
 
 function siteTypePlanUser(string $roleName = 'admin'): User
@@ -157,6 +160,88 @@ test('site plan draft can be saved published duplicated and republished', functi
         'status' => 'published',
         'version' => 2,
     ]);
+});
+
+test('plan layout normalisation upgrades legacy layout with schema and export defaults', function () {
+    $user = siteTypePlanUser();
+    $site = Site::factory()->create(['type' => 'house']);
+
+    $legacyLayout = sampleSitePlanLayout();
+    unset($legacyLayout['schema_version']);
+    $legacyLayout['doors'] = [
+        [
+            'id' => 'front-door',
+            'x' => 0.2,
+            'y' => 0.55,
+            'swing' => 'left',
+        ],
+    ];
+
+    $this->actingAs($user)
+        ->postJson("/sites/{$site->id}/plan/draft", [
+            'layout' => $legacyLayout,
+            'notes' => 'Legacy shape should be upgraded',
+        ])
+        ->assertOk()
+        ->assertJsonPath('plan.layout.schema_version', 2)
+        ->assertJsonPath('plan.layout.export.paper', 'a4')
+        ->assertJsonPath('plan.layout.export.orientation', 'landscape')
+        ->assertJsonPath('plan.layout.doors.0.subkind', 'single_swing')
+        ->assertJsonPath('plan.layout.doors.0.swing_side', 'left')
+        ->assertJsonPath('plan.layout.doors.0.swing_direction', 'in');
+});
+
+test('published plan svg breaks walls behind attached doors and windows', function () {
+    $site = Site::factory()->create(['type' => 'house']);
+    $service = app(SiteTypePlanService::class);
+
+    $plan = $service->storeDraft($site, [
+        'canvas' => ['width' => 1000, 'height' => 700, 'unit' => 'rel'],
+        'walls' => [
+            [
+                'id' => 'front-wall',
+                'points' => [
+                    ['x' => 0.1, 'y' => 0.5],
+                    ['x' => 0.9, 'y' => 0.5],
+                ],
+                'thickness' => 4,
+            ],
+        ],
+        'doors' => [
+            [
+                'id' => 'front-door',
+                'x' => 0.45,
+                'y' => 0.5,
+                'width' => 0.1,
+                'wall_id' => 'front-wall',
+                'wall_segment_index' => 0,
+                'wall_t' => 0.5,
+            ],
+        ],
+        'windows' => [
+            [
+                'id' => 'front-window',
+                'x' => 0.2,
+                'y' => 0.5,
+                'width' => 0.08,
+                'wall_id' => 'front-wall',
+                'wall_segment_index' => 0,
+                'wall_t' => 0.25,
+            ],
+        ],
+    ], null, null);
+
+    $published = $service->publishDraft($site, null);
+    expect($published)->toBeInstanceOf(SiteTypePlan::class);
+
+    $svg = $service->renderLayoutSvg($published);
+
+    expect($svg)
+        ->toContain('x2="260.00"')
+        ->toContain('x1="340.00"')
+        ->toContain('x2="450.00"')
+        ->toContain('x1="550.00"')
+        ->toContain('fill="#e0f2fe"');
 });
 
 test('pin batch endpoint reconciles draft pins', function () {

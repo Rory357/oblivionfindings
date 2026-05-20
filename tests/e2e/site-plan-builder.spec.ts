@@ -46,10 +46,15 @@ echo json_encode(['siteId' => $site->id]);
 async function clickCanvasAt(page: Page, xRatio: number, yRatio: number) {
     const box = await page.getByTestId('site-plan-canvas').boundingBox();
     expect(box).not.toBeNull();
-    await page.mouse.click(box!.x + box!.width * xRatio, box!.y + box!.height * yRatio);
+    await page.mouse.click(
+        box!.x + box!.width * xRatio,
+        box!.y + box!.height * yRatio,
+    );
 }
 
-test('site plan builder supports select, retyping, and emergency mode', async ({ page }) => {
+test('site plan builder supports select, retyping, and emergency mode', async ({
+    page,
+}) => {
     const errors = collectConsoleErrors(page);
     const { siteId } = seedSitePlanBuilderFixture();
 
@@ -64,11 +69,19 @@ test('site plan builder supports select, retyping, and emergency mode', async ({
     const canvas = page.getByTestId('site-plan-canvas');
     const box = await canvas.boundingBox();
     expect(box).not.toBeNull();
-    await page.mouse.move(box!.x + box!.width * 0.04, box!.y + box!.height * 0.1);
+    await page.mouse.move(
+        box!.x + box!.width * 0.04,
+        box!.y + box!.height * 0.1,
+    );
     await page.mouse.down();
-    await page.mouse.move(box!.x + box!.width * 0.5, box!.y + box!.height * 0.48);
+    await page.mouse.move(
+        box!.x + box!.width * 0.5,
+        box!.y + box!.height * 0.48,
+    );
     await page.mouse.up();
-    await expect(page.getByTestId('site-plan-marquee-count')).toContainText(/items selected/i);
+    await expect(page.getByTestId('site-plan-marquee-count')).toContainText(
+        /items selected/i,
+    );
 
     await clickCanvasAt(page, 0.22, 0.35);
     await page.getByTestId('site-plan-pin-kind-picker').click();
@@ -80,20 +93,29 @@ test('site plan builder supports select, retyping, and emergency mode', async ({
     await dialog.getByRole('button', { name: /Close/i }).click();
     await expect(dialog).toBeHidden();
 
-    await page.getByRole('button', { name: /^More$/i }).click();
-    await page.getByRole('menuitem', { name: /Emergency Plan/i }).click();
+    await page.goto(`/sites/${siteId}/emergency-plan`);
     await page.getByRole('button', { name: /Edit emergency plan/i }).click();
-    await expect(page.getByTestId('site-plan-emergency-mode-badge')).toBeVisible();
-    await expect(page.getByTestId('site-plan-emergency-checklist')).toBeVisible();
+    await expect(
+        page.getByTestId('site-plan-emergency-mode-badge'),
+    ).toBeVisible();
+    await expect(
+        page.getByTestId('site-plan-emergency-checklist'),
+    ).toBeVisible();
     await expect(page.getByTestId('site-plan-wall-tool')).toHaveCount(0);
 
     await dialog.getByRole('button', { name: /Assembly point/i }).click();
-    await expect(page.getByTestId('site-plan-tool-hint')).toContainText(/Assembly point/i);
+    await expect(page.getByTestId('site-plan-tool-hint')).toContainText(
+        /Assembly point/i,
+    );
     await clickCanvasAt(page, 0.78, 0.82);
     await dialog.getByRole('button', { name: /Emergency exit/i }).click();
-    await expect(page.getByTestId('site-plan-tool-hint')).toContainText(/Emergency exit/i);
+    await expect(page.getByTestId('site-plan-tool-hint')).toContainText(
+        /Emergency exit/i,
+    );
     await clickCanvasAt(page, 0.12, 0.86);
-    await expect(page.getByTestId('site-plan-emergency-checklist')).toContainText(/Ready to publish/i);
+    await expect(
+        page.getByTestId('site-plan-emergency-checklist'),
+    ).toContainText(/Ready to publish/i);
 
     await page.getByRole('button', { name: /Publish/i }).click();
     await expect(dialog).toContainText(/All changes saved/i);
