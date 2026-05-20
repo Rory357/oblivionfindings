@@ -1,4 +1,5 @@
 import InputError from '@/components/input-error';
+import { PageHero } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -31,14 +32,12 @@ import {
     Info,
     Layers,
     Mail,
-    Megaphone,
     Plus,
     Search,
     Shield,
     Timer,
     TrendingUp,
     X,
-    Zap,
 } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 
@@ -568,89 +567,17 @@ export default function NotificationEscalations({
                     className="space-y-6"
                 >
                     {/* ── Header ── */}
-                    <div>
-                        <div className="flex items-center gap-3">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 dark:bg-primary/30">
-                                <Shield className="h-5 w-5 text-primary dark:text-primary" />
-                            </div>
-                            <div>
-                                <h1 className="text-xl font-bold tracking-tight text-foreground">
-                                    Escalation Rules
-                                </h1>
-                                <p className="text-sm text-muted-foreground">
-                                    Configure automatic reminders,
-                                    acknowledgement requirements, and multi-tier
-                                    escalation chains. Critical events will
-                                    automatically escalate if not acknowledged
-                                    within the configured timeframes.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* ── Stats Row ── */}
-                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                        <Card className="border-primary dark:border-primary/30">
-                            <CardContent className="flex items-center gap-3 p-4">
-                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-primary/10 dark:bg-primary/30">
-                                    <Shield className="h-4 w-4 text-primary dark:text-primary" />
-                                </div>
-                                <div>
-                                    <p className="text-xl font-bold text-primary dark:text-primary">
-                                        {stats.total}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                        Total Rules
-                                    </p>
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card className="border-status-success/30 dark:border-status-success/30">
-                            <CardContent className="flex items-center gap-3 p-4">
-                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-status-success-bg">
-                                    <Zap className="h-4 w-4 text-status-success dark:text-status-success" />
-                                </div>
-                                <div>
-                                    <p className="text-xl font-bold text-status-success dark:text-status-success">
-                                        {stats.active}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                        Active Rules
-                                    </p>
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card className="border-status-warning/30 dark:border-status-warning/30">
-                            <CardContent className="flex items-center gap-3 p-4">
-                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-status-warning-bg">
-                                    <Bell className="h-4 w-4 text-status-warning dark:text-status-warning" />
-                                </div>
-                                <div>
-                                    <p className="text-xl font-bold text-status-warning dark:text-status-warning">
-                                        {stats.ack}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                        Require Acknowledgement
-                                    </p>
-                                </div>
-                            </CardContent>
-                        </Card>
-                        <Card className="border-status-critical/30 dark:border-status-critical/30">
-                            <CardContent className="flex items-center gap-3 p-4">
-                                <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-status-critical-bg">
-                                    <Megaphone className="h-4 w-4 text-status-critical dark:text-status-critical" />
-                                </div>
-                                <div>
-                                    <p className="text-xl font-bold text-status-critical dark:text-status-critical">
-                                        {stats.force}
-                                    </p>
-                                    <p className="text-xs text-muted-foreground">
-                                        Force Delivery
-                                    </p>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
+                    <PageHero
+                        icon={Bell}
+                        title="Escalation Rules"
+                        description="Configure automatic reminders, acknowledgement requirements, and multi-tier escalation chains. Critical events will automatically escalate if not acknowledged within the configured timeframes."
+                        stats={[
+                            { label: 'Total Rules', value: stats.total },
+                            { label: 'Active', value: stats.active },
+                            { label: 'Require Ack', value: stats.ack },
+                            { label: 'Force Delivery', value: stats.force },
+                        ]}
+                    />
 
                     {/* ── Info Banner ── */}
                     <Card className="border-status-info/30 bg-status-info-bg dark:border-status-info/30">

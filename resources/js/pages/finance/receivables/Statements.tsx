@@ -1,5 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -20,7 +21,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { ArrowLeft, Printer } from 'lucide-react';
+import { ArrowLeft, FileText, Printer } from 'lucide-react';
 import { useRef } from 'react';
 
 type ClientOption = {
@@ -126,22 +127,34 @@ export default function Statements({ clients, statement, filters }: PageProps) {
             ]}
         >
             <Head title="Client Statements" />
-            <div className="space-y-6 p-4">
-                <div className="flex items-center justify-between print:hidden">
-                    <div>
-                        <h1 className="text-xl font-semibold">Client Statements</h1>
-                        <p className="text-sm text-muted-foreground">
-                            Generate and view outstanding invoice statements by client.
-                        </p>
+            <PageLayout
+                hero={
+                    <div className="print:hidden">
+                        <PageHero
+                            icon={FileText}
+                            title="Client Statements"
+                            description="Generate and view outstanding invoice statements by client."
+                            stats={
+                                statement
+                                    ? [
+                                          { label: 'Client', value: statement.client.name },
+                                          { label: 'Invoices', value: statement.invoices.length },
+                                          { label: 'Outstanding', value: formatNZD(statement.total_outstanding) },
+                                      ]
+                                    : undefined
+                            }
+                            actions={
+                                <Link href="/finance/receivables">
+                                    <Button variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                        <ArrowLeft className="mr-2 h-4 w-4" />
+                                        Back to Receivables
+                                    </Button>
+                                </Link>
+                            }
+                        />
                     </div>
-                    <Link href="/finance/receivables">
-                        <Button variant="outline">
-                            <ArrowLeft className="mr-2 h-4 w-4" />
-                            Back to Receivables
-                        </Button>
-                    </Link>
-                </div>
-
+                }
+            >
                 {/* Filters */}
                 <Card className="print:hidden">
                     <CardHeader>
@@ -287,7 +300,7 @@ export default function Statements({ clients, statement, filters }: PageProps) {
                         </Card>
                     </div>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

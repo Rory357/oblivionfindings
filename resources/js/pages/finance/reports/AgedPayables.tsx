@@ -1,10 +1,11 @@
 import { Head } from '@inertiajs/react';
 import { type BreadcrumbItem, PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
-import { Printer, DollarSign, CheckCircle, AlertTriangle } from 'lucide-react';
+import { Printer, DollarSign, CheckCircle, AlertTriangle, ArrowDownToLine } from 'lucide-react';
 import { PieChart, Pie, Cell, BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { useMemo } from 'react';
 
@@ -89,18 +90,26 @@ export default function AgedPayables({ report }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Aged Payables" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Aged Payables</h1>
-                        <p className="text-muted-foreground">Outstanding payables by vendor and aging period</p>
-                    </div>
-                    <Button variant="outline" size="sm" onClick={() => window.print()}>
-                        <Printer className="mr-1 h-4 w-4" />
-                        Print
-                    </Button>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={ArrowDownToLine}
+                        title="Aged Payables"
+                        description="Outstanding payables by vendor and aging period."
+                        stats={[
+                            { label: 'Outstanding', value: formatCurrency(grand_total.total) },
+                            { label: 'Current', value: `${currentPct}%` },
+                            { label: 'Overdue 31+', value: formatCurrency(overdueAmount) },
+                        ]}
+                        actions={
+                            <Button variant="outline" size="sm" onClick={() => window.print()} className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                <Printer className="mr-1 h-4 w-4" />
+                                Print
+                            </Button>
+                        }
+                    />
+                }
+            >
                 {/* KPI Cards */}
                 <div className="grid gap-4 sm:grid-cols-3">
                     <Card>
@@ -248,7 +257,7 @@ export default function AgedPayables({ report }: Props) {
                         )}
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

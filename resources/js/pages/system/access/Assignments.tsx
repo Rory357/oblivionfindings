@@ -1,9 +1,9 @@
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 import {
-    ArrowLeft,
     Users,
     Search,
     UserCheck,
@@ -105,35 +105,36 @@ export default function UserAssignments({ users, roles }: Props) {
         return 'bg-muted text-foreground border-border';
     };
 
+    const staffCount = users.filter((u) => u.is_staff).length;
+    const portalCount = users.length - staffCount;
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="User Assignments" />
 
-            <div className="space-y-6">
-                {/* Header */}
-                <div className="flex flex-col sm:flex-row sm:items-center justify-between gap-4">
-                    <div>
-                        <div className="flex items-center gap-2 mb-2">
-                            <Link href="/system/access">
-                                <Button variant="ghost" size="sm">
-                                    <ArrowLeft className="h-4 w-4 mr-1" />
-                                    Back
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={UserCheck}
+                        title="User Assignments"
+                        description="Manage role assignments for organization members."
+                        stats={[
+                            { label: 'Total', value: users.length },
+                            { label: 'Staff', value: staffCount },
+                            { label: 'Portal', value: portalCount },
+                            { label: 'Roles', value: roles.length },
+                        ]}
+                        actions={
+                            <Link href="/system/users/create">
+                                <Button size="sm">
+                                    <UserCheck className="h-4 w-4 mr-2" />
+                                    Invite Member
                                 </Button>
                             </Link>
-                        </div>
-                        <h1 className="text-2xl font-semibold tracking-tight">User Assignments</h1>
-                        <p className="text-muted-foreground">
-                            Manage role assignments for organization members.
-                        </p>
-                    </div>
-                    <Link href="/system/users/create">
-                        <Button>
-                            <UserCheck className="h-4 w-4 mr-2" />
-                            Invite Member
-                        </Button>
-                    </Link>
-                </div>
-
+                        }
+                    />
+                }
+            >
                 {/* Members Card */}
                 <Card>
                     <CardHeader>
@@ -244,7 +245,7 @@ export default function UserAssignments({ users, roles }: Props) {
                         </div>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
 
             {/* Edit Dialog */}
             <Dialog open={!!editingUser} onOpenChange={() => setEditingUser(null)}>

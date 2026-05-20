@@ -1,6 +1,7 @@
 import { Head, router } from '@inertiajs/react';
 import { PageProps, type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -95,20 +96,26 @@ export default function BalanceSheet({ report, filters }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Balance Sheet" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold">Balance Sheet</h1>
-                        <p className="text-muted-foreground">
-                            Financial position showing assets, liabilities, and equity
-                        </p>
-                    </div>
-                    <Button variant="outline" size="sm" onClick={() => window.print()}>
-                        <Printer className="mr-1 h-4 w-4" />
-                        Print
-                    </Button>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Scale}
+                        title="Balance Sheet"
+                        description="Financial position showing assets, liabilities, and equity."
+                        stats={[
+                            { label: 'Assets', value: formatCurrency(report.total_assets) },
+                            { label: 'Liabilities', value: formatCurrency(report.total_liabilities) },
+                            { label: 'Equity', value: formatCurrency(report.total_equity) },
+                        ]}
+                        actions={
+                            <Button variant="outline" size="sm" onClick={() => window.print()} className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                <Printer className="mr-1 h-4 w-4" />
+                                Print
+                            </Button>
+                        }
+                    />
+                }
+            >
                 {/* KPI Summary Cards */}
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-3">
                     <Card>
@@ -264,7 +271,7 @@ export default function BalanceSheet({ report, filters }: Props) {
                         </Table>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

@@ -1,4 +1,4 @@
-import PageShell from '@/components/page-shell';
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -58,7 +58,6 @@ import {
     LayoutDashboard,
     Loader2,
     Play,
-    RadioTower,
     RefreshCw,
     Satellite,
     Send,
@@ -283,90 +282,21 @@ export default function QueclinkHub({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Queclink Integration" />
-            <PageShell>
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/security-devices/integrations"
+                        backLabel="Back to APIs & Integrations"
+                        title="Queclink Integration"
+                        description="Direct device-to-server TCP intake for vehicle, lone-worker, and client safeguarding trackers."
+                    />
+                }
+            >
                 <div
                     data-testid="queclink-page-shell"
                     className="w-full space-y-6"
                 >
-                    {/* ── Hero Header ──────────────────────────────── */}
-                    <div
-                        data-testid="queclink-hero"
-                        className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-primary-foreground md:p-8"
-                    >
-                        <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-primary-foreground/5" />
-                        <div className="pointer-events-none absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-primary-foreground/5" />
-                        <div className="pointer-events-none absolute top-1/4 right-1/3 h-24 w-24 rounded-full bg-primary-foreground/5" />
-
-                        <div className="relative flex flex-col items-center gap-6 md:flex-row md:items-start">
-                            <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full border-4 border-primary-foreground/20 bg-primary-foreground/10 shadow-xl md:h-28 md:w-28">
-                                <Satellite className="h-12 w-12 text-primary-foreground md:h-14 md:w-14" />
-                            </div>
-
-                            <div className="min-w-0 flex-1 text-center md:text-left">
-                                <h1 className="text-2xl font-bold md:text-3xl">
-                                    Queclink Integration
-                                </h1>
-                                <p className="mt-1 flex flex-wrap items-center justify-center gap-1.5 text-sm text-primary-foreground/65 md:justify-start">
-                                    <RadioTower className="h-3.5 w-3.5" />
-                                    Direct device-to-server TCP intake for
-                                    vehicle, lone-worker, and client
-                                    safeguarding trackers.
-                                </p>
-
-                                <div className="mt-3 flex flex-wrap items-center justify-center gap-2 md:justify-start">
-                                    <Badge className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90">
-                                        <Server className="mr-1 h-3 w-3" />
-                                        Direct TCP listener
-                                    </Badge>
-                                    <Badge className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90">
-                                        Port {listener.port}
-                                    </Badge>
-                                    <Badge
-                                        className={
-                                            listener.service_state === 'active'
-                                                ? 'border-status-success/30 bg-status-success-bg text-status-success'
-                                                : listener.service_state ===
-                                                    'not_applicable'
-                                                  ? 'border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90'
-                                                  : 'border-status-warning/30 bg-status-warning-bg text-status-warning'
-                                        }
-                                    >
-                                        {listener.service_state === 'active' ? (
-                                            <CheckCircle className="mr-1 h-3 w-3" />
-                                        ) : (
-                                            <XCircle className="mr-1 h-3 w-3" />
-                                        )}
-                                        {listener.service_state ===
-                                        'not_applicable'
-                                            ? 'Manual listener mode'
-                                            : `Listener ${listener.service_state.replaceAll('_', ' ')}`}
-                                    </Badge>
-                                </div>
-                            </div>
-
-                            <div className="flex flex-col items-center gap-3 md:items-end">
-                                <div className="grid grid-cols-2 gap-4 text-center sm:flex sm:gap-6">
-                                    <HeroStat
-                                        label="Paired"
-                                        value={devices.paired.length}
-                                    />
-                                    <HeroStat
-                                        label="Pending"
-                                        value={devices.pending.length}
-                                    />
-                                    <HeroStat
-                                        label="Connected"
-                                        value={listener.connected_count}
-                                    />
-                                    <HeroStat
-                                        label="Frames/hr"
-                                        value={statistics.frames_last_hour}
-                                    />
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
                     {/* ── Tabs ────────────────────────────────────── */}
                     <Tabs
                         value={activeTab}
@@ -478,21 +408,12 @@ export default function QueclinkHub({
                         </TabsContent>
                     </Tabs>
                 </div>
-            </PageShell>
+            </PageLayout>
         </AppLayout>
     );
 }
 
 // ── Listener status pill ──────────────────────────────────────────
-
-function HeroStat({ label, value }: { label: string; value: number | string }) {
-    return (
-        <div>
-            <p className="text-2xl font-bold">{value}</p>
-            <p className="text-xs text-primary-foreground/60">{label}</p>
-        </div>
-    );
-}
 
 function ListenerStatusBadge({ listener }: { listener: Props['listener'] }) {
     const state = listener.service_state;

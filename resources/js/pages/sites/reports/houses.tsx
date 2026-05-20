@@ -1,11 +1,12 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Home, Download, ArrowLeft, AlertTriangle, CheckCircle2, BedDouble, Users } from 'lucide-react';
+import { Home, Download, AlertTriangle, CheckCircle2, BedDouble, Users } from 'lucide-react';
 import { useState } from 'react';
 
 type House = {
@@ -59,72 +60,34 @@ export default function HouseReports({ houses, stats, dateRange, regions }: Prop
         ]}>
             <Head title="House Reports" />
 
-            <div className="m-4 space-y-4">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div>
-                        <Button asChild variant="ghost" size="sm" className="mb-2">
-                            <Link href="/sites/reports">
-                                <ArrowLeft className="w-4 h-4 mr-1" />
-                                Back
-                            </Link>
-                        </Button>
-                        <h1 className="text-lg font-semibold flex items-center gap-2">
-                            <Home className="w-5 h-5 text-status-success" />
-                            House Reports
-                        </h1>
-                        <p className="text-sm text-muted-foreground">
-                            Quality home checks, occupancy, and compliance
-                        </p>
-                    </div>
-                    <Button variant="outline" asChild>
-                        <Link href={`/sites/reports/export?type=houses&format=csv&date_from=${dateFrom}&date_to=${dateTo}`}>
-                            <Download className="w-4 h-4 mr-1" />
-                            Export CSV
-                        </Link>
-                    </Button>
-                </div>
-
-                {/* Stats */}
-                <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-6">
-                    <Card>
-                        <CardContent className="p-4">
-                            <div className="text-2xl font-bold">{stats.total_houses}</div>
-                            <div className="text-sm text-muted-foreground">Houses</div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="p-4">
-                            <div className="text-2xl font-bold">{stats.total_bedrooms}</div>
-                            <div className="text-sm text-muted-foreground">Bedrooms</div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="p-4">
-                            <div className="text-2xl font-bold">{stats.total_clients}</div>
-                            <div className="text-sm text-muted-foreground">Clients</div>
-                        </CardContent>
-                    </Card>
-                    <Card className="bg-status-critical border-status-critical/20">
-                        <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-status-critical">{stats.open_hazards}</div>
-                            <div className="text-sm text-muted-foreground">Open Hazards</div>
-                        </CardContent>
-                    </Card>
-                    <Card className="bg-status-critical border-status-critical/20">
-                        <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-status-critical">{stats.critical_hazards}</div>
-                            <div className="text-sm text-muted-foreground">Critical</div>
-                        </CardContent>
-                    </Card>
-                    <Card className="bg-status-success border-status-success/20">
-                        <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-status-success">{stats.checklist_completion_rate}%</div>
-                            <div className="text-sm text-muted-foreground">Checklist Completion</div>
-                        </CardContent>
-                    </Card>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Home}
+                        title="House Reports"
+                        description="Quality home checks, occupancy, and compliance"
+                        stats={[
+                            { label: 'Houses', value: stats.total_houses },
+                            { label: 'Open hazards', value: stats.open_hazards },
+                            { label: 'Critical hazards', value: stats.critical_hazards },
+                            { label: 'Checklist completion', value: `${stats.checklist_completion_rate}%` },
+                        ]}
+                        actions={
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                asChild
+                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                            >
+                                <Link href={`/sites/reports/export?type=houses&format=csv&date_from=${dateFrom}&date_to=${dateTo}`}>
+                                    <Download className="w-4 h-4 mr-1" />
+                                    Export CSV
+                                </Link>
+                            </Button>
+                        }
+                    />
+                }
+            >
                 {/* Date Filter */}
                 <Card>
                     <CardHeader className="pb-3">
@@ -207,7 +170,7 @@ export default function HouseReports({ houses, stats, dateRange, regions }: Prop
                         </div>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

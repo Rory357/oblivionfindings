@@ -2,9 +2,11 @@ import AppLayout from '@/layouts/app-layout';
 import ClientSafetyRibbon, {
     type ClientSafety,
 } from '@/components/client-safety-ribbon';
+import { PageHero, PageLayout } from '@/components/page';
 import { Head, usePage } from '@inertiajs/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { TabsContent, TabsList, TabsRoot, TabsTrigger } from '@/components/ui/tabs';
+import { Stethoscope } from 'lucide-react';
 
 export default function MedicalSimple() {
     const { client, medications, conditions, emergency_contacts, profile, safety } = usePage<any>().props;
@@ -13,13 +15,21 @@ export default function MedicalSimple() {
         <AppLayout breadcrumbs={[{ title: 'Clients', href: '/clients' }, { title: `${client?.first_name} ${client?.last_name}`, href: `/clients/${client?.id}` }, { title: 'Medical', href: `/clients/${client?.id}/medical` }]}>
             <Head title={`Medical - ${client?.first_name} ${client?.last_name}`} />
 
-            <div className="space-y-6 p-6">
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Stethoscope}
+                        title="Medical Profile (Debug)"
+                        description={`${client?.first_name} ${client?.last_name}`}
+                        stats={[
+                            { label: 'Medications', value: medications?.length || 0 },
+                            { label: 'Conditions', value: conditions?.length || 0 },
+                            { label: 'Contacts', value: emergency_contacts?.length || 0 },
+                        ]}
+                    />
+                }
+            >
                 <ClientSafetyRibbon safety={safety as ClientSafety | null | undefined} />
-
-                <div>
-                    <h1 className="text-2xl font-semibold tracking-tight">Medical Profile (Debug)</h1>
-                    <p className="text-sm text-muted-foreground">{client?.first_name} {client?.last_name}</p>
-                </div>
 
                 <TabsRoot defaultValue="overview" className="space-y-4">
                     <TabsList>
@@ -73,7 +83,7 @@ export default function MedicalSimple() {
                         </Card>
                     </TabsContent>
                 </TabsRoot>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

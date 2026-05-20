@@ -1,11 +1,12 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Building2, Download, ArrowLeft, AlertTriangle, CheckCircle2, DoorOpen, Calendar } from 'lucide-react';
+import { Building, Download, AlertTriangle, CheckCircle2, DoorOpen, Calendar } from 'lucide-react';
 import { useState } from 'react';
 
 type Office = {
@@ -49,66 +50,34 @@ export default function HeadOfficeReports({ offices, stats, dateRange }: Props) 
         ]}>
             <Head title="Head Office Reports" />
 
-            <div className="m-4 space-y-4">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div>
-                        <Button asChild variant="ghost" size="sm" className="mb-2">
-                            <Link href="/sites/reports">
-                                <ArrowLeft className="w-4 h-4 mr-1" />
-                                Back
-                            </Link>
-                        </Button>
-                        <h1 className="text-lg font-semibold flex items-center gap-2">
-                            <Building2 className="w-5 h-5 text-status-info" />
-                            Head Office Reports
-                        </h1>
-                        <p className="text-sm text-muted-foreground">
-                            Room utilization, safety compliance, and facilities
-                        </p>
-                    </div>
-                    <Button variant="outline" asChild>
-                        <Link href={`/sites/reports/export?type=head_office&format=csv&date_from=${dateFrom}&date_to=${dateTo}`}>
-                            <Download className="w-4 h-4 mr-1" />
-                            Export CSV
-                        </Link>
-                    </Button>
-                </div>
-
-                {/* Stats */}
-                <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-5">
-                    <Card>
-                        <CardContent className="p-4">
-                            <div className="text-2xl font-bold">{stats.total_offices}</div>
-                            <div className="text-sm text-muted-foreground">Offices</div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="p-4">
-                            <div className="text-2xl font-bold">{stats.total_rooms}</div>
-                            <div className="text-sm text-muted-foreground">Rooms</div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="p-4">
-                            <div className="text-2xl font-bold">{stats.room_bookings}</div>
-                            <div className="text-sm text-muted-foreground">Bookings</div>
-                        </CardContent>
-                    </Card>
-                    <Card className="bg-status-critical border-status-critical/20">
-                        <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-status-critical">{stats.open_hazards}</div>
-                            <div className="text-sm text-muted-foreground">Open Hazards</div>
-                        </CardContent>
-                    </Card>
-                    <Card className="bg-status-success border-status-success/20">
-                        <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-status-success">{stats.safety_compliance_rate}%</div>
-                            <div className="text-sm text-muted-foreground">Safety Compliance</div>
-                        </CardContent>
-                    </Card>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Building}
+                        title="Head Office Reports"
+                        description="Room utilization, safety compliance, and facilities"
+                        stats={[
+                            { label: 'Offices', value: stats.total_offices },
+                            { label: 'Rooms', value: stats.total_rooms },
+                            { label: 'Open hazards', value: stats.open_hazards },
+                            { label: 'Safety compliance', value: `${stats.safety_compliance_rate}%` },
+                        ]}
+                        actions={
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                asChild
+                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                            >
+                                <Link href={`/sites/reports/export?type=head_office&format=csv&date_from=${dateFrom}&date_to=${dateTo}`}>
+                                    <Download className="w-4 h-4 mr-1" />
+                                    Export CSV
+                                </Link>
+                            </Button>
+                        }
+                    />
+                }
+            >
                 {/* Date Filter */}
                 <Card>
                     <CardHeader className="pb-3">
@@ -185,7 +154,7 @@ export default function HeadOfficeReports({ offices, stats, dateRange }: Props) 
                         </div>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

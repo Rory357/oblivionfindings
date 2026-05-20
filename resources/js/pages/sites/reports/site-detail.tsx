@@ -1,10 +1,10 @@
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link } from '@inertiajs/react';
-import { Button } from '@/components/ui/button';
+import { Head } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
-import { ArrowLeft, AlertTriangle, CheckCircle2, Clock, Shield, Key, ClipboardList, Search } from 'lucide-react';
+import { AlertTriangle, Clock, Shield, Key, ClipboardList } from 'lucide-react';
 
 type Site = {
     id: number;
@@ -63,25 +63,17 @@ export default function SiteDetailReport({
         ]}>
             <Head title={`Site Report - ${site.name}`} />
 
-            <div className="m-4 space-y-4">
-                {/* Header */}
-                <div>
-                    <Button asChild variant="ghost" size="sm" className="mb-2">
-                        <Link href="/sites/reports">
-                            <ArrowLeft className="w-4 h-4 mr-1" />
-                            Back
-                        </Link>
-                    </Button>
-                    <h1 className="text-lg font-semibold flex items-center gap-2">
-                        <Search className="w-5 h-5" />
-                        Site Detail Report: {site.name}
-                    </h1>
-                    <p className="text-sm text-muted-foreground">
-                        {site.type === 'house' ? 'House' : site.type === 'facility' ? 'Facility' : 'Head Office'}
-                        {site.region ? ` - ${site.region}` : ''}
-                    </p>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref={`/sites/${site.id}/reports`}
+                        backLabel="Back to reports"
+                        title={`Site Detail Report: ${site.name}`}
+                        description={`${site.type === 'house' ? 'House' : site.type === 'facility' ? 'Facility' : 'Head Office'}${site.region ? ` - ${site.region}` : ''}`}
+                    />
+                }
+            >
                 {/* Hazard Stats */}
                 <Card>
                     <CardHeader>
@@ -230,7 +222,7 @@ export default function SiteDetailReport({
                         </CardContent>
                     </Card>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

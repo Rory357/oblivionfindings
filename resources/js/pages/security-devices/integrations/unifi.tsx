@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,8 +9,8 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router, useForm } from '@inertiajs/react';
-import { ArrowLeft, Building2, CheckCircle, Loader2, RefreshCw, ShieldAlert, Wifi, XCircle } from 'lucide-react';
+import { Head, router, useForm } from '@inertiajs/react';
+import { Building2, CheckCircle, Loader2, RefreshCw, ShieldAlert, XCircle } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 type TenantSecret = {
@@ -228,21 +229,17 @@ export default function UnifiIntegration({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="UniFi Integration" />
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div>
-                    <Link href="/security-devices/integrations" className="mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-                        <ArrowLeft className="h-4 w-4" />
-                        Back to APIs &amp; Integrations
-                    </Link>
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted"><Wifi className="h-5 w-5 text-muted-foreground" /></div>
-                        <div>
-                            <h1 className="text-2xl font-semibold tracking-tight">UniFi Integration</h1>
-                            <p className="text-sm text-muted-foreground">Dynamic location to room assignment for synced UniFi devices.</p>
-                        </div>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/security-devices/integrations"
+                        backLabel="Back to APIs & Integrations"
+                        title="UniFi Integration"
+                        description="Dynamic location to room assignment for synced UniFi devices."
+                    />
+                }
+            >
                 <Card>
                     <CardHeader><CardTitle>API Key</CardTitle></CardHeader>
                     <CardContent className="space-y-4">
@@ -449,7 +446,7 @@ export default function UnifiIntegration({
                         </CardContent>
                     </Card>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

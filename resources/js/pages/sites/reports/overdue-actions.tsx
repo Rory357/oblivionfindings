@@ -1,11 +1,12 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, AlertTriangle } from 'lucide-react';
+import { AlertTriangle } from 'lucide-react';
 import { useState } from 'react';
 
 type OverdueAction = {
@@ -61,50 +62,20 @@ export default function OverdueActions({ overdueActions, sites, filters }: Props
         ]}>
             <Head title="Overdue Corrective Actions" />
 
-            <div className="m-4 space-y-4">
-                {/* Header */}
-                <div>
-                    <Button asChild variant="ghost" size="sm" className="mb-2">
-                        <Link href="/sites/reports">
-                            <ArrowLeft className="w-4 h-4 mr-1" />
-                            Back
-                        </Link>
-                    </Button>
-                    <h1 className="text-lg font-semibold flex items-center gap-2">
-                        <AlertTriangle className="w-5 h-5 text-status-critical" />
-                        Overdue Corrective Actions
-                    </h1>
-                    <p className="text-sm text-muted-foreground">
-                        Hazards past their due date that remain open
-                    </p>
-                </div>
-
-                {/* Summary */}
-                <div className="grid gap-4 sm:grid-cols-3">
-                    <Card className="bg-status-critical border-status-critical/20">
-                        <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-status-critical">{overdueActions.length}</div>
-                            <div className="text-sm text-muted-foreground">Total Overdue</div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-status-warning">
-                                {overdueActions.filter(a => a.severity === 'critical' || a.severity === 'high').length}
-                            </div>
-                            <div className="text-sm text-muted-foreground">High/Critical</div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="p-4">
-                            <div className="text-2xl font-bold">
-                                {overdueActions.filter(a => !a.assigned_to).length}
-                            </div>
-                            <div className="text-sm text-muted-foreground">Unassigned</div>
-                        </CardContent>
-                    </Card>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={AlertTriangle}
+                        title="Overdue Corrective Actions"
+                        description="Hazards past their due date that remain open"
+                        stats={[
+                            { label: 'Total overdue', value: overdueActions.length },
+                            { label: 'High/Critical', value: overdueActions.filter(a => a.severity === 'critical' || a.severity === 'high').length },
+                            { label: 'Unassigned', value: overdueActions.filter(a => !a.assigned_to).length },
+                        ]}
+                    />
+                }
+            >
                 {/* Filters */}
                 <Card>
                     <CardHeader className="pb-3">
@@ -218,7 +189,7 @@ export default function OverdueActions({ overdueActions, sites, filters }: Props
                         )}
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

@@ -1,10 +1,10 @@
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, useForm, router, usePage } from '@inertiajs/react';
+import { Head, useForm, router, usePage } from '@inertiajs/react';
 import { useEffect, useState } from 'react';
 import {
     Shield,
-    ArrowLeft,
     Plus,
     Copy,
     Pencil,
@@ -12,9 +12,6 @@ import {
     ShieldCheck,
     Users,
     Lock,
-    Search,
-    X,
-    Check,
 } from 'lucide-react';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -250,31 +247,26 @@ export default function RolesManagement({ systemRoles, customRoles, permissions,
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Roles Management" />
 
-            <div className="space-y-6">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div>
-                        <div className="flex items-center gap-2 mb-2">
-                            <Link href="/system/access">
-                                <Button variant="ghost" size="sm">
-                                    <ArrowLeft className="h-4 w-4 mr-1" />
-                                    Back
-                                </Button>
-                            </Link>
-                        </div>
-                        <h1 className="text-2xl font-semibold tracking-tight">Roles Management</h1>
-                        <p className="text-muted-foreground">
-                            Manage roles and their permissions for your organization.
-                        </p>
-                    </div>
-                    <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
-                        <DialogTrigger asChild>
-                            <Button>
-                                <Plus className="h-4 w-4 mr-2" />
-                                Create Custom Role
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Shield}
+                        title="Roles Management"
+                        description="Manage roles and their permissions for your organization."
+                        stats={[
+                            { label: 'System', value: systemRoles.length },
+                            { label: 'Custom', value: customRoles.length },
+                            { label: 'Permissions', value: permissions.length },
+                        ]}
+                        actions={
+                            <Dialog open={createDialogOpen} onOpenChange={setCreateDialogOpen}>
+                                <DialogTrigger asChild>
+                                    <Button size="sm">
+                                        <Plus className="h-4 w-4 mr-2" />
+                                        Create Custom Role
+                                    </Button>
+                                </DialogTrigger>
+                                <DialogContent className="max-w-2xl max-h-[90vh] overflow-y-auto">
                             <DialogHeader>
                                 <DialogTitle>Create Custom Role</DialogTitle>
                                 <DialogDescription>
@@ -395,7 +387,10 @@ export default function RolesManagement({ systemRoles, customRoles, permissions,
                             </form>
                         </DialogContent>
                     </Dialog>
-                </div>
+                        }
+                    />
+                }
+            >
 
                 {/* System Roles */}
                 <div>
@@ -452,7 +447,7 @@ export default function RolesManagement({ systemRoles, customRoles, permissions,
                         </CardContent>
                     </Card>
                 </div>
-            </div>
+            </PageLayout>
 
             {/* Edit Dialog */}
             <Dialog open={!!editingRole} onOpenChange={() => setEditingRole(null)}>

@@ -1,3 +1,4 @@
+import { PageHero } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -32,7 +33,7 @@ import {
     AlertTriangle,
     Briefcase,
     Eye,
-    Hash,
+    FileText,
     Mail,
     MessageSquare,
     Pencil,
@@ -190,37 +191,6 @@ function renderWithSampleData(text: string, orgName: string): string {
         result = result.replaceAll(field, value);
     }
     return result;
-}
-
-// ---------------------------------------------------------------------------
-// Component: StatCard
-// ---------------------------------------------------------------------------
-function StatCard({
-    label,
-    value,
-    colour,
-    icon: Icon,
-}: {
-    label: string;
-    value: number;
-    colour: string;
-    icon: typeof Mail;
-}) {
-    return (
-        <Card>
-            <CardContent className="flex items-center gap-4 p-4">
-                <div
-                    className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-lg ${colour}`}
-                >
-                    <Icon className="h-5 w-5 text-white" />
-                </div>
-                <div>
-                    <p className="text-2xl font-bold">{value}</p>
-                    <p className="text-xs text-muted-foreground">{label}</p>
-                </div>
-            </CardContent>
-        </Card>
-    );
 }
 
 // ---------------------------------------------------------------------------
@@ -972,45 +942,16 @@ export default function Templates({
 
                 <div className="space-y-6">
                     {/* Header */}
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                        <div className="flex items-start gap-3">
-                            <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-lg bg-primary/10 dark:bg-primary/40">
-                                <Mail className="h-5 w-5 text-primary dark:text-primary" />
-                            </div>
-                            <div>
-                                <h1 className="text-xl font-semibold">
-                                    Email &amp; SMS Templates
-                                </h1>
-                                <p className="mt-0.5 text-sm text-muted-foreground">
-                                    Customise notification emails and SMS
-                                    messages. Use merge fields to personalise
-                                    content.
-                                </p>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Stats */}
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
-                        <StatCard
-                            label="Total Templates"
-                            value={templates.length}
-                            colour="bg-primary"
-                            icon={Hash}
-                        />
-                        <StatCard
-                            label="Email Templates"
-                            value={emailTemplates.length}
-                            colour="bg-status-info"
-                            icon={Mail}
-                        />
-                        <StatCard
-                            label="SMS Templates"
-                            value={smsTemplates.length}
-                            colour="bg-status-success"
-                            icon={Smartphone}
-                        />
-                    </div>
+                    <PageHero
+                        icon={FileText}
+                        title="Email & SMS Templates"
+                        description="Customise notification emails and SMS messages. Use merge fields to personalise content."
+                        stats={[
+                            { label: 'Total', value: templates.length },
+                            { label: 'Email', value: emailTemplates.length },
+                            { label: 'SMS', value: smsTemplates.length },
+                        ]}
+                    />
 
                     {/* Tabs */}
                     <TabsRoot defaultValue="email">

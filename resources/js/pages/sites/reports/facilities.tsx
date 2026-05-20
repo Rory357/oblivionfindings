@@ -1,11 +1,12 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { Warehouse, Download, ArrowLeft, AlertTriangle, CheckCircle2, LayoutGrid, Package } from 'lucide-react';
+import { Home, Download, AlertTriangle, CheckCircle2, LayoutGrid, Package } from 'lucide-react';
 import { useState } from 'react';
 
 type Facility = {
@@ -49,72 +50,34 @@ export default function FacilityReports({ facilities, stats, dateRange }: Props)
         ]}>
             <Head title="Facility Reports" />
 
-            <div className="m-4 space-y-4">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div>
-                        <Button asChild variant="ghost" size="sm" className="mb-2">
-                            <Link href="/sites/reports">
-                                <ArrowLeft className="w-4 h-4 mr-1" />
-                                Back
-                            </Link>
-                        </Button>
-                        <h1 className="text-lg font-semibold flex items-center gap-2">
-                            <Warehouse className="w-5 h-5 text-status-warning" />
-                            Facility Reports
-                        </h1>
-                        <p className="text-sm text-muted-foreground">
-                            Equipment safety, zone utilization, and compliance
-                        </p>
-                    </div>
-                    <Button variant="outline" asChild>
-                        <Link href={`/sites/reports/export?type=facilities&format=csv&date_from=${dateFrom}&date_to=${dateTo}`}>
-                            <Download className="w-4 h-4 mr-1" />
-                            Export CSV
-                        </Link>
-                    </Button>
-                </div>
-
-                {/* Stats */}
-                <div className="grid gap-4 sm:grid-cols-3 lg:grid-cols-6">
-                    <Card>
-                        <CardContent className="p-4">
-                            <div className="text-2xl font-bold">{stats.total_facilities}</div>
-                            <div className="text-sm text-muted-foreground">Facilities</div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="p-4">
-                            <div className="text-2xl font-bold">{stats.total_zones}</div>
-                            <div className="text-sm text-muted-foreground">Zones</div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="p-4">
-                            <div className="text-2xl font-bold">{stats.total_assets}</div>
-                            <div className="text-sm text-muted-foreground">Assets</div>
-                        </CardContent>
-                    </Card>
-                    <Card className="bg-status-critical border-status-critical/20">
-                        <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-status-critical">{stats.open_hazards}</div>
-                            <div className="text-sm text-muted-foreground">Open Hazards</div>
-                        </CardContent>
-                    </Card>
-                    <Card className="bg-status-warning border-status-warning/20">
-                        <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-status-warning">{stats.equipment_failures}</div>
-                            <div className="text-sm text-muted-foreground">Equipment Issues</div>
-                        </CardContent>
-                    </Card>
-                    <Card className="bg-status-success border-status-success/20">
-                        <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-status-success">{stats.safety_walkthrough_completion}%</div>
-                            <div className="text-sm text-muted-foreground">Walkthroughs</div>
-                        </CardContent>
-                    </Card>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Home}
+                        title="Facility Reports"
+                        description="Equipment safety, zone utilization, and compliance"
+                        stats={[
+                            { label: 'Facilities', value: stats.total_facilities },
+                            { label: 'Open hazards', value: stats.open_hazards },
+                            { label: 'Equipment issues', value: stats.equipment_failures },
+                            { label: 'Walkthroughs', value: `${stats.safety_walkthrough_completion}%` },
+                        ]}
+                        actions={
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                asChild
+                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                            >
+                                <Link href={`/sites/reports/export?type=facilities&format=csv&date_from=${dateFrom}&date_to=${dateTo}`}>
+                                    <Download className="w-4 h-4 mr-1" />
+                                    Export CSV
+                                </Link>
+                            </Button>
+                        }
+                    />
+                }
+            >
                 {/* Date Filter */}
                 <Card>
                     <CardHeader className="pb-3">
@@ -197,7 +160,7 @@ export default function FacilityReports({ facilities, stats, dateRange }: Props)
                         </div>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

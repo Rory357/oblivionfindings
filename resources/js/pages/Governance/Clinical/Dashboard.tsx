@@ -1,10 +1,11 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
 import { Head, Link } from '@inertiajs/react';
-import { ArrowUpRight, Minus, TrendingDown, TrendingUp } from 'lucide-react';
+import { ArrowUpRight, HeartPulse, Minus, TrendingDown, TrendingUp } from 'lucide-react';
 
 type Indicator = {
     id: number;
@@ -83,21 +84,30 @@ export default function ClinicalDashboard({ indicators, latestSnapshot, sourceHi
         <AppLayout>
             <Head title="Clinical Governance" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold text-foreground">Clinical Governance</h1>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            Automated clinical indicator snapshot for Governance oversight.
-                        </p>
-                    </div>
-                    <div className="flex gap-2">
-                        <Link href="/governance/clinical/trends">
-                            <Button variant="outline">Trends</Button>
-                        </Link>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={HeartPulse}
+                        title="Clinical Governance"
+                        description="Automated clinical indicator snapshot for Governance oversight."
+                        stats={[
+                            { label: 'Indicators', value: indicators.length },
+                            { label: 'Active', value: indicators.filter((i) => i.is_active).length },
+                            { label: 'Automated', value: indicators.filter((i) => i.is_automated).length },
+                        ]}
+                        actions={
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                asChild
+                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                            >
+                                <Link href="/governance/clinical/trends">Trends</Link>
+                            </Button>
+                        }
+                    />
+                }
+            >
                 <Card className="border-status-info/30 bg-status-info-bg">
                     <CardContent className="flex flex-col gap-2 p-4 text-sm text-status-info sm:flex-row sm:items-center sm:justify-between">
                         <div>
@@ -201,7 +211,7 @@ export default function ClinicalDashboard({ indicators, latestSnapshot, sourceHi
                         </CardContent>
                     </Card>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

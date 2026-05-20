@@ -1,5 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, usePage } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -227,53 +228,61 @@ export default function BudgetVsActuals({ budgets, selectedBudgetId, report }: P
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Budget vs Actuals" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                {/* Header */}
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Budget vs Actuals</h1>
-                        <p className="text-muted-foreground">
-                            {report.budget
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={BarChart3}
+                        title="Budget vs Actuals"
+                        description={
+                            report.budget
                                 ? `${report.budget.title || 'Budget'} - FY${report.budget.fiscal_year}`
-                                : 'Compare budgeted amounts against actual GL transactions'}
-                        </p>
-                    </div>
+                                : 'Compare budgeted amounts against actual GL transactions.'
+                        }
+                        stats={hasBudget ? [
+                            { label: 'Budget', value: formatNZD(totals.budget_amount) },
+                            { label: 'Actual', value: formatNZD(totals.actual_amount) },
+                            { label: 'Variance', value: formatPct(totals.variance_pct) },
+                            { label: 'Utilisation', value: `${totals.utilization_pct.toFixed(1)}%` },
+                        ] : undefined}
+                        actions={
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Select
+                                    value={selectedBudgetId?.toString() ?? ''}
+                                    onValueChange={handleBudgetChange}
+                                >
+                                    <SelectTrigger className="w-[220px] border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20">
+                                        <SelectValue placeholder="Select a budget" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {budgets.map((b) => (
+                                            <SelectItem key={b.id} value={b.id.toString()}>
+                                                <span className="flex items-center gap-2">
+                                                    {b.label}
+                                                    {b.status === 'approved' && (
+                                                        <Badge variant="outline" className="text-xs bg-status-success-bg text-status-success border-status-success/30">
+                                                            Approved
+                                                        </Badge>
+                                                    )}
+                                                </span>
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
 
-                    <div className="flex items-center gap-3">
-                        <Select
-                            value={selectedBudgetId?.toString() ?? ''}
-                            onValueChange={handleBudgetChange}
-                        >
-                            <SelectTrigger className="w-[260px]">
-                                <SelectValue placeholder="Select a budget" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {budgets.map((b) => (
-                                    <SelectItem key={b.id} value={b.id.toString()}>
-                                        <span className="flex items-center gap-2">
-                                            {b.label}
-                                            {b.status === 'approved' && (
-                                                <Badge variant="outline" className="text-xs bg-status-success-bg text-status-success border-status-success/30">
-                                                    Approved
-                                                </Badge>
-                                            )}
-                                        </span>
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-
-                        <Button
-                            variant="outline"
-                            onClick={handleSync}
-                            disabled={syncing}
-                        >
-                            <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
-                            Sync Actuals
-                        </Button>
-                    </div>
-                </div>
-
+                                <Button
+                                    variant="outline"
+                                    onClick={handleSync}
+                                    disabled={syncing}
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                >
+                                    <RefreshCw className={`mr-2 h-4 w-4 ${syncing ? 'animate-spin' : ''}`} />
+                                    Sync Actuals
+                                </Button>
+                            </div>
+                        }
+                    />
+                }
+            >
                 {/* Flash message */}
                 {flash?.success && (
                     <div className="rounded-lg border border-status-success/30 bg-status-success-bg p-4 text-sm text-status-success dark:border-status-success/30 dark:bg-status-success-bg dark:text-status-success">
@@ -406,7 +415,7 @@ export default function BudgetVsActuals({ budgets, selectedBudgetId, report }: P
                         </CardContent>
                     </Card>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

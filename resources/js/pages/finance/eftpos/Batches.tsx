@@ -2,14 +2,15 @@ import { Head, Link, router } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHero, PageLayout } from '@/components/page';
+import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { CheckCircle2, AlertTriangle, Clock, CreditCard, DollarSign, Hash } from 'lucide-react';
+import { AlertTriangle, CheckCircle2, Clock, CreditCard, DollarSign, Hash, Layers } from 'lucide-react';
 import { useMemo } from 'react';
 
 interface Batch {
@@ -104,73 +105,26 @@ export default function EftposBatches({ batches, terminals, unmatchedBankTransac
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="EFTPOS Batches" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">EFTPOS Batches</h1>
-                        <p className="text-muted-foreground">Reconcile EFTPOS settlements with bank transactions</p>
-                    </div>
-                    <Button asChild variant="outline">
-                        <Link href="/finance/eftpos/terminals">Manage Terminals</Link>
-                    </Button>
-                </div>
-
-                {/* KPI Cards */}
-                <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-status-success p-2">
-                                    <DollarSign className="h-5 w-5 text-status-success" />
-                                </div>
-                                <div>
-                                    <p className="text-sm text-muted-foreground">Total Settlement</p>
-                                    <p className="text-xl font-bold font-mono tabular-nums">{formatCurrency(kpis.totalSettlement)}</p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-status-warning p-2">
-                                    <DollarSign className="h-5 w-5 text-status-warning" />
-                                </div>
-                                <div>
-                                    <p className="text-sm text-muted-foreground">Total Fees</p>
-                                    <p className="text-xl font-bold font-mono tabular-nums">{formatCurrency(kpis.totalFees)}</p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-status-info p-2">
-                                    <Hash className="h-5 w-5 text-status-info" />
-                                </div>
-                                <div>
-                                    <p className="text-sm text-muted-foreground">Total Transactions</p>
-                                    <p className="text-xl font-bold">{kpis.totalTxns}</p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="pt-6">
-                            <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-status-critical p-2">
-                                    <AlertTriangle className="h-5 w-5 text-status-critical" />
-                                </div>
-                                <div>
-                                    <p className="text-sm text-muted-foreground">Unreconciled</p>
-                                    <p className="text-xl font-bold">{kpis.unreconciledCount}</p>
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Layers}
+                        title="EFTPOS Batches"
+                        description="Reconcile EFTPOS settlements with bank transactions."
+                        stats={[
+                            { label: 'Settlement', value: formatCurrency(kpis.totalSettlement) },
+                            { label: 'Fees', value: formatCurrency(kpis.totalFees) },
+                            { label: 'Transactions', value: kpis.totalTxns },
+                            { label: 'Unreconciled', value: kpis.unreconciledCount },
+                        ]}
+                        actions={
+                            <Button asChild size="sm" variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                <Link href="/finance/eftpos/terminals">Manage Terminals</Link>
+                            </Button>
+                        }
+                    />
+                }
+            >
                 {/* Filters */}
                 <Card>
                     <CardContent className="flex flex-wrap items-end gap-4 p-4">
@@ -335,7 +289,7 @@ export default function EftposBatches({ batches, terminals, unmatchedBankTransac
                         ))}
                     </div>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

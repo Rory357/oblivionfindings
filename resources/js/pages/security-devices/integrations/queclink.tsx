@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -19,16 +20,14 @@ import {
 } from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Head, router, useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
-    ArrowLeft,
     CheckCircle,
     Clock,
     Loader2,
     MapPin,
     RefreshCw,
-    Satellite,
     ShieldAlert,
     Trash2,
     XCircle,
@@ -133,31 +132,17 @@ export default function QueclinkIntegration({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Queclink Integration" />
-            <div className="mx-auto max-w-5xl space-y-6 px-4 py-6 sm:px-6 lg:px-8">
-                <div>
-                    <Link
-                        href="/security-devices/integrations"
-                        className="mb-3 inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground"
-                    >
-                        <ArrowLeft className="h-4 w-4" />
-                        Back to APIs &amp; Integrations
-                    </Link>
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-muted">
-                            <Satellite className="h-5 w-5 text-muted-foreground" />
-                        </div>
-                        <div>
-                            <h1 className="text-2xl font-semibold tracking-tight">
-                                Queclink Integration
-                            </h1>
-                            <p className="text-sm text-muted-foreground">
-                                Cellular GPS trackers for vehicles, assets, and
-                                personal / client use.
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/security-devices/integrations"
+                        backLabel="Back to APIs & Integrations"
+                        title="Queclink Integration"
+                        description="Cellular GPS trackers for vehicles, assets, and personal / client use."
+                    />
+                }
+            >
                 {/* ── Scaffold state banner ───────────────────────────── */}
                 <Card className="border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30">
                     <CardContent className="flex items-start gap-3 p-4 text-sm">
@@ -518,7 +503,7 @@ export default function QueclinkIntegration({
                         </div>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

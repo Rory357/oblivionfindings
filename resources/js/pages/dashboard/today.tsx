@@ -1,9 +1,11 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Separator } from '@/components/ui/separator';
 import AppLayout from '@/layouts/app-layout';
 import { show as showShift } from '@/routes/operations/shifts';
 import { Head, Link } from '@inertiajs/react';
+import { Calendar } from 'lucide-react';
 
 type Shift = {
     id: number;
@@ -61,12 +63,20 @@ export default function TodayDashboard({
         <AppLayout>
             <Head title="Today" />
 
-            <div className="space-y-6">
-                <div>
-                    <h1 className="text-2xl font-semibold">Today</h1>
-                    <div className="text-sm text-muted-foreground">{date}</div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Calendar}
+                        title="Today"
+                        description={date}
+                        stats={[
+                            { label: 'My shifts', value: shifts.length },
+                            { label: 'Due meds', value: dueMeds.length },
+                            { label: 'Open incidents', value: openIncidents.length },
+                        ]}
+                    />
+                }
+            >
                 <div className="grid gap-4 md:grid-cols-3">
                     <Card>
                         <CardHeader>
@@ -279,7 +289,7 @@ export default function TodayDashboard({
                         )}
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

@@ -1,11 +1,12 @@
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { ArrowLeft, Package, ShieldAlert, Clock } from 'lucide-react';
+import { BarChart3 } from 'lucide-react';
 import { useState } from 'react';
 
 type AssetItem = {
@@ -63,52 +64,20 @@ export default function AssetConditionReport({ conditionGroups, sites, filters, 
         ]}>
             <Head title="Asset Condition Report" />
 
-            <div className="m-4 space-y-4">
-                {/* Header */}
-                <div>
-                    <Button asChild variant="ghost" size="sm" className="mb-2">
-                        <Link href="/sites/reports">
-                            <ArrowLeft className="w-4 h-4 mr-1" />
-                            Back
-                        </Link>
-                    </Button>
-                    <h1 className="text-lg font-semibold flex items-center gap-2">
-                        <Package className="w-5 h-5 text-status-info" />
-                        Asset Condition Report
-                    </h1>
-                    <p className="text-sm text-muted-foreground">
-                        Assets grouped by condition with warranty expiry information
-                    </p>
-                </div>
-
-                {/* Summary */}
-                <div className="grid gap-4 sm:grid-cols-3">
-                    <Card>
-                        <CardContent className="p-4">
-                            <div className="text-2xl font-bold">{summary.total_assets}</div>
-                            <div className="text-sm text-muted-foreground">Total Assets</div>
-                        </CardContent>
-                    </Card>
-                    <Card className="bg-status-critical border-status-critical/20">
-                        <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-status-critical flex items-center gap-1">
-                                <ShieldAlert className="w-5 h-5" />
-                                {summary.warranty_expired}
-                            </div>
-                            <div className="text-sm text-muted-foreground">Warranty Expired</div>
-                        </CardContent>
-                    </Card>
-                    <Card className="bg-status-warning border-status-warning/20">
-                        <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-status-warning flex items-center gap-1">
-                                <Clock className="w-5 h-5" />
-                                {summary.warranty_expiring_soon}
-                            </div>
-                            <div className="text-sm text-muted-foreground">Expiring Within 30 Days</div>
-                        </CardContent>
-                    </Card>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={BarChart3}
+                        title="Asset Condition Report"
+                        description="Assets grouped by condition with warranty expiry information"
+                        stats={[
+                            { label: 'Total assets', value: summary.total_assets },
+                            { label: 'Warranty expired', value: summary.warranty_expired },
+                            { label: 'Expiring 30d', value: summary.warranty_expiring_soon },
+                        ]}
+                    />
+                }
+            >
                 {/* Filter */}
                 <Card>
                     <CardHeader className="pb-3">
@@ -233,7 +202,7 @@ export default function AssetConditionReport({ conditionGroups, sites, filters, 
                         </Card>
                     ))
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

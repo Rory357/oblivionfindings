@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -7,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
+import { ShieldAlert } from 'lucide-react';
 import { useState } from 'react';
 
 type Props = {
@@ -46,17 +48,32 @@ export default function ClientRisks({ client, risks, can }: Props) {
         >
             <Head title={`Risks • ${name}`} />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">Risk register</h1>
-                        <div className="mt-1 text-sm text-muted-foreground">{name}</div>
-                    </div>
-                    <Link href={`/clients/${client.id}`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
-                        Back to {(labels?.['client.singular'] ?? 'Client').toLowerCase()}
-                    </Link>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={ShieldAlert}
+                        title="Risk register"
+                        description={name}
+                        stats={[
+                            { label: 'Total', value: risks.length },
+                            { label: 'Active', value: risks.filter((r) => r.active).length },
+                            { label: 'High/Critical', value: risks.filter((r) => r.severity === 'high' || r.severity === 'critical').length },
+                        ]}
+                        actions={
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                asChild
+                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                            >
+                                <Link href={`/clients/${client.id}`}>
+                                    Back to {(labels?.['client.singular'] ?? 'Client').toLowerCase()}
+                                </Link>
+                            </Button>
+                        }
+                    />
+                }
+            >
                 {can.create && (
                     <Card>
                         <CardHeader>
@@ -215,7 +232,7 @@ export default function ClientRisks({ client, risks, can }: Props) {
                     ))}
                     {!risks.length && <div className="text-sm text-muted-foreground">No risks recorded.</div>}
                 </div>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

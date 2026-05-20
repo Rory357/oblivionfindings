@@ -4,6 +4,7 @@ import { Transition } from '@headlessui/react';
 import { Form, Head, Link, router, useForm, usePage } from '@inertiajs/react';
 
 import InputError from '@/components/input-error';
+import { PageHero } from '@/components/page';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -237,6 +238,15 @@ export default function Profile({
             <Head title={title} />
 
             <SettingsLayout>
+                <PageHero
+                    variant="compact"
+                    title={t('app.profile.title', 'Profile settings')}
+                    description={t(
+                        'app.profile.description',
+                        'Manage your personal details, preferences, and account security.',
+                    )}
+                />
+
                 {/* ── Modern Profile Header ── */}
                 <Card className="relative overflow-hidden bg-white dark:bg-muted">
                     {/* Accent bar */}
@@ -282,9 +292,9 @@ export default function Profile({
                             {/* Info */}
                             <div className="min-w-0 flex-1">
                                 <div className="flex items-center gap-3">
-                                    <h1 className="truncate text-xl font-semibold tracking-tight text-foreground dark:text-foreground">
+                                    <p className="truncate text-xl font-semibold tracking-tight text-foreground dark:text-foreground">
                                         {auth.user.name}
-                                    </h1>
+                                    </p>
                                     {roles.length > 0 ? (
                                         roles.map((role: string) => (
                                             <Badge

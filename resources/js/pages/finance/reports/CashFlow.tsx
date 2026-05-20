@@ -1,11 +1,12 @@
 import { Head, router } from '@inertiajs/react';
 import { PageProps, type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
-import { Printer, ArrowUpCircle, ArrowDownCircle, TrendingUp, Wallet } from 'lucide-react';
+import { Printer, Activity, ArrowUpCircle, ArrowDownCircle, TrendingUp, Wallet } from 'lucide-react';
 import { useState, useMemo } from 'react';
 import { BarChart, Bar, XAxis, YAxis, CartesianGrid, Tooltip, ResponsiveContainer, Cell } from 'recharts';
 
@@ -125,20 +126,27 @@ export default function CashFlow({ report, filters }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Cash Flow Statement" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold">Cash Flow Statement</h1>
-                        <p className="text-muted-foreground">
-                            Cash inflows and outflows across operating, investing, and financing activities
-                        </p>
-                    </div>
-                    <Button variant="outline" size="sm" onClick={() => window.print()}>
-                        <Printer className="mr-1 h-4 w-4" />
-                        Print
-                    </Button>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Activity}
+                        title="Cash Flow Statement"
+                        description="Cash inflows and outflows across operating, investing, and financing activities."
+                        stats={[
+                            { label: 'Operating', value: formatCurrency(report.total_operating) },
+                            { label: 'Investing', value: formatCurrency(report.total_investing) },
+                            { label: 'Financing', value: formatCurrency(report.total_financing) },
+                            { label: 'Net Change', value: formatCurrency(report.net_cash_change) },
+                        ]}
+                        actions={
+                            <Button variant="outline" size="sm" onClick={() => window.print()} className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                <Printer className="mr-1 h-4 w-4" />
+                                Print
+                            </Button>
+                        }
+                    />
+                }
+            >
                 {/* KPI Summary Cards */}
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-2 lg:grid-cols-4">
                     <Card>
@@ -410,7 +418,7 @@ export default function CashFlow({ report, filters }: Props) {
                         </Table>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

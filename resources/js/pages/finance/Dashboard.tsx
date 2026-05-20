@@ -1,11 +1,13 @@
 import { Head, Link } from '@inertiajs/react';
 import { type BreadcrumbItem, PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import {
     DollarSign,
+    LayoutDashboard,
     TrendingUp,
     TrendingDown,
     Wallet,
@@ -173,37 +175,49 @@ export default function FinanceDashboard({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Finance Dashboard" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold">Finance Dashboard</h1>
-                    <div className="flex gap-2">
-                        <Button asChild size="sm">
-                            <Link href={'/finance/journals/create'}>
-                                <Plus className="mr-1 h-4 w-4" />
-                                New Journal
-                            </Link>
-                        </Button>
-                        <Button asChild size="sm" variant="outline">
-                            <Link href={'/finance/bills/create'}>
-                                <Plus className="mr-1 h-4 w-4" />
-                                New Bill
-                            </Link>
-                        </Button>
-                        <Button asChild size="sm" variant="outline">
-                            <Link href={'/finance/receivables'}>
-                                <FileText className="mr-1 h-4 w-4" />
-                                Receivables
-                            </Link>
-                        </Button>
-                        <Button asChild size="sm" variant="outline">
-                            <Link href={'/finance/bank-reconciliation'}>
-                                <CreditCard className="mr-1 h-4 w-4" />
-                                Bank Recon
-                            </Link>
-                        </Button>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={LayoutDashboard}
+                        title="Finance Dashboard"
+                        description="Revenue, expenses, cash flow, and outstanding balances at a glance."
+                        stats={[
+                            { label: 'Revenue', value: formatCurrency(totalRevenue) },
+                            { label: 'Expenses', value: formatCurrency(totalExpenses) },
+                            { label: 'Net Profit', value: formatCurrency(netProfit) },
+                            { label: 'Cash', value: formatCurrency(cashBalance) },
+                        ]}
+                        actions={
+                            <div className="flex flex-wrap gap-2">
+                                <Button asChild size="sm">
+                                    <Link href={'/finance/journals/create'}>
+                                        <Plus className="mr-1 h-4 w-4" />
+                                        New Journal
+                                    </Link>
+                                </Button>
+                                <Button asChild size="sm" variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                    <Link href={'/finance/bills/create'}>
+                                        <Plus className="mr-1 h-4 w-4" />
+                                        New Bill
+                                    </Link>
+                                </Button>
+                                <Button asChild size="sm" variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                    <Link href={'/finance/receivables'}>
+                                        <FileText className="mr-1 h-4 w-4" />
+                                        Receivables
+                                    </Link>
+                                </Button>
+                                <Button asChild size="sm" variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                    <Link href={'/finance/bank-reconciliation'}>
+                                        <CreditCard className="mr-1 h-4 w-4" />
+                                        Bank Recon
+                                    </Link>
+                                </Button>
+                            </div>
+                        }
+                    />
+                }
+            >
                 {/* KPI Cards */}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
                     <KpiCard
@@ -433,7 +447,7 @@ export default function FinanceDashboard({
                         </CardContent>
                     </Card>
                 </div>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

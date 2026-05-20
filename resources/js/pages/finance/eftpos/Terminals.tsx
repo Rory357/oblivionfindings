@@ -2,6 +2,7 @@ import { Head, useForm, Link } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -9,7 +10,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, CreditCard } from 'lucide-react';
+import { Plus, CreditCard, Smartphone } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
 interface Terminal {
@@ -77,27 +78,38 @@ export default function EftposTerminals({ terminals, bankAccounts, glAccounts }:
         });
     };
 
+    const activeCount = terminals.filter((t) => t.is_active).length;
+    const totalBatches = terminals.reduce((sum, t) => sum + t.batch_count, 0);
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="EFTPOS Terminals" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">EFTPOS Terminals</h1>
-                        <p className="text-muted-foreground">Configure and manage EFTPOS terminal devices</p>
-                    </div>
-                    <div className="flex gap-2">
-                        <Button asChild variant="outline">
-                            <Link href="/finance/eftpos/batches">View Batches</Link>
-                        </Button>
-                        <Button onClick={() => setShowForm(!showForm)}>
-                            <Plus className="mr-1 h-4 w-4" />
-                            Add Terminal
-                        </Button>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Smartphone}
+                        title="EFTPOS Terminals"
+                        description="Configure and manage EFTPOS terminal devices."
+                        stats={[
+                            { label: 'Total', value: terminals.length },
+                            { label: 'Active', value: activeCount },
+                            { label: 'Batches', value: totalBatches },
+                        ]}
+                        actions={
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button asChild size="sm" variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                    <Link href="/finance/eftpos/batches">View Batches</Link>
+                                </Button>
+                                <Button size="sm" onClick={() => setShowForm(!showForm)}>
+                                    <Plus className="mr-1 h-4 w-4" />
+                                    Add Terminal
+                                </Button>
+                            </div>
+                        }
+                    />
+                }
+            >
                 {showForm && (
                     <Card>
                         <CardHeader>
@@ -258,7 +270,7 @@ export default function EftposTerminals({ terminals, bankAccounts, glAccounts }:
                         </CardContent>
                     </Card>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

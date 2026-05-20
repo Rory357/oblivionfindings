@@ -1,10 +1,10 @@
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link } from '@inertiajs/react';
-import { Button } from '@/components/ui/button';
+import { Head } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableHeader, TableRow, TableHead, TableBody, TableCell } from '@/components/ui/table';
-import { ArrowLeft, TrendingDown } from 'lucide-react';
+import { TrendingUp } from 'lucide-react';
 
 type FailedItem = {
     template_id: number;
@@ -32,51 +32,20 @@ export default function ChecklistTrends({ failedItems, dateRange }: Props) {
         ]}>
             <Head title="Checklist Failure Trends" />
 
-            <div className="m-4 space-y-4">
-                {/* Header */}
-                <div>
-                    <Button asChild variant="ghost" size="sm" className="mb-2">
-                        <Link href="/sites/reports">
-                            <ArrowLeft className="w-4 h-4 mr-1" />
-                            Back
-                        </Link>
-                    </Button>
-                    <h1 className="text-lg font-semibold flex items-center gap-2">
-                        <TrendingDown className="w-5 h-5 text-status-warning" />
-                        Checklist Failure Trends
-                    </h1>
-                    <p className="text-sm text-muted-foreground">
-                        Most frequently failed checklist items over the last 3 months
-                        ({dateRange.from} to {dateRange.to})
-                    </p>
-                </div>
-
-                {/* Summary */}
-                <div className="grid gap-4 sm:grid-cols-3">
-                    <Card>
-                        <CardContent className="p-4">
-                            <div className="text-2xl font-bold">{failedItems.length}</div>
-                            <div className="text-sm text-muted-foreground">Unique Failed Items</div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-status-warning">
-                                {failedItems.reduce((sum, i) => sum + i.failure_count, 0)}
-                            </div>
-                            <div className="text-sm text-muted-foreground">Total Failures</div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="p-4">
-                            <div className="text-2xl font-bold">
-                                {new Set(failedItems.map(i => i.template_id)).size}
-                            </div>
-                            <div className="text-sm text-muted-foreground">Affected Templates</div>
-                        </CardContent>
-                    </Card>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={TrendingUp}
+                        title="Checklist Failure Trends"
+                        description={`Most frequently failed checklist items over the last 3 months (${dateRange.from} to ${dateRange.to})`}
+                        stats={[
+                            { label: 'Unique items', value: failedItems.length },
+                            { label: 'Total failures', value: failedItems.reduce((sum, i) => sum + i.failure_count, 0) },
+                            { label: 'Affected templates', value: new Set(failedItems.map(i => i.template_id)).size },
+                        ]}
+                    />
+                }
+            >
                 {/* Table */}
                 <Card>
                     <CardHeader>
@@ -147,7 +116,7 @@ export default function ChecklistTrends({ failedItems, dateRange }: Props) {
                         )}
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

@@ -1,6 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import {
@@ -12,7 +13,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { ArrowLeft } from 'lucide-react';
+import { ArrowLeft, Clock } from 'lucide-react';
 
 type ClientAging = {
     client_id: number;
@@ -79,22 +80,29 @@ export default function AgingReport({ clients, totals }: PageProps) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Aged Receivables" />
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Aged Receivables</h1>
-                        <p className="text-muted-foreground">
-                            Outstanding receivables grouped by client and aging bucket.
-                        </p>
-                    </div>
-                    <Link href="/finance/receivables">
-                        <Button variant="outline">
-                            <ArrowLeft className="mr-2 h-4 w-4" />
-                            Back to Receivables
-                        </Button>
-                    </Link>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Clock}
+                        title="Aged Receivables"
+                        description="Outstanding receivables grouped by client and aging bucket."
+                        stats={[
+                            { label: 'Total', value: formatNZD(totals.total) },
+                            { label: 'Current', value: formatNZD(totals.current) },
+                            { label: '31-90', value: formatNZD(totals['31_60'] + totals['61_90']) },
+                            { label: '90+', value: formatNZD(totals['90_plus']) },
+                        ]}
+                        actions={
+                            <Link href="/finance/receivables">
+                                <Button variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                    <ArrowLeft className="mr-2 h-4 w-4" />
+                                    Back to Receivables
+                                </Button>
+                            </Link>
+                        }
+                    />
+                }
+            >
                 {/* Summary cards for each bucket */}
                 <div className="grid grid-cols-2 gap-4 md:grid-cols-6">
                     {[
@@ -213,7 +221,7 @@ export default function AgingReport({ clients, totals }: PageProps) {
                         )}
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

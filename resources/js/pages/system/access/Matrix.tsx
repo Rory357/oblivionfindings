@@ -1,11 +1,12 @@
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 import { useState, useMemo } from 'react';
 import {
-    ArrowLeft,
     Check,
     X,
+    LayoutGrid,
     Settings,
     Search,
 } from 'lucide-react';
@@ -103,23 +104,20 @@ export default function PermissionsMatrix({ roles, permissions, permissionGroups
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Permissions Matrix" />
 
-            <div className="space-y-6">
-                {/* Header */}
-                <div>
-                    <div className="flex items-center gap-2 mb-2">
-                        <Link href="/system/access">
-                            <Button variant="ghost" size="sm">
-                                <ArrowLeft className="h-4 w-4 mr-1" />
-                                Back
-                            </Button>
-                        </Link>
-                    </div>
-                    <h1 className="text-2xl font-semibold tracking-tight">Permissions Matrix</h1>
-                    <p className="text-muted-foreground">
-                        Overview of permissions across all roles for your organization.
-                    </p>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={LayoutGrid}
+                        title="Permissions Matrix"
+                        description="Overview of permissions across all roles for your organization."
+                        stats={[
+                            { label: 'Roles', value: roles.length },
+                            { label: 'Permissions', value: permissions.length },
+                            { label: 'Groups', value: permissionGroups.length },
+                        ]}
+                    />
+                }
+            >
                 {/* Roles Selector */}
                 <Card>
                     <CardHeader>
@@ -276,7 +274,7 @@ export default function PermissionsMatrix({ roles, permissions, permissionGroups
                         </div>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

@@ -1,12 +1,12 @@
-import { Head, Link } from '@inertiajs/react';
+import { Head } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, CheckCircle2, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, AlertTriangle } from 'lucide-react';
 
 interface BatchData {
     id: number;
@@ -97,20 +97,21 @@ export default function EftposBatchDetail({ batch, transactions }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`EFTPOS Batch ${batch.batch_number}`} />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center gap-4">
-                    <Button asChild variant="ghost" size="sm">
-                        <Link href="/finance/eftpos/batches">
-                            <ArrowLeft className="mr-1 h-4 w-4" />
-                            Back
-                        </Link>
-                    </Button>
-                    <h1 className="text-2xl font-bold tracking-tight">Batch {batch.batch_number}</h1>
-                    <Badge variant="outline" className={badge.className}>
-                        {badge.label}
-                    </Badge>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/finance/eftpos/batches"
+                        title={`Batch ${batch.batch_number}`}
+                        description={batch.terminal_name ? `Terminal: ${batch.terminal_name}` : undefined}
+                        actions={
+                            <Badge variant="outline" className={badge.className}>
+                                {badge.label}
+                            </Badge>
+                        }
+                    />
+                }
+            >
                 {/* Batch Summary */}
                 <div className="grid grid-cols-2 gap-4 sm:grid-cols-3 lg:grid-cols-6">
                     <Card>
@@ -281,7 +282,7 @@ export default function EftposBatchDetail({ batch, transactions }: Props) {
                         )}
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }
