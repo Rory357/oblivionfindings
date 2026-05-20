@@ -95,13 +95,14 @@ export function DoorSymbol({
 }
 
 /**
- * Hit area for clicks — sized to just the opening plus a small margin around
- * the door panel. Stays clear of the swing arc so clicks in the arc region
- * (which can extend deep into the room) don't accidentally select the door.
+ * Hit area for clicks — sized to just the opening plus a comfortable margin
+ * around the door panel. Stays clear of the swing arc so clicks in the arc
+ * region (which can extend deep into the room) don't accidentally select
+ * the door.
  */
 function clickShieldBox(w: number): { minX: number; maxX: number; minY: number; maxY: number } {
-    const margin = Math.max(6, w * 0.18);
-    return { minX: 0, maxX: w, minY: -margin, maxY: margin };
+    const margin = Math.max(10, w * 0.3);
+    return { minX: -2, maxX: w + 2, minY: -margin, maxY: margin };
 }
 
 /**
@@ -119,12 +120,16 @@ function swingKey(door: NormalisedDoor): SwingKey {
 }
 
 function SymbolPaths({ door, x, y, w }: { door: NormalisedDoor; x: number; y: number; w: number }): ReactNode {
+    // pointer-events: none so clicks on the visible door (panel / arc / hinge
+    // dot) fall through to the click-shield underneath. Without this the
+    // symbol parts catch the click but have no handler, making the door feel
+    // un-selectable.
     return (
-        <>
+        <g pointerEvents="none">
             {/* Block-out: covers the cut wall area so room fill / grid don't show through. */}
             <OpeningClear x={x} y={y} w={w} />
             {symbolFor(door, x, y, w)}
-        </>
+        </g>
     );
 }
 

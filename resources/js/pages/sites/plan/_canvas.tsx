@@ -2090,6 +2090,26 @@ export default function PlanCanvas(props: Props) {
                                 pointerEvents={
                                     itemsInteractive ? 'auto' : 'none'
                                 }
+                                // Fallback: any click on a child symbol part
+                                // (panel rect, arc, hinge dot) that lacks its
+                                // own handler bubbles up here and still
+                                // selects/drags the door. Child handles use
+                                // event.stopPropagation so they win for their
+                                // own gestures.
+                                onPointerDown={(event) =>
+                                    beginMoveDrag(event, {
+                                        type: 'door',
+                                        id: door.id,
+                                    })
+                                }
+                                onClick={(event) => event.stopPropagation()}
+                                onContextMenu={(event) =>
+                                    openContextMenu(
+                                        event,
+                                        { type: 'door', id: door.id },
+                                        structureInteractive,
+                                    )
+                                }
                             >
                                 <DoorSymbol
                                     door={renderDoor}
