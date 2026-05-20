@@ -404,7 +404,7 @@ export default function SiteTypePlanBuilderDialog({
         <>
             <Dialog open={open} onOpenChange={requestOpenChange}>
                 <DialogContent
-                    className="grid h-[min(900px,92vh)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden bg-muted/30 p-0 sm:max-w-[min(1500px,calc(100vw-2rem))]"
+                    className="grid h-[min(900px,92vh)] grid-rows-[auto_minmax(0,1fr)_auto] overflow-hidden bg-muted p-0 sm:max-w-[min(1500px,calc(100vw-2rem))]"
                     data-test="site-plan-builder-dialog"
                 >
                     <DialogHeader className="border-b bg-background px-5 py-4">
