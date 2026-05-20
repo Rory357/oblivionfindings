@@ -1,11 +1,12 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { FileText, Plus, DollarSign, TrendingUp, TrendingDown } from 'lucide-react';
+import { FileText, Plus, DollarSign, TrendingUp, TrendingDown, Calculator } from 'lucide-react';
 import { useMemo } from 'react';
 
 type GstReturn = {
@@ -95,20 +96,29 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="GST Returns" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">GST Returns</h1>
-                        <p className="text-muted-foreground">Manage and file GST returns with IRD</p>
-                    </div>
-                    <Link href={'/finance/gst-returns/prepare'}>
-                        <Button>
-                            <Plus className="mr-2 h-4 w-4" />
-                            Prepare Return
-                        </Button>
-                    </Link>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Calculator}
+                        title="GST Returns"
+                        description="Manage and file GST returns with IRD"
+                        stats={[
+                            { label: 'GST collected', value: formatNZD(kpis.totalCollected) },
+                            { label: 'GST paid', value: formatNZD(kpis.totalPaid) },
+                            { label: 'Net payable', value: formatNZD(Math.abs(kpis.totalPayable)) },
+                            { label: 'Drafts', value: kpis.draftCount },
+                        ]}
+                        actions={
+                            <Link href={'/finance/gst-returns/prepare'}>
+                                <Button size="sm">
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    Prepare Return
+                                </Button>
+                            </Link>
+                        }
+                    />
+                }
+            >
                 {/* KPI Summary Cards */}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <Card>
@@ -310,7 +320,7 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                         )}
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

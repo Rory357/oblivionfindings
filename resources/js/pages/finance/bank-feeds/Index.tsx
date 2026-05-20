@@ -1,5 +1,6 @@
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Button } from '@/components/ui/button';
@@ -22,7 +23,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { Plus, RefreshCw, Trash2, FileText, Radio, AlertCircle } from 'lucide-react';
+import { Plus, RefreshCw, Trash2, FileText, Radio, AlertCircle, Rss } from 'lucide-react';
 import { type BreadcrumbItem } from '@/types';
 import { useState } from 'react';
 
@@ -149,119 +150,130 @@ export default function BankFeedsIndex({
         { title: 'Bank Feeds', href: '/finance/bank-feeds' },
     ];
 
+    const activeFeeds = feeds.filter((f) => f.is_active).length;
+    const failedFeeds = feeds.filter((f) => f.last_sync_status === 'failed').length;
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Bank Feeds" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center justify-between mb-6">
-                    <div>
-                        <h1 className="text-3xl font-bold text-foreground">Bank Feeds</h1>
-                        <p className="text-muted-foreground mt-1">
-                            Automated bank transaction imports from NZ banks
-                        </p>
-                    </div>
-                    <div className="flex gap-2">
-                        {feeds.length > 0 && (
-                            <Button
-                                variant="outline"
-                                onClick={handleSyncAll}
-                                disabled={syncingAll || !providerSetupEnabled}
-                            >
-                                <RefreshCw className={`w-4 h-4 mr-2 ${syncingAll ? 'animate-spin' : ''}`} />
-                                Sync All
-                            </Button>
-                        )}
-                        <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
-                            <DialogTrigger asChild>
-                                <Button disabled={availableAccounts.length === 0 || !providerSetupEnabled}>
-                                    <Plus className="w-4 h-4 mr-2" />
-                                    Add Bank Feed
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                                <form onSubmit={handleSubmit}>
-                                    <DialogHeader>
-                                        <DialogTitle>Connect Bank Feed</DialogTitle>
-                                        <DialogDescription>
-                                            Set up an automated bank feed connection for a bank account.
-                                        </DialogDescription>
-                                    </DialogHeader>
-                                    <div className="space-y-4 py-4">
-                                        <div className="space-y-2">
-                                            <Label htmlFor="bank_account_id">Bank Account</Label>
-                                            <Select
-                                                value={form.data.bank_account_id}
-                                                onValueChange={(value) => form.setData('bank_account_id', value)}
-                                            >
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select a bank account" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {availableAccounts.map((account) => (
-                                                        <SelectItem key={account.id} value={String(account.id)}>
-                                                            {account.name} ({account.bank_name})
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                            {form.errors.bank_account_id && (
-                                                <p className="text-sm text-destructive">{form.errors.bank_account_id}</p>
-                                            )}
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <Label htmlFor="provider">Bank Provider</Label>
-                                            <Select
-                                                value={form.data.provider}
-                                                onValueChange={(value) => form.setData('provider', value)}
-                                            >
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select provider" />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="asb">ASB</SelectItem>
-                                                    <SelectItem value="anz">ANZ</SelectItem>
-                                                    <SelectItem value="westpac">Westpac</SelectItem>
-                                                    <SelectItem value="bnz">BNZ</SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                            {form.errors.provider && (
-                                                <p className="text-sm text-destructive">{form.errors.provider}</p>
-                                            )}
-                                        </div>
-
-                                        <div className="space-y-2">
-                                            <Label htmlFor="sync_from_date">Sync From Date (optional)</Label>
-                                            <Input
-                                                type="date"
-                                                id="sync_from_date"
-                                                value={form.data.sync_from_date}
-                                                onChange={(e) => form.setData('sync_from_date', e.target.value)}
-                                            />
-                                            <p className="text-xs text-muted-foreground">
-                                                Leave blank to sync the last 30 days by default.
-                                            </p>
-                                        </div>
-                                    </div>
-                                    <DialogFooter>
-                                        <Button
-                                            type="button"
-                                            variant="outline"
-                                            onClick={() => setShowAddDialog(false)}
-                                        >
-                                            Cancel
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Rss}
+                        title="Bank Feeds"
+                        description="Automated bank transaction imports from NZ banks"
+                        stats={[
+                            { label: 'Feeds', value: feeds.length },
+                            { label: 'Active', value: activeFeeds },
+                            { label: 'Failed', value: failedFeeds },
+                        ]}
+                        actions={
+                            <div className="flex flex-wrap items-center gap-2">
+                                {feeds.length > 0 && (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={handleSyncAll}
+                                        disabled={syncingAll || !providerSetupEnabled}
+                                        className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                    >
+                                        <RefreshCw className={`w-4 h-4 mr-1.5 ${syncingAll ? 'animate-spin' : ''}`} />
+                                        Sync All
+                                    </Button>
+                                )}
+                                <Dialog open={showAddDialog} onOpenChange={setShowAddDialog}>
+                                    <DialogTrigger asChild>
+                                        <Button size="sm" disabled={availableAccounts.length === 0 || !providerSetupEnabled}>
+                                            <Plus className="w-4 h-4 mr-1.5" />
+                                            Add Bank Feed
                                         </Button>
-                                        <Button type="submit" disabled={form.processing}>
-                                            Connect Feed
-                                        </Button>
-                                    </DialogFooter>
-                                </form>
-                            </DialogContent>
-                        </Dialog>
-                    </div>
-                </div>
+                                    </DialogTrigger>
+                                    <DialogContent>
+                                        <form onSubmit={handleSubmit}>
+                                            <DialogHeader>
+                                                <DialogTitle>Connect Bank Feed</DialogTitle>
+                                                <DialogDescription>
+                                                    Set up an automated bank feed connection for a bank account.
+                                                </DialogDescription>
+                                            </DialogHeader>
+                                            <div className="space-y-4 py-4">
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="bank_account_id">Bank Account</Label>
+                                                    <Select
+                                                        value={form.data.bank_account_id}
+                                                        onValueChange={(value) => form.setData('bank_account_id', value)}
+                                                    >
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder="Select a bank account" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            {availableAccounts.map((account) => (
+                                                                <SelectItem key={account.id} value={String(account.id)}>
+                                                                    {account.name} ({account.bank_name})
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                    {form.errors.bank_account_id && (
+                                                        <p className="text-sm text-destructive">{form.errors.bank_account_id}</p>
+                                                    )}
+                                                </div>
 
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="provider">Bank Provider</Label>
+                                                    <Select
+                                                        value={form.data.provider}
+                                                        onValueChange={(value) => form.setData('provider', value)}
+                                                    >
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder="Select provider" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="asb">ASB</SelectItem>
+                                                            <SelectItem value="anz">ANZ</SelectItem>
+                                                            <SelectItem value="westpac">Westpac</SelectItem>
+                                                            <SelectItem value="bnz">BNZ</SelectItem>
+                                                        </SelectContent>
+                                                    </Select>
+                                                    {form.errors.provider && (
+                                                        <p className="text-sm text-destructive">{form.errors.provider}</p>
+                                                    )}
+                                                </div>
+
+                                                <div className="space-y-2">
+                                                    <Label htmlFor="sync_from_date">Sync From Date (optional)</Label>
+                                                    <Input
+                                                        type="date"
+                                                        id="sync_from_date"
+                                                        value={form.data.sync_from_date}
+                                                        onChange={(e) => form.setData('sync_from_date', e.target.value)}
+                                                    />
+                                                    <p className="text-xs text-muted-foreground">
+                                                        Leave blank to sync the last 30 days by default.
+                                                    </p>
+                                                </div>
+                                            </div>
+                                            <DialogFooter>
+                                                <Button
+                                                    type="button"
+                                                    variant="outline"
+                                                    onClick={() => setShowAddDialog(false)}
+                                                >
+                                                    Cancel
+                                                </Button>
+                                                <Button type="submit" disabled={form.processing}>
+                                                    Connect Feed
+                                                </Button>
+                                            </DialogFooter>
+                                        </form>
+                                    </DialogContent>
+                                </Dialog>
+                            </div>
+                        }
+                    />
+                }
+            >
                 {!providerSetupEnabled && (
                     <Alert>
                         <AlertCircle className="h-4 w-4" />
@@ -387,7 +399,7 @@ export default function BankFeedsIndex({
                         ))}
                     </div>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

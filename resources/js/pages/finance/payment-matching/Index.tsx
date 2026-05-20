@@ -1,5 +1,6 @@
 import { Head, Link, router } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -146,28 +147,35 @@ export default function PaymentMatchingIndex({ matches, filters }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Payment Matching" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center justify-between mb-6">
-                    <div>
-                        <h1 className="text-3xl font-bold text-foreground">Payment Matching</h1>
-                        <p className="text-muted-foreground mt-1">
-                            Automatically match bank transactions to bills and invoices
-                        </p>
-                    </div>
-                    <div className="flex gap-2">
-                        <Button variant="outline" asChild>
-                            <Link href="/finance/match-rules">
-                                <Settings className="w-4 h-4 mr-2" />
-                                Match Rules
-                            </Link>
-                        </Button>
-                        <Button onClick={handleMatchAll}>
-                            <Zap className="w-4 h-4 mr-2" />
-                            Run Auto-Match
-                        </Button>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={ArrowLeftRight}
+                        title="Payment Matching"
+                        description="Automatically match bank transactions to bills and invoices"
+                        stats={[
+                            { label: 'Total', value: matches.total },
+                            { label: 'Suggested', value: suggestedCount },
+                            { label: 'Confirmed', value: confirmedCount },
+                            { label: 'Rejected', value: rejectedCount },
+                        ]}
+                        actions={
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Button size="sm" variant="outline" asChild className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                    <Link href="/finance/match-rules">
+                                        <Settings className="w-4 h-4 mr-1.5" />
+                                        Match Rules
+                                    </Link>
+                                </Button>
+                                <Button size="sm" onClick={handleMatchAll}>
+                                    <Zap className="w-4 h-4 mr-1.5" />
+                                    Run Auto-Match
+                                </Button>
+                            </div>
+                        }
+                    />
+                }
+            >
                 {/* KPI Cards */}
                 {matches.total > 0 && (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -404,7 +412,7 @@ export default function PaymentMatchingIndex({ matches, filters }: Props) {
                         </div>
                     </div>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

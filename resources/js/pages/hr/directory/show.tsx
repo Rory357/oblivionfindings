@@ -1,4 +1,5 @@
 import { DonutChart } from '@/components/dashboard/donut-chart';
+import { PageHero, type PageHeroBadge, type PageHeroMetaItem } from '@/components/page';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -18,7 +19,6 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
 import {
-    ArrowLeft,
     Award,
     Briefcase,
     Calendar,
@@ -271,102 +271,69 @@ export default function DirectoryShow({
 
             <div className="flex flex-col gap-6 p-4 md:p-6">
                 {/* ========== HERO BANNER ========== */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 shadow-lg">
-                    {/* Decorative shapes */}
-                    <div className="absolute -top-16 -right-16 h-56 w-56 rounded-full bg-primary-foreground/5" />
-                    <div className="absolute -bottom-10 -left-10 h-36 w-36 rounded-full bg-primary-foreground/5" />
-                    <div className="absolute right-32 bottom-0 h-24 w-24 rounded-full bg-primary-foreground/5" />
+                {(() => {
+                    const heroBadges: PageHeroBadge[] = [];
+                    if (employee.department)
+                        heroBadges.push({ label: employee.department });
+                    if (employee.team) heroBadges.push({ label: employee.team });
+                    if (employee.site)
+                        heroBadges.push({ label: employee.site, icon: MapPin });
+                    if (employee.is_first_aider)
+                        heroBadges.push({
+                            label: 'First Aider',
+                            icon: Heart,
+                            tone: 'success',
+                        });
+                    if (employee.is_fire_warden)
+                        heroBadges.push({
+                            label: 'Fire Warden',
+                            icon: Flame,
+                            tone: 'warning',
+                        });
 
-                    <div className="relative p-6 md:p-8">
-                        <Link
-                            href="/hr/directory"
-                            className="mb-4 inline-flex items-center gap-1.5 text-sm text-primary-foreground/60 transition-colors hover:text-primary-foreground"
-                        >
-                            <ArrowLeft className="h-4 w-4" />
-                            Back to Directory
-                        </Link>
+                    const heroMeta: PageHeroMetaItem[] = [];
+                    if (employee.full_name !== employee.name)
+                        heroMeta.push({ label: `(${employee.full_name})` });
+                    if (tenure)
+                        heroMeta.push({
+                            icon: Clock,
+                            label: `${
+                                tenure.years > 0
+                                    ? `${tenure.years} year${tenure.years !== 1 ? 's' : ''} ${tenure.months} month${tenure.months !== 1 ? 's' : ''}`
+                                    : `${tenure.months} month${tenure.months !== 1 ? 's' : ''}`
+                            } at the organisation`,
+                        });
 
-                        <div className="flex flex-col items-center gap-6 md:flex-row md:items-start">
-                            {/* Avatar */}
-                            <Avatar className="h-32 w-32 border-4 border-primary-foreground/20 shadow-xl md:h-36 md:w-36">
-                                <AvatarImage
-                                    src={
-                                        employee.profile_photo_path
-                                            ? `/storage/${employee.profile_photo_path}`
-                                            : undefined
-                                    }
-                                />
-                                <AvatarFallback className="bg-primary-foreground/20 text-4xl font-bold text-primary-foreground">
-                                    {getInitials(employee.name)}
-                                </AvatarFallback>
-                            </Avatar>
+                    const heroStats = [
+                        {
+                            label: 'Years',
+                            value: tenure ? `${tenure.years}.${tenure.months}` : '\u2014',
+                        },
+                        { label: 'Kudos', value: kudosCount },
+                    ];
+                    if (complianceRate != null)
+                        heroStats.push({ label: 'Compliant', value: `${complianceRate}%` });
 
-                            {/* Info */}
-                            <div className="flex-1 text-center text-primary-foreground md:text-left">
-                                <h1 className="text-2xl font-bold md:text-3xl">
-                                    {employee.name}
-                                </h1>
-                                {employee.full_name !== employee.name && (
-                                    <p className="text-sm text-primary-foreground/60">
-                                        ({employee.full_name})
-                                    </p>
-                                )}
-                                {employee.position_title && (
-                                    <p className="mt-1 text-lg text-primary-foreground/80">
-                                        {employee.position_title}
-                                    </p>
-                                )}
-
-                                {/* Badges */}
-                                <div className="mt-3 flex flex-wrap justify-center gap-2 md:justify-start">
-                                    {employee.department && (
-                                        <Badge className="border-primary-foreground/20 bg-primary-foreground/15 text-xs text-primary-foreground hover:bg-primary-foreground/25">
-                                            {employee.department}
-                                        </Badge>
-                                    )}
-                                    {employee.team && (
-                                        <Badge className="border-primary-foreground/15 bg-primary-foreground/10 text-xs text-primary-foreground/80">
-                                            {employee.team}
-                                        </Badge>
-                                    )}
-                                    {employee.site && (
-                                        <Badge className="gap-1 border-primary-foreground/15 bg-primary-foreground/10 text-xs text-primary-foreground/80">
-                                            <MapPin className="h-3 w-3" />
-                                            {employee.site}
-                                        </Badge>
-                                    )}
-                                    {employee.is_first_aider && (
-                                        <Badge className="border-status-success/30 bg-status-success-bg text-xs text-status-success">
-                                            <Heart className="mr-1 h-3 w-3" />{' '}
-                                            First Aider
-                                        </Badge>
-                                    )}
-                                    {employee.is_fire_warden && (
-                                        <Badge className="border-status-warning/30 bg-status-warning-bg text-xs text-status-warning">
-                                            <Flame className="mr-1 h-3 w-3" />{' '}
-                                            Fire Warden
-                                        </Badge>
-                                    )}
-                                </div>
-
-                                {/* Tenure */}
-                                {tenure && (
-                                    <p className="mt-3 flex items-center justify-center gap-1.5 text-sm text-primary-foreground/50 md:justify-start">
-                                        <Clock className="h-3.5 w-3.5" />
-                                        {tenure.years > 0
-                                            ? `${tenure.years} year${tenure.years !== 1 ? 's' : ''} ${tenure.months} month${tenure.months !== 1 ? 's' : ''}`
-                                            : `${tenure.months} month${tenure.months !== 1 ? 's' : ''}`}{' '}
-                                        at the organisation
-                                    </p>
-                                )}
-
-                                {/* Quick actions */}
-                                <div className="mt-5 flex flex-wrap items-center justify-center gap-2 md:justify-start">
+                    return (
+                        <PageHero
+                            backHref="/hr/directory"
+                            backLabel="Back to Directory"
+                            avatar={{
+                                src: employee.profile_photo_path
+                                    ? `/storage/${employee.profile_photo_path}`
+                                    : undefined,
+                                fallback: getInitials(employee.name),
+                            }}
+                            title={employee.name}
+                            description={employee.position_title ?? undefined}
+                            meta={heroMeta}
+                            badges={heroBadges}
+                            stats={heroStats}
+                            actions={
+                                <>
                                     {!isSelf && (
                                         <Button
-                                            onClick={() =>
-                                                setKudosDialogOpen(true)
-                                            }
+                                            onClick={() => setKudosDialogOpen(true)}
                                             size="sm"
                                             className="gap-2 rounded-full bg-white font-semibold text-primary shadow-md hover:bg-primary-foreground/90"
                                         >
@@ -379,13 +346,10 @@ export default function DirectoryShow({
                                             asChild
                                             size="sm"
                                             variant="outline"
-                                            className="gap-1.5 rounded-full border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                            className="gap-1.5 rounded-full border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
                                         >
-                                            <a
-                                                href={`mailto:${employee.email}`}
-                                            >
-                                                <Mail className="h-3.5 w-3.5" />{' '}
-                                                Email
+                                            <a href={`mailto:${employee.email}`}>
+                                                <Mail className="h-3.5 w-3.5" /> Email
                                             </a>
                                         </Button>
                                     )}
@@ -394,11 +358,10 @@ export default function DirectoryShow({
                                             asChild
                                             size="sm"
                                             variant="outline"
-                                            className="gap-1.5 rounded-full border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                            className="gap-1.5 rounded-full border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
                                         >
                                             <a href={`tel:${employee.phone}`}>
-                                                <Phone className="h-3.5 w-3.5" />{' '}
-                                                Call
+                                                <Phone className="h-3.5 w-3.5" /> Call
                                             </a>
                                         </Button>
                                     )}
@@ -408,7 +371,7 @@ export default function DirectoryShow({
                                             disabled={messageSending}
                                             size="sm"
                                             variant="outline"
-                                            className="gap-1.5 rounded-full border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                            className="gap-1.5 rounded-full border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
                                         >
                                             {messageSending ? (
                                                 <Loader2 className="h-3.5 w-3.5" />
@@ -418,46 +381,11 @@ export default function DirectoryShow({
                                             Message
                                         </Button>
                                     )}
-                                </div>
-                            </div>
-
-                            {/* Right side stats (desktop) */}
-                            <div className="hidden items-center gap-4 lg:flex">
-                                <div className="flex flex-col items-center rounded-xl bg-primary-foreground/10 px-5 py-3 backdrop-blur-sm">
-                                    <Clock className="mb-1 h-5 w-5 text-primary-foreground/70" />
-                                    <span className="text-2xl font-bold text-primary-foreground">
-                                        {tenure
-                                            ? `${tenure.years}.${tenure.months}`
-                                            : '\u2014'}
-                                    </span>
-                                    <span className="text-[10px] text-primary-foreground/60">
-                                        Years
-                                    </span>
-                                </div>
-                                <div className="flex flex-col items-center rounded-xl bg-primary-foreground/10 px-5 py-3 backdrop-blur-sm">
-                                    <Award className="mb-1 h-5 w-5 text-status-warning" />
-                                    <span className="text-2xl font-bold text-primary-foreground">
-                                        {kudosCount}
-                                    </span>
-                                    <span className="text-[10px] text-primary-foreground/60">
-                                        Kudos
-                                    </span>
-                                </div>
-                                {complianceRate != null && (
-                                    <div className="flex flex-col items-center rounded-xl bg-primary-foreground/10 px-5 py-3 backdrop-blur-sm">
-                                        <Shield className="mb-1 h-5 w-5 text-status-success" />
-                                        <span className="text-2xl font-bold text-primary-foreground">
-                                            {complianceRate}%
-                                        </span>
-                                        <span className="text-[10px] text-primary-foreground/60">
-                                            Compliant
-                                        </span>
-                                    </div>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                                </>
+                            }
+                        />
+                    );
+                })()}
 
                 {/* Mobile stat cards (hidden on lg) */}
                 <div className="grid grid-cols-3 gap-3 lg:hidden">

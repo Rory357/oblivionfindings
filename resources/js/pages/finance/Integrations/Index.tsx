@@ -1,6 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, useForm, router } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
@@ -41,7 +42,7 @@ import {
     AlertDialogTitle,
     AlertDialogTrigger,
 } from '@/components/ui/alert-dialog';
-import { RefreshCw, Plus, Settings, Trash2, Link2, AlertCircle, CheckCircle2, Clock, XCircle } from 'lucide-react';
+import { RefreshCw, Plus, Settings, Trash2, Link2, AlertCircle, CheckCircle2, Clock, XCircle, Plug } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
 type SyncLog = {
@@ -385,21 +386,28 @@ function IntegrationCard({ integration }: { integration: Integration }) {
 }
 
 export default function IntegrationsIndex({ integrations }: PageProps) {
+    const activeCount = integrations.filter((i) => i.is_active).length;
+    const errorCount = integrations.filter((i) => i.last_sync_status === 'failed').length;
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Accounting Integrations" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Accounting Integrations</h1>
-                        <p className="text-muted-foreground">
-                            Connect to Xero or MYOB for two-way general ledger synchronisation
-                        </p>
-                    </div>
-                    <CreateIntegrationDialog />
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Plug}
+                        title="Accounting Integrations"
+                        description="Connect to Xero or MYOB for two-way general ledger synchronisation"
+                        stats={[
+                            { label: 'Total', value: integrations.length },
+                            { label: 'Active', value: activeCount },
+                            { label: 'Failed', value: errorCount },
+                        ]}
+                        actions={<CreateIntegrationDialog />}
+                    />
+                }
+            >
                 {integrations.length === 0 ? (
                     <Card>
                         <CardContent className="flex flex-col items-center justify-center py-12">
@@ -420,7 +428,7 @@ export default function IntegrationsIndex({ integrations }: PageProps) {
                         ))}
                     </div>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

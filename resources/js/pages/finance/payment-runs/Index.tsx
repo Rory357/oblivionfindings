@@ -1,12 +1,13 @@
 import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Head, Link, router } from '@inertiajs/react';
-import { Banknote, Plus } from 'lucide-react';
+import { Banknote, Plus, Send } from 'lucide-react';
 
 type PaymentRun = {
     id: number;
@@ -58,24 +59,37 @@ export default function PaymentRunsIndex({ paymentRuns, filters }: PageProps) {
         );
     };
 
+    const completedCount = paymentRuns.data.filter((r) => r.status === 'completed').length;
+    const processingCount = paymentRuns.data.filter((r) => r.status === 'processing').length;
+    const draftCount = paymentRuns.data.filter((r) => r.status === 'draft').length;
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Payment Runs" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-3xl font-bold tracking-tight text-foreground">Payment Runs</h1>
-                        <p className="text-muted-foreground mt-1">Manage batch payments to vendors</p>
-                    </div>
-                    <Link href="/finance/payment-runs/create">
-                        <Button>
-                            <Plus className="mr-2 h-4 w-4" />
-                            New Payment Run
-                        </Button>
-                    </Link>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Send}
+                        title="Payment Runs"
+                        description="Manage batch payments to vendors"
+                        stats={[
+                            { label: 'Total', value: paymentRuns.total },
+                            { label: 'Completed', value: completedCount },
+                            { label: 'Processing', value: processingCount },
+                            { label: 'Drafts', value: draftCount },
+                        ]}
+                        actions={
+                            <Link href="/finance/payment-runs/create">
+                                <Button size="sm">
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    New Payment Run
+                                </Button>
+                            </Link>
+                        }
+                    />
+                }
+            >
                 <Card>
                     <CardHeader>
                         <div className="flex items-center justify-between">
@@ -188,7 +202,7 @@ export default function PaymentRunsIndex({ paymentRuns, filters }: PageProps) {
                         )}
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

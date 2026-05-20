@@ -1,4 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -49,15 +50,27 @@ export default function CareersIndex({ jobs, options, filters }: Props) {
         }, { preserveState: true, replace: true });
     }
 
+    const siteCount = options.sites.length;
+
     return (
         <>
             <Head title="Careers" />
-            <div className="mx-auto max-w-5xl px-4 py-10 space-y-6">
-                <div className="space-y-2">
-                    <h1 className="text-3xl font-bold">Careers</h1>
-                    <p className="text-muted-foreground">Join our team and make a meaningful impact in the lives of the people we support.</p>
-                </div>
-
+            <div className="mx-auto max-w-5xl px-4 py-10">
+                <PageLayout
+                    padding="none"
+                    hero={
+                        <PageHero
+                            icon={Briefcase}
+                            title="Careers"
+                            description="Join our team and make a meaningful impact in the lives of the people we support."
+                            stats={[
+                                { label: 'Open roles', value: jobs.length },
+                                { label: 'Sites hiring', value: siteCount },
+                                { label: 'Role types', value: options.position_roles.length },
+                            ]}
+                        />
+                    }
+                >
                 <div className="grid gap-3 md:grid-cols-4">
                     <div className="relative">
                         <Search className="absolute left-3 top-1/2 -translate-y-1/2 h-4 w-4 text-muted-foreground" />
@@ -151,6 +164,7 @@ export default function CareersIndex({ jobs, options, filters }: Props) {
                         </Card>
                     )}
                 </div>
+                </PageLayout>
             </div>
         </>
     );

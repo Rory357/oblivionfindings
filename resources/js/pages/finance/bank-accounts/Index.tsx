@@ -1,9 +1,10 @@
 import { Head, Link } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Building2, AlertCircle, DollarSign, Landmark, Star } from 'lucide-react';
+import { Plus, Building2, AlertCircle, DollarSign, Landmark, Star, Banknote } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 import { type BreadcrumbItem } from '@/types';
 import { useMemo } from 'react';
@@ -50,26 +51,38 @@ export default function BankAccountsIndex({ bankAccounts }: Props) {
         [bankAccounts],
     );
 
+    const activeCount = useMemo(() => bankAccounts.filter((a) => a.is_active).length, [bankAccounts]);
+    const unreconciledTotal = useMemo(
+        () => bankAccounts.reduce((sum, a) => sum + a.unreconciled_count, 0),
+        [bankAccounts],
+    );
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Bank Accounts" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center justify-between mb-6">
-                    <div>
-                        <h1 className="text-3xl font-bold text-foreground">Bank Accounts</h1>
-                        <p className="text-muted-foreground mt-1">
-                            Manage your organisation's bank accounts and balances
-                        </p>
-                    </div>
-                    <Button asChild>
-                        <Link href={'/finance/bank-accounts/create'}>
-                            <Plus className="w-4 h-4 mr-2" />
-                            Add Bank Account
-                        </Link>
-                    </Button>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Banknote}
+                        title="Bank Accounts"
+                        description="Manage your organisation's bank accounts and balances"
+                        stats={[
+                            { label: 'Accounts', value: bankAccounts.length },
+                            { label: 'Active', value: activeCount },
+                            { label: 'Unreconciled', value: unreconciledTotal },
+                        ]}
+                        actions={
+                            <Button asChild size="sm">
+                                <Link href={'/finance/bank-accounts/create'}>
+                                    <Plus className="w-4 h-4 mr-1.5" />
+                                    Add Bank Account
+                                </Link>
+                            </Button>
+                        }
+                    />
+                }
+            >
                 {bankAccounts.length === 0 ? (
                     <Card>
                         <CardContent className="flex flex-col items-center justify-center py-12 text-center">
@@ -234,7 +247,7 @@ export default function BankAccountsIndex({ bankAccounts }: Props) {
                         </div>
                     </>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

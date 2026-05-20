@@ -1,6 +1,7 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -14,7 +15,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
-import { Plus, Search } from 'lucide-react';
+import { Plus, Search, BookOpen } from 'lucide-react';
 import { useState } from 'react';
 
 interface JournalLine {
@@ -101,6 +102,9 @@ export default function JournalsIndex({ auth, journals, filters }: Props) {
         router.get('/finance/journals', {}, { preserveState: true });
     };
 
+    const postedCount = journals.data.filter((j) => j.status === 'posted').length;
+    const draftCount = journals.data.filter((j) => j.status === 'draft').length;
+
     return (
         <AppLayout
             user={auth.user}
@@ -111,21 +115,28 @@ export default function JournalsIndex({ auth, journals, filters }: Props) {
         >
             <Head title="Journals" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                {/* Header */}
-                <div className="flex items-center justify-between mb-6">
-                    <div>
-                        <h1 className="text-3xl font-bold text-foreground">Journals</h1>
-                        <p className="text-muted-foreground mt-1">General ledger journal entries</p>
-                    </div>
-                    <Button asChild>
-                        <Link href="/finance/journals/create">
-                            <Plus className="w-4 h-4 mr-2" />
-                            New Journal
-                        </Link>
-                    </Button>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={BookOpen}
+                        title="Journals"
+                        description="General ledger journal entries"
+                        stats={[
+                            { label: 'Total', value: journals.total },
+                            { label: 'Posted (this page)', value: postedCount },
+                            { label: 'Drafts (this page)', value: draftCount },
+                        ]}
+                        actions={
+                            <Button asChild size="sm">
+                                <Link href="/finance/journals/create">
+                                    <Plus className="w-4 h-4 mr-1.5" />
+                                    New Journal
+                                </Link>
+                            </Button>
+                        }
+                    />
+                }
+            >
                 {/* Filters */}
                 <Card className="mb-6">
                     <CardContent className="pt-6">
@@ -260,7 +271,7 @@ export default function JournalsIndex({ auth, journals, filters }: Props) {
                         </div>
                     </div>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

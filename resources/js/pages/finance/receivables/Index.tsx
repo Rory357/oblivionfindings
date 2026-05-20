@@ -1,6 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, useForm, router } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -24,7 +25,7 @@ import {
     DialogTrigger,
 } from '@/components/ui/dialog';
 import { Badge } from '@/components/ui/badge';
-import { DollarSign, Clock, FileText, TrendingUp } from 'lucide-react';
+import { DollarSign, Clock, FileText, TrendingUp, ArrowUpFromLine } from 'lucide-react';
 import { useState } from 'react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 
@@ -151,30 +152,36 @@ export default function ReceivablesIndex({ summary, invoices }: PageProps) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Receivables" />
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Receivables</h1>
-                        <p className="text-muted-foreground">
-                            Accounts receivable dashboard for outstanding invoices and payments.
-                        </p>
-                    </div>
-                    <div className="flex gap-2">
-                        <Link href="/finance/receivables/aging">
-                            <Button variant="outline">
-                                <TrendingUp className="mr-2 h-4 w-4" />
-                                Aging Report
-                            </Button>
-                        </Link>
-                        <Link href="/finance/receivables/statements">
-                            <Button variant="outline">
-                                <FileText className="mr-2 h-4 w-4" />
-                                Statements
-                            </Button>
-                        </Link>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={ArrowUpFromLine}
+                        title="Receivables"
+                        description="Accounts receivable dashboard for outstanding invoices and payments."
+                        stats={[
+                            { label: 'Outstanding', value: formatNZD(summary.total_outstanding) },
+                            { label: 'Overdue', value: formatNZD(summary.total_overdue) },
+                            { label: 'Unpaid invoices', value: summary.unpaid_count },
+                        ]}
+                        actions={
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Link href="/finance/receivables/aging">
+                                    <Button size="sm" variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                        <TrendingUp className="mr-1.5 h-4 w-4" />
+                                        Aging Report
+                                    </Button>
+                                </Link>
+                                <Link href="/finance/receivables/statements">
+                                    <Button size="sm" variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                        <FileText className="mr-1.5 h-4 w-4" />
+                                        Statements
+                                    </Button>
+                                </Link>
+                            </div>
+                        }
+                    />
+                }
+            >
                 {/* Summary Cards + PieChart */}
                 <div className="grid grid-cols-1 gap-4 md:grid-cols-4">
                     <Card>
@@ -365,7 +372,7 @@ export default function ReceivablesIndex({ summary, invoices }: PageProps) {
                         )}
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

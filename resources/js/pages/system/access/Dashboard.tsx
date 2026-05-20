@@ -11,6 +11,7 @@ import {
     ShieldCheck,
     UserCog,
 } from 'lucide-react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import {
@@ -60,15 +61,21 @@ export default function AccessControlDashboard({ stats, roles }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Access Control" />
 
-            <div className="space-y-6">
-                {/* Header */}
-                <div>
-                    <h1 className="text-2xl font-semibold tracking-tight">Access Control</h1>
-                    <p className="text-muted-foreground">
-                        Manage roles, permissions, and user access for your organization.
-                    </p>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Shield}
+                        title="Access Control"
+                        description="Manage roles, permissions, and user access for your organization."
+                        stats={[
+                            { label: 'Roles', value: stats.total_roles },
+                            { label: 'Permissions', value: stats.total_permissions },
+                            { label: 'Active users', value: stats.active_users },
+                            { label: 'Pending invites', value: stats.pending_invitations },
+                        ]}
+                    />
+                }
+            >
                 {/* Stats Cards */}
                 <div className="grid gap-4 md:grid-cols-2 lg:grid-cols-4">
                     <Card>
@@ -252,7 +259,7 @@ export default function AccessControlDashboard({ stats, roles }: Props) {
                         ))}
                     </div>
                 </div>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

@@ -1,11 +1,12 @@
 import { Head, Link, router } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, FileCheck, CheckCircle, Clock, ListChecks } from 'lucide-react';
+import { Plus, FileCheck, CheckCircle, Clock, ListChecks, Scale } from 'lucide-react';
 import { type BreadcrumbItem } from '@/types';
 import { useCallback, useMemo } from 'react';
 
@@ -86,22 +87,28 @@ export default function ReconciliationIndex({ reconciliations, bankAccounts, fil
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Bank Reconciliation" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center justify-between mb-6">
-                    <div>
-                        <h1 className="text-3xl font-bold text-foreground">Bank Reconciliation</h1>
-                        <p className="text-muted-foreground mt-1">
-                            Reconcile bank statements against your ledger
-                        </p>
-                    </div>
-                    <Button asChild>
-                        <Link href={'/finance/bank-reconciliation/create'}>
-                            <Plus className="w-4 h-4 mr-2" />
-                            New Reconciliation
-                        </Link>
-                    </Button>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Scale}
+                        title="Bank Reconciliation"
+                        description="Reconcile bank statements against your ledger"
+                        stats={[
+                            { label: 'Total', value: totalCount },
+                            { label: 'Completed', value: completedCount },
+                            { label: 'In progress', value: inProgressCount },
+                        ]}
+                        actions={
+                            <Button asChild size="sm">
+                                <Link href={'/finance/bank-reconciliation/create'}>
+                                    <Plus className="w-4 h-4 mr-1.5" />
+                                    New Reconciliation
+                                </Link>
+                            </Button>
+                        }
+                    />
+                }
+            >
                 {/* KPI Cards */}
                 {totalCount > 0 && (
                     <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
@@ -272,7 +279,7 @@ export default function ReconciliationIndex({ reconciliations, bankAccounts, fil
                         </div>
                     </div>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

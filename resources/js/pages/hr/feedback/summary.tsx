@@ -1,3 +1,4 @@
+import { PageHero } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -5,7 +6,6 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/react';
 import {
-    ArrowLeft,
     BarChart3,
     MessageSquare,
     Star,
@@ -127,61 +127,28 @@ export default function FeedbackSummary({
             <Head title={`Feedback Summary - ${subjectUser.name}`} />
             <div className="space-y-6 p-4 lg:p-6">
                 {/* Hero Banner */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-primary p-6 text-primary-foreground shadow-lg">
-                    <div className="absolute -top-10 -right-10 h-40 w-40 rounded-full bg-primary-foreground/5" />
-                    <div className="absolute right-20 -bottom-8 h-24 w-24 rounded-full bg-primary-foreground/5" />
-                    <div className="relative flex flex-wrap items-center justify-between gap-4">
-                        <div className="flex items-center gap-4">
-                            <Link href="/hr/feedback">
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="text-primary-foreground/70 hover:bg-primary-foreground/10 hover:text-primary-foreground"
-                                >
-                                    <ArrowLeft className="h-5 w-5" />
-                                </Button>
-                            </Link>
-                            <div
-                                className={`flex h-14 w-14 items-center justify-center rounded-2xl border-2 border-primary-foreground/30 text-lg font-bold shadow-md ${avatarColor(subjectUser.id)}`}
-                            >
-                                {getInitials(subjectUser.name)}
-                            </div>
-                            <div>
-                                <h1 className="text-2xl font-bold">
-                                    Feedback Summary
-                                </h1>
-                                <p className="text-primary-foreground/70">
-                                    360-degree feedback for{' '}
-                                    <strong className="text-primary-foreground">
-                                        {subjectUser.name}
-                                    </strong>
-                                </p>
-                            </div>
-                        </div>
-                        {overallAvg !== null && (
-                            <div className="flex items-center gap-6">
-                                <div className="text-center">
-                                    <div className="flex items-center gap-1 text-3xl font-bold">
-                                        {overallAvg.toFixed(1)}{' '}
-                                        <Star className="h-6 w-6 fill-amber-300 text-status-warning" />
-                                    </div>
-                                    <div className="text-[10px] tracking-wider text-primary-foreground/60 uppercase">
-                                        Overall
-                                    </div>
-                                </div>
-                                <div className="h-10 w-px bg-primary-foreground/20" />
-                                <div className="text-center">
-                                    <div className="text-3xl font-bold">
-                                        {summary.total_reviews}
-                                    </div>
-                                    <div className="text-[10px] tracking-wider text-primary-foreground/60 uppercase">
-                                        Reviews
-                                    </div>
-                                </div>
-                            </div>
-                        )}
-                    </div>
-                </div>
+                <PageHero
+                    icon={BarChart3}
+                    backHref="/hr/feedback"
+                    backLabel="Back to Feedback"
+                    title="Feedback Summary"
+                    description={
+                        <>
+                            360-degree feedback for{' '}
+                            <strong className="text-primary-foreground">
+                                {subjectUser.name}
+                            </strong>
+                        </>
+                    }
+                    stats={
+                        overallAvg !== null
+                            ? [
+                                  { label: 'Overall', value: overallAvg.toFixed(1) },
+                                  { label: 'Reviews', value: summary.total_reviews },
+                              ]
+                            : undefined
+                    }
+                />
 
                 {summary.total_reviews === 0 ? (
                     <Card className="border-dashed">

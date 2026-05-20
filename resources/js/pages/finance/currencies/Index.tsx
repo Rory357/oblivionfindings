@@ -1,6 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, useForm, router } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -316,15 +317,21 @@ export default function CurrenciesIndex({ currencies }: PageProps) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Currencies" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Currencies</h1>
-                        <p className="text-muted-foreground">Manage currencies and exchange rates for multi-currency transactions</p>
-                    </div>
-                    <CreateCurrencyDialog />
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Coins}
+                        title="Currencies"
+                        description="Manage currencies and exchange rates for multi-currency transactions"
+                        stats={[
+                            { label: 'Total', value: currencies.length },
+                            { label: 'Active', value: activeCurrencies.length },
+                            { label: 'Base', value: baseCurrency ? baseCurrency.code : 'Not set' },
+                        ]}
+                        actions={<CreateCurrencyDialog />}
+                    />
+                }
+            >
                 {/* KPI Cards */}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <Card>
@@ -430,7 +437,7 @@ export default function CurrenciesIndex({ currencies }: PageProps) {
                         </Table>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

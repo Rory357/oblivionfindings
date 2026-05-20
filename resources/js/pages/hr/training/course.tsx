@@ -1,3 +1,4 @@
+import { PageHero, type PageHeroBadge, type PageHeroMetaItem } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,7 +23,7 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
 import {
-    ArrowLeft,
+    Book,
     BookOpen,
     Calendar,
     CheckCircle2,
@@ -214,96 +215,49 @@ export default function CourseDetail({ course, users, can }: Props) {
             <Head title={course.title} />
             <div className="space-y-6 p-4 lg:p-6">
                 {/* Hero Banner */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-primary p-6 text-primary-foreground shadow-lg">
-                    <div className="absolute -top-10 -right-10 h-40 w-40 rounded-full bg-primary-foreground/5" />
-                    <div className="absolute right-20 -bottom-8 h-24 w-24 rounded-full bg-primary-foreground/5" />
-                    <div className="relative flex flex-wrap items-start justify-between gap-4">
-                        <div className="flex items-start gap-4">
-                            <Link href="/hr/training/catalog">
-                                <Button
-                                    variant="ghost"
-                                    size="icon"
-                                    className="shrink-0 text-primary-foreground/70 hover:bg-primary-foreground/10 hover:text-primary-foreground"
-                                >
-                                    <ArrowLeft className="h-5 w-5" />
-                                </Button>
-                            </Link>
-                            <div>
-                                <div className="flex flex-wrap items-center gap-2">
-                                    <h1 className="text-2xl font-bold">
-                                        {course.title}
-                                    </h1>
-                                    <Badge className="border-0 bg-primary-foreground/20 font-mono text-[10px] text-primary-foreground">
-                                        {course.code}
-                                    </Badge>
-                                    {course.is_mandatory && (
-                                        <Badge className="border-0 bg-status-critical text-[10px] text-primary-foreground">
-                                            Mandatory
-                                        </Badge>
-                                    )}
-                                </div>
-                                <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-primary-foreground/70">
-                                    <span className="flex items-center gap-1">
-                                        <DmIcon className="h-3.5 w-3.5" />
-                                        {
-                                            DELIVERY_LABELS[
-                                                course.delivery_method
-                                            ]
-                                        }
-                                    </span>
-                                    <span className="flex items-center gap-1">
-                                        <Clock className="h-3.5 w-3.5" />
-                                        {course.duration_hours}h
-                                    </span>
-                                    {course.provider && (
-                                        <span>{course.provider}</span>
-                                    )}
-                                    {course.cost && (
-                                        <span>
-                                            {formatCurrency(course.cost)}
-                                        </span>
-                                    )}
-                                </div>
-                                {course.description && (
-                                    <p className="mt-2 line-clamp-2 max-w-2xl text-sm text-primary-foreground/60">
-                                        {course.description}
-                                    </p>
-                                )}
-                            </div>
-                        </div>
-                        <div className="flex items-center gap-4">
-                            <div className="flex items-center gap-6">
-                                <div className="text-center">
-                                    <div className="text-3xl font-bold">
-                                        {course.enrollments?.length ?? 0}
-                                    </div>
-                                    <div className="text-[10px] tracking-wider text-primary-foreground/60 uppercase">
-                                        Enrolled
-                                    </div>
-                                </div>
-                                <div className="h-10 w-px bg-primary-foreground/20" />
-                                <div className="text-center">
-                                    <div className="text-3xl font-bold">
-                                        {completedCount}
-                                    </div>
-                                    <div className="text-[10px] tracking-wider text-primary-foreground/60 uppercase">
-                                        Completed
-                                    </div>
-                                </div>
-                            </div>
-                            {can.enroll && (
-                                <Button
-                                    size="sm"
-                                    className="ml-4 gap-1.5 bg-white text-primary shadow-md hover:bg-primary-foreground/90"
-                                    onClick={() => setEnrollOpen(true)}
-                                >
-                                    <UserPlus className="h-4 w-4" />
-                                    Enrol Employee
-                                </Button>
-                            )}
-                        </div>
-                    </div>
-                </div>
+                {(() => {
+                    const heroBadges: PageHeroBadge[] = [{ label: course.code }];
+                    if (course.is_mandatory)
+                        heroBadges.push({ label: 'Mandatory', tone: 'critical' });
+
+                    const heroMeta: PageHeroMetaItem[] = [
+                        {
+                            icon: DELIVERY_ICONS[course.delivery_method] || BookOpen,
+                            label: DELIVERY_LABELS[course.delivery_method],
+                        },
+                        { icon: Clock, label: `${course.duration_hours}h` },
+                    ];
+                    if (course.provider) heroMeta.push({ label: course.provider });
+                    if (course.cost) heroMeta.push({ label: formatCurrency(course.cost) });
+
+                    return (
+                        <PageHero
+                            icon={Book}
+                            backHref="/hr/training/catalog"
+                            backLabel="Back to Catalog"
+                            title={course.title}
+                            description={course.description ?? undefined}
+                            meta={heroMeta}
+                            badges={heroBadges}
+                            stats={[
+                                { label: 'Enrolled', value: course.enrollments?.length ?? 0 },
+                                { label: 'Completed', value: completedCount },
+                            ]}
+                            actions={
+                                can.enroll ? (
+                                    <Button
+                                        size="sm"
+                                        className="gap-1.5 bg-white text-primary shadow-md hover:bg-primary-foreground/90"
+                                        onClick={() => setEnrollOpen(true)}
+                                    >
+                                        <UserPlus className="h-4 w-4" />
+                                        Enrol Employee
+                                    </Button>
+                                ) : undefined
+                            }
+                        />
+                    );
+                })()}
 
                 {/* Course Info Cards */}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">

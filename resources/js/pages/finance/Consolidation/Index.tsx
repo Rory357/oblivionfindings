@@ -1,6 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,7 +24,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { Building2, Plus, Eye, Users } from 'lucide-react';
+import { Building2, Plus, Eye, Users, Network } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 import { Link } from '@inertiajs/react';
 import { Textarea } from '@/components/ui/textarea';

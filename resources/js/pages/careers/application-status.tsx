@@ -1,7 +1,8 @@
 import { Head } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { CheckCircle2, Clock, FileText, Briefcase, MapPin } from 'lucide-react';
+import { CheckCircle2, Clock, Briefcase, MapPin, Search } from 'lucide-react';
 import type { ApplicationStatus } from '@/types/job-postings';
 
 type Props = {
@@ -37,13 +38,18 @@ export default function ApplicationStatus({ application }: Props) {
         <>
             <Head title="Application Status" />
             <div className="min-h-screen bg-background flex items-center justify-center px-4 py-16">
-                <div className="max-w-lg w-full space-y-6">
-                    <div className="text-center">
-                        <FileText className="mx-auto h-12 w-12 text-primary mb-4" />
-                        <h1 className="text-2xl font-bold">Application Status</h1>
-                        <p className="text-muted-foreground text-sm mt-1">Track the progress of your application</p>
-                    </div>
-
+                <div className="max-w-lg w-full">
+                    <PageLayout
+                        padding="none"
+                        hero={
+                            <PageHero
+                                variant="compact"
+                                icon={Search}
+                                title="Application Status"
+                                description="Track the progress of your application."
+                            />
+                        }
+                    >
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-lg">{application.position_title}</CardTitle>
@@ -123,6 +129,7 @@ export default function ApplicationStatus({ application }: Props) {
                     <p className="text-xs text-center text-muted-foreground">
                         If you have questions about your application, please contact our recruitment team.
                     </p>
+                    </PageLayout>
                 </div>
             </div>
         </>

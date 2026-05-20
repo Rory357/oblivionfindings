@@ -1,5 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm, router } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -22,7 +23,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { CalendarDays, Plus, Lock, Pencil } from 'lucide-react';
+import { CalendarDays, Plus, Lock, Pencil, CalendarRange } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
 type FiscalPeriod = {
@@ -207,19 +208,30 @@ export default function FiscalPeriodsIndex({ periods }: PageProps) {
         });
     }
 
+    const openCount = periods.filter((p) => p.status === 'open').length;
+    const closedCount = periods.filter((p) => p.status === 'closed').length;
+    const lockedCount = periods.filter((p) => p.status === 'locked').length;
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Fiscal Periods" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Fiscal Periods</h1>
-                        <p className="text-muted-foreground">Manage accounting periods for your organisation</p>
-                    </div>
-                    <CreatePeriodDialog />
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={CalendarRange}
+                        title="Fiscal Periods"
+                        description="Manage accounting periods for your organisation"
+                        stats={[
+                            { label: 'Total', value: periods.length },
+                            { label: 'Open', value: openCount },
+                            { label: 'Closed', value: closedCount },
+                            { label: 'Locked', value: lockedCount },
+                        ]}
+                        actions={<CreatePeriodDialog />}
+                    />
+                }
+            >
                 <Card>
                     <CardHeader>
                         <div className="flex items-center gap-2">
@@ -283,7 +295,7 @@ export default function FiscalPeriodsIndex({ periods }: PageProps) {
                         </Table>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

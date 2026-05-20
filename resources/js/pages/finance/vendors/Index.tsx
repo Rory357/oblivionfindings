@@ -2,6 +2,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import { type PageProps } from '@/types';
 import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -90,27 +91,33 @@ export default function VendorsIndex({ vendors, filters }: Props) {
         [handleSearch],
     );
 
+    const activeCount = vendors.data.filter((v) => v.is_active).length;
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Vendors" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Vendors</h1>
-                        <p className="text-muted-foreground">
-                            Manage your suppliers, contractors and service providers
-                        </p>
-                    </div>
-                    <Button asChild>
-                        <Link href="/finance/vendors/create">
-                            <Plus className="w-4 h-4 mr-2" />
-                            Add Vendor
-                        </Link>
-                    </Button>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Building2}
+                        title="Vendors"
+                        description="Manage your suppliers, contractors and service providers"
+                        stats={[
+                            { label: 'Total', value: vendors.total },
+                            { label: 'Active (this page)', value: activeCount },
+                        ]}
+                        actions={
+                            <Button asChild size="sm">
+                                <Link href="/finance/vendors/create">
+                                    <Plus className="w-4 h-4 mr-1.5" />
+                                    Add Vendor
+                                </Link>
+                            </Button>
+                        }
+                    />
+                }
+            >
                 {/* Filters */}
                 <Card>
                     <CardContent className="pt-6">
@@ -270,7 +277,7 @@ export default function VendorsIndex({ vendors, filters }: Props) {
                         </div>
                     </div>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

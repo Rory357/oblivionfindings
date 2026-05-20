@@ -1,5 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm, router } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,7 +31,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Settings, Plus, Pencil, Trash2 } from 'lucide-react';
+import { Settings, Plus, Pencil, Trash2, SlidersHorizontal } from 'lucide-react';
 import { type BreadcrumbItem } from '@/types';
 import { FormEvent, useState } from 'react';
 
@@ -309,21 +310,26 @@ export default function MatchRulesIndex({ rules }: PageProps) {
         }
     }
 
+    const activeCount = rules.filter((r) => r.is_active).length;
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Match Rules" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Match Rules</h1>
-                        <p className="text-muted-foreground">
-                            Configure rules for automatic payment matching and auto-confirmation thresholds
-                        </p>
-                    </div>
-                    <CreateRuleDialog />
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={SlidersHorizontal}
+                        title="Match Rules"
+                        description="Configure rules for automatic payment matching and auto-confirmation thresholds"
+                        stats={[
+                            { label: 'Total rules', value: rules.length },
+                            { label: 'Active', value: activeCount },
+                        ]}
+                        actions={<CreateRuleDialog />}
+                    />
+                }
+            >
                 <Card>
                     <CardHeader>
                         <div className="flex items-center gap-2">
@@ -403,7 +409,7 @@ export default function MatchRulesIndex({ rules }: PageProps) {
                         </Table>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

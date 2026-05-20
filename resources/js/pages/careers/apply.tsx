@@ -1,4 +1,5 @@
-import { Head, Link, useForm, usePage } from '@inertiajs/react';
+import { Head, useForm, usePage } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, Briefcase, MapPin } from 'lucide-react';
+import { Briefcase, FileText, MapPin } from 'lucide-react';
 import { employmentTypeLabels, sourceChannelOptions } from '@/lib/job-posting-constants';
 
 type Props = {
@@ -52,19 +53,25 @@ export default function CareersApply({ job, trackingDefaults }: Props) {
     return (
         <>
             <Head title={`Apply - ${job.title}`} />
-            <div className="mx-auto max-w-3xl px-4 py-10 space-y-6">
-                <div>
-                    <Link href="/careers" className="inline-flex items-center gap-1 text-sm text-muted-foreground hover:text-foreground">
-                        <ArrowLeft className="h-4 w-4" /> Back to careers
-                    </Link>
-                    <h1 className="mt-3 text-3xl font-bold">Apply for {job.title}</h1>
-                    <div className="flex flex-wrap gap-2 mt-2 text-sm text-muted-foreground">
-                        <span className="flex items-center gap-1"><Briefcase className="h-3.5 w-3.5" /> {employmentTypeLabels[job.employment_type] || job.employment_type}</span>
-                        {job.position_role && <Badge variant="outline" className="text-xs">{job.position_role.replace(/_/g, ' ')}</Badge>}
-                        {job.site && <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> {job.site.name}</span>}
-                    </div>
-                </div>
-
+            <div className="mx-auto max-w-3xl px-4 py-10">
+                <PageLayout
+                    padding="none"
+                    hero={
+                        <PageHero
+                            variant="compact"
+                            backHref="/careers"
+                            backLabel="Back to careers"
+                            icon={FileText}
+                            title={`Apply for ${job.title}`}
+                        >
+                            <div className="flex flex-wrap gap-2 text-sm text-muted-foreground">
+                                <span className="flex items-center gap-1"><Briefcase className="h-3.5 w-3.5" /> {employmentTypeLabels[job.employment_type] || job.employment_type}</span>
+                                {job.position_role && <Badge variant="outline" className="text-xs">{job.position_role.replace(/_/g, ' ')}</Badge>}
+                                {job.site && <span className="flex items-center gap-1"><MapPin className="h-3.5 w-3.5" /> {job.site.name}</span>}
+                            </div>
+                        </PageHero>
+                    }
+                >
                 {flash?.success && (
                     <div className="rounded-lg border border-status-success/30 bg-status-success-bg p-4 text-sm text-status-success">
                         {flash.success}
@@ -179,6 +186,7 @@ export default function CareersApply({ job, trackingDefaults }: Props) {
                         </Button>
                     </div>
                 </form>
+                </PageLayout>
             </div>
         </>
     );

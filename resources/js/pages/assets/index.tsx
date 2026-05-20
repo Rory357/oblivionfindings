@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PageHero, PageLayout } from '@/components/page';
 import {
     Select,
     SelectContent,
@@ -11,6 +12,7 @@ import {
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Box } from 'lucide-react';
 import { useMemo } from 'react';
 
 type Site = { id: number; name: string };
@@ -69,25 +71,34 @@ export default function AssetsIndex() {
         return clientOptions.filter((c) => c.site_id === selectedSiteId);
     }, [clientOptions, selectedSiteId]);
 
+    const totalAssets = rows.length;
+    const activeAssets = rows.filter((a) => a.status === 'active').length;
+    const highRiskAssets = rows.filter((a) => a.risk_level === 'high').length;
+
     return (
         <AppLayout breadcrumbs={[{ title: 'Assets', href: '/assets' }]}>
             <Head title="Assets" />
-            <div className="space-y-4 p-4">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-xl font-semibold">Assets</h1>
-                        <p className="text-sm text-muted-foreground">
-                            Site + client assets, inspections, maintenance,
-                            documents.
-                        </p>
-                    </div>
-                    {can?.create ? (
-                        <Link href="/fleet-assets/assets/create">
-                            <Button>Create Asset</Button>
-                        </Link>
-                    ) : null}
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Box}
+                        title="Assets"
+                        description="Site + client assets, inspections, maintenance, documents."
+                        stats={[
+                            { label: 'Total', value: totalAssets },
+                            { label: 'Active', value: activeAssets },
+                            { label: 'High risk', value: highRiskAssets },
+                        ]}
+                        actions={
+                            can?.create ? (
+                                <Link href="/fleet-assets/assets/create">
+                                    <Button>Create Asset</Button>
+                                </Link>
+                            ) : null
+                        }
+                    />
+                }
+            >
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-base">Filters</CardTitle>
@@ -310,7 +321,7 @@ export default function AssetsIndex() {
                         ) : null}
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

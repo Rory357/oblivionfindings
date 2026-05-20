@@ -1,3 +1,4 @@
+import { PageHero, type PageHeroMetaItem } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -5,7 +6,7 @@ import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
-import { Calendar, CheckCircle2, Send, Star } from 'lucide-react';
+import { Calendar, CheckCircle2, MessageSquare, Send, Star } from 'lucide-react';
 
 type User = { id: number; name: string };
 type FeedbackRequestData = {
@@ -133,53 +134,48 @@ export default function FeedbackRespond({ feedbackRequest, questions }: Props) {
             <Head title="Submit Feedback" />
             <div className="space-y-6 p-4 lg:p-6">
                 {/* Hero */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-primary p-6 text-primary-foreground shadow-lg">
-                    <div className="absolute -top-10 -right-10 h-40 w-40 rounded-full bg-primary-foreground/5" />
-                    <div className="absolute right-20 -bottom-8 h-24 w-24 rounded-full bg-primary-foreground/5" />
-                    <div className="relative flex items-center gap-4">
-                        <div
-                            className={`flex h-14 w-14 items-center justify-center rounded-2xl border-2 border-primary-foreground/30 text-lg font-bold shadow-md ${avatarColor(feedbackRequest.subject?.id ?? 0)}`}
+                {(() => {
+                    const heroMeta: PageHeroMetaItem[] = [];
+                    if (feedbackRequest.due_date)
+                        heroMeta.push({
+                            icon: Calendar,
+                            label: `Due ${feedbackRequest.due_date}`,
+                        });
+
+                    return (
+                        <PageHero
+                            icon={MessageSquare}
+                            backHref="/hr/feedback"
+                            backLabel="Back to Feedback"
+                            title="Provide Feedback"
+                            description={
+                                <>
+                                    for{' '}
+                                    <strong className="text-primary-foreground">
+                                        {feedbackRequest.subject?.name ?? 'Unknown'}
+                                    </strong>
+                                </>
+                            }
+                            meta={heroMeta}
+                            stats={[
+                                {
+                                    label: 'Answered',
+                                    value: `${answeredCount}/${questionKeys.length}`,
+                                },
+                            ]}
                         >
-                            {getInitials(feedbackRequest.subject?.name ?? '?')}
-                        </div>
-                        <div className="flex-1">
-                            <h1 className="text-xl font-bold">
-                                Provide Feedback
-                            </h1>
-                            <p className="text-primary-foreground/70">
-                                for{' '}
-                                <strong className="text-primary-foreground">
-                                    {feedbackRequest.subject?.name ?? 'Unknown'}
-                                </strong>
-                            </p>
-                        </div>
-                        <div className="flex items-center gap-4">
-                            {feedbackRequest.due_date && (
-                                <div className="flex items-center gap-1.5 text-sm text-primary-foreground/70">
-                                    <Calendar className="h-4 w-4" />
-                                    Due {feedbackRequest.due_date}
-                                </div>
-                            )}
-                            <div className="text-center">
-                                <div className="text-2xl font-bold">
-                                    {answeredCount}/{questionKeys.length}
-                                </div>
-                                <div className="text-[10px] tracking-wider text-primary-foreground/60 uppercase">
-                                    Answered
-                                </div>
+                            {/* Progress bar */}
+                            <div className="h-1.5 overflow-hidden rounded-full bg-primary-foreground/20">
+                                <div
+                                    className="h-full rounded-full bg-primary-foreground/80 transition-all duration-500"
+                                    style={{
+                                        width: `${(answeredCount / questionKeys.length) * 100}%`,
+                                    }}
+                                />
                             </div>
-                        </div>
-                    </div>
-                    {/* Progress bar */}
-                    <div className="mt-4 h-1.5 overflow-hidden rounded-full bg-primary-foreground/20">
-                        <div
-                            className="h-full rounded-full bg-primary-foreground/80 transition-all duration-500"
-                            style={{
-                                width: `${(answeredCount / questionKeys.length) * 100}%`,
-                            }}
-                        />
-                    </div>
-                </div>
+                        </PageHero>
+                    );
+                })()}
 
                 <form onSubmit={submit} className="mx-auto max-w-3xl space-y-4">
                     {questionKeys.map((key, index) => {

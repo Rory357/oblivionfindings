@@ -1,12 +1,13 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { type BreadcrumbItem, PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Card, CardContent } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
-import { FileText, Plus } from 'lucide-react';
+import { FileText, Plus, FileMinus } from 'lucide-react';
 import { useState } from 'react';
 
 interface CreditNote {
@@ -77,25 +78,35 @@ export default function CreditNotesIndex({ auth, creditNotes, filters }: Props) 
         router.get('/finance/credit-notes', {}, { preserveState: true });
     };
 
+    const payableCount = creditNotes.data.filter((cn) => cn.type === 'payable').length;
+    const receivableCount = creditNotes.data.filter((cn) => cn.type === 'receivable').length;
+
     return (
         <AppLayout user={auth.user} breadcrumbs={breadcrumbs}>
             <Head title="Credit Notes" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                {/* Header */}
-                <div className="flex items-center justify-between mb-6">
-                    <div>
-                        <h1 className="text-3xl font-bold text-foreground">Credit Notes</h1>
-                        <p className="text-muted-foreground mt-1">Manage credit notes for accounts payable and receivable</p>
-                    </div>
-                    <Button asChild>
-                        <Link href="/finance/credit-notes/create">
-                            <Plus className="w-4 h-4 mr-2" />
-                            New Credit Note
-                        </Link>
-                    </Button>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={FileMinus}
+                        title="Credit Notes"
+                        description="Manage credit notes for accounts payable and receivable"
+                        stats={[
+                            { label: 'Total (this page)', value: creditNotes.data.length },
+                            { label: 'AP', value: payableCount },
+                            { label: 'AR', value: receivableCount },
+                        ]}
+                        actions={
+                            <Button asChild size="sm">
+                                <Link href="/finance/credit-notes/create">
+                                    <Plus className="w-4 h-4 mr-1.5" />
+                                    New Credit Note
+                                </Link>
+                            </Button>
+                        }
+                    />
+                }
+            >
                 {/* Filters */}
                 <Card className="mb-6">
                     <CardContent className="pt-6">
@@ -207,7 +218,7 @@ export default function CreditNotesIndex({ auth, creditNotes, filters }: Props) 
                         </>
                     )}
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

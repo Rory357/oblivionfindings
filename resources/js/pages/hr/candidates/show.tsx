@@ -1,3 +1,4 @@
+import { PageHero, type PageHeroBadge, type PageHeroMetaItem } from '@/components/page';
 import { ActivityItem } from '@/components/recruitment/activity-item';
 import { PipelineStepper } from '@/components/recruitment/pipeline-stepper';
 import { Badge } from '@/components/ui/badge';
@@ -986,78 +987,58 @@ export default function CandidateShow({
                     </div>
                 )}
 
-                {/* Hero Header - Gradient Purple Banner */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-primary-foreground md:p-8">
-                    {/* Decorative circles */}
-                    <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-primary-foreground/5" />
-                    <div className="pointer-events-none absolute -bottom-20 -left-20 h-72 w-72 rounded-full bg-primary-foreground/5" />
-                    <div className="pointer-events-none absolute right-1/3 -bottom-10 h-48 w-48 rounded-full bg-primary-foreground/5" />
+                {/* Hero Header - Gradient Banner */}
+                {(() => {
+                    const heroBadges: PageHeroBadge[] = [
+                        { label: currentStatus.replace(/_/g, ' ') },
+                        { label: candidate.source.replace(/_/g, ' ') },
+                    ];
+                    if (candidate.source_detail)
+                        heroBadges.push({ label: candidate.source_detail });
 
-                    <div className="relative flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
-                        <div className="flex flex-col gap-5 sm:flex-row sm:items-start">
-                            {/* Avatar */}
-                            <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl border-4 border-primary-foreground/20 bg-primary-foreground/20 text-2xl font-bold shadow-xl">
-                                {initials}
-                            </div>
-                            <div className="min-w-0">
-                                <h1 className="text-2xl font-bold md:text-3xl">
-                                    {fullName}
-                                </h1>
-                                {candidate.preferred_name && (
-                                    <p className="mt-0.5 text-sm text-primary-foreground/70">
-                                        Goes by &ldquo;
-                                        {candidate.preferred_name}&rdquo;
-                                    </p>
-                                )}
-                                <div className="mt-2 flex flex-wrap items-center gap-3 text-sm text-primary-foreground/80">
-                                    <a
-                                        href={`mailto:${candidate.personal_email}`}
-                                        className="flex items-center gap-1.5 transition-colors hover:text-primary-foreground"
-                                    >
-                                        <Mail className="h-3.5 w-3.5" />
-                                        {candidate.personal_email}
-                                    </a>
-                                    {candidate.personal_phone && (
-                                        <a
-                                            href={`tel:${candidate.personal_phone}`}
-                                            className="flex items-center gap-1.5 transition-colors hover:text-primary-foreground"
-                                        >
-                                            <Phone className="h-3.5 w-3.5" />
-                                            {candidate.personal_phone}
-                                        </a>
-                                    )}
-                                </div>
-                                <div className="mt-3 flex flex-wrap items-center gap-2">
-                                    <Badge className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90 capitalize">
-                                        {currentStatus.replace(/_/g, ' ')}
-                                    </Badge>
-                                    <Badge className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90 capitalize">
-                                        {candidate.source.replace(/_/g, ' ')}
-                                    </Badge>
-                                    {candidate.source_detail && (
-                                        <Badge className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90">
-                                            {candidate.source_detail}
-                                        </Badge>
-                                    )}
-                                </div>
-                            </div>
-                        </div>
+                    const heroMeta: PageHeroMetaItem[] = [];
+                    if (candidate.preferred_name)
+                        heroMeta.push({ label: `Goes by "${candidate.preferred_name}"` });
+                    heroMeta.push({
+                        icon: Mail,
+                        label: candidate.personal_email,
+                        href: `mailto:${candidate.personal_email}`,
+                    });
+                    if (candidate.personal_phone)
+                        heroMeta.push({
+                            icon: Phone,
+                            label: candidate.personal_phone,
+                            href: `tel:${candidate.personal_phone}`,
+                        });
 
-                        <div className="flex flex-col items-end gap-4">
-                            {/* Action buttons */}
-                            {can.manage &&
-                                candidate.applications[0]?.status ===
-                                    'active' && (
-                                    <div className="flex items-center gap-2">
+                    const daysInPipeline =
+                        totalDaysInPipeline ??
+                        Math.round(
+                            (Date.now() - new Date(candidate.created_at).getTime()) /
+                                86400000,
+                        );
+
+                    return (
+                        <PageHero
+                            avatar={{ fallback: initials }}
+                            title={fullName}
+                            meta={heroMeta}
+                            badges={heroBadges}
+                            stats={[
+                                { label: 'Days in Pipeline', value: daysInPipeline },
+                                { label: 'Applications', value: candidate.applications.length },
+                                { label: 'Interviews', value: totalInterviews },
+                            ]}
+                            actions={
+                                can.manage &&
+                                candidate.applications[0]?.status === 'active' ? (
+                                    <>
                                         <Button
                                             size="sm"
-                                            className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+                                            className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
                                             variant="outline"
                                             onClick={() =>
-                                                advanceStage(
-                                                    candidate.applications[0]
-                                                        .id,
-                                                )
+                                                advanceStage(candidate.applications[0].id)
                                             }
                                         >
                                             Advance{' '}
@@ -1065,57 +1046,22 @@ export default function CandidateShow({
                                         </Button>
                                         <Button
                                             size="sm"
-                                            className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+                                            className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
                                             variant="outline"
                                             onClick={() =>
                                                 rejectApplication(
-                                                    candidate.applications[0]
-                                                        .id,
+                                                    candidate.applications[0].id,
                                                 )
                                             }
                                         >
                                             Reject
                                         </Button>
-                                    </div>
-                                )}
-
-                            {/* Right side KPIs */}
-                            <div className="hidden items-center gap-6 md:flex">
-                                <div className="text-center">
-                                    <p className="text-2xl font-bold">
-                                        {totalDaysInPipeline ??
-                                            Math.round(
-                                                (Date.now() -
-                                                    new Date(
-                                                        candidate.created_at,
-                                                    ).getTime()) /
-                                                    86400000,
-                                            )}
-                                    </p>
-                                    <p className="text-xs text-primary-foreground/70">
-                                        Days in Pipeline
-                                    </p>
-                                </div>
-                                <div className="text-center">
-                                    <p className="text-2xl font-bold">
-                                        {candidate.applications.length}
-                                    </p>
-                                    <p className="text-xs text-primary-foreground/70">
-                                        Applications
-                                    </p>
-                                </div>
-                                <div className="text-center">
-                                    <p className="text-2xl font-bold">
-                                        {totalInterviews}
-                                    </p>
-                                    <p className="text-xs text-primary-foreground/70">
-                                        Interviews
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                                    </>
+                                ) : undefined
+                            }
+                        />
+                    );
+                })()}
 
                 {/* Tab bar - Full width, no sidebar */}
                 <Tabs defaultValue="applications" className="space-y-4">

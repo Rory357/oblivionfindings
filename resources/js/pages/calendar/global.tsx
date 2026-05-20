@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Head, Link } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -168,26 +169,28 @@ export default function GlobalCalendar({ sites, events, filters, eventTypes }: P
         <AppLayout breadcrumbs={[{ title: 'Calendar', href: '/calendar' }]}>
             <Head title="Global Calendar" />
 
-            <div className="m-4 space-y-4">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-lg font-semibold flex items-center gap-2">
-                            <CalendarDays className="w-5 h-5" />
-                            Global Calendar
-                        </h1>
-                        <p className="text-sm text-muted-foreground">
-                            All sites and events in one view
-                        </p>
-                    </div>
-                    <Button asChild>
-                        <Link href="/calendar?action=add">
-                            <Plus className="w-4 h-4 mr-1" />
-                            New Event
-                        </Link>
-                    </Button>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Calendar}
+                        title="Global Calendar"
+                        description="All sites and events in one view."
+                        stats={[
+                            { label: 'Events', value: filteredEvents.length },
+                            { label: 'Sites', value: sites.length },
+                            { label: 'Event types', value: eventTypes.length },
+                        ]}
+                        actions={
+                            <Button asChild>
+                                <Link href="/calendar?action=add">
+                                    <Plus className="w-4 h-4 mr-1" />
+                                    New Event
+                                </Link>
+                            </Button>
+                        }
+                    />
+                }
+            >
                 {/* Filters */}
                 <Card>
                     <CardHeader className="pb-3">
@@ -373,7 +376,7 @@ export default function GlobalCalendar({ sites, events, filters, eventTypes }: P
                         </Button>
                     ))}
                 </div>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

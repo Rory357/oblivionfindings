@@ -1,5 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm, router } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -30,7 +31,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Banknote, Plus, Pencil, Trash2 } from 'lucide-react';
+import { Banknote, Plus, Pencil, Trash2, Sprout } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
 type RevenueAccount = {
@@ -345,19 +346,26 @@ export default function FundingStreamsIndex({ fundingStreams, revenueAccounts }:
         }
     }
 
+    const activeCount = fundingStreams.filter((fs) => fs.is_active).length;
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Funding Streams" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Funding Streams</h1>
-                        <p className="text-muted-foreground">Manage funding sources and revenue allocations</p>
-                    </div>
-                    <CreateFundingStreamDialog revenueAccounts={revenueAccounts} />
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Sprout}
+                        title="Funding Streams"
+                        description="Manage funding sources and revenue allocations"
+                        stats={[
+                            { label: 'Total', value: fundingStreams.length },
+                            { label: 'Active', value: activeCount },
+                        ]}
+                        actions={<CreateFundingStreamDialog revenueAccounts={revenueAccounts} />}
+                    />
+                }
+            >
                 <Card>
                     <CardHeader>
                         <div className="flex items-center gap-2">
@@ -435,7 +443,7 @@ export default function FundingStreamsIndex({ fundingStreams, revenueAccounts }:
                         </Table>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

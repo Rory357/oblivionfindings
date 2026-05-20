@@ -1,6 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, useForm, router } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -222,15 +223,21 @@ export default function IntercompanyIndex({ group, transactions, entities }: Pag
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Intercompany - ${group.name}`} />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Intercompany Transactions</h1>
-                        <p className="text-muted-foreground">Manage transactions between entities in {group.name}</p>
-                    </div>
-                    <CreateTransactionDialog groupId={group.id} entities={entities} />
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={ArrowLeftRight}
+                        title="Intercompany Transactions"
+                        description={`Manage transactions between entities in ${group.name}`}
+                        stats={[
+                            { label: 'Total', value: transactions.length },
+                            { label: 'Pending', value: pendingTransactions.length },
+                            { label: 'Pending amount', value: formatCurrency(pendingTotal) },
+                        ]}
+                        actions={<CreateTransactionDialog groupId={group.id} entities={entities} />}
+                    />
+                }
+            >
                 {/* KPI Cards */}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <Card>
@@ -321,7 +328,7 @@ export default function IntercompanyIndex({ group, transactions, entities }: Pag
                         </Table>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

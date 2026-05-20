@@ -1,5 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, usePage } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -34,22 +35,18 @@ export default function PortalIndex({ clients }: Props) {
         <AppLayout breadcrumbs={[{ title: 'Portal', href: '/portal' }]}>
             <Head title="Portal" />
 
-            <div className="space-y-6">
-                {/* Hero header */}
-                <div className="rounded-xl bg-gradient-to-br from-primary/10 via-primary/5 to-transparent p-6 md:p-8">
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10">
-                            <Heart className="h-5 w-5 text-primary" />
-                        </div>
-                        <div>
-                            <h1 className="text-2xl font-semibold tracking-tight md:text-3xl">
-                                Welcome back, {auth.user.name}
-                            </h1>
-                            <p className="text-sm text-muted-foreground">{today}</p>
-                        </div>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Heart}
+                        title={`Welcome back, ${auth.user.name}`}
+                        description={today}
+                        stats={[
+                            { label: 'Linked clients', value: clients.length },
+                        ]}
+                    />
+                }
+            >
                 {/* Client grid or empty state */}
                 {clients.length === 0 ? (
                     <Card className="mx-auto max-w-md text-center">
@@ -111,7 +108,7 @@ export default function PortalIndex({ clients }: Props) {
                         ))}
                     </div>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

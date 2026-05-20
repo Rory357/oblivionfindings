@@ -1,4 +1,5 @@
 import InputError from '@/components/input-error';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -14,6 +15,7 @@ import { Tabs } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { Box } from 'lucide-react';
 import { useMemo } from 'react';
 
 type Asset = {
@@ -114,41 +116,48 @@ export default function AssetShow() {
             ]}
         >
             <Head title={a.name} />
-            <div className="space-y-4 p-4">
-                <div className="flex items-start justify-between gap-4">
-                    <div className="min-w-0">
-                        <h1 className="truncate text-xl font-semibold">
-                            {a.name}
-                        </h1>
-                        <div className="mt-1 flex flex-wrap gap-2">
-                            {headerBadges.map((b) => (
-                                <span
-                                    key={b}
-                                    className="rounded bg-muted px-2 py-0.5 text-xs text-foreground"
-                                >
-                                    {b}
-                                </span>
-                            ))}
-                        </div>
-                        <div className="mt-2 text-sm text-muted-foreground">
-                            {a.site ? `Site: ${a.site.name}` : 'Site: —'}
-                            {a.client ? ` • Client: ${a.client.name}` : ''}
-                        </div>
-                    </div>
-                    <div className="flex shrink-0 items-center gap-2">
-                        {can?.update ? (
-                            <Link href={`/fleet-assets/assets/${a.id}/edit`}>
-                                <Button variant="secondary">Edit</Button>
-                            </Link>
-                        ) : null}
-                        {can?.delete ? (
-                            <Button variant="destructive" onClick={deleteAsset}>
-                                Delete
-                            </Button>
-                        ) : null}
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/assets"
+                        backLabel="Back to assets"
+                        icon={Box}
+                        title={a.name}
+                        description={
+                            (a.site ? `Site: ${a.site.name}` : 'Site: —') +
+                            (a.client ? ` • Client: ${a.client.name}` : '')
+                        }
+                        actions={
+                            <>
+                                {can?.update ? (
+                                    <Link href={`/fleet-assets/assets/${a.id}/edit`}>
+                                        <Button variant="secondary">Edit</Button>
+                                    </Link>
+                                ) : null}
+                                {can?.delete ? (
+                                    <Button variant="destructive" onClick={deleteAsset}>
+                                        Delete
+                                    </Button>
+                                ) : null}
+                            </>
+                        }
+                    >
+                        {headerBadges.length > 0 && (
+                            <div className="flex flex-wrap gap-2">
+                                {headerBadges.map((b) => (
+                                    <span
+                                        key={b}
+                                        className="rounded bg-muted px-2 py-0.5 text-xs text-foreground"
+                                    >
+                                        {b}
+                                    </span>
+                                ))}
+                            </div>
+                        )}
+                    </PageHero>
+                }
+            >
                 <Tabs
                     tabs={[
                         {
@@ -1339,7 +1348,7 @@ export default function AssetShow() {
                         },
                     ]}
                 />
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

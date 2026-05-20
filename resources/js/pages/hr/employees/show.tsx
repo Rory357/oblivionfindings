@@ -1,3 +1,4 @@
+import { PageHero, type PageHeroBadge, type PageHeroMetaItem } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -573,160 +574,93 @@ export default function EmployeeShow({
                 {/* ============================================================ */}
                 {/*  HERO HEADER                                                  */}
                 {/* ============================================================ */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-primary-foreground md:p-8">
-                    <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-primary-foreground/5" />
-                    <div className="pointer-events-none absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-primary-foreground/5" />
-                    <div className="pointer-events-none absolute top-1/4 right-1/3 h-24 w-24 rounded-full bg-primary-foreground/5" />
+                {(() => {
+                    const heroBadges: PageHeroBadge[] = [
+                        {
+                            label: p.is_active ? 'Active' : 'Inactive',
+                            tone: p.is_active ? 'success' : 'critical',
+                        },
+                        { label: formatLabel(p.employment_type) },
+                    ];
+                    if (p.department) heroBadges.push({ label: p.department, icon: Briefcase });
+                    if (p.team) heroBadges.push({ label: p.team, icon: Users });
+                    if (p.primary_site)
+                        heroBadges.push({ label: p.primary_site.name, icon: MapPin });
+                    if (p.is_first_aider)
+                        heroBadges.push({ label: 'First Aider', icon: Heart, tone: 'success' });
+                    if (p.is_fire_warden)
+                        heroBadges.push({ label: 'Fire Warden', icon: Flame, tone: 'warning' });
+                    if (p.can_drive_clients)
+                        heroBadges.push({ label: 'Driver', icon: Car, tone: 'info' });
 
-                    <div className="relative flex flex-col items-center gap-6 md:flex-row md:items-start">
-                        <div
-                            className={`flex h-24 w-24 shrink-0 items-center justify-center rounded-2xl border-4 border-primary-foreground/20 text-2xl font-bold shadow-xl md:h-28 md:w-28 md:text-3xl ${getAvatarColor(p.id)}`}
-                        >
-                            {getInitials(p.user.name)}
-                        </div>
+                    const heroMeta: PageHeroMetaItem[] = [];
+                    if (p.preferred_name && p.preferred_name !== p.user.name)
+                        heroMeta.push({ label: `Goes by ${p.preferred_name}` });
+                    if (tenure)
+                        heroMeta.push({
+                            icon: Clock,
+                            label: `${
+                                tenure.years > 0
+                                    ? `${tenure.years} year${tenure.years !== 1 ? 's' : ''}, `
+                                    : ''
+                            }${tenure.months} month${tenure.months !== 1 ? 's' : ''} at the organisation`,
+                        });
 
-                        <div className="flex-1 text-center md:text-left">
-                            <h1 className="text-2xl font-bold md:text-3xl">
-                                {p.user.name}
-                            </h1>
-                            {p.preferred_name &&
-                                p.preferred_name !== p.user.name && (
-                                    <p className="text-sm text-primary-foreground/70">
-                                        Goes by {p.preferred_name}
-                                    </p>
-                                )}
-                            <p className="mt-1 text-lg text-primary-foreground/80">
-                                {p.position_title}
-                            </p>
+                    const leaveTotal = leaveBalances
+                        .reduce((s, l) => s + l.balance_hours, 0)
+                        .toFixed(0);
 
-                            <div className="mt-3 flex flex-wrap items-center justify-center gap-2 md:justify-start">
-                                <Badge
-                                    className={
-                                        p.is_active
-                                            ? 'border-status-success/30 bg-status-success-bg text-status-success'
-                                            : 'border-status-critical/30 bg-status-critical-bg text-status-critical'
-                                    }
-                                >
-                                    {p.is_active ? 'Active' : 'Inactive'}
-                                </Badge>
-                                <Badge className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90">
-                                    {formatLabel(p.employment_type)}
-                                </Badge>
-                                {p.department && (
-                                    <Badge className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90">
-                                        <Briefcase className="mr-1 h-3 w-3" />
-                                        {p.department}
-                                    </Badge>
-                                )}
-                                {p.team && (
-                                    <Badge className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90">
-                                        <Users className="mr-1 h-3 w-3" />
-                                        {p.team}
-                                    </Badge>
-                                )}
-                                {p.primary_site && (
-                                    <Badge className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90">
-                                        <MapPin className="mr-1 h-3 w-3" />
-                                        {p.primary_site.name}
-                                    </Badge>
-                                )}
-                                {p.is_first_aider && (
-                                    <Badge className="border-status-success/30 bg-status-success-bg text-status-success">
-                                        <Heart className="mr-1 h-3 w-3" />
-                                        First Aider
-                                    </Badge>
-                                )}
-                                {p.is_fire_warden && (
-                                    <Badge className="border-status-warning/30 bg-status-warning-bg text-status-warning">
-                                        <Flame className="mr-1 h-3 w-3" />
-                                        Fire Warden
-                                    </Badge>
-                                )}
-                                {p.can_drive_clients && (
-                                    <Badge className="border-status-info/30 bg-status-info-bg text-status-info">
-                                        <Car className="mr-1 h-3 w-3" />
-                                        Driver
-                                    </Badge>
-                                )}
-                            </div>
-
-                            {tenure && (
-                                <p className="mt-2 flex items-center justify-center gap-1.5 text-sm text-primary-foreground/60 md:justify-start">
-                                    <Clock className="h-3.5 w-3.5" />
-                                    {tenure.years > 0
-                                        ? `${tenure.years} year${tenure.years !== 1 ? 's' : ''}, `
-                                        : ''}
-                                    {tenure.months} month
-                                    {tenure.months !== 1 ? 's' : ''} at the
-                                    organisation
-                                </p>
-                            )}
-                        </div>
-
-                        <div className="flex flex-col items-center gap-3 md:items-end">
-                            <div className="flex gap-2">
-                                <a href={`mailto:${p.user.email}`}>
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
-                                    >
-                                        <Mail className="mr-1.5 h-3.5 w-3.5" />
-                                        Email
-                                    </Button>
-                                </a>
-                                {can.manage && (
-                                    <Link href={`/hr/people/${p.id}/edit`}>
+                    return (
+                        <PageHero
+                            avatar={{
+                                src: p.profile_photo_path ?? undefined,
+                                fallback: getInitials(p.user.name),
+                            }}
+                            title={p.user.name}
+                            description={p.position_title}
+                            meta={heroMeta}
+                            badges={heroBadges}
+                            stats={[
+                                {
+                                    label: 'Tenure',
+                                    value: tenure
+                                        ? tenure.years > 0
+                                            ? `${tenure.years}y`
+                                            : `${tenure.months}m`
+                                        : '\u2014',
+                                },
+                                { label: 'Compliance', value: `${complianceRate}%` },
+                                { label: 'Leave Bal.', value: `${leaveTotal}h` },
+                            ]}
+                            actions={
+                                <>
+                                    <a href={`mailto:${p.user.email}`}>
                                         <Button
                                             size="sm"
                                             variant="outline"
-                                            className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+                                            className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
                                         >
-                                            <Pencil className="mr-1.5 h-3.5 w-3.5" />
-                                            Edit
+                                            <Mail className="mr-1.5 h-3.5 w-3.5" />
+                                            Email
                                         </Button>
-                                    </Link>
-                                )}
-                            </div>
-                            <div className="hidden gap-6 text-center md:flex">
-                                <div>
-                                    <p className="text-2xl font-bold">
-                                        {tenure
-                                            ? tenure.years > 0
-                                                ? `${tenure.years}y`
-                                                : `${tenure.months}m`
-                                            : '\u2014'}
-                                    </p>
-                                    <p className="text-xs text-primary-foreground/50">
-                                        Tenure
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="text-2xl font-bold">
-                                        {complianceRate}%
-                                    </p>
-                                    <p className="text-xs text-primary-foreground/50">
-                                        Compliance
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="text-2xl font-bold">
-                                        {leaveBalances
-                                            .reduce(
-                                                (s, l) => s + l.balance_hours,
-                                                0,
-                                            )
-                                            .toFixed(0)}
-                                        h
-                                    </p>
-                                    <p className="text-xs text-primary-foreground/50">
-                                        Leave Bal.
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                                    </a>
+                                    {can.manage && (
+                                        <Link href={`/hr/people/${p.id}/edit`}>
+                                            <Button
+                                                size="sm"
+                                                variant="outline"
+                                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                            >
+                                                <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                                                Edit
+                                            </Button>
+                                        </Link>
+                                    )}
+                                </>
+                            }
+                        />
+                    );
+                })()}
 
                 {/* ============================================================ */}
                 {/*  TABS                                                         */}

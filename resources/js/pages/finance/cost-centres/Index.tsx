@@ -1,5 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm, router } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,7 +24,7 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
-import { Building2, Plus, Pencil, Trash2 } from 'lucide-react';
+import { Building2, Plus, Pencil, Trash2, Layers } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
 type CostCentre = {
@@ -216,19 +217,26 @@ export default function CostCentresIndex({ costCentres }: PageProps) {
         }
     }
 
+    const activeCount = costCentres.filter((c) => c.is_active).length;
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Cost Centres" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Cost Centres</h1>
-                        <p className="text-muted-foreground">Manage cost centres for expense tracking and allocation</p>
-                    </div>
-                    <CreateCostCentreDialog />
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Layers}
+                        title="Cost Centres"
+                        description="Manage cost centres for expense tracking and allocation"
+                        stats={[
+                            { label: 'Total', value: costCentres.length },
+                            { label: 'Active', value: activeCount },
+                        ]}
+                        actions={<CreateCostCentreDialog />}
+                    />
+                }
+            >
                 <Card>
                     <CardHeader>
                         <div className="flex items-center gap-2">
@@ -293,7 +301,7 @@ export default function CostCentresIndex({ costCentres }: PageProps) {
                         </Table>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

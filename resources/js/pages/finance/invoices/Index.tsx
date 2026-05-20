@@ -1,13 +1,14 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { type BreadcrumbItem, PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, Search, AlertTriangle, Send, DollarSign, Clock, FileText, CheckCircle } from 'lucide-react';
+import { Plus, Search, AlertTriangle, Send, DollarSign, Clock, FileText, CheckCircle, Receipt } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 
@@ -105,21 +106,29 @@ export default function InvoicesIndex({ auth, invoices, filters, summary }: Prop
         <AppLayout user={auth.user} breadcrumbs={breadcrumbs}>
             <Head title="Invoices" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                {/* Header */}
-                <div className="flex items-center justify-between mb-6">
-                    <div>
-                        <h1 className="text-3xl font-bold text-foreground">Invoices</h1>
-                        <p className="text-muted-foreground mt-1">Manage and send invoices to clients</p>
-                    </div>
-                    <Button asChild>
-                        <Link href="/finance/invoices/create">
-                            <Plus className="w-4 h-4 mr-2" />
-                            New Invoice
-                        </Link>
-                    </Button>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Receipt}
+                        title="Invoices"
+                        description="Manage and send invoices to clients"
+                        stats={[
+                            { label: 'Outstanding', value: formatCurrency(summary.total_outstanding) },
+                            { label: 'Overdue', value: formatCurrency(summary.total_overdue) },
+                            { label: 'Drafts', value: summary.draft_count },
+                            { label: 'Paid this month', value: formatCurrency(summary.paid_this_month) },
+                        ]}
+                        actions={
+                            <Button asChild size="sm">
+                                <Link href="/finance/invoices/create">
+                                    <Plus className="w-4 h-4 mr-1.5" />
+                                    New Invoice
+                                </Link>
+                            </Button>
+                        }
+                    />
+                }
+            >
                 {/* KPI Summary Cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-4 gap-4 mb-6">
                     <Card>
@@ -316,7 +325,7 @@ export default function InvoicesIndex({ auth, invoices, filters, summary }: Prop
                         </div>
                     )}
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

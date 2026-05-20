@@ -1,6 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import { type BreadcrumbItem } from '@/types';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
@@ -11,7 +12,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Wallet } from 'lucide-react';
+import { Wallet, ArrowLeftRight } from 'lucide-react';
 
 type Allocation = {
     id: number;
@@ -52,39 +53,48 @@ const formatDate = (date: string) =>
     new Date(date).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
 
 export default function PaymentAllocationsIndex({ allocations, filters }: Props) {
+    const totalAllocated = allocations.data.reduce((total, allocation) => total + allocation.amount, 0);
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Payment Allocations" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Payment Allocations</h1>
-                        <p className="text-muted-foreground">Track how incoming payments have been allocated across invoices and bills.</p>
-                    </div>
-                    <div className="w-44">
-                        <Select
-                            value={filters.type || ANY}
-                            onValueChange={(value) =>
-                                router.get(
-                                    '/finance/payment-allocations',
-                                    { type: value === ANY ? '' : value },
-                                    { preserveState: true, preserveScroll: true },
-                                )
-                            }
-                        >
-                            <SelectTrigger>
-                                <SelectValue placeholder="All types" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value={ANY}>All types</SelectItem>
-                                <SelectItem value="payable">Payable</SelectItem>
-                                <SelectItem value="receivable">Receivable</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={ArrowLeftRight}
+                        title="Payment Allocations"
+                        description="Track how incoming payments have been allocated across invoices and bills."
+                        stats={[
+                            { label: 'Allocations', value: allocations.total },
+                            { label: 'Total (this page)', value: formatCurrency(totalAllocated) },
+                        ]}
+                        actions={
+                            <div className="w-44">
+                                <Select
+                                    value={filters.type || ANY}
+                                    onValueChange={(value) =>
+                                        router.get(
+                                            '/finance/payment-allocations',
+                                            { type: value === ANY ? '' : value },
+                                            { preserveState: true, preserveScroll: true },
+                                        )
+                                    }
+                                >
+                                    <SelectTrigger className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20">
+                                        <SelectValue placeholder="All types" />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value={ANY}>All types</SelectItem>
+                                        <SelectItem value="payable">Payable</SelectItem>
+                                        <SelectItem value="receivable">Receivable</SelectItem>
+                                    </SelectContent>
+                                </Select>
+                            </div>
+                        }
+                    />
+                }
+            >
                 <div className="grid gap-4 sm:grid-cols-2">
                     <Card>
                         <CardContent className="flex items-center gap-4 pt-6">
@@ -159,7 +169,7 @@ export default function PaymentAllocationsIndex({ allocations, filters }: Props)
                         </div>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

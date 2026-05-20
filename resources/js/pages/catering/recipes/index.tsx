@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -8,7 +9,6 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Head, Link, router } from '@inertiajs/react';
 import { ChefHat, Eye, Pencil, Plus } from 'lucide-react';
 import { useState } from 'react';
-import { CateringHero } from '../_hero';
 import { CateringTabs } from '../_tabs';
 import { type DietaryTag, type Recipe, tagBadgeStyle } from '../_helpers';
 
@@ -29,27 +29,36 @@ export default function CateringRecipesIndex({ recipes, filters, canManage }: Pr
         router.get('/catering/recipes', { q: search || undefined }, { preserveState: true, replace: true });
     }
 
+    const activeCount = recipes.data.filter((r) => r.is_active).length;
+    const draftCount = recipes.data.length - activeCount;
+
     return (
         <AppLayout breadcrumbs={[{ title: 'Catering', href: '/catering' }, { title: 'Recipes', href: '/catering/recipes' }]}>
             <Head title="Recipes" />
-            <div className="space-y-6 p-6">
-                <CateringHero />
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={ChefHat}
+                        title="Recipes"
+                        description="Reusable recipes for meal planning at any site."
+                        stats={[
+                            { label: 'Total', value: recipes.data.length },
+                            { label: 'Active', value: activeCount },
+                            { label: 'Draft', value: draftCount },
+                        ]}
+                        actions={
+                            canManage && (
+                                <Button asChild>
+                                    <Link href="/catering/recipes/create">
+                                        <Plus className="mr-2 h-4 w-4" /> New recipe
+                                    </Link>
+                                </Button>
+                            )
+                        }
+                    />
+                }
+            >
                 <CateringTabs active="recipes" />
-
-                <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                        <div className="rounded-full bg-primary/10 p-2 text-primary"><ChefHat className="h-5 w-5" /></div>
-                        <div>
-                            <h1 className="text-2xl font-semibold">Recipes</h1>
-                            <p className="text-sm text-muted-foreground">Reusable recipes for meal planning at any site.</p>
-                        </div>
-                    </div>
-                    {canManage && (
-                        <Button asChild>
-                            <Link href="/catering/recipes/create"><Plus className="mr-2 h-4 w-4" /> New recipe</Link>
-                        </Button>
-                    )}
-                </div>
 
                 <div className="flex flex-wrap items-end gap-3">
                     <div className="flex-1 min-w-[240px]">
@@ -102,7 +111,7 @@ export default function CateringRecipesIndex({ recipes, filters, canManage }: Pr
                     </Table>
                 </div>
                 <LaravelPagination links={recipes.links} lastPage={recipes.last_page} />
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

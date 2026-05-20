@@ -1,3 +1,4 @@
+import { PageHero } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -133,66 +134,40 @@ export default function TrainingIndex({
             <Head title="Training Dashboard" />
             <div className="space-y-6 p-4 lg:p-6">
                 {/* Hero Banner */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-primary-foreground shadow-lg">
-                    <div className="absolute -top-10 -right-10 h-40 w-40 rounded-full bg-primary-foreground/5" />
-                    <div className="absolute right-20 -bottom-8 h-24 w-24 rounded-full bg-primary-foreground/5" />
-                    <div className="absolute top-0 left-1/2 h-32 w-32 rounded-full bg-primary-foreground/5" />
-                    <div className="relative flex flex-wrap items-center justify-between gap-4">
-                        <div>
-                            <h1 className="text-2xl font-bold">
-                                Training Dashboard
-                            </h1>
-                            <p className="mt-1 text-primary-foreground/70">
-                                Monitor training renewals, compliance and
-                                overdue records
-                            </p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-6">
-                                <div className="text-center">
-                                    <div className="text-3xl font-bold">
-                                        {complianceRate}%
-                                    </div>
-                                    <div className="text-[10px] tracking-wider text-primary-foreground/60 uppercase">
-                                        Compliance
-                                    </div>
-                                </div>
-                                <div className="h-10 w-px bg-primary-foreground/20" />
-                                <div className="text-center">
-                                    <div className="text-3xl font-bold">
-                                        {stats.totalRecords}
-                                    </div>
-                                    <div className="text-[10px] tracking-wider text-primary-foreground/60 uppercase">
-                                        Records
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="ml-4 flex gap-2">
-                                <Button
-                                    variant="secondary"
-                                    size="sm"
-                                    className="gap-1.5 border-primary-foreground/20 bg-primary-foreground/15 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/25"
-                                    asChild
-                                >
-                                    <Link href="/hr/compliance">
-                                        <ShieldCheck className="h-4 w-4" />
-                                        Compliance
-                                    </Link>
-                                </Button>
-                                <Button
-                                    size="sm"
-                                    className="gap-1.5 bg-white text-primary shadow-md hover:bg-primary-foreground/90"
-                                    asChild
-                                >
-                                    <Link href="/hr/training/catalog">
-                                        <BookOpen className="h-4 w-4" />
-                                        Course Catalog
-                                    </Link>
-                                </Button>
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                <PageHero
+                    icon={GraduationCap}
+                    title="Training Dashboard"
+                    description="Monitor training renewals, compliance and overdue records"
+                    stats={[
+                        { label: 'Compliance', value: `${complianceRate}%` },
+                        { label: 'Records', value: stats.totalRecords },
+                    ]}
+                    actions={
+                        <>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-1.5 border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                asChild
+                            >
+                                <Link href="/hr/compliance">
+                                    <ShieldCheck className="h-4 w-4" />
+                                    Compliance
+                                </Link>
+                            </Button>
+                            <Button
+                                size="sm"
+                                className="gap-1.5 bg-white text-primary shadow-md hover:bg-primary-foreground/90"
+                                asChild
+                            >
+                                <Link href="/hr/training/catalog">
+                                    <BookOpen className="h-4 w-4" />
+                                    Course Catalog
+                                </Link>
+                            </Button>
+                        </>
+                    }
+                />
 
                 {/* KPI Cards */}
                 <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">

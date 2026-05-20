@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
@@ -12,7 +13,6 @@ import { Head, router, useForm } from '@inertiajs/react';
 import { Package, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { ConfirmAction } from '@/pages/sites/_confirm-action';
-import { CateringHero } from '../_hero';
 import { CateringTabs } from '../_tabs';
 import { type DietaryTag, type Product, formatMoneyFromCents, tagBadgeStyle } from '../_helpers';
 
@@ -100,23 +100,33 @@ export default function CateringProductsIndex({ products, categories, tags, filt
         form.setData('tag_ids', next);
     }
 
+    const activeCount = products.data.filter((p) => p.is_active).length;
+
     return (
         <AppLayout breadcrumbs={[{ title: 'Catering', href: '/catering' }, { title: 'Products', href: '/catering/products' }]}>
             <Head title="Catering Products" />
-            <div className="space-y-6 p-6">
-                <CateringHero />
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Package}
+                        title="Catering Products"
+                        description="Master catalogue of ingredients and kitchen consumables."
+                        stats={[
+                            { label: 'Total', value: products.data.length },
+                            { label: 'Active', value: activeCount },
+                            { label: 'Categories', value: categories.length },
+                        ]}
+                        actions={
+                            canManage && (
+                                <Button onClick={openNew}>
+                                    <Plus className="mr-2 h-4 w-4" /> New product
+                                </Button>
+                            )
+                        }
+                    />
+                }
+            >
                 <CateringTabs active="products" />
-
-                <div className="flex items-center justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                        <div className="rounded-full bg-primary/10 p-2 text-primary"><Package className="h-5 w-5" /></div>
-                        <div>
-                            <h1 className="text-2xl font-semibold">Catering Products</h1>
-                            <p className="text-sm text-muted-foreground">Master catalogue of ingredients and kitchen consumables.</p>
-                        </div>
-                    </div>
-                    {canManage && <Button onClick={openNew}><Plus className="mr-2 h-4 w-4" /> New product</Button>}
-                </div>
 
                 <div className="flex flex-wrap items-end gap-3">
                     <div className="flex-1 min-w-[240px]">
@@ -271,7 +281,7 @@ export default function CateringProductsIndex({ products, categories, tags, filt
                         </form>
                     </DialogContent>
                 </Dialog>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

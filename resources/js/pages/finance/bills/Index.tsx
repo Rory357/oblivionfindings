@@ -1,13 +1,14 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { type BreadcrumbItem, PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, Search, AlertTriangle, DollarSign, Clock, CalendarClock } from 'lucide-react';
+import { Plus, Search, AlertTriangle, DollarSign, Clock, CalendarClock, ArrowDownToLine } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 
@@ -112,21 +113,28 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary }: P
         <AppLayout user={auth.user} breadcrumbs={breadcrumbs}>
             <Head title="Bills" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                {/* Header */}
-                <div className="flex items-center justify-between mb-6">
-                    <div>
-                        <h1 className="text-3xl font-bold text-foreground">Bills</h1>
-                        <p className="text-muted-foreground mt-1">Manage accounts payable</p>
-                    </div>
-                    <Button asChild>
-                        <Link href="/finance/bills/create">
-                            <Plus className="w-4 h-4 mr-2" />
-                            New Bill
-                        </Link>
-                    </Button>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={ArrowDownToLine}
+                        title="Bills"
+                        description="Manage accounts payable"
+                        stats={[
+                            { label: 'Total unpaid', value: formatCurrency(summary.total_unpaid) },
+                            { label: 'Overdue', value: formatCurrency(summary.total_overdue) },
+                            { label: 'Due this week', value: formatCurrency(summary.due_this_week) },
+                        ]}
+                        actions={
+                            <Button asChild size="sm">
+                                <Link href="/finance/bills/create">
+                                    <Plus className="w-4 h-4 mr-1.5" />
+                                    New Bill
+                                </Link>
+                            </Button>
+                        }
+                    />
+                }
+            >
                 {/* KPI Summary Cards */}
                 <div className="grid grid-cols-1 sm:grid-cols-3 gap-4 mb-6">
                     <Card>
@@ -310,7 +318,7 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary }: P
                         </div>
                     )}
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

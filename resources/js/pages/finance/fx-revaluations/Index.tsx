@@ -1,10 +1,11 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { ArrowLeftRight, Plus, TrendingUp, TrendingDown } from 'lucide-react';
+import { ArrowLeftRight, Plus, TrendingUp, TrendingDown, Globe } from 'lucide-react';
 
 type Revaluation = {
     id: number;
@@ -57,26 +58,34 @@ export default function FxRevaluationsIndex({ revaluations }: PageProps) {
     const isGain = totalGainLoss > 0;
     const isLoss = totalGainLoss < 0;
 
+    const postedCount = revaluations.data.filter((r) => r.status === 'posted').length;
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="FX Revaluations" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">FX Revaluations</h1>
-                        <p className="text-muted-foreground">
-                            Calculate and post unrealised foreign exchange gain/loss adjustments
-                        </p>
-                    </div>
-                    <Link href="/finance/fx-revaluations/create">
-                        <Button>
-                            <Plus className="mr-2 h-4 w-4" />
-                            New Revaluation
-                        </Button>
-                    </Link>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Globe}
+                        title="FX Revaluations"
+                        description="Calculate and post unrealised foreign exchange gain/loss adjustments"
+                        stats={[
+                            { label: 'Revaluations', value: revaluations.data.length },
+                            { label: 'Posted', value: postedCount },
+                            { label: 'Net gain/loss', value: formatCurrency(totalGainLoss) },
+                        ]}
+                        actions={
+                            <Link href="/finance/fx-revaluations/create">
+                                <Button size="sm">
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    New Revaluation
+                                </Button>
+                            </Link>
+                        }
+                    />
+                }
+            >
                 {/* KPI Summary */}
                 {revaluations.data.length > 0 && (
                     <Card>
@@ -204,7 +213,7 @@ export default function FxRevaluationsIndex({ revaluations }: PageProps) {
                         )}
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

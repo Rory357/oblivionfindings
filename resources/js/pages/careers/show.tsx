@@ -1,9 +1,10 @@
 import MarketingLayout from '@/layouts/marketing-layout';
 import { Link, usePage } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, MapPin, Briefcase, Clock, DollarSign, Wifi } from 'lucide-react';
+import { MapPin, Briefcase, Clock, DollarSign, Wifi } from 'lucide-react';
 import { employmentTypeLabels } from '@/lib/job-posting-constants';
 import type { PublicJobDetail } from '@/types/job-postings';
 
@@ -17,45 +18,50 @@ export default function CareersShow({ posting }: Props) {
     return (
         <MarketingLayout title={posting.title} description={`Apply for ${posting.title} position.`}>
             <div className="mx-auto max-w-3xl px-4 py-16 sm:px-6 lg:px-8">
-                <Link href="/careers" className="inline-flex items-center gap-1.5 text-sm text-muted-foreground hover:text-foreground mb-6">
-                    <ArrowLeft className="h-4 w-4" /> Back to all positions
-                </Link>
-
+                <PageLayout
+                    padding="none"
+                    hero={
+                        <PageHero
+                            variant="compact"
+                            backHref="/careers"
+                            backLabel="Back to all positions"
+                            icon={Briefcase}
+                            title={posting.title}
+                        >
+                            <div className="flex flex-wrap gap-3">
+                                <Badge variant="secondary" className="text-sm">
+                                    <Briefcase className="mr-1 h-3.5 w-3.5" />
+                                    {employmentTypeLabels[posting.employment_type] || posting.employment_type}
+                                </Badge>
+                                {posting.department && <Badge variant="outline" className="text-sm">{posting.department}</Badge>}
+                                {posting.location && (
+                                    <Badge variant="outline" className="text-sm"><MapPin className="mr-1 h-3.5 w-3.5" />{posting.location}</Badge>
+                                )}
+                                {posting.is_remote && (
+                                    <Badge variant="outline" className="text-sm gap-1 border-status-info/30 text-status-info bg-status-info">
+                                        <Wifi className="h-3 w-3" /> Remote
+                                    </Badge>
+                                )}
+                                {posting.salary_range && (
+                                    <Badge variant="outline" className="text-sm"><DollarSign className="mr-1 h-3.5 w-3.5" />{posting.salary_range}</Badge>
+                                )}
+                            </div>
+                            {posting.closes_at && (
+                                <p className="mt-3 text-sm text-muted-foreground flex items-center gap-1.5">
+                                    <Clock className="h-3.5 w-3.5" /> Applications close: {posting.closes_at}
+                                </p>
+                            )}
+                        </PageHero>
+                    }
+                >
                 {flash?.success && (
-                    <div className="mb-6 rounded-lg border border-status-success/30 bg-status-success-bg p-4 text-sm text-status-success">
+                    <div className="rounded-lg border border-status-success/30 bg-status-success-bg p-4 text-sm text-status-success">
                         {flash.success}
                     </div>
                 )}
 
-                <div className="mb-8">
-                    <h1 className="text-3xl font-bold tracking-tight">{posting.title}</h1>
-                    <div className="mt-4 flex flex-wrap gap-3">
-                        <Badge variant="secondary" className="text-sm">
-                            <Briefcase className="mr-1 h-3.5 w-3.5" />
-                            {employmentTypeLabels[posting.employment_type] || posting.employment_type}
-                        </Badge>
-                        {posting.department && <Badge variant="outline" className="text-sm">{posting.department}</Badge>}
-                        {posting.location && (
-                            <Badge variant="outline" className="text-sm"><MapPin className="mr-1 h-3.5 w-3.5" />{posting.location}</Badge>
-                        )}
-                        {posting.is_remote && (
-                            <Badge variant="outline" className="text-sm gap-1 border-status-info/30 text-status-info bg-status-info">
-                                <Wifi className="h-3 w-3" /> Remote
-                            </Badge>
-                        )}
-                        {posting.salary_range && (
-                            <Badge variant="outline" className="text-sm"><DollarSign className="mr-1 h-3.5 w-3.5" />{posting.salary_range}</Badge>
-                        )}
-                    </div>
-                    {posting.closes_at && (
-                        <p className="mt-3 text-sm text-muted-foreground flex items-center gap-1.5">
-                            <Clock className="h-3.5 w-3.5" /> Applications close: {posting.closes_at}
-                        </p>
-                    )}
-                </div>
-
                 {posting.summary && (
-                    <p className="text-muted-foreground italic border-l-2 border-primary/30 pl-4 mb-6">{posting.summary}</p>
+                    <p className="text-muted-foreground italic border-l-2 border-primary/30 pl-4">{posting.summary}</p>
                 )}
 
                 <Card className="mb-6">
@@ -88,6 +94,7 @@ export default function CareersShow({ posting }: Props) {
                         <Link href={`/careers/${posting.slug}/apply`}>Apply Now</Link>
                     </Button>
                 </div>
+                </PageLayout>
             </div>
         </MarketingLayout>
     );

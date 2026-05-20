@@ -2,11 +2,12 @@ import { Head, Link } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Heart, AlertTriangle } from 'lucide-react';
+import { Plus, Heart, AlertTriangle, HandHeart } from 'lucide-react';
 import { PieChart, Pie, Cell, Tooltip, ResponsiveContainer } from 'recharts';
 
 const CHART_COLORS = ['#3b82f6', '#10b981', '#f59e0b', '#ef4444', '#8b5cf6', '#ec4899', '#06b6d4', '#84cc16'];
@@ -82,20 +83,29 @@ export default function DonorFundsIndex({ funds, summary }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Donor Funds" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Donor Funds</h1>
-                        <p className="text-muted-foreground">Track donations, grants, and restricted funding</p>
-                    </div>
-                    <Button asChild>
-                        <Link href="/finance/donor-funds/create">
-                            <Plus className="mr-1 h-4 w-4" />
-                            New Fund
-                        </Link>
-                    </Button>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={HandHeart}
+                        title="Donor Funds"
+                        description="Track donations, grants, and restricted funding"
+                        stats={[
+                            { label: 'Total funds', value: summary.total_funds },
+                            { label: 'Received', value: formatCurrency(summary.total_received) },
+                            { label: 'Available', value: formatCurrency(summary.total_available) },
+                            { label: 'Expiring soon', value: summary.expiring_soon },
+                        ]}
+                        actions={
+                            <Button asChild size="sm">
+                                <Link href="/finance/donor-funds/create">
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    New Fund
+                                </Link>
+                            </Button>
+                        }
+                    />
+                }
+            >
                 {/* Summary Cards + PieChart */}
                 <div className="grid grid-cols-1 gap-6 lg:grid-cols-3">
                     <div className="lg:col-span-2 grid grid-cols-2 gap-4 sm:grid-cols-3">
@@ -278,7 +288,7 @@ export default function DonorFundsIndex({ funds, summary }: Props) {
                         </CardContent>
                     </Card>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

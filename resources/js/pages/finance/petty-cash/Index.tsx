@@ -2,10 +2,11 @@ import { Head, Link } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Plus, Wallet } from 'lucide-react';
+import { Plus, Wallet, Coins } from 'lucide-react';
 
 interface Fund {
     id: number;
@@ -30,24 +31,37 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 export default function PettyCashIndex({ funds }: Props) {
+    const activeCount = funds.filter((f) => f.is_active).length;
+    const totalFloat = funds.reduce((s, f) => s + f.float_amount, 0);
+    const totalBalance = funds.reduce((s, f) => s + f.current_balance, 0);
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Petty Cash" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Petty Cash Funds</h1>
-                        <p className="text-muted-foreground">Manage petty cash floats and transactions</p>
-                    </div>
-                    <Button asChild>
-                        <Link href={'/finance/petty-cash/create'}>
-                            <Plus className="mr-1 h-4 w-4" />
-                            New Fund
-                        </Link>
-                    </Button>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Coins}
+                        title="Petty Cash Funds"
+                        description="Manage petty cash floats and transactions"
+                        stats={[
+                            { label: 'Funds', value: funds.length },
+                            { label: 'Active', value: activeCount },
+                            { label: 'Total float', value: formatCurrency(totalFloat) },
+                            { label: 'Total balance', value: formatCurrency(totalBalance) },
+                        ]}
+                        actions={
+                            <Button asChild size="sm">
+                                <Link href={'/finance/petty-cash/create'}>
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    New Fund
+                                </Link>
+                            </Button>
+                        }
+                    />
+                }
+            >
                 {funds.length === 0 ? (
                     <Card>
                         <CardContent className="flex flex-col items-center justify-center py-12">
@@ -118,7 +132,7 @@ export default function PettyCashIndex({ funds }: Props) {
                         })}
                     </div>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

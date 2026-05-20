@@ -1,6 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -157,64 +158,72 @@ export default function FixedAssetsIndex({ assets, summary, filters }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Fixed Assets" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Fixed Assets</h1>
-                        <p className="text-muted-foreground">Manage your organisation's fixed asset register</p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <Dialog open={depModalOpen} onOpenChange={setDepModalOpen}>
-                            <DialogTrigger asChild>
-                                <Button variant="outline">
-                                    <Calculator className="mr-2 h-4 w-4" />
-                                    Run Depreciation
-                                </Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                                <DialogHeader>
-                                    <DialogTitle>Run Depreciation</DialogTitle>
-                                    <DialogDescription>
-                                        Process monthly depreciation for all active assets. This will create depreciation
-                                        records and post GL journals.
-                                    </DialogDescription>
-                                </DialogHeader>
-                                <form onSubmit={handleRunDepreciation}>
-                                    <div className="space-y-4 py-4">
-                                        <div className="space-y-1.5">
-                                            <Label htmlFor="depreciation_date">Depreciation Date</Label>
-                                            <Input
-                                                id="depreciation_date"
-                                                type="date"
-                                                value={depForm.data.depreciation_date}
-                                                onChange={(e) => depForm.setData('depreciation_date', e.target.value)}
-                                            />
-                                            {depForm.errors.depreciation_date && (
-                                                <p className="text-sm text-destructive">{depForm.errors.depreciation_date}</p>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <DialogFooter>
-                                        <Button type="button" variant="outline" onClick={() => setDepModalOpen(false)}>
-                                            Cancel
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Package}
+                        title="Fixed Assets"
+                        description="Manage your organisation's fixed asset register"
+                        stats={[
+                            { label: 'Total assets', value: summary.total_count },
+                            { label: 'Total cost', value: formatNZD(summary.total_cost) },
+                            { label: 'Depreciation', value: formatNZD(summary.total_depreciation) },
+                            { label: 'Book value', value: formatNZD(summary.net_book_value) },
+                        ]}
+                        actions={
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Dialog open={depModalOpen} onOpenChange={setDepModalOpen}>
+                                    <DialogTrigger asChild>
+                                        <Button size="sm" variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                            <Calculator className="mr-1.5 h-4 w-4" />
+                                            Run Depreciation
                                         </Button>
-                                        <Button type="submit" disabled={depForm.processing}>
-                                            {depForm.processing ? 'Processing...' : 'Run Depreciation'}
-                                        </Button>
-                                    </DialogFooter>
-                                </form>
-                            </DialogContent>
-                        </Dialog>
-                        <Link href={'/finance/fixed-assets/create'}>
-                            <Button>
-                                <Plus className="mr-2 h-4 w-4" />
-                                Add Asset
-                            </Button>
-                        </Link>
-                    </div>
-                </div>
-
+                                    </DialogTrigger>
+                                    <DialogContent>
+                                        <DialogHeader>
+                                            <DialogTitle>Run Depreciation</DialogTitle>
+                                            <DialogDescription>
+                                                Process monthly depreciation for all active assets. This will create depreciation
+                                                records and post GL journals.
+                                            </DialogDescription>
+                                        </DialogHeader>
+                                        <form onSubmit={handleRunDepreciation}>
+                                            <div className="space-y-4 py-4">
+                                                <div className="space-y-1.5">
+                                                    <Label htmlFor="depreciation_date">Depreciation Date</Label>
+                                                    <Input
+                                                        id="depreciation_date"
+                                                        type="date"
+                                                        value={depForm.data.depreciation_date}
+                                                        onChange={(e) => depForm.setData('depreciation_date', e.target.value)}
+                                                    />
+                                                    {depForm.errors.depreciation_date && (
+                                                        <p className="text-sm text-destructive">{depForm.errors.depreciation_date}</p>
+                                                    )}
+                                                </div>
+                                            </div>
+                                            <DialogFooter>
+                                                <Button type="button" variant="outline" onClick={() => setDepModalOpen(false)}>
+                                                    Cancel
+                                                </Button>
+                                                <Button type="submit" disabled={depForm.processing}>
+                                                    {depForm.processing ? 'Processing...' : 'Run Depreciation'}
+                                                </Button>
+                                            </DialogFooter>
+                                        </form>
+                                    </DialogContent>
+                                </Dialog>
+                                <Link href={'/finance/fixed-assets/create'}>
+                                    <Button size="sm">
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        Add Asset
+                                    </Button>
+                                </Link>
+                            </div>
+                        }
+                    />
+                }
+            >
                 {/* Summary Cards - 4 KPIs */}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <Card>
@@ -441,7 +450,7 @@ export default function FixedAssetsIndex({ assets, summary, filters }: Props) {
                         </div>
                     </div>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

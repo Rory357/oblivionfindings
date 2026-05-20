@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -8,7 +9,7 @@ import {
 } from '@/components/ui/collapsible';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { ChevronDown, ChevronRight, DollarSign, Plus } from 'lucide-react';
+import { ChevronDown, ChevronRight, DollarSign, Plus, Wallet } from 'lucide-react';
 import { useState } from 'react';
 
 type Account = {
@@ -197,28 +198,37 @@ export default function AccountsIndex({
         { title: 'Chart of Accounts', href: '/finance/accounts' },
     ];
 
+    const countTree = (nodes: Account[]): number =>
+        nodes.reduce((t, n) => t + 1 + countTree(n.children), 0);
+    const totalAccounts = (
+        ['asset', 'liability', 'equity', 'revenue', 'expense'] as const
+    ).reduce((sum, type) => sum + countTree(accountTree[type] || []), 0);
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Chart of Accounts" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">
-                            Chart of Accounts
-                        </h1>
-                        <p className="text-muted-foreground">
-                            Manage your organisation's account structure
-                        </p>
-                    </div>
-                    <Link href={'/finance/accounts/create'}>
-                        <Button>
-                            <Plus className="mr-2 h-4 w-4" />
-                            Add Account
-                        </Button>
-                    </Link>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Wallet}
+                        title="Chart of Accounts"
+                        description="Manage your organisation's account structure"
+                        stats={[
+                            { label: 'Total accounts', value: totalAccounts },
+                            { label: 'Account types', value: accountTypes.length },
+                        ]}
+                        actions={
+                            <Link href={'/finance/accounts/create'}>
+                                <Button size="sm">
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    Add Account
+                                </Button>
+                            </Link>
+                        }
+                    />
+                }
+            >
                 <Card>
                     <CardHeader>
                         <div className="flex items-center gap-2">
@@ -244,7 +254,7 @@ export default function AccountsIndex({
                         ))}
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

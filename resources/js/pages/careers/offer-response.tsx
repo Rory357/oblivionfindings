@@ -1,4 +1,5 @@
 ﻿import { Head, useForm } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -6,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Badge } from '@/components/ui/badge';
+import { FileCheck } from 'lucide-react';
 
 interface OfferData {
     position_title: string;
@@ -65,12 +67,18 @@ export default function OfferResponse({ valid, expired, token, offer, candidate 
     return (
         <>
             <Head title="Respond to Offer" />
-            <div className="mx-auto max-w-3xl px-4 py-10 space-y-6">
-                <div>
-                    <h1 className="text-3xl font-bold">Offer Response</h1>
-                    <p className="text-sm text-muted-foreground">Review your offer and respond below.</p>
-                </div>
-
+            <div className="mx-auto max-w-3xl px-4 py-10">
+                <PageLayout
+                    padding="none"
+                    hero={
+                        <PageHero
+                            variant="compact"
+                            icon={FileCheck}
+                            title="Offer Response"
+                            description="Review your offer and respond below."
+                        />
+                    }
+                >
                 <Card>
                     <CardHeader>
                         <CardTitle>{offer?.position_title}</CardTitle>
@@ -158,6 +166,7 @@ export default function OfferResponse({ valid, expired, token, offer, candidate 
                         </CardContent>
                     </Card>
                 ) : null}
+                </PageLayout>
             </div>
         </>
     );

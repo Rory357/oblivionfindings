@@ -1,3 +1,4 @@
+import { PageHero, type PageHeroBadge, type PageHeroMetaItem } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -324,108 +325,67 @@ export default function GoalShow({ goal, users, can }: Props) {
 
             <div className="flex flex-col gap-6 p-6">
                 {/* ============================================================ */}
-                {/*  PURPLE GRADIENT HEADER                                       */}
+                {/*  PAGE HERO                                                    */}
                 {/* ============================================================ */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-primary-foreground md:p-8">
-                    {/* Decorative circles */}
-                    <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-primary-foreground/5" />
-                    <div className="pointer-events-none absolute -bottom-20 -left-20 h-72 w-72 rounded-full bg-primary-foreground/5" />
-                    <div className="pointer-events-none absolute right-1/3 -bottom-10 h-48 w-48 rounded-full bg-primary-foreground/5" />
+                {(() => {
+                    const statusTone: PageHeroBadge['tone'] =
+                        goal.status === 'completed'
+                            ? 'success'
+                            : goal.status === 'cancelled'
+                              ? 'critical'
+                              : 'default';
+                    const priorityTone: PageHeroBadge['tone'] =
+                        goal.priority === 'high' || goal.priority === 'critical'
+                            ? 'critical'
+                            : goal.priority === 'medium'
+                              ? 'warning'
+                              : 'default';
 
-                    <div className="relative flex flex-col gap-6 md:flex-row md:items-start md:justify-between">
-                        {/* Left side: title + badges + meta */}
-                        <div className="min-w-0 flex-1">
-                            <h1 className="text-2xl font-bold md:text-3xl">
-                                {goal.title}
-                            </h1>
+                    const heroBadges: PageHeroBadge[] = [
+                        { label: capitalize(goal.status), tone: statusTone },
+                        {
+                            label: `${capitalize(goal.priority)} Priority`,
+                            tone: priorityTone,
+                        },
+                        { label: capitalize(goal.goal_type) },
+                    ];
 
-                            {goal.description && (
-                                <p className="mt-1 max-w-2xl text-sm text-primary-foreground/70">
-                                    {goal.description}
-                                </p>
-                            )}
+                    const heroMeta: PageHeroMetaItem[] = [];
+                    if (goal.user) heroMeta.push({ icon: User, label: goal.user.name });
+                    heroMeta.push({
+                        icon: Calendar,
+                        label: `${formatDate(goal.start_date)} – ${formatDate(goal.due_date)}`,
+                    });
+                    if (goal.category)
+                        heroMeta.push({ icon: Target, label: goal.category });
+                    if (goal.parent_goal)
+                        heroMeta.push({
+                            label: `Parent: ${goal.parent_goal.title}`,
+                            href: `/hr/goals/${goal.parent_goal.id}`,
+                        });
 
-                            {/* Badges row */}
-                            <div className="mt-3 flex flex-wrap items-center gap-2">
-                                <Badge
-                                    className={
-                                        statusBadgeWhite[goal.status] ??
-                                        'border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90'
-                                    }
-                                >
-                                    {capitalize(goal.status)}
-                                </Badge>
-                                <Badge
-                                    className={
-                                        priorityBadgeWhite[goal.priority] ??
-                                        'border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/80'
-                                    }
-                                >
-                                    {capitalize(goal.priority)} Priority
-                                </Badge>
-                                <Badge
-                                    className={
-                                        typeBadgeWhite[goal.goal_type] ??
-                                        'border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90'
-                                    }
-                                >
-                                    {capitalize(goal.goal_type)}
-                                </Badge>
-                            </div>
+                    const heroStats: { label: string; value: string }[] = [
+                        { label: 'Progress', value: `${goal.progress_percentage}%` },
+                    ];
+                    if (goal.target_value !== null && goal.target_value !== undefined) {
+                        heroStats.push({
+                            label: goal.unit ?? 'Target',
+                            value: `${goal.current_value ?? 0}/${goal.target_value}`,
+                        });
+                    }
 
-                            {/* Meta row: assignee, dates, category */}
-                            <div className="mt-4 flex flex-wrap items-center gap-x-5 gap-y-2 text-sm text-primary-foreground/80">
-                                {goal.user && (
-                                    <span className="flex items-center gap-1.5">
-                                        <User className="h-3.5 w-3.5" />
-                                        {goal.user.name}
-                                    </span>
-                                )}
-                                <span className="flex items-center gap-1.5">
-                                    <Calendar className="h-3.5 w-3.5" />
-                                    {formatDate(goal.start_date)} &ndash;{' '}
-                                    {formatDate(goal.due_date)}
-                                </span>
-                                {goal.category && (
-                                    <span className="flex items-center gap-1.5">
-                                        <Target className="h-3.5 w-3.5" />
-                                        {goal.category}
-                                    </span>
-                                )}
-                                {goal.parent_goal && (
-                                    <Link
-                                        href={`/hr/goals/${goal.parent_goal.id}`}
-                                        className="flex items-center gap-1.5 underline decoration-white/30 transition-colors hover:text-primary-foreground"
-                                    >
-                                        Parent: {goal.parent_goal.title}
-                                    </Link>
-                                )}
-                            </div>
-                        </div>
-
-                        {/* Right side: large progress display */}
-                        <div className="flex flex-col items-center justify-center text-center">
-                            <div className="flex items-baseline gap-1">
-                                <span className="text-4xl font-bold">
-                                    {goal.progress_percentage}
-                                </span>
-                                <span className="text-xl font-semibold text-primary-foreground/80">
-                                    %
-                                </span>
-                            </div>
-                            <span className="mt-1 text-sm font-medium text-primary-foreground/70">
-                                Progress
-                            </span>
-                            {goal.target_value !== null &&
-                                goal.target_value !== undefined && (
-                                    <span className="mt-1 text-xs text-primary-foreground/60">
-                                        {goal.current_value ?? 0} /{' '}
-                                        {goal.target_value} {goal.unit ?? ''}
-                                    </span>
-                                )}
-                        </div>
-                    </div>
-                </div>
+                    return (
+                        <PageHero
+                            icon={Target}
+                            backHref="/hr/development/goals"
+                            title={goal.title}
+                            description={goal.description ?? undefined}
+                            meta={heroMeta}
+                            badges={heroBadges}
+                            stats={heroStats}
+                        />
+                    );
+                })()}
 
                 {/* ============================================================ */}
                 {/*  TABS                                                         */}

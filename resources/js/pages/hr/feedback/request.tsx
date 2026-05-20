@@ -1,3 +1,4 @@
+import { PageHero } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -23,9 +24,9 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/react';
 import {
-    ArrowLeft,
     CheckCircle2,
     FileText,
+    MessageCircle,
     Plus,
     Search,
     Send,
@@ -221,24 +222,13 @@ export default function FeedbackRequest({
             <Head title="Request 360 Feedback" />
             <div className="space-y-6 p-4 lg:p-6">
                 {/* Header */}
-                <div className="flex items-center gap-3">
-                    <Button
-                        variant="outline"
-                        size="icon"
-                        className="h-9 w-9"
-                        onClick={() => router.get('/hr/feedback')}
-                    >
-                        <ArrowLeft className="h-4 w-4" />
-                    </Button>
-                    <div>
-                        <h1 className="text-xl font-bold">
-                            Request 360-Degree Feedback
-                        </h1>
-                        <p className="text-sm text-muted-foreground">
-                            Select a template, employee, and reviewers
-                        </p>
-                    </div>
-                </div>
+                <PageHero
+                    icon={MessageCircle}
+                    backHref="/hr/feedback"
+                    backLabel="Back to Feedback"
+                    title="Request 360-Degree Feedback"
+                    description="Select a template, employee, and reviewers"
+                />
 
                 <form onSubmit={submit} className="mx-auto max-w-3xl space-y-6">
                     {/* Step 1: Template Selection */}

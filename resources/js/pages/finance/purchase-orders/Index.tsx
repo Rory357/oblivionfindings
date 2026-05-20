@@ -1,12 +1,14 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Button } from '@/components/ui/button';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
+import { Plus, ShoppingCart } from 'lucide-react';
 
 type Vendor = { id: number; name: string };
 
@@ -63,17 +65,26 @@ export default function PurchaseOrderIndex() {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Purchase Orders" />
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Purchase Orders</h1>
-                        <p className="text-muted-foreground">Manage purchase orders and convert them to bills.</p>
-                    </div>
-                    <Link href="/finance/purchase-orders/create">
-                        <Button>New Purchase Order</Button>
-                    </Link>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={ShoppingCart}
+                        title="Purchase Orders"
+                        description="Manage purchase orders and convert them to bills."
+                        stats={[
+                            { label: 'Total', value: purchaseOrders?.total ?? rows.length },
+                        ]}
+                        actions={
+                            <Link href="/finance/purchase-orders/create">
+                                <Button size="sm">
+                                    <Plus className="w-4 h-4 mr-1.5" />
+                                    New Purchase Order
+                                </Button>
+                            </Link>
+                        }
+                    />
+                }
+            >
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-base">Filters</CardTitle>
@@ -191,7 +202,7 @@ export default function PurchaseOrderIndex() {
                         ))}
                     </div>
                 ) : null}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

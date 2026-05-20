@@ -16,6 +16,7 @@ import {
     ProgressRing,
 } from '@/components/fleet-charts';
 import { DonutChart } from '@/components/ops-stat-card';
+import { PageHero, type PageHeroBadge, type PageHeroMetaItem } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { TimelineInteractions } from '@/components/timeline-interactions';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -821,242 +822,164 @@ export default function ClientShow({
 
             <PageShell>
                 {/* ── Hero Header ──────────────────────────────── */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-primary-foreground md:p-8">
-                    <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-primary-foreground/5" />
-                    <div className="pointer-events-none absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-primary-foreground/5" />
-                    <div className="pointer-events-none absolute top-1/4 right-1/3 h-24 w-24 rounded-full bg-primary-foreground/5" />
+                {(() => {
+                    const heroBadges: PageHeroBadge[] = [
+                        {
+                            label: client.status,
+                            tone:
+                                client.status === 'active'
+                                    ? 'success'
+                                    : client.status === 'onboarding'
+                                      ? 'warning'
+                                      : 'default',
+                        },
+                    ];
+                    if (client.funding_type) heroBadges.push({ label: client.funding_type });
+                    if (client.service_context) heroBadges.push({ label: client.service_context.name });
+                    if (client.site)
+                        heroBadges.push({
+                            label: client.site.name,
+                            icon: Home,
+                            href: `/sites/${client.site.id}`,
+                            'aria-label': `Open ${client.site.name}`,
+                        });
+                    if (client.risk_level && client.risk_level !== 'low')
+                        heroBadges.push({
+                            label: `${client.risk_level} risk`,
+                            icon: ShieldAlert,
+                            tone: client.risk_level === 'critical' ? 'critical' : 'warning',
+                        });
+                    if (client.safeguarding_flag)
+                        heroBadges.push({
+                            label: 'Safeguarding',
+                            icon: Shield,
+                            tone: 'critical',
+                        });
 
-                    <div className="relative flex flex-col items-center gap-6 md:flex-row md:items-start">
-                        {/* Avatar */}
-                        <Avatar className="h-24 w-24 shrink-0 border-4 border-primary-foreground/20 shadow-xl md:h-28 md:w-28">
-                            <AvatarImage
-                                src={
-                                    client.avatar ??
-                                    client.profile_photo_url ??
-                                    undefined
-                                }
-                                alt={name}
-                            />
-                            <AvatarFallback className="bg-primary-foreground/10 text-2xl font-bold text-primary-foreground md:text-3xl">
-                                {getInitials(name)}
-                            </AvatarFallback>
-                        </Avatar>
+                    const heroMeta: PageHeroMetaItem[] = [];
+                    if (client.preferred_name && client.preferred_name !== name)
+                        heroMeta.push({ label: `Preferred: ${client.preferred_name}` });
+                    if (client.nhi_number) heroMeta.push({ label: `NHI: ${client.nhi_number}` });
+                    if (client.service_start_date)
+                        heroMeta.push({
+                            icon: Clock,
+                            label: `Since ${new Date(client.service_start_date).toLocaleDateString('en-NZ', {
+                                month: 'short',
+                                year: 'numeric',
+                            })}`,
+                        });
 
-                        {/* Info */}
-                        <div className="flex-1 text-center md:text-left">
-                            <h1 className="text-2xl font-bold md:text-3xl">
-                                {name}
-                            </h1>
-                            {client.preferred_name &&
-                                client.preferred_name !== name && (
-                                    <p className="mt-0.5 text-sm text-primary-foreground/60">
-                                        Preferred: {client.preferred_name}
-                                    </p>
-                                )}
-                            {client.nhi_number && (
-                                <p className="mt-0.5 text-sm text-primary-foreground/60">
-                                    NHI: {client.nhi_number}
-                                </p>
-                            )}
+                    const carePlanSummary = (pageProps as any).care_plans_summary ?? {};
+                    const carePlanGoals = carePlanSummary.active_plan?.goals ?? [];
+                    const carePlanDone = carePlanGoals.filter(
+                        (g: any) => g.status === 'completed',
+                    ).length;
 
-                            <div className="mt-3 flex flex-wrap items-center justify-center gap-2 md:justify-start">
-                                <Badge
-                                    className={
-                                        client.status === 'active'
-                                            ? 'border-status-success/30 bg-status-success-bg text-status-success'
-                                            : client.status === 'onboarding'
-                                              ? 'border-status-warning/30 bg-status-warning-bg text-status-warning'
-                                              : 'border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90'
-                                    }
-                                >
-                                    {client.status}
-                                </Badge>
-                                {client.funding_type && (
-                                    <Badge className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90">
-                                        {client.funding_type}
-                                    </Badge>
-                                )}
-                                {client.service_context && (
-                                    <Badge className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground/90">
-                                        {client.service_context.name}
-                                    </Badge>
-                                )}
-                                {client.site && (
-                                    <Link
-                                        href={`/sites/${client.site.id}`}
-                                        className="inline-flex items-center rounded-full border border-primary-foreground/20 bg-primary-foreground/10 px-2.5 py-0.5 text-xs font-semibold text-primary-foreground/90 transition hover:bg-primary-foreground/20"
-                                        title={`Open ${client.site.name}`}
-                                    >
-                                        <Home className="mr-1 h-3 w-3" />
-                                        {client.site.name}
-                                    </Link>
-                                )}
-                                {client.risk_level &&
-                                    client.risk_level !== 'low' && (
-                                        <Badge
-                                            className={
-                                                client.risk_level === 'critical'
-                                                    ? 'border-status-critical/30 bg-status-critical-bg text-status-critical'
-                                                    : client.risk_level ===
-                                                        'high'
-                                                      ? 'border-status-warning/30 bg-status-warning-bg text-status-warning'
-                                                      : 'border-status-warning/30 bg-status-warning-bg text-status-warning'
-                                            }
-                                        >
-                                            <ShieldAlert className="mr-1 h-3 w-3" />
-                                            {client.risk_level} risk
-                                        </Badge>
-                                    )}
-                                {client.safeguarding_flag && (
-                                    <Badge className="border-status-critical/30 bg-status-critical-bg text-status-critical">
-                                        <Shield className="mr-1 h-3 w-3" />
-                                        Safeguarding
-                                    </Badge>
-                                )}
-                            </div>
-
-                            {client.service_start_date && (
-                                <p className="mt-2 flex items-center justify-center gap-1.5 text-sm text-primary-foreground/60 md:justify-start">
-                                    <Clock className="h-3.5 w-3.5" />
-                                    Since{' '}
-                                    {new Date(
-                                        client.service_start_date,
-                                    ).toLocaleDateString('en-NZ', {
-                                        month: 'short',
-                                        year: 'numeric',
-                                    })}
-                                </p>
-                            )}
-                        </div>
-
-                        {/* Right: Actions + KPIs */}
-                        <div className="flex flex-col items-center gap-3 md:items-end">
-                            <div className="flex flex-wrap gap-2">
-                                {client.phone && (
-                                    <a href={`tel:${client.phone}`}>
+                    return (
+                        <>
+                            <PageHero
+                                avatar={{
+                                    src: client.avatar ?? client.profile_photo_url ?? undefined,
+                                    fallback: getInitials(name),
+                                }}
+                                title={name}
+                                meta={heroMeta}
+                                badges={heroBadges}
+                                stats={[
+                                    {
+                                        label: 'Care Plan',
+                                        value: carePlanSummary.active_plan ? 'Active' : '—',
+                                    },
+                                    {
+                                        label: 'Goals',
+                                        value:
+                                            carePlanGoals.length > 0
+                                                ? `${carePlanDone}/${carePlanGoals.length}`
+                                                : '—',
+                                    },
+                                    {
+                                        label: 'Next Shift',
+                                        value: shifts_summary?.next ? 'Yes' : '—',
+                                    },
+                                ]}
+                                actions={
+                                    <>
+                                        {client.phone && (
+                                            <a href={`tel:${client.phone}`}>
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                                >
+                                                    <Phone className="mr-1.5 h-3.5 w-3.5" />
+                                                    Call
+                                                </Button>
+                                            </a>
+                                        )}
                                         <Button
                                             size="sm"
                                             variant="outline"
-                                            className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+                                            className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                            asChild
                                         >
-                                            <Phone className="mr-1.5 h-3.5 w-3.5" />
-                                            Call
+                                            <Link href={`/operations/clients/${client.id}/visit-requests`}>
+                                                <Users className="mr-1.5 h-3.5 w-3.5" />
+                                                Visits
+                                                {pendingVisitCount > 0 ? (
+                                                    <span className="ml-1 rounded-full bg-status-warning-bg px-1.5 py-0.5 text-[10px] font-bold text-status-warning">
+                                                        {pendingVisitCount}
+                                                    </span>
+                                                ) : null}
+                                            </Link>
                                         </Button>
-                                    </a>
-                                )}
-                                <Button
-                                    size="sm"
-                                    variant="outline"
-                                    className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
-                                    asChild
-                                >
-                                    <Link
-                                        href={`/operations/clients/${client.id}/visit-requests`}
-                                    >
-                                        <Users className="mr-1.5 h-3.5 w-3.5" />
-                                        Visits
-                                        {pendingVisitCount > 0 ? (
-                                            <span className="ml-1 rounded-full bg-status-warning-bg px-1.5 py-0.5 text-[10px] font-bold text-status-warning">
-                                                {pendingVisitCount}
-                                            </span>
-                                        ) : null}
-                                    </Link>
-                                </Button>
-                                {can.edit && (
-                                    <Button
-                                        type="button"
-                                        size="sm"
-                                        variant="outline"
-                                        className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
-                                        onClick={() => setEditDialogOpen(true)}
-                                    >
-                                        <Pencil className="mr-1.5 h-3.5 w-3.5" />
-                                        Edit
-                                    </Button>
-                                )}
-                            </div>
-
-                            {/* KPI Stats */}
-                            <div className="hidden gap-6 text-center md:flex">
-                                <div>
-                                    <p className="text-2xl font-bold">
-                                        {(() => {
-                                            const summary =
-                                                (pageProps as any)
-                                                    .care_plans_summary ?? {};
-                                            return summary.active_plan
-                                                ? 'Active'
-                                                : '—';
-                                        })()}
-                                    </p>
-                                    <p className="text-xs text-primary-foreground/50">
-                                        Care Plan
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="text-2xl font-bold">
-                                        {(() => {
-                                            const summary =
-                                                (pageProps as any)
-                                                    .care_plans_summary ?? {};
-                                            const goals =
-                                                summary.active_plan?.goals ??
-                                                [];
-                                            const done = goals.filter(
-                                                (g: any) =>
-                                                    g.status === 'completed',
-                                            ).length;
-                                            return goals.length > 0
-                                                ? `${done}/${goals.length}`
-                                                : '—';
-                                        })()}
-                                    </p>
-                                    <p className="text-xs text-primary-foreground/50">
-                                        Goals
-                                    </p>
-                                </div>
-                                <div>
-                                    <p className="text-2xl font-bold">
-                                        {shifts_summary?.next ? 'Yes' : '—'}
-                                    </p>
-                                    <p className="text-xs text-primary-foreground/50">
-                                        Next Shift
-                                    </p>
-                                </div>
-                            </div>
-                        </div>
-                    </div>
-
-                    {/* Hidden photo upload form */}
-                    {can.edit && (
-                        <form
-                            onSubmit={(e) => {
-                                e.preventDefault();
-                                if (!photoForm.data.photo) return;
-                                photoForm.post(
-                                    `/operations/clients/${client.id}/photo`,
-                                    {
-                                        forceFormData: true,
-                                        preserveScroll: true,
-                                    },
-                                );
-                            }}
-                            className="hidden"
-                        >
-                            <Input
-                                type="file"
-                                accept="image/*"
-                                id="client-photo"
-                                onChange={(e) =>
-                                    photoForm.setData(
-                                        'photo',
-                                        e.target.files?.[0] ?? null,
-                                    )
+                                        {can.edit && (
+                                            <Button
+                                                type="button"
+                                                size="sm"
+                                                variant="outline"
+                                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                                onClick={() => setEditDialogOpen(true)}
+                                            >
+                                                <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                                                Edit
+                                            </Button>
+                                        )}
+                                    </>
                                 }
                             />
-                        </form>
-                    )}
-                </div>
+
+                            {/* Hidden photo upload form */}
+                            {can.edit && (
+                                <form
+                                    onSubmit={(e) => {
+                                        e.preventDefault();
+                                        if (!photoForm.data.photo) return;
+                                        photoForm.post(
+                                            `/operations/clients/${client.id}/photo`,
+                                            {
+                                                forceFormData: true,
+                                                preserveScroll: true,
+                                            },
+                                        );
+                                    }}
+                                    className="hidden"
+                                >
+                                    <Input
+                                        type="file"
+                                        accept="image/*"
+                                        id="client-photo"
+                                        onChange={(e) =>
+                                            photoForm.setData(
+                                                'photo',
+                                                e.target.files?.[0] ?? null,
+                                            )
+                                        }
+                                    />
+                                </form>
+                            )}
+                        </>
+                    );
+                })()}
 
                 <ClientSafetyRibbon safety={safety} className="mt-4" />
 

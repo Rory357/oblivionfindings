@@ -1,3 +1,4 @@
+import { PageHero } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -196,69 +197,43 @@ export default function TrainingCatalog({
 
             <div className="space-y-6 p-4 lg:p-6">
                 {/* Hero Banner */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary via-primary to-primary p-6 text-primary-foreground shadow-lg">
-                    <div className="absolute -top-10 -right-10 h-40 w-40 rounded-full bg-primary-foreground/5" />
-                    <div className="absolute right-20 -bottom-8 h-24 w-24 rounded-full bg-primary-foreground/5" />
-                    <div className="absolute -top-4 left-1/3 h-28 w-28 rounded-full bg-primary-foreground/5" />
-                    <div className="relative flex flex-wrap items-center justify-between gap-4">
-                        <div>
-                            <h1 className="text-2xl font-bold">
-                                Course Catalog
-                            </h1>
-                            <p className="mt-1 text-primary-foreground/70">
-                                Browse and manage training courses for your
-                                organisation
-                            </p>
-                        </div>
-                        <div className="flex items-center gap-3">
-                            <div className="flex items-center gap-6">
-                                <div className="text-center">
-                                    <div className="text-3xl font-bold">
-                                        {summary.total_courses}
-                                    </div>
-                                    <div className="text-[10px] tracking-wider text-primary-foreground/60 uppercase">
-                                        Courses
-                                    </div>
-                                </div>
-                                <div className="h-10 w-px bg-primary-foreground/20" />
-                                <div className="text-center">
-                                    <div className="text-3xl font-bold">
-                                        {summary.completion_rate}%
-                                    </div>
-                                    <div className="text-[10px] tracking-wider text-primary-foreground/60 uppercase">
-                                        Completion
-                                    </div>
-                                </div>
-                            </div>
-                            <div className="ml-4 flex gap-2">
+                <PageHero
+                    icon={BookOpen}
+                    title="Course Catalog"
+                    description="Browse and manage training courses for your organisation"
+                    stats={[
+                        { label: 'Courses', value: summary.total_courses },
+                        { label: 'Completion', value: `${summary.completion_rate}%` },
+                    ]}
+                    actions={
+                        <>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="gap-1.5 border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                asChild
+                            >
+                                <Link href="/hr/compliance/training">
+                                    <BarChart3 className="h-4 w-4" />
+                                    Dashboard
+                                </Link>
+                            </Button>
+                            {can.manage && (
                                 <Button
-                                    variant="secondary"
                                     size="sm"
-                                    className="gap-1.5 border-primary-foreground/20 bg-primary-foreground/15 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/25"
-                                    asChild
+                                    className="gap-1.5 bg-white text-primary shadow-md hover:bg-primary-foreground/90"
+                                    onClick={() => {
+                                        setForm(emptyForm);
+                                        setOpen(true);
+                                    }}
                                 >
-                                    <Link href="/hr/compliance/training">
-                                        <BarChart3 className="h-4 w-4" />
-                                        Dashboard
-                                    </Link>
+                                    <Plus className="h-4 w-4" />
+                                    New Course
                                 </Button>
-                                {can.manage && (
-                                    <Button
-                                        size="sm"
-                                        className="gap-1.5 bg-white text-primary shadow-md hover:bg-primary-foreground/90"
-                                        onClick={() => {
-                                            setForm(emptyForm);
-                                            setOpen(true);
-                                        }}
-                                    >
-                                        <Plus className="h-4 w-4" />
-                                        New Course
-                                    </Button>
-                                )}
-                            </div>
-                        </div>
-                    </div>
-                </div>
+                            )}
+                        </>
+                    }
+                />
 
                 {/* KPI Cards */}
                 <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">

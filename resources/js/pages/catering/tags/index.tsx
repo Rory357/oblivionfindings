@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
@@ -8,10 +9,9 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
 import { Head, router, useForm } from '@inertiajs/react';
-import { Pencil, Plus, ShieldAlert, Trash2 } from 'lucide-react';
+import { Pencil, Plus, Tag, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { ConfirmAction } from '@/pages/sites/_confirm-action';
-import { CateringHero } from '../_hero';
 import { CateringTabs } from '../_tabs';
 import { type DietaryTag, type TagKind, type TagSeverity, tagBadgeStyle } from '../_helpers';
 
@@ -75,24 +75,28 @@ export default function CateringTagsIndex({ tags, canManage }: Props) {
     return (
         <AppLayout breadcrumbs={[{ title: 'Catering', href: '/catering' }, { title: 'Dietary & Allergen Tags', href: '/catering/tags' }]}>
             <Head title="Dietary & Allergen Tags" />
-            <div className="space-y-6 p-6">
-                <CateringHero />
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Tag}
+                        title="Dietary & Allergen Tags"
+                        description="Used across recipes, products and resident profiles to drive allergen warnings."
+                        stats={[
+                            { label: 'Total', value: tags.length },
+                            { label: 'Dietary', value: grouped.dietary.length },
+                            { label: 'Allergens', value: grouped.allergen.length },
+                        ]}
+                        actions={
+                            canManage && (
+                                <Button onClick={openNew}>
+                                    <Plus className="mr-2 h-4 w-4" /> New tag
+                                </Button>
+                            )
+                        }
+                    />
+                }
+            >
                 <CateringTabs active="tags" />
-
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <div className="rounded-full bg-primary/10 p-2 text-primary"><ShieldAlert className="h-5 w-5" /></div>
-                        <div>
-                            <h1 className="text-2xl font-semibold">Dietary & Allergen Tags</h1>
-                            <p className="text-sm text-muted-foreground">Used across recipes, products and resident profiles to drive allergen warnings.</p>
-                        </div>
-                    </div>
-                    {canManage && (
-                        <Button onClick={openNew}>
-                            <Plus className="mr-2 h-4 w-4" /> New tag
-                        </Button>
-                    )}
-                </div>
 
                 {(['dietary', 'allergen'] as TagKind[]).map((kind) => (
                     <section key={kind}>
@@ -194,7 +198,7 @@ export default function CateringTagsIndex({ tags, canManage }: Props) {
                         </form>
                     </DialogContent>
                 </Dialog>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

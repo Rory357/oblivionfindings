@@ -1,13 +1,14 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import { FileText, Send, Shield, CheckCircle, Clock, DollarSign } from 'lucide-react';
+import { FileText, Send, Shield, CheckCircle, Clock, DollarSign, Landmark } from 'lucide-react';
 import { useState } from 'react';
 
 type Filing = {
@@ -125,20 +126,26 @@ export default function IrdFilingsIndex({ filings, availableGstReturns, filters 
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="IRD Filings" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">IRD Filings</h1>
-                        <p className="text-muted-foreground">
-                            Prepare and submit IRD e-filings directly to Inland Revenue
-                        </p>
-                    </div>
-                    <Button onClick={() => setShowCreateForm(!showCreateForm)}>
-                        <Send className="mr-2 h-4 w-4" />
-                        New Filing
-                    </Button>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Landmark}
+                        title="IRD Filings"
+                        description="Prepare and submit IRD e-filings directly to Inland Revenue"
+                        stats={[
+                            { label: 'Filed', value: filedCount },
+                            { label: 'Pending', value: pendingCount },
+                            { label: 'Total filed', value: formatCurrency(totalFiledAmount) },
+                        ]}
+                        actions={
+                            <Button size="sm" onClick={() => setShowCreateForm(!showCreateForm)}>
+                                <Send className="mr-1.5 h-4 w-4" />
+                                New Filing
+                            </Button>
+                        }
+                    />
+                }
+            >
                 {/* KPI Cards */}
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-3">
                     <Card>
@@ -369,7 +376,7 @@ export default function IrdFilingsIndex({ filings, availableGstReturns, filters 
                         )}
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }
