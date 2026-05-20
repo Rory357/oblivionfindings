@@ -1,4 +1,5 @@
 import { useCallback, useEffect, useMemo, useReducer } from 'react';
+import { roomIdFromEdgeWallId } from './_geometry';
 import {
     SELECT_TOOL,
     metersPerUnit,
@@ -347,6 +348,26 @@ function reducer(state: EditorState, action: EditorAction): EditorState {
                 }
             }
             const layout = state.layout;
+            // Cascade: when a room is deleted, its auto-promoted edge walls
+            // and any openings attached to them go with it.
+            for (const wall of layout.walls) {
+                const ownerRoomId = roomIdFromEdgeWallId(wall.id);
+                if (ownerRoomId && roomIds.has(ownerRoomId)) {
+                    wallIds.add(wall.id);
+                }
+            }
+            // Cascade: when a wall is deleted, openings attached to it are
+            // removed too (they'd otherwise float as orphan ghosts).
+            for (const door of layout.doors) {
+                if (door.wall_id && wallIds.has(door.wall_id)) {
+                    doorIds.add(door.id);
+                }
+            }
+            for (const win of layout.windows) {
+                if (win.wall_id && wallIds.has(win.wall_id)) {
+                    windowIds.add(win.id);
+                }
+            }
             return withDirty({
                 ...state,
                 layout: {

@@ -20,9 +20,12 @@ import {
 import { toast } from 'sonner';
 import { DoorSymbol } from './_door';
 import {
+    inferSwingDirection,
     openingCentreFromTopLeft,
     resolveAttachedOpening,
-    snapOpeningToNearestWall,
+    roomEdgeWalls,
+    roomIdFromEdgeWallId,
+    snapOpeningWithRoomFallback,
     wallSegmentsWithOpenings,
     type AttachedOpening,
 } from './_geometry';
@@ -262,11 +265,18 @@ function refsInsideMarquee(
             }
         }
         for (const door of layout.doors) {
-            if (inside({ x: door.x, y: door.y }))
+            const normalised = normaliseDoor(door);
+            const centre = {
+                x: normalised.x + normalised.width / 2,
+                y: normalised.y,
+            };
+            if (inside(centre))
                 result.push({ type: 'door', id: door.id });
         }
         for (const win of layout.windows) {
-            if (inside({ x: win.x, y: win.y }))
+            const w = win.width ?? 0.1;
+            const centre = { x: win.x + w / 2, y: win.y };
+            if (inside(centre))
                 result.push({ type: 'window', id: win.id });
         }
         for (const label of layout.labels) {
@@ -461,6 +471,11 @@ export default function PlanCanvas(props: Props) {
 
     const showStructure = layers.structure !== false;
     const structureInteractive = mode === 'full';
+    // When a placement tool is active, existing items must be transparent to
+    // pointer events so the click reaches the background placement handler.
+    const placementMode = !isSelectMode(activeKind);
+    const itemsInteractive = structureInteractive && !placementMode;
+    const pinsInteractive = !placementMode;
     const gridSize = layout.grid?.size ?? 10;
 
     // ── Background pointer-down: start marquee or place item ─────────
@@ -596,21 +611,31 @@ export default function PlanCanvas(props: Props) {
                 const id = `door-${Date.now()}`;
                 const subkind =
                     (activeSubkind as DoorSubkind | null) ?? 'single_swing';
-                const snapped = snapOpeningToNearestWall(
+                const result = snapOpeningWithRoomFallback(
                     point,
                     layout.walls,
+                    layout.rooms,
                     canvasSize,
                     { width: 0.08, maxDistancePx: 64 },
                 );
-                if (!snapped) {
+                if (!result) {
                     toast.warning(
-                        layout.walls.length > 0
-                            ? 'Place doors close to a wall so the opening can snap cleanly.'
-                            : 'Draw a wall first, then place doors on the wall.',
+                        layout.walls.length > 0 || layout.rooms.length > 0
+                            ? 'Place doors closer to a wall or room edge.'
+                            : 'Draw a room or wall first, then place doors on it.',
                     );
                     return;
                 }
+                const { snapped, newWalls } = result;
+                const swingDirection = inferSwingDirection(
+                    point,
+                    snapped,
+                    canvasSize,
+                );
                 dispatch({ type: 'commit' });
+                for (const wall of newWalls) {
+                    dispatch({ type: 'add_wall', wall });
+                }
                 dispatch({
                     type: 'add_door',
                     door: {
@@ -622,10 +647,9 @@ export default function PlanCanvas(props: Props) {
                         wall_id: snapped.wall_id,
                         wall_segment_index: snapped.wall_segment_index,
                         wall_t: snapped.wall_t,
-                        swing: 'right',
                         subkind,
                         swing_side: 'right',
-                        swing_direction: 'in',
+                        swing_direction: swingDirection,
                     },
                     selectAfter: true,
                 });
@@ -633,21 +657,26 @@ export default function PlanCanvas(props: Props) {
             }
             if (activeKind === '__window') {
                 const id = `win-${Date.now()}`;
-                const snapped = snapOpeningToNearestWall(
+                const result = snapOpeningWithRoomFallback(
                     point,
                     layout.walls,
+                    layout.rooms,
                     canvasSize,
                     { width: 0.1, maxDistancePx: 64 },
                 );
-                if (!snapped) {
+                if (!result) {
                     toast.warning(
-                        layout.walls.length > 0
-                            ? 'Place windows close to a wall so the opening can snap cleanly.'
-                            : 'Draw a wall first, then place windows on the wall.',
+                        layout.walls.length > 0 || layout.rooms.length > 0
+                            ? 'Place windows closer to a wall or room edge.'
+                            : 'Draw a room or wall first, then place windows on it.',
                     );
                     return;
                 }
+                const { snapped, newWalls } = result;
                 dispatch({ type: 'commit' });
+                for (const wall of newWalls) {
+                    dispatch({ type: 'add_wall', wall });
+                }
                 dispatch({
                     type: 'add_window',
                     window: {
@@ -1072,14 +1101,32 @@ export default function PlanCanvas(props: Props) {
                 for (const [, base] of drag.bases) {
                     if (base.kind === 'room') {
                         const r = base.base;
+                        const nextX = clamp(r.x + dx, 0, 1 - r.width);
+                        const nextY = clamp(r.y + dy, 0, 1 - r.height);
                         dispatch({
                             type: 'update_room',
                             id: r.id,
-                            patch: {
-                                x: clamp(r.x + dx, 0, 1 - r.width),
-                                y: clamp(r.y + dy, 0, 1 - r.height),
-                            },
+                            patch: { x: nextX, y: nextY },
                         });
+                        // Keep any auto-promoted edge walls glued to the room.
+                        const edgeWalls = roomEdgeWalls({
+                            ...r,
+                            x: nextX,
+                            y: nextY,
+                        });
+                        for (const edge of edgeWalls) {
+                            if (
+                                layout.walls.some(
+                                    (wall) => wall.id === edge.id,
+                                )
+                            ) {
+                                dispatch({
+                                    type: 'update_wall',
+                                    id: edge.id,
+                                    patch: { points: edge.points },
+                                });
+                            }
+                        }
                     } else if (base.kind === 'wall') {
                         const w = base.base;
                         const points = w.points.map((p) => ({
@@ -1099,12 +1146,19 @@ export default function PlanCanvas(props: Props) {
                             y: clamp01(d.y + dy),
                             width: normaliseDoor(d).width,
                         };
-                        const snapped = snapOpeningToNearestWall(
+                        const result = snapOpeningWithRoomFallback(
                             openingCentreFromTopLeft(moved, canvasSize),
                             layout.walls,
+                            layout.rooms,
                             canvasSize,
                             { width: moved.width, maxDistancePx: 72 },
                         );
+                        if (result) {
+                            for (const wall of result.newWalls) {
+                                dispatch({ type: 'add_wall', wall });
+                            }
+                        }
+                        const snapped = result?.snapped ?? null;
                         dispatch({
                             type: 'update_door',
                             id: d.id,
@@ -1135,12 +1189,19 @@ export default function PlanCanvas(props: Props) {
                             y: clamp01(w.y + dy),
                             width: w.width ?? 0.1,
                         };
-                        const snapped = snapOpeningToNearestWall(
+                        const result = snapOpeningWithRoomFallback(
                             openingCentreFromTopLeft(moved, canvasSize),
                             layout.walls,
+                            layout.rooms,
                             canvasSize,
                             { width: moved.width, maxDistancePx: 72 },
                         );
+                        if (result) {
+                            for (const wall of result.newWalls) {
+                                dispatch({ type: 'add_wall', wall });
+                            }
+                        }
+                        const snapped = result?.snapped ?? null;
                         dispatch({
                             type: 'update_window',
                             id: w.id,
@@ -1219,6 +1280,23 @@ export default function PlanCanvas(props: Props) {
                     id: drag.roomId,
                     patch: { x, y, width, height },
                 });
+                // Sync auto-promoted edge walls to the resized rectangle.
+                const edgeWalls = roomEdgeWalls({
+                    ...r,
+                    x,
+                    y,
+                    width,
+                    height,
+                });
+                for (const edge of edgeWalls) {
+                    if (layout.walls.some((wall) => wall.id === edge.id)) {
+                        dispatch({
+                            type: 'update_wall',
+                            id: edge.id,
+                            patch: { points: edge.points },
+                        });
+                    }
+                }
                 return;
             }
 
@@ -1555,7 +1633,7 @@ export default function PlanCanvas(props: Props) {
                                 key={room.id}
                                 opacity={structureInteractive ? 1 : 0.45}
                                 pointerEvents={
-                                    structureInteractive ? 'auto' : 'none'
+                                    itemsInteractive ? 'auto' : 'none'
                                 }
                             >
                                 <rect
@@ -1687,28 +1765,43 @@ export default function PlanCanvas(props: Props) {
                                                 : handle.includes('s')
                                                   ? y + h
                                                   : y + h / 2;
+                                            const onPointerDown = (
+                                                event: React.PointerEvent,
+                                            ) =>
+                                                beginResizeDrag(
+                                                    event,
+                                                    room.id,
+                                                    room,
+                                                    handle,
+                                                );
                                             return (
-                                                <rect
-                                                    key={handle}
-                                                    x={hx - 5}
-                                                    y={hy - 5}
-                                                    width={10}
-                                                    height={10}
-                                                    fill="#ffffff"
-                                                    stroke="#2563eb"
-                                                    strokeWidth={2}
-                                                    style={{
-                                                        cursor: `${handle}-resize`,
-                                                    }}
-                                                    onPointerDown={(event) =>
-                                                        beginResizeDrag(
-                                                            event,
-                                                            room.id,
-                                                            room,
-                                                            handle,
-                                                        )
-                                                    }
-                                                />
+                                                <g key={handle}>
+                                                    {/* Generous transparent hit pad so the handle is easy to grab. */}
+                                                    <rect
+                                                        x={hx - 9}
+                                                        y={hy - 9}
+                                                        width={18}
+                                                        height={18}
+                                                        fill="transparent"
+                                                        style={{
+                                                            cursor: `${handle}-resize`,
+                                                        }}
+                                                        onPointerDown={
+                                                            onPointerDown
+                                                        }
+                                                    />
+                                                    {/* Visible handle. */}
+                                                    <rect
+                                                        x={hx - 6}
+                                                        y={hy - 6}
+                                                        width={12}
+                                                        height={12}
+                                                        fill="#ffffff"
+                                                        stroke="#2563eb"
+                                                        strokeWidth={2}
+                                                        pointerEvents="none"
+                                                    />
+                                                </g>
                                             );
                                         })}
                                     </>
@@ -1758,7 +1851,7 @@ export default function PlanCanvas(props: Props) {
                                 key={wall.id}
                                 opacity={structureInteractive ? 1 : 0.45}
                                 pointerEvents={
-                                    structureInteractive ? 'auto' : 'none'
+                                    itemsInteractive ? 'auto' : 'none'
                                 }
                             >
                                 {renderSegments.map((segment) => (
@@ -1893,7 +1986,7 @@ export default function PlanCanvas(props: Props) {
                                 }
                                 opacity={structureInteractive ? 1 : 0.45}
                                 pointerEvents={
-                                    structureInteractive ? 'auto' : 'none'
+                                    itemsInteractive ? 'auto' : 'none'
                                 }
                             >
                                 <DoorSymbol
@@ -1902,6 +1995,7 @@ export default function PlanCanvas(props: Props) {
                                     canvasHeight={canvasHeight}
                                     selected={selected}
                                     pending={pending}
+                                    detached={!resolved.attached}
                                     onPointerDown={(event) =>
                                         beginMoveDrag(event, {
                                             type: 'door',
@@ -1917,26 +2011,31 @@ export default function PlanCanvas(props: Props) {
                                         )
                                     }
                                 />
-                                {onlySelected && structureInteractive && (
-                                    <RotationHandle
-                                        cx={cx}
-                                        cy={cy}
-                                        offset={26}
-                                        onBegin={(event) =>
-                                            beginRotateDrag(
-                                                event,
-                                                { type: 'door', id: door.id },
-                                                {
-                                                    x:
-                                                        resolved.x +
-                                                        resolved.width / 2,
-                                                    y: resolved.y,
-                                                },
-                                                rotation,
-                                            )
-                                        }
-                                    />
-                                )}
+                                {onlySelected &&
+                                    structureInteractive &&
+                                    !resolved.attached && (
+                                        <RotationHandle
+                                            cx={cx}
+                                            cy={cy}
+                                            offset={26}
+                                            onBegin={(event) =>
+                                                beginRotateDrag(
+                                                    event,
+                                                    {
+                                                        type: 'door',
+                                                        id: door.id,
+                                                    },
+                                                    {
+                                                        x:
+                                                            resolved.x +
+                                                            resolved.width / 2,
+                                                        y: resolved.y,
+                                                    },
+                                                    rotation,
+                                                )
+                                            }
+                                        />
+                                    )}
                             </g>
                         );
                     })}
@@ -1975,7 +2074,7 @@ export default function PlanCanvas(props: Props) {
                                 }
                                 opacity={structureInteractive ? 1 : 0.45}
                                 pointerEvents={
-                                    structureInteractive ? 'auto' : 'none'
+                                    itemsInteractive ? 'auto' : 'none'
                                 }
                             >
                                 <rect
@@ -1996,11 +2095,17 @@ export default function PlanCanvas(props: Props) {
                                     stroke={
                                         selected || pending
                                             ? '#2563eb'
-                                            : '#0284c7'
+                                            : resolved.attached
+                                              ? '#0284c7'
+                                              : '#d97706'
                                     }
                                     strokeWidth={selected || pending ? 3 : 2}
                                     strokeDasharray={
-                                        pending && !selected ? '6 4' : undefined
+                                        (pending && !selected) ||
+                                        (!resolved.attached &&
+                                            !(selected || pending))
+                                            ? '6 4'
+                                            : undefined
                                     }
                                     onPointerDown={(event) =>
                                         beginMoveDrag(event, {
@@ -2038,26 +2143,31 @@ export default function PlanCanvas(props: Props) {
                                     strokeWidth={1.5}
                                     pointerEvents="none"
                                 />
-                                {onlySelected && structureInteractive && (
-                                    <RotationHandle
-                                        cx={cx}
-                                        cy={cy}
-                                        offset={26}
-                                        onBegin={(event) =>
-                                            beginRotateDrag(
-                                                event,
-                                                { type: 'window', id: win.id },
-                                                {
-                                                    x:
-                                                        resolved.x +
-                                                        resolved.width / 2,
-                                                    y: resolved.y,
-                                                },
-                                                rotation,
-                                            )
-                                        }
-                                    />
-                                )}
+                                {onlySelected &&
+                                    structureInteractive &&
+                                    !resolved.attached && (
+                                        <RotationHandle
+                                            cx={cx}
+                                            cy={cy}
+                                            offset={26}
+                                            onBegin={(event) =>
+                                                beginRotateDrag(
+                                                    event,
+                                                    {
+                                                        type: 'window',
+                                                        id: win.id,
+                                                    },
+                                                    {
+                                                        x:
+                                                            resolved.x +
+                                                            resolved.width / 2,
+                                                        y: resolved.y,
+                                                    },
+                                                    rotation,
+                                                )
+                                            }
+                                        />
+                                    )}
                             </g>
                         );
                     })}
@@ -2130,7 +2240,7 @@ export default function PlanCanvas(props: Props) {
                                 }
                                 opacity={structureInteractive ? 1 : 0.45}
                                 pointerEvents={
-                                    structureInteractive ? 'auto' : 'none'
+                                    itemsInteractive ? 'auto' : 'none'
                                 }
                             >
                                 <text
@@ -2242,6 +2352,7 @@ export default function PlanCanvas(props: Props) {
                         <g
                             key={`pin-${id}`}
                             transform={`translate(${x} ${y})`}
+                            pointerEvents={pinsInteractive ? 'auto' : 'none'}
                             onPointerDown={
                                 editable
                                     ? (event) =>

@@ -2,6 +2,8 @@ import type { ReactNode } from 'react';
 import { normaliseDoor, type NormalisedDoor, type PlanDoor } from './_types';
 
 const STROKE = '#1f2937';
+/** Door panel (leaf) thickness in canvas units. */
+const PANEL_THICKNESS = 2.4;
 
 type DoorSymbolProps = {
     door: PlanDoor;
@@ -9,6 +11,12 @@ type DoorSymbolProps = {
     canvasHeight: number;
     selected?: boolean;
     pending?: boolean;
+    /**
+     * The door isn't attached to a wall (`wall_id == null`). Render with an
+     * amber dashed outline so users can see it's floating and needs to be
+     * dragged back near a wall.
+     */
+    detached?: boolean;
     onPointerDown?: (event: React.PointerEvent<SVGElement>) => void;
     onClick?: (event: React.MouseEvent<SVGElement>) => void;
     onContextMenu?: (event: React.MouseEvent<SVGElement>) => void;
@@ -26,6 +34,7 @@ export function DoorSymbol({
     canvasHeight,
     selected = false,
     pending = false,
+    detached = false,
     onPointerDown,
     onClick,
     onContextMenu,
@@ -36,32 +45,63 @@ export function DoorSymbol({
     const y = normalised.y * canvasHeight;
     const w = normalised.width * canvasWidth;
 
-    const bbox = symbolBoundingBox(normalised, w);
-    const highlightStroke = selected || pending ? '#2563eb' : 'transparent';
-    const highlightDash = pending && !selected ? '6 4' : undefined;
+    const click = clickShieldBox(w);
+    const visual = symbolBoundingBox(normalised, w);
+    const outlineStroke = selected
+        ? detached
+            ? '#d97706'
+            : '#2563eb'
+        : pending
+          ? '#2563eb'
+          : detached
+            ? '#d97706'
+            : 'transparent';
+    const outlineDash = detached || (pending && !selected) ? '6 4' : undefined;
+    const showOutline = selected || pending || detached;
     const cursorStyle: React.CSSProperties = { cursor: selected ? 'grab' : 'move' };
 
     return (
         <g>
-            {/* Hit shield — transparent rect sized to the symbol bbox */}
+            {/* Click shield — narrow rect over the opening (not the swing arc). */}
             <rect
-                x={x + bbox.minX - 4}
-                y={y + bbox.minY - 4}
-                width={bbox.maxX - bbox.minX + 8}
-                height={bbox.maxY - bbox.minY + 8}
+                x={x + click.minX - 4}
+                y={y + click.minY - 4}
+                width={click.maxX - click.minX + 8}
+                height={click.maxY - click.minY + 8}
                 fill="transparent"
-                stroke={highlightStroke}
-                strokeWidth={selected || pending ? 1.5 : 0}
-                strokeDasharray={highlightDash}
                 onPointerDown={onPointerDown}
                 onClick={onClick}
                 onContextMenu={onContextMenu}
                 onDoubleClick={onDoubleClick}
                 style={cursorStyle}
             />
+            {/* Selection / pending / detached outline tracks the full symbol bbox. */}
+            {showOutline && (
+                <rect
+                    x={x + visual.minX - 4}
+                    y={y + visual.minY - 4}
+                    width={visual.maxX - visual.minX + 8}
+                    height={visual.maxY - visual.minY + 8}
+                    fill="none"
+                    stroke={outlineStroke}
+                    strokeWidth={1.5}
+                    strokeDasharray={outlineDash}
+                    pointerEvents="none"
+                />
+            )}
             <SymbolPaths door={normalised} x={x} y={y} w={w} />
         </g>
     );
+}
+
+/**
+ * Hit area for clicks — sized to just the opening plus a small margin around
+ * the door panel. Stays clear of the swing arc so clicks in the arc region
+ * (which can extend deep into the room) don't accidentally select the door.
+ */
+function clickShieldBox(w: number): { minX: number; maxX: number; minY: number; maxY: number } {
+    const margin = Math.max(6, w * 0.18);
+    return { minX: 0, maxX: w, minY: -margin, maxY: margin };
 }
 
 /**
@@ -79,6 +119,16 @@ function swingKey(door: NormalisedDoor): SwingKey {
 }
 
 function SymbolPaths({ door, x, y, w }: { door: NormalisedDoor; x: number; y: number; w: number }): ReactNode {
+    return (
+        <>
+            {/* Block-out: covers the cut wall area so room fill / grid don't show through. */}
+            <OpeningClear x={x} y={y} w={w} />
+            {symbolFor(door, x, y, w)}
+        </>
+    );
+}
+
+function symbolFor(door: NormalisedDoor, x: number, y: number, w: number): ReactNode {
     switch (door.subkind) {
         case 'single_swing':
             return <SingleSwing door={door} x={x} y={y} w={w} />;
@@ -101,6 +151,14 @@ function SymbolPaths({ door, x, y, w }: { door: NormalisedDoor; x: number; y: nu
     }
 }
 
+/**
+ * White rect drawn under the door symbol to mask the wall cut + anything
+ * behind it, so the door reads as a solid opening rather than transparent.
+ */
+function OpeningClear({ x, y, w }: { x: number; y: number; w: number }) {
+    return <rect x={x} y={y - 5} width={w} height={10} fill="#ffffff" pointerEvents="none" />;
+}
+
 function WallStops({ x, y, w }: { x: number; y: number; w: number }) {
     return (
         <>
@@ -114,26 +172,36 @@ function SingleSwing({ door, x, y, w }: { door: NormalisedDoor; x: number; y: nu
     const key = swingKey(door);
     const config = SWING_PATHS[key];
     const hinge = { x: x + config.hinge[0] * w, y: y + config.hinge[1] * w };
-    const end = { x: x + config.end[0] * w, y: y + config.end[1] * w };
+    // The door leaf is drawn as a thin filled rect (length `w`, hinge-aligned)
+    // rotated so it points to `end`. This reads as a solid door instead of a
+    // hairline stroke.
+    const angle = Math.atan2(
+        config.end[1] - config.hinge[1],
+        config.end[0] - config.hinge[0],
+    );
+    const angleDeg = (angle * 180) / Math.PI;
     return (
         <>
             <WallStops x={x} y={y} w={w} />
-            <path
-                d={`M ${hinge.x},${hinge.y} L ${end.x},${end.y}`}
-                stroke={STROKE}
-                strokeWidth={2}
-                strokeLinecap="round"
-                fill="none"
+            <rect
+                x={hinge.x}
+                y={hinge.y - PANEL_THICKNESS / 2}
+                width={w}
+                height={PANEL_THICKNESS}
+                fill={STROKE}
+                transform={`rotate(${angleDeg} ${hinge.x} ${hinge.y})`}
             />
             <path
-                d={`M ${end.x},${end.y} A ${w},${w} 0 0 ${config.arcSweep} ${
+                d={`M ${x + (config.end[0] * w)},${y + (config.end[1] * w)} A ${w},${w} 0 0 ${config.arcSweep} ${
                     config.swing_side === 'right' ? x : x + w
                 },${y}`}
                 stroke={STROKE}
-                strokeWidth={1.5}
+                strokeWidth={1.2}
+                strokeDasharray="4 3"
                 fill="none"
+                opacity={0.6}
             />
-            <circle cx={hinge.x} cy={hinge.y} r={2} fill={STROKE} />
+            <circle cx={hinge.x} cy={hinge.y} r={2.5} fill={STROKE} />
         </>
     );
 }
@@ -153,34 +221,50 @@ const SWING_PATHS: Record<
 };
 
 function DoubleSwing({ door, x, y, w }: { door: NormalisedDoor; x: number; y: number; w: number }) {
-    // Both leaves are w/2 wide. swing_direction flips both arcs together.
     const out = door.swing_direction === 'out';
-    const leafEndY = out ? y - w / 2 : y + w / 2;
-    // For 'in': left leaf sweeps clockwise (arc=1), right leaf counter-clockwise (arc=0) so they curl inward.
-    // For 'out': flip both.
+    const half = w / 2;
+    const leafEndY = out ? y - half : y + half;
+    // Leaves are shown open, perpendicular to the wall, half-width long.
+    const leafTopY = out ? y - half : y;
     const leftSweep: 0 | 1 = out ? 0 : 1;
     const rightSweep: 0 | 1 = out ? 1 : 0;
     return (
         <>
             <WallStops x={x} y={y} w={w} />
             {/* Left leaf */}
-            <path d={`M ${x},${y} L ${x},${leafEndY}`} stroke={STROKE} strokeWidth={2} strokeLinecap="round" fill="none" />
-            <path
-                d={`M ${x},${leafEndY} A ${w / 2},${w / 2} 0 0 ${leftSweep} ${x + w / 2},${y}`}
-                stroke={STROKE}
-                strokeWidth={1.5}
-                fill="none"
+            <rect
+                x={x - PANEL_THICKNESS / 2}
+                y={leafTopY}
+                width={PANEL_THICKNESS}
+                height={half}
+                fill={STROKE}
             />
-            <circle cx={x} cy={y} r={2} fill={STROKE} />
+            <path
+                d={`M ${x},${leafEndY} A ${half},${half} 0 0 ${leftSweep} ${x + half},${y}`}
+                stroke={STROKE}
+                strokeWidth={1.2}
+                strokeDasharray="4 3"
+                fill="none"
+                opacity={0.6}
+            />
+            <circle cx={x} cy={y} r={2.5} fill={STROKE} />
             {/* Right leaf */}
-            <path d={`M ${x + w},${y} L ${x + w},${leafEndY}`} stroke={STROKE} strokeWidth={2} strokeLinecap="round" fill="none" />
-            <path
-                d={`M ${x + w},${leafEndY} A ${w / 2},${w / 2} 0 0 ${rightSweep} ${x + w / 2},${y}`}
-                stroke={STROKE}
-                strokeWidth={1.5}
-                fill="none"
+            <rect
+                x={x + w - PANEL_THICKNESS / 2}
+                y={leafTopY}
+                width={PANEL_THICKNESS}
+                height={half}
+                fill={STROKE}
             />
-            <circle cx={x + w} cy={y} r={2} fill={STROKE} />
+            <path
+                d={`M ${x + w},${leafEndY} A ${half},${half} 0 0 ${rightSweep} ${x + half},${y}`}
+                stroke={STROKE}
+                strokeWidth={1.2}
+                strokeDasharray="4 3"
+                fill="none"
+                opacity={0.6}
+            />
+            <circle cx={x + w} cy={y} r={2.5} fill={STROKE} />
         </>
     );
 }
