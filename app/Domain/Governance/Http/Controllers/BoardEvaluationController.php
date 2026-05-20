@@ -13,7 +13,7 @@ class BoardEvaluationController extends Controller
 {
     public function index()
     {
-        abort_unless(request()->user()?->canDo('governance.evaluations.view'), 403);
+        $this->authorize('viewAny', BoardEvaluation::class);
 
         $evaluations = BoardEvaluation::withCount('responses')
             ->orderByDesc('created_at')
@@ -38,14 +38,14 @@ class BoardEvaluationController extends Controller
 
     public function create()
     {
-        abort_unless(request()->user()?->canDo('governance.evaluations.manage'), 403);
+        $this->authorize('create', BoardEvaluation::class);
 
         return Inertia::render('Governance/Evaluations/Create');
     }
 
     public function store(Request $request)
     {
-        abort_unless($request->user()?->canDo('governance.evaluations.manage'), 403);
+        $this->authorize('create', BoardEvaluation::class);
 
         $validated = $request->validate([
             'title' => 'required|string|max:255',
@@ -77,7 +77,7 @@ class BoardEvaluationController extends Controller
 
     public function show(BoardEvaluation $evaluation)
     {
-        abort_unless(request()->user()?->canDo('governance.evaluations.view'), 403);
+        $this->authorize('view', $evaluation);
 
         $evaluation->load('responses.boardMember.user');
 
@@ -122,7 +122,7 @@ class BoardEvaluationController extends Controller
 
     public function launch(BoardEvaluation $evaluation)
     {
-        abort_unless(request()->user()?->canDo('governance.evaluations.manage'), 403);
+        $this->authorize('launch', $evaluation);
 
         $evaluation->update([
             'status' => 'open',
@@ -160,7 +160,7 @@ class BoardEvaluationController extends Controller
 
     public function close(BoardEvaluation $evaluation)
     {
-        abort_unless(request()->user()?->canDo('governance.evaluations.manage'), 403);
+        $this->authorize('close', $evaluation);
 
         $evaluation->update([
             'status' => 'closed',
@@ -172,7 +172,7 @@ class BoardEvaluationController extends Controller
 
     public function results(BoardEvaluation $evaluation)
     {
-        abort_unless(request()->user()?->canDo('governance.evaluations.view'), 403);
+        $this->authorize('results', $evaluation);
 
         $evaluation->load('responses.boardMember.user');
 

@@ -20,6 +20,7 @@ class ComplianceObligation extends Model
         'obligation_title',
         'description',
         'frequency',
+        'workforce_requirement_id',
         'due_date',
         'next_due_date',
         'reminder_days',
@@ -77,6 +78,17 @@ class ComplianceObligation extends Model
     public function owner(): BelongsTo
     {
         return $this->belongsTo(User::class, 'owner_id');
+    }
+
+    /**
+     * Optional link to an HR-owned workforce certification / training
+     * requirement. The HR module remains source of truth for the underlying
+     * staff records; Governance just surfaces the org-level obligation
+     * (e.g. "All staff complete H&S induction").
+     */
+    public function workforceRequirement(): BelongsTo
+    {
+        return $this->belongsTo(\App\Domain\Hr\Models\HrComplianceRequirement::class, 'workforce_requirement_id');
     }
 
     public function completedBy(): BelongsTo

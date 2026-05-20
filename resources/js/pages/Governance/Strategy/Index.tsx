@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Target, Compass, TrendingUp, Calendar } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { governanceStatusColor } from '@/lib/governance-status';
 
 interface StrategicPlan {
   id: number;
@@ -28,14 +29,7 @@ interface Props extends PageProps {
 }
 
 export default function StrategyIndex({ auth, plans }: Props) {
-  const getStatusColor = (status: string) => {
-    return {
-      draft: 'bg-muted text-foreground',
-      consultation: 'bg-status-info-bg text-status-info',
-      approved: 'bg-status-success-bg text-status-success',
-      archived: 'bg-muted text-foreground',
-    }[status] || 'bg-muted text-foreground';
-  };
+  const getStatusColor = (status: string) => governanceStatusColor(status);
 
   const getHorizonLabel = (horizon: string) => {
     return {

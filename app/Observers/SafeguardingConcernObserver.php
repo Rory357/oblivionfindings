@@ -2,6 +2,8 @@
 
 namespace App\Observers;
 
+use App\Domain\Governance\Models\NotifiableIncident;
+use App\Domain\Governance\Services\GovernanceAuditService;
 use App\Models\HsEvent;
 use App\Models\SafeguardingConcern;
 use App\Services\ControlRoom\ComprehensiveAlertBridgeService;
@@ -25,6 +27,7 @@ class SafeguardingConcernObserver implements ShouldHandleEventsAfterCommit
     {
         $this->recordHsEvent($concern);
         $this->dispatchBridge($concern);
+        $this->maybeCreateNotifiableIncident($concern);
     }
 
     /**
@@ -43,7 +46,99 @@ class SafeguardingConcernObserver implements ShouldHandleEventsAfterCommit
             && $concern->getOriginal('severity') !== 'critical'
         ) {
             $this->dispatchBridge($concern, escalation: true);
+            $this->maybeCreateNotifiableIncident($concern);
         }
+    }
+
+    /**
+     * For critical safeguarding concerns requiring external reporting,
+     * automatically create a `NotifiableIncident` so the regulator
+     * notification clock starts. Idempotent — one notifiable per concern.
+     */
+    private function maybeCreateNotifiableIncident(SafeguardingConcern $concern): void
+    {
+        if ($concern->severity !== 'critical') {
+            return;
+        }
+
+        // Tied to the concern via the `related_incident_id` column. Skip if
+        // it's already been created for this concern.
+        $existing = NotifiableIncident::query()
+            ->where('related_incident_id', $concern->id)
+            ->where('incident_type', 'safeguarding')
+            ->first();
+
+        if ($existing) {
+            return;
+        }
+
+        try {
+            $authority = $this->resolveAuthority($concern);
+
+            $incident = NotifiableIncident::create([
+                'incident_type' => 'safeguarding',
+                'notification_authority' => $authority,
+                'title' => 'Auto-generated from safeguarding concern #' . $concern->id,
+                'description' => $concern->description ?? 'Critical safeguarding concern requiring authority notification.',
+                'related_incident_id' => $concern->id,
+                'severity' => 'critical',
+                'status' => 'pending',
+                'occurred_at' => $concern->occurred_at ?? $concern->created_at,
+                'discovered_at' => $concern->reported_at ?? now(),
+                'notification_deadline' => $this->resolveDeadline($authority),
+                'submitted_by' => $concern->reported_by_user_id,
+            ]);
+
+            GovernanceAuditService::log(
+                'notifiable_incident.auto_created',
+                'NotifiableIncident',
+                $incident->id,
+                [
+                    'source' => 'SafeguardingConcern',
+                    'safeguarding_concern_id' => $concern->id,
+                    'authority' => $authority,
+                ],
+            );
+        } catch (\Throwable $e) {
+            Log::error('SafeguardingConcernObserver: NotifiableIncident creation failed', [
+                'concern_id' => $concern->id,
+                'error' => $e->getMessage(),
+            ]);
+        }
+    }
+
+    /**
+     * Map concern context to the most likely notification authority.
+     * Conservative default is 'oranga_tamariki' for child-related concerns
+     * and 'police' for adult abuse / assault categories — the user can edit
+     * the authority on the NotifiableIncident before it's submitted.
+     */
+    private function resolveAuthority(SafeguardingConcern $concern): string
+    {
+        // SafeguardingConcern uses concern_type + abuse_category — combine for routing.
+        $hint = strtolower(implode(' ', array_filter([
+            (string) ($concern->concern_type ?? ''),
+            (string) ($concern->abuse_category ?? ''),
+        ])));
+
+        if (str_contains($hint, 'financial') || str_contains($hint, 'fraud')) {
+            return 'police';
+        }
+        if (str_contains($hint, 'abuse') || str_contains($hint, 'assault') || str_contains($hint, 'violence')) {
+            return 'police';
+        }
+        if (str_contains($hint, 'child') || str_contains($hint, 'minor')) {
+            return 'oranga_tamariki';
+        }
+
+        return 'health_nz';
+    }
+
+    private function resolveDeadline(string $authority): \Illuminate\Support\Carbon
+    {
+        // Statutory deadlines vary by authority. Use a conservative 48-hour
+        // window as a placeholder; the user can adjust on review.
+        return now()->addHours(48);
     }
 
     /* ------------------------------------------------------------------ */

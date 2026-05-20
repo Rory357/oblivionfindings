@@ -67,6 +67,11 @@ class Budget extends Model
         return $this->hasMany(BudgetAdjustment::class);
     }
 
+    public function allocations(): HasMany
+    {
+        return $this->hasMany(BudgetAllocation::class);
+    }
+
     public function scopeByFiscalYear($query, string $year)
     {
         return $query->where('fiscal_year', $year);

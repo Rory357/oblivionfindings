@@ -12,7 +12,7 @@ class BoardInterestController extends Controller
 {
     public function index()
     {
-        abort_unless(request()->user()?->canDo('governance.interests.view'), 403);
+        $this->authorize('viewAny', BoardMemberInterest::class);
 
         $interests = BoardMemberInterest::with('boardMember.user')
             ->where('is_current', true)
@@ -31,7 +31,7 @@ class BoardInterestController extends Controller
 
     public function store(Request $request)
     {
-        abort_unless($request->user()?->canDo('governance.interests.manage'), 403);
+        $this->authorize('create', BoardMemberInterest::class);
 
         // Ensure the user can only declare interests for their own board member record
         $userBoardMember = $request->user()->boardMember;
@@ -70,7 +70,7 @@ class BoardInterestController extends Controller
 
     public function update(Request $request, BoardMemberInterest $interest)
     {
-        abort_unless($request->user()?->canDo('governance.interests.manage'), 403);
+        $this->authorize('update', $interest);
 
         $validated = $request->validate([
             'description' => 'sometimes|string',
@@ -89,7 +89,7 @@ class BoardInterestController extends Controller
 
     public function myInterests()
     {
-        abort_unless(request()->user()?->canDo('governance.interests.view'), 403);
+        $this->authorize('viewAny', BoardMemberInterest::class);
 
         $boardMember = auth()->user()->boardMember;
 

@@ -9,6 +9,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Compass, Target, Rocket, Calendar, CheckCircle, Clock, AlertTriangle } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { governanceStatusColor } from '@/lib/governance-status';
 
 interface Initiative {
   id: number;
@@ -77,24 +78,7 @@ export default function StrategyShow({ auth, plan }: Props) {
     return colors[pillar] || 'bg-muted text-foreground border-border';
   };
 
-  const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'achieved':
-      case 'complete':
-      case 'approved':
-        return 'bg-status-success-bg text-status-success';
-      case 'in_progress':
-        return 'bg-status-info-bg text-status-info';
-      case 'at_risk':
-      case 'on_hold':
-        return 'bg-status-warning-bg text-status-warning';
-      case 'blocked':
-      case 'cancelled':
-        return 'bg-status-critical-bg text-status-critical';
-      default:
-        return 'bg-muted text-foreground';
-    }
-  };
+  const getStatusColor = (status: string) => governanceStatusColor(status);
 
   const groupGoalsByPillar = () => {
     const grouped: Record<string, Goal[]> = {};

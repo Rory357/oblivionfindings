@@ -8,6 +8,8 @@ import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { BookOpen, Plus, Eye } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { governanceStatusColor } from '@/lib/governance-status';
+import { EmptyList } from '@/components/ui/empty-state';
 
 interface Policy {
   id: number;
@@ -30,12 +32,7 @@ interface Props extends PageProps {
 }
 
 export default function PolicyIndex({ auth, policies, categories }: Props) {
-  const getStatusColor = (status: string) => ({
-    draft: 'bg-muted text-foreground',
-    active: 'bg-status-success-bg text-status-success',
-    under_review: 'bg-status-warning-bg text-status-warning',
-    archived: 'bg-status-critical-bg text-status-critical',
-  }[status] || 'bg-muted text-foreground');
+  const getStatusColor = (status: string) => governanceStatusColor(status);
 
   const getCategoryLabel = (value: string) =>
     categories.find(c => c.value === value)?.label ?? value;
@@ -106,11 +103,14 @@ export default function PolicyIndex({ auth, policies, categories }: Props) {
           ))}
 
           {policies.data.length === 0 && (
-            <Card>
-              <CardContent className="p-8 text-center text-muted-foreground">
-                No policies found. Create your first governance policy.
-              </CardContent>
-            </Card>
+            <EmptyList
+              icon={BookOpen}
+              itemName="policy"
+              itemNamePlural="policies"
+              createHref="/governance/policies/create"
+              createLabel="Create policy"
+              variant="compact"
+            />
           )}
         </div>
 

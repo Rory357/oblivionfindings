@@ -6,8 +6,11 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+use App\Models\Concerns\AuditableChanges;
 class MeetingRsvp extends Model
 {
+    use AuditableChanges;
+
     protected $fillable = [
         'governance_meeting_id', 'board_member_id', 'response',
         'decline_reason', 'dietary_requirements', 'dietary_notes', 'responded_at',

@@ -6,8 +6,11 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+use App\Models\Concerns\AuditableChanges;
 class GovernanceFeedbackEscalation extends Model
 {
+    use AuditableChanges;
+
     protected $fillable = [
         'source_type', 'source_id', 'title', 'description', 'severity',
         'status', 'resolution_notes', 'assigned_to', 'escalated_by',

@@ -12,6 +12,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Landmark, Plus } from 'lucide-react';
 import { useState } from 'react';
 import { cn } from '@/lib/utils';
+import { governanceStatusColor } from '@/lib/governance-status';
 
 interface Obligation {
   id: number;
@@ -52,12 +53,7 @@ export default function TeTiritiIndex({ auth, obligationsByPrinciple, principles
     });
   };
 
-  const getStatusColor = (status: string) => ({
-    not_started: 'bg-muted text-foreground',
-    in_progress: 'bg-status-warning-bg text-status-warning',
-    implemented: 'bg-status-info-bg text-status-info',
-    embedded: 'bg-status-success-bg text-status-success',
-  }[status] || 'bg-muted text-foreground');
+  const getStatusColor = (status: string) => governanceStatusColor(status);
 
   const getStatusLabel = (status: string) => ({
     not_started: 'Not Started',

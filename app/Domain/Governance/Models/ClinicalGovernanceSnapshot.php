@@ -6,8 +6,11 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+use App\Models\Concerns\AuditableChanges;
 class ClinicalGovernanceSnapshot extends Model
 {
+    use AuditableChanges;
+
     protected $fillable = [
         'period_start', 'period_end', 'period_type',
         'indicator_values', 'summary', 'narrative', 'captured_by',

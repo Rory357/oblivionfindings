@@ -8,8 +8,11 @@ use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
 
+use App\Models\Concerns\AuditableChanges;
 class RecurringMeetingSchedule extends Model
 {
+    use AuditableChanges;
+
     protected $fillable = [
         'meeting_type', 'board_committee_id', 'title_template', 'frequency',
         'day_of_month', 'time', 'duration_minutes', 'location', 'virtual_link',

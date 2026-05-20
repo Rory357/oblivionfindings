@@ -7,6 +7,8 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Star, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { governanceStatusColor } from '@/lib/governance-status';
+import { EmptyList } from '@/components/ui/empty-state';
 
 interface Evaluation {
   id: number;
@@ -27,11 +29,7 @@ interface Props extends PageProps {
 }
 
 export default function EvaluationsIndex({ auth, evaluations }: Props) {
-  const getStatusColor = (status: string) => ({
-    draft: 'bg-muted text-foreground',
-    active: 'bg-status-info-bg text-status-info',
-    closed: 'bg-status-success-bg text-status-success',
-  }[status] || 'bg-muted text-foreground');
+  const getStatusColor = (status: string) => governanceStatusColor(status);
 
   const getTypeLabel = (type: string) => ({
     board: 'Full Board',
@@ -92,7 +90,13 @@ export default function EvaluationsIndex({ auth, evaluations }: Props) {
             </Card>
           ))}
           {evaluations.data.length === 0 && (
-            <Card><CardContent className="p-8 text-center text-muted-foreground">No evaluations yet.</CardContent></Card>
+            <EmptyList
+              icon={Star}
+              itemName="evaluation"
+              createHref="/governance/evaluations/create"
+              createLabel="Start evaluation"
+              variant="compact"
+            />
           )}
         </div>
       </PageLayout>

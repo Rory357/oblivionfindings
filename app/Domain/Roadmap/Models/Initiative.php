@@ -3,6 +3,7 @@
 namespace App\Domain\Roadmap\Models;
 
 use App\Domain\Governance\Models\RiskRegisterEntry;
+use App\Domain\Governance\Models\StrategicGoal;
 use App\Models\Concerns\AuditableChanges;
 use App\Models\Site;
 use App\Models\User;
@@ -41,6 +42,7 @@ class Initiative extends Model
 
     protected $fillable = [
         'tenant_id',
+        'strategic_goal_id',
         'code',
         'title',
         'summary',
@@ -115,6 +117,11 @@ class Initiative extends Model
     public function category(): BelongsTo
     {
         return $this->belongsTo(InitiativeCategory::class, 'category_id');
+    }
+
+    public function strategicGoal(): BelongsTo
+    {
+        return $this->belongsTo(StrategicGoal::class, 'strategic_goal_id');
     }
 
     public function owner(): BelongsTo

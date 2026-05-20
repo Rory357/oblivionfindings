@@ -5,8 +5,11 @@ namespace App\Domain\Governance\Models;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+use App\Models\Concerns\AuditableChanges;
 class BoardEvaluationResponse extends Model
 {
+    use AuditableChanges;
+
     protected $fillable = [
         'board_evaluation_id', 'board_member_id', 'answers',
         'is_anonymous', 'submitted_at',

@@ -13,7 +13,7 @@ class BoardMemberAdminController extends Controller
 {
     public function index()
     {
-        abort_unless(request()->user()?->canDo('governance.meetings.manage'), 403);
+        $this->authorize('viewAny', BoardMember::class);
 
         $boardMembers = BoardMember::with('user')
             ->orderBy('board_role')
@@ -34,7 +34,7 @@ class BoardMemberAdminController extends Controller
 
     public function store(Request $request)
     {
-        abort_unless($request->user()?->canDo('governance.meetings.manage'), 403);
+        $this->authorize('create', BoardMember::class);
 
         $validated = $request->validate([
             'user_id' => [
@@ -71,7 +71,7 @@ class BoardMemberAdminController extends Controller
 
     public function update(Request $request, BoardMember $boardMember)
     {
-        abort_unless($request->user()?->canDo('governance.meetings.manage'), 403);
+        $this->authorize('update', $boardMember);
 
         $validated = $request->validate([
             'board_role' => 'sometimes|in:chair,secretary,treasurer,member,observer',
@@ -86,7 +86,7 @@ class BoardMemberAdminController extends Controller
 
     public function destroy(BoardMember $boardMember)
     {
-        abort_unless(request()->user()?->canDo('governance.meetings.manage'), 403);
+        $this->authorize('delete', $boardMember);
 
         $boardMember->update(['is_active' => false]);
         $boardMember->delete();

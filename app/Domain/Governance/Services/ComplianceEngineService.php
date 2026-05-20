@@ -5,6 +5,7 @@ namespace App\Domain\Governance\Services;
 use App\Domain\Governance\Models\ComplianceEvidence;
 use App\Domain\Governance\Models\ComplianceObligation;
 use App\Domain\Governance\Models\ComplianceReminder;
+use App\Domain\Governance\Models\GovernanceSetting;
 use App\Models\User;
 use Carbon\Carbon;
 
@@ -178,7 +179,8 @@ class ComplianceEngineService
             $count++;
 
             // Escalate if overdue
-            if ($obligation->isOverdue() && $reminder->escalation_level < 3) {
+            $maxLevel = GovernanceSetting::getInt('compliance.escalation.max_level', 3);
+            if ($obligation->isOverdue() && $reminder->escalation_level < $maxLevel) {
                 $this->escalateReminder($reminder);
             }
         }
@@ -187,23 +189,29 @@ class ComplianceEngineService
     }
 
     /**
-     * Escalate a reminder to higher levels
+     * Escalate a reminder to higher levels. Max level + final notification
+     * recipient configurable via GovernanceSetting.
      */
     protected function escalateReminder(ComplianceReminder $reminder): void
     {
-        if ($reminder->escalation_level >= 3) {
+        $maxLevel = GovernanceSetting::getInt('compliance.escalation.max_level', 3);
+        if ($reminder->escalation_level >= $maxLevel) {
             return; // Maximum escalation level reached
         }
 
         $obligation = $reminder->obligation;
         $nextLevel = $reminder->escalation_level + 1;
 
+        // Final-level recipient configurable (default falls back to chair / admin).
+        $finalRecipient = GovernanceSetting::getInt('compliance.escalation.final_notify_user_id', 0)
+            ?: $this->resolveFinalEscalationRecipient();
+
         // Determine who to notify based on escalation level
-        $notifyUsers = match($nextLevel) {
-            1 => [$obligation->owner_id], // Owner again
-            2 => [$obligation->backup_owner_id ?? $obligation->owner_id], // Backup owner
-            3 => [1], // CEO/Admin (would lookup actual CEO)
-            default => [1],
+        $notifyUsers = match (true) {
+            $nextLevel === 1 => [$obligation->owner_id],
+            $nextLevel === 2 => [$obligation->backup_owner_id ?? $obligation->owner_id],
+            $nextLevel >= $maxLevel => [$finalRecipient],
+            default => [$obligation->backup_owner_id ?? $obligation->owner_id],
         };
 
         ComplianceReminder::create([
@@ -215,6 +223,21 @@ class ComplianceEngineService
             'is_escalation' => true,
             'escalation_level' => $nextLevel,
         ]);
+    }
+
+    /**
+     * Resolve a final-level escalation recipient when no governance setting
+     * has been explicitly configured. Prefers an active user with the
+     * board_chair role, then admin, then user id 1 as a last resort.
+     */
+    private function resolveFinalEscalationRecipient(): int
+    {
+        $chair = User::query()
+            ->whereHas('roles', fn ($q) => $q->whereIn('name', ['board_chair', 'admin']))
+            ->orderBy('id')
+            ->value('id');
+
+        return $chair ?: 1;
     }
 
     /**

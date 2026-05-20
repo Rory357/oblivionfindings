@@ -9,6 +9,7 @@ import { PageHero, PageLayout } from '@/components/page';
 import { Textarea } from '@/components/ui/textarea';
 import { CheckCircle, Shield } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { governanceStatusColor } from '@/lib/governance-status';
 
 interface Attestation {
   id: number;
@@ -52,12 +53,7 @@ export default function PolicyShow({ auth, policy, attestationStats, canEdit }: 
     router.post(`/governance/policies/${policy.id}/approve`);
   };
 
-  const getStatusColor = (status: string) => ({
-    draft: 'bg-muted text-foreground',
-    active: 'bg-status-success-bg text-status-success',
-    under_review: 'bg-status-warning-bg text-status-warning',
-    archived: 'bg-status-critical-bg text-status-critical',
-  }[status] || 'bg-muted text-foreground');
+  const getStatusColor = (status: string) => governanceStatusColor(status);
 
   return (
     <AppLayout>

@@ -11,7 +11,7 @@ class GovernanceDocumentController extends Controller
 {
     public function index(Request $request)
     {
-        abort_unless($request->user()?->canDo('governance.documents.view'), 403);
+        $this->authorize('viewAny', GovernanceDocument::class);
 
         $documents = GovernanceDocument::query()
             ->when($request->document_type, fn($q, $type) => $q->where('document_type', $type))
@@ -45,7 +45,7 @@ class GovernanceDocumentController extends Controller
 
     public function store(Request $request)
     {
-        abort_unless($request->user()?->canDo('governance.documents.manage'), 403);
+        $this->authorize('create', GovernanceDocument::class);
 
         $validated = $request->validate([
             'title' => 'required|string|max:255',
@@ -72,9 +72,36 @@ class GovernanceDocumentController extends Controller
         return redirect()->back()->with('success', 'Document uploaded.');
     }
 
+    public function show(GovernanceDocument $document)
+    {
+        $this->authorize('view', $document);
+
+        $document->load('uploadedBy:id,name,email');
+
+        return Inertia::render('Governance/Documents/Show', [
+            'document' => [
+                'id' => $document->id,
+                'title' => $document->title,
+                'category' => $document->document_type,
+                'description' => $document->description,
+                'file_name' => basename($document->file_path),
+                'file_size' => (int) ($document->file_size ?? 0),
+                'mime_type' => $document->mime_type,
+                'version' => (int) $document->version_number,
+                'is_current' => (bool) $document->is_current,
+                'uploaded_by' => $document->uploadedBy ? [
+                    'id' => $document->uploadedBy->id,
+                    'name' => $document->uploadedBy->name,
+                ] : null,
+                'created_at' => $document->created_at?->toIso8601String(),
+                'updated_at' => $document->updated_at?->toIso8601String(),
+            ],
+        ]);
+    }
+
     public function download(GovernanceDocument $document)
     {
-        abort_unless(request()->user()?->canDo('governance.documents.view'), 403);
+        $this->authorize('download', $document);
 
         $path = storage_path('app/' . $document->file_path);
         abort_unless(is_file($path), 404);
@@ -84,7 +111,7 @@ class GovernanceDocumentController extends Controller
 
     public function destroy(GovernanceDocument $document)
     {
-        abort_unless(request()->user()?->canDo('governance.documents.manage'), 403);
+        $this->authorize('delete', $document);
 
         $document->delete();
 

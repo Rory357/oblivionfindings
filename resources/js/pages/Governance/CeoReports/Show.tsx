@@ -7,6 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Send } from 'lucide-react';
 import { PageHero, PageLayout } from '@/components/page';
 import { cn } from '@/lib/utils';
+import { governanceStatusColor } from '@/lib/governance-status';
 
 interface Report {
   id: number;
@@ -34,11 +35,7 @@ export default function CeoReportShow({ auth, report }: Props) {
     router.post(`/governance/ceo-reports/${report.id}/submit`);
   };
 
-  const getStatusColor = (status: string) => ({
-    draft: 'bg-muted text-foreground',
-    submitted: 'bg-status-info-bg text-status-info',
-    presented: 'bg-status-success-bg text-status-success',
-  }[status] || 'bg-muted text-foreground');
+  const getStatusColor = (status: string) => governanceStatusColor(status);
 
   return (
     <AppLayout>

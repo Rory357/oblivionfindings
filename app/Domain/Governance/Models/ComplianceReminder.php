@@ -6,9 +6,10 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+use App\Models\Concerns\AuditableChanges;
 class ComplianceReminder extends Model
 {
-    use HasFactory;
+    use HasFactory, AuditableChanges;
 
     protected $fillable = [
         'compliance_obligation_id',

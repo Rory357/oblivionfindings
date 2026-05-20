@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { AlertTriangle, CheckSquare, Clock, User } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { governanceStatusColor } from '@/lib/governance-status';
 
 interface ActionItem {
   id: number;
@@ -33,14 +34,7 @@ interface Props extends PageProps {
 }
 
 export default function ActionsIndex({ auth, items, summary }: Props) {
-  const getStatusColor = (status: string) => {
-    return {
-      open: 'bg-status-info-bg text-status-info',
-      in_progress: 'bg-status-warning-bg text-status-warning',
-      complete: 'bg-status-success-bg text-status-success',
-      overdue: 'bg-status-critical-bg text-status-critical',
-    }[status] || 'bg-muted text-foreground';
-  };
+  const getStatusColor = (status: string) => governanceStatusColor(status);
 
   const getPriorityColor = (priority: string) => {
     return {

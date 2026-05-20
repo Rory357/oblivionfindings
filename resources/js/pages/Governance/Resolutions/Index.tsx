@@ -8,6 +8,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Vote, Clock, AlertCircle, CheckCircle, Gavel } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { governanceStatusColor } from '@/lib/governance-status';
 
 interface Resolution {
   id: number;
@@ -31,17 +32,7 @@ interface Props extends PageProps {
 }
 
 export default function ResolutionsIndex({ auth, resolutions, my_pending_votes }: Props) {
-  const getStatusColor = (status: string) => {
-    return {
-      draft: 'bg-muted text-foreground',
-      proposed: 'bg-status-info-bg text-status-info',
-      open: 'bg-status-success-bg text-status-success',
-      closed: 'bg-primary/10 text-primary',
-      implemented: 'bg-status-success-bg text-status-success',
-      archived: 'bg-muted text-foreground',
-      cancelled: 'bg-status-critical-bg text-status-critical',
-    }[status] || 'bg-muted text-foreground';
-  };
+  const getStatusColor = (status: string) => governanceStatusColor(status);
 
   const getOutcomeBadge = (outcome: string | null) => {
     if (!outcome) return null;

@@ -10,6 +10,9 @@ use App\Domain\Governance\Http\Controllers\BoardPackController;
 use App\Domain\Governance\Http\Controllers\StrategicPlanController;
 use App\Domain\Governance\Http\Controllers\BudgetController;
 use App\Domain\Governance\Http\Controllers\BoardMemberAdminController;
+use App\Domain\Governance\Http\Controllers\GovernanceAuditLogController;
+use App\Domain\Governance\Http\Controllers\SpendApprovalController;
+use App\Domain\Governance\Http\Controllers\GovernanceSettingController;
 use Illuminate\Support\Facades\Route;
 
 /**
@@ -79,6 +82,7 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
     
     // Board Packs
     Route::middleware('permission:governance.packs.view')->group(function () {
+        Route::get('/packs', [BoardPackController::class, 'index'])->name('packs.index');
         Route::get('/packs/{pack}', [BoardPackController::class, 'show'])->name('packs.show');
         Route::get('/packs/{pack}/download', [BoardPackController::class, 'download'])->name('packs.download');
         Route::post('/packs/{pack}/read', [BoardPackController::class, 'markAsRead'])->name('packs.read');
@@ -210,6 +214,11 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
 
             // Record actuals
             Route::post('/budgets/{budget}/record-actuals', [BudgetController::class, 'recordActuals'])->name('budgets.record-actuals');
+
+            // Allocations (link annual budget → monthly site buckets)
+            Route::post('/budgets/{budget}/allocations', [BudgetController::class, 'storeAllocation'])->name('budgets.allocations.store');
+            Route::put('/budgets/{budget}/allocations/{allocation}', [BudgetController::class, 'updateAllocation'])->name('budgets.allocations.update');
+            Route::delete('/budgets/{budget}/allocations/{allocation}', [BudgetController::class, 'destroyAllocation'])->name('budgets.allocations.destroy');
         });
 
         Route::middleware('permission:governance.budgets.submit')->group(function () {
@@ -233,6 +242,7 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
     // Governance Policies
     Route::middleware('permission:governance.policies.view')->group(function () {
         Route::get('/policies', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'index'])->name('policies.index');
+        Route::get('/policies/attestations', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'attestations'])->name('policies.attestations');
         Route::get('/policies/create', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'create'])->name('policies.create');
         Route::get('/policies/{policy}', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'show'])->name('policies.show');
         Route::get('/policies/{policy}/edit', [\App\Domain\Governance\Http\Controllers\GovernancePolicyController::class, 'edit'])->name('policies.edit');
@@ -288,6 +298,7 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
     // Governance Documents
     Route::middleware('permission:governance.documents.view')->group(function () {
         Route::get('/documents', [\App\Domain\Governance\Http\Controllers\GovernanceDocumentController::class, 'index'])->name('documents.index');
+        Route::get('/documents/{document}', [\App\Domain\Governance\Http\Controllers\GovernanceDocumentController::class, 'show'])->name('documents.show');
         Route::get('/documents/{document}/download', [\App\Domain\Governance\Http\Controllers\GovernanceDocumentController::class, 'download'])->name('documents.download');
 
         Route::middleware('permission:governance.documents.manage')->group(function () {
@@ -333,5 +344,39 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
         Route::post('/actions/{action}/block', [\App\Domain\Governance\Http\Controllers\ActionItemController::class, 'block'])->name('actions.block');
         Route::post('/actions/{action}/unblock', [\App\Domain\Governance\Http\Controllers\ActionItemController::class, 'unblock'])->name('actions.unblock');
         Route::post('/actions/{action}/escalate', [\App\Domain\Governance\Http\Controllers\ActionItemController::class, 'escalate'])->name('actions.escalate');
+    });
+
+    // Governance Audit Log (cross-module changes + action events)
+    Route::middleware('permission:governance.audit.view')->group(function () {
+        Route::get('/audit-log', [GovernanceAuditLogController::class, 'index'])->name('audit-log.index');
+        Route::get('/audit-log/export', [GovernanceAuditLogController::class, 'export'])->name('audit-log.export');
+    });
+
+    // Spend Approvals (board / finance committee sign-off above threshold)
+    Route::middleware('permission:governance.spend.view')->group(function () {
+        Route::get('/spend-approvals', [SpendApprovalController::class, 'index'])->name('spend-approvals.index');
+        Route::get('/spend-approvals/create', [SpendApprovalController::class, 'create'])->name('spend-approvals.create');
+        Route::get('/spend-approvals/{approval}', [SpendApprovalController::class, 'show'])->name('spend-approvals.show');
+
+        Route::middleware('permission:governance.spend.request')->group(function () {
+            Route::get('/spend-approvals/{approval}/edit', [SpendApprovalController::class, 'edit'])->name('spend-approvals.edit');
+            Route::post('/spend-approvals', [SpendApprovalController::class, 'store'])->name('spend-approvals.store');
+            Route::put('/spend-approvals/{approval}', [SpendApprovalController::class, 'update'])->name('spend-approvals.update');
+            Route::post('/spend-approvals/{approval}/submit', [SpendApprovalController::class, 'submit'])->name('spend-approvals.submit');
+        });
+
+        Route::middleware('permission:governance.spend.approve')->group(function () {
+            Route::post('/spend-approvals/{approval}/approve', [SpendApprovalController::class, 'approve'])->name('spend-approvals.approve');
+            Route::post('/spend-approvals/{approval}/reject', [SpendApprovalController::class, 'reject'])->name('spend-approvals.reject');
+        });
+    });
+
+    // Governance Settings (escalation paths, spend thresholds, etc.)
+    Route::middleware('permission:governance.settings.view')->group(function () {
+        Route::get('/settings', [GovernanceSettingController::class, 'index'])->name('settings.index');
+
+        Route::middleware('permission:governance.settings.manage')->group(function () {
+            Route::put('/settings', [GovernanceSettingController::class, 'update'])->name('settings.update');
+        });
     });
 });

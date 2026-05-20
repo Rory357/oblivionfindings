@@ -54,13 +54,25 @@ export interface AuthPermissions {
     governance?: {
         view?: boolean;
         meetings?: { view?: boolean; manage?: boolean };
+        resolutions?: { view?: boolean; vote?: boolean; manage?: boolean };
         risks?: { view?: boolean; manage?: boolean; create?: boolean };
-        budgets?: { view?: boolean; create?: boolean; approve?: boolean };
+        budgets?: { view?: boolean; create?: boolean; submit?: boolean; approve?: boolean };
         compliance?: { view?: boolean; manage?: boolean; create?: boolean };
         performance?: { view?: boolean; manage?: boolean; create?: boolean };
+        strategy?: { view?: boolean; manage?: boolean };
         documents?: { view?: boolean; manage?: boolean };
         packs?: { view?: boolean; manage?: boolean };
-        actions?: { manage?: boolean };
+        actions?: { view?: boolean; manage?: boolean };
+        policies?: { view?: boolean; manage?: boolean };
+        'ceo-reports'?: { view?: boolean; manage?: boolean };
+        interests?: { view?: boolean; manage?: boolean };
+        evaluations?: { view?: boolean; manage?: boolean };
+        clinical?: { view?: boolean; manage?: boolean };
+        'te-tiriti'?: { view?: boolean; manage?: boolean };
+        evidence?: { view?: boolean; manage?: boolean };
+        audit?: { view?: boolean };
+        spend?: { view?: boolean; request?: boolean; approve?: boolean };
+        settings?: { view?: boolean; manage?: boolean };
     };
     finance?: {
         dashboard?: boolean;

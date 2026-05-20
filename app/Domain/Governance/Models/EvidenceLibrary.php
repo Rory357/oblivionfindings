@@ -8,9 +8,10 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\BelongsToMany;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
+use App\Models\Concerns\AuditableChanges;
 class EvidenceLibrary extends Model
 {
-    use SoftDeletes;
+    use SoftDeletes, AuditableChanges;
 
     protected $table = 'evidence_library';
 

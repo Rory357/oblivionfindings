@@ -6,6 +6,7 @@ import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
+import { governanceStatusColor } from '@/lib/governance-status';
 
 interface CalendarEvent {
   id: number;
@@ -30,14 +31,7 @@ export default function ComplianceCalendar({ auth, events }: Props) {
     return acc;
   }, {} as Record<string, CalendarEvent[]>);
 
-  const getStatusColor = (status: string) => {
-    return {
-      complete: 'bg-status-success-bg text-status-success',
-      not_due: 'bg-status-info-bg text-status-info',
-      due_soon: 'bg-status-warning-bg text-status-warning',
-      overdue: 'bg-status-critical-bg text-status-critical',
-    }[status] || 'bg-muted text-foreground';
-  };
+  const getStatusColor = (status: string) => governanceStatusColor(status);
 
   return (
     <AppLayout

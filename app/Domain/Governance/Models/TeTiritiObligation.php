@@ -6,8 +6,11 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+use App\Models\Concerns\AuditableChanges;
 class TeTiritiObligation extends Model
 {
+    use AuditableChanges;
+
     protected $fillable = [
         'principle', 'title', 'description', 'status', 'evidence',
         'actions_taken', 'target_date', 'progress_pct', 'owner_id',

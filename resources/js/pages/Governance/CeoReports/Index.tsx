@@ -7,6 +7,7 @@ import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { FileText, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { governanceStatusColor } from '@/lib/governance-status';
 
 interface Report {
   id: number;
@@ -25,11 +26,7 @@ interface Props extends PageProps {
 }
 
 export default function CeoReportsIndex({ auth, reports }: Props) {
-  const getStatusColor = (status: string) => ({
-    draft: 'bg-muted text-foreground',
-    submitted: 'bg-status-info-bg text-status-info',
-    presented: 'bg-status-success-bg text-status-success',
-  }[status] || 'bg-muted text-foreground');
+  const getStatusColor = (status: string) => governanceStatusColor(status);
 
   const submittedCount = reports.data.filter(r => r.status === 'submitted').length;
   const presentedCount = reports.data.filter(r => r.status === 'presented').length;

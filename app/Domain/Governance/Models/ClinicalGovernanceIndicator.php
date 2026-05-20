@@ -4,8 +4,11 @@ namespace App\Domain\Governance\Models;
 
 use Illuminate\Database\Eloquent\Model;
 
+use App\Models\Concerns\AuditableChanges;
 class ClinicalGovernanceIndicator extends Model
 {
+    use AuditableChanges;
+
     protected $fillable = [
         'indicator_code', 'category', 'name', 'definition', 'data_source',
         'unit', 'target_value', 'warning_threshold', 'critical_threshold',

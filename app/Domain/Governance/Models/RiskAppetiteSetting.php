@@ -6,8 +6,11 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+use App\Models\Concerns\AuditableChanges;
 class RiskAppetiteSetting extends Model
 {
+    use AuditableChanges;
+
     protected $fillable = [
         'category', 'threshold', 'rationale',
         'approved_by', 'approved_at', 'approval_resolution_id',

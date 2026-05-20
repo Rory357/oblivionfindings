@@ -13,6 +13,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { Target, TrendingUp, Star, Award, User } from 'lucide-react';
+import { governanceStatusColor } from '@/lib/governance-status';
 import { cn } from '@/lib/utils';
 import { useMemo, useState } from 'react';
 
@@ -90,18 +91,8 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
   };
 
   const getStatusColor = (status: string) => {
-    switch (status) {
-      case 'completed':
-        return 'bg-status-success-bg text-status-success';
-      case 'board_review':
-        return 'bg-primary/10 text-primary';
-      case 'peer_review':
-        return 'bg-status-info-bg text-status-info';
-      case 'self_review':
-        return 'bg-status-warning-bg text-status-warning';
-      default:
-        return 'bg-muted text-foreground';
-    }
+    return governanceStatusColor(status);
+    // legacy switch removed — see lib/governance-status.ts
   };
 
   const getRatingLabel = (rating: string | null) => {

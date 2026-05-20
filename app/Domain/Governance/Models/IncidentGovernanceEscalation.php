@@ -6,8 +6,11 @@ use App\Models\User;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
+use App\Models\Concerns\AuditableChanges;
 class IncidentGovernanceEscalation extends Model
 {
+    use AuditableChanges;
+
     protected $fillable = [
         'client_incident_id', 'notifiable_incident_id', 'risk_register_entry_id',
         'escalation_reason', 'status', 'notified_chair', 'notified_ceo',

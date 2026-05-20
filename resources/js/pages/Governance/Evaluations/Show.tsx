@@ -10,6 +10,7 @@ import { Label } from '@/components/ui/label';
 import { Play, Lock, CheckCircle } from 'lucide-react';
 import { PageHero, PageLayout } from '@/components/page';
 import { cn } from '@/lib/utils';
+import { governanceStatusColor } from '@/lib/governance-status';
 
 interface Question {
   text: string;
@@ -56,11 +57,7 @@ export default function EvaluationShow({ auth, evaluation, boardMembers, myRespo
   const handleLaunch = () => router.post(`/governance/evaluations/${evaluation.id}/launch`);
   const handleClose = () => router.post(`/governance/evaluations/${evaluation.id}/close`);
 
-  const getStatusColor = (status: string) => ({
-    draft: 'bg-muted text-foreground',
-    active: 'bg-status-info-bg text-status-info',
-    closed: 'bg-status-success-bg text-status-success',
-  }[status] || 'bg-muted text-foreground');
+  const getStatusColor = (status: string) => governanceStatusColor(status);
 
   return (
     <AppLayout>

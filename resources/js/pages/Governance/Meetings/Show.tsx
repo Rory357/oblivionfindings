@@ -7,6 +7,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { TabsRoot as Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { governanceStatusColor } from '@/lib/governance-status';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import {
   AlertDialog,
@@ -218,17 +219,7 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
     setMinutesBlocks(prev => prev.filter((_, i) => i !== index));
   };
 
-  const getStatusColor = (status: string) => {
-    return {
-      scheduled: 'bg-status-info-bg text-status-info',
-      agenda_draft: 'bg-status-warning-bg text-status-warning',
-      agenda_final: 'bg-status-success-bg text-status-success',
-      in_progress: 'bg-primary/10 text-primary',
-      minutes_draft: 'bg-status-warning-bg text-status-warning',
-      minutes_approved: 'bg-status-success-bg text-status-success',
-      archived: 'bg-muted text-foreground',
-    }[status] || 'bg-muted text-foreground';
-  };
+  const getStatusColor = (status: string) => governanceStatusColor(status);
 
   const getChecklistStatusColor = (status: 'done' | 'in_progress' | 'todo' | 'blocked') => {
     return {

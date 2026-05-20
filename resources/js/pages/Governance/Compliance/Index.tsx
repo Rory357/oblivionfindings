@@ -10,6 +10,7 @@ import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
 import { Calendar, CheckCircle, Clock, AlertTriangle, FileCheck, ShieldCheck } from 'lucide-react';
 import { cn } from '@/lib/utils';
+import { governanceStatusColor } from '@/lib/governance-status';
 
 interface Obligation {
   id: number;
@@ -43,14 +44,7 @@ interface Props extends PageProps {
 }
 
 export default function ComplianceIndex({ auth, obligations, summary, frameworks }: Props) {
-  const getStatusColor = (status: string) => {
-    return {
-      complete: 'bg-status-success-bg text-status-success',
-      not_due: 'bg-status-info-bg text-status-info',
-      due_soon: 'bg-status-warning-bg text-status-warning',
-      overdue: 'bg-status-critical-bg text-status-critical',
-    }[status] || 'bg-muted text-foreground';
-  };
+  const getStatusColor = (status: string) => governanceStatusColor(status);
 
   const getFrameworkColor = (framework: string) => {
     const colors: Record<string, string> = {
@@ -106,7 +100,7 @@ export default function ComplianceIndex({ auth, obligations, summary, frameworks
                 <Button variant="outline" asChild className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
                   <Link href={complianceCalendar.url()}>Calendar View</Link>
                 </Button>
-                {(auth.can as any)?.governance?.compliance?.create && (
+                {auth.can?.governance?.compliance?.create && (
                   <Button asChild>
                     <Link href={createCompliance.url()}>New Obligation</Link>
                   </Button>
