@@ -307,7 +307,7 @@ test('board secretary can prepare a meeting and clear workflow items', function 
             ->click('@record-attendance')
             ->waitFor('@save-attendance', 10)
             ->click('@save-attendance')
-            ->waitFor('@workflow-status-quorum', 30)
+            ->waitUntilMissing('@save-attendance', 15)
             ->assertSeeIn('@workflow-status-quorum', 'done')
             ->waitFor('@generate-pack', 30)
             ->click('@generate-pack')
