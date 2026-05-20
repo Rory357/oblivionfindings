@@ -61,7 +61,6 @@ export default function PacksIndex({ auth, packs, filters, summary }: Props) {
           <PageHero
             icon={FolderOpen}
             category="governance"
-            variant="compact"
             title="Board Packs"
             description="Generated and distributed board packs across all meetings."
             stats={[

@@ -118,7 +118,6 @@ export default function SpendApprovalsIndex({ auth, approvals, filters, summary,
           <PageHero
             icon={HandCoins}
             category="governance"
-            variant="compact"
             title="Spend Approvals"
             description="Board / finance committee sign-off for spend above configured thresholds."
             stats={[
