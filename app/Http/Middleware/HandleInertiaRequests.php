@@ -695,7 +695,52 @@ class HandleInertiaRequests extends Middleware
                     'manage' => $user->canDo('governance.packs.manage'),
                 ],
                 'actions' => [
+                    'view' => $user->canDo('governance.actions.view'),
                     'manage' => $user->canDo('governance.actions.manage'),
+                ],
+                'policies' => [
+                    'view' => $user->canDo('governance.policies.view'),
+                    'manage' => $user->canDo('governance.policies.manage'),
+                ],
+                'documents' => [
+                    'view' => $user->canDo('governance.documents.view'),
+                    'manage' => $user->canDo('governance.documents.manage'),
+                ],
+                'ceo-reports' => [
+                    'view' => $user->canDo('governance.ceo-reports.view'),
+                    'manage' => $user->canDo('governance.ceo-reports.manage'),
+                ],
+                'interests' => [
+                    'view' => $user->canDo('governance.interests.view'),
+                    'manage' => $user->canDo('governance.interests.manage'),
+                ],
+                'evaluations' => [
+                    'view' => $user->canDo('governance.evaluations.view'),
+                    'manage' => $user->canDo('governance.evaluations.manage'),
+                ],
+                'clinical' => [
+                    'view' => $user->canDo('governance.clinical.view'),
+                    'manage' => $user->canDo('governance.clinical.manage'),
+                ],
+                'te-tiriti' => [
+                    'view' => $user->canDo('governance.te-tiriti.view'),
+                    'manage' => $user->canDo('governance.te-tiriti.manage'),
+                ],
+                'evidence' => [
+                    'view' => $user->canDo('governance.evidence.view'),
+                    'manage' => $user->canDo('governance.evidence.manage'),
+                ],
+                'audit' => [
+                    'view' => $user->canDo('governance.audit.view'),
+                ],
+                'spend' => [
+                    'view' => $user->canDo('governance.spend.view'),
+                    'request' => $user->canDo('governance.spend.request'),
+                    'approve' => $user->canDo('governance.spend.approve'),
+                ],
+                'settings' => [
+                    'view' => $user->canDo('governance.settings.view'),
+                    'manage' => $user->canDo('governance.settings.manage'),
                 ],
             ],
 

@@ -1543,6 +1543,62 @@ function buildGovernanceSubPanelGroups({
             href: '/governance/actions',
             icon: ClipboardList,
         });
+        items.push({
+            title: 'Policies',
+            href: '/governance/policies',
+            icon: FileText,
+        });
+        items.push({
+            title: 'CEO Reports',
+            href: '/governance/ceo-reports',
+            icon: FileText,
+        });
+        items.push({
+            title: 'Interests Register',
+            href: '/governance/interests',
+            icon: ClipboardList,
+        });
+        items.push({
+            title: 'Board Evaluations',
+            href: '/governance/evaluations',
+            icon: ClipboardCheck,
+        });
+        items.push({
+            title: 'Documents',
+            href: '/governance/documents',
+            icon: FileText,
+        });
+        items.push({
+            title: 'Clinical Governance',
+            href: '/governance/clinical',
+            icon: Shield,
+        });
+        items.push({
+            title: 'Te Tiriti',
+            href: '/governance/te-tiriti',
+            icon: Landmark,
+        });
+    }
+    if (can?.governance?.spend?.view) {
+        items.push({
+            title: 'Spend Approvals',
+            href: '/governance/spend-approvals',
+            icon: DollarSign,
+        });
+    }
+    if (can?.governance?.audit?.view) {
+        items.push({
+            title: 'Audit Log',
+            href: '/governance/audit-log',
+            icon: ClipboardCheck,
+        });
+    }
+    if (can?.governance?.settings?.view) {
+        items.push({
+            title: 'Governance Settings',
+            href: '/governance/settings',
+            icon: Shield,
+        });
     }
     if (can?.roadmap?.view) {
         items.push({
