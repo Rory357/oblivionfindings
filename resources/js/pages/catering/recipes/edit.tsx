@@ -4,10 +4,10 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero } from '@/components/page';
 import { Head, router, useForm } from '@inertiajs/react';
-import { ChefHat, Plus, Trash2 } from 'lucide-react';
+import { ChefHat, Plus, Trash2, Utensils } from 'lucide-react';
 import { useMemo, useState } from 'react';
-import { CateringHero } from '../_hero';
 import { CateringTabs } from '../_tabs';
 import { type DietaryTag, type Recipe, type RecipeIngredient, tagBadgeStyle } from '../_helpers';
 
@@ -98,7 +98,11 @@ export default function CateringRecipeEdit({ recipe, tags, products }: Props) {
         ]}>
             <Head title={isNew ? 'New recipe' : `Edit ${recipe!.name}`} />
             <form onSubmit={submit} className="space-y-6 p-6">
-                <CateringHero />
+                <PageHero
+                    icon={Utensils}
+                    title="Meal Planner"
+                    description="Cross-site overview of meal plans, kitchen inventory and the catering library."
+                />
                 <CateringTabs active="recipes" />
 
                 <div className="flex items-start gap-3">

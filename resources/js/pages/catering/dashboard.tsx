@@ -2,7 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { CateringHero } from './_hero';
+import { PageHero } from '@/components/page';
 import { CateringTabs } from './_tabs';
 import { Head, Link } from '@inertiajs/react';
 import {
@@ -15,6 +15,7 @@ import {
     Package,
     ShoppingCart,
     Sparkles,
+    Utensils,
 } from 'lucide-react';
 
 type SiteCard = {
@@ -81,7 +82,10 @@ export default function CateringDashboard({ week_start, week_end, sites, totals,
         <AppLayout breadcrumbs={[{ title: 'Catering', href: '/catering' }, { title: 'Overview', href: '/catering' }]}>
             <Head title="Meal Planner — Overview" />
             <div className="space-y-6 p-6">
-                <CateringHero
+                <PageHero
+                    icon={Utensils}
+                    title="Meal Planner"
+                    description="Cross-site overview of meal plans, kitchen inventory and the catering library."
                     badges={[
                         { icon: CalendarDays, label: `Week of ${week_start} → ${week_end}` },
                         { icon: Home, label: `${totals.sites} site${totals.sites === 1 ? '' : 's'}` },

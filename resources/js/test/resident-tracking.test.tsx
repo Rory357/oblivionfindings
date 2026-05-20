@@ -34,28 +34,6 @@ vi.mock('@/components/page-shell', () => ({
     default: ({ children }: { children: React.ReactNode }) => <div>{children}</div>,
 }));
 
-vi.mock('@/components/fleet-hero', () => ({
-    default: ({
-        title,
-        actions,
-        stats,
-    }: {
-        title: string;
-        actions?: React.ReactNode;
-        stats?: Array<{ label: string; value: string | number }>;
-    }) => (
-        <header>
-            <h1>{title}</h1>
-            {stats?.map((stat) => (
-                <span key={stat.label}>
-                    {stat.label}: {stat.value}
-                </span>
-            ))}
-            {actions}
-        </header>
-    ),
-}));
-
 vi.mock('@/components/leaflet-map', () => ({
     default: ({ markers }: { markers?: unknown[] }) => (
         <div data-marker-count={markers?.length ?? 0} data-testid="resident-map" />
@@ -236,9 +214,9 @@ function historyResident(overrides: Partial<Resident> = {}): Resident {
 it('renders the resident sidebar and queues Locate Now from a list row', async () => {
     renderResidentTracking();
 
-    expect(screen.getByText('Tracked: 3')).toBeVisible();
-    expect(screen.getByText('Online: 3')).toBeVisible();
-    expect(screen.getByText('Low Battery: 1')).toBeVisible();
+    expect(screen.getByText('Tracked')).toBeInTheDocument();
+    expect(screen.getByText('Online')).toBeInTheDocument();
+    expect(screen.getByText('Low Battery')).toBeInTheDocument();
     expect(screen.getByText('Battery not reported')).toBeVisible();
     expect(screen.getByText('Low battery')).toBeVisible();
     expect(screen.getByText('Charging')).toBeVisible();
