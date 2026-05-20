@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -10,6 +11,7 @@ import {
     AlertTriangle,
     Calendar,
     CheckCircle2,
+    NotebookPen,
     Plus,
     Trash2,
 } from 'lucide-react';
@@ -167,58 +169,30 @@ export default function FamilyNotes({ client, notes, stats }: Props) {
         >
             <Head title={`${clientName} - Notes & To-Dos`} />
 
-            <div className="mx-auto max-w-4xl space-y-6 p-4 md:p-6">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-xl font-bold">Notes & To-Dos</h1>
-                        <p className="text-sm text-muted-foreground">
-                            Share notes, requests, and reminders with{' '}
-                            {client.first_name}'s care team
-                        </p>
-                    </div>
-                    <Button
-                        size="sm"
-                        className="gap-1.5"
-                        onClick={() => setShowForm(!showForm)}
-                    >
-                        <Plus className="h-3.5 w-3.5" />
-                        {showForm ? 'Cancel' : 'Add Note'}
-                    </Button>
-                </div>
-
-                {/* Stats */}
-                <div className="grid grid-cols-3 gap-3">
-                    <div className="rounded-xl border bg-status-info-bg p-3 text-center">
-                        <div className="text-xl font-bold text-status-info">
-                            {stats.open}
-                        </div>
-                        <div className="text-[10px] tracking-wider text-status-info uppercase">
-                            Open
-                        </div>
-                    </div>
-                    <div className="rounded-xl border bg-status-success-bg p-3 text-center">
-                        <div className="text-xl font-bold text-status-success">
-                            {stats.completed}
-                        </div>
-                        <div className="text-[10px] tracking-wider text-status-success uppercase">
-                            Completed
-                        </div>
-                    </div>
-                    <div
-                        className={`rounded-xl border p-3 text-center ${stats.overdue > 0 ? 'bg-status-critical-bg' : ''}`}
-                    >
-                        <div
-                            className={`text-xl font-bold ${stats.overdue > 0 ? 'text-status-critical' : 'text-muted-foreground'}`}
-                        >
-                            {stats.overdue}
-                        </div>
-                        <div className="text-[10px] tracking-wider text-muted-foreground uppercase">
-                            Overdue
-                        </div>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={NotebookPen}
+                        title="Notes & To-Dos"
+                        description={`Share notes, requests, and reminders with ${client.first_name}'s care team`}
+                        stats={[
+                            { label: 'Open', value: stats.open },
+                            { label: 'Completed', value: stats.completed },
+                            { label: 'Overdue', value: stats.overdue },
+                        ]}
+                        actions={
+                            <Button
+                                size="sm"
+                                className="gap-1.5"
+                                onClick={() => setShowForm(!showForm)}
+                            >
+                                <Plus className="h-3.5 w-3.5" />
+                                {showForm ? 'Cancel' : 'Add Note'}
+                            </Button>
+                        }
+                    />
+                }
+            >
                 {/* Add Form */}
                 {showForm && (
                     <Card className="border-primary/20">
@@ -404,7 +378,7 @@ export default function FamilyNotes({ client, notes, stats }: Props) {
                         </CardContent>
                     </Card>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

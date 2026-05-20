@@ -1,9 +1,12 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import RespiteSubnav from '@/components/respite-subnav';
 import { formatDateTime } from '@/lib/date-format';
 import { Head, Link } from '@inertiajs/react';
+import { Plus } from 'lucide-react';
 
 type Props = {
     stay: any;
@@ -21,23 +24,24 @@ export default function DailyNotesForStay({ stay, notes, wellbeingTrend }: Props
         ]}>
             <Head title="Daily Notes for Stay" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">
-                            Daily Notes for {stay.client?.first_name} {stay.client?.last_name}
-                        </h1>
-                        <div className="mt-1 text-sm text-muted-foreground">
-                            {formatDateTime(stay.start_date)} &mdash; {formatDateTime(stay.end_date)}
-                        </div>
-                    </div>
-                    <Link
-                        href={`/respite/daily-notes/create?stay_id=${stay.id}`}
-                        className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
-                    >
-                        New Note
-                    </Link>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref={`/respite/stays/${stay.id}`}
+                        title={`Daily Notes for ${stay.client?.first_name ?? ''} ${stay.client?.last_name ?? ''}`.trim()}
+                        description={`${formatDateTime(stay.start_date)} — ${formatDateTime(stay.end_date)}`}
+                        actions={
+                            <Link href={`/respite/daily-notes/create?stay_id=${stay.id}`}>
+                                <Button size="sm" variant="outline">
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    New Note
+                                </Button>
+                            </Link>
+                        }
+                    />
+                }
+            >
                 <RespiteSubnav />
 
                 {wellbeingTrend.length > 0 && (
@@ -103,7 +107,7 @@ export default function DailyNotesForStay({ stay, notes, wellbeingTrend }: Props
                         </div>
                     )}
                 </div>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

@@ -11,6 +11,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { ArrowLeft, Plus } from 'lucide-react';
@@ -93,24 +94,16 @@ export default function CreateSupervision({ staff, sessionTypes }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Add Supervision Note" />
 
-            <div className="max-w-4xl space-y-6">
-                <div className="flex items-center gap-4">
-                    <Link href="/hr/performance">
-                        <Button variant="outline" size="sm">
-                            <ArrowLeft className="mr-2 h-4 w-4" />
-                            Back
-                        </Button>
-                    </Link>
-                    <div>
-                        <h1 className="text-2xl font-bold">
-                            Add Supervision Note
-                        </h1>
-                        <p className="text-muted-foreground">
-                            Record a supervision session or check-in
-                        </p>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/hr/performance"
+                        title="Add Supervision Note"
+                        description="Record a supervision session or check-in."
+                    />
+                }
+            >
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <Card>
                         <CardHeader>
@@ -395,7 +388,7 @@ export default function CreateSupervision({ staff, sessionTypes }: Props) {
                         </Button>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

@@ -10,6 +10,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { useI18n } from '@/lib/i18n';
 import { Head, Link, router } from '@inertiajs/react';
 import { CheckCircle2, RotateCcw } from 'lucide-react';
@@ -194,92 +195,61 @@ export default function Review({ period, summary, shifts }: Props) {
                 )}
             />
 
-            <div className="space-y-4 p-4" data-test="publish-review-page">
-                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div>
-                        <h1 className="text-2xl font-semibold">
-                            {t(
-                                'rostering.publish.review_title',
-                                'Publish review',
-                            )}
-                        </h1>
-                        <p className="text-sm text-muted-foreground">
-                            {period.site_name ??
-                                t(
-                                    'rostering.publish.selected_site',
-                                    'Selected site',
-                                )}{' '}
-                            · {t('rostering.publish.week_of', 'Week of')}{' '}
-                            {period.week_start} ·{' '}
-                            {t('rostering.publish.version', 'Version')}{' '}
-                            {period.version}
-                        </p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                        <Badge
-                            variant={
-                                summary.can_publish ? 'default' : 'destructive'
-                            }
-                        >
-                            {summary.can_publish
-                                ? t(
-                                      'rostering.publish.ready_to_publish',
-                                      'Ready to publish',
-                                  )
-                                : t('rostering.publish.blocked', 'Blocked')}
-                        </Badge>
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            disabled={period.status === 'archived'}
-                            onClick={() => postPeriodAction(period, 'review')}
-                        >
-                            <RotateCcw className="mr-1 h-4 w-4" />
-                            {t(
-                                'rostering.publish.rerun_review',
-                                'Re-run review',
-                            )}
-                        </Button>
-                        <Button
-                            size="sm"
-                            disabled={hasBlocks || period.status === 'archived'}
-                            onClick={() =>
-                                postPeriodAction(period, confirmAction)
-                            }
-                            data-test="publish-review-confirm"
-                        >
-                            <CheckCircle2 className="mr-1 h-4 w-4" />
-                            {isRepublish
-                                ? t('rostering.publish.republish', 'Re-publish')
-                                : t(
-                                      'rostering.publish.confirm_publish',
-                                      'Confirm publish',
-                                  )}
-                        </Button>
-                        {period.published_at ? (
-                            <Link
-                                href={`/operations/rostering/periods/${period.id}/diff`}
-                            >
-                                <Button size="sm" variant="outline">
-                                    {t(
-                                        'rostering.publish.view_diff',
-                                        'View diff',
-                                    )}
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref={`/operations/rostering?week=${period.week_start}&site_id=${period.site_id}`}
+                        backLabel={t('rostering.publish.back_to_roster', 'Back to roster')}
+                        title={t('rostering.publish.review_title', 'Publish review')}
+                        description={`${period.site_name ?? t('rostering.publish.selected_site', 'Selected site')} · ${t('rostering.publish.week_of', 'Week of')} ${period.week_start} · ${t('rostering.publish.version', 'Version')} ${period.version}`}
+                        actions={
+                            <>
+                                <Badge
+                                    variant={
+                                        summary.can_publish ? 'default' : 'destructive'
+                                    }
+                                >
+                                    {summary.can_publish
+                                        ? t(
+                                              'rostering.publish.ready_to_publish',
+                                              'Ready to publish',
+                                          )
+                                        : t('rostering.publish.blocked', 'Blocked')}
+                                </Badge>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    disabled={period.status === 'archived'}
+                                    onClick={() => postPeriodAction(period, 'review')}
+                                >
+                                    <RotateCcw className="mr-1 h-4 w-4" />
+                                    {t('rostering.publish.rerun_review', 'Re-run review')}
                                 </Button>
-                            </Link>
-                        ) : null}
-                        <Link
-                            href={`/operations/rostering?week=${period.week_start}&site_id=${period.site_id}`}
-                        >
-                            <Button size="sm" variant="outline">
-                                {t(
-                                    'rostering.publish.back_to_roster',
-                                    'Back to roster',
-                                )}
-                            </Button>
-                        </Link>
-                    </div>
-                </div>
+                                <Button
+                                    size="sm"
+                                    disabled={hasBlocks || period.status === 'archived'}
+                                    onClick={() => postPeriodAction(period, confirmAction)}
+                                    data-test="publish-review-confirm"
+                                >
+                                    <CheckCircle2 className="mr-1 h-4 w-4" />
+                                    {isRepublish
+                                        ? t('rostering.publish.republish', 'Re-publish')
+                                        : t('rostering.publish.confirm_publish', 'Confirm publish')}
+                                </Button>
+                                {period.published_at ? (
+                                    <Link href={`/operations/rostering/periods/${period.id}/diff`}>
+                                        <Button size="sm" variant="outline">
+                                            {t('rostering.publish.view_diff', 'View diff')}
+                                        </Button>
+                                    </Link>
+                                ) : null}
+                            </>
+                        }
+                    />
+                }
+            >
+                <div data-test="publish-review-page">
 
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-4">
                     <Card>
@@ -465,7 +435,8 @@ export default function Review({ period, summary, shifts }: Props) {
                         </Table>
                     </CardContent>
                 </Card>
-            </div>
+                </div>
+            </PageLayout>
         </AppLayout>
     );
 }

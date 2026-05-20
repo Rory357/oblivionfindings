@@ -10,10 +10,11 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
-import { Plus } from 'lucide-react';
+import { FileText, Plus } from 'lucide-react';
 
 interface Template {
     id: number;
@@ -82,19 +83,29 @@ export default function DocumentTemplates({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Document Templates" />
-            <div className="flex flex-col gap-6 p-6">
-                <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold">Document Templates</h1>
-                    {can.manage && (
-                        <Button asChild>
-                            <Link href="/hr/documents/templates/create">
-                                <Plus className="mr-2 h-4 w-4" />
-                                Create Template
-                            </Link>
-                        </Button>
-                    )}
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={FileText}
+                        title="Document Templates"
+                        description="Manage templates for HR documents and letters."
+                        stats={[
+                            { label: 'Templates', value: templates.total },
+                            { label: 'Active', value: templates.data.filter((t) => t.is_active).length },
+                        ]}
+                        actions={
+                            can.manage ? (
+                                <Button asChild>
+                                    <Link href="/hr/documents/templates/create">
+                                        <Plus className="mr-2 h-4 w-4" />
+                                        Create Template
+                                    </Link>
+                                </Button>
+                            ) : null
+                        }
+                    />
+                }
+            >
                 <div className="flex flex-wrap items-center gap-3">
                     <Input
                         placeholder="Search templates..."
@@ -280,7 +291,7 @@ export default function DocumentTemplates({
                         <LaravelPagination links={templates.links} />
                     </div>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

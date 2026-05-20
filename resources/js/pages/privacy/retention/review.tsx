@@ -1,8 +1,10 @@
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Head, Link } from '@inertiajs/react';
-import { Database, Clock } from 'lucide-react';
+import { ClipboardCheck, Clock, Database } from 'lucide-react';
 
 type Props = {
     policies: any[];
@@ -17,19 +19,25 @@ export default function ReviewRetention({ policies }: Props) {
         ]}>
             <Head title="Review Data for Retention" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">Review Data for Retention</h1>
-                        <div className="mt-1 text-sm text-muted-foreground">
-                            Review data that may be due for archival or deletion
-                        </div>
-                    </div>
-                    <Link href="/privacy/retention" className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
-                        Back to Policies
-                    </Link>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={ClipboardCheck}
+                        title="Review Data for Retention"
+                        description="Review data that may be due for archival or deletion"
+                        stats={[
+                            { label: 'Policies', value: policies.length },
+                        ]}
+                        actions={
+                            <Link href="/privacy/retention">
+                                <Button size="sm" variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                    Back to Policies
+                                </Button>
+                            </Link>
+                        }
+                    />
+                }
+            >
                 <div className="space-y-4">
                     {policies.length > 0 ? (
                         policies.map((policy: any) => (
@@ -65,7 +73,7 @@ export default function ReviewRetention({ policies }: Props) {
                         </div>
                     )}
                 </div>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

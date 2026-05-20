@@ -11,6 +11,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { AlertTriangle, ArrowLeft } from 'lucide-react';
@@ -79,28 +80,17 @@ export default function CreateDisciplinary({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Add Disciplinary - ${hrCase.case_number}`} />
 
-            <div className="max-w-4xl space-y-6">
-                <div className="flex items-center gap-4">
-                    <Link href={`/hr/cases/${hrCase.id}`}>
-                        <Button variant="outline" size="sm">
-                            <ArrowLeft className="mr-2 h-4 w-4" />
-                            Back to Case
-                        </Button>
-                    </Link>
-                    <div className="flex items-center gap-3">
-                        <AlertTriangle className="h-6 w-6 text-status-critical" />
-                        <div>
-                            <h1 className="text-2xl font-bold">
-                                Add Disciplinary Action
-                            </h1>
-                            <p className="text-muted-foreground">
-                                Case: {hrCase.case_number} • Subject:{' '}
-                                {hrCase.subject.name}
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref={`/hr/cases/${hrCase.id}`}
+                        backLabel="Back to Case"
+                        title="Add Disciplinary Action"
+                        description={`Case: ${hrCase.case_number} · Subject: ${hrCase.subject.name}`}
+                    />
+                }
+            >
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <Card>
                         <CardHeader>
@@ -447,7 +437,7 @@ export default function CreateDisciplinary({
                         </Button>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

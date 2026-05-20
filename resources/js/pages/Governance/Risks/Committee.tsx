@@ -1,6 +1,7 @@
 import { Head } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -51,12 +52,19 @@ export default function CommitteeRisks({ auth, committee, risks }: Props) {
         >
             <Head title={`${title} Committee Risks`} />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="mb-6">
-                    <h1 className="text-3xl font-bold text-foreground">{title}</h1>
-                    <p className="text-muted-foreground mt-1">Committee risk oversight</p>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={AlertTriangle}
+                        title={title}
+                        description="Committee risk oversight."
+                        stats={[
+                            { label: 'Total Risks', value: sorted.length },
+                            { label: 'Above Appetite', value: sorted.filter((r) => r.within_appetite === false).length },
+                        ]}
+                    />
+                }
+            >
                 <div className="space-y-3">
                     {sorted.map((risk) => (
                         <Card key={risk.id} className={cn('border-l-4', getSeverityBorder(risk.residual_score ?? 0))}>
@@ -107,7 +115,7 @@ export default function CommitteeRisks({ auth, committee, risks }: Props) {
                         </div>
                     )}
                 </div>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

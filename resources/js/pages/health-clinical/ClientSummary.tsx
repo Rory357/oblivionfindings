@@ -2,6 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHero, PageLayout } from '@/components/page';
 import { Head, Link } from '@inertiajs/react';
 import { Activity, ClipboardList, HeartPulse, ShieldAlert } from 'lucide-react';
 
@@ -72,25 +73,26 @@ export default function ClientSummary({ client, summary, observation_types, even
     return (
         <AppLayout>
             <Head title={`Health Summary — ${name}`} />
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold text-foreground">{name}</h1>
-                        <p className="mt-1 text-sm text-muted-foreground">Health & Clinical Summary</p>
-                    </div>
-                    <div className="flex gap-2">
-                        <Link href={`/health-clinical/clients/${client.id}/trends`}>
-                            <Button variant="outline" size="sm">Observation Trends</Button>
-                        </Link>
-                        <Link href={`/operations/clients/${client.id}`}>
-                            <Button variant="outline" size="sm">Client Profile</Button>
-                        </Link>
-                        <Link href="/health-clinical">
-                            <Button variant="outline" size="sm">Dashboard</Button>
-                        </Link>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/health-clinical"
+                        title={name}
+                        description="Health & Clinical Summary."
+                        actions={
+                            <>
+                                <Link href={`/health-clinical/clients/${client.id}/trends`}>
+                                    <Button variant="outline" size="sm">Observation Trends</Button>
+                                </Link>
+                                <Link href={`/operations/clients/${client.id}`}>
+                                    <Button variant="outline" size="sm">Client Profile</Button>
+                                </Link>
+                            </>
+                        }
+                    />
+                }
+            >
                 {/* Medical Profile */}
                 {summary.medical_profile && (
                     <>
@@ -214,7 +216,7 @@ export default function ClientSummary({ client, summary, observation_types, even
                         )}
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

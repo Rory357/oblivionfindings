@@ -2,6 +2,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
 import { ArrowLeft, Minus, TrendingDown, TrendingUp } from 'lucide-react';
@@ -91,27 +92,16 @@ export default function CompensationHistory({ profile, history, can }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Compensation History - ${profile.user.name}`} />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <div className="flex items-center gap-2">
-                            <Link href={`/hr/people/${profile.id}`}>
-                                <Button size="sm" variant="outline">
-                                    <ArrowLeft className="mr-1 h-4 w-4" />
-                                    Back
-                                </Button>
-                            </Link>
-                            <h1 className="text-lg font-semibold">
-                                Compensation History
-                            </h1>
-                        </div>
-                        <div className="mt-1 text-sm text-muted-foreground">
-                            {profile.user.name} &middot;{' '}
-                            {profile.position_title}
-                        </div>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref={`/hr/people/${profile.id}`}
+                        title="Compensation History"
+                        description={`${profile.user.name} · ${profile.position_title}`}
+                    />
+                }
+            >
                 <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                     <Card>
                         <CardHeader className="pb-2">
@@ -268,7 +258,7 @@ export default function CompensationHistory({ profile, history, can }: Props) {
                 {history?.links?.length ? (
                     <LaravelPagination links={history.links} />
                 ) : null}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

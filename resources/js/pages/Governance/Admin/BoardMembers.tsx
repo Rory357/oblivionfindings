@@ -1,6 +1,8 @@
 import { Head, useForm } from '@inertiajs/react';
+import { Users } from 'lucide-react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -58,9 +60,20 @@ export default function ManageBoardMembers({ auth, boardMembers, availableUsers 
     >
       <Head title="Manage Board Members" />
 
-      <div className="flex flex-col gap-6 p-4 md:p-6">
-        <h1 className="text-3xl font-bold text-foreground mb-6">Board Member Management</h1>
-
+      <PageLayout
+        hero={
+          <PageHero
+            icon={Users}
+            title="Board Member Management"
+            description="Appoint, manage, and track board members and their terms."
+            stats={[
+              { label: 'Total Members', value: boardMembers.length },
+              { label: 'Active', value: boardMembers.filter((m) => m.is_active).length },
+              { label: 'Available', value: availableUsers.length },
+            ]}
+          />
+        }
+      >
         <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
           {/* Add New Board Member */}
           <Card className="lg:col-span-1">
@@ -189,7 +202,7 @@ export default function ManageBoardMembers({ auth, boardMembers, availableUsers 
             </CardContent>
           </Card>
         </div>
-      </div>
+      </PageLayout>
     </AppLayout>
   );
 }

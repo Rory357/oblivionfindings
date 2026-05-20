@@ -18,6 +18,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
@@ -342,12 +343,26 @@ function GoalCard({ goal }: { goal: Goal }) {
 }
 
 export default function MyGoals({ goals }: Props) {
+    const completed = goals.data.filter((g) => g.status === 'completed').length;
+    const inProgress = goals.data.filter((g) => g.status === 'in_progress').length;
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="My Goals" />
-            <div className="flex flex-col gap-6 p-6">
-                <h1 className="text-2xl font-bold">My Development Goals</h1>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Target}
+                        title="My Development Goals"
+                        description="Track and update your development and performance goals."
+                        stats={[
+                            { label: 'Total', value: goals.data.length },
+                            { label: 'In Progress', value: inProgress },
+                            { label: 'Completed', value: completed },
+                        ]}
+                    />
+                }
+            >
                 {goals.data.length === 0 ? (
                     <Card>
                         <CardContent className="py-8 text-center text-muted-foreground">
@@ -365,7 +380,7 @@ export default function MyGoals({ goals }: Props) {
                 {goals.last_page > 1 && (
                     <LaravelPagination links={goals.links} />
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

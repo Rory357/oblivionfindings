@@ -20,8 +20,9 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { formatDateTime } from '@/lib/date-format';
-import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
@@ -184,82 +185,35 @@ export default function ClientIncidents({
         >
             <Head title={`Incidents - ${name}`} />
 
-            <div className="space-y-4">
-                {/* Header */}
-                <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-3">
-                        <div className="flex h-10 w-10 items-center justify-center rounded-lg bg-status-critical-bg">
-                            <ShieldAlert className="h-5 w-5 text-status-critical" />
-                        </div>
-                        <div>
-                            <h1 className="text-lg font-semibold">
-                                Incidents for {name}
-                            </h1>
-                            <div className="text-sm text-muted-foreground">
-                                {incidents.length} incident
-                                {incidents.length !== 1 ? 's' : ''} recorded
-                            </div>
-                        </div>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Link
-                            href={`/operations/clients/${client.id}`}
-                            className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
-                        >
-                            Back to{' '}
-                            {(
-                                labels?.['client.singular'] ?? 'Client'
-                            ).toLowerCase()}
-                        </Link>
-                        {can.create && (
-                            <Button
-                                size="sm"
-                                onClick={() => setShowNew((v) => !v)}
-                            >
-                                <Plus className="mr-1 h-4 w-4" />
-                                {showNew ? 'Cancel' : 'New incident'}
-                            </Button>
-                        )}
-                    </div>
-                </div>
-
-                {/* Quick stats */}
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <Card className="gap-0 rounded-lg p-3 shadow-sm">
-                        <div className="text-2xl font-bold">
-                            {incidents.length}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                            Total incidents
-                        </div>
-                    </Card>
-                    <Card className="gap-0 rounded-lg p-3 shadow-sm">
-                        <div className="text-2xl font-bold text-muted-foreground">
-                            {draftCount}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                            Drafts
-                        </div>
-                    </Card>
-                    <Card className="gap-0 rounded-lg p-3 shadow-sm">
-                        <div
-                            className={`text-2xl font-bold ${highCount > 0 ? 'text-status-critical' : 'text-muted-foreground'}`}
-                        >
-                            {highCount}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                            High severity
-                        </div>
-                    </Card>
-                    <Card className="gap-0 rounded-lg p-3 shadow-sm">
-                        <div className="text-2xl font-bold text-status-info">
-                            {awaitingReview}
-                        </div>
-                        <div className="text-xs text-muted-foreground">
-                            Awaiting review
-                        </div>
-                    </Card>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={ShieldAlert}
+                        backHref={`/operations/clients/${client.id}`}
+                        title={`Incidents for ${name}`}
+                        description={`${incidents.length} incident${incidents.length !== 1 ? 's' : ''} recorded`}
+                        stats={[
+                            { label: 'Total', value: incidents.length },
+                            { label: 'Drafts', value: draftCount },
+                            { label: 'High severity', value: highCount },
+                            { label: 'Awaiting review', value: awaitingReview },
+                        ]}
+                        actions={
+                            can.create ? (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() => setShowNew((v) => !v)}
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                >
+                                    <Plus className="mr-1 h-4 w-4" />
+                                    {showNew ? 'Cancel' : 'New incident'}
+                                </Button>
+                            ) : null
+                        }
+                    />
+                }
+            >
 
                 {/* Inline create form */}
                 {showNew && can.create && (
@@ -649,7 +603,7 @@ export default function ClientIncidents({
                         </div>
                     )}
                 </div>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

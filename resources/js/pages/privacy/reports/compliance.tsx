@@ -1,9 +1,10 @@
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Head, router } from '@inertiajs/react';
 import { cn } from '@/lib/utils';
-import { FileText, Shield, AlertTriangle, Lock, Scale } from 'lucide-react';
+import { AlertTriangle, BarChart3, FileText, Lock, Scale, Shield } from 'lucide-react';
 
 type Props = {
     period: string;
@@ -63,28 +64,39 @@ export default function PrivacyComplianceReport({ period, dsrStats, breachStats,
         ]}>
             <Head title="Privacy Compliance Report" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">Privacy Compliance Report</h1>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            Comprehensive privacy metrics and compliance status
-                        </p>
-                    </div>
-                    <div className="flex gap-1">
-                        {periods.map((p) => (
-                            <Button
-                                key={p.value}
-                                size="sm"
-                                variant={period === p.value ? 'default' : 'outline'}
-                                onClick={() => switchPeriod(p.value)}
-                            >
-                                {p.label}
-                            </Button>
-                        ))}
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={BarChart3}
+                        title="Privacy Compliance Report"
+                        description="Comprehensive privacy metrics and compliance status"
+                        stats={[
+                            { label: 'DSRs', value: dsrStats.total },
+                            { label: 'Breaches', value: breachStats.total },
+                            { label: 'DPIAs', value: dpiaStats.total },
+                        ]}
+                        actions={
+                            <div className="flex gap-1">
+                                {periods.map((p) => (
+                                    <Button
+                                        key={p.value}
+                                        size="sm"
+                                        variant={period === p.value ? 'default' : 'outline'}
+                                        onClick={() => switchPeriod(p.value)}
+                                        className={
+                                            period === p.value
+                                                ? undefined
+                                                : 'border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground'
+                                        }
+                                    >
+                                        {p.label}
+                                    </Button>
+                                ))}
+                            </div>
+                        }
+                    />
+                }
+            >
                 {/* DSR Stats */}
                 <Card>
                     <CardHeader>
@@ -178,7 +190,7 @@ export default function PrivacyComplianceReport({ period, dsrStats, breachStats,
                         </div>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

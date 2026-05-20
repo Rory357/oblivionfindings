@@ -1,6 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
 import {
@@ -128,25 +129,16 @@ export default function ShowReview({ review, can }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Review - ${review.employee.name}`} />
 
-            <div className="max-w-4xl space-y-6">
-                <div className="flex items-center gap-4">
-                    <Link href="/hr/performance/reviews">
-                        <Button variant="outline" size="sm">
-                            <ArrowLeft className="mr-2 h-4 w-4" />
-                            Back
-                        </Button>
-                    </Link>
-                    <div>
-                        <h1 className="text-2xl font-bold">
-                            Performance Review
-                        </h1>
-                        <p className="text-muted-foreground">
-                            {getReviewTypeLabel(review.review_type)} for{' '}
-                            {review.employee.name}
-                        </p>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/hr/performance/reviews"
+                        title="Performance Review"
+                        description={`${getReviewTypeLabel(review.review_type)} for ${review.employee.name}`}
+                    />
+                }
+            >
                 <div className="flex flex-wrap gap-2">
                     <Badge className={getStatusColor(review.status)}>
                         {review.status.replace(/_/g, ' ')}
@@ -354,7 +346,7 @@ export default function ShowReview({ review, can }: Props) {
                         </Link>
                     )}
                 </div>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

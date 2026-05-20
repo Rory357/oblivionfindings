@@ -4,9 +4,11 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Webhook } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 interface EventOption {
@@ -161,21 +163,35 @@ export default function HrWebhookIndex({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="HR Webhooks" />
-            <div className="flex flex-col gap-6 p-6">
-                <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold">HR Webhooks</h1>
-                    <div className="flex items-center gap-2">
-                        <Button variant="outline" asChild>
-                            <Link href="/hr/reports/automations">
-                                Automations
-                            </Link>
-                        </Button>
-                        <Button variant="outline" asChild>
-                            <Link href="/hr/reports">Back to Reports</Link>
-                        </Button>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Webhook}
+                        title="HR Webhooks"
+                        description="Manage webhook endpoints for HR event notifications."
+                        actions={
+                            <>
+                                <Button
+                                    variant="outline"
+                                    asChild
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                >
+                                    <Link href="/hr/reports/automations">
+                                        Automations
+                                    </Link>
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    asChild
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                >
+                                    <Link href="/hr/reports">Back to Reports</Link>
+                                </Button>
+                            </>
+                        }
+                    />
+                }
+            >
                 {can.manage && (
                     <Card>
                         <CardHeader>
@@ -598,7 +614,7 @@ export default function HrWebhookIndex({
                         </table>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

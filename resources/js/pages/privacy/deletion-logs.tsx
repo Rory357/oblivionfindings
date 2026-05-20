@@ -1,11 +1,12 @@
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
-import { Head, router, usePage } from '@inertiajs/react';
-import { Trash2 } from 'lucide-react';
+import { Head, router } from '@inertiajs/react';
+import { History, Trash2 } from 'lucide-react';
 
 type Props = {
     logs: any[];
@@ -38,14 +39,18 @@ export default function DeletionLogs({ logs, filters }: Props) {
         ]}>
             <Head title="Deletion Logs" />
 
-            <div className="space-y-4">
-                <div>
-                    <h1 className="text-lg font-semibold">Deletion Logs</h1>
-                    <p className="mt-1 text-sm text-muted-foreground">
-                        Audit trail of data deletion operations performed under retention policies
-                    </p>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={History}
+                        title="Deletion Logs"
+                        description="Audit trail of data deletion operations performed under retention policies"
+                        stats={[
+                            { label: 'Total', value: logs.length },
+                        ]}
+                    />
+                }
+            >
                 {/* Filters */}
                 <Card>
                     <CardHeader>
@@ -114,7 +119,7 @@ export default function DeletionLogs({ logs, filters }: Props) {
                         </div>
                     )}
                 </div>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

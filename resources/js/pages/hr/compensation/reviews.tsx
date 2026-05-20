@@ -18,9 +18,10 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { Plus } from 'lucide-react';
+import { DollarSign, Plus } from 'lucide-react';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -104,35 +105,39 @@ export default function CompensationReviews({ reviews, filters, can }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Compensation Reviews" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">
-                            Compensation Reviews
-                        </h1>
-                        <div className="mt-1 text-sm text-muted-foreground">
-                            Manage compensation review cycles and bulk salary
-                            adjustments
-                        </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Link href="/hr/compensation/bands">
-                            <Button size="sm" variant="outline">
-                                Salary Bands
-                            </Button>
-                        </Link>
-                        {can.manage && (
-                            <Link href="/hr/compensation/reviews/create">
-                                <Button size="sm">
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    New Review
-                                </Button>
-                            </Link>
-                        )}
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={DollarSign}
+                        title="Compensation Reviews"
+                        description="Manage compensation review cycles and bulk salary adjustments."
+                        stats={[
+                            { label: 'Reviews', value: reviews.data.length },
+                        ]}
+                        actions={
+                            <>
+                                <Link href="/hr/compensation/bands">
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                    >
+                                        Salary Bands
+                                    </Button>
+                                </Link>
+                                {can.manage && (
+                                    <Link href="/hr/compensation/reviews/create">
+                                        <Button size="sm">
+                                            <Plus className="mr-1.5 h-4 w-4" />
+                                            New Review
+                                        </Button>
+                                    </Link>
+                                )}
+                            </>
+                        }
+                    />
+                }
+            >
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-base">Filters</CardTitle>
@@ -242,7 +247,7 @@ export default function CompensationReviews({ reviews, filters, can }: Props) {
                 {reviews?.links?.length ? (
                     <LaravelPagination links={reviews.links} />
                 ) : null}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

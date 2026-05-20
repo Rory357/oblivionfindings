@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -55,18 +56,16 @@ export default function CreateDataSubjectRequest({ staff }: Props) {
         >
             <Head title="New Data Subject Request" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">
-                            New Data Subject Request
-                        </h1>
-                        <div className="mt-1 text-sm text-muted-foreground">
-                            Record a new GDPR data subject request
-                        </div>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/privacy/requests"
+                        title="New Data Subject Request"
+                        description="Record a new GDPR data subject request"
+                    />
+                }
+            >
                 <form
                     onSubmit={handleSubmit}
                     data-test="privacy-dsr-create-form"
@@ -227,7 +226,7 @@ export default function CreateDataSubjectRequest({ staff }: Props) {
                         </CardContent>
                     </Card>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

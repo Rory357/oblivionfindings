@@ -17,9 +17,10 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
-import { Pencil, Plus } from 'lucide-react';
+import { DollarSign, Pencil, Plus } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
 type BreadcrumbItem = { title: string; href: string };
@@ -141,23 +142,26 @@ export default function SalaryBands({ bands, filters, can }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Salary Bands" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">Salary Bands</h1>
-                        <div className="mt-1 text-sm text-muted-foreground">
-                            Manage salary bands by position role
-                        </div>
-                    </div>
-
-                    {can.manage && (
-                        <Button size="sm" onClick={openCreate}>
-                            <Plus className="mr-1.5 h-4 w-4" />
-                            New Band
-                        </Button>
-                    )}
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={DollarSign}
+                        title="Salary Bands"
+                        description="Manage salary bands by position role."
+                        stats={[
+                            { label: 'Bands', value: bands.data.length },
+                        ]}
+                        actions={
+                            can.manage ? (
+                                <Button size="sm" onClick={openCreate}>
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    New Band
+                                </Button>
+                            ) : null
+                        }
+                    />
+                }
+            >
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-base">Filters</CardTitle>
@@ -276,7 +280,7 @@ export default function SalaryBands({ bands, filters, can }: Props) {
                 {bands?.links?.length ? (
                     <LaravelPagination links={bands.links} />
                 ) : null}
-            </div>
+            </PageLayout>
 
             <Dialog open={open} onOpenChange={setOpen}>
                 <DialogContent className="sm:max-w-lg">

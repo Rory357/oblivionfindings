@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -13,7 +14,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm } from '@inertiajs/react';
-import { Download, File, FileImage, FileText, FolderOpen, Inbox, Upload, X } from 'lucide-react';
+import { Download, File, FileImage, FileText, Folder, FolderOpen, Inbox, Upload, X } from 'lucide-react';
 import { useCallback, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
@@ -128,16 +129,24 @@ export default function Documents({ client, documents }: Props) {
         >
             <Head title={`${clientName} - Documents`} />
 
-            <div className="mx-auto max-w-5xl space-y-6 p-4 md:p-6">
-                <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold tracking-tight">Documents</h1>
-                    <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
-                        <DialogTrigger asChild>
-                            <Button className="gap-2">
-                                <Upload className="h-4 w-4" />
-                                Upload Document
-                            </Button>
-                        </DialogTrigger>
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Folder}
+                        title="Documents"
+                        description={`Documents shared with ${client.first_name}'s care team.`}
+                        stats={[
+                            { label: 'Total', value: documents.length },
+                            { label: 'Categories', value: grouped.size },
+                        ]}
+                        actions={
+                            <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
+                                <DialogTrigger asChild>
+                                    <Button className="gap-2">
+                                        <Upload className="h-4 w-4" />
+                                        Upload Document
+                                    </Button>
+                                </DialogTrigger>
                         <DialogContent className="sm:max-w-lg">
                             <DialogHeader>
                                 <DialogTitle>Upload a Document</DialogTitle>
@@ -245,9 +254,11 @@ export default function Documents({ client, documents }: Props) {
                                 </div>
                             </form>
                         </DialogContent>
-                    </Dialog>
-                </div>
-
+                            </Dialog>
+                        }
+                    />
+                }
+            >
                 {documents.length > 0 ? (
                     Array.from(grouped.entries()).map(([category, docs]) => (
                         <Card key={category}>
@@ -334,7 +345,7 @@ export default function Documents({ client, documents }: Props) {
                         </CardContent>
                     </Card>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

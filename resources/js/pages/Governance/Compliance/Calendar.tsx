@@ -1,6 +1,8 @@
 import { Head } from '@inertiajs/react';
+import { ShieldCheck } from 'lucide-react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -48,13 +50,20 @@ export default function ComplianceCalendar({ auth, events }: Props) {
     >
       <Head title="Compliance Calendar" />
 
-      <div className="max-w-5xl mx-auto px-4 sm:px-6 lg:px-8">
-          {/* Header */}
-          <div className="mb-6">
-            <h1 className="text-3xl font-bold text-foreground">Compliance Calendar</h1>
-            <p className="text-muted-foreground mt-1">Upcoming obligations and deadlines</p>
-          </div>
-
+      <PageLayout
+        hero={
+          <PageHero
+            icon={ShieldCheck}
+            title="Compliance Calendar"
+            description="Upcoming obligations and deadlines across all frameworks."
+            stats={[
+              { label: 'Events', value: events.length },
+              { label: 'Overdue', value: events.filter((e) => e.status === 'overdue').length },
+              { label: 'Due Soon', value: events.filter((e) => e.status === 'due_soon').length },
+            ]}
+          />
+        }
+      >
           {/* Calendar */}
           <div className="space-y-6">
             {Object.entries(grouped).map(([month, monthEvents]) => (
@@ -108,7 +117,7 @@ export default function ComplianceCalendar({ auth, events }: Props) {
               </Card>
             ))}
           </div>
-      </div>
+      </PageLayout>
     </AppLayout>
   );
 }

@@ -1,6 +1,7 @@
 import { Head } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -52,12 +53,16 @@ export default function EvaluationResults({ auth, evaluation }: Props) {
         >
             <Head title={`${evaluation.title} - Results`} />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="mb-6">
-                    <h1 className="text-3xl font-bold text-foreground">{evaluation.title} Results</h1>
-                    <p className="text-muted-foreground mt-1">Evaluation outcome summary and analysis</p>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/governance/evaluations"
+                        title={`${evaluation.title} Results`}
+                        description="Evaluation outcome summary and analysis."
+                    />
+                }
+            >
                 {/* Summary Card */}
                 <div className="grid grid-cols-1 md:grid-cols-3 gap-4 mb-6">
                     <Card>
@@ -192,7 +197,7 @@ export default function EvaluationResults({ auth, evaluation }: Props) {
                         )}
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

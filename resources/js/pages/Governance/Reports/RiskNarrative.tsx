@@ -1,6 +1,7 @@
 import { Head } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -63,12 +64,21 @@ export default function RiskNarrative({ auth, risks, summary }: Props) {
         >
             <Head title="Risk Narrative Report" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="mb-6">
-                    <h1 className="text-3xl font-bold text-foreground">Risk Narrative Report</h1>
-                    <p className="text-muted-foreground mt-1">Detailed narrative view of all active risks</p>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={AlertTriangle}
+                        title="Risk Narrative Report"
+                        description="Detailed narrative view of all active risks."
+                        stats={[
+                            { label: 'Critical', value: summary.critical },
+                            { label: 'High', value: summary.high },
+                            { label: 'Above Appetite', value: summary.above_appetite },
+                            { label: 'Total', value: summary.total_active },
+                        ]}
+                    />
+                }
+            >
                 {/* Summary Stats */}
                 <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
                     <Card className="border-status-critical/30">
@@ -179,7 +189,7 @@ export default function RiskNarrative({ auth, risks, summary }: Props) {
                         <div className="py-12 text-center text-sm text-muted-foreground">No active risks found.</div>
                     )}
                 </div>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

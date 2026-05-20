@@ -1,10 +1,12 @@
 import { Head, router } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
+    Banknote,
     CheckCircle,
     XCircle,
     Link2,
@@ -203,25 +205,25 @@ export default function Reconcile({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Reconcile - ${reconciliation.bank_account_name}`} />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-3xl font-bold text-foreground">
-                            Bank Reconciliation
-                        </h1>
-                        <p className="text-muted-foreground mt-1">
-                            {reconciliation.bank_account_name} &mdash; Statement date: {reconciliation.statement_date}
-                        </p>
-                    </div>
-                    {isCompleted && (
-                        <Badge className="bg-status-success-bg text-status-success border-status-success/30 text-sm px-3 py-1">
-                            <CheckCircle className="h-4 w-4 mr-1" />
-                            Completed {reconciliation.completed_at}
-                            {reconciliation.completed_by_name && ` by ${reconciliation.completed_by_name}`}
-                        </Badge>
-                    )}
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Banknote}
+                        backHref="/finance/bank-reconciliation"
+                        title="Bank Reconciliation"
+                        description={`${reconciliation.bank_account_name} — Statement date: ${reconciliation.statement_date}`}
+                        actions={
+                            isCompleted ? (
+                                <Badge className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm">
+                                    <CheckCircle className="h-4 w-4 mr-1" />
+                                    Completed {reconciliation.completed_at}
+                                    {reconciliation.completed_by_name && ` by ${reconciliation.completed_by_name}`}
+                                </Badge>
+                            ) : null
+                        }
+                    />
+                }
+            >
 
                 {/* Summary Cards */}
                 <div className="grid grid-cols-2 md:grid-cols-5 gap-4">
@@ -571,7 +573,7 @@ export default function Reconcile({
                         </CardContent>
                     </Card>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

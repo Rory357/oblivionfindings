@@ -1,4 +1,4 @@
-import PageShell from '@/components/page-shell';
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -318,7 +318,19 @@ export default function PortalCalendar({ client, visitRequests }: Props) {
             <Head title={`${clientName} - Calendar`} />
             <style dangerouslySetInnerHTML={{ __html: calendarStyles }} />
 
-            <PageShell>
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Calendar}
+                        title={`${client.first_name}'s Calendar`}
+                        description="View shifts, appointments, and request visits."
+                        stats={[
+                            { label: 'Pending visits', value: pendingCount },
+                            { label: 'Total visits', value: visitRequests.length },
+                        ]}
+                    />
+                }
+            >
                 <div className="flex gap-6">
                     {/* Sidebar */}
                     <div className="hidden w-60 shrink-0 space-y-4 lg:block">
@@ -586,9 +598,9 @@ export default function PortalCalendar({ client, visitRequests }: Props) {
                     <div className="min-w-0 flex-1">
                         <div className="mb-5 flex flex-col gap-3 sm:flex-row sm:items-center sm:justify-between">
                             <div className="flex items-center gap-4">
-                                <h1 className="text-2xl font-bold tracking-tight">
+                                <span className="text-2xl font-bold tracking-tight">
                                     {calTitle}
-                                </h1>
+                                </span>
                                 <div className="flex items-center">
                                     <Button
                                         type="button"
@@ -864,7 +876,7 @@ export default function PortalCalendar({ client, visitRequests }: Props) {
                         </Button>
                     </div>
                 )}
-            </PageShell>
+            </PageLayout>
         </AppLayout>
     );
 }

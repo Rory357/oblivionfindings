@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Head } from '@inertiajs/react';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,8 +12,6 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { BarChart3, DollarSign, TrendingDown, TrendingUp, Building2, Minus, ArrowLeftRight, Activity } from 'lucide-react';
-import { Link } from '@inertiajs/react';
-import { Button } from '@/components/ui/button';
 import { BarChart, Bar, PieChart, Pie, Cell, XAxis, YAxis, CartesianGrid, Tooltip, Legend, ResponsiveContainer } from 'recharts';
 import { type BreadcrumbItem } from '@/types';
 
@@ -146,26 +145,22 @@ export default function RunResults({ group, run }: PageProps) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Consolidation Run #${run.id}`} />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">
-                            Consolidation Run #{run.id}
-                        </h1>
-                        <p className="text-muted-foreground">
-                            {run.period_from} to {run.period_to}
-                            {run.created_by && ` | Run by ${run.created_by}`}
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Badge variant="outline" className={statusColors[run.status]}>
-                            {run.status.charAt(0).toUpperCase() + run.status.slice(1)}
-                        </Badge>
-                        <Link href={`/finance/consolidation/${group.id}`}>
-                            <Button variant="outline" size="sm">Back to Group</Button>
-                        </Link>
-                    </div>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref={`/finance/consolidation/${group.id}`}
+                        backLabel="Back to Group"
+                        title={`Consolidation Run #${run.id}`}
+                        description={`${run.period_from} to ${run.period_to}${run.created_by ? ` | Run by ${run.created_by}` : ''}`}
+                        actions={
+                            <Badge variant="outline" className={statusColors[run.status]}>
+                                {run.status.charAt(0).toUpperCase() + run.status.slice(1)}
+                            </Badge>
+                        }
+                    />
+                }
+            >
 
                 {/* Summary Cards */}
                 <div className="grid grid-cols-2 md:grid-cols-3 lg:grid-cols-5 gap-4">
@@ -334,7 +329,7 @@ export default function RunResults({ group, run }: PageProps) {
                         </CardContent>
                     </Card>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

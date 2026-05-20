@@ -1,6 +1,7 @@
 import { Head, useForm } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -8,7 +9,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus } from 'lucide-react';
+import { FileText, Plus } from 'lucide-react';
 import { useState } from 'react';
 
 interface Interest {
@@ -56,14 +57,24 @@ export default function MyInterests({ auth, interests, boardMember, canDeclare }
   return (
     <AppLayout>
       <Head title="My Interests" />
-      <div className="max-w-4xl mx-auto px-4 sm:px-6 lg:px-8 py-8">
-        <div className="flex items-center justify-between mb-6">
-          <h1 className="text-2xl font-bold text-foreground">My Interests</h1>
-          <Button onClick={() => setShowForm(!showForm)} dusk="declare-interest" disabled={!canDeclare}>
-            <Plus className="w-4 h-4 mr-2" /> Declare Interest
-          </Button>
-        </div>
-
+      <PageLayout
+        hero={
+          <PageHero
+            icon={FileText}
+            title="My Interests"
+            description="Declare and manage your personal interest declarations."
+            stats={[
+              { label: 'Total', value: interests.length },
+              { label: 'Active', value: interests.filter((i) => i.is_active).length },
+            ]}
+            actions={
+              <Button onClick={() => setShowForm(!showForm)} dusk="declare-interest" disabled={!canDeclare}>
+                <Plus className="w-4 h-4 mr-2" /> Declare Interest
+              </Button>
+            }
+          />
+        }
+      >
         {!canDeclare && (
           <Card className="mb-6">
             <CardContent className="p-6 text-sm text-muted-foreground">
@@ -145,7 +156,7 @@ export default function MyInterests({ auth, interests, boardMember, canDeclare }
             <Card><CardContent className="p-8 text-center text-muted-foreground">{canDeclare ? 'No interests declared. Use the button above to add one.' : 'No personal interest declarations are available for this account.'}</CardContent></Card>
           )}
         </div>
-      </div>
+      </PageLayout>
     </AppLayout>
   );
 }

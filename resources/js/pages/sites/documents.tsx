@@ -20,10 +20,12 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import {
     CheckCircle2,
     Download,
+    FileText,
     Filter,
     FolderOpen,
     FolderPlus,
@@ -283,50 +285,45 @@ export default function SiteDocuments({
         >
             <Head title={`Documents - ${site.name}`} />
 
-            <div className="space-y-4 p-4 lg:p-6">
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                        <h1 className="text-xl font-bold">Documents</h1>
-                        <p className="text-sm text-muted-foreground">
-                            {site.name} document library
-                        </p>
-                    </div>
-                    {can_edit && (
-                        <div className="flex items-center gap-2">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="gap-1.5"
-                                onClick={() => setShowNewFolder(true)}
-                            >
-                                <FolderPlus className="h-4 w-4" />
-                                New Folder
-                            </Button>
-                            <Button
-                                className="gap-1.5 bg-primary hover:bg-primary"
-                                onClick={() => openUpload()}
-                            >
-                                <Upload className="h-4 w-4" />
-                                Upload Document
-                            </Button>
-                        </div>
-                    )}
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <StatTile label="Total" value={stats.total} highlight />
-                    <StatTile label="Folders" value={stats.folders} highlight />
-                    <StatTile
-                        label="Expiring"
-                        value={stats.expiring}
-                        tone={stats.expiring > 0 ? 'warning' : undefined}
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={FileText}
+                        backHref={`/sites/${site.id}`}
+                        title="Documents"
+                        description={`${site.name} document library`}
+                        stats={[
+                            { label: 'Total', value: stats.total },
+                            { label: 'Folders', value: stats.folders },
+                            { label: 'Expiring', value: stats.expiring },
+                            { label: 'Expired', value: stats.expired },
+                        ]}
+                        actions={
+                            can_edit ? (
+                                <>
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="gap-1.5 border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                        onClick={() => setShowNewFolder(true)}
+                                    >
+                                        <FolderPlus className="h-4 w-4" />
+                                        New Folder
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        className="gap-1.5 bg-primary hover:bg-primary"
+                                        onClick={() => openUpload()}
+                                    >
+                                        <Upload className="h-4 w-4" />
+                                        Upload Document
+                                    </Button>
+                                </>
+                            ) : null
+                        }
                     />
-                    <StatTile
-                        label="Expired"
-                        value={stats.expired}
-                        tone={stats.expired > 0 ? 'critical' : undefined}
-                    />
-                </div>
+                }
+            >
 
                 {currentFolder && (
                     <div className="flex items-center gap-2 text-sm">
@@ -544,7 +541,7 @@ export default function SiteDocuments({
                         ))}
                     </div>
                 )}
-            </div>
+            </PageLayout>
 
             <Dialog open={showUpload} onOpenChange={setShowUpload}>
                 <DialogContent className="sm:max-w-lg">
@@ -711,44 +708,6 @@ export default function SiteDocuments({
                 </DialogContent>
             </Dialog>
         </AppLayout>
-    );
-}
-
-function StatTile({
-    label,
-    value,
-    highlight = false,
-    tone,
-}: {
-    label: string;
-    value: number;
-    highlight?: boolean;
-    tone?: 'warning' | 'critical';
-}) {
-    const valueClass =
-        tone === 'warning'
-            ? 'text-status-warning'
-            : tone === 'critical'
-              ? 'text-status-critical'
-              : highlight
-                ? 'text-primary'
-                : 'text-muted-foreground';
-
-    return (
-        <div
-            className={`rounded-xl border p-3 text-center ${
-                highlight ? 'bg-primary/10' : ''
-            }`}
-        >
-            <div className={`text-xl font-bold ${valueClass}`}>{value}</div>
-            <div
-                className={`text-[10px] tracking-wider uppercase ${
-                    highlight ? 'text-primary' : 'text-muted-foreground'
-                }`}
-            >
-                {label}
-            </div>
-        </div>
     );
 }
 

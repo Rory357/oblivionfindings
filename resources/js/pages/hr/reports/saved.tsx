@@ -10,9 +10,10 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { Download, FileSpreadsheet, Play, Plus, Trash2 } from 'lucide-react';
+import { BarChart3, Download, FileSpreadsheet, Play, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 type SavedReport = {
@@ -128,17 +129,26 @@ export default function SavedReports({ reports, sources }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Saved Reports" />
-            <div className="flex flex-col gap-6 p-6">
-                <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold">Saved Reports</h1>
-                    <Button asChild>
-                        <Link href="/hr/reports/builder">
-                            <Plus className="mr-2 h-4 w-4" />
-                            New Report
-                        </Link>
-                    </Button>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={BarChart3}
+                        title="Saved Reports"
+                        description="Run, export, and manage saved HR reports."
+                        stats={[
+                            { label: 'Reports', value: reports.total },
+                        ]}
+                        actions={
+                            <Button asChild>
+                                <Link href="/hr/reports/builder">
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    New Report
+                                </Link>
+                            </Button>
+                        }
+                    />
+                }
+            >
                 <Card>
                     <CardContent className="p-0">
                         <Table>
@@ -321,7 +331,7 @@ export default function SavedReports({ reports, sources }: Props) {
                 {reports.last_page > 1 && (
                     <LaravelPagination links={reports.links} />
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

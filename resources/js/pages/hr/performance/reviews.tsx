@@ -19,6 +19,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import {
@@ -30,6 +31,7 @@ import {
     Search,
     ShieldCheck,
     Star,
+    TrendingUp,
 } from 'lucide-react';
 import type { ReactElement } from 'react';
 import {
@@ -208,33 +210,45 @@ export default function PerformanceReviews({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Performance Reviews" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">
-                            Performance Reviews
-                        </h1>
-                        <p className="mt-0.5 text-sm text-muted-foreground">
-                            Track and manage staff performance reviews
-                        </p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Link href="/hr/performance">
-                            <Button size="sm" variant="outline">
-                                Dashboard
-                            </Button>
-                        </Link>
-                        {can.manage && (
-                            <Link href="/hr/performance/reviews/create">
-                                <Button size="sm">
-                                    <Plus className="mr-1.5 h-4 w-4" /> New
-                                    Review
-                                </Button>
-                            </Link>
-                        )}
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={TrendingUp}
+                        title="Performance Reviews"
+                        description="Track and manage staff performance reviews."
+                        stats={
+                            stats
+                                ? [
+                                      { label: 'Total', value: stats.total },
+                                      { label: 'Completed', value: stats.completed },
+                                      { label: 'Overdue', value: stats.overdue },
+                                      { label: 'Drafts', value: stats.draft },
+                                  ]
+                                : undefined
+                        }
+                        actions={
+                            <>
+                                <Link href="/hr/performance">
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                    >
+                                        Dashboard
+                                    </Button>
+                                </Link>
+                                {can.manage && (
+                                    <Link href="/hr/performance/reviews/create">
+                                        <Button size="sm">
+                                            <Plus className="mr-1.5 h-4 w-4" /> New Review
+                                        </Button>
+                                    </Link>
+                                )}
+                            </>
+                        }
+                    />
+                }
+            >
                 {/* KPI Cards */}
                 {stats && (
                     <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
@@ -673,7 +687,7 @@ export default function PerformanceReviews({
                         </CardContent>
                     </Card>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

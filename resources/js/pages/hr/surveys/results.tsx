@@ -1,5 +1,6 @@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/react';
@@ -92,24 +93,26 @@ export default function SurveyResults({ survey, results, enps, can }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Results: ${survey.title}`} />
-            <div className="flex flex-col gap-6 p-6">
-                <div>
-                    <h1 className="text-2xl font-bold">{survey.title}</h1>
-                    {survey.description && (
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            {survey.description}
-                        </p>
-                    )}
-                    <div className="mt-2 flex gap-2">
-                        <Badge variant="outline" className={config.className}>
-                            {config.label}
-                        </Badge>
-                        <Badge variant="secondary">
-                            {results.total_responses} responses
-                        </Badge>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/hr/surveys"
+                        title={survey.title}
+                        description={survey.description ?? undefined}
+                        actions={
+                            <>
+                                <Badge variant="outline" className={config.className}>
+                                    {config.label}
+                                </Badge>
+                                <Badge variant="secondary">
+                                    {results.total_responses} responses
+                                </Badge>
+                            </>
+                        }
+                    />
+                }
+            >
                 {/* eNPS Score Card */}
                 {enps && enps.total > 0 && (
                     <Card>
@@ -341,7 +344,7 @@ export default function SurveyResults({ survey, results, enps, can }: Props) {
                         </CardContent>
                     </Card>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

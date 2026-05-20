@@ -1,8 +1,9 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import {
     AlertTriangle,
     Calendar,
@@ -84,14 +85,16 @@ export default function ShowDataBreach({ breach }: Props) {
         >
             <Head title={`Breach ${breach.breach_reference}`} />
 
-            <div className="space-y-4" data-test="privacy-breach-show">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="flex items-center gap-2 text-lg font-semibold">
-                            <AlertTriangle className="h-5 w-5 text-status-critical" />
-                            {breach.breach_reference}
-                        </h1>
-                        <div className="mt-2 flex flex-wrap gap-2">
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/privacy/breaches"
+                        backLabel="Back to List"
+                        title={breach.breach_reference}
+                        description={statusLabels[breach.status] ?? breach.status}
+                    >
+                        <div className="flex flex-wrap gap-2" data-test="privacy-breach-show">
                             <Badge
                                 className={getStatusColor(breach.status)}
                                 data-test="privacy-breach-status"
@@ -104,8 +107,7 @@ export default function ShowDataBreach({ breach }: Props) {
                                     className="border-status-critical/30 bg-status-critical-bg text-status-critical"
                                 >
                                     <AlertTriangle className="mr-1 h-3 w-3" />
-                                    ICO deadline exceeded ({hours}h since
-                                    discovery)
+                                    ICO deadline exceeded ({hours}h since discovery)
                                 </Badge>
                             )}
                             {icoDeadlineApproaching && (
@@ -137,15 +139,9 @@ export default function ShowDataBreach({ breach }: Props) {
                                 </Badge>
                             )}
                         </div>
-                    </div>
-                    <Link
-                        href="/privacy/breaches"
-                        className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
-                    >
-                        Back to List
-                    </Link>
-                </div>
-
+                    </PageHero>
+                }
+            >
                 <div className="grid gap-4 lg:grid-cols-2">
                     <Card>
                         <CardHeader>
@@ -383,7 +379,7 @@ export default function ShowDataBreach({ breach }: Props) {
                         </CardContent>
                     </Card>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

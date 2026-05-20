@@ -16,10 +16,11 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
-import { ChevronDown, Plus, Trash2 } from 'lucide-react';
+import { ChevronDown, FileText, Plus, Trash2 } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
 type ExpenseClaim = {
@@ -159,9 +160,24 @@ export default function MyExpenses({ claims, categories }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="My Expenses" />
-            <div className="flex flex-col gap-6 p-6">
-                <h1 className="text-2xl font-bold">My Expenses</h1>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={FileText}
+                        title="My Expenses"
+                        description="Submit, track, and review your expense claims."
+                        stats={[
+                            { label: 'Claims', value: claims.total },
+                            { label: 'Page', value: `${claims.current_page} / ${claims.last_page}` },
+                        ]}
+                        actions={
+                            <Button onClick={() => setFormOpen(!formOpen)}>
+                                <Plus className="mr-1 h-4 w-4" /> New Claim
+                            </Button>
+                        }
+                    />
+                }
+            >
                 {/* Submit Expense Form */}
                 <Collapsible open={formOpen} onOpenChange={setFormOpen}>
                     <Card>
@@ -419,7 +435,7 @@ export default function MyExpenses({ claims, categories }: Props) {
                         <LaravelPagination links={claims.links} />
                     </div>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

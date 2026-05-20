@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { PresenceBadge, PresenceDot } from '@/components/presence-dot';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
@@ -22,6 +23,7 @@ import {
     Check,
     CheckCheck,
     FileText,
+    MessageSquare,
     MessageSquareText,
     Mic,
     MicOff,
@@ -470,11 +472,23 @@ export default function PortalMessages({
         >
             <Head title={`Messages - ${clientName}`} />
 
-            <div className="flex h-[calc(100vh-7rem)] overflow-hidden">
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={MessageSquare}
+                        title="Messages"
+                        description={`Chat with ${clientName}'s care team.`}
+                        stats={[
+                            { label: 'Conversations', value: conversations.length },
+                        ]}
+                    />
+                }
+            >
+            <div className="flex h-[calc(100vh-22rem)] overflow-hidden">
                 {/* Left Panel */}
                 <div className="flex w-72 flex-col border-r bg-card">
                     <div className="flex items-center justify-between border-b px-4 py-3">
-                        <h1 className="text-base font-semibold">Messages</h1>
+                        <h2 className="text-base font-semibold">Messages</h2>
                         <div className="flex items-center gap-1">
                             <Button
                                 type="button"
@@ -1670,6 +1684,7 @@ export default function PortalMessages({
                     </div>
                 </DialogContent>
             </Dialog>
+            </PageLayout>
         </AppLayout>
     );
 }

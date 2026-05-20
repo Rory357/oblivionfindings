@@ -18,10 +18,11 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
-import { Plus, Trash2 } from 'lucide-react';
+import { GitBranch, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 type Step = {
@@ -138,21 +139,25 @@ export default function ApprovalChains({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Approval Chains" />
-            <div className="flex flex-col gap-6 p-6">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-2xl font-bold">Approval Chains</h1>
-                        <p className="text-sm text-muted-foreground">
-                            Configure multi-level approval workflows for HR
-                            processes
-                        </p>
-                    </div>
-                    <Button size="sm" onClick={() => setShowForm(!showForm)}>
-                        <Plus className="mr-1.5 h-4 w-4" />
-                        New Chain
-                    </Button>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={GitBranch}
+                        title="Approval Chains"
+                        description="Configure multi-level approval workflows for HR processes."
+                        stats={[
+                            { label: 'Chains', value: chains.length },
+                            { label: 'Active', value: chains.filter((c) => c.is_active).length },
+                        ]}
+                        actions={
+                            <Button size="sm" onClick={() => setShowForm(!showForm)}>
+                                <Plus className="mr-1.5 h-4 w-4" />
+                                New Chain
+                            </Button>
+                        }
+                    />
+                }
+            >
                 {showForm && (
                     <Card>
                         <CardHeader>
@@ -443,7 +448,7 @@ export default function ApprovalChains({
                         </Table>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

@@ -1,11 +1,12 @@
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Head, Link, useForm } from '@inertiajs/react';
-import { Scale, LockOpen } from 'lucide-react';
+import { Head, useForm } from '@inertiajs/react';
+import { LockOpen, Scale } from 'lucide-react';
 
 type LegalHold = {
     id: number;
@@ -80,19 +81,17 @@ export default function EditLegalHold({ hold }: Props) {
         ]}>
             <Head title={`Legal Hold ${hold.hold_reference}`} />
 
-            <div className="space-y-4">
-                <div className="flex flex-wrap items-center justify-between gap-2">
-                    <div>
-                        <h1 className="text-lg font-semibold">Legal Hold {hold.hold_reference}</h1>
-                        <div className="mt-1 text-sm text-muted-foreground">
-                            Type: {hold.hold_type} - Status: {hold.status}
-                        </div>
-                    </div>
-                    <Link href="/privacy/legal-holds" className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
-                        Back to legal holds
-                    </Link>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/privacy/legal-holds"
+                        backLabel="Back to legal holds"
+                        title={`Legal Hold ${hold.hold_reference}`}
+                        description={`Type: ${hold.hold_type} - Status: ${hold.status}`}
+                    />
+                }
+            >
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-base">
@@ -215,7 +214,7 @@ export default function EditLegalHold({ hold }: Props) {
                         </CardContent>
                     </Card>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

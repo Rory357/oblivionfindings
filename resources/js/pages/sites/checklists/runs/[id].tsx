@@ -1,4 +1,3 @@
-import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -11,11 +10,11 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero } from '@/components/page';
 import { cn } from '@/lib/utils';
-import { Head, Link, useForm } from '@inertiajs/react';
+import { Head, useForm } from '@inertiajs/react';
 import {
     AlertTriangle,
-    ArrowLeft,
     Camera,
     Check,
     CheckCircle2,
@@ -467,73 +466,43 @@ export default function ChecklistRun({
             <Head title={`${template.name} — Checklist Run`} />
 
             <div className="relative pb-32">
-                {/* HERO HEADER — matches site show purple gradient */}
+                {/* HERO HEADER */}
                 <div className="px-4 pt-4 md:px-6">
-                    <Button
-                        asChild
-                        variant="ghost"
-                        size="sm"
-                        className="-ml-2 mb-3 text-muted-foreground hover:text-foreground"
-                    >
-                        <Link href={`/sites/${site.id}/checklists`}>
-                            <ArrowLeft className="mr-1 h-4 w-4" />
-                            Back to checklists
-                        </Link>
-                    </Button>
-
-                    <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-primary/90 via-primary to-primary/80 p-6 text-primary-foreground md:p-8">
-                        <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-primary-foreground/5" />
-                        <div className="pointer-events-none absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-primary-foreground/5" />
-                        <div className="pointer-events-none absolute top-1/4 right-1/3 h-24 w-24 rounded-full bg-primary-foreground/5" />
-
-                        <div className="relative flex flex-col items-center gap-6 md:flex-row md:items-start">
-                            {/* Run icon avatar */}
-                            <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full border-4 border-primary-foreground/20 bg-primary-foreground/10 shadow-xl md:h-28 md:w-28">
-                                <ClipboardCheck className="h-12 w-12 text-primary-foreground md:h-14 md:w-14" />
-                            </div>
-
-                            {/* Info */}
-                            <div className="min-w-0 flex-1 text-center md:text-left">
-                                <h1 className="text-2xl font-bold md:text-3xl">
-                                    {template.name}
-                                </h1>
-                                <p className="mt-0.5 text-sm text-primary-foreground/70">
-                                    {site.name}
-                                    {run.scheduled_date && (
-                                        <>
-                                            {' · Scheduled '}
-                                            {new Date(
-                                                run.scheduled_date,
-                                            ).toLocaleDateString(undefined, {
-                                                weekday: 'short',
-                                                month: 'short',
-                                                day: 'numeric',
-                                                year: 'numeric',
-                                            })}
-                                        </>
-                                    )}
-                                </p>
-
-                                <div className="mt-3 flex flex-wrap items-center justify-center gap-2 md:justify-start">
-                                    {run.status === 'in_progress' && (
-                                        <Badge className="border-amber-200/40 bg-amber-50/15 text-amber-100">
-                                            In progress
-                                        </Badge>
-                                    )}
-                                    {run.status === 'scheduled' && (
-                                        <Badge className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground">
-                                            Scheduled
-                                        </Badge>
-                                    )}
-                                    {run.status === 'completed' && (
-                                        <Badge className="border-emerald-200/40 bg-emerald-50/15 text-emerald-100">
-                                            Completed
-                                        </Badge>
-                                    )}
-                                </div>
-                            </div>
-
-                            {/* Progress ring + stats — frosted card on the purple */}
+                    <PageHero
+                        icon={ClipboardCheck}
+                        backHref={`/sites/${site.id}/checklists`}
+                        backLabel="Back to checklists"
+                        title={template.name}
+                        description={
+                            <>
+                                {site.name}
+                                {run.scheduled_date && (
+                                    <>
+                                        {' · Scheduled '}
+                                        {new Date(
+                                            run.scheduled_date,
+                                        ).toLocaleDateString(undefined, {
+                                            weekday: 'short',
+                                            month: 'short',
+                                            day: 'numeric',
+                                            year: 'numeric',
+                                        })}
+                                    </>
+                                )}
+                            </>
+                        }
+                        badges={[
+                            ...(run.status === 'in_progress'
+                                ? [{ label: 'In progress', tone: 'warning' as const }]
+                                : []),
+                            ...(run.status === 'scheduled'
+                                ? [{ label: 'Scheduled', tone: 'default' as const }]
+                                : []),
+                            ...(run.status === 'completed'
+                                ? [{ label: 'Completed', tone: 'success' as const }]
+                                : []),
+                        ]}
+                        actions={
                             <div className="flex items-center gap-5 rounded-xl border border-primary-foreground/20 bg-primary-foreground/10 px-5 py-3 text-primary-foreground backdrop-blur">
                                 <ProgressRing
                                     value={progressPercentage}
@@ -574,8 +543,8 @@ export default function ChecklistRun({
                                     </div>
                                 </div>
                             </div>
-                        </div>
-                    </div>
+                        }
+                    />
 
                     {/* Failed items strip — kept below the hero, light surface for readability */}
                     {failedItems.length > 0 && (

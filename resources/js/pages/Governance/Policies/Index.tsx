@@ -44,7 +44,13 @@ export default function PolicyIndex({ auth, policies, categories }: Props) {
   const needsAttestation = policies.data.filter(p => p.requires_attestation).length;
 
   return (
-    <AppLayout>
+    <AppLayout
+      user={auth.user}
+      breadcrumbs={[
+        { title: 'Governance', href: '/governance/dashboard' },
+        { title: 'Policies', href: '/governance/policies' },
+      ]}
+    >
       <Head title="Governance Policies" />
       <PageLayout
         hero={

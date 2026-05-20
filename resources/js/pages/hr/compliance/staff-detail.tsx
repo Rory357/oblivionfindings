@@ -1,6 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/react';
@@ -116,25 +117,21 @@ export default function StaffComplianceDetail({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Compliance - ${staff.name}`} />
-            <div className="flex flex-col gap-6 p-6">
-                {/* Header */}
-                <div className="flex items-start justify-between">
-                    <div className="flex items-center gap-4">
-                        <div className="flex h-14 w-14 items-center justify-center rounded-full bg-primary/10">
-                            <User className="h-7 w-7 text-primary" />
-                        </div>
-                        <div>
-                            <h1 className="text-2xl font-bold">{staff.name}</h1>
-                            <p className="text-muted-foreground">
-                                {staff.email}
-                            </p>
-                        </div>
-                    </div>
-                    <Button variant="outline" asChild>
-                        <Link href="/hr/compliance">Back to Dashboard</Link>
-                    </Button>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/hr/compliance"
+                        title={staff.name}
+                        description={staff.email}
+                        actions={
+                            <span className="rounded-full bg-primary/10 px-3 py-1 text-sm font-medium text-primary">
+                                {compliancePercent}% Compliant
+                            </span>
+                        }
+                    />
+                }
+            >
                 {/* Summary Cards */}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
                     <Card>
@@ -358,7 +355,7 @@ export default function StaffComplianceDetail({
                         </CardContent>
                     </Card>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

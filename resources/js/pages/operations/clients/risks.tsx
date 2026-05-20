@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import ClientSafetyRibbon, {
     type ClientSafety,
 } from '@/components/client-safety-ribbon';
@@ -9,8 +10,9 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { Head, Link, useForm, usePage } from '@inertiajs/react';
+import { Head, useForm, usePage } from '@inertiajs/react';
 import { useState } from 'react';
+import { ShieldAlert } from 'lucide-react';
 
 type Props = {
     client: { id: number; first_name: string; last_name: string; status: string };
@@ -50,18 +52,21 @@ export default function ClientRisks({ client, risks, safety, can }: Props) {
         >
             <Head title={`Risks • ${name}`} />
 
-            <div className="space-y-4">
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={ShieldAlert}
+                        backHref={`/operations/clients/${client.id}`}
+                        title="Risk register"
+                        description={name}
+                        stats={[
+                            { label: 'Risks', value: risks.length },
+                            { label: 'Active', value: risks.filter((r: any) => r.active).length },
+                        ]}
+                    />
+                }
+            >
                 <ClientSafetyRibbon safety={safety} />
-
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">Risk register</h1>
-                        <div className="mt-1 text-sm text-muted-foreground">{name}</div>
-                    </div>
-                    <Link href={`/operations/clients/${client.id}`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
-                        Back to {(labels?.['client.singular'] ?? 'Client').toLowerCase()}
-                    </Link>
-                </div>
 
                 {can.create && (
                     <Card>
@@ -221,7 +226,7 @@ export default function ClientRisks({ client, risks, safety, can }: Props) {
                     ))}
                     {!risks.length && <div className="text-sm text-muted-foreground">No risks recorded.</div>}
                 </div>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

@@ -1,4 +1,5 @@
 import LeafletMap, { type MapMarker, type MapGeofence } from '@/components/leaflet-map';
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -171,15 +172,23 @@ export default function PortalLocation({ client, tracker, currentLocation, track
         <AppLayout>
             <Head title={`Location - ${clientName}`} />
 
-            <div className="space-y-6 p-4 sm:p-6">
-                {/* Header */}
-                <div>
-                    <h1 className="text-2xl font-bold tracking-tight">Location</h1>
-                    <p className="text-sm text-muted-foreground mt-1">
-                        Live location and movement history for {clientName}
-                    </p>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={MapPin}
+                        title="Location"
+                        description={`Live location and movement history for ${clientName}`}
+                        stats={
+                            hasTracker && tracker
+                                ? [
+                                      { label: 'Status', value: tracker.status },
+                                      { label: 'Battery', value: tracker.battery != null ? `${tracker.battery}%` : '--' },
+                                  ]
+                                : undefined
+                        }
+                    />
+                }
+            >
                 {/* Consent Warning */}
                 {!hasConsent && (
                     <Card className="border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30">
@@ -456,7 +465,7 @@ export default function PortalLocation({ client, tracker, currentLocation, track
                         </CardContent>
                     </Card>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

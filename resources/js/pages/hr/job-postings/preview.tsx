@@ -1,6 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card } from '@/components/ui/card';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { employmentTypeLabels } from '@/lib/job-posting-constants';
 import { type BreadcrumbItem } from '@/types';
@@ -51,7 +52,38 @@ export default function PreviewJobPosting({ posting }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Preview: ${posting.title}`} />
-            <div className="mx-auto flex max-w-3xl flex-col gap-6 p-6">
+            <PageLayout
+                width="narrow"
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref={`/hr/job-postings/${posting.id}`}
+                        title={`Preview: ${posting.title}`}
+                        description="This is how the posting will appear to candidates on the career portal."
+                        actions={
+                            <>
+                                <Button variant="outline" size="sm" asChild>
+                                    <Link href={`/hr/job-postings/${posting.id}/edit`}>
+                                        <Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit
+                                    </Link>
+                                </Button>
+                                {posting.status === 'draft' && (
+                                    <Button
+                                        size="sm"
+                                        onClick={() =>
+                                            router.post(
+                                                `/hr/job-postings/${posting.id}/publish`,
+                                            )
+                                        }
+                                    >
+                                        <Globe className="mr-1.5 h-3.5 w-3.5" /> Publish
+                                    </Button>
+                                )}
+                            </>
+                        }
+                    />
+                }
+            >
                 {/* Preview Banner */}
                 <div className="flex items-center justify-between gap-4 rounded-lg border border-status-warning/30 bg-status-warning p-4">
                     <div className="flex items-center gap-2">
@@ -100,9 +132,9 @@ export default function PreviewJobPosting({ posting }: Props) {
                 <Card className="p-8">
                     <div className="mx-auto max-w-2xl space-y-8">
                         <div>
-                            <h1 className="text-3xl font-bold">
+                            <h2 className="text-3xl font-bold">
                                 {posting.title}
-                            </h1>
+                            </h2>
                             <div className="mt-3 flex flex-wrap items-center gap-3 text-sm text-muted-foreground">
                                 {posting.department && (
                                     <span className="flex items-center gap-1">
@@ -232,7 +264,7 @@ export default function PreviewJobPosting({ posting }: Props) {
                         </div>
                     </div>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

@@ -1,10 +1,12 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import RespiteSubnav from '@/components/respite-subnav';
 import { formatDateTime } from '@/lib/date-format';
 import { Head, Link, router } from '@inertiajs/react';
+import { ShieldAlert } from 'lucide-react';
 
 type Props = {
     clientId: number;
@@ -33,11 +35,16 @@ export default function RiskPlanActivationsForClient({ clientId, activations, pl
         <AppLayout breadcrumbs={[{ title: 'Respite', href: '/respite' }, { title: 'Risk Plan Activations', href: '/respite/risk-plan-activations' }, { title: 'For Client', href: '#' }]}>
             <Head title="Risk Plans for Client" />
 
-            <div className="space-y-4">
-                <div>
-                    <h1 className="text-lg font-semibold">Risk Plans for Client</h1>
-                    <div className="mt-1 text-sm text-muted-foreground">All risk plan activations across all stays for this client.</div>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref={`/operations/clients/${clientId}`}
+                        title="Risk Plans for Client"
+                        description="All risk plan activations across all stays for this client."
+                    />
+                }
+            >
                 <RespiteSubnav />
 
                 <div className="space-y-2">
@@ -84,7 +91,7 @@ export default function RiskPlanActivationsForClient({ clientId, activations, pl
                         ))}
                     </div>
                 ) : null}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

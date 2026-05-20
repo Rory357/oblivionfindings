@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { PresenceBadge, PresenceDot } from '@/components/presence-dot';
 import ShiftTimelineSummary from '@/components/shift-timeline-summary';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
@@ -429,72 +430,57 @@ export default function FamilyDashboard({
         >
             <Head title={`${name} - Family Portal`} />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                {/* ── Hero header ──────────────────────────────── */}
-                <div className="relative overflow-hidden rounded-2xl border bg-primary/10 p-6">
-                    <div className="flex flex-col gap-4 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex items-center gap-4">
-                            <Avatar className="h-16 w-16 ring-2 ring-status-warning ring-offset-2 dark:ring-status-warning">
-                                <AvatarImage
-                                    src={
-                                        client.avatar ??
-                                        client.profile_photo_url ??
-                                        undefined
-                                    }
-                                    alt={fullName}
-                                />
-                                <AvatarFallback className="bg-status-warning-bg text-lg font-semibold text-status-warning dark:bg-status-warning-bg dark:text-status-warning">
-                                    {getInitials(fullName)}
-                                </AvatarFallback>
-                            </Avatar>
-                            <div>
-                                <h1 className="text-2xl font-bold tracking-tight">
-                                    {greeting.emoji} {greeting.text}!
-                                </h1>
-                                <p className="text-sm text-muted-foreground">
-                                    Here's how {name} is doing today
-                                </p>
-                                <div className="mt-1 flex flex-wrap items-center gap-2 text-sm text-muted-foreground">
-                                    {relation && (
-                                        <Badge
-                                            variant="outline"
-                                            className="border-status-warning/30 bg-status-warning-bg text-status-warning capitalize dark:border-status-warning/30 dark:bg-status-warning-bg dark:text-status-warning"
-                                        >
-                                            <Heart className="mr-1 h-3 w-3" />
-                                            {relation}
-                                        </Badge>
-                                    )}
-                                    {client.date_of_birth && (
-                                        <span>
-                                            Age{' '}
-                                            {calculateAge(client.date_of_birth)}
-                                        </span>
-                                    )}
-                                    {client.status && (
-                                        <Badge
-                                            variant="secondary"
-                                            className={
-                                                client.status === 'active'
-                                                    ? 'bg-status-success-bg text-status-success dark:bg-status-success-bg dark:text-status-success'
-                                                    : ''
-                                            }
-                                        >
-                                            {client.status}
-                                        </Badge>
-                                    )}
-                                </div>
-                            </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        avatar={{
+                            src: client.avatar ?? client.profile_photo_url ?? null,
+                            fallback: getInitials(fullName),
+                        }}
+                        title={`${greeting.emoji} ${greeting.text}!`}
+                        description={`Here's how ${name} is doing today`}
+                        actions={
+                            <Button
+                                size="lg"
+                                className="gap-2 shadow-md"
+                                onClick={() => setBookingOpen(true)}
+                            >
+                                <CalendarPlus className="h-5 w-5" />
+                                Plan a Visit 💛
+                            </Button>
+                        }
+                    >
+                        <div className="flex flex-wrap items-center gap-2 text-sm">
+                            {relation && (
+                                <Badge
+                                    variant="outline"
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground capitalize"
+                                >
+                                    <Heart className="mr-1 h-3 w-3" />
+                                    {relation}
+                                </Badge>
+                            )}
+                            {client.date_of_birth && (
+                                <span className="text-primary-foreground/70">
+                                    Age {calculateAge(client.date_of_birth)}
+                                </span>
+                            )}
+                            {client.status && (
+                                <Badge
+                                    variant="outline"
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground"
+                                >
+                                    {client.status}
+                                </Badge>
+                            )}
                         </div>
-                        <Dialog
-                            open={bookingOpen}
-                            onOpenChange={setBookingOpen}
-                        >
-                            <DialogTrigger asChild>
-                                <Button size="lg" className="gap-2 shadow-md">
-                                    <CalendarPlus className="h-5 w-5" />
-                                    Plan a Visit 💛
-                                </Button>
-                            </DialogTrigger>
+                    </PageHero>
+                }
+            >
+                <Dialog
+                    open={bookingOpen}
+                    onOpenChange={setBookingOpen}
+                >
                             <DialogContent className="sm:max-w-md">
                                 <DialogHeader>
                                     <DialogTitle>Request a Visit</DialogTitle>
@@ -655,8 +641,6 @@ export default function FamilyDashboard({
                                 </form>
                             </DialogContent>
                         </Dialog>
-                    </div>
-                </div>
 
                 {/* ── Quick Actions Bar ────────────────────────── */}
                 <div className="flex flex-wrap gap-2 sm:gap-3">
@@ -2151,7 +2135,7 @@ export default function FamilyDashboard({
                         )}
                     </div>
                 </div>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

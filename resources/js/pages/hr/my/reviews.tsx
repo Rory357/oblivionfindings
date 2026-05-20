@@ -9,10 +9,11 @@ import {
 import { Label } from '@/components/ui/label';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
-import { ChevronDown, Star } from 'lucide-react';
+import { ChevronDown, Star, TrendingUp } from 'lucide-react';
 import { useState } from 'react';
 
 interface Review {
@@ -298,12 +299,24 @@ function ReviewCard({ review }: { review: Review }) {
 }
 
 export default function MyReviews({ reviews }: Props) {
+    const signedOff = reviews.data.filter((r) => r.employee_signed_off).length;
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="My Reviews" />
-            <div className="flex flex-col gap-6 p-6">
-                <h1 className="text-2xl font-bold">My Performance Reviews</h1>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={TrendingUp}
+                        title="My Performance Reviews"
+                        description="View and respond to your performance review cycles."
+                        stats={[
+                            { label: 'Total', value: reviews.data.length },
+                            { label: 'Signed Off', value: signedOff },
+                        ]}
+                    />
+                }
+            >
                 {reviews.data.length === 0 ? (
                     <Card>
                         <CardContent className="py-8 text-center text-muted-foreground">
@@ -321,7 +334,7 @@ export default function MyReviews({ reviews }: Props) {
                 {reviews.last_page > 1 && (
                     <LaravelPagination links={reviews.links} />
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

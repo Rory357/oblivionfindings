@@ -10,6 +10,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Head, Link } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -169,61 +170,21 @@ export default function GlobalSiteInspections({
         >
             <Head title="Inspections & Maintenance" />
 
-            <div className="m-4 space-y-4">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="flex items-center gap-2 text-lg font-semibold">
-                            <ClipboardCheck className="h-5 w-5" />
-                            Inspections & Maintenance
-                        </h1>
-                        <p className="text-sm text-muted-foreground">
-                            All sites
-                        </p>
-                    </div>
-                </div>
-
-                <div className="grid gap-4 sm:grid-cols-4">
-                    <Card>
-                        <CardContent className="p-4">
-                            <div className="text-2xl font-bold">
-                                {filteredSchedules.length}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                                Schedules
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card className="border-status-critical/20 bg-status-critical">
-                        <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-status-critical">
-                                {overdueCount}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                                Overdue
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card className="border-status-warning/20 bg-status-warning">
-                        <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-status-warning">
-                                {dueSoonCount}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                                Due In 7 Days
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card className="border-status-success/20 bg-status-success">
-                        <CardContent className="p-4">
-                            <div className="text-2xl font-bold text-status-success">
-                                {completedPassCount}
-                            </div>
-                            <div className="text-sm text-muted-foreground">
-                                Passed Records
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={ClipboardCheck}
+                        title="Inspections & Maintenance"
+                        description="All sites"
+                        stats={[
+                            { label: 'Schedules', value: filteredSchedules.length },
+                            { label: 'Overdue', value: overdueCount },
+                            { label: 'Due in 7 days', value: dueSoonCount },
+                            { label: 'Passed records', value: completedPassCount },
+                        ]}
+                    />
+                }
+            >
 
                 <Card>
                     <CardHeader className="pb-3">
@@ -506,7 +467,7 @@ export default function GlobalSiteInspections({
                         )}
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

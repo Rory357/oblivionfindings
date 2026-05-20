@@ -99,53 +99,6 @@ export default function RiskIndex({ auth, risks, categories, summary, filters }:
           />
         }
       >
-          {/* Summary Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Total Risks</p>
-                    <p className="text-3xl font-bold">{totalStats.total}</p>
-                  </div>
-                  <Shield className="w-8 h-8 text-muted-foreground" />
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="border-status-critical/30">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-status-critical">Critical</p>
-                    <p className="text-3xl font-bold text-status-critical">{totalStats.critical}</p>
-                  </div>
-                  <AlertTriangle className="w-8 h-8 text-status-critical" />
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="border-status-warning/30">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-status-warning">High</p>
-                    <p className="text-3xl font-bold text-status-warning">{totalStats.high}</p>
-                  </div>
-                  <AlertCircle className="w-8 h-8 text-status-warning" />
-                </div>
-              </CardContent>
-            </Card>
-            <Card className="border-primary">
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-primary">Above Appetite</p>
-                    <p className="text-3xl font-bold text-primary">{totalStats.above_appetite}</p>
-                  </div>
-                  <TrendingUp className="w-8 h-8 text-primary" />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
 
           {/* Filters */}
           <Card className="mb-6">

@@ -12,6 +12,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
 import { CalendarDays, Globe, MapPin, Plus, Trash2 } from 'lucide-react';
@@ -87,38 +88,45 @@ export default function Holidays({ holidays, year, can }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Public Holidays" />
-            <div className="flex flex-col gap-6 p-6">
-                <div className="flex items-center justify-between">
-                    <div className="flex items-center gap-3">
-                        <h1 className="text-2xl font-bold">Public Holidays</h1>
-                        <div className="flex items-center gap-1">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleYearChange(year - 1)}
-                            >
-                                &larr;
-                            </Button>
-                            <span className="px-3 text-lg font-semibold">
-                                {year}
-                            </span>
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={() => handleYearChange(year + 1)}
-                            >
-                                &rarr;
-                            </Button>
-                        </div>
-                    </div>
-                    {can.manage && (
-                        <Button onClick={() => setShowForm(!showForm)}>
-                            <Plus className="mr-2 h-4 w-4" />
-                            Add Holiday
-                        </Button>
-                    )}
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={CalendarDays}
+                        title="Public Holidays"
+                        description="Manage public holidays used for NZ leave calculations."
+                        stats={[
+                            { label: 'Year', value: year },
+                            { label: 'Holidays', value: holidays.length },
+                        ]}
+                        actions={
+                            <>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                    onClick={() => handleYearChange(year - 1)}
+                                >
+                                    &larr; {year - 1}
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                    onClick={() => handleYearChange(year + 1)}
+                                >
+                                    {year + 1} &rarr;
+                                </Button>
+                                {can.manage && (
+                                    <Button onClick={() => setShowForm(!showForm)}>
+                                        <Plus className="mr-2 h-4 w-4" />
+                                        Add Holiday
+                                    </Button>
+                                )}
+                            </>
+                        }
+                    />
+                }
+            >
                 {/* Add Holiday Form */}
                 {showForm && can.manage && (
                     <Card>
@@ -330,7 +338,7 @@ export default function Holidays({ holidays, year, can }: Props) {
                     {holidays.length !== 1 ? 's' : ''} for {year}. Holidays are
                     used in leave calculations under the NZ Holidays Act 2003.
                 </div>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

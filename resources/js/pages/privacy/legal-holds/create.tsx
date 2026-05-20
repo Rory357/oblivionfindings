@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -61,14 +62,16 @@ export default function CreateLegalHold() {
         ]}>
             <Head title="New Legal Hold" />
 
-            <div className="space-y-4">
-                <div>
-                    <h1 className="text-lg font-semibold">New Legal Hold</h1>
-                    <div className="mt-1 text-sm text-muted-foreground">
-                        Preserve records for litigation, investigations, or regulatory matters.
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/privacy/legal-holds"
+                        title="New Legal Hold"
+                        description="Preserve records for litigation, investigations, or regulatory matters."
+                    />
+                }
+            >
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <Card>
                         <CardHeader>
@@ -180,7 +183,7 @@ export default function CreateLegalHold() {
                         </Button>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

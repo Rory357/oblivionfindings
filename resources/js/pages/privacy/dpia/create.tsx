@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -74,14 +75,16 @@ export default function CreateDPIA({ staff: _staff }: Props) {
         ]}>
             <Head title="New DPIA" />
 
-            <div className="space-y-4">
-                <div>
-                    <h1 className="text-lg font-semibold">New DPIA</h1>
-                    <div className="mt-1 text-sm text-muted-foreground">
-                        Document data processing risks and mitigation steps.
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/privacy/dpia"
+                        title="New DPIA"
+                        description="Document data processing risks and mitigation steps."
+                    />
+                }
+            >
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <Card>
                         <CardHeader>
@@ -267,7 +270,7 @@ export default function CreateDPIA({ staff: _staff }: Props) {
                         </Button>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

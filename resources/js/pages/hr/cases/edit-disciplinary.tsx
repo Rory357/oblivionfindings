@@ -12,6 +12,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { AlertTriangle, ArrowLeft } from 'lucide-react';
@@ -191,31 +192,22 @@ export default function EditDisciplinary({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Edit Disciplinary - ${hrCase.case_number}`} />
 
-            <div className="max-w-5xl space-y-6">
-                <div className="flex items-center gap-4">
-                    <Link href={`/hr/cases/${hrCase.id}`}>
-                        <Button variant="outline" size="sm">
-                            <ArrowLeft className="mr-2 h-4 w-4" />
-                            Back to Case
-                        </Button>
-                    </Link>
-                    <div className="flex items-center gap-3">
-                        <AlertTriangle className="h-6 w-6 text-status-critical" />
-                        <div>
-                            <h1 className="text-2xl font-bold">
-                                Edit Disciplinary Action
-                            </h1>
-                            <p className="text-muted-foreground">
-                                Case: {hrCase.case_number} | Subject:{' '}
-                                {hrCase.subject?.name ?? 'Unknown'}
-                            </p>
-                        </div>
-                        <Badge variant="outline" className={stageBadgeClass}>
-                            Stage: {currentStageLabel}
-                        </Badge>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref={`/hr/cases/${hrCase.id}`}
+                        backLabel="Back to Case"
+                        title="Edit Disciplinary Action"
+                        description={`Case: ${hrCase.case_number} · Subject: ${hrCase.subject?.name ?? 'Unknown'}`}
+                        actions={
+                            <Badge variant="outline" className={stageBadgeClass}>
+                                Stage: {currentStageLabel}
+                            </Badge>
+                        }
+                    />
+                }
+            >
                 {goodFaithError || stageError ? (
                     <Card className="border-status-critical/30 bg-status-critical-bg">
                         <CardContent className="py-3 text-sm text-status-critical">
@@ -694,7 +686,7 @@ export default function EditDisciplinary({
                         </Button>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

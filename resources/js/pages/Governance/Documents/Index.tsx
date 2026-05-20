@@ -66,7 +66,13 @@ export default function DocumentsIndex({ auth, documents, categories }: Props) {
   const confidentialCount = documents.data.filter(d => d.is_confidential).length;
 
   return (
-    <AppLayout>
+    <AppLayout
+      user={auth.user}
+      breadcrumbs={[
+        { title: 'Governance', href: '/governance/dashboard' },
+        { title: 'Documents', href: '/governance/documents' },
+      ]}
+    >
       <Head title="Governance Documents" />
       <PageLayout
         hero={

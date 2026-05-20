@@ -20,6 +20,7 @@ import {
 import { Label } from '@/components/ui/label';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
@@ -330,9 +331,20 @@ export default function MySurveys({ surveys }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="My Surveys" />
-            <div className="flex flex-col gap-6 p-6">
-                <h1 className="text-2xl font-bold">My Surveys</h1>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={MessageSquare}
+                        title="My Surveys"
+                        description="Take part in organisational pulse and feedback surveys."
+                        stats={[
+                            { label: 'Available', value: surveys.length },
+                            { label: 'Pending', value: pending.length },
+                            { label: 'Completed', value: completed.length },
+                        ]}
+                    />
+                }
+            >
                 {surveys.length === 0 ? (
                     <Card>
                         <CardContent className="py-8 text-center text-muted-foreground">
@@ -370,7 +382,7 @@ export default function MySurveys({ surveys }: Props) {
                         )}
                     </>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

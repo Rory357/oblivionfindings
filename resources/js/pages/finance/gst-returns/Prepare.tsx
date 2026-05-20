@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Head, useForm } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -81,14 +82,17 @@ export default function GstReturnPrepare({ filingDates, currentYear }: PageProps
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Prepare GST Return" />
 
-            <div className="mx-auto max-w-4xl space-y-6 p-6">
-                <div>
-                    <h1 className="text-2xl font-bold tracking-tight">Prepare GST Return</h1>
-                    <p className="text-muted-foreground">
-                        Select your filing frequency and period to prepare a new GST return
-                    </p>
-                </div>
-
+            <PageLayout
+                width="narrow"
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/finance/gst-returns"
+                        title="Prepare GST Return"
+                        description="Select your filing frequency and period to prepare a new GST return"
+                    />
+                }
+            >
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <Card>
                         <CardHeader>
@@ -245,7 +249,7 @@ export default function GstReturnPrepare({ filingDates, currentYear }: PageProps
                         </Button>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

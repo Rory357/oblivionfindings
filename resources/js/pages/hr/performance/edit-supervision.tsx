@@ -11,6 +11,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { ArrowLeft, Plus } from 'lucide-react';
@@ -109,24 +110,16 @@ export default function EditSupervision({ note, staff, sessionTypes }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Edit Supervision Note" />
 
-            <div className="max-w-4xl space-y-6">
-                <div className="flex items-center gap-4">
-                    <Link href={`/hr/performance/supervision/${note.id}`}>
-                        <Button variant="outline" size="sm">
-                            <ArrowLeft className="mr-2 h-4 w-4" />
-                            Back
-                        </Button>
-                    </Link>
-                    <div>
-                        <h1 className="text-2xl font-bold">
-                            Edit Supervision Note
-                        </h1>
-                        <p className="text-muted-foreground">
-                            Update supervision session for {note.employee.name}
-                        </p>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref={`/hr/performance/supervision/${note.id}`}
+                        title="Edit Supervision Note"
+                        description={`Update supervision session for ${note.employee.name}`}
+                    />
+                }
+            >
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <Card>
                         <CardHeader>
@@ -386,7 +379,7 @@ export default function EditSupervision({ note, staff, sessionTypes }: Props) {
                         </Button>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

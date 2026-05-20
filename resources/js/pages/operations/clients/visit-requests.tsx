@@ -5,9 +5,9 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
+import { PageHero, PageLayout } from '@/components/page';
+import { Head, router } from '@inertiajs/react';
 import {
-    ArrowLeft,
     Calendar,
     Check,
     Clock,
@@ -119,60 +119,21 @@ export default function VisitRequests({
         >
             <Head title={`Visit Requests - ${name}`} />
 
-            <div className="mx-auto max-w-4xl space-y-6 p-4 md:p-6">
-                {/* Hero */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-status-success/90 via-status-success to-status-info/80 p-6 text-white">
-                    <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-white/5" />
-                    <div className="relative flex items-center justify-between">
-                        <div>
-                            <h1 className="text-2xl font-bold">
-                                Family Visit Requests
-                            </h1>
-                            <p className="mt-1 text-sm text-white/70">
-                                Manage visit requests for {name}
-                            </p>
-                        </div>
-                        <Button
-                            size="sm"
-                            variant="outline"
-                            className="border-white/20 bg-white/10 text-white hover:bg-white/20"
-                            asChild
-                        >
-                            <Link href={`/operations/clients/${client.id}`}>
-                                <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
-                                Back
-                            </Link>
-                        </Button>
-                    </div>
-                </div>
-
-                {/* Stats */}
-                <div className="grid grid-cols-3 gap-3">
-                    <div className="rounded-xl border bg-status-warning-bg p-4 text-center">
-                        <div className="text-2xl font-bold text-status-warning">
-                            {stats.pending}
-                        </div>
-                        <div className="text-[10px] tracking-wider text-status-warning uppercase">
-                            Pending
-                        </div>
-                    </div>
-                    <div className="rounded-xl border bg-status-success-bg p-4 text-center">
-                        <div className="text-2xl font-bold text-status-success">
-                            {stats.approved_this_month}
-                        </div>
-                        <div className="text-[10px] tracking-wider text-status-success uppercase">
-                            Approved This Month
-                        </div>
-                    </div>
-                    <div className="rounded-xl border p-4 text-center">
-                        <div className="text-2xl font-bold text-foreground">
-                            {stats.total}
-                        </div>
-                        <div className="text-[10px] tracking-wider text-muted-foreground uppercase">
-                            Total Requests
-                        </div>
-                    </div>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Calendar}
+                        backHref={`/operations/clients/${client.id}`}
+                        title="Family Visit Requests"
+                        description={`Manage visit requests for ${name}`}
+                        stats={[
+                            { label: 'Pending', value: stats.pending },
+                            { label: 'Approved this month', value: stats.approved_this_month },
+                            { label: 'Total', value: stats.total },
+                        ]}
+                    />
+                }
+            >
 
                 {/* Filter tabs */}
                 <div className="overflow-x-auto border-b">
@@ -402,7 +363,7 @@ export default function VisitRequests({
                         ))}
                     </div>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

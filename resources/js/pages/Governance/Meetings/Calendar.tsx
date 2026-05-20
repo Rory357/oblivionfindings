@@ -14,6 +14,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
 import { PageProps } from '@/types';
@@ -25,6 +26,7 @@ import {
     Clock,
     MapPin,
     Plus,
+    Users,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
@@ -200,29 +202,36 @@ export default function MeetingsCalendar({
         >
             <Head title="Board Meeting Calendar" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="mb-6 flex flex-col gap-4 md:flex-row md:items-center md:justify-between">
-                    <div>
-                        <h1 className="text-3xl font-bold text-foreground">
-                            Board Meeting Calendar
-                        </h1>
-                        <p className="mt-1 text-muted-foreground">
-                            Click any date to view meetings and open records.
-                        </p>
-                    </div>
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Button variant="outline" asChild>
-                            <Link href="/governance/meetings">List View</Link>
-                        </Button>
-                        <Button asChild>
-                            <Link href="/governance/meetings/create">
-                                <Plus className="mr-1 h-4 w-4" />
-                                Schedule Meeting
-                            </Link>
-                        </Button>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Users}
+                        title="Board Meeting Calendar"
+                        description="Click any date to view meetings and open records."
+                        stats={[
+                            { label: 'This month', value: meetings.length },
+                            { label: 'Period', value: monthLabel },
+                        ]}
+                        actions={
+                            <>
+                                <Button
+                                    variant="outline"
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                    asChild
+                                >
+                                    <Link href="/governance/meetings">List View</Link>
+                                </Button>
+                                <Button asChild>
+                                    <Link href="/governance/meetings/create">
+                                        <Plus className="mr-1 h-4 w-4" />
+                                        Schedule Meeting
+                                    </Link>
+                                </Button>
+                            </>
+                        }
+                    />
+                }
+            >
                 <Card className="mb-4 flex flex-col gap-3 bg-card p-4 md:flex-row md:items-center md:justify-between">
                     <div className="flex items-center gap-2">
                         <Button
@@ -463,7 +472,7 @@ export default function MeetingsCalendar({
                         </CardContent>
                     </Card>
                 </div>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

@@ -1,6 +1,7 @@
 import { Head } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -56,12 +57,21 @@ export default function RiskTrends({ auth, snapshots }: Props) {
         >
             <Head title="Risk Trends" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="mb-6">
-                    <h1 className="text-3xl font-bold text-foreground">Risk Trends</h1>
-                    <p className="text-muted-foreground mt-1">Historical risk snapshot analysis</p>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={TrendingUp}
+                        title="Risk Trends"
+                        description="Historical risk snapshot analysis."
+                        stats={[
+                            { label: 'Snapshots', value: snapshots.length },
+                            { label: 'Critical', value: latest?.summary.critical ?? 0 },
+                            { label: 'High', value: latest?.summary.high ?? 0 },
+                            { label: 'Above Appetite', value: latest?.summary.above_appetite ?? 0 },
+                        ]}
+                    />
+                }
+            >
                 {/* Current Summary */}
                 {latest && (
                     <div className="grid grid-cols-1 md:grid-cols-5 gap-4 mb-6">
@@ -230,7 +240,7 @@ export default function RiskTrends({ auth, snapshots }: Props) {
                         </div>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

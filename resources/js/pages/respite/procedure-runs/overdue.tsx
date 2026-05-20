@@ -1,10 +1,12 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import RespiteSubnav from '@/components/respite-subnav';
 import { formatDateTime } from '@/lib/date-format';
 import { Head, Link, router } from '@inertiajs/react';
+import { AlertTriangle } from 'lucide-react';
 
 type Props = {
     runs: { data: any[]; links: any[] };
@@ -15,12 +17,18 @@ export default function OverdueProcedureRuns({ runs }: Props) {
         <AppLayout breadcrumbs={[{ title: 'Respite', href: '/respite' }, { title: 'Procedure Runs', href: '/respite/procedure-runs' }, { title: 'Overdue', href: '/respite/procedure-runs/overdue' }]}>
             <Head title="Overdue Procedure Runs" />
 
-            <div className="space-y-4">
-                <div className="flex items-center gap-3">
-                    <h1 className="text-lg font-semibold">Overdue Procedure Runs</h1>
-                    <Badge className="bg-status-critical-bg text-status-critical">{runs.data.length}</Badge>
-                </div>
-                <div className="text-sm text-muted-foreground">Procedure runs that have breached their SLA deadline.</div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={AlertTriangle}
+                        title="Overdue Procedure Runs"
+                        description="Procedure runs that have breached their SLA deadline."
+                        stats={[
+                            { label: 'Overdue', value: runs.data.length },
+                        ]}
+                    />
+                }
+            >
                 <RespiteSubnav />
 
                 <div className="space-y-2">
@@ -72,7 +80,7 @@ export default function OverdueProcedureRuns({ runs }: Props) {
                         ))}
                     </div>
                 ) : null}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

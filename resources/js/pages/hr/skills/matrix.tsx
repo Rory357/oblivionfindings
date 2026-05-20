@@ -15,9 +15,11 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
+import { Award } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
 type SkillDef = {
@@ -127,15 +129,19 @@ export default function SkillsMatrix({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Skills Matrix" />
-            <div className="flex flex-col gap-6 p-6">
-                <div>
-                    <h1 className="text-2xl font-bold">Skills Matrix</h1>
-                    <p className="text-sm text-muted-foreground">
-                        Employee skills overview.{' '}
-                        {can.assess ? 'Click a cell to assess.' : ''}
-                    </p>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Award}
+                        title="Skills Matrix"
+                        description={`Employee skills overview. ${can.assess ? 'Click a cell to assess.' : ''}`}
+                        stats={[
+                            { label: 'Employees', value: employees.length },
+                            { label: 'Skills', value: skills.length },
+                        ]}
+                    />
+                }
+            >
                 {/* Legend */}
                 <div className="flex flex-wrap gap-3">
                     {proficiencyLevels.map((level) => (
@@ -265,7 +271,7 @@ export default function SkillsMatrix({
                         </table>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
 
             {/* Assess Dialog */}
             <Dialog open={assessOpen} onOpenChange={setAssessOpen}>

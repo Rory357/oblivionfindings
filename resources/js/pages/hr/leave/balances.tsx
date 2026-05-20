@@ -18,9 +18,10 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
-import { Search } from 'lucide-react';
+import { CalendarDays, Search } from 'lucide-react';
 
 type BreadcrumbItem = { title: string; href: string };
 
@@ -92,18 +93,19 @@ export default function LeaveBalances({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Leave Balances" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">
-                            Leave Balances
-                        </h1>
-                        <div className="mt-1 text-sm text-muted-foreground">
-                            Staff leave entitlements and usage for {year}
-                        </div>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={CalendarDays}
+                        title="Leave Balances"
+                        description={`Staff leave entitlements and usage for ${year}.`}
+                        stats={[
+                            { label: 'Year', value: year },
+                            { label: 'Records', value: balances.data.length },
+                        ]}
+                    />
+                }
+            >
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-base">Filters</CardTitle>
@@ -240,7 +242,7 @@ export default function LeaveBalances({
                 {balances?.links?.length ? (
                     <LaravelPagination links={balances.links} />
                 ) : null}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

@@ -1,9 +1,10 @@
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { Activity, CheckCircle, AlertTriangle } from 'lucide-react';
+import { AlertTriangle, CheckCircle } from 'lucide-react';
 
 type DPIA = {
     id: number;
@@ -82,14 +83,25 @@ export default function ShowDPIA({ dpia }: Props) {
         ]}>
             <Head title={`DPIA - ${dpia.assessment_name}`} />
 
-            <div className="space-y-4">
-                <div className="flex flex-wrap items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold flex items-center gap-2">
-                            <Activity className="h-5 w-5 text-status-success" />
-                            {dpia.assessment_name}
-                        </h1>
-                        <div className="mt-2 flex flex-wrap gap-2">
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/privacy/dpia"
+                        backLabel="Back to list"
+                        title={dpia.assessment_name}
+                        description={`Assessed: ${formatDate(dpia.assessment_date)}${dpia.assessor ? ` by ${dpia.assessor.name}` : ''}${dpia.review_date ? ` - Review: ${formatDate(dpia.review_date)}` : ''}`}
+                        actions={
+                            can.conductDPIA ? (
+                                <Link href={`/privacy/dpia/${dpia.id}/edit`}>
+                                    <Button size="sm" variant="outline">
+                                        Edit
+                                    </Button>
+                                </Link>
+                            ) : undefined
+                        }
+                    >
+                        <div className="flex flex-wrap gap-2">
                             <Badge variant="outline">{outcomeLabel}</Badge>
                             <Badge className="border-status-critical/30 bg-status-critical-bg text-status-critical">
                                 Risk: {riskLabels[dpia.overall_risk_level] ?? dpia.overall_risk_level}
@@ -98,25 +110,9 @@ export default function ShowDPIA({ dpia }: Props) {
                                 <Badge variant="outline">Residual: {riskLabels[dpia.residual_risk_level] ?? dpia.residual_risk_level}</Badge>
                             )}
                         </div>
-                        <div className="mt-2 text-xs text-muted-foreground">
-                            Assessed: {formatDate(dpia.assessment_date)}
-                            {dpia.assessor && ` by ${dpia.assessor.name}`}
-                            {dpia.review_date && ` - Review: ${formatDate(dpia.review_date)}`}
-                        </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Link href="/privacy/dpia" className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
-                            Back to list
-                        </Link>
-                        {can.conductDPIA && (
-                            <Link href={`/privacy/dpia/${dpia.id}/edit`}>
-                                <Button size="sm" variant="outline">Edit</Button>
-                            </Link>
-                        )}
-                    </div>
-                </div>
-
+                    </PageHero>
+                }
+            >
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-base">Overview</CardTitle>
@@ -238,7 +234,7 @@ export default function ShowDPIA({ dpia }: Props) {
                         </CardContent>
                     </Card>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

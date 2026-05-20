@@ -10,6 +10,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
@@ -48,9 +49,16 @@ export default function UploadDocument({ employees, categories }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Upload HR Document" />
-            <div className="flex max-w-3xl flex-col gap-6 p-6">
-                <h1 className="text-2xl font-bold">Upload HR Document</h1>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/hr/documents"
+                        title="Upload HR Document"
+                        description="Attach a document file to an employee profile."
+                    />
+                }
+            >
                 <form onSubmit={submit} className="space-y-6">
                     <Card>
                         <CardHeader>
@@ -191,7 +199,7 @@ export default function UploadDocument({ employees, categories }: Props) {
                         </Button>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

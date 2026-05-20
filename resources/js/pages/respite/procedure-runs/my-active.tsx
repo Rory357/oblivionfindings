@@ -1,9 +1,11 @@
 import AppLayout from '@/layouts/app-layout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHero, PageLayout } from '@/components/page';
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import RespiteSubnav from '@/components/respite-subnav';
 import { formatDateTime } from '@/lib/date-format';
 import { Head, Link } from '@inertiajs/react';
+import { BookOpen } from 'lucide-react';
 
 type Props = {
     runs: any[];
@@ -20,11 +22,20 @@ export default function MyActiveProcedureRuns({ runs }: Props) {
         <AppLayout breadcrumbs={[{ title: 'Respite', href: '/respite' }, { title: 'Procedure Runs', href: '/respite/procedure-runs' }, { title: 'My Active', href: '/respite/procedure-runs/my-active' }]}>
             <Head title="My Active Procedure Runs" />
 
-            <div className="space-y-4">
-                <div>
-                    <h1 className="text-lg font-semibold">My Active Procedure Runs</h1>
-                    <div className="mt-1 text-sm text-muted-foreground">Procedure runs currently assigned to you.</div>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={BookOpen}
+                        title="My Active Procedure Runs"
+                        description="Procedure runs currently assigned to you."
+                        stats={[
+                            { label: 'Total', value: runs.length },
+                            { label: 'In progress', value: runs.filter((r: any) => r.status === 'in_progress').length },
+                            { label: 'SLA breached', value: runs.filter((r: any) => r.sla_breached).length },
+                        ]}
+                    />
+                }
+            >
                 <RespiteSubnav />
 
                 <div className="space-y-2">
@@ -60,7 +71,7 @@ export default function MyActiveProcedureRuns({ runs }: Props) {
                         <div className="py-8 text-center text-sm text-muted-foreground">No active procedure runs assigned to you.</div>
                     )}
                 </div>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

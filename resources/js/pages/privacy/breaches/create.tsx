@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -45,19 +46,16 @@ export default function CreateDataBreach({ staff }: Props) {
         >
             <Head title="Report Data Breach" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">
-                            Report Data Breach
-                        </h1>
-                        <div className="mt-1 text-sm text-muted-foreground">
-                            GDPR Article 33 - ICO notification required within
-                            72 hours
-                        </div>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/privacy/breaches"
+                        title="Report Data Breach"
+                        description="GDPR Article 33 - ICO notification required within 72 hours"
+                    />
+                }
+            >
                 <form
                     onSubmit={handleSubmit}
                     data-test="privacy-breach-create-form"
@@ -249,7 +247,7 @@ export default function CreateDataBreach({ staff }: Props) {
                         </CardContent>
                     </Card>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

@@ -17,10 +17,11 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
-import { ChevronDown, Plus } from 'lucide-react';
+import { CalendarDays, ChevronDown, Plus } from 'lucide-react';
 import { useState } from 'react';
 
 interface LeaveRequest {
@@ -108,9 +109,24 @@ export default function MyLeave({ requests, balances, leaveTypes }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="My Leave" />
-            <div className="flex flex-col gap-6 p-6">
-                <h1 className="text-2xl font-bold">My Leave</h1>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={CalendarDays}
+                        title="My Leave"
+                        description="Submit and track your leave requests and balances."
+                        stats={[
+                            { label: 'Requests', value: requests.total },
+                            { label: 'Pending', value: requests.data.filter((r) => r.status === 'pending').length },
+                        ]}
+                        actions={
+                            <Button onClick={() => setFormOpen(!formOpen)}>
+                                <Plus className="mr-1 h-4 w-4" /> Request Leave
+                            </Button>
+                        }
+                    />
+                }
+            >
                 {/* Leave Balances */}
                 {balances.length > 0 && (
                     <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
@@ -404,7 +420,7 @@ export default function MyLeave({ requests, balances, leaveTypes }: Props) {
                         <LaravelPagination links={requests.links} />
                     </div>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

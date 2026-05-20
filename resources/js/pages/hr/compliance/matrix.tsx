@@ -10,6 +10,7 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
@@ -19,6 +20,7 @@ import {
     Plus,
     Settings,
     Shield,
+    ShieldCheck,
     Square,
     Trash2,
 } from 'lucide-react';
@@ -174,32 +176,37 @@ export default function ComplianceMatrix({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Compliance Matrix" />
-            <div className="flex flex-col gap-6 p-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold">
-                            Compliance Matrix
-                        </h1>
-                        <p className="text-muted-foreground">
-                            Configure compliance requirements and role
-                            assignments
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Button variant="outline" asChild>
-                            <Link href="/hr/compliance">Back to Dashboard</Link>
-                        </Button>
-                        {can.manage && (
-                            <Button
-                                onClick={() => setShowAddForm(!showAddForm)}
-                            >
-                                <Plus className="mr-1 h-4 w-4" />
-                                Add Requirement
-                            </Button>
-                        )}
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={ShieldCheck}
+                        title="Compliance Matrix"
+                        description="Configure compliance requirements and role assignments."
+                        stats={[
+                            { label: 'Requirements', value: requirements.length },
+                            { label: 'Active', value: requirements.filter((r) => r.is_active).length },
+                            { label: 'Roles', value: roles.length },
+                        ]}
+                        actions={
+                            <>
+                                <Button
+                                    variant="outline"
+                                    asChild
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                >
+                                    <Link href="/hr/compliance">Dashboard</Link>
+                                </Button>
+                                {can.manage && (
+                                    <Button onClick={() => setShowAddForm(!showAddForm)}>
+                                        <Plus className="mr-1 h-4 w-4" />
+                                        Add Requirement
+                                    </Button>
+                                )}
+                            </>
+                        }
+                    />
+                }
+            >
                 {/* Add Requirement Form */}
                 {showAddForm && can.manage && (
                     <Card>
@@ -718,7 +725,7 @@ export default function ComplianceMatrix({
                         </CardContent>
                     </Card>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

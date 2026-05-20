@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -85,14 +86,16 @@ export default function EditDPIA({ dpia, staff: _staff }: Props) {
         ]}>
             <Head title={`Edit DPIA - ${dpia.assessment_name}`} />
 
-            <div className="space-y-4">
-                <div>
-                    <h1 className="text-lg font-semibold">Edit DPIA</h1>
-                    <div className="mt-1 text-sm text-muted-foreground">
-                        Outcome: {dpia.outcome ? dpia.outcome.replace(/_/g, ' ') : 'Pending review'}
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/privacy/dpia"
+                        title="Edit DPIA"
+                        description={`Outcome: ${dpia.outcome ? dpia.outcome.replace(/_/g, ' ') : 'Pending review'}`}
+                    />
+                }
+            >
                 <form onSubmit={handleSubmit} className="space-y-4">
                     <Card>
                         <CardHeader>
@@ -258,7 +261,7 @@ export default function EditDPIA({ dpia, staff: _staff }: Props) {
                         </Button>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

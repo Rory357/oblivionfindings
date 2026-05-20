@@ -8,6 +8,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head } from '@inertiajs/react';
@@ -94,14 +95,16 @@ export default function CompetencyProfile({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${employee.name} - Competency Profile`} />
 
-            <div className="space-y-4">
-                <div>
-                    <h1 className="text-lg font-semibold">{employee.name}</h1>
-                    <div className="mt-1 text-sm text-muted-foreground">
-                        Competency profile and assessment history
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/hr/performance/competencies"
+                        title={employee.name}
+                        description="Competency profile and assessment history."
+                    />
+                }
+            >
                 <div className="grid gap-4 lg:grid-cols-2">
                     {/* Radar Chart */}
                     <Card>
@@ -364,7 +367,7 @@ export default function CompetencyProfile({
                         </Table>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

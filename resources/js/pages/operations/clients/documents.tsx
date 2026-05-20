@@ -21,6 +21,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
     Download,
@@ -360,44 +361,45 @@ export default function ClientDocuments({
         >
             <Head title={`Documents - ${name}`} />
 
-            <div className="space-y-4 p-4 lg:p-6">
-                {/* Header */}
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                        <h1 className="text-xl font-bold">Documents</h1>
-                        <p className="text-sm text-muted-foreground">
-                            {name}&apos;s document library
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        {can_edit && (
-                            <>
-                                <Button
-                                    variant="outline"
-                                    className="gap-1.5"
-                                    size="sm"
-                                    onClick={() => setShowNewFolder(true)}
-                                >
-                                    <FolderPlus className="h-4 w-4" />
-                                    New Folder
-                                </Button>
-                                <Button
-                                    className="gap-1.5 bg-primary hover:bg-primary"
-                                    onClick={() => {
-                                        uploadForm.setData(
-                                            'folder',
-                                            currentFolder ?? '',
-                                        );
-                                        setShowUpload(true);
-                                    }}
-                                >
-                                    <Upload className="h-4 w-4" />
-                                    Upload Document
-                                </Button>
-                            </>
-                        )}
-                    </div>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref={`/operations/clients/${client.id}`}
+                        title="Documents"
+                        description={`${name}'s document library`}
+                        actions={
+                            can_edit ? (
+                                <>
+                                    <Button
+                                        variant="outline"
+                                        className="gap-1.5"
+                                        size="sm"
+                                        onClick={() => setShowNewFolder(true)}
+                                    >
+                                        <FolderPlus className="h-4 w-4" />
+                                        New Folder
+                                    </Button>
+                                    <Button
+                                        size="sm"
+                                        className="gap-1.5 bg-primary hover:bg-primary"
+                                        onClick={() => {
+                                            uploadForm.setData(
+                                                'folder',
+                                                currentFolder ?? '',
+                                            );
+                                            setShowUpload(true);
+                                        }}
+                                    >
+                                        <Upload className="h-4 w-4" />
+                                        Upload Document
+                                    </Button>
+                                </>
+                            ) : null
+                        }
+                    />
+                }
+            >
 
                 {/* Stats Bar */}
                 <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
@@ -929,7 +931,7 @@ export default function ClientDocuments({
                         </CardContent>
                     </Card>
                 )}
-            </div>
+            </PageLayout>
 
             {/* Upload Dialog */}
             <Dialog open={showUpload} onOpenChange={setShowUpload}>

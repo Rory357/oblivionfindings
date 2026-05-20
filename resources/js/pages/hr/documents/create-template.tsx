@@ -11,6 +11,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
@@ -75,18 +76,16 @@ export default function CreateTemplate() {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Create Document Template" />
-            <div className="flex max-w-4xl flex-col gap-6 p-6">
-                <div className="flex items-center gap-4">
-                    <Link href="/hr/documents/templates">
-                        <Button variant="outline" size="icon">
-                            <ArrowLeft className="h-4 w-4" />
-                        </Button>
-                    </Link>
-                    <h1 className="text-2xl font-bold">
-                        Create Document Template
-                    </h1>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/hr/documents/templates"
+                        title="Create Document Template"
+                        description="Define a new HR document template with merge fields."
+                    />
+                }
+            >
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <Card>
                         <CardHeader>
@@ -284,7 +283,8 @@ export default function CreateTemplate() {
                         </Button>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }
+

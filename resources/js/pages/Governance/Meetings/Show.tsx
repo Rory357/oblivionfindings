@@ -405,548 +405,523 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
             </div>
           )}
 
-          <Card className="mb-6">
-            <CardHeader className="pb-3">
-              <CardTitle>Meeting Workflow</CardTitle>
-              <CardDescription>Step-by-step checklist for this meeting cycle.</CardDescription>
-            </CardHeader>
-            <CardContent>
-              <div className="mb-3 flex flex-wrap gap-2">
-                <Badge variant="outline">{workflowChecklist.counts.done} complete</Badge>
-                {workflowChecklist.counts.remaining > 0 && (
-                  <Badge className="bg-status-warning-bg text-status-warning border-status-warning/30">
-                    {workflowChecklist.counts.remaining} remaining
-                  </Badge>
-                )}
-                {workflowChecklist.counts.blocked > 0 && (
-                  <Badge className="bg-status-critical-bg text-status-critical border-status-critical/30">
-                    {workflowChecklist.counts.blocked} blocked
-                  </Badge>
-                )}
-              </div>
+          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
+            {/* Main Area (Left Column): 8/12 width */}
+            <div className="lg:col-span-8 space-y-6">
+              {/* Tabs */}
+              <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
+                <TabsList>
+                  <TabsTrigger value="agenda">Agenda</TabsTrigger>
+                  <TabsTrigger value="attendance" dusk="meeting-tab-attendance">Attendance</TabsTrigger>
+                  <TabsTrigger value="minutes" dusk="meeting-tab-minutes">Minutes</TabsTrigger>
+                  <TabsTrigger value="resolutions">Resolutions</TabsTrigger>
+                </TabsList>
 
-              {workflowChecklist.next_step && (
-                <div className="mb-4 rounded-lg border border-status-info/30 bg-status-info-bg p-3">
-                  <p className="text-xs font-medium uppercase tracking-wide text-status-info">Next Step</p>
-                  <p className="font-semibold text-status-info">{workflowChecklist.next_step.label}</p>
-                  <p className="text-sm text-status-info">{workflowChecklist.next_step.detail}</p>
-                </div>
-              )}
-
-              <div className="space-y-2">
-                {workflowChecklist.items.map((item) => (
-                  <div key={item.key} className="flex flex-col gap-2 rounded-lg border p-3 md:flex-row md:items-start md:justify-between" dusk={`workflow-item-${item.key}`}>
-                    <div className="space-y-1">
-                      <div className="flex items-center gap-2">
-                        <p className="font-medium text-foreground">{item.label}</p>
-                        <Badge className={getChecklistStatusColor(item.status)} dusk={`workflow-status-${item.key}`}>{item.status.replace('_', ' ')}</Badge>
+                {/* ========== AGENDA TAB ========== */}
+                <TabsContent value="agenda">
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                      <div>
+                        <CardTitle>Agenda Items</CardTitle>
+                        <CardDescription>{agendaItems.length} items</CardDescription>
                       </div>
-                      <p className="text-sm text-muted-foreground">{item.detail}</p>
-                      {item.blocked_by && (
-                        <p className="text-xs text-status-critical">Blocked by: {item.blocked_by}</p>
-                      )}
-                    </div>
-                    <div>
-                      <Button size="sm" variant="outline" asChild>
-                        <Link href={item.action_url}>{item.action_label}</Link>
-                      </Button>
-                    </div>
-                  </div>
-                ))}
-              </div>
-            </CardContent>
-          </Card>
-
-          {/* Info Cards */}
-          <div className="grid grid-cols-1 md:grid-cols-2 xl:grid-cols-3 gap-4 mb-6">
-            <Card>
-              <CardContent className="pt-6">
-                <p className="text-sm text-muted-foreground">Chair</p>
-                <p className="font-semibold">{meeting.chair?.user.name || 'Not assigned'}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <p className="text-sm text-muted-foreground">Secretary</p>
-                <p className="font-semibold">{meeting.secretary?.user.name || 'Not assigned'}</p>
-              </CardContent>
-            </Card>
-            {meetingCockpit.cards.map((card) => (
-              <Card key={card.key}>
-                <CardContent className="pt-6 space-y-2">
-                  <div className="flex items-center justify-between gap-2">
-                    <p className="text-sm text-muted-foreground">{card.title}</p>
-                    <Badge className={getChecklistStatusColor(card.status === 'warning' ? 'blocked' : card.status)}>
-                      {card.status.replace('_', ' ')}
-                    </Badge>
-                  </div>
-                  <p className="font-semibold text-foreground">{card.value}</p>
-                  <p className="text-sm text-muted-foreground">{card.detail}</p>
-                  <Button variant="ghost" size="sm" className="px-0" asChild>
-                    <Link href={card.href}>Open</Link>
-                  </Button>
-                </CardContent>
-              </Card>
-            ))}
-          </div>
-
-          {/* Tabs */}
-          <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-            <TabsList>
-              <TabsTrigger value="agenda">Agenda</TabsTrigger>
-              <TabsTrigger value="attendance" dusk="meeting-tab-attendance">Attendance</TabsTrigger>
-              <TabsTrigger value="minutes" dusk="meeting-tab-minutes">Minutes</TabsTrigger>
-              <TabsTrigger value="resolutions">Resolutions</TabsTrigger>
-            </TabsList>
-
-            {/* ========== AGENDA TAB ========== */}
-            <TabsContent value="agenda">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <div>
-                    <CardTitle>Agenda Items</CardTitle>
-                    <CardDescription>{agendaItems.length} items</CardDescription>
-                  </div>
-                  {canEdit && (
-                    <Dialog open={agendaDialogOpen} onOpenChange={setAgendaDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button size="sm">
-                          <Plus className="w-4 h-4 mr-1" />
-                          Add Item
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-lg" aria-describedby={undefined}>
-                        <DialogHeader>
-                          <DialogTitle>Add Agenda Item</DialogTitle>
-                        </DialogHeader>
-                        <form onSubmit={submitAgendaItem} className="space-y-4">
-                          <div>
-                            <Label htmlFor="agenda-title">Title</Label>
-                            <Input
-                              id="agenda-title"
-                              value={agendaForm.data.title}
-                              onChange={e => agendaForm.setData('title', e.target.value)}
-                              required
-                            />
-                            {agendaForm.errors.title && <p className="text-sm text-status-critical mt-1">{agendaForm.errors.title}</p>}
-                          </div>
-                          <div>
-                            <Label htmlFor="agenda-description">Description</Label>
-                            <Textarea
-                              id="agenda-description"
-                              value={agendaForm.data.description}
-                              onChange={e => agendaForm.setData('description', e.target.value)}
-                              rows={3}
-                            />
-                          </div>
-                          <div className="grid grid-cols-2 gap-4">
-                            <div>
-                              <Label>Item Type</Label>
-                              <Select
-                                value={agendaForm.data.item_type}
-                                onValueChange={v => agendaForm.setData('item_type', v)}
-                              >
-                                <SelectTrigger>
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="standard">Standard</SelectItem>
-                                  <SelectItem value="decision">Decision Required</SelectItem>
-                                  <SelectItem value="consent">Consent</SelectItem>
-                                  <SelectItem value="for_info">For Information</SelectItem>
-                                </SelectContent>
-                              </Select>
-                            </div>
-                            <div>
-                              <Label htmlFor="agenda-duration">Duration (mins)</Label>
-                              <Input
-                                id="agenda-duration"
-                                type="number"
-                                min={5}
-                                max={120}
-                                value={agendaForm.data.duration_minutes}
-                                onChange={e => agendaForm.setData('duration_minutes', e.target.value)}
-                                required
-                              />
-                            </div>
-                          </div>
-                          <div>
-                            <Label>Presenter</Label>
-                            <Select
-                              value={agendaForm.data.presenter_id || undefined}
-                              onValueChange={v => agendaForm.setData('presenter_id', v)}
-                            >
-                              <SelectTrigger>
-                                <SelectValue placeholder="Select presenter (optional)" />
-                              </SelectTrigger>
-                              <SelectContent>
-                                {allBoardMembers.map(m => (
-                                  <SelectItem key={m.user.id} value={String(m.user.id)}>{m.user.name}</SelectItem>
-                                ))}
-                              </SelectContent>
-                            </Select>
-                          </div>
-                          <div className="flex items-center gap-2">
-                            <Checkbox
-                              id="agenda-confidential"
-                              checked={agendaForm.data.is_confidential}
-                              onCheckedChange={v => agendaForm.setData('is_confidential', !!v)}
-                            />
-                            <Label htmlFor="agenda-confidential">Confidential item</Label>
-                          </div>
-                          <div className="flex justify-end gap-2">
-                            <Button type="button" variant="outline" onClick={() => setAgendaDialogOpen(false)}>
-                              Cancel
-                            </Button>
-                            <Button type="submit" disabled={agendaForm.processing}>
-                              {agendaForm.processing ? 'Adding...' : 'Add Item'}
-                            </Button>
-                          </div>
-                        </form>
-                      </DialogContent>
-                    </Dialog>
-                  )}
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-4">
-                    {agendaItems.length === 0 && (
-                      <p className="text-muted-foreground text-center py-8">No agenda items yet. Add items to build the meeting agenda.</p>
-                    )}
-                    {agendaItems.map((item) => (
-                      <div
-                        key={item.id}
-                        className={cn(
-                          "flex items-start gap-4 p-4 rounded-lg border",
-                          item.is_confidential && "bg-primary/10 border-primary"
-                        )}
-                      >
-                        <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center font-semibold text-muted-foreground">
-                          {item.order}
-                        </div>
-                        <div className="flex-1">
-                          <div className="flex items-center gap-2 mb-1">
-                            {getItemTypeIcon(item.item_type)}
-                            <h4 className="font-semibold text-foreground">{item.title}</h4>
-                            {item.is_confidential && (
-                              <Badge variant="outline" className="text-primary border-primary">
-                                Confidential
-                              </Badge>
-                            )}
-                            <Badge variant="outline">{item.item_type}</Badge>
-                          </div>
-                          {item.description && (
-                            <p className="text-sm text-muted-foreground mb-2">{item.description}</p>
-                          )}
-                          <div className="flex items-center gap-4 text-sm text-muted-foreground">
-                            {item.presenter && <span>Presenter: {item.presenter.name}</span>}
-                            <span>{item.duration_minutes} minutes</span>
-                          </div>
-                        </div>
-                        {canEdit && (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button
-                                variant="ghost"
-                                size="sm"
-                                className="text-status-critical hover:text-status-critical"
-                              >
-                                Remove
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Remove Agenda Item</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to remove "{item.title}" from the agenda? This action cannot be undone.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction
-                                  onClick={() => removeAgendaItem(item.id)}
-                                  className="bg-status-critical hover:bg-status-critical"
-                                >
-                                  Remove
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
-                        )}
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {/* ========== ATTENDANCE TAB ========== */}
-            <TabsContent value="attendance">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle>Attendance Record</CardTitle>
-                  {canEdit && (
-                    <Dialog open={attendanceDialogOpen} onOpenChange={setAttendanceDialogOpen}>
-                      <DialogTrigger asChild>
-                        <Button size="sm" dusk="record-attendance">
-                          <Users className="w-4 h-4 mr-1" />
-                          Record Attendance
-                        </Button>
-                      </DialogTrigger>
-                      <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto" aria-describedby={undefined}>
-                        <DialogHeader>
-                          <DialogTitle>Record Attendance</DialogTitle>
-                        </DialogHeader>
-                        <div className="space-y-3">
-                          {allBoardMembers.map(member => (
-                            <div key={member.id} className="flex items-center gap-3 p-3 rounded-lg border">
-                              <span className="font-medium flex-1 min-w-0 truncate">{member.user.name}</span>
-                              <Select
-                                value={attendanceRecords[member.id]?.status || 'present'}
-                                onValueChange={v => setAttendanceRecords(prev => ({
-                                  ...prev,
-                                  [member.id]: { ...prev[member.id], status: v },
-                                }))}
-                              >
-                                <SelectTrigger className="w-32">
-                                  <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                  <SelectItem value="present">Present</SelectItem>
-                                  <SelectItem value="apology">Apology</SelectItem>
-                                  <SelectItem value="no_show">No Show</SelectItem>
-                                  <SelectItem value="late">Late</SelectItem>
-                                </SelectContent>
-                              </Select>
-                              {attendanceRecords[member.id]?.status === 'apology' && (
-                                <Input
-                                  placeholder="Reason"
-                                  className="w-40"
-                                  value={attendanceRecords[member.id]?.apology_reason || ''}
-                                  onChange={e => setAttendanceRecords(prev => ({
-                                    ...prev,
-                                    [member.id]: { ...prev[member.id], apology_reason: e.target.value },
-                                  }))}
-                                />
-                              )}
-                            </div>
-                          ))}
-                          {allBoardMembers.length === 0 && (
-                            <p className="text-muted-foreground text-center py-4">No active board members found.</p>
-                          )}
-                        </div>
-                        <div className="flex justify-end gap-2 mt-4">
-                          <Button variant="outline" onClick={() => setAttendanceDialogOpen(false)}>Cancel</Button>
-                          <Button onClick={submitAttendance} disabled={attendanceSubmitting} dusk="save-attendance">
-                            {attendanceSubmitting ? 'Saving...' : 'Save Attendance'}
-                          </Button>
-                        </div>
-                      </DialogContent>
-                    </Dialog>
-                  )}
-                </CardHeader>
-                <CardContent>
-                  <div className="space-y-2">
-                    {attendances.length === 0 && (
-                      <p className="text-muted-foreground text-center py-8">No attendance recorded yet.</p>
-                    )}
-                    {attendances.map((attendance) => (
-                      <div
-                        key={attendance.id}
-                        className="flex items-center justify-between p-3 rounded-lg border"
-                      >
-                        <span className="font-medium">{attendance.board_member.user.name}</span>
-                        <div className="flex items-center gap-2">
-                          <Badge className={cn(
-                            attendance.status === 'present' && 'bg-status-success-bg text-status-success',
-                            attendance.status === 'apology' && 'bg-status-warning-bg text-status-warning',
-                            attendance.status === 'no_show' && 'bg-status-critical-bg text-status-critical',
-                            attendance.status === 'late' && 'bg-status-info-bg text-status-info',
-                          )}>
-                            {attendance.status.replace('_', ' ')}
-                          </Badge>
-                          {attendance.apology_reason && (
-                            <span className="text-sm text-muted-foreground">({attendance.apology_reason})</span>
-                          )}
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-            </TabsContent>
-
-            {/* ========== MINUTES TAB ========== */}
-            <TabsContent value="minutes">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <div>
-                    <CardTitle>Meeting Minutes</CardTitle>
-                    <CardDescription>
-                      {meeting.minutes ? `Version ${meeting.minutes.version_number} - ${meeting.minutes.status}` : 'No minutes recorded'}
-                    </CardDescription>
-                  </div>
-                  <div className="flex gap-2">
-                    {canManageMinutes && (
-                      <>
-                        <Dialog open={minutesDialogOpen} onOpenChange={setMinutesDialogOpen}>
+                      {canEdit && (
+                        <Dialog open={agendaDialogOpen} onOpenChange={setAgendaDialogOpen}>
                           <DialogTrigger asChild>
-                            <Button size="sm" variant={meeting.minutes ? 'outline' : 'default'} dusk="edit-minutes">
-                              {meeting.minutes ? (
-                                <><Pencil className="w-4 h-4 mr-1" /> Edit</>
-                              ) : (
-                                <><Plus className="w-4 h-4 mr-1" /> Create Minutes</>
-                              )}
+                            <Button size="sm">
+                              <Plus className="w-4 h-4 mr-1" />
+                              Add Item
                             </Button>
                           </DialogTrigger>
-                          <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto" aria-describedby={undefined}>
+                          <DialogContent className="max-w-lg" aria-describedby={undefined}>
                             <DialogHeader>
-                              <DialogTitle>{meeting.minutes ? 'Edit Minutes' : 'Create Minutes'}</DialogTitle>
+                              <DialogTitle>Add Agenda Item</DialogTitle>
                             </DialogHeader>
-                            <form onSubmit={submitMinutes} className="space-y-4">
-                              <div className="space-y-4">
-                                {minutesBlocks.map((block, idx) => (
-                                  <div key={idx} className="rounded-lg border p-4 space-y-2">
-                                    <div className="flex items-center justify-between gap-2">
-                                      <Input
-                                      dusk={idx === 0 ? 'minutes-heading-0' : undefined}
-                                      value={block.heading}
-                                      onChange={e => updateMinutesBlock(idx, 'heading', e.target.value)}
-                                      placeholder="Section heading"
-                                      className="font-semibold"
-                                      />
-                                      {minutesBlocks.length > 1 && (
-                                        <Button
-                                          type="button"
-                                          variant="ghost"
-                                          size="sm"
-                                          className="text-status-critical hover:text-status-critical shrink-0"
-                                          onClick={() => removeMinutesBlock(idx)}
-                                        >
-                                          Remove
-                                        </Button>
-                                      )}
-                                    </div>
-                                    <Textarea
-                                      dusk={idx === 0 ? 'minutes-content-0' : undefined}
-                                      value={block.content}
-                                      onChange={e => updateMinutesBlock(idx, 'content', e.target.value)}
-                                      placeholder="Enter minutes for this section..."
-                                      rows={4}
-                                    />
-                                  </div>
-                                ))}
+                            <form onSubmit={submitAgendaItem} className="space-y-4">
+                              <div>
+                                <Label htmlFor="agenda-title">Title</Label>
+                                <Input
+                                  id="agenda-title"
+                                  value={agendaForm.data.title}
+                                  onChange={e => agendaForm.setData('title', e.target.value)}
+                                  required
+                                />
+                                {agendaForm.errors.title && <p className="text-sm text-status-critical mt-1">{agendaForm.errors.title}</p>}
                               </div>
-                              <Button
-                                type="button"
-                                variant="outline"
-                                size="sm"
-                                className="w-full"
-                                onClick={addMinutesBlock}
-                              >
-                                <Plus className="w-4 h-4 mr-1" />
-                                Add Section
-                              </Button>
-                              <div className="flex justify-end gap-2 pt-2">
-                                <Button type="button" variant="outline" onClick={() => setMinutesDialogOpen(false)}>
+                              <div>
+                                <Label htmlFor="agenda-description">Description</Label>
+                                <Textarea
+                                  id="agenda-description"
+                                  value={agendaForm.data.description}
+                                  onChange={e => agendaForm.setData('description', e.target.value)}
+                                  rows={3}
+                                />
+                              </div>
+                              <div className="grid grid-cols-2 gap-4">
+                                <div>
+                                  <Label>Item Type</Label>
+                                  <Select
+                                    value={agendaForm.data.item_type}
+                                    onValueChange={v => agendaForm.setData('item_type', v)}
+                                  >
+                                    <SelectTrigger>
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="standard">Standard</SelectItem>
+                                      <SelectItem value="decision">Decision Required</SelectItem>
+                                      <SelectItem value="consent">Consent</SelectItem>
+                                      <SelectItem value="for_info">For Information</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                </div>
+                                <div>
+                                  <Label htmlFor="agenda-duration">Duration (mins)</Label>
+                                  <Input
+                                    id="agenda-duration"
+                                    type="number"
+                                    min={5}
+                                    max={120}
+                                    value={agendaForm.data.duration_minutes}
+                                    onChange={e => agendaForm.setData('duration_minutes', e.target.value)}
+                                    required
+                                  />
+                                </div>
+                              </div>
+                              <div>
+                                <Label>Presenter</Label>
+                                <Select
+                                  value={agendaForm.data.presenter_id || undefined}
+                                  onValueChange={v => agendaForm.setData('presenter_id', v)}
+                                >
+                                  <SelectTrigger>
+                                    <SelectValue placeholder="Select presenter (optional)" />
+                                  </SelectTrigger>
+                                  <SelectContent>
+                                    {allBoardMembers.map(m => (
+                                      <SelectItem key={m.user.id} value={String(m.user.id)}>{m.user.name}</SelectItem>
+                                    ))}
+                                  </SelectContent>
+                                </Select>
+                              </div>
+                              <div className="flex items-center gap-2">
+                                <Checkbox
+                                  id="agenda-confidential"
+                                  checked={agendaForm.data.is_confidential}
+                                  onCheckedChange={v => agendaForm.setData('is_confidential', !!v)}
+                                />
+                                <Label htmlFor="agenda-confidential">Confidential item</Label>
+                              </div>
+                              <div className="flex justify-end gap-2">
+                                <Button type="button" variant="outline" onClick={() => setAgendaDialogOpen(false)}>
                                   Cancel
                                 </Button>
-                                <Button type="submit" disabled={minutesSubmitting} dusk="save-minutes">
-                                  {minutesSubmitting ? 'Saving...' : meeting.minutes ? 'Update Minutes' : 'Create Minutes'}
+                                <Button type="submit" disabled={agendaForm.processing}>
+                                  {agendaForm.processing ? 'Adding...' : 'Add Item'}
                                 </Button>
                               </div>
                             </form>
                           </DialogContent>
                         </Dialog>
-                        {meeting.minutes && meeting.minutes.status === 'draft' && canApproveMinutes && (
-                          <AlertDialog>
-                            <AlertDialogTrigger asChild>
-                              <Button size="sm" dusk="approve-minutes">
-                                <Send className="w-4 h-4 mr-1" />
-                                Approve Minutes
-                              </Button>
-                            </AlertDialogTrigger>
-                            <AlertDialogContent>
-                              <AlertDialogHeader>
-                                <AlertDialogTitle>Submit Minutes for Approval</AlertDialogTitle>
-                                <AlertDialogDescription>
-                                  Are you sure you want to submit these minutes for approval? This will notify the Chair for review and sign-off.
-                                </AlertDialogDescription>
-                              </AlertDialogHeader>
-                              <AlertDialogFooter>
-                                <AlertDialogCancel>Cancel</AlertDialogCancel>
-                                <AlertDialogAction onClick={submitForApproval}>
-                                  Submit for Approval
-                                </AlertDialogAction>
-                              </AlertDialogFooter>
-                            </AlertDialogContent>
-                          </AlertDialog>
+                      )}
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-4">
+                        {agendaItems.length === 0 && (
+                          <p className="text-muted-foreground text-center py-8">No agenda items yet. Add items to build the meeting agenda.</p>
                         )}
-                      </>
+                        {agendaItems.map((item) => (
+                          <div
+                            key={item.id}
+                            className={cn(
+                              "flex items-start gap-4 p-4 rounded-lg border",
+                              item.is_confidential && "bg-primary/10 border-primary"
+                            )}
+                          >
+                            <div className="flex-shrink-0 w-8 h-8 rounded-full bg-muted flex items-center justify-center font-semibold text-muted-foreground">
+                              {item.order}
+                            </div>
+                            <div className="flex-1">
+                              <div className="flex items-center gap-2 mb-1">
+                                {getItemTypeIcon(item.item_type)}
+                                <h4 className="font-semibold text-foreground">{item.title}</h4>
+                                {item.is_confidential && (
+                                  <Badge variant="outline" className="text-primary border-primary">
+                                    Confidential
+                                  </Badge>
+                                )}
+                                <Badge variant="outline">{item.item_type}</Badge>
+                              </div>
+                              {item.description && (
+                                <p className="text-sm text-muted-foreground mb-2">{item.description}</p>
+                              )}
+                              <div className="flex items-center gap-4 text-sm text-muted-foreground">
+                                {item.presenter && <span>Presenter: {item.presenter.name}</span>}
+                                <span>{item.duration_minutes} minutes</span>
+                              </div>
+                            </div>
+                            {canEdit && (
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button
+                                    variant="ghost"
+                                    size="sm"
+                                    className="text-status-critical hover:text-status-critical"
+                                  >
+                                    Remove
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Remove Agenda Item</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Are you sure you want to remove "{item.title}" from the agenda? This action cannot be undone.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction
+                                      onClick={() => removeAgendaItem(item.id)}
+                                      className="bg-status-critical hover:bg-status-critical"
+                                    >
+                                      Remove
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            )}
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                {/* ========== ATTENDANCE TAB ========== */}
+                <TabsContent value="attendance">
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                      <CardTitle>Attendance Record</CardTitle>
+                      {canEdit && (
+                        <Dialog open={attendanceDialogOpen} onOpenChange={setAttendanceDialogOpen}>
+                          <DialogTrigger asChild>
+                            <Button size="sm" dusk="record-attendance">
+                              <Users className="w-4 h-4 mr-1" />
+                              Record Attendance
+                            </Button>
+                          </DialogTrigger>
+                          <DialogContent className="max-w-lg max-h-[80vh] overflow-y-auto" aria-describedby={undefined}>
+                            <DialogHeader>
+                              <DialogTitle>Record Attendance</DialogTitle>
+                            </DialogHeader>
+                            <div className="space-y-3">
+                              {allBoardMembers.map(member => (
+                                <div key={member.id} className="flex items-center gap-3 p-3 rounded-lg border">
+                                  <span className="font-medium flex-1 min-w-0 truncate">{member.user.name}</span>
+                                  <Select
+                                    value={attendanceRecords[member.id]?.status || 'present'}
+                                    onValueChange={v => setAttendanceRecords(prev => ({
+                                      ...prev,
+                                      [member.id]: { ...prev[member.id], status: v },
+                                    }))}
+                                  >
+                                    <SelectTrigger className="w-32">
+                                      <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                      <SelectItem value="present">Present</SelectItem>
+                                      <SelectItem value="apology">Apology</SelectItem>
+                                      <SelectItem value="no_show">No Show</SelectItem>
+                                      <SelectItem value="late">Late</SelectItem>
+                                    </SelectContent>
+                                  </Select>
+                                  {attendanceRecords[member.id]?.status === 'apology' && (
+                                    <Input
+                                      placeholder="Reason"
+                                      className="w-40"
+                                      value={attendanceRecords[member.id]?.apology_reason || ''}
+                                      onChange={e => setAttendanceRecords(prev => ({
+                                        ...prev,
+                                        [member.id]: { ...prev[member.id], apology_reason: e.target.value },
+                                      }))}
+                                    />
+                                  )}
+                                </div>
+                              ))}
+                              {allBoardMembers.length === 0 && (
+                                <p className="text-muted-foreground text-center py-4">No active board members found.</p>
+                              )}
+                            </div>
+                            <div className="flex justify-end gap-2 mt-4">
+                              <Button variant="outline" onClick={() => setAttendanceDialogOpen(false)}>Cancel</Button>
+                              <Button onClick={submitAttendance} disabled={attendanceSubmitting} dusk="save-attendance">
+                                {attendanceSubmitting ? 'Saving...' : 'Save Attendance'}
+                              </Button>
+                            </div>
+                          </DialogContent>
+                        </Dialog>
+                      )}
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {attendances.length === 0 && (
+                          <p className="text-muted-foreground text-center py-8">No attendance recorded yet.</p>
+                        )}
+                        {attendances.map((attendance) => (
+                          <div
+                            key={attendance.id}
+                            className="flex items-center justify-between p-3 rounded-lg border"
+                          >
+                            <span className="font-medium">{attendance.board_member.user.name}</span>
+                            <div className="flex items-center gap-2">
+                              <Badge className={cn(
+                                attendance.status === 'present' && 'bg-status-success-bg text-status-success',
+                                attendance.status === 'apology' && 'bg-status-warning-bg text-status-warning',
+                                attendance.status === 'no_show' && 'bg-status-critical-bg text-status-critical',
+                                attendance.status === 'late' && 'bg-status-info-bg text-status-info',
+                              )}>
+                                {attendance.status.replace('_', ' ')}
+                              </Badge>
+                              {attendance.apology_reason && (
+                                <span className="text-sm text-muted-foreground">({attendance.apology_reason})</span>
+                              )}
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                {/* ========== MINUTES TAB ========== */}
+                <TabsContent value="minutes">
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                      <div>
+                        <CardTitle>Meeting Minutes</CardTitle>
+                        <CardDescription>
+                          {meeting.minutes ? `Version ${meeting.minutes.version_number} - ${meeting.minutes.status}` : 'No minutes recorded'}
+                        </CardDescription>
+                      </div>
+                      <div className="flex gap-2">
+                        {canManageMinutes && (
+                          <>
+                            <Dialog open={minutesDialogOpen} onOpenChange={setMinutesDialogOpen}>
+                              <DialogTrigger asChild>
+                                <Button size="sm" variant={meeting.minutes ? 'outline' : 'default'} dusk="edit-minutes">
+                                  {meeting.minutes ? (
+                                    <><Pencil className="w-4 h-4 mr-1" /> Edit</>
+                                  ) : (
+                                    <><Plus className="w-4 h-4 mr-1" /> Create Minutes</>
+                                  )}
+                                </Button>
+                              </DialogTrigger>
+                              <DialogContent className="max-w-2xl max-h-[85vh] overflow-y-auto" aria-describedby={undefined}>
+                                <DialogHeader>
+                                  <DialogTitle>{meeting.minutes ? 'Edit Minutes' : 'Create Minutes'}</DialogTitle>
+                                </DialogHeader>
+                                <form onSubmit={submitMinutes} className="space-y-4">
+                                  <div className="space-y-4">
+                                    {minutesBlocks.map((block, idx) => (
+                                      <div key={idx} className="rounded-lg border p-4 space-y-2">
+                                        <div className="flex items-center justify-between gap-2">
+                                          <Input
+                                            dusk={idx === 0 ? 'minutes-heading-0' : undefined}
+                                            value={block.heading}
+                                            onChange={e => updateMinutesBlock(idx, 'heading', e.target.value)}
+                                            placeholder="Section heading"
+                                            className="font-semibold"
+                                          />
+                                          {minutesBlocks.length > 1 && (
+                                            <Button
+                                              type="button"
+                                              variant="ghost"
+                                              size="sm"
+                                              className="text-status-critical hover:text-status-critical shrink-0"
+                                              onClick={() => removeMinutesBlock(idx)}
+                                            >
+                                              Remove
+                                            </Button>
+                                          )}
+                                        </div>
+                                        <Textarea
+                                          dusk={idx === 0 ? 'minutes-content-0' : undefined}
+                                          value={block.content}
+                                          onChange={e => updateMinutesBlock(idx, 'content', e.target.value)}
+                                          placeholder="Enter minutes for this section..."
+                                          rows={4}
+                                        />
+                                      </div>
+                                    ))}
+                                  </div>
+                                  <Button
+                                    type="button"
+                                    variant="outline"
+                                    size="sm"
+                                    className="w-full"
+                                    onClick={addMinutesBlock}
+                                  >
+                                    <Plus className="w-4 h-4 mr-1" />
+                                    Add Section
+                                  </Button>
+                                  <div className="flex justify-end gap-2 pt-2">
+                                    <Button type="button" variant="outline" onClick={() => setMinutesDialogOpen(false)}>
+                                      Cancel
+                                    </Button>
+                                    <Button type="submit" disabled={minutesSubmitting} dusk="save-minutes">
+                                      {minutesSubmitting ? 'Saving...' : meeting.minutes ? 'Update Minutes' : 'Create Minutes'}
+                                    </Button>
+                                  </div>
+                                </form>
+                              </DialogContent>
+                            </Dialog>
+                            {meeting.minutes && meeting.minutes.status === 'draft' && canApproveMinutes && (
+                              <AlertDialog>
+                                <AlertDialogTrigger asChild>
+                                  <Button size="sm" dusk="approve-minutes">
+                                    <Send className="w-4 h-4 mr-1" />
+                                    Approve Minutes
+                                  </Button>
+                                </AlertDialogTrigger>
+                                <AlertDialogContent>
+                                  <AlertDialogHeader>
+                                    <AlertDialogTitle>Submit Minutes for Approval</AlertDialogTitle>
+                                    <AlertDialogDescription>
+                                      Are you sure you want to submit these minutes for approval? This will notify the Chair for review and sign-off.
+                                    </AlertDialogDescription>
+                                  </AlertDialogHeader>
+                                  <AlertDialogFooter>
+                                    <AlertDialogCancel>Cancel</AlertDialogCancel>
+                                    <AlertDialogAction onClick={submitForApproval}>
+                                      Submit for Approval
+                                    </AlertDialogAction>
+                                  </AlertDialogFooter>
+                                </AlertDialogContent>
+                              </AlertDialog>
+                            )}
+                          </>
+                        )}
+                      </div>
+                    </CardHeader>
+                    <CardContent>
+                      {meeting.minutes ? (
+                        <div className="space-y-4">
+                          <div className="flex items-center gap-2 mb-4">
+                            <span className="text-sm text-muted-foreground">Status:</span>
+                            <Badge className={cn(
+                              meeting.minutes.status === 'draft' && 'bg-status-warning-bg text-status-warning',
+                              meeting.minutes.status === 'approved' && 'bg-status-success-bg text-status-success',
+                            )}>
+                              {meeting.minutes.status}
+                            </Badge>
+                          </div>
+                          {meeting.minutes.content_blocks && Array.isArray(meeting.minutes.content_blocks) && (
+                            <div className="prose max-w-none">
+                              {meeting.minutes.content_blocks.map((block: { heading: string; content: string }, idx: number) => (
+                                <div key={idx} className="mb-4">
+                                  <h3 className="font-semibold text-foreground">{block.heading}</h3>
+                                  <p className="text-foreground whitespace-pre-wrap">{block.content || <span className="text-muted-foreground italic">No content yet</span>}</p>
+                                </div>
+                              ))}
+                            </div>
+                          )}
+                        </div>
+                      ) : (
+                        <p className="text-muted-foreground text-center py-8">No minutes have been recorded for this meeting yet.</p>
+                      )}
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+
+                {/* ========== RESOLUTIONS TAB ========== */}
+                <TabsContent value="resolutions">
+                  <Card>
+                    <CardHeader className="flex flex-row items-center justify-between">
+                      <CardTitle>Resolutions</CardTitle>
+                      <Button size="sm" asChild>
+                        <Link href={createResolution.url({ query: { meeting_id: meeting.id } })}>
+                          <Plus className="w-4 h-4 mr-1" />
+                          New Resolution
+                        </Link>
+                      </Button>
+                    </CardHeader>
+                    <CardContent>
+                      <div className="space-y-2">
+                        {resolutions.length === 0 && (
+                          <p className="text-muted-foreground text-center py-8">No resolutions for this meeting.</p>
+                        )}
+                        {resolutions.map((resolution) => (
+                          <div
+                            key={resolution.id}
+                            className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted"
+                          >
+                            <div>
+                              <p className="font-medium">{resolution.title}</p>
+                              <p className="text-sm text-muted-foreground">{resolution.resolution_reference}</p>
+                            </div>
+                            <div className="flex items-center gap-2">
+                              <Badge>{resolution.status}</Badge>
+                              <Button variant="ghost" size="sm" asChild>
+                                <Link href={showResolution.url({ resolution: resolution.id })}>
+                                  View &rarr;
+                                </Link>
+                              </Button>
+                            </div>
+                          </div>
+                        ))}
+                      </div>
+                    </CardContent>
+                  </Card>
+                </TabsContent>
+              </Tabs>
+            </div>
+
+            {/* Sidebar Area (Right Column): 4/12 width */}
+            <div className="lg:col-span-4 space-y-6">
+              <Card dusk="meeting-workflow-checklist-card">
+                <CardHeader className="pb-3">
+                  <CardTitle>Meeting Workflow</CardTitle>
+                  <CardDescription>Step-by-step checklist for this meeting cycle.</CardDescription>
+                </CardHeader>
+                <CardContent>
+                  <div className="mb-3 flex flex-wrap gap-2">
+                    <Badge variant="outline">{workflowChecklist.counts.done} complete</Badge>
+                    {workflowChecklist.counts.remaining > 0 && (
+                      <Badge className="bg-status-warning-bg text-status-warning border-status-warning/30">
+                        {workflowChecklist.counts.remaining} remaining
+                      </Badge>
+                    )}
+                    {workflowChecklist.counts.blocked > 0 && (
+                      <Badge className="bg-status-critical-bg text-status-critical border-status-critical/30">
+                        {workflowChecklist.counts.blocked} blocked
+                      </Badge>
                     )}
                   </div>
-                </CardHeader>
-                <CardContent>
-                  {meeting.minutes ? (
-                    <div className="space-y-4">
-                      <div className="flex items-center gap-2 mb-4">
-                        <span className="text-sm text-muted-foreground">Status:</span>
-                        <Badge className={cn(
-                          meeting.minutes.status === 'draft' && 'bg-status-warning-bg text-status-warning',
-                          meeting.minutes.status === 'approved' && 'bg-status-success-bg text-status-success',
-                        )}>
-                          {meeting.minutes.status}
-                        </Badge>
-                      </div>
-                      {meeting.minutes.content_blocks && Array.isArray(meeting.minutes.content_blocks) && (
-                        <div className="prose max-w-none">
-                          {meeting.minutes.content_blocks.map((block: { heading: string; content: string }, idx: number) => (
-                            <div key={idx} className="mb-4">
-                              <h3 className="font-semibold text-foreground">{block.heading}</h3>
-                              <p className="text-foreground whitespace-pre-wrap">{block.content || <span className="text-muted-foreground italic">No content yet</span>}</p>
-                            </div>
-                          ))}
-                        </div>
-                      )}
-                    </div>
-                  ) : (
-                    <p className="text-muted-foreground text-center py-8">No minutes have been recorded for this meeting yet.</p>
-                  )}
-                </CardContent>
-              </Card>
-            </TabsContent>
 
-            {/* ========== RESOLUTIONS TAB ========== */}
-            <TabsContent value="resolutions">
-              <Card>
-                <CardHeader className="flex flex-row items-center justify-between">
-                  <CardTitle>Resolutions</CardTitle>
-                  <Button size="sm" asChild>
-                    <Link href={createResolution.url({ query: { meeting_id: meeting.id } })}>
-                      <Plus className="w-4 h-4 mr-1" />
-                      New Resolution
-                    </Link>
-                  </Button>
-                </CardHeader>
-                <CardContent>
+                  {workflowChecklist.next_step && (
+                    <div className="mb-4 rounded-lg border border-status-info/30 bg-status-info-bg p-3">
+                      <p className="text-xs font-medium uppercase tracking-wide text-status-info">Next Step</p>
+                      <p className="font-semibold text-status-info">{workflowChecklist.next_step.label}</p>
+                      <p className="text-sm text-status-info">{workflowChecklist.next_step.detail}</p>
+                    </div>
+                  )}
+
                   <div className="space-y-2">
-                    {resolutions.length === 0 && (
-                      <p className="text-muted-foreground text-center py-8">No resolutions for this meeting.</p>
-                    )}
-                    {resolutions.map((resolution) => (
-                      <div
-                        key={resolution.id}
-                        className="flex items-center justify-between p-3 rounded-lg border hover:bg-muted"
-                      >
-                        <div>
-                          <p className="font-medium">{resolution.title}</p>
-                          <p className="text-sm text-muted-foreground">{resolution.resolution_reference}</p>
+                    {workflowChecklist.items.map((item) => (
+                      <div key={item.key} className="flex flex-col gap-2 rounded-lg border p-3" dusk={`workflow-item-${item.key}`}>
+                        <div className="space-y-1">
+                          <div className="flex items-center justify-between gap-2">
+                            <p className="font-medium text-foreground">{item.label}</p>
+                            <Badge className={getChecklistStatusColor(item.status)} dusk={`workflow-status-${item.key}`}>{item.status.replace('_', ' ')}</Badge>
+                          </div>
+                          <p className="text-sm text-muted-foreground">{item.detail}</p>
+                          {item.blocked_by && (
+                            <p className="text-xs text-status-critical">Blocked by: {item.blocked_by}</p>
+                          )}
                         </div>
-                        <div className="flex items-center gap-2">
-                          <Badge>{resolution.status}</Badge>
-                          <Button variant="ghost" size="sm" asChild>
-                            <Link href={showResolution.url({ resolution: resolution.id })}>
-                              View &rarr;
-                            </Link>
+                        <div className="flex justify-end mt-1">
+                          <Button size="sm" variant="outline" asChild className="w-full">
+                            <Link href={item.action_url}>{item.action_label}</Link>
                           </Button>
                         </div>
                       </div>
@@ -954,8 +929,43 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
                   </div>
                 </CardContent>
               </Card>
-            </TabsContent>
-          </Tabs>
+
+              {/* Info Cards */}
+              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4">
+                <Card dusk="meeting-info-chair-card">
+                  <CardContent className="pt-6">
+                    <p className="text-sm text-muted-foreground font-medium mb-1">Chair</p>
+                    <p className="font-semibold text-foreground">{meeting.chair?.user.name || 'Not assigned'}</p>
+                  </CardContent>
+                </Card>
+                <Card dusk="meeting-info-secretary-card">
+                  <CardContent className="pt-6">
+                    <p className="text-sm text-muted-foreground font-medium mb-1">Secretary</p>
+                    <p className="font-semibold text-foreground">{meeting.secretary?.user.name || 'Not assigned'}</p>
+                  </CardContent>
+                </Card>
+                {meetingCockpit.cards.map((card) => (
+                  <Card key={card.key} dusk={`meeting-info-card-${card.key}`}>
+                    <CardContent className="pt-6 space-y-2">
+                      <div className="flex items-center justify-between gap-2">
+                        <p className="text-sm text-muted-foreground font-medium">{card.title}</p>
+                        <Badge className={getChecklistStatusColor(card.status === 'warning' ? 'blocked' : card.status)}>
+                          {card.status.replace('_', ' ')}
+                        </Badge>
+                      </div>
+                      <p className="font-semibold text-foreground">{card.value}</p>
+                      <p className="text-sm text-muted-foreground">{card.detail}</p>
+                      <div className="flex justify-start">
+                        <Button variant="ghost" size="sm" className="px-0 hover:bg-transparent text-status-info font-medium" asChild>
+                          <Link href={card.href}>Open</Link>
+                        </Button>
+                      </div>
+                    </CardContent>
+                  </Card>
+                ))}
+              </div>
+            </div>
+          </div>
       </div>
     </AppLayout>
   );

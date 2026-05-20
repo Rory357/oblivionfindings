@@ -116,59 +116,6 @@ export default function ComplianceIndex({ auth, obligations, summary, frameworks
           />
         }
       >
-          {/* Summary Stats */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Overdue</p>
-                    <p className="text-3xl font-bold text-status-critical">{summary.total_overdue}</p>
-                  </div>
-                  <AlertTriangle className="w-8 h-8 text-status-critical" />
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Due Soon (30d)</p>
-                    <p className="text-3xl font-bold text-status-warning">{summary.total_due_soon}</p>
-                  </div>
-                  <Clock className="w-8 h-8 text-status-warning" />
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Next 30 Days</p>
-                    <p className="text-3xl font-bold text-status-info">{summary.next_30_days.length}</p>
-                  </div>
-                  <Calendar className="w-8 h-8 text-status-info" />
-                </div>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <div className="flex items-center justify-between">
-                  <div>
-                    <p className="text-sm text-muted-foreground">Compliance Rate</p>
-                    <p className="text-3xl font-bold text-status-success">
-                      {(() => {
-                        const total = Object.values(summary.by_framework).reduce((a, f) => a + f.total, 0);
-                        const complete = Object.values(summary.by_framework).reduce((a, f) => a + f.complete, 0);
-                        return total > 0 ? Math.round((complete / total) * 100) : 0;
-                      })()}%
-                  </p>
-                  </div>
-                  <FileCheck className="w-8 h-8 text-status-success" />
-                </div>
-              </CardContent>
-            </Card>
-          </div>
 
           {/* Framework Summary */}
           <div className="grid grid-cols-1 md:grid-cols-2 lg:grid-cols-3 gap-4 mb-6">

@@ -7,11 +7,11 @@ import {
     CardTitle,
 } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { cn } from '@/lib/utils';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertTriangle,
-    ArrowLeft,
     Calendar,
     CheckCircle2,
     ClipboardCheck,
@@ -75,82 +75,6 @@ function StatusBadge({ status }: { status: Run['status'] }) {
     );
 }
 
-function StatCard({
-    label,
-    value,
-    accent,
-    icon: Icon,
-    active,
-    onClick,
-}: {
-    label: string;
-    value: number;
-    accent: 'slate' | 'amber' | 'violet' | 'emerald' | 'rose';
-    icon: React.ComponentType<{ className?: string }>;
-    active?: boolean;
-    onClick?: () => void;
-}) {
-    const accentMap = {
-        slate: {
-            text: 'text-foreground',
-            badge: 'bg-slate-100 text-slate-600 dark:bg-slate-800 dark:text-slate-300',
-            ring: 'ring-slate-300 dark:ring-slate-700',
-        },
-        amber: {
-            text: 'text-amber-600 dark:text-amber-400',
-            badge: 'bg-amber-100 text-amber-600 dark:bg-amber-950/60 dark:text-amber-400',
-            ring: 'ring-amber-400 dark:ring-amber-700',
-        },
-        violet: {
-            text: 'text-violet-600 dark:text-violet-400',
-            badge: 'bg-violet-100 text-violet-600 dark:bg-violet-950/60 dark:text-violet-400',
-            ring: 'ring-violet-400 dark:ring-violet-700',
-        },
-        emerald: {
-            text: 'text-emerald-600 dark:text-emerald-400',
-            badge: 'bg-emerald-100 text-emerald-600 dark:bg-emerald-950/60 dark:text-emerald-400',
-            ring: 'ring-emerald-400 dark:ring-emerald-700',
-        },
-        rose: {
-            text: 'text-rose-600 dark:text-rose-400',
-            badge: 'bg-rose-100 text-rose-600 dark:bg-rose-950/60 dark:text-rose-400',
-            ring: 'ring-rose-400 dark:ring-rose-700',
-        },
-    };
-    const a = accentMap[accent];
-    const Wrapper: any = onClick ? 'button' : 'div';
-    return (
-        <Wrapper
-            type={onClick ? 'button' : undefined}
-            onClick={onClick}
-            className={cn(
-                'group block w-full rounded-xl border bg-card p-4 text-left transition',
-                onClick && 'hover:border-primary/30 hover:shadow-sm',
-                active && `ring-2 ${a.ring}`,
-            )}
-        >
-            <div className="flex items-start justify-between gap-3">
-                <div>
-                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                        {label}
-                    </p>
-                    <p className={cn('mt-1.5 text-3xl font-semibold tabular-nums', a.text)}>
-                        {value}
-                    </p>
-                </div>
-                <span
-                    className={cn(
-                        'flex h-9 w-9 shrink-0 items-center justify-center rounded-lg',
-                        a.badge,
-                    )}
-                >
-                    <Icon className="h-5 w-5" />
-                </span>
-            </div>
-        </Wrapper>
-    );
-}
-
 export default function ChecklistRuns({ site, runs, filters }: Props) {
     const total = runs.data.length;
     const counts = {
@@ -179,82 +103,78 @@ export default function ChecklistRuns({ site, runs, filters }: Props) {
         >
             <Head title={`${site.name} — Checklist Runs`} />
 
-            <div className="mx-auto w-full max-w-6xl space-y-5 p-4 md:p-6">
-                {/* Header */}
-                <div className="flex flex-wrap items-end justify-between gap-3">
-                    <div className="min-w-0">
-                        <Button
-                            asChild
-                            variant="ghost"
-                            size="sm"
-                            className="-ml-2 mb-2 text-muted-foreground hover:text-foreground"
-                        >
-                            <Link href={`/sites/${site.id}/checklists`}>
-                                <ArrowLeft className="mr-1 h-4 w-4" />
-                                Back to checklists
-                            </Link>
-                        </Button>
-                        <h1 className="flex items-center gap-2 text-xl font-semibold tracking-tight">
-                            <span className="flex h-8 w-8 items-center justify-center rounded-lg bg-primary/10 text-primary">
-                                <ClipboardCheck className="h-4 w-4" />
-                            </span>
-                            Checklist Runs
-                        </h1>
-                        <p className="mt-0.5 text-sm text-muted-foreground">{site.name}</p>
-                    </div>
-                    {filters.status && (
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => filterTo(undefined)}
-                        >
-                            Clear filter
-                        </Button>
-                    )}
-                </div>
-
-                {/* Stats — clickable to filter */}
-                <div className="grid gap-3 grid-cols-2 lg:grid-cols-5">
-                    <StatCard
-                        label="Total"
-                        value={total}
-                        accent="slate"
+            <PageLayout
+                hero={
+                    <PageHero
                         icon={ClipboardCheck}
-                        active={!filters.status}
+                        backHref={`/sites/${site.id}/checklists`}
+                        backLabel="Back to checklists"
+                        title="Checklist Runs"
+                        description={site.name}
+                        stats={[
+                            { label: 'Total', value: total },
+                            { label: 'Scheduled', value: counts.scheduled },
+                            { label: 'Completed', value: counts.completed },
+                            { label: 'Overdue', value: counts.overdue },
+                        ]}
+                        actions={
+                            filters.status ? (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => filterTo(undefined)}
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                >
+                                    Clear filter
+                                </Button>
+                            ) : null
+                        }
+                    />
+                }
+            >
+
+                {/* Status filter chips */}
+                <div className="flex flex-wrap gap-2">
+                    <Button
+                        variant={!filters.status ? 'default' : 'outline'}
+                        size="sm"
                         onClick={() => filterTo(undefined)}
-                    />
-                    <StatCard
-                        label="Scheduled"
-                        value={counts.scheduled}
-                        accent="amber"
-                        icon={Calendar}
-                        active={filters.status === 'scheduled'}
+                    >
+                        <ClipboardCheck className="mr-1 h-3.5 w-3.5" />
+                        Total ({total})
+                    </Button>
+                    <Button
+                        variant={filters.status === 'scheduled' ? 'default' : 'outline'}
+                        size="sm"
                         onClick={() => filterTo('scheduled')}
-                    />
-                    <StatCard
-                        label="In Progress"
-                        value={counts.in_progress}
-                        accent="violet"
-                        icon={RotateCw}
-                        active={filters.status === 'in_progress'}
+                    >
+                        <Calendar className="mr-1 h-3.5 w-3.5" />
+                        Scheduled ({counts.scheduled})
+                    </Button>
+                    <Button
+                        variant={filters.status === 'in_progress' ? 'default' : 'outline'}
+                        size="sm"
                         onClick={() => filterTo('in_progress')}
-                    />
-                    <StatCard
-                        label="Completed"
-                        value={counts.completed}
-                        accent="emerald"
-                        icon={CheckCircle2}
-                        active={filters.status === 'completed'}
+                    >
+                        <RotateCw className="mr-1 h-3.5 w-3.5" />
+                        In Progress ({counts.in_progress})
+                    </Button>
+                    <Button
+                        variant={filters.status === 'completed' ? 'default' : 'outline'}
+                        size="sm"
                         onClick={() => filterTo('completed')}
-                    />
-                    <StatCard
-                        label="Overdue"
-                        value={counts.overdue}
-                        accent="rose"
-                        icon={AlertTriangle}
-                        active={filters.status === 'overdue'}
+                    >
+                        <CheckCircle2 className="mr-1 h-3.5 w-3.5" />
+                        Completed ({counts.completed})
+                    </Button>
+                    <Button
+                        variant={filters.status === 'overdue' ? 'default' : 'outline'}
+                        size="sm"
                         onClick={() => filterTo('overdue')}
-                    />
+                    >
+                        <AlertTriangle className="mr-1 h-3.5 w-3.5" />
+                        Overdue ({counts.overdue})
+                    </Button>
                 </div>
 
                 {/* Runs list */}
@@ -375,7 +295,7 @@ export default function ChecklistRuns({ site, runs, filters }: Props) {
                         )}
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

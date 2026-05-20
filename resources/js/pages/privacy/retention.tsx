@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -6,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import { Head, Link, router, usePage } from '@inertiajs/react';
-import { Database, Plus, Clock } from 'lucide-react';
+import { Archive, Database, Plus, Clock } from 'lucide-react';
 
 type Props = {
     filters: {
@@ -36,54 +37,45 @@ export default function DataRetentionPolicies({ filters, policies, stats }: Prop
         ]}>
             <Head title="Data Retention Policies" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">Data Retention Policies</h1>
-                        <div className="mt-1 text-sm text-muted-foreground">
-                            Manage data retention periods and automated deletion rules
-                        </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Link href="/privacy/dashboard" className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
-                            Privacy Dashboard
-                        </Link>
-                        <Link href="/privacy/retention/review" className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
-                            Review Data
-                        </Link>
-                        {can.manageRetention && (
-                            <Link href="/privacy/retention/create">
-                                <Button size="sm">
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    New Policy
-                                </Button>
-                            </Link>
-                        )}
-                    </div>
-                </div>
-
-                {stats && (
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-sm font-medium text-muted-foreground">Total Policies</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold">{stats.total}</div>
-                            </CardContent>
-                        </Card>
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-sm font-medium text-muted-foreground">Active Policies</CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="text-2xl font-bold text-status-success">{stats.active}</div>
-                            </CardContent>
-                        </Card>
-                    </div>
-                )}
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Archive}
+                        title="Data Retention Policies"
+                        description="Manage data retention periods and automated deletion rules"
+                        stats={
+                            stats
+                                ? [
+                                      { label: 'Total', value: stats.total },
+                                      { label: 'Active', value: stats.active },
+                                  ]
+                                : undefined
+                        }
+                        actions={
+                            <div className="flex flex-wrap items-center gap-2">
+                                <Link href="/privacy/dashboard">
+                                    <Button size="sm" variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                        Privacy Dashboard
+                                    </Button>
+                                </Link>
+                                <Link href="/privacy/retention/review">
+                                    <Button size="sm" variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                                        Review Data
+                                    </Button>
+                                </Link>
+                                {can.manageRetention && (
+                                    <Link href="/privacy/retention/create">
+                                        <Button size="sm">
+                                            <Plus className="mr-1.5 h-4 w-4" />
+                                            New Policy
+                                        </Button>
+                                    </Link>
+                                )}
+                            </div>
+                        }
+                    />
+                }
+            >
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-base">Filters</CardTitle>
@@ -183,7 +175,7 @@ export default function DataRetentionPolicies({ filters, policies, stats }: Prop
                         ))}
                     </div>
                 ) : null}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

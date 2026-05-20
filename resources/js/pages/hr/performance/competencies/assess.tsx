@@ -9,6 +9,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
@@ -84,16 +85,16 @@ export default function CompetencyAssess({ competencies, staff }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Assess Competencies" />
 
-            <div className="space-y-4">
-                <div>
-                    <h1 className="text-lg font-semibold">
-                        Competency Assessment
-                    </h1>
-                    <div className="mt-1 text-sm text-muted-foreground">
-                        Rate an employee against the competency framework
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/hr/performance/competencies"
+                        title="Competency Assessment"
+                        description="Rate an employee against the competency framework."
+                    />
+                }
+            >
                 <form onSubmit={submit} className="space-y-4">
                     <Card>
                         <CardHeader>
@@ -281,7 +282,7 @@ export default function CompetencyAssess({ competencies, staff }: Props) {
                         </Button>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

@@ -8,10 +8,11 @@ import {
     DialogTitle,
     DialogTrigger,
 } from '@/components/ui/dialog';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
-import { Eye, FileText, ShieldCheck } from 'lucide-react';
+import { BookOpen, Eye, FileText, ShieldCheck } from 'lucide-react';
 
 interface PolicyVersion {
     id: number;
@@ -65,49 +66,20 @@ export default function MyPolicies({ policies }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="My Policies" />
-            <div className="flex flex-col gap-6 p-6">
-                <h1 className="text-2xl font-bold">My Policies</h1>
-
-                {/* Summary */}
-                <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">
-                                Total Policies
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-2xl font-bold">
-                                {policies.length}
-                            </p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">
-                                Attested
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-2xl font-bold text-status-success">
-                                {attestedCount}
-                            </p>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-sm font-medium text-muted-foreground">
-                                Pending Attestation
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <p className="text-2xl font-bold text-status-warning">
-                                {pendingCount}
-                            </p>
-                        </CardContent>
-                    </Card>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={BookOpen}
+                        title="My Policies"
+                        description="View and attest to required organisational policies."
+                        stats={[
+                            { label: 'Total', value: policies.length },
+                            { label: 'Attested', value: attestedCount },
+                            { label: 'Pending', value: pendingCount },
+                        ]}
+                    />
+                }
+            >
                 {/* Policies List */}
                 <Card>
                     <CardHeader>
@@ -274,7 +246,7 @@ export default function MyPolicies({ policies }: Props) {
                         </table>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

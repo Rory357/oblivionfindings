@@ -11,8 +11,9 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Head, Link, router } from '@inertiajs/react';
-import { Filter, X } from 'lucide-react';
+import { AlertTriangle, Filter, X } from 'lucide-react';
 import { useState } from 'react';
 
 type PaginatedData<T> = {
@@ -154,58 +155,32 @@ export default function EventRegister({
         <AppLayout>
             <Head title="Clinical Event Register — Health & Clinical" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">
-                            Clinical Event Register
-                        </h1>
-                        <p className="text-sm text-muted-foreground">
-                            Cross-client oversight of recorded clinical events.
-                        </p>
-                    </div>
-                    <Link href="/health-clinical">
-                        <Button variant="outline" size="sm">
-                            Dashboard
-                        </Button>
-                    </Link>
-                </div>
-
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <div className="rounded-xl border bg-primary/10 p-4">
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-status-critical">
-                            Last 7 days
-                        </p>
-                        <p className="mt-1 text-2xl font-bold text-status-critical">
-                            {stats.total_7d}
-                        </p>
-                    </div>
-                    <div className="rounded-xl border bg-status-warning-bg p-4">
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-status-warning">
-                            Last 30 days
-                        </p>
-                        <p className="mt-1 text-2xl font-bold text-status-warning">
-                            {stats.total_30d}
-                        </p>
-                    </div>
-                    <div className="rounded-xl border bg-status-critical-bg p-4">
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-status-critical">
-                            Pending follow-up
-                        </p>
-                        <p className="mt-1 text-2xl font-bold text-status-critical">
-                            {stats.pending_follow_ups}
-                        </p>
-                    </div>
-                    <div className="rounded-xl border bg-primary/10 p-4">
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                            Unreviewed
-                        </p>
-                        <p className="mt-1 text-2xl font-bold text-foreground">
-                            {stats.unreviewed}
-                        </p>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={AlertTriangle}
+                        title="Clinical Event Register"
+                        description="Cross-client oversight of recorded clinical events."
+                        stats={[
+                            { label: 'Last 7d', value: stats.total_7d },
+                            { label: 'Last 30d', value: stats.total_30d },
+                            { label: 'Pending follow-up', value: stats.pending_follow_ups },
+                            { label: 'Unreviewed', value: stats.unreviewed },
+                        ]}
+                        actions={
+                            <Link href="/health-clinical">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                >
+                                    Dashboard
+                                </Button>
+                            </Link>
+                        }
+                    />
+                }
+            >
                 <Card>
                     <CardHeader className="pb-3">
                         <CardTitle className="flex items-center gap-2 text-sm">
@@ -523,7 +498,7 @@ export default function EventRegister({
                         )}
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

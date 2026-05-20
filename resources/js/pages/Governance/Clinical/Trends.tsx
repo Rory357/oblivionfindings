@@ -1,10 +1,11 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
 import { Head, Link } from '@inertiajs/react';
-import { Minus, TrendingDown, TrendingUp } from 'lucide-react';
+import { Activity, Minus, TrendingDown, TrendingUp } from 'lucide-react';
 
 type Indicator = {
     id: number;
@@ -87,19 +88,30 @@ export default function ClinicalTrends({ snapshots, indicators, sourceHint }: Pr
         <AppLayout>
             <Head title="Clinical Governance Trends" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold text-foreground">Clinical Governance Trends</h1>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            Recent automated snapshot history for the Governance clinical indicators.
-                        </p>
-                    </div>
-                    <Link href="/governance/clinical">
-                        <Button variant="outline">Dashboard</Button>
-                    </Link>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Activity}
+                        title="Clinical Governance Trends"
+                        description="Recent automated snapshot history for the Governance clinical indicators."
+                        stats={[
+                            { label: 'Snapshots', value: snapshots.length },
+                            { label: 'Indicators', value: activeIndicators.length },
+                            { label: 'Period', value: formatColumnDate(latestSnapshot?.period_end ?? null) },
+                        ]}
+                        actions={
+                            <Link href="/governance/clinical">
+                                <Button
+                                    variant="outline"
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                >
+                                    Dashboard
+                                </Button>
+                            </Link>
+                        }
+                    />
+                }
+            >
                 <Card className="border-status-info/30 bg-status-info-bg">
                     <CardContent className="flex flex-col gap-2 p-4 text-sm text-status-info sm:flex-row sm:items-center sm:justify-between">
                         <div>
@@ -244,7 +256,7 @@ export default function ClinicalTrends({ snapshots, indicators, sourceHint }: Pr
                         </CardContent>
                     </Card>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router, useForm } from '@inertiajs/react';
@@ -165,14 +166,16 @@ export default function SignDocument({ signature, can }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Sign: ${signature.document_title}`} />
-            <div className="flex flex-col gap-6 p-6">
-                <div>
-                    <h1 className="text-2xl font-bold">Sign Document</h1>
-                    <p className="text-sm text-muted-foreground">
-                        Review the document and provide your signature
-                    </p>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/hr/signatures/pending"
+                        title="Sign Document"
+                        description="Review the document and provide your signature."
+                    />
+                }
+            >
                 {/* Document Info */}
                 <Card>
                     <CardHeader>
@@ -330,7 +333,7 @@ export default function SignDocument({ signature, can }: Props) {
                         </CardContent>
                     </Card>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

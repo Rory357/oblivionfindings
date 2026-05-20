@@ -1,4 +1,5 @@
 import PageShell from '@/components/page-shell';
+import { PageHero } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -365,7 +366,13 @@ export default function ClientCalendar({ client, pending_visit_count }: Props) {
             <style dangerouslySetInnerHTML={{ __html: calendarStyles }} />
 
             <PageShell>
-                <div className="flex gap-6">
+                <PageHero
+                    variant="compact"
+                    backHref={`/operations/clients/${client.id}`}
+                    title={`Calendar — ${name}`}
+                    description={`${client.first_name}'s schedule, appointments, and visits.`}
+                />
+                <div className="mt-6 flex gap-6">
                     {/* Sidebar */}
                     <div className="hidden w-60 shrink-0 space-y-4 lg:block">
                         <Card className="overflow-hidden">
@@ -460,9 +467,9 @@ export default function ClientCalendar({ client, pending_visit_count }: Props) {
                                         Back
                                     </Link>
                                 </Button>
-                                <h1 className="text-2xl font-bold tracking-tight">
+                                <div className="text-2xl font-bold tracking-tight">
                                     {title}
-                                </h1>
+                                </div>
                                 <div className="flex items-center">
                                     <Button
                                         type="button"

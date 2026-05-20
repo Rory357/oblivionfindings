@@ -85,75 +85,51 @@ export default function ActionsIndex({ auth, items, summary }: Props) {
           />
         }
       >
-          {/* Summary */}
-          <div className="grid grid-cols-1 md:grid-cols-4 gap-4 mb-6">
-            <Card>
-              <CardContent className="pt-6">
-                <p className="text-sm text-muted-foreground">Open</p>
-                <p className="text-3xl font-bold">{summary.total_open}</p>
-              </CardContent>
-            </Card>
-            <Card className="border-status-critical/30">
-              <CardContent className="pt-6">
-                <p className="text-sm text-status-critical">Overdue</p>
-                <p className="text-3xl font-bold text-status-critical">{summary.overdue}</p>
-              </CardContent>
-            </Card>
-            <Card>
-              <CardContent className="pt-6">
-                <p className="text-sm text-muted-foreground">My Open</p>
-                <p className="text-3xl font-bold">{summary.my_open}</p>
-              </CardContent>
-            </Card>
-            <Card className="border-status-warning/30">
-              <CardContent className="pt-6">
-                <p className="text-sm text-status-warning">High Priority</p>
-                <p className="text-3xl font-bold text-status-warning">{summary.high_priority}</p>
-              </CardContent>
-            </Card>
-          </div>
-
           {/* List */}
-          <Card>
+          <Card dusk="actions-list-card">
             <CardHeader>
               <CardTitle>Action Items</CardTitle>
             </CardHeader>
             <CardContent>
               <div className="space-y-3">
-                {items.data.map((item) => {
-                  const dateInfo = formatDate(item.due_date);
-                  return (
-                    <div
-                      key={item.id}
-                      className={cn(
-                        "flex items-start justify-between p-4 rounded-lg border",
-                        dateInfo.text.includes('overdue') && "bg-status-critical-bg border-status-critical/30"
-                      )}
-                    >
-                      <div className="flex-1">
-                        <div className="flex items-center gap-2 mb-1">
-                          <span className="text-sm text-muted-foreground">{item.action_reference}</span>
-                          <Badge className={cn(getPriorityColor(item.priority))}>
-                            {item.priority}
-                          </Badge>
+                {items.data.length === 0 ? (
+                  <p className="text-muted-foreground text-center py-8">No actions assigned or outstanding.</p>
+                ) : (
+                  items.data.map((item) => {
+                    const dateInfo = formatDate(item.due_date);
+                    return (
+                      <div
+                        key={item.id}
+                        className={cn(
+                          "flex items-start justify-between p-4 rounded-lg border",
+                          dateInfo.text.includes('overdue') && "bg-status-critical-bg border-status-critical/30"
+                        )}
+                      >
+                        <div className="flex-1">
+                          <div className="flex items-center gap-2 mb-1">
+                            <span className="text-sm text-muted-foreground">{item.action_reference}</span>
+                            <Badge className={cn(getPriorityColor(item.priority))}>
+                              {item.priority}
+                            </Badge>
+                          </div>
+                          <p className="font-medium">{item.description}</p>
+                          <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
+                            <span className="flex items-center gap-1">
+                              <User className="w-3 h-3" />
+                              {item.assigned_to.name}
+                            </span>
+                            <span className={cn(dateInfo.color)}>
+                              {dateInfo.text}
+                            </span>
+                          </div>
                         </div>
-                        <p className="font-medium">{item.description}</p>
-                        <div className="flex items-center gap-4 mt-2 text-sm text-muted-foreground">
-                          <span className="flex items-center gap-1">
-                            <User className="w-3 h-3" />
-                            {item.assigned_to.name}
-                          </span>
-                          <span className={cn(dateInfo.color)}>
-                            {dateInfo.text}
-                          </span>
-                        </div>
+                        <Button variant="ghost" size="sm" asChild>
+                          <Link href={showAction.url({ action: item.id })}>View &rarr;</Link>
+                        </Button>
                       </div>
-                      <Button variant="ghost" size="sm" asChild>
-                        <Link href={showAction.url({ action: item.id })}>View &rarr;</Link>
-                      </Button>
-                    </div>
-                  );
-                })}
+                    );
+                  })
+                )}
               </div>
             </CardContent>
           </Card>

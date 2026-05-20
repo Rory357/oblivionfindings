@@ -11,8 +11,9 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Head, Link, router } from '@inertiajs/react';
-import { Activity, ClipboardList, Filter, X } from 'lucide-react';
+import { Activity, ClipboardList, Eye, Filter, X } from 'lucide-react';
 import { useState } from 'react';
 
 type PaginatedData<T> = {
@@ -153,57 +154,31 @@ export default function ObservationRegister({
         <AppLayout>
             <Head title="Observation Register — Health & Clinical" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                {/* Header */}
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">
-                            Observation Register
-                        </h1>
-                        <p className="text-sm text-muted-foreground">
-                            All clinical observations across clients.
-                        </p>
-                    </div>
-                    <Link href="/health-clinical">
-                        <Button variant="outline" size="sm">
-                            Dashboard
-                        </Button>
-                    </Link>
-                </div>
-
-                {/* Hero Stats */}
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <div className="rounded-xl border bg-primary/10 p-4">
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-primary">
-                            Last 7 days
-                        </p>
-                        <p className="mt-1 text-2xl font-bold text-primary">
-                            {stats.total_7d}
-                        </p>
-                    </div>
-                    <div className="rounded-xl border bg-status-info-bg p-4">
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-status-info">
-                            Last 30 days
-                        </p>
-                        <p className="mt-1 text-2xl font-bold text-status-info">
-                            {stats.total_30d}
-                        </p>
-                    </div>
-                    {filter_options.observation_types.slice(0, 2).map((t) => (
-                        <div
-                            key={t.value}
-                            className="rounded-xl border bg-primary/10 p-4"
-                        >
-                            <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                                {t.label} (30d)
-                            </p>
-                            <p className="mt-1 text-2xl font-bold text-foreground">
-                                {stats.by_type[t.value] ?? 0}
-                            </p>
-                        </div>
-                    ))}
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Eye}
+                        title="Observation Register"
+                        description="All clinical observations across clients."
+                        stats={[
+                            { label: 'Last 7d', value: stats.total_7d },
+                            { label: 'Last 30d', value: stats.total_30d },
+                            { label: 'Total Page', value: observations.total },
+                        ]}
+                        actions={
+                            <Link href="/health-clinical">
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                >
+                                    Dashboard
+                                </Button>
+                            </Link>
+                        }
+                    />
+                }
+            >
                 {/* Filters */}
                 <Card>
                     <CardHeader className="pb-3">
@@ -449,7 +424,7 @@ export default function ObservationRegister({
                         )}
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

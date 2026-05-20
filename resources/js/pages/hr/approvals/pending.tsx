@@ -11,10 +11,11 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
-import { Check, Settings } from 'lucide-react';
+import { Check, CheckCircle2, Settings } from 'lucide-react';
 import { useState } from 'react';
 
 type ApprovalInstance = {
@@ -88,26 +89,33 @@ export default function PendingApprovals({ instances, can }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Pending Approvals" />
-            <div className="flex flex-col gap-6 p-6">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-2xl font-bold">
-                            Pending Approvals
-                        </h1>
-                        <p className="text-sm text-muted-foreground">
-                            Review and action pending approval requests
-                        </p>
-                    </div>
-                    {can.manage && (
-                        <Button asChild size="sm" variant="outline">
-                            <Link href="/hr/approvals/chains">
-                                <Settings className="mr-1.5 h-4 w-4" />
-                                Manage Chains
-                            </Link>
-                        </Button>
-                    )}
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={CheckCircle2}
+                        title="Pending Approvals"
+                        description="Review and action pending approval requests."
+                        stats={[
+                            { label: 'Pending', value: instances.data.length },
+                        ]}
+                        actions={
+                            can.manage ? (
+                                <Button
+                                    asChild
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                >
+                                    <Link href="/hr/approvals/chains">
+                                        <Settings className="mr-1.5 h-4 w-4" />
+                                        Manage Chains
+                                    </Link>
+                                </Button>
+                            ) : null
+                        }
+                    />
+                }
+            >
                 <Card>
                     <CardContent className="p-0">
                         <Table>
@@ -251,7 +259,7 @@ export default function PendingApprovals({ instances, can }: Props) {
                 {instances.links?.length > 3 && (
                     <LaravelPagination links={instances.links} />
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

@@ -19,6 +19,7 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { ArrowLeft, Play, X } from 'lucide-react';
@@ -237,19 +238,16 @@ export default function CompensationReviewDetail({
         return (
             <AppLayout breadcrumbs={breadcrumbs}>
                 <Head title="New Compensation Review" />
-                <div className="space-y-4">
-                    <div className="flex items-center gap-2">
-                        <Link href="/hr/compensation/reviews">
-                            <Button size="sm" variant="outline">
-                                <ArrowLeft className="mr-1 h-4 w-4" />
-                                Back
-                            </Button>
-                        </Link>
-                        <h1 className="text-lg font-semibold">
-                            New Compensation Review
-                        </h1>
-                    </div>
-
+                <PageLayout
+                    hero={
+                        <PageHero
+                            variant="compact"
+                            backHref="/hr/compensation/reviews"
+                            title="New Compensation Review"
+                            description="Define a new review cycle and add employees for adjustments."
+                        />
+                    }
+                >
                     <form onSubmit={submitCreate} className="space-y-4">
                         <Card>
                             <CardHeader>
@@ -468,7 +466,7 @@ export default function CompensationReviewDetail({
                             <Button type="submit">Create Review</Button>
                         </div>
                     </form>
-                </div>
+                </PageLayout>
             </AppLayout>
         );
     }
@@ -478,45 +476,29 @@ export default function CompensationReviewDetail({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={review.title} />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div className="flex items-center gap-2">
-                        <Link href="/hr/compensation/reviews">
-                            <Button size="sm" variant="outline">
-                                <ArrowLeft className="mr-1 h-4 w-4" />
-                                Back
-                            </Button>
-                        </Link>
-                        <div>
-                            <h1 className="text-lg font-semibold">
-                                {review.title}
-                            </h1>
-                            <div className="mt-0.5 flex items-center gap-2 text-sm text-muted-foreground">
-                                <span>
-                                    {getCycleLabel(review.review_cycle)}
-                                </span>
-                                <span>&middot;</span>
-                                <span>
-                                    Effective{' '}
-                                    {formatDate(review.effective_date)}
-                                </span>
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/hr/compensation/reviews"
+                        title={review.title}
+                        description={`${getCycleLabel(review.review_cycle)} · Effective ${formatDate(review.effective_date)}`}
+                        actions={
+                            <div className="flex items-center gap-2">
+                                <Badge className={getStatusColor(review.status)}>
+                                    {review.status.replace(/_/g, ' ')}
+                                </Badge>
+                                {can.manage && review.status === 'approved' && (
+                                    <Button size="sm" onClick={applyReview}>
+                                        <Play className="mr-1 h-4 w-4" />
+                                        Apply Review
+                                    </Button>
+                                )}
                             </div>
-                        </div>
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                        <Badge className={getStatusColor(review.status)}>
-                            {review.status.replace(/_/g, ' ')}
-                        </Badge>
-                        {can.manage && review.status === 'approved' && (
-                            <Button size="sm" onClick={applyReview}>
-                                <Play className="mr-1 h-4 w-4" />
-                                Apply Review
-                            </Button>
-                        )}
-                    </div>
-                </div>
-
+                        }
+                    />
+                }
+            >
                 {(review.budget_amount || review.notes) && (
                     <Card>
                         <CardContent className="pt-4">
@@ -640,7 +622,7 @@ export default function CompensationReviewDetail({
                         </Table>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

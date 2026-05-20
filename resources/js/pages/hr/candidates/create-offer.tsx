@@ -11,6 +11,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, useForm } from '@inertiajs/react';
@@ -219,30 +220,15 @@ export default function CreateOffer({ application, sites, roles }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Create Offer - ${candidateName}`} />
-            <div className="flex flex-col gap-6 p-6">
-                {/* Header */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-status-success/90 via-status-success to-status-success/80 p-6 text-white md:p-8">
-                    <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-white/5" />
-                    <div className="pointer-events-none absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-white/5" />
-                    <div className="relative flex items-center gap-5">
-                        <div className="flex h-16 w-16 shrink-0 items-center justify-center rounded-2xl border-4 border-white/20 bg-white/10 text-xl font-bold shadow-xl">
-                            {initials}
-                        </div>
-                        <div className="flex-1">
-                            <div className="flex items-center gap-2">
-                                <FileSignature className="h-5 w-5 text-white/70" />
-                                <h1 className="text-2xl font-bold">
-                                    Prepare Offer
-                                </h1>
-                            </div>
-                            <p className="mt-1 text-white/80">
-                                {candidateName} &middot;{' '}
-                                {application.position_title}
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        avatar={{ fallback: initials }}
+                        title="Prepare Offer"
+                        description={`${candidateName} · ${application.position_title}`}
+                    />
+                }
+            >
                 {/* Two-column layout */}
                 <div className="grid gap-6 lg:grid-cols-[1fr_380px]">
                     {/* Left: Offer Form */}
@@ -848,7 +834,7 @@ export default function CreateOffer({ application, sites, roles }: Props) {
                         )}
                     </div>
                 </div>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

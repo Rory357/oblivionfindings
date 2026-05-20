@@ -1,26 +1,32 @@
+import { PageHero, PageLayout } from '@/components/page';
 import MarketingLayout from '@/layouts/marketing-layout';
+import { Shield } from 'lucide-react';
 import React from 'react';
 
 const Privacy: React.FC = () => {
+    const lastUpdated = new Date().toLocaleDateString('en-GB', {
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+    });
+
     return (
         <MarketingLayout
             title="Privacy Policy"
             description="Privacy Policy for Oblivion Findings - how we collect, use and protect your data."
         >
-            <div className="mx-auto max-w-3xl">
-                <h1 className="text-4xl font-bold tracking-tight text-foreground">
-                    Privacy Policy
-                </h1>
-                <p className="mt-4 text-muted-foreground">
-                    Last updated:{' '}
-                    {new Date().toLocaleDateString('en-GB', {
-                        day: 'numeric',
-                        month: 'long',
-                        year: 'numeric',
-                    })}
-                </p>
-
-                <div className="mt-12 space-y-10">
+            <PageLayout
+                padding="none"
+                hero={
+                    <PageHero
+                        icon={Shield}
+                        title="Privacy Policy"
+                        description={`Last updated: ${lastUpdated}`}
+                    />
+                }
+            >
+                <div className="mx-auto max-w-3xl">
+                    <div className="space-y-10">
                     <section>
                         <h2 className="text-xl font-semibold text-foreground">
                             1. Introduction
@@ -349,8 +355,9 @@ const Privacy: React.FC = () => {
                             believe we have not handled your data properly.
                         </p>
                     </section>
+                    </div>
                 </div>
-            </div>
+            </PageLayout>
         </MarketingLayout>
     );
 };

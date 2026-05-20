@@ -1,6 +1,8 @@
 import { Head } from '@inertiajs/react';
+import { ShieldCheck } from 'lucide-react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
@@ -50,12 +52,21 @@ export default function ComplianceStatus({ auth, report }: Props) {
     >
       <Head title="Compliance Status Report" />
 
-      <div className="flex flex-col gap-6 p-4 md:p-6">
-        <div className="mb-6 space-y-2">
-          <h1 className="text-3xl font-bold text-foreground">Compliance Status Report</h1>
-          <p className="text-sm text-muted-foreground">A framework-by-framework view of obligations due, overdue, and complete.</p>
-        </div>
-
+      <PageLayout
+        hero={
+          <PageHero
+            icon={ShieldCheck}
+            title="Compliance Status Report"
+            description="A framework-by-framework view of obligations due, overdue, and complete."
+            stats={[
+              { label: 'Total', value: report.summary.total },
+              { label: 'Complete', value: report.summary.complete },
+              { label: 'Overdue', value: report.summary.overdue },
+              { label: 'Completion', value: `${report.summary.completion_rate}%` },
+            ]}
+          />
+        }
+      >
         <div className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-5">
           {[
             { label: 'Total Obligations', value: report.summary.total, tone: 'text-foreground' },
@@ -126,7 +137,7 @@ export default function ComplianceStatus({ auth, report }: Props) {
             </Card>
           )}
         </div>
-      </div>
+      </PageLayout>
     </AppLayout>
   );
 }

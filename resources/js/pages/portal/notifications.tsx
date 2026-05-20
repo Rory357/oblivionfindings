@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -74,17 +75,32 @@ export default function Notifications({ notifications, filter, unreadCount }: Pr
         >
             <Head title="Notifications" />
 
-            <div className="mx-auto max-w-3xl space-y-6 p-4 sm:p-6">
-                <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold tracking-tight">Notifications</h1>
-                    {unreadCount > 0 && (
-                        <Button variant="outline" size="sm" onClick={markAllRead}>
-                            <CheckCheck className="mr-2 h-4 w-4" />
-                            Mark all read
-                        </Button>
-                    )}
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Bell}
+                        title="Notifications"
+                        description="Latest updates from the care team."
+                        stats={[
+                            { label: 'Total', value: notifications.data.length },
+                            { label: 'Unread', value: unreadCount },
+                        ]}
+                        actions={
+                            unreadCount > 0 ? (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={markAllRead}
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                >
+                                    <CheckCheck className="mr-2 h-4 w-4" />
+                                    Mark all read
+                                </Button>
+                            ) : undefined
+                        }
+                    />
+                }
+            >
                 {/* Filter tabs */}
                 <div className="flex gap-2">
                     <Button
@@ -174,7 +190,7 @@ export default function Notifications({ notifications, filter, unreadCount }: Pr
                         </Button>
                     </div>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

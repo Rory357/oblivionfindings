@@ -1,13 +1,14 @@
-import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
+import { User } from 'lucide-react';
 
 interface EmployeeProfile {
     id: number;
@@ -57,8 +58,15 @@ export default function MyProfile({ profile }: Props) {
         return (
             <AppLayout breadcrumbs={breadcrumbs}>
                 <Head title="My Profile" />
-                <div className="flex flex-col gap-6 p-6">
-                    <h1 className="text-2xl font-bold">My Profile</h1>
+                <PageLayout
+                    hero={
+                        <PageHero
+                            icon={User}
+                            title="My Profile"
+                            description="Your employment record and personal contact details."
+                        />
+                    }
+                >
                     <Card>
                         <CardContent className="py-8 text-center text-muted-foreground">
                             <p>
@@ -70,40 +78,34 @@ export default function MyProfile({ profile }: Props) {
                             </p>
                         </CardContent>
                     </Card>
-                </div>
+                </PageLayout>
             </AppLayout>
         );
     }
 
+    const initials = profile.user.name
+        .split(' ')
+        .map((n) => n[0])
+        .join('')
+        .slice(0, 2)
+        .toUpperCase();
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="My Profile" />
-            <div className="flex flex-col gap-6 p-6">
-                <div className="flex items-center gap-4">
-                    <Avatar className="h-16 w-16">
-                        <AvatarImage
-                            src={profile.user.avatar ?? undefined}
-                            alt={profile.user.name}
-                        />
-                        <AvatarFallback className="text-lg">
-                            {profile.user.name
-                                .split(' ')
-                                .map((n) => n[0])
-                                .join('')
-                                .slice(0, 2)
-                                .toUpperCase()}
-                        </AvatarFallback>
-                    </Avatar>
-                    <div>
-                        <h1 className="text-2xl font-bold">
-                            {profile.user.name}
-                        </h1>
-                        <p className="text-sm text-muted-foreground">
-                            {profile.position_title}
-                        </p>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        avatar={{ src: profile.user.avatar ?? null, fallback: initials }}
+                        title={profile.user.name}
+                        description={profile.position_title}
+                        stats={[
+                            { label: 'Status', value: profile.is_active ? 'Active' : 'Inactive' },
+                            { label: 'Site', value: profile.primary_site?.name ?? 'Unassigned' },
+                        ]}
+                    />
+                }
+            >
                 {/* Read-Only Employment Info */}
                 <Card>
                     <CardHeader>
@@ -376,7 +378,7 @@ export default function MyProfile({ profile }: Props) {
                         </form>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

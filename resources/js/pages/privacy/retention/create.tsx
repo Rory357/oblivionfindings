@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -37,16 +38,16 @@ export default function CreateRetentionPolicy() {
         ]}>
             <Head title="New Data Retention Policy" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">New Data Retention Policy</h1>
-                        <div className="mt-1 text-sm text-muted-foreground">
-                            Define retention periods for data types
-                        </div>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/privacy/retention"
+                        title="New Data Retention Policy"
+                        description="Define retention periods for data types"
+                    />
+                }
+            >
                 <form onSubmit={handleSubmit}>
                     <Card>
                         <CardHeader>
@@ -214,7 +215,7 @@ export default function CreateRetentionPolicy() {
                         </CardContent>
                     </Card>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

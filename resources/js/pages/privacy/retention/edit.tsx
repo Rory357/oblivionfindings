@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -40,16 +41,16 @@ export default function EditRetentionPolicy({ policy }: Props) {
         ]}>
             <Head title={`Edit Policy: ${policy.policy_name}`} />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">Edit Retention Policy</h1>
-                        <div className="mt-1 text-sm text-muted-foreground">
-                            Model: {policy.model_type}
-                        </div>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/privacy/retention"
+                        title="Edit Retention Policy"
+                        description={`Model: ${policy.model_type}`}
+                    />
+                }
+            >
                 <form onSubmit={handleSubmit}>
                     <Card>
                         <CardHeader>
@@ -195,7 +196,7 @@ export default function EditRetentionPolicy({ policy }: Props) {
                         </CardContent>
                     </Card>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

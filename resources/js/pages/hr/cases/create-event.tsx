@@ -10,6 +10,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, useForm } from '@inertiajs/react';
 import { ArrowLeft, Clock } from 'lucide-react';
@@ -60,28 +61,17 @@ export default function CreateEvent({ hrCase, eventTypes }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Add Event - ${hrCase.case_number}`} />
 
-            <div className="max-w-3xl space-y-6">
-                <div className="flex items-center gap-4">
-                    <Link href={`/hr/cases/${hrCase.id}`}>
-                        <Button variant="outline" size="sm">
-                            <ArrowLeft className="mr-2 h-4 w-4" />
-                            Back to Case
-                        </Button>
-                    </Link>
-                    <div className="flex items-center gap-3">
-                        <Clock className="h-6 w-6 text-status-info" />
-                        <div>
-                            <h1 className="text-2xl font-bold">
-                                Add Timeline Event
-                            </h1>
-                            <p className="text-muted-foreground">
-                                Case: {hrCase.case_number} • Subject:{' '}
-                                {hrCase.subject.name}
-                            </p>
-                        </div>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref={`/hr/cases/${hrCase.id}`}
+                        backLabel="Back to Case"
+                        title="Add Timeline Event"
+                        description={`Case: ${hrCase.case_number} · Subject: ${hrCase.subject.name}`}
+                    />
+                }
+            >
                 <form onSubmit={handleSubmit} className="space-y-6">
                     <Card>
                         <CardHeader>
@@ -253,7 +243,7 @@ export default function CreateEvent({ hrCase, eventTypes }: Props) {
                         </Button>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

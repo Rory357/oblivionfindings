@@ -1,7 +1,6 @@
 import ClientSafetyRibbon, {
     type ClientSafety,
 } from '@/components/client-safety-ribbon';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,12 +25,12 @@ import { Separator } from '@/components/ui/separator';
 import { Textarea } from '@/components/ui/textarea';
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { cn } from '@/lib/utils';
 import { Head, Link, useForm, usePage } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
-    ArrowLeft,
     ClipboardList,
     FileHeart,
     Heart,
@@ -230,7 +229,39 @@ export default function ClientMedical({
         >
             <Head title={`Medical - ${name}`} />
 
-            <div className="space-y-6">
+            <PageLayout
+                hero={
+                    <PageHero
+                        avatar={{ fallback: getInitials(name) }}
+                        backHref={`/operations/clients/${client.id}`}
+                        title="Medical Profile"
+                        description={`Health records for ${name}`}
+                        stats={[
+                            {
+                                label: 'Active meds',
+                                value: medications.filter(
+                                    (m: any) =>
+                                        m.active !== false && m.state !== 'ceased',
+                                ).length,
+                            },
+                            { label: 'Conditions', value: conditions.length },
+                        ]}
+                        actions={
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                onClick={() =>
+                                    (window.location.href = `/operations/clients/${client.id}/mar`)
+                                }
+                            >
+                                <ClipboardList className="mr-1.5 h-3.5 w-3.5" />
+                                Daily MAR
+                            </Button>
+                        }
+                    />
+                }
+            >
                 <ClientSafetyRibbon
                     safety={
                         (usePage().props as any).safety as
@@ -239,83 +270,6 @@ export default function ClientMedical({
                             | undefined
                     }
                 />
-
-                {/* ── Hero Header ──────────────────────────────── */}
-                <div className="relative overflow-hidden rounded-2xl bg-gradient-to-br from-status-critical/90 via-status-critical to-status-critical/80 p-6 text-white md:p-8">
-                    <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-white/5" />
-                    <div className="pointer-events-none absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-white/5" />
-
-                    <div className="relative flex flex-col items-center gap-6 md:flex-row md:items-start">
-                        <Avatar className="h-20 w-20 shrink-0 border-4 border-white/20 shadow-xl md:h-24 md:w-24">
-                            <AvatarFallback className="bg-white/10 text-xl font-bold text-white md:text-2xl">
-                                {getInitials(name)}
-                            </AvatarFallback>
-                        </Avatar>
-
-                        <div className="flex-1 text-center md:text-left">
-                            <h1 className="text-2xl font-bold md:text-3xl">
-                                Medical Profile
-                            </h1>
-                            <p className="mt-1 text-sm text-white/70">
-                                Health records for {name}
-                            </p>
-
-                            <div className="mt-3 flex flex-wrap items-center justify-center gap-2 md:justify-start">
-                                {profile?.allergies && (
-                                    <Badge className="border-status-critical/40 bg-status-critical-bg text-status-critical">
-                                        <AlertTriangle className="mr-1 h-3 w-3" />
-                                        Allergies: {profile.allergies}
-                                    </Badge>
-                                )}
-                                {medications.length > 0 && (
-                                    <Badge className="border-white/20 bg-white/10 text-white/90">
-                                        <Pill className="mr-1 h-3 w-3" />
-                                        {
-                                            medications.filter(
-                                                (m: any) =>
-                                                    m.active !== false &&
-                                                    m.state !== 'ceased',
-                                            ).length
-                                        }{' '}
-                                        active medications
-                                    </Badge>
-                                )}
-                                {conditions.length > 0 && (
-                                    <Badge className="border-white/20 bg-white/10 text-white/90">
-                                        <Heart className="mr-1 h-3 w-3" />
-                                        {conditions.length} condition
-                                        {conditions.length !== 1 ? 's' : ''}
-                                    </Badge>
-                                )}
-                            </div>
-                        </div>
-
-                        <div className="flex flex-wrap gap-2">
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                className="border-white/20 bg-white/10 text-white hover:bg-white/20"
-                                asChild
-                            >
-                                <Link href={`/operations/clients/${client.id}`}>
-                                    <ArrowLeft className="mr-1.5 h-3.5 w-3.5" />
-                                    Back
-                                </Link>
-                            </Button>
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                className="border-white/20 bg-white/10 text-white hover:bg-white/20"
-                                onClick={() =>
-                                    (window.location.href = `/operations/clients/${client.id}/mar`)
-                                }
-                            >
-                                <ClipboardList className="mr-1.5 h-3.5 w-3.5" />
-                                Daily MAR
-                            </Button>
-                        </div>
-                    </div>
-                </div>
 
                 {has_open_controlled_discrepancy && (
                     <div className="flex items-center gap-3 rounded-xl border-2 border-status-warning/30 bg-status-warning-bg p-4">
@@ -3176,7 +3130,7 @@ export default function ClientMedical({
                         </Card>
                     </div>
                 )}
-            </div>
+            </PageLayout>
 
             <Dialog open={closeDiscOpen} onOpenChange={setCloseDiscOpen}>
                 <DialogContent>

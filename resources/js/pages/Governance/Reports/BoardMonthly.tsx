@@ -1,6 +1,8 @@
 import { Head } from '@inertiajs/react';
+import { BarChart3 } from 'lucide-react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -63,12 +65,19 @@ export default function BoardMonthly({ auth, report, generatedAt }: Props) {
     >
       <Head title="Board Monthly Report" />
 
-      <div className="flex flex-col gap-6 p-4 md:p-6">
-        <div className="mb-6 space-y-2">
-          <h1 className="text-3xl font-bold text-foreground">Board Monthly Report</h1>
-          <p className="text-sm text-muted-foreground">A board-ready summary of decisions, delivery, assurance, and organisational controls.</p>
-        </div>
-
+      <PageLayout
+        hero={
+          <PageHero
+            icon={BarChart3}
+            title="Board Monthly Report"
+            description="A board-ready summary of decisions, delivery, assurance, and organisational controls."
+            stats={[
+              { label: 'Sections', value: report.sections.length },
+              { label: 'Headline KPIs', value: report.headline.length },
+            ]}
+          />
+        }
+      >
         <div className="mb-8 grid gap-4 md:grid-cols-2 xl:grid-cols-4">
           {report.headline.map((metric) => (
             <Card key={metric.label}>
@@ -129,7 +138,7 @@ export default function BoardMonthly({ auth, report, generatedAt }: Props) {
         <p className="mt-6 text-right text-sm text-muted-foreground">
           Generated {new Date(generatedAt).toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland' })}
         </p>
-      </div>
+      </PageLayout>
     </AppLayout>
   );
 }

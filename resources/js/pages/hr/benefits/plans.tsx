@@ -26,10 +26,11 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
-import { Plus } from 'lucide-react';
+import { Gift, Plus } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
 interface PlanType {
@@ -111,29 +112,33 @@ export default function BenefitPlans({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Benefit Plans" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">Benefit Plans</h1>
-                        <div className="mt-1 text-sm text-muted-foreground">
-                            Manage available benefit plans for employees
-                        </div>
-                    </div>
-
-                    {can.manage && (
-                        <Button
-                            size="sm"
-                            onClick={() => {
-                                setForm(emptyForm);
-                                setOpen(true);
-                            }}
-                        >
-                            <Plus className="mr-1.5 h-4 w-4" />
-                            New Plan
-                        </Button>
-                    )}
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Gift}
+                        title="Benefit Plans"
+                        description="Manage available benefit plans for employees."
+                        stats={[
+                            { label: 'Plans', value: plans.data.length },
+                            { label: 'Active', value: plans.data.filter((p) => p.is_active).length },
+                        ]}
+                        actions={
+                            can.manage ? (
+                                <Button
+                                    size="sm"
+                                    onClick={() => {
+                                        setForm(emptyForm);
+                                        setOpen(true);
+                                    }}
+                                >
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    New Plan
+                                </Button>
+                            ) : null
+                        }
+                    />
+                }
+            >
                 {/* Filters */}
                 <Card>
                     <CardHeader>
@@ -241,7 +246,7 @@ export default function BenefitPlans({
                 {plans?.links?.length ? (
                     <LaravelPagination links={plans.links} />
                 ) : null}
-            </div>
+            </PageLayout>
 
             {/* Create Plan Dialog */}
             <Dialog open={open} onOpenChange={setOpen}>

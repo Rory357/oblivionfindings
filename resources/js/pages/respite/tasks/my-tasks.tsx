@@ -1,9 +1,11 @@
 import AppLayout from '@/layouts/app-layout';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHero, PageLayout } from '@/components/page';
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import RespiteSubnav from '@/components/respite-subnav';
 import { formatDateTime } from '@/lib/date-format';
 import { Head, Link } from '@inertiajs/react';
+import { ListChecks } from 'lucide-react';
 
 type Props = {
     tasks: any[];
@@ -32,11 +34,20 @@ export default function MyTasks({ tasks }: Props) {
         <AppLayout breadcrumbs={[{ title: 'Respite', href: '/respite' }, { title: 'Tasks', href: '/respite/tasks' }, { title: 'My Tasks', href: '/respite/tasks/my-tasks' }]}>
             <Head title="My Tasks" />
 
-            <div className="space-y-4">
-                <div>
-                    <h1 className="text-lg font-semibold">My Tasks</h1>
-                    <div className="mt-1 text-sm text-muted-foreground">Tasks assigned to you, sorted by priority.</div>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={ListChecks}
+                        title="My Tasks"
+                        description="Tasks assigned to you, sorted by priority."
+                        stats={[
+                            { label: 'Total', value: tasks.length },
+                            { label: 'Urgent', value: tasks.filter((t: any) => t.priority === 'urgent').length },
+                            { label: 'High', value: tasks.filter((t: any) => t.priority === 'high').length },
+                        ]}
+                    />
+                }
+            >
                 <RespiteSubnav />
 
                 <div className="space-y-2">
@@ -74,7 +85,7 @@ export default function MyTasks({ tasks }: Props) {
                         <div className="py-8 text-center text-sm text-muted-foreground">No tasks assigned to you.</div>
                     )}
                 </div>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

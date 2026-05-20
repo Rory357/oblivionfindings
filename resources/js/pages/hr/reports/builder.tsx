@@ -18,9 +18,10 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
-import { Eye, Plus, Save, Trash2 } from 'lucide-react';
+import { Eye, BarChart3, Plus, Save, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 type ReportSource = {
@@ -174,23 +175,27 @@ export default function ReportBuilder({ sources }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Report Builder" />
-            <div className="flex flex-col gap-6 p-6">
-                <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold">Report Builder</h1>
-                    <div className="flex gap-2">
-                        {selectedFields.length > 0 && (
-                            <>
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={BarChart3}
+                        title="Report Builder"
+                        description="Build and save custom HR reports with selected data sources and fields."
+                        actions={
+                            selectedFields.length > 0 ? (
                                 <Button
                                     variant="outline"
                                     onClick={() => setShowSave(!showSave)}
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
                                 >
                                     <Save className="mr-2 h-4 w-4" />
                                     Save Report
                                 </Button>
-                            </>
-                        )}
-                    </div>
-                </div>
+                            ) : null
+                        }
+                    />
+                }
+            >
 
                 {/* Step 1: Select Report Type */}
                 <Card>
@@ -560,7 +565,7 @@ export default function ReportBuilder({ sources }: Props) {
                         </CardContent>
                     </Card>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

@@ -11,6 +11,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { Search, ShieldCheck } from 'lucide-react';
@@ -69,29 +70,26 @@ export default function PolicyAttestations({ attestations, filters }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Policy Attestations" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="flex items-center gap-2 text-lg font-semibold">
-                            <ShieldCheck className="h-5 w-5 text-status-warning" />
-                            Policy Attestations
-                        </h1>
-                        <div className="mt-1 text-sm text-muted-foreground">
-                            Track staff acknowledgement and attestation of
-                            organisational policies
-                        </div>
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Link
-                            href="/hr/policies"
-                            className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
-                        >
-                            Back to Policies
-                        </Link>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={ShieldCheck}
+                        title="Policy Attestations"
+                        description="Track staff acknowledgement and attestation of organisational policies."
+                        stats={[
+                            { label: 'Attestations', value: attestations.data.length },
+                        ]}
+                        actions={
+                            <Link
+                                href="/hr/policies"
+                                className="rounded-md border border-primary-foreground/30 bg-primary-foreground/10 px-3 py-2 text-xs text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20"
+                            >
+                                Back to Policies
+                            </Link>
+                        }
+                    />
+                }
+            >
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-base">Filters</CardTitle>
@@ -173,7 +171,7 @@ export default function PolicyAttestations({ attestations, filters }: Props) {
                 {attestations?.links?.length ? (
                     <LaravelPagination links={attestations.links} />
                 ) : null}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

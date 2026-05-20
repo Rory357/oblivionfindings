@@ -1,6 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
 import {
@@ -79,23 +80,16 @@ export default function ShowSupervision({ note, can }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Supervision Note - ${note.employee.name}`} />
 
-            <div className="max-w-4xl space-y-6">
-                <div className="flex items-center gap-4">
-                    <Link href="/hr/performance">
-                        <Button variant="outline" size="sm">
-                            <ArrowLeft className="mr-2 h-4 w-4" />
-                            Back
-                        </Button>
-                    </Link>
-                    <div>
-                        <h1 className="text-2xl font-bold">Supervision Note</h1>
-                        <p className="text-muted-foreground">
-                            {getSessionTypeLabel(note.session_type)} with{' '}
-                            {note.employee.name}
-                        </p>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/hr/performance"
+                        title="Supervision Note"
+                        description={`${getSessionTypeLabel(note.session_type)} with ${note.employee.name}`}
+                    />
+                }
+            >
                 <div className="flex flex-wrap gap-2">
                     <Badge
                         variant={
@@ -270,7 +264,7 @@ export default function ShowSupervision({ note, can }: Props) {
                         </Link>
                     )}
                 </div>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

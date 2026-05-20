@@ -1,9 +1,10 @@
 import { Head, Link } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
+import { CheckCircle2, XCircle, AlertTriangle } from 'lucide-react';
 import { type BreadcrumbItem } from '@/types';
 
 interface LogEntry {
@@ -68,21 +69,16 @@ export default function BankFeedLogs({ feed, logs }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Bank Feed Logs - ${feed.bank_account_name}`} />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center gap-4 mb-6">
-                    <Button variant="outline" size="sm" asChild>
-                        <Link href="/finance/bank-feeds">
-                            <ArrowLeft className="w-4 h-4 mr-1" />
-                            Back
-                        </Link>
-                    </Button>
-                    <div>
-                        <h1 className="text-3xl font-bold text-foreground">Sync Logs</h1>
-                        <p className="text-muted-foreground mt-1">
-                            {feed.bank_account_name} &middot; {providerLabels[feed.provider] || feed.provider} &middot; {feed.bank_name}
-                        </p>
-                    </div>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/finance/bank-feeds"
+                        title="Sync Logs"
+                        description={`${feed.bank_account_name} · ${providerLabels[feed.provider] || feed.provider} · ${feed.bank_name}`}
+                    />
+                }
+            >
 
                 {logs.data.length === 0 ? (
                     <Card>
@@ -174,7 +170,7 @@ export default function BankFeedLogs({ feed, logs }: Props) {
                         )}
                     </>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

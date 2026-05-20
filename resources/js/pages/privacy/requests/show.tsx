@@ -1,8 +1,9 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import {
     AlertTriangle,
     Calendar,
@@ -97,16 +98,16 @@ export default function ShowDataSubjectRequest({ request: dsr, staff }: Props) {
         >
             <Head title={`DSR ${dsr.reference_number}`} />
 
-            <div className="space-y-4" data-test="privacy-dsr-show">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="flex items-center gap-2 text-lg font-semibold">
-                            {isOverdue && (
-                                <AlertTriangle className="h-5 w-5 text-status-critical" />
-                            )}
-                            {dsr.reference_number}
-                        </h1>
-                        <div className="mt-2 flex flex-wrap gap-2">
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/privacy/requests"
+                        backLabel="Back to List"
+                        title={dsr.reference_number}
+                        description={getRequestTypeLabel(dsr.request_type)}
+                    >
+                        <div className="flex flex-wrap gap-2" data-test="privacy-dsr-show">
                             <Badge
                                 className={getStatusColor(dsr.status)}
                                 data-test="privacy-dsr-status"
@@ -148,15 +149,9 @@ export default function ShowDataSubjectRequest({ request: dsr, staff }: Props) {
                                 </Badge>
                             )}
                         </div>
-                    </div>
-                    <Link
-                        href="/privacy/requests"
-                        className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
-                    >
-                        Back to List
-                    </Link>
-                </div>
-
+                    </PageHero>
+                }
+            >
                 <div className="grid gap-4 lg:grid-cols-2">
                     <Card>
                         <CardHeader>
@@ -401,7 +396,7 @@ export default function ShowDataSubjectRequest({ request: dsr, staff }: Props) {
                         </CardContent>
                     </Card>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

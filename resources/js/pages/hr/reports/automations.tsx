@@ -12,9 +12,11 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
+import { Settings } from 'lucide-react';
 import { useState } from 'react';
 
 interface Option {
@@ -285,19 +287,37 @@ export default function HrAutomationsPage({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="HR Automations" />
-            <div className="flex flex-col gap-6 p-6">
-                <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold">HR Automations</h1>
-                    <div className="flex items-center gap-2">
-                        <Button variant="outline" asChild>
-                            <Link href="/hr/reports/webhooks">Webhooks</Link>
-                        </Button>
-                        <Button variant="outline" asChild>
-                            <Link href="/hr/reports">Back to Reports</Link>
-                        </Button>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={Settings}
+                        title="HR Automations"
+                        description="Configure rules that fire actions when HR events occur."
+                        stats={[
+                            { label: 'Rules', value: rules.length },
+                            { label: 'Active', value: rules.filter((r) => r.is_active).length },
+                        ]}
+                        actions={
+                            <>
+                                <Button
+                                    variant="outline"
+                                    asChild
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                >
+                                    <Link href="/hr/reports/webhooks">Webhooks</Link>
+                                </Button>
+                                <Button
+                                    variant="outline"
+                                    asChild
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                >
+                                    <Link href="/hr/reports">Back to Reports</Link>
+                                </Button>
+                            </>
+                        }
+                    />
+                }
+            >
                 {can.manage && (
                     <Card>
                         <CardHeader>
@@ -1065,7 +1085,7 @@ export default function HrAutomationsPage({
                         </table>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

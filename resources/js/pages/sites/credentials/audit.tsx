@@ -1,9 +1,8 @@
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link } from '@inertiajs/react';
-import { Button } from '@/components/ui/button';
+import { PageHero, PageLayout } from '@/components/page';
+import { Head } from '@inertiajs/react';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
-import { ArrowLeft, History } from 'lucide-react';
 
 type Site = {
     id: number;
@@ -47,23 +46,16 @@ export default function CredentialAudit({ site, credential, logs }: Props) {
         >
             <Head title={`Credential Audit - ${credential.label}`} />
 
-            <div className="m-4 max-w-5xl space-y-4">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <Button asChild variant="ghost" size="sm" className="mb-2">
-                            <Link href={`/sites/${site.id}/credentials`}>
-                                <ArrowLeft className="w-4 h-4 mr-1" />
-                                Back
-                            </Link>
-                        </Button>
-                        <h1 className="text-lg font-semibold flex items-center gap-2">
-                            <History className="w-5 h-5" />
-                            Credential Audit
-                        </h1>
-                        <p className="text-sm text-muted-foreground">{credential.label}</p>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref={`/sites/${site.id}/credentials`}
+                        title="Credential Audit"
+                        description={credential.label}
+                    />
+                }
+            >
                 <Card>
                     <CardHeader>
                         <CardTitle className="text-base">Audit Entries ({logs.data.length})</CardTitle>
@@ -93,7 +85,7 @@ export default function CredentialAudit({ site, credential, logs }: Props) {
                         )}
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

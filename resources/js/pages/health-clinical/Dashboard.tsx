@@ -2,6 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHero, PageLayout } from '@/components/page';
 import { Head, Link } from '@inertiajs/react';
 import {
     Activity,
@@ -116,36 +117,52 @@ export default function Dashboard({
         <AppLayout breadcrumbs={[{ title: 'Health & Clinical', href: '/health-clinical' }, { title: 'Dashboard', href: '/health-clinical' }]}>
             <Head title="Health & Clinical" />
 
-            <div className="flex flex-col gap-6 p-6">
-                {/* Header */}
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Health & Clinical</h1>
-                        <p className="text-sm text-muted-foreground">
-                            Clinical observation compliance and event oversight
-                        </p>
-                    </div>
-                </div>
-
-                {/* Quick Nav */}
-                <div className="flex flex-wrap gap-2">
-                    <Link href="/health-clinical/observations">
-                        <Button variant="outline" size="sm" className="gap-1.5">
-                            <Eye className="h-4 w-4" /> Observation Register
-                        </Button>
-                    </Link>
-                    <Link href="/health-clinical/events">
-                        <Button variant="outline" size="sm" className="gap-1.5">
-                            <AlertTriangle className="h-4 w-4" /> Event Register
-                        </Button>
-                    </Link>
-                    <Link href="/health-clinical/protocols">
-                        <Button variant="outline" size="sm" className="gap-1.5">
-                            <ClipboardList className="h-4 w-4" /> Protocols
-                        </Button>
-                    </Link>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={HeartPulse}
+                        title="Health & Clinical"
+                        description="Clinical observation compliance and event oversight."
+                        stats={[
+                            { label: 'Observations (30d)', value: observation_stats.total_observations },
+                            { label: 'Events (30d)', value: event_stats.total_events },
+                            { label: 'Active Protocols', value: protocol_stats.active_protocols },
+                            { label: 'Pending Follow-ups', value: event_stats.pending_follow_ups },
+                        ]}
+                        actions={
+                            <>
+                                <Link href="/health-clinical/observations">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="gap-1.5 border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                    >
+                                        <Eye className="h-4 w-4" /> Observations
+                                    </Button>
+                                </Link>
+                                <Link href="/health-clinical/events">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="gap-1.5 border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                    >
+                                        <AlertTriangle className="h-4 w-4" /> Events
+                                    </Button>
+                                </Link>
+                                <Link href="/health-clinical/protocols">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="gap-1.5 border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                    >
+                                        <ClipboardList className="h-4 w-4" /> Protocols
+                                    </Button>
+                                </Link>
+                            </>
+                        }
+                    />
+                }
+            >
                 {/* Stats */}
                 <div className="grid grid-cols-2 gap-4 lg:grid-cols-5">
                     <StatCard label="Observations (30d)" value={observation_stats.total_observations} subtitle={`${observation_stats.observations_today} today`} icon={Eye} color="blue" />
@@ -256,7 +273,7 @@ export default function Dashboard({
                         </CardContent>
                     </Card>
                 </div>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

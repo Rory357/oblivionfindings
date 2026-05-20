@@ -9,6 +9,7 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link } from '@inertiajs/react';
@@ -117,36 +118,31 @@ export default function PayslipDetail({ payslip, ytd }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Payslip - ${payslip.user?.name ?? 'Employee'}`} />
-            <div className="flex flex-col gap-6 p-6">
-                {/* Header */}
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-2xl font-bold">
-                            {payslip.user?.name ?? 'Employee'}
-                        </h1>
-                        <div className="mt-1 flex items-center gap-2">
-                            <span className="text-sm text-muted-foreground">
-                                {payslip.pay_period_start} &mdash;{' '}
-                                {payslip.pay_period_end}
-                            </span>
-                            <Badge
-                                variant="outline"
-                                className={config.className}
-                            >
-                                {config.label}
-                            </Badge>
-                        </div>
-                    </div>
-                    <Button variant="outline" size="sm" asChild>
-                        <Link
-                            href={`/hr/payroll/payslips/${payslip.id}/download`}
-                        >
-                            <Download className="mr-1.5 h-3.5 w-3.5" />
-                            Download
-                        </Link>
-                    </Button>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/hr/payroll/payslips"
+                        title={payslip.user?.name ?? 'Employee'}
+                        description={`${payslip.pay_period_start} - ${payslip.pay_period_end}`}
+                        actions={
+                            <>
+                                <Badge variant="outline" className={config.className}>
+                                    {config.label}
+                                </Badge>
+                                <Button variant="outline" size="sm" asChild>
+                                    <Link
+                                        href={`/hr/payroll/payslips/${payslip.id}/download`}
+                                    >
+                                        <Download className="mr-1.5 h-3.5 w-3.5" />
+                                        Download
+                                    </Link>
+                                </Button>
+                            </>
+                        }
+                    />
+                }
+            >
                 {/* Employee Details */}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <Card>
@@ -488,7 +484,7 @@ export default function PayslipDetail({ payslip, ytd }: Props) {
                         </Table>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

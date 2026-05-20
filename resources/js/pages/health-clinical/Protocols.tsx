@@ -10,8 +10,9 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Head, Link, router } from '@inertiajs/react';
-import { Filter, FilePlus2, X } from 'lucide-react';
+import { ClipboardList, Filter, FilePlus2, X } from 'lucide-react';
 import { useState } from 'react';
 
 type PaginatedData<T> = {
@@ -172,76 +173,42 @@ export default function Protocols({
         <AppLayout>
             <Head title="Protocol Management — Health & Clinical" />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">
-                            Protocol Management
-                        </h1>
-                        <p className="text-sm text-muted-foreground">
-                            Manage observation protocols and monitor basic adherence across clients.
-                        </p>
-                    </div>
-                    <div className="flex gap-2">
-                        {can_manage ? (
-                            <Link href="/health-clinical/protocols/create">
-                                <Button size="sm" className="gap-2">
-                                    <FilePlus2 className="h-4 w-4" />
-                                    New Protocol
-                                </Button>
-                            </Link>
-                        ) : null}
-                        <Link href="/health-clinical">
-                            <Button variant="outline" size="sm">
-                                Dashboard
-                            </Button>
-                        </Link>
-                    </div>
-                </div>
-
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-5">
-                    <div className="rounded-xl border bg-status-success-bg p-4">
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-status-success">
-                            Active
-                        </p>
-                        <p className="mt-1 text-2xl font-bold text-status-success">
-                            {stats.active_protocols}
-                        </p>
-                    </div>
-                    <div className="rounded-xl border bg-primary/10 p-4">
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-muted-foreground">
-                            Inactive
-                        </p>
-                        <p className="mt-1 text-2xl font-bold text-foreground">
-                            {stats.inactive_protocols}
-                        </p>
-                    </div>
-                    <div className="rounded-xl border bg-status-info-bg p-4">
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-status-info">
-                            Due Schedules
-                        </p>
-                        <p className="mt-1 text-2xl font-bold text-status-info">
-                            {stats.schedules_due}
-                        </p>
-                    </div>
-                    <div className="rounded-xl border bg-primary/10 p-4">
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-status-critical">
-                            Overdue
-                        </p>
-                        <p className="mt-1 text-2xl font-bold text-status-critical">
-                            {stats.schedules_overdue}
-                        </p>
-                    </div>
-                    <div className="rounded-xl border bg-primary/10 p-4">
-                        <p className="text-[10px] font-semibold uppercase tracking-wider text-primary">
-                            Compliance (30d)
-                        </p>
-                        <p className="mt-1 text-2xl font-bold text-primary">
-                            {stats.compliance_rate_30d}%
-                        </p>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={ClipboardList}
+                        title="Protocol Management"
+                        description="Manage observation protocols and monitor basic adherence across clients."
+                        stats={[
+                            { label: 'Active', value: stats.active_protocols },
+                            { label: 'Due', value: stats.schedules_due },
+                            { label: 'Overdue', value: stats.schedules_overdue },
+                            { label: 'Compliance (30d)', value: `${stats.compliance_rate_30d}%` },
+                        ]}
+                        actions={
+                            <>
+                                {can_manage ? (
+                                    <Link href="/health-clinical/protocols/create">
+                                        <Button size="sm" className="gap-2">
+                                            <FilePlus2 className="h-4 w-4" />
+                                            New Protocol
+                                        </Button>
+                                    </Link>
+                                ) : null}
+                                <Link href="/health-clinical">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                    >
+                                        Dashboard
+                                    </Button>
+                                </Link>
+                            </>
+                        }
+                    />
+                }
+            >
                 <Card>
                     <CardHeader className="pb-3">
                         <CardTitle className="flex items-center gap-2 text-sm">
@@ -497,7 +464,7 @@ export default function Protocols({
                         ) : null}
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

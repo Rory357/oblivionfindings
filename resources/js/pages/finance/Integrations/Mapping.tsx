@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { type BreadcrumbItem } from '@/types';
 import { Head, useForm } from '@inertiajs/react';
 import { Button } from '@/components/ui/button';
@@ -116,24 +117,27 @@ export default function AccountMapping({ integration, localAccounts }: PageProps
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${providerName} Account Mapping`} />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">{providerName} Account Mapping</h1>
-                        <p className="text-muted-foreground">
-                            Map your local chart of accounts to {providerName} accounts for synchronisation
-                        </p>
-                    </div>
-                    <div className="flex items-center gap-3">
-                        <Badge variant="outline">
-                            {mappedCount} / {localAccounts.length} mapped
-                        </Badge>
-                        <Button onClick={handleSubmit} disabled={processing}>
-                            <Save className="mr-2 h-4 w-4" />
-                            {processing ? 'Saving...' : 'Save Mapping'}
-                        </Button>
-                    </div>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/finance/integrations"
+                        title={`${providerName} Account Mapping`}
+                        description={`Map your local chart of accounts to ${providerName} accounts for synchronisation`}
+                        actions={
+                            <>
+                                <Badge variant="outline">
+                                    {mappedCount} / {localAccounts.length} mapped
+                                </Badge>
+                                <Button onClick={handleSubmit} disabled={processing}>
+                                    <Save className="mr-2 h-4 w-4" />
+                                    {processing ? 'Saving...' : 'Save Mapping'}
+                                </Button>
+                            </>
+                        }
+                    />
+                }
+            >
 
                 <Card>
                     <CardHeader>
@@ -220,7 +224,7 @@ export default function AccountMapping({ integration, localAccounts }: PageProps
                         </form>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

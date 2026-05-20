@@ -1,10 +1,12 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import RespiteSubnav from '@/components/respite-subnav';
 import { formatDateTime } from '@/lib/date-format';
 import { Head, Link, router } from '@inertiajs/react';
+import { AlertTriangle } from 'lucide-react';
 
 type Props = {
     notes: { data: any[]; links: any[] };
@@ -19,13 +21,18 @@ export default function DailyNotesWithConcerns({ notes }: Props) {
         ]}>
             <Head title="Notes with Concerns" />
 
-            <div className="space-y-4">
-                <div>
-                    <h1 className="text-lg font-semibold">Notes with Concerns</h1>
-                    <div className="mt-1 text-sm text-muted-foreground">
-                        Daily notes that have recorded concerns.
-                    </div>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={AlertTriangle}
+                        title="Notes with Concerns"
+                        description="Daily notes that have recorded concerns."
+                        stats={[
+                            { label: 'Total', value: notes.data.length },
+                        ]}
+                    />
+                }
+            >
                 <RespiteSubnav />
 
                 <div className="space-y-2">
@@ -77,7 +84,7 @@ export default function DailyNotesWithConcerns({ notes }: Props) {
                         ))}
                     </div>
                 ) : null}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

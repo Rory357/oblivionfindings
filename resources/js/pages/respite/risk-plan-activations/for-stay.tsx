@@ -1,10 +1,12 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import RespiteSubnav from '@/components/respite-subnav';
 import { formatDateTime } from '@/lib/date-format';
 import { Head, Link } from '@inertiajs/react';
+import { Plus } from 'lucide-react';
 
 type Props = {
     stay: any;
@@ -33,20 +35,24 @@ export default function RiskPlanActivationsForStay({ stay, activations, planType
         <AppLayout breadcrumbs={[{ title: 'Respite', href: '/respite' }, { title: 'Risk Plan Activations', href: '/respite/risk-plan-activations' }, { title: 'For Stay', href: '#' }]}>
             <Head title="Risk Plans for Stay" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">
-                            Risk Plans for {stay.client?.first_name} {stay.client?.last_name}
-                        </h1>
-                        <div className="mt-1 text-sm text-muted-foreground">
-                            Stay #{stay.id} — {formatDateTime(stay.check_in)} to {formatDateTime(stay.check_out)}
-                        </div>
-                    </div>
-                    <Link href={`/respite/risk-plan-activations/create?stay_id=${stay.id}`}>
-                        <Button size="sm">New Activation</Button>
-                    </Link>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref={`/respite/stays/${stay.id}`}
+                        title={`Risk Plans for ${stay.client?.first_name ?? ''} ${stay.client?.last_name ?? ''}`.trim()}
+                        description={`Stay #${stay.id} — ${formatDateTime(stay.check_in)} to ${formatDateTime(stay.check_out)}`}
+                        actions={
+                            <Link href={`/respite/risk-plan-activations/create?stay_id=${stay.id}`}>
+                                <Button size="sm" variant="outline">
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    New Activation
+                                </Button>
+                            </Link>
+                        }
+                    />
+                }
+            >
                 <RespiteSubnav />
 
                 <div className="space-y-2">
@@ -75,7 +81,7 @@ export default function RiskPlanActivationsForStay({ stay, activations, planType
                         <div className="py-8 text-center text-sm text-muted-foreground">No risk plan activations for this stay.</div>
                     )}
                 </div>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

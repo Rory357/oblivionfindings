@@ -1,10 +1,12 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import RespiteSubnav from '@/components/respite-subnav';
 import { formatDateTime } from '@/lib/date-format';
 import { Head, Link } from '@inertiajs/react';
+import { Plus } from 'lucide-react';
 
 type Props = {
     stay: any;
@@ -16,18 +18,24 @@ export default function HandoverNotesForStay({ stay, notes }: Props) {
         <AppLayout breadcrumbs={[{ title: 'Respite', href: '/respite' }, { title: 'Handover Notes', href: '/respite/handover-notes' }, { title: 'For Stay', href: '#' }]}>
             <Head title="Handover Notes for Stay" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">
-                            Handover Notes for {stay.client?.first_name} {stay.client?.last_name}
-                        </h1>
-                        <div className="mt-1 text-sm text-muted-foreground">Stay #{stay.id}</div>
-                    </div>
-                    <Link href={`/respite/handover-notes/create?stay_id=${stay.id}`}>
-                        <Button size="sm">New Handover Note</Button>
-                    </Link>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref={`/respite/stays/${stay.id}`}
+                        title={`Handover Notes for ${stay.client?.first_name ?? ''} ${stay.client?.last_name ?? ''}`.trim()}
+                        description={`Stay #${stay.id}`}
+                        actions={
+                            <Link href={`/respite/handover-notes/create?stay_id=${stay.id}`}>
+                                <Button size="sm" variant="outline">
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    New Handover Note
+                                </Button>
+                            </Link>
+                        }
+                    />
+                }
+            >
                 <RespiteSubnav />
 
                 <div className="space-y-2">
@@ -57,7 +65,7 @@ export default function HandoverNotesForStay({ stay, notes }: Props) {
                         <div className="py-8 text-center text-sm text-muted-foreground">No handover notes found for this stay.</div>
                     )}
                 </div>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

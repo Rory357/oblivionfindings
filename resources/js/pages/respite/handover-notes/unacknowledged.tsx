@@ -1,10 +1,12 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import RespiteSubnav from '@/components/respite-subnav';
 import { formatDateTime } from '@/lib/date-format';
 import { Head, Link, router } from '@inertiajs/react';
+import { FileText } from 'lucide-react';
 
 type Props = {
     notes: { data: any[]; links: any[] };
@@ -15,11 +17,18 @@ export default function UnacknowledgedHandoverNotes({ notes }: Props) {
         <AppLayout breadcrumbs={[{ title: 'Respite', href: '/respite' }, { title: 'Handover Notes', href: '/respite/handover-notes' }, { title: 'Unacknowledged', href: '/respite/handover-notes/unacknowledged' }]}>
             <Head title="Unacknowledged Handover Notes" />
 
-            <div className="space-y-4">
-                <div>
-                    <h1 className="text-lg font-semibold">Unacknowledged Handover Notes</h1>
-                    <div className="mt-1 text-sm text-muted-foreground">Handover notes that have not yet been acknowledged by incoming staff.</div>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={FileText}
+                        title="Unacknowledged Handover Notes"
+                        description="Handover notes that have not yet been acknowledged by incoming staff."
+                        stats={[
+                            { label: 'Total', value: notes.data.length },
+                        ]}
+                    />
+                }
+            >
                 <RespiteSubnav />
 
                 <div className="space-y-2">
@@ -71,7 +80,7 @@ export default function UnacknowledgedHandoverNotes({ notes }: Props) {
                         ))}
                     </div>
                 ) : null}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

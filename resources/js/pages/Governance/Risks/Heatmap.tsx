@@ -1,6 +1,8 @@
 import { Head } from '@inertiajs/react';
+import { AlertTriangle } from 'lucide-react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
@@ -43,13 +45,19 @@ export default function RiskHeatmap({ auth, heatmap, trend }: Props) {
     >
       <Head title="Risk Heatmap" />
 
-      <div className="flex flex-col gap-6 p-4 md:p-6">
-          {/* Header */}
-          <div className="mb-6">
-            <h1 className="text-3xl font-bold text-foreground">Risk Heatmap</h1>
-            <p className="text-muted-foreground mt-1">Visual representation of risk distribution</p>
-          </div>
-
+      <PageLayout
+        hero={
+          <PageHero
+            icon={AlertTriangle}
+            title="Risk Heatmap"
+            description="Visual representation of risk distribution across likelihood and impact."
+            stats={[
+              { label: 'Total Risks', value: heatmap.flat().reduce((sum, c) => sum + c.count, 0) },
+              { label: 'Period', value: '12 mo' },
+            ]}
+          />
+        }
+      >
           <div className="grid grid-cols-1 lg:grid-cols-3 gap-6">
             {/* Heatmap */}
             <Card className="lg:col-span-2">
@@ -204,7 +212,7 @@ export default function RiskHeatmap({ auth, heatmap, trend }: Props) {
               </Card>
             </div>
           </div>
-      </div>
+      </PageLayout>
     </AppLayout>
   );
 }

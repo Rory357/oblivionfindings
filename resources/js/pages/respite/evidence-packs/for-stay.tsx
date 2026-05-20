@@ -1,4 +1,5 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
@@ -57,17 +58,16 @@ export default function EvidencePackForStay({ stay, pack }: Props) {
         ]}>
             <Head title="Evidence Pack for Stay" />
 
-            <div className="space-y-4">
-                <div className="flex items-start justify-between gap-3">
-                    <div>
-                        <h1 className="text-lg font-semibold">
-                            Evidence Pack for {stay.client?.first_name} {stay.client?.last_name}
-                        </h1>
-                        <div className="mt-1 text-sm text-muted-foreground">
-                            {formatDateTime(stay.start_date)} &mdash; {formatDateTime(stay.end_date)}
-                        </div>
-                    </div>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref={`/respite/stays/${stay.id}`}
+                        title={`Evidence Pack for ${stay.client?.first_name ?? ''} ${stay.client?.last_name ?? ''}`.trim()}
+                        description={`${formatDateTime(stay.start_date)} — ${formatDateTime(stay.end_date)}`}
+                    />
+                }
+            >
                 <RespiteSubnav />
 
                 {!pack ? (
@@ -216,7 +216,7 @@ export default function EvidencePackForStay({ stay, pack }: Props) {
                         )}
                     </>
                 )}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

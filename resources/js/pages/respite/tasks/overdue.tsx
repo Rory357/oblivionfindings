@@ -1,10 +1,12 @@
 import AppLayout from '@/layouts/app-layout';
+import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import RespiteSubnav from '@/components/respite-subnav';
 import { formatDateTime } from '@/lib/date-format';
 import { Head, Link, router } from '@inertiajs/react';
+import { AlertTriangle } from 'lucide-react';
 
 type Props = {
     tasks: { data: any[]; links: any[] };
@@ -22,11 +24,18 @@ export default function OverdueTasks({ tasks }: Props) {
         <AppLayout breadcrumbs={[{ title: 'Respite', href: '/respite' }, { title: 'Tasks', href: '/respite/tasks' }, { title: 'Overdue', href: '/respite/tasks/overdue' }]}>
             <Head title="Overdue Tasks" />
 
-            <div className="space-y-4">
-                <div>
-                    <h1 className="text-lg font-semibold">Overdue Tasks</h1>
-                    <div className="mt-1 text-sm text-muted-foreground">Tasks that have passed their due date.</div>
-                </div>
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={AlertTriangle}
+                        title="Overdue Tasks"
+                        description="Tasks that have passed their due date."
+                        stats={[
+                            { label: 'Overdue', value: tasks.data.length },
+                        ]}
+                    />
+                }
+            >
                 <RespiteSubnav />
 
                 <div className="space-y-2">
@@ -76,7 +85,7 @@ export default function OverdueTasks({ tasks }: Props) {
                         ))}
                     </div>
                 ) : null}
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

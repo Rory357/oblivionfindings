@@ -2,6 +2,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import {
@@ -241,27 +242,29 @@ export default function ClientTrends({
         <AppLayout>
             <Head title={`Observation Trends — ${clientName}`} />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex flex-col gap-4 sm:flex-row sm:items-start sm:justify-between">
-                    <div>
-                        <h1 className="text-2xl font-bold tracking-tight">Observation Trends</h1>
-                        <p className="text-sm text-muted-foreground">
-                            {clientName} with chartable observation data over time.
-                        </p>
-                    </div>
-                    <div className="flex flex-wrap gap-2">
-                        <Link href={`/health-clinical/clients/${client.id}/summary`}>
-                            <Button variant="outline" size="sm">Health Summary</Button>
-                        </Link>
-                        <Link href={`/operations/clients/${client.id}`}>
-                            <Button variant="outline" size="sm">Client Profile</Button>
-                        </Link>
-                        <Link href={`/health-clinical/observations?client_id=${client.id}`}>
-                            <Button variant="outline" size="sm">Observation Register</Button>
-                        </Link>
-                    </div>
-                </div>
-
+            <PageLayout
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref={`/health-clinical/clients/${client.id}/summary`}
+                        title="Observation Trends"
+                        description={`${clientName} with chartable observation data over time.`}
+                        actions={
+                            <>
+                                <Link href={`/health-clinical/clients/${client.id}/summary`}>
+                                    <Button variant="outline" size="sm">Health Summary</Button>
+                                </Link>
+                                <Link href={`/operations/clients/${client.id}`}>
+                                    <Button variant="outline" size="sm">Client Profile</Button>
+                                </Link>
+                                <Link href={`/health-clinical/observations?client_id=${client.id}`}>
+                                    <Button variant="outline" size="sm">Observation Register</Button>
+                                </Link>
+                            </>
+                        }
+                    />
+                }
+            >
                 <Card>
                     <CardHeader className="pb-3">
                         <CardTitle className="text-base">Date Range</CardTitle>
@@ -404,7 +407,7 @@ export default function ClientTrends({
                         </Link>
                     </CardContent>
                 </Card>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

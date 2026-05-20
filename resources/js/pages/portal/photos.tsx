@@ -1,3 +1,4 @@
+import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -14,7 +15,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
-import { Camera, Upload, X } from 'lucide-react';
+import { Camera, Image as ImageIcon, Upload, X } from 'lucide-react';
 import { FormEvent, useCallback, useRef, useState } from 'react';
 
 type Photo = {
@@ -132,19 +133,24 @@ export default function Photos({
         >
             <Head title={`Photos - ${clientName}`} />
 
-            <div className="flex flex-col gap-6 p-4 md:p-6">
-                <div className="flex items-center justify-between">
-                    <h1 className="text-2xl font-bold tracking-tight">
-                        Photos
-                    </h1>
-                    {canUpload && (
-                        <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
-                            <DialogTrigger asChild>
-                                <Button>
-                                    <Upload className="mr-2 h-4 w-4" />
-                                    Upload Photo
-                                </Button>
-                            </DialogTrigger>
+            <PageLayout
+                hero={
+                    <PageHero
+                        icon={ImageIcon}
+                        title="Photos"
+                        description={`Photos shared with and by ${clientName}'s care team.`}
+                        stats={[
+                            { label: 'Total', value: photos.data.length },
+                        ]}
+                        actions={
+                            canUpload ? (
+                                <Dialog open={uploadOpen} onOpenChange={setUploadOpen}>
+                                    <DialogTrigger asChild>
+                                        <Button>
+                                            <Upload className="mr-2 h-4 w-4" />
+                                            Upload Photo
+                                        </Button>
+                                    </DialogTrigger>
                             <DialogContent>
                                 <DialogHeader>
                                     <DialogTitle>Upload Photo</DialogTitle>
@@ -274,10 +280,12 @@ export default function Photos({
                                     </DialogFooter>
                                 </form>
                             </DialogContent>
-                        </Dialog>
-                    )}
-                </div>
-
+                                </Dialog>
+                            ) : undefined
+                        }
+                    />
+                }
+            >
                 {photos.data.length === 0 ? (
                     <Card>
                         <CardContent className="flex flex-col items-center justify-center py-16">
@@ -394,7 +402,7 @@ export default function Photos({
                         )}
                     </DialogContent>
                 </Dialog>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }

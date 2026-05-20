@@ -2,6 +2,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Textarea } from '@/components/ui/textarea';
+import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
@@ -80,26 +81,29 @@ export default function RespondSurvey({ survey }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Survey: ${survey.title}`} />
-            <div className="mx-auto flex max-w-2xl flex-col gap-6 p-6">
-                <div>
-                    <h1 className="text-2xl font-bold">{survey.title}</h1>
-                    {survey.description && (
-                        <p className="mt-2 text-sm text-muted-foreground">
-                            {survey.description}
-                        </p>
-                    )}
-                    <div className="mt-2 flex gap-2">
-                        {survey.is_anonymous && (
-                            <Badge variant="secondary">Anonymous</Badge>
-                        )}
-                        {survey.ends_at && (
-                            <Badge variant="outline">
-                                Ends: {survey.ends_at}
-                            </Badge>
-                        )}
-                    </div>
-                </div>
-
+            <PageLayout
+                width="narrow"
+                hero={
+                    <PageHero
+                        variant="compact"
+                        backHref="/hr/surveys"
+                        title={survey.title}
+                        description={survey.description ?? undefined}
+                        actions={
+                            <>
+                                {survey.is_anonymous && (
+                                    <Badge variant="secondary">Anonymous</Badge>
+                                )}
+                                {survey.ends_at && (
+                                    <Badge variant="outline">
+                                        Ends: {survey.ends_at}
+                                    </Badge>
+                                )}
+                            </>
+                        }
+                    />
+                }
+            >
                 <form onSubmit={handleSubmit} className="space-y-4">
                     {survey.questions.map((question, index) => (
                         <Card key={question.id}>
@@ -265,7 +269,7 @@ export default function RespondSurvey({ survey }: Props) {
                         </Button>
                     </div>
                 </form>
-            </div>
+            </PageLayout>
         </AppLayout>
     );
 }
