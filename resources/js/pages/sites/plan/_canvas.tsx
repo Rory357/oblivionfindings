@@ -20,6 +20,7 @@ import {
 import { toast } from 'sonner';
 import { DoorSymbol } from './_door';
 import {
+    ROOM_EDGE_WALL_PREFIX,
     inferSwingDirection,
     openingCentreFromTopLeft,
     resolveAttachedOpening,
@@ -378,6 +379,17 @@ export default function PlanCanvas(props: Props) {
         ],
         [layout.doors, layout.windows],
     );
+    // Rooms that have at least one auto-promoted edge wall in layout.walls.
+    // For these we suppress the room rect's own stroke, so the wall is the
+    // single visible boundary and door openings read as clean gaps.
+    const roomsWithEdgeWalls = useMemo(() => {
+        const ids = new Set<string>();
+        for (const wall of layout.walls) {
+            const ownerId = roomIdFromEdgeWallId(wall.id);
+            if (ownerId) ids.add(ownerId);
+        }
+        return ids;
+    }, [layout.walls]);
 
     const svgRef = useRef<SVGSVGElement | null>(null);
     const dragRef = useRef<DragRef | null>(null);
@@ -409,6 +421,11 @@ export default function PlanCanvas(props: Props) {
             if (!editable) return;
             event.preventDefault();
             event.stopPropagation();
+            // Auto-promoted edge wall → present as its parent room.
+            if (ref.type === 'wall') {
+                const ownerRoomId = roomIdFromEdgeWallId(String(ref.id));
+                if (ownerRoomId) ref = { type: 'room', id: ownerRoomId };
+            }
             if (!isRefInSelection(selection, ref)) {
                 dispatch({ type: 'select', ref, additive: false });
             }
@@ -850,6 +867,17 @@ export default function PlanCanvas(props: Props) {
         ) => {
             event.stopPropagation();
             if (!structureInteractive && target.type !== 'pin') return;
+            // Auto-promoted room-edge walls behave as part of their parent
+            // room: grabbing one drags the whole room, not just that wall.
+            if (target.type === 'wall') {
+                const ownerRoomId = roomIdFromEdgeWallId(String(target.id));
+                if (
+                    ownerRoomId &&
+                    layout.rooms.some((room) => room.id === ownerRoomId)
+                ) {
+                    target = { type: 'room', id: ownerRoomId };
+                }
+            }
             if (target.type === 'pin') {
                 const pin = pins.find(
                     (candidate, index) =>
@@ -1628,6 +1656,15 @@ export default function PlanCanvas(props: Props) {
                             editing?.type === 'room' &&
                             String(editing.id) === room.id;
                         const onlySelected = selected && selection.length === 1;
+                        // When the room has edge walls, those walls are the
+                        // visible boundary — don't paint the rect border too,
+                        // or it would close door openings the walls have cut.
+                        const hasEdgeWalls = roomsWithEdgeWalls.has(room.id);
+                        const stroke = selected || pending
+                            ? '#2563eb'
+                            : hasEdgeWalls
+                              ? 'transparent'
+                              : '#334155';
                         return (
                             <g
                                 key={room.id}
@@ -1642,11 +1679,7 @@ export default function PlanCanvas(props: Props) {
                                     width={w}
                                     height={h}
                                     fill={linked ? '#e0f2fe' : '#f8fafc'}
-                                    stroke={
-                                        selected || pending
-                                            ? '#2563eb'
-                                            : '#334155'
-                                    }
+                                    stroke={stroke}
                                     strokeWidth={selected ? 4 : 3}
                                     strokeDasharray={
                                         pending && !selected ? '6 4' : undefined

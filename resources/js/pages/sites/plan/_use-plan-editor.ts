@@ -525,6 +525,11 @@ function reducer(state: EditorState, action: EditorAction): EditorState {
                 : next;
         }
         case 'add_wall': {
+            // Drop duplicate dispatches (e.g. a fast door drag firing multiple
+            // pointermoves before React commits the first add_wall).
+            if (state.layout.walls.some((wall) => wall.id === action.wall.id)) {
+                return state;
+            }
             const next = withDirty({
                 ...state,
                 layout: {
