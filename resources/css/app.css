@@ -174,8 +174,8 @@
     --category-compliance-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 60)) 12%, transparent);
     --category-incidents: var(--status-critical);
     --category-incidents-bg: var(--status-critical-bg);
-    --category-governance: oklch(from var(--primary) l c calc(h + 180));
-    --category-governance-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 180)) 12%, transparent);
+    --category-governance: var(--primary);
+    --category-governance-bg: color-mix(in oklch, var(--primary) 12%, transparent);
     --category-sites: oklch(from var(--primary) l c calc(h + 210));
     --category-sites-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 210)) 12%, transparent);
     --category-fleet: oklch(from var(--primary) l c calc(h + 45));
@@ -251,8 +251,8 @@
     --category-compliance-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 60)) 20%, transparent);
     --category-incidents: var(--status-critical);
     --category-incidents-bg: var(--status-critical-bg);
-    --category-governance: oklch(from var(--primary) l c calc(h + 180));
-    --category-governance-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 180)) 20%, transparent);
+    --category-governance: var(--primary);
+    --category-governance-bg: color-mix(in oklch, var(--primary) 20%, transparent);
     --category-sites: oklch(from var(--primary) l c calc(h + 210));
     --category-sites-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 210)) 20%, transparent);
     --category-fleet: oklch(from var(--primary) l c calc(h + 45));
