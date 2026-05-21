@@ -9,6 +9,7 @@ import { PageHero, PageLayout } from '@/components/page';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { store as storeResolution } from '@/routes/governance/resolutions';
+import { Gavel } from 'lucide-react';
 
 interface MeetingOption {
   id: number;
@@ -53,8 +54,9 @@ export default function CreateResolution({ auth, meetings, selectedMeetingId }: 
       <PageLayout
         hero={
           <PageHero
-            variant="compact"
+            category="governance"
             backHref="/governance/resolutions"
+            icon={Gavel}
             title="New Resolution"
           />
         }

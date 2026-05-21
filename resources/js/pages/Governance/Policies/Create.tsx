@@ -9,6 +9,7 @@ import { PageHero, PageLayout } from '@/components/page';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
+import { BookOpen } from 'lucide-react';
 
 export default function PolicyCreate({ auth }: PageProps) {
   const { data, setData, post, processing, errors } = useForm({
@@ -33,8 +34,9 @@ export default function PolicyCreate({ auth }: PageProps) {
       <PageLayout
         hero={
           <PageHero
-            variant="compact"
+            category="governance"
             backHref="/governance/policies"
+            icon={BookOpen}
             title="Create Governance Policy"
           />
         }

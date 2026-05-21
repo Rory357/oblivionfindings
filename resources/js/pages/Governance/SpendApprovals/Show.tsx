@@ -7,8 +7,12 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { HandCoins, ArrowLeft, Check, X, Send } from 'lucide-react';
+import { HandCoins, ArrowLeft, Check, X, Send, Paperclip } from 'lucide-react';
 import { statusColors } from '@/lib/status-colors';
+import {
+  GovernanceAttachmentsPanel,
+  type GovernanceAttachment,
+} from '@/components/governance/GovernanceAttachmentsPanel';
 
 interface Approval {
   id: number;
@@ -34,13 +38,17 @@ interface Props extends PageProps {
   approval: Approval;
   categories: Record<string, string>;
   threshold: number;
+  attachments: GovernanceAttachment[];
 }
 
 const formatNzd = (amount: number) =>
   new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount || 0);
 
-export default function ShowSpendApproval({ auth, approval, categories, threshold }: Props) {
+export default function ShowSpendApproval({ auth, approval, categories, threshold, attachments }: Props) {
   const can = auth.can?.governance?.spend ?? {};
+  const canManageAttachments = Boolean(
+    can?.request && (approval.status === 'draft' && approval.requestedBy?.id === auth.user?.id || can?.approve),
+  );
   const [decisionDraft, setDecisionDraft] = useState('');
   const [showApprove, setShowApprove] = useState(false);
   const [showReject, setShowReject] = useState(false);
@@ -94,7 +102,6 @@ export default function ShowSpendApproval({ auth, approval, categories, threshol
           <PageHero
             icon={HandCoins}
             category="governance"
-            variant="compact"
             title={approval.title}
             description={`${approval.reference} · ${categories[approval.category] ?? approval.category}`}
             stats={[
@@ -250,6 +257,38 @@ export default function ShowSpendApproval({ auth, approval, categories, threshol
             )}
           </div>
         </div>
+
+        <Card className="mt-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2 text-base">
+              <Paperclip className="h-5 w-5" />
+              Supporting documents
+              <span className="ml-1 text-sm font-normal text-muted-foreground">
+                ({attachments.length})
+              </span>
+            </CardTitle>
+            <p className="mt-1 text-sm text-muted-foreground">
+              Quotes, contracts, invoices, vendor due diligence — the documentary trail behind the
+              spend decision.
+            </p>
+          </CardHeader>
+          <CardContent>
+            <GovernanceAttachmentsPanel
+              canManage={canManageAttachments}
+              attachments={attachments}
+              urls={{
+                upload: `/governance/spend-approvals/${approval.id}/attachments`,
+                delete: (id) => `/governance/spend-approvals/${approval.id}/attachments/${id}`,
+              }}
+              reloadProp="attachments"
+              helperText="PDF, Office, images, CSV / TXT — up to 20 MB each."
+              emptyText={{
+                managed: 'No supporting documents yet. Drop files above to attach one.',
+                readOnly: 'No supporting documents have been attached to this approval.',
+              }}
+            />
+          </CardContent>
+        </Card>
       </PageLayout>
     </AppLayout>
   );

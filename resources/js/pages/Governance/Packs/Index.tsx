@@ -1,4 +1,5 @@
 import { Head, Link, router } from '@inertiajs/react';
+import { useState } from 'react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
@@ -6,8 +7,9 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { EmptyState } from '@/components/ui/empty-state';
-import { FolderOpen, Calendar, ChevronLeft, ChevronRight, ExternalLink } from 'lucide-react';
+import { FolderOpen, Calendar, ChevronLeft, ChevronRight, ExternalLink, Plus } from 'lucide-react';
 import { statusColors } from '@/lib/status-colors';
+import { GenerateBoardPackDialog, type MeetingWithoutPack } from './_dialogs';
 
 interface Pack {
   id: number;
@@ -39,9 +41,14 @@ interface Props extends PageProps {
     distributed: number;
     draft: number;
   };
+  meetings_without_pack: MeetingWithoutPack[];
 }
 
-export default function PacksIndex({ auth, packs, filters, summary }: Props) {
+export default function PacksIndex({ auth, packs, filters, summary, meetings_without_pack }: Props) {
+  const [generateOpen, setGenerateOpen] = useState(false);
+  const canManagePacks =
+    (auth as { can?: { governance?: { packs?: { manage?: boolean } } } })?.can?.governance?.packs?.manage ?? true;
+
   const setStatus = (status: string | null) => {
     router.get('/governance/packs', { status }, { preserveState: true, preserveScroll: true, replace: true });
   };
@@ -62,15 +69,30 @@ export default function PacksIndex({ auth, packs, filters, summary }: Props) {
             icon={FolderOpen}
             category="governance"
             title="Board Packs"
-            description="Generated and distributed board packs across all meetings."
+            description="Board packs are generated from a meeting's agenda, CEO report, resolutions, and attendance — one pack per meeting."
             stats={[
               { label: 'Total', value: summary.total },
               { label: 'Distributed', value: summary.distributed },
               { label: 'Draft', value: summary.draft },
             ]}
+            actions={
+              canManagePacks ? (
+                <Button onClick={() => setGenerateOpen(true)} dusk="generate-board-pack-button">
+                  <Plus className="mr-1.5 h-4 w-4" />
+                  Generate Board Pack
+                </Button>
+              ) : undefined
+            }
           />
         }
       >
+        {canManagePacks && (
+          <GenerateBoardPackDialog
+            isOpen={generateOpen}
+            onClose={() => setGenerateOpen(false)}
+            meetings={meetings_without_pack ?? []}
+          />
+        )}
         <div className="mb-4 flex flex-wrap items-center gap-2">
           <Button variant={!filters.status ? 'default' : 'outline'} size="sm" onClick={() => setStatus(null)}>
             All
@@ -89,11 +111,19 @@ export default function PacksIndex({ auth, packs, filters, summary }: Props) {
           </CardHeader>
           <CardContent className="space-y-2">
             {packs.data.length === 0 ? (
-              <EmptyState
-                icon={FolderOpen}
-                title="No board packs yet"
-                description="Board packs are generated from a scheduled meeting's data once an agenda exists."
-              />
+              <div className="flex flex-col items-center gap-3 py-6">
+                <EmptyState
+                  icon={FolderOpen}
+                  title="No board packs yet"
+                  description="Board packs are generated from a scheduled meeting's agenda, CEO report and resolutions. Pick a meeting to generate one."
+                />
+                {canManagePacks && (
+                  <Button onClick={() => setGenerateOpen(true)}>
+                    <Plus className="mr-1.5 h-4 w-4" />
+                    Generate from a meeting
+                  </Button>
+                )}
+              </div>
             ) : (
               packs.data.map((pack) => (
                 <Link

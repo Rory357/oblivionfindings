@@ -6,10 +6,17 @@ use App\Domain\Governance\Models\ActionItem;
 use App\Domain\Governance\Models\BoardCommittee;
 use App\Domain\Governance\Models\ComplianceObligation;
 use App\Domain\Governance\Models\GovernanceMeeting;
+use App\Domain\Governance\Models\GovernancePolicy;
+use App\Domain\Governance\Models\MeetingMinute;
 use App\Domain\Governance\Models\RiskRegisterEntry;
+use App\Domain\Governance\Models\SpendApproval;
+use App\Domain\Governance\Services\GovernanceAuditService;
+use App\Domain\Governance\Services\GovernanceWorkflowService;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 
 class GovernancePresenter
 {
@@ -88,7 +95,448 @@ class GovernancePresenter
             'cards_by_key' => $cardsByKey->all(),
             'workflow_summary' => $workflow['summary'] ?? ['total' => 0, 'critical' => 0, 'overdue' => 0],
             'role_actions' => $this->roleActions($user),
+            'kpi_band' => $this->buildKpiBand($widgets, $workflow),
+            'next_meeting' => $this->buildNextMeeting($user),
+            'board_pack' => $this->buildBoardPack(),
+            'calendar_events' => $this->buildCalendarEvents(),
+            'timeline' => $this->buildTimeline(),
+            'recently_completed' => $this->buildRecentlyCompleted(),
         ];
+    }
+
+    /**
+     * 4-tile board-friendly KPI band for the top of the cockpit.
+     * Derived from already-aggregated widgets so no extra queries fire.
+     */
+    protected function buildKpiBand(array $widgets, array $workflow): array
+    {
+        $upcomingMeetings = Schema::hasTable('governance_meetings')
+            ? GovernanceMeeting::query()
+                ->where('scheduled_at', '>=', now())
+                ->where('scheduled_at', '<=', now()->addDays(30))
+                ->whereNotIn('status', ['cancelled', 'archived'])
+                ->count()
+            : 0;
+
+        $nextMeeting = Schema::hasTable('governance_meetings')
+            ? GovernanceMeeting::query()
+                ->where('scheduled_at', '>=', now())
+                ->whereNotIn('status', ['cancelled', 'archived'])
+                ->orderBy('scheduled_at')
+                ->first()
+            : null;
+
+        $openActions = (int) ($workflow['summary']['total'] ?? 0);
+        $overdueActions = (int) ($workflow['summary']['overdue'] ?? 0);
+
+        $topRisks = $widgets['top_risks'] ?? [];
+        $risksOverAppetite = (int) ($topRisks['above_appetite'] ?? 0);
+
+        $attestation = $this->policyAttestationPercent();
+
+        return [
+            [
+                'key' => 'upcoming_meetings',
+                'label' => 'Upcoming Meetings',
+                'value' => (string) $upcomingMeetings,
+                'sublabel' => $nextMeeting
+                    ? 'Next: ' . $nextMeeting->scheduled_at->timezone('Pacific/Auckland')->format('j M Y')
+                    : 'No meeting scheduled',
+                'tone' => $upcomingMeetings > 0 ? 'info' : 'muted',
+                'href' => '/governance/meetings',
+            ],
+            [
+                'key' => 'open_actions',
+                'label' => 'Open Actions',
+                'value' => (string) $openActions,
+                'sublabel' => $overdueActions > 0 ? "{$overdueActions} overdue" : 'On track',
+                'tone' => $overdueActions > 0 ? 'critical' : ($openActions > 0 ? 'warning' : 'success'),
+                'href' => '/governance/actions',
+            ],
+            [
+                'key' => 'risks_over_appetite',
+                'label' => 'Risks Over Appetite',
+                'value' => (string) $risksOverAppetite,
+                'sublabel' => $risksOverAppetite > 0 ? 'Review required' : 'Within appetite',
+                'tone' => $risksOverAppetite > 0 ? 'critical' : 'success',
+                'href' => '/governance/risks',
+            ],
+            [
+                'key' => 'policy_attestations',
+                'label' => 'Policy Attestations',
+                'value' => $attestation['percent'] . '%',
+                'sublabel' => $attestation['percent'] >= 90
+                    ? 'Board complete'
+                    : 'Board completion',
+                'tone' => $attestation['percent'] >= 90 ? 'success' : ($attestation['percent'] >= 60 ? 'warning' : 'critical'),
+                'href' => '/governance/policies/attestations',
+            ],
+        ];
+    }
+
+    /**
+     * Policy attestation completion percentage across all active policies.
+     */
+    protected function policyAttestationPercent(): array
+    {
+        if (! Schema::hasTable('policy_attestations') || ! Schema::hasTable('governance_policies')) {
+            return ['percent' => 0, 'required' => 0, 'completed' => 0];
+        }
+
+        $required = DB::table('policy_attestations')->count();
+        $completed = DB::table('policy_attestations')
+            ->whereNotNull('acknowledged_at')
+            ->count();
+
+        $percent = $required > 0 ? (int) round(($completed / $required) * 100) : 0;
+
+        return ['percent' => $percent, 'required' => $required, 'completed' => $completed];
+    }
+
+    /**
+     * Next upcoming meeting with its readiness checklist.
+     */
+    protected function buildNextMeeting(?User $user): ?array
+    {
+        if (! Schema::hasTable('governance_meetings')) {
+            return null;
+        }
+
+        $meeting = GovernanceMeeting::query()
+            ->with(['agendaItems', 'attendances', 'boardPack', 'ceoReport', 'minutes', 'resolutions', 'chair.user', 'secretary.user'])
+            ->where('scheduled_at', '>=', now())
+            ->whereNotIn('status', ['cancelled', 'archived'])
+            ->orderBy('scheduled_at')
+            ->first();
+
+        if (! $meeting) {
+            return null;
+        }
+
+        $checklist = app(GovernanceWorkflowService::class)->meetingChecklist($meeting, $user);
+        $total = count($checklist['items'] ?? []);
+        $done = (int) ($checklist['counts']['done'] ?? 0);
+        $percent = $total > 0 ? (int) round(($done / $total) * 100) : 0;
+
+        return [
+            'meeting' => [
+                'id' => $meeting->id,
+                'title' => $meeting->title,
+                'scheduled_at' => $meeting->scheduled_at?->toIso8601String(),
+                'scheduled_label' => $meeting->scheduled_at?->timezone('Pacific/Auckland')->format('j M Y, g:i A'),
+                'days_until' => $meeting->scheduled_at ? (int) now()->startOfDay()->diffInDays($meeting->scheduled_at->copy()->startOfDay(), false) : null,
+                'status' => $meeting->status,
+                'location' => $meeting->location,
+                'chair' => $meeting->chair?->user?->name,
+                'secretary' => $meeting->secretary?->user?->name,
+                'href' => "/governance/meetings/{$meeting->id}",
+            ],
+            'progress' => [
+                'done' => $done,
+                'total' => $total,
+                'percent' => $percent,
+                'remaining' => (int) ($checklist['counts']['remaining'] ?? 0),
+                'blocked' => (int) ($checklist['counts']['blocked'] ?? 0),
+            ],
+            'checklist' => $checklist['items'] ?? [],
+            'next_step' => $checklist['next_step'] ?? null,
+        ];
+    }
+
+    /**
+     * Board pack readiness for the next upcoming meeting.
+     */
+    protected function buildBoardPack(): ?array
+    {
+        if (! Schema::hasTable('governance_meetings')) {
+            return null;
+        }
+
+        $meeting = GovernanceMeeting::query()
+            ->with(['boardPack'])
+            ->where('scheduled_at', '>=', now())
+            ->whereNotIn('status', ['cancelled', 'archived'])
+            ->orderBy('scheduled_at')
+            ->first();
+
+        if (! $meeting) {
+            return null;
+        }
+
+        $pack = $meeting->boardPack;
+        $distributed = $pack ? count(array_unique($pack->distributed_to ?? [])) : 0;
+        $readCount = $pack?->readCount() ?? 0;
+
+        return [
+            'meeting_id' => $meeting->id,
+            'meeting_title' => $meeting->title,
+            'ready' => $pack !== null,
+            'distributed' => $pack?->distributed_at !== null,
+            'distributed_label' => $pack?->distributed_at?->timezone('Pacific/Auckland')->format('j M g:i A'),
+            'doc_count' => $pack ? (is_array($pack->document_manifest) ? count($pack->document_manifest) : 0) : 0,
+            'distributed_count' => $distributed,
+            'read_count' => $readCount,
+            'href' => $pack ? "/governance/packs/{$pack->id}" : "/governance/meetings/{$meeting->id}",
+            'updated_at' => $pack?->updated_at?->toIso8601String(),
+        ];
+    }
+
+    /**
+     * Calendar feed: upcoming meetings + compliance due dates + policy review dates.
+     */
+    protected function buildCalendarEvents(): array
+    {
+        $events = collect();
+        $start = now()->startOfMonth();
+        $end = now()->copy()->addMonths(2)->endOfMonth();
+
+        if (Schema::hasTable('governance_meetings')) {
+            GovernanceMeeting::query()
+                ->whereBetween('scheduled_at', [$start, $end])
+                ->whereNotIn('status', ['cancelled', 'archived'])
+                ->get()
+                ->each(function (GovernanceMeeting $meeting) use ($events) {
+                    $events->push([
+                        'id' => 'meeting-' . $meeting->id,
+                        'kind' => 'meeting',
+                        'date' => $meeting->scheduled_at?->toDateString(),
+                        'title' => $meeting->title,
+                        'href' => "/governance/meetings/{$meeting->id}",
+                    ]);
+                });
+        }
+
+        if (Schema::hasTable('compliance_obligations')) {
+            ComplianceObligation::query()
+                ->whereBetween('due_date', [$start, $end])
+                ->whereNotIn('status', ['complete'])
+                ->limit(50)
+                ->get()
+                ->each(function (ComplianceObligation $obligation) use ($events) {
+                    $events->push([
+                        'id' => 'compliance-' . $obligation->id,
+                        'kind' => 'compliance',
+                        'date' => $obligation->due_date?->toDateString(),
+                        'title' => $obligation->obligation_title,
+                        'href' => "/governance/compliance/{$obligation->id}",
+                    ]);
+                });
+        }
+
+        if (Schema::hasTable('governance_policies')) {
+            GovernancePolicy::query()
+                ->whereBetween('next_review_date', [$start, $end])
+                ->limit(50)
+                ->get()
+                ->each(function (GovernancePolicy $policy) use ($events) {
+                    $events->push([
+                        'id' => 'policy-' . $policy->id,
+                        'kind' => 'policy',
+                        'date' => $policy->next_review_date?->toDateString(),
+                        'title' => 'Review: ' . ($policy->title ?? $policy->name ?? 'Policy'),
+                        'href' => "/governance/policies/{$policy->id}",
+                    ]);
+                });
+        }
+
+        return $events
+            ->filter(fn (array $event) => ! empty($event['date']))
+            ->sortBy('date')
+            ->values()
+            ->take(80)
+            ->all();
+    }
+
+    /**
+     * What changed since the last completed board meeting.
+     */
+    protected function buildTimeline(): array
+    {
+        $sinceMeeting = Schema::hasTable('governance_meetings')
+            ? GovernanceMeeting::query()
+                ->where('scheduled_at', '<', now())
+                ->whereNotIn('status', ['cancelled'])
+                ->orderByDesc('scheduled_at')
+                ->first()
+            : null;
+
+        $since = $sinceMeeting?->scheduled_at?->copy() ?? now()->subDays(30);
+
+        $events = GovernanceAuditService::recentEventsSince($since, 60);
+
+        $formatted = collect($events)->map(function (array $row) {
+            $createdAt = isset($row['created_at']) ? Carbon::parse($row['created_at']) : null;
+
+            return [
+                'id' => ($row['kind'] ?? 'event') . '-' . ($row['id'] ?? 0),
+                'kind' => $row['kind'] ?? 'event',
+                'actor' => $row['actor_name'] ?? 'System',
+                'type' => $this->humaniseEventType($row['type'] ?? ''),
+                'entity_type' => $this->humaniseEntityType($row['entity_type'] ?? ''),
+                'entity_id' => $row['entity_id'] ?? null,
+                'description' => $row['description'] ?? null,
+                'occurred_at' => $createdAt?->toIso8601String(),
+                'occurred_label' => $createdAt?->timezone('Pacific/Auckland')->format('j M g:i A'),
+                'day' => $createdAt?->timezone('Pacific/Auckland')->format('j M Y'),
+                'href' => $this->entityHref($row['entity_type'] ?? '', $row['entity_id'] ?? null),
+            ];
+        });
+
+        return [
+            'since' => $sinceMeeting ? [
+                'meeting_id' => $sinceMeeting->id,
+                'title' => $sinceMeeting->title,
+                'held_at' => $sinceMeeting->scheduled_at?->toIso8601String(),
+                'held_label' => $sinceMeeting->scheduled_at?->timezone('Pacific/Auckland')->format('j M Y'),
+            ] : null,
+            'events' => $formatted->all(),
+        ];
+    }
+
+    /**
+     * Recently completed items so the board can see what no longer needs action.
+     */
+    protected function buildRecentlyCompleted(): array
+    {
+        $since = now()->subDays(14);
+        $items = collect();
+
+        if (Schema::hasTable('risk_register_entries')) {
+            RiskRegisterEntry::query()
+                ->where('status', 'voided')
+                ->where('closed_at', '>=', $since)
+                ->orderByDesc('closed_at')
+                ->limit(8)
+                ->get()
+                ->each(function (RiskRegisterEntry $risk) use ($items) {
+                    $items->push([
+                        'kind' => 'risk_closed',
+                        'title' => ($risk->risk_reference ? "{$risk->risk_reference} " : '') . $risk->title,
+                        'completed_at' => $risk->closed_at?->toIso8601String(),
+                        'completed_label' => $risk->closed_at?->diffForHumans(),
+                        'href' => "/governance/risks/{$risk->id}",
+                        'owner' => $risk->riskOwner?->name,
+                    ]);
+                });
+        }
+
+        if (Schema::hasTable('action_items')) {
+            ActionItem::query()
+                ->with('assignedTo:id,name')
+                ->where('status', 'completed')
+                ->where('completed_at', '>=', $since)
+                ->orderByDesc('completed_at')
+                ->limit(8)
+                ->get()
+                ->each(function (ActionItem $action) use ($items) {
+                    $items->push([
+                        'kind' => 'action_completed',
+                        'title' => ($action->action_reference ? "{$action->action_reference} " : '') . $action->description,
+                        'completed_at' => $action->completed_at?->toIso8601String(),
+                        'completed_label' => $action->completed_at?->diffForHumans(),
+                        'href' => "/governance/actions/{$action->id}",
+                        'owner' => $action->assignedTo?->name,
+                    ]);
+                });
+        }
+
+        if (Schema::hasTable('meeting_minutes')) {
+            MeetingMinute::query()
+                ->whereIn('status', ['approved', 'signed', 'archived'])
+                ->where('updated_at', '>=', $since)
+                ->orderByDesc('updated_at')
+                ->limit(6)
+                ->get()
+                ->each(function (MeetingMinute $minute) use ($items) {
+                    $items->push([
+                        'kind' => 'minutes_approved',
+                        'title' => 'Minutes ' . $minute->status . ' for meeting #' . $minute->meeting_id,
+                        'completed_at' => $minute->updated_at?->toIso8601String(),
+                        'completed_label' => $minute->updated_at?->diffForHumans(),
+                        'href' => "/governance/meetings/{$minute->meeting_id}?tab=minutes",
+                        'owner' => null,
+                    ]);
+                });
+        }
+
+        if (Schema::hasTable('governance_policies')) {
+            GovernancePolicy::query()
+                ->whereNotNull('approved_at')
+                ->where('approved_at', '>=', $since)
+                ->orderByDesc('approved_at')
+                ->limit(6)
+                ->get()
+                ->each(function (GovernancePolicy $policy) use ($items) {
+                    $items->push([
+                        'kind' => 'policy_signed',
+                        'title' => 'Policy approved: ' . ($policy->title ?? $policy->name ?? 'Policy #' . $policy->id),
+                        'completed_at' => $policy->approved_at?->toIso8601String(),
+                        'completed_label' => $policy->approved_at?->diffForHumans(),
+                        'href' => "/governance/policies/{$policy->id}",
+                        'owner' => null,
+                    ]);
+                });
+        }
+
+        if (Schema::hasTable('spend_approvals')) {
+            SpendApproval::query()
+                ->where('status', SpendApproval::STATUS_APPROVED)
+                ->where('updated_at', '>=', $since)
+                ->orderByDesc('updated_at')
+                ->limit(6)
+                ->get()
+                ->each(function (SpendApproval $approval) use ($items) {
+                    $items->push([
+                        'kind' => 'spend_approved',
+                        'title' => 'Spend approved: ' . ($approval->description ?? 'Request #' . $approval->id),
+                        'completed_at' => $approval->updated_at?->toIso8601String(),
+                        'completed_label' => $approval->updated_at?->diffForHumans(),
+                        'href' => "/governance/spend-approvals/{$approval->id}",
+                        'owner' => null,
+                    ]);
+                });
+        }
+
+        return $items
+            ->sortByDesc('completed_at')
+            ->values()
+            ->take(20)
+            ->all();
+    }
+
+    protected function humaniseEventType(string $type): string
+    {
+        return ucwords(str_replace(['_', '-'], ' ', $type));
+    }
+
+    protected function humaniseEntityType(string $entity): string
+    {
+        $entity = class_basename($entity);
+
+        return ucwords(preg_replace('/(?<!^)([A-Z])/', ' $1', $entity) ?: $entity);
+    }
+
+    protected function entityHref(string $entityType, mixed $entityId): ?string
+    {
+        if (! $entityId) {
+            return null;
+        }
+
+        $name = class_basename($entityType);
+
+        return match ($name) {
+            'GovernanceMeeting' => "/governance/meetings/{$entityId}",
+            'Resolution' => "/governance/resolutions/{$entityId}",
+            'RiskRegisterEntry' => "/governance/risks/{$entityId}",
+            'ComplianceObligation' => "/governance/compliance/{$entityId}",
+            'GovernancePolicy' => "/governance/policies/{$entityId}",
+            'ActionItem' => "/governance/actions/{$entityId}",
+            'BoardPack' => "/governance/packs/{$entityId}",
+            'CeoBoardReport' => "/governance/ceo-reports/{$entityId}",
+            'SpendApproval' => "/governance/spend-approvals/{$entityId}",
+            'Budget' => "/governance/budgets/{$entityId}",
+            default => null,
+        };
     }
 
     public function boardMonthly(array $widgets, array $freshness, array $workflow): array

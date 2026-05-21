@@ -178,10 +178,21 @@ export default function PerformanceShow({ auth, review, can_assess }: Props) {
       <PageLayout
         hero={
           <PageHero
-            variant="compact"
+            category="governance"
             backHref="/governance/performance"
-            title="Performance Review"
+            icon={Target}
+            title={
+              <span className="flex flex-wrap items-center gap-3" dusk="performance-heading">
+                Performance Review
+              </span>
+            }
             description={`${review.reviewee.name} - ${review.review_cycle}`}
+            stats={[
+              { label: 'Status', value: review.status.replace('_', ' ') },
+              { label: 'Rating', value: getRatingLabel(review.overall_rating) },
+              { label: 'Goals', value: review.goals.length },
+              { label: 'KPIs', value: review.kpis.length },
+            ]}
             actions={
               <div className="flex flex-wrap items-center gap-2">
                 <Badge className={getStatusColor(review.status)}>{review.status.replace('_', ' ')}</Badge>

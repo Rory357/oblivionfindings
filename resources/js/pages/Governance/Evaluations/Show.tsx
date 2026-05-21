@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
-import { Play, Lock, CheckCircle } from 'lucide-react';
+import { Play, Lock, CheckCircle, Star } from 'lucide-react';
 import { PageHero, PageLayout } from '@/components/page';
 import { cn } from '@/lib/utils';
 import { governanceStatusColor } from '@/lib/governance-status';
@@ -65,8 +65,9 @@ export default function EvaluationShow({ auth, evaluation, boardMembers, myRespo
       <PageLayout
         hero={
           <PageHero
-            variant="compact"
+            category="governance"
             backHref="/governance/evaluations"
+            icon={Star}
             title={
               <span className="flex flex-wrap items-center gap-3" dusk="evaluation-title">
                 {evaluation.title}
@@ -74,6 +75,12 @@ export default function EvaluationShow({ auth, evaluation, boardMembers, myRespo
               </span>
             }
             description={`Period: ${new Date(evaluation.period_start).toLocaleDateString('en-NZ')} - ${new Date(evaluation.period_end).toLocaleDateString('en-NZ')}`}
+            stats={[
+              { label: 'Status', value: evaluation.status },
+              { label: 'Responses', value: `${responseRate.completed}/${responseRate.total}` },
+              { label: 'Questions', value: evaluation.questions.length },
+              { label: 'Due', value: new Date(evaluation.due_date).toLocaleDateString('en-NZ') },
+            ]}
             actions={
               <>
                 {evaluation.status === 'draft' && <Button onClick={handleLaunch}><Play className="w-4 h-4 mr-2" /> Launch</Button>}

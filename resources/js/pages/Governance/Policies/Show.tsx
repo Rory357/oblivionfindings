@@ -7,7 +7,7 @@ import { Badge } from '@/components/ui/badge';
 import { Checkbox } from '@/components/ui/checkbox';
 import { PageHero, PageLayout } from '@/components/page';
 import { Textarea } from '@/components/ui/textarea';
-import { CheckCircle, Shield } from 'lucide-react';
+import { CheckCircle, Shield, BookOpen } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { governanceStatusColor } from '@/lib/governance-status';
 
@@ -61,10 +61,11 @@ export default function PolicyShow({ auth, policy, attestationStats, canEdit }: 
       <PageLayout
         hero={
           <PageHero
-            variant="compact"
+            category="governance"
             backHref="/governance/policies"
+            icon={BookOpen}
             title={
-              <span className="flex flex-wrap items-center gap-3">
+              <span className="flex flex-wrap items-center gap-3" dusk="policy-heading">
                 {policy.title}
                 <Badge variant="outline">v{policy.version}</Badge>
                 <Badge className={cn('text-xs', getStatusColor(policy.status))}>
@@ -73,6 +74,12 @@ export default function PolicyShow({ auth, policy, attestationStats, canEdit }: 
               </span>
             }
             description={`${policy.category} policy`}
+            stats={[
+              { label: 'Status', value: policy.status.replace('_', ' ') },
+              { label: 'Version', value: `v${policy.version}` },
+              { label: 'Attestations', value: `${attestationStats.completed}/${attestationStats.total_required}` },
+              { label: 'Review', value: new Date(policy.review_date).toLocaleDateString('en-NZ') },
+            ]}
             actions={
               <div className="flex gap-2">
                 {canEdit && policy.status === 'draft' && (

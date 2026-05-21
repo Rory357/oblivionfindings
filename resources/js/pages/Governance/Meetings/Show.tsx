@@ -2,11 +2,13 @@ import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { generate as generatePackRoute, show as showPack } from '@/routes/governance/packs';
-import { create as createResolution, show as showResolution } from '@/routes/governance/resolutions';
+import { show as showResolution } from '@/routes/governance/resolutions';
+import { NewResolutionDialog } from '../Resolutions/_dialogs';
 import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { TabsRoot as Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
+import { TabsContent } from '@/components/ui/tabs';
+import { PageTabs, type PageTabItem } from '@/components/page/page-tabs';
 import { governanceStatusColor } from '@/lib/governance-status';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
 import {
@@ -38,6 +40,8 @@ import {
   Plus,
   Pencil,
   Send,
+  ClipboardList,
+  ListChecks,
 } from 'lucide-react';
 import { PageHero, PageLayout } from '@/components/page';
 import { cn } from '@/lib/utils';
@@ -154,7 +158,8 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
   const [agendaDialogOpen, setAgendaDialogOpen] = useState(false);
   const [attendanceDialogOpen, setAttendanceDialogOpen] = useState(false);
   const [minutesDialogOpen, setMinutesDialogOpen] = useState(false);
-  const validTabs = ['agenda', 'attendance', 'minutes', 'resolutions'];
+  const [newResolutionOpen, setNewResolutionOpen] = useState(false);
+  const validTabs = ['agenda', 'attendance', 'minutes', 'resolutions', 'workflow'];
   const parsedTab = new URLSearchParams(page.url.split('?')[1] ?? '').get('tab');
   const defaultTab = parsedTab && validTabs.includes(parsedTab) ? parsedTab : 'agenda';
   const [activeTab, setActiveTab] = useState(defaultTab);
@@ -347,8 +352,9 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
       <PageLayout
         hero={
           <PageHero
-            variant="compact"
+            category="governance"
             backHref="/governance/meetings"
+            icon={Calendar}
             title={
               <span className="flex flex-wrap items-center gap-3" dusk="meeting-title">
                 {meeting.title}
@@ -375,6 +381,16 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
                 )}
               </div>
             }
+            meta={[
+              { icon: Users, label: `Chair: ${meeting.chair?.user.name ?? 'Unassigned'}` },
+              { icon: Users, label: `Secretary: ${meeting.secretary?.user.name ?? 'Unassigned'}` },
+            ]}
+            stats={[
+              { label: 'Workflow', value: `${workflowChecklist.counts.done}/${workflowChecklist.counts.done + workflowChecklist.counts.remaining + workflowChecklist.counts.blocked}` },
+              { label: 'Quorum', value: `${quorum.present}/${quorum.required}` },
+              { label: 'Agenda', value: agendaItems.length },
+              { label: 'Resolutions', value: resolutions.length },
+            ]}
             actions={
               <>
                 {canEdit && (
@@ -405,17 +421,42 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
             </div>
           )}
 
-          <div className="grid grid-cols-1 lg:grid-cols-12 gap-6 items-start">
-            {/* Main Area (Left Column): 8/12 width */}
-            <div className="lg:col-span-8 space-y-6">
-              {/* Tabs */}
-              <Tabs value={activeTab} onValueChange={setActiveTab} className="space-y-6">
-                <TabsList>
-                  <TabsTrigger value="agenda">Agenda</TabsTrigger>
-                  <TabsTrigger value="attendance" dusk="meeting-tab-attendance">Attendance</TabsTrigger>
-                  <TabsTrigger value="minutes" dusk="meeting-tab-minutes">Minutes</TabsTrigger>
-                  <TabsTrigger value="resolutions">Resolutions</TabsTrigger>
-                </TabsList>
+          <NewResolutionDialog
+            isOpen={newResolutionOpen}
+            onClose={() => setNewResolutionOpen(false)}
+            meetings={[
+              {
+                id: meeting.id,
+                title: meeting.title,
+                scheduled_at: meeting.scheduled_at,
+              },
+            ]}
+            meetingId={meeting.id}
+            lockMeeting
+          />
+
+          {/* Meeting Status Strip — replaces the right-rail info cards. */}
+          <MeetingStatusStrip
+            meeting={meeting}
+            quorum={quorum}
+            workflowChecklist={workflowChecklist}
+            resolutions={resolutions}
+            attendances={attendances}
+          />
+
+          <div className="space-y-6">
+            {/* Tabs (Sites-style PageTabs) */}
+            <PageTabs
+              value={activeTab}
+              onValueChange={setActiveTab}
+              items={[
+                { value: 'agenda', label: `Agenda (${agendaItems.length})`, icon: FileText, 'data-test': 'meeting-tab-agenda' },
+                { value: 'attendance', label: 'Attendance', icon: Users, 'data-test': 'meeting-tab-attendance' },
+                { value: 'minutes', label: 'Minutes', icon: Pencil, 'data-test': 'meeting-tab-minutes' },
+                { value: 'resolutions', label: `Resolutions (${resolutions.length})`, icon: Vote, 'data-test': 'meeting-tab-resolutions' },
+                { value: 'workflow', label: 'Workflow', icon: ListChecks, 'data-test': 'meeting-tab-workflow' },
+              ] as PageTabItem[]}
+            >
 
                 {/* ========== AGENDA TAB ========== */}
                 <TabsContent value="agenda">
@@ -838,11 +879,13 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
                   <Card>
                     <CardHeader className="flex flex-row items-center justify-between">
                       <CardTitle>Resolutions</CardTitle>
-                      <Button size="sm" asChild>
-                        <Link href={createResolution.url({ query: { meeting_id: meeting.id } })}>
-                          <Plus className="w-4 h-4 mr-1" />
-                          New Resolution
-                        </Link>
+                      <Button
+                        size="sm"
+                        onClick={() => setNewResolutionOpen(true)}
+                        dusk="new-resolution-button"
+                      >
+                        <Plus className="w-4 h-4 mr-1" />
+                        New Resolution
                       </Button>
                     </CardHeader>
                     <CardContent>
@@ -873,100 +916,202 @@ export default function MeetingShow({ auth, meeting, boardMembers, quorum, canEd
                     </CardContent>
                   </Card>
                 </TabsContent>
-              </Tabs>
-            </div>
-
-            {/* Sidebar Area (Right Column): 4/12 width */}
-            <div className="lg:col-span-4 space-y-6">
-              <Card dusk="meeting-workflow-checklist-card">
-                <CardHeader className="pb-3">
-                  <CardTitle>Meeting Workflow</CardTitle>
-                  <CardDescription>Step-by-step checklist for this meeting cycle.</CardDescription>
-                </CardHeader>
-                <CardContent>
-                  <div className="mb-3 flex flex-wrap gap-2">
-                    <Badge variant="outline">{workflowChecklist.counts.done} complete</Badge>
-                    {workflowChecklist.counts.remaining > 0 && (
-                      <Badge className="bg-status-warning-bg text-status-warning border-status-warning/30">
-                        {workflowChecklist.counts.remaining} remaining
-                      </Badge>
-                    )}
-                    {workflowChecklist.counts.blocked > 0 && (
-                      <Badge className="bg-status-critical-bg text-status-critical border-status-critical/30">
-                        {workflowChecklist.counts.blocked} blocked
-                      </Badge>
-                    )}
-                  </div>
-
-                  {workflowChecklist.next_step && (
-                    <div className="mb-4 rounded-lg border border-status-info/30 bg-status-info-bg p-3">
-                      <p className="text-xs font-medium uppercase tracking-wide text-status-info">Next Step</p>
-                      <p className="font-semibold text-status-info">{workflowChecklist.next_step.label}</p>
-                      <p className="text-sm text-status-info">{workflowChecklist.next_step.detail}</p>
+              {/* ========== WORKFLOW TAB ========== */}
+              <TabsContent value="workflow">
+                <Card dusk="meeting-workflow-checklist-card">
+                  <CardHeader className="pb-3">
+                    <div className="flex flex-wrap items-start justify-between gap-3">
+                      <div>
+                        <CardTitle>Meeting Workflow</CardTitle>
+                        <CardDescription>Step-by-step checklist for this meeting cycle.</CardDescription>
+                      </div>
+                      <div className="flex flex-wrap gap-2">
+                        <Badge variant="outline">{workflowChecklist.counts.done} complete</Badge>
+                        {workflowChecklist.counts.remaining > 0 && (
+                          <Badge className="bg-status-warning-bg text-status-warning border-status-warning/30">
+                            {workflowChecklist.counts.remaining} remaining
+                          </Badge>
+                        )}
+                        {workflowChecklist.counts.blocked > 0 && (
+                          <Badge className="bg-status-critical-bg text-status-critical border-status-critical/30">
+                            {workflowChecklist.counts.blocked} blocked
+                          </Badge>
+                        )}
+                      </div>
                     </div>
-                  )}
+                  </CardHeader>
+                  <CardContent className="space-y-4">
+                    {workflowChecklist.next_step && (
+                      <div className="rounded-lg border border-primary/30 bg-primary/10 p-4">
+                        <p className="text-xs font-medium uppercase tracking-wide text-primary">Next Step</p>
+                        <p className="mt-1 text-base font-semibold text-foreground">{workflowChecklist.next_step.label}</p>
+                        <p className="mt-0.5 text-sm text-muted-foreground">{workflowChecklist.next_step.detail}</p>
+                        {workflowChecklist.next_step.action_url && (
+                          <Button asChild size="sm" className="mt-3">
+                            <Link href={workflowChecklist.next_step.action_url}>{workflowChecklist.next_step.action_label}</Link>
+                          </Button>
+                        )}
+                      </div>
+                    )}
 
-                  <div className="space-y-2">
-                    {workflowChecklist.items.map((item) => (
-                      <div key={item.key} className="flex flex-col gap-2 rounded-lg border p-3" dusk={`workflow-item-${item.key}`}>
-                        <div className="space-y-1">
-                          <div className="flex items-center justify-between gap-2">
-                            <p className="font-medium text-foreground">{item.label}</p>
-                            <Badge className={getChecklistStatusColor(item.status)} dusk={`workflow-status-${item.key}`}>{item.status.replace('_', ' ')}</Badge>
+                    <div className="grid grid-cols-1 gap-3 md:grid-cols-2 xl:grid-cols-3">
+                      {workflowChecklist.items.map((item) => (
+                        <div
+                          key={item.key}
+                          className="flex h-full flex-col gap-2 rounded-lg border p-4"
+                          dusk={`workflow-item-${item.key}`}
+                        >
+                          <div className="flex items-start justify-between gap-2">
+                            <p className="font-medium leading-snug text-foreground">{item.label}</p>
+                            <Badge className={cn('shrink-0', getChecklistStatusColor(item.status))} dusk={`workflow-status-${item.key}`}>
+                              {item.status.replace('_', ' ')}
+                            </Badge>
                           </div>
                           <p className="text-sm text-muted-foreground">{item.detail}</p>
                           {item.blocked_by && (
-                            <p className="text-xs text-status-critical">Blocked by: {item.blocked_by}</p>
+                            <p className="text-xs italic text-status-critical">Blocked by: {item.blocked_by}</p>
                           )}
+                          <div className="mt-auto pt-2">
+                            <Button
+                              size="sm"
+                              variant={item.status === 'done' ? 'ghost' : item.status === 'blocked' ? 'outline' : 'outline'}
+                              asChild
+                              className="w-full"
+                              disabled={item.status === 'blocked'}
+                            >
+                              <Link href={item.action_url}>{item.action_label}</Link>
+                            </Button>
+                          </div>
                         </div>
-                        <div className="flex justify-end mt-1">
-                          <Button size="sm" variant="outline" asChild className="w-full">
-                            <Link href={item.action_url}>{item.action_label}</Link>
-                          </Button>
-                        </div>
-                      </div>
-                    ))}
-                  </div>
-                </CardContent>
-              </Card>
-
-              {/* Info Cards */}
-              <div className="grid grid-cols-1 sm:grid-cols-2 lg:grid-cols-1 gap-4">
-                <Card dusk="meeting-info-chair-card">
-                  <CardContent className="pt-6">
-                    <p className="text-sm text-muted-foreground font-medium mb-1">Chair</p>
-                    <p className="font-semibold text-foreground">{meeting.chair?.user.name || 'Not assigned'}</p>
+                      ))}
+                    </div>
                   </CardContent>
                 </Card>
-                <Card dusk="meeting-info-secretary-card">
-                  <CardContent className="pt-6">
-                    <p className="text-sm text-muted-foreground font-medium mb-1">Secretary</p>
-                    <p className="font-semibold text-foreground">{meeting.secretary?.user.name || 'Not assigned'}</p>
-                  </CardContent>
-                </Card>
-                {meetingCockpit.cards.map((card) => (
-                  <Card key={card.key} dusk={`meeting-info-card-${card.key}`}>
-                    <CardContent className="pt-6 space-y-2">
-                      <div className="flex items-center justify-between gap-2">
-                        <p className="text-sm text-muted-foreground font-medium">{card.title}</p>
-                        <Badge className={getChecklistStatusColor(card.status === 'warning' ? 'blocked' : card.status)}>
-                          {card.status.replace('_', ' ')}
-                        </Badge>
-                      </div>
-                      <p className="font-semibold text-foreground">{card.value}</p>
-                      <p className="text-sm text-muted-foreground">{card.detail}</p>
-                      <div className="flex justify-start">
-                        <Button variant="ghost" size="sm" className="px-0 hover:bg-transparent text-status-info font-medium" asChild>
-                          <Link href={card.href}>Open</Link>
-                        </Button>
-                      </div>
-                    </CardContent>
-                  </Card>
-                ))}
-              </div>
-            </div>
+              </TabsContent>
+            </PageTabs>
           </div>
       </PageLayout>
     </AppLayout>
+  );
+}
+
+/**
+ * Strip of meeting status mini-cards rendered under the hero. Surfaces
+ * Chair, Secretary, CEO Report, Board Pack, Quorum, Pending Resolutions,
+ * Minutes and Previous Follow-through so the board can scan the meeting
+ * state in one row without scrolling.
+ */
+function MeetingStatusStrip({
+  meeting,
+  quorum,
+  workflowChecklist,
+  resolutions,
+  attendances,
+}: {
+  meeting: {
+    id: number;
+    chair: { user: { name: string } } | null;
+    secretary: { user: { name: string } } | null;
+    board_pack: { distributed_at: string | null } | null;
+    minutes: { status: string } | null;
+  };
+  quorum: { present: number; required: number; met: boolean };
+  workflowChecklist: { items: Array<{ key: string; status: string }> };
+  resolutions: Array<{ status: string }>;
+  attendances: Array<{ status: string }>;
+}) {
+  const ceoStep = workflowChecklist.items.find((i) => i.key === 'ceo_report');
+  const followStep = workflowChecklist.items.find((i) => i.key === 'follow_through');
+
+  const minuteStatus = meeting.minutes?.status ?? null;
+  const minuteValue = minuteStatus
+    ? minuteStatus.charAt(0).toUpperCase() + minuteStatus.slice(1)
+    : 'Not drafted';
+
+  const packDistributed = Boolean(meeting.board_pack?.distributed_at);
+  const packPresent = Boolean(meeting.board_pack);
+  const packValue = packDistributed ? 'Distributed' : packPresent ? 'Generated' : 'Not started';
+  const pendingResolutions = resolutions.filter((r) => ['draft', 'open'].includes(r.status)).length;
+
+  const presentAttendees = attendances.filter((a) => a.status === 'present').length;
+
+  type Tile = { label: string; value: string; tone: 'success' | 'info' | 'warning' | 'critical' | 'muted' };
+  const tiles: Tile[] = [
+    {
+      label: 'Chair',
+      value: meeting.chair?.user.name ?? 'Unassigned',
+      tone: meeting.chair ? 'info' : 'warning',
+    },
+    {
+      label: 'Secretary',
+      value: meeting.secretary?.user.name ?? 'Unassigned',
+      tone: meeting.secretary ? 'info' : 'warning',
+    },
+    {
+      label: 'CEO Report',
+      value: ceoStep?.status === 'done' ? 'Submitted' : ceoStep?.status === 'blocked' ? 'Blocked' : 'Pending',
+      tone: ceoStep?.status === 'done' ? 'success' : ceoStep?.status === 'blocked' ? 'critical' : 'warning',
+    },
+    {
+      label: 'Board Pack',
+      value: packValue,
+      tone: packDistributed ? 'success' : packPresent ? 'info' : 'warning',
+    },
+    {
+      label: 'Quorum',
+      value: `${quorum.present}/${quorum.required}`,
+      tone: quorum.met ? 'success' : presentAttendees > 0 ? 'info' : 'warning',
+    },
+    {
+      label: 'Pending Resolutions',
+      value: String(pendingResolutions),
+      tone: pendingResolutions > 0 ? 'warning' : 'success',
+    },
+    {
+      label: 'Minutes',
+      value: minuteValue,
+      tone: ['signed', 'approved', 'archived'].includes(minuteStatus ?? '')
+        ? 'success'
+        : minuteStatus
+          ? 'info'
+          : 'warning',
+    },
+    {
+      label: 'Previous Follow-through',
+      value: followStep?.status === 'done' ? 'Reviewed' : 'Open items',
+      tone: followStep?.status === 'done' ? 'success' : 'warning',
+    },
+  ];
+
+  const TONE_VALUE: Record<Tile['tone'], string> = {
+    success: 'text-status-success',
+    info: 'text-foreground',
+    warning: 'text-status-warning',
+    critical: 'text-status-critical',
+    muted: 'text-muted-foreground',
+  };
+
+  return (
+    <div
+      className="grid gap-3 md:grid-cols-2 lg:grid-cols-4 xl:grid-cols-4"
+      dusk="meeting-status-strip"
+    >
+      {tiles.map((t) => (
+        <Card key={t.label}>
+          <CardContent className="p-4">
+            <p className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{t.label}</p>
+            <p
+              className={cn(
+                'mt-1 truncate text-sm font-semibold leading-snug',
+                TONE_VALUE[t.tone],
+              )}
+              title={t.value}
+            >
+              {t.value}
+            </p>
+          </CardContent>
+        </Card>
+      ))}
+    </div>
   );
 }

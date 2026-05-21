@@ -46,8 +46,9 @@ export default function CreateCompliance({ auth }: Props) {
       <PageLayout
         hero={
           <PageHero
-            variant="compact"
+            category="governance"
             backHref="/governance/compliance"
+            icon={Shield}
             title="New Compliance Obligation"
             description="Register a regulatory or framework obligation"
           />

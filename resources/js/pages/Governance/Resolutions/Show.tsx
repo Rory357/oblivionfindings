@@ -9,10 +9,14 @@ import { Badge } from '@/components/ui/badge';
 import { PageHero, PageLayout } from '@/components/page';
 import { RadioGroup, RadioGroupItem } from '@/components/ui/radio-group';
 import { Textarea } from '@/components/ui/textarea';
-import { CheckCircle, XCircle, MinusCircle, AlertTriangle } from 'lucide-react';
+import { CheckCircle, XCircle, MinusCircle, AlertTriangle, Paperclip, Gavel } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 import axios from 'axios';
+import {
+  GovernanceAttachmentsPanel,
+  type GovernanceAttachment,
+} from '@/components/governance/GovernanceAttachmentsPanel';
 
 interface Vote {
   id: number;
@@ -86,9 +90,10 @@ interface Props extends PageProps {
   my_vote: Vote | null;
   can_vote: boolean;
   quorum: { present: number; required: number; met: boolean } | null;
+  attachments: GovernanceAttachment[];
 }
 
-export default function ResolutionShow({ auth, resolution, results, my_vote, can_vote, quorum }: Props) {
+export default function ResolutionShow({ auth, resolution, results, my_vote, can_vote, quorum, attachments }: Props) {
   const [selectedVote, setSelectedVote] = useState<string>('');
   const [conflictNote, setConflictNote] = useState('');
   const [submitting, setSubmitting] = useState(false);
@@ -188,10 +193,21 @@ export default function ResolutionShow({ auth, resolution, results, my_vote, can
       <PageLayout
         hero={
           <PageHero
-            variant="compact"
+            category="governance"
             backHref="/governance/resolutions"
-            title={resolution.title}
+            icon={Gavel}
+            title={
+              <span className="flex flex-wrap items-center gap-3" dusk="resolution-heading">
+                {resolution.title}
+              </span>
+            }
             description={resolution.resolution_reference}
+            stats={[
+              { label: 'Status', value: resolution.status },
+              { label: 'Outcome', value: resolution.outcome ?? 'Pending' },
+              { label: 'For', value: resolution.vote_summary?.for ?? 0 },
+              { label: 'Against', value: resolution.vote_summary?.against ?? 0 },
+            ]}
             actions={
               <div className="flex flex-wrap items-center gap-2">
                 <Badge className={cn(
@@ -463,6 +479,38 @@ export default function ResolutionShow({ auth, resolution, results, my_vote, can
               </CardContent>
             </Card>
           )}
+
+          <Card className="mt-6">
+            <CardHeader>
+              <CardTitle className="flex items-center gap-2">
+                <Paperclip className="h-5 w-5" />
+                Supporting documents
+                <span className="ml-1 text-sm font-normal text-muted-foreground">
+                  ({attachments.length})
+                </span>
+              </CardTitle>
+              <CardDescription>
+                Background analyses, draft contracts, legal opinions and other papers
+                the board should review alongside this resolution.
+              </CardDescription>
+            </CardHeader>
+            <CardContent>
+              <GovernanceAttachmentsPanel
+                canManage={!!canManage}
+                attachments={attachments}
+                urls={{
+                  upload: `/governance/resolutions/${resolution.id}/attachments`,
+                  delete: (id) => `/governance/resolutions/${resolution.id}/attachments/${id}`,
+                }}
+                reloadProp="attachments"
+                helperText="PDF, Office, images, CSV / TXT — up to 20 MB each."
+                emptyText={{
+                  managed: 'No supporting documents yet. Drop files above to attach one.',
+                  readOnly: 'No supporting documents have been attached to this resolution.',
+                }}
+              />
+            </CardContent>
+          </Card>
       </PageLayout>
     </AppLayout>
   );

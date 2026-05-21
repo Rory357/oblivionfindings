@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { UserCheck } from 'lucide-react';
+import { UserCheck, Target } from 'lucide-react';
 import { PageHero, PageLayout } from '@/components/page';
 
 interface Review {
@@ -52,8 +52,9 @@ export default function EditPerformance({ auth, review }: { auth: any; review: R
             <PageLayout
                 hero={
                     <PageHero
-                        variant="compact"
+                        category="governance"
                         backHref={`/governance/performance/${review.id}`}
+                        icon={Target}
                         title="Edit Performance Review"
                         description={`${review.review_cycle} Review`}
                     />

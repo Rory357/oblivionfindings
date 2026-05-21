@@ -2,6 +2,7 @@
 
 namespace App\Domain\Governance\Services;
 
+use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Schema;
 
@@ -124,5 +125,58 @@ class GovernanceAuditService
         $sub = DB::query()->fromSub($union, 'audit')->orderByDesc('created_at');
 
         return $sub->paginate($perPage);
+    }
+
+    /**
+     * Recent audit + change events since a given timestamp (newest first).
+     * Used by the dashboard "what changed since last meeting" timeline.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public static function recentEventsSince(Carbon $since, int $limit = 100): array
+    {
+        if (! Schema::hasTable('governance_audit_log') || ! Schema::hasTable('governance_change_log')) {
+            return [];
+        }
+
+        $actions = DB::table('governance_audit_log as a')
+            ->leftJoin('users as u', 'u.id', '=', 'a.user_id')
+            ->where('a.created_at', '>=', $since)
+            ->select([
+                DB::raw("'action' as kind"),
+                'a.id',
+                'a.user_id',
+                DB::raw('u.name as actor_name'),
+                DB::raw('a.action as type'),
+                DB::raw('a.resource_type as entity_type'),
+                DB::raw('a.resource_id as entity_id'),
+                DB::raw('NULL as description'),
+                'a.created_at',
+            ]);
+
+        $changes = DB::table('governance_change_log as c')
+            ->leftJoin('users as u', 'u.id', '=', 'c.user_id')
+            ->where('c.created_at', '>=', $since)
+            ->select([
+                DB::raw("'change' as kind"),
+                'c.id',
+                'c.user_id',
+                DB::raw('u.name as actor_name'),
+                DB::raw('c.change_type as type'),
+                'c.entity_type',
+                'c.entity_id',
+                'c.description',
+                'c.created_at',
+            ]);
+
+        $union = $actions->unionAll($changes);
+
+        return DB::query()
+            ->fromSub($union, 'events')
+            ->orderByDesc('created_at')
+            ->limit($limit)
+            ->get()
+            ->map(fn ($row) => (array) $row)
+            ->all();
     }
 }

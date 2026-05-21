@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { DollarSign } from 'lucide-react';
+import { DollarSign, Wallet } from 'lucide-react';
 import { PageHero, PageLayout } from '@/components/page';
 
 interface Budget {
@@ -46,8 +46,9 @@ export default function EditBudget({ auth, budget }: { auth: any; budget: Budget
             <PageLayout
                 hero={
                     <PageHero
-                        variant="compact"
+                        category="governance"
                         backHref={`/governance/budgets/${budget.id}`}
+                        icon={Wallet}
                         title="Edit Budget"
                         description={budget.title || `FY${budget.fiscal_year}`}
                     />

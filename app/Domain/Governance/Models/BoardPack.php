@@ -27,6 +27,7 @@ class BoardPack extends Model
         'distributed_to',
         'download_tracking',
         'read_tracking',
+        'supplementary_attachments',
     ];
 
     protected $casts = [
@@ -36,6 +37,7 @@ class BoardPack extends Model
         'distributed_to' => 'array',
         'download_tracking' => 'array',
         'read_tracking' => 'array',
+        'supplementary_attachments' => 'array',
     ];
 
     public function meeting(): BelongsTo

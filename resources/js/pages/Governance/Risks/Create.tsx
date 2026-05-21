@@ -9,6 +9,7 @@ import { PageHero, PageLayout } from '@/components/page';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { store as storeRisk } from '@/routes/governance/risks';
+import { ShieldAlert } from 'lucide-react';
 
 interface Props extends PageProps {
   categories: Array<{ value: string; label: string }>;
@@ -46,8 +47,9 @@ export default function CreateRisk({ auth }: Props) {
       <PageLayout
         hero={
           <PageHero
-            variant="compact"
+            category="governance"
             backHref="/governance/risks"
+            icon={ShieldAlert}
             title="New Risk"
           />
         }

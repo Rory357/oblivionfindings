@@ -8,6 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { PageHero, PageLayout } from '@/components/page';
+import { FileText } from 'lucide-react';
 
 interface Meeting {
   id: number;
@@ -36,8 +37,9 @@ export default function CeoReportCreate({ auth, meetings }: Props) {
       <PageLayout
         hero={
           <PageHero
-            variant="compact"
+            category="governance"
             backHref="/governance/ceo-reports"
+            icon={FileText}
             title="Create CEO Board Report"
             description="Compose a new CEO update for the board"
           />

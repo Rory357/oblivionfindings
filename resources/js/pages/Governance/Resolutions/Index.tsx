@@ -1,14 +1,16 @@
 import { Head, Link } from '@inertiajs/react';
+import { useState } from 'react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
-import { index as resolutionsIndex, create as createResolution, show as showResolution } from '@/routes/governance/resolutions';
+import { index as resolutionsIndex, show as showResolution } from '@/routes/governance/resolutions';
 import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
-import { Vote, Clock, AlertCircle, CheckCircle, Gavel } from 'lucide-react';
+import { Vote, Clock, AlertCircle, CheckCircle, Gavel, Plus } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { governanceStatusColor } from '@/lib/governance-status';
+import { NewResolutionDialog, type MeetingOption } from './_dialogs';
 
 interface Resolution {
   id: number;
@@ -29,9 +31,11 @@ interface Props extends PageProps {
     links: Array<{ url: string | null; label: string; active: boolean }>;
   };
   my_pending_votes: Resolution[];
+  meetings: MeetingOption[];
 }
 
-export default function ResolutionsIndex({ auth, resolutions, my_pending_votes }: Props) {
+export default function ResolutionsIndex({ auth, resolutions, my_pending_votes, meetings }: Props) {
+  const [newResolutionOpen, setNewResolutionOpen] = useState(false);
   const getStatusColor = (status: string) => governanceStatusColor(status);
 
   const getOutcomeBadge = (outcome: string | null) => {
@@ -69,13 +73,19 @@ export default function ResolutionsIndex({ auth, resolutions, my_pending_votes }
               { label: 'Carried', value: resolutions.data.filter((r) => r.outcome === 'carried').length },
             ]}
             actions={
-              <Button asChild>
-                <Link href={createResolution.url()}>New Resolution</Link>
+              <Button onClick={() => setNewResolutionOpen(true)} dusk="new-resolution-button">
+                <Plus className="mr-1.5 h-4 w-4" />
+                New Resolution
               </Button>
             }
           />
         }
       >
+          <NewResolutionDialog
+            isOpen={newResolutionOpen}
+            onClose={() => setNewResolutionOpen(false)}
+            meetings={meetings ?? []}
+          />
           {/* Pending Votes Alert */}
           {my_pending_votes.length > 0 && (
             <Card className="mb-6 border-status-warning/30 bg-status-warning-bg">

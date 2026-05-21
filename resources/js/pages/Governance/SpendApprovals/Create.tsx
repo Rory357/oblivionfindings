@@ -50,7 +50,6 @@ export default function CreateSpendApproval({ auth, categories, thresholds }: Pr
           <PageHero
             icon={HandCoins}
             category="governance"
-            variant="compact"
             title="Request Spend Approval"
             description="Submit a spend item for board or finance-committee sign-off."
             actions={

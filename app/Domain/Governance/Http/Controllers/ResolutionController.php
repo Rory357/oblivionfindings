@@ -13,6 +13,8 @@ use App\Http\Controllers\Controller;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 
 class ResolutionController extends Controller
@@ -43,9 +45,14 @@ class ResolutionController extends Controller
 
         $resolutions = $query->orderByDesc('created_at')->paginate(20);
 
+        $meetings = GovernanceMeeting::query()
+            ->orderByDesc('scheduled_at')
+            ->get(['id', 'title', 'scheduled_at']);
+
         return Inertia::render('Governance/Resolutions/Index', [
             'resolutions' => $resolutions,
             'my_pending_votes' => $this->getMyPendingVotes(),
+            'meetings' => $meetings,
         ]);
     }
 
@@ -73,6 +80,7 @@ class ResolutionController extends Controller
             'quorum' => $resolution->governance_meeting_id
                 ? $this->votingService->calculateQuorum($resolution->governance_meeting_id)
                 : null,
+            'attachments' => $this->presentAttachments($resolution),
         ]);
     }
 
@@ -254,5 +262,129 @@ class ResolutionController extends Controller
         return $this->votingService
             ->getPendingVotes($boardMember->id)
             ->toArray();
+    }
+
+    /**
+     * Upload supporting documents (analyses, briefings, draft contracts) for
+     * a resolution. These attach to the JSON column and travel with the
+     * resolution when the board reviews it.
+     */
+    public function attachFiles(Request $request, Resolution $resolution)
+    {
+        $this->authorize('update', $resolution);
+
+        $request->validate([
+            'files' => 'required|array|min:1|max:10',
+            'files.*' => [
+                'required',
+                'file',
+                'max:20480', // 20 MB per file
+                'mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,jpg,jpeg,png,gif,webp,csv,txt,md',
+            ],
+        ]);
+
+        $existing = is_array($resolution->attachments) ? $resolution->attachments : [];
+
+        foreach ($request->file('files') as $file) {
+            $directory = "governance/resolutions/{$resolution->id}";
+            $extension = $file->getClientOriginalExtension() ?: $file->extension();
+            $storedName = Str::uuid()->toString() . ($extension ? ".{$extension}" : '');
+            $path = $file->storeAs($directory, $storedName, 'local');
+
+            $existing[] = [
+                'id' => Str::uuid()->toString(),
+                'path' => $path,
+                'original_name' => $file->getClientOriginalName(),
+                'mime_type' => $file->getMimeType(),
+                'size_bytes' => $file->getSize(),
+                'uploaded_at' => now()->toIso8601String(),
+                'uploaded_by_id' => auth()->id(),
+                'uploaded_by_name' => auth()->user()?->name,
+            ];
+        }
+
+        $resolution->update(['attachments' => $existing]);
+
+        GovernanceAuditService::log(
+            'resolution.attachment_added',
+            'Resolution',
+            $resolution->id,
+            ['count' => count($request->file('files'))],
+        );
+
+        return $request->wantsJson()
+            ? response()->json(['attachments' => $this->presentAttachments($resolution->fresh())])
+            : redirect()->back()->with('success', 'Attachment(s) added.');
+    }
+
+    public function deleteAttachment(Request $request, Resolution $resolution, string $attachment)
+    {
+        $this->authorize('update', $resolution);
+
+        $existing = is_array($resolution->attachments) ? $resolution->attachments : [];
+        $target = collect($existing)->firstWhere('id', $attachment);
+
+        if (! $target) {
+            abort(404, 'Attachment not found.');
+        }
+
+        if (isset($target['path']) && Storage::disk('local')->exists($target['path'])) {
+            Storage::disk('local')->delete($target['path']);
+        }
+
+        $remaining = array_values(
+            array_filter($existing, fn (array $row) => ($row['id'] ?? null) !== $attachment),
+        );
+
+        $resolution->update(['attachments' => $remaining]);
+
+        GovernanceAuditService::log(
+            'resolution.attachment_removed',
+            'Resolution',
+            $resolution->id,
+            ['attachment_id' => $attachment, 'original_name' => $target['original_name'] ?? null],
+        );
+
+        return $request->wantsJson()
+            ? response()->json(['attachments' => $this->presentAttachments($resolution->fresh())])
+            : redirect()->back()->with('success', 'Attachment removed.');
+    }
+
+    public function downloadAttachment(Resolution $resolution, string $attachment)
+    {
+        $this->authorize('view', $resolution);
+
+        $existing = is_array($resolution->attachments) ? $resolution->attachments : [];
+        $target = collect($existing)->firstWhere('id', $attachment);
+
+        if (! $target || empty($target['path']) || ! Storage::disk('local')->exists($target['path'])) {
+            abort(404, 'Attachment not found.');
+        }
+
+        return Storage::disk('local')->download(
+            $target['path'],
+            $target['original_name'] ?? 'attachment',
+            ['Content-Type' => $target['mime_type'] ?? 'application/octet-stream'],
+        );
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    protected function presentAttachments(Resolution $resolution): array
+    {
+        $existing = is_array($resolution->attachments) ? $resolution->attachments : [];
+
+        return collect($existing)->map(fn (array $row) => [
+            'id' => $row['id'] ?? null,
+            'original_name' => $row['original_name'] ?? 'attachment',
+            'mime_type' => $row['mime_type'] ?? null,
+            'size_bytes' => $row['size_bytes'] ?? null,
+            'uploaded_at' => $row['uploaded_at'] ?? null,
+            'uploaded_by_name' => $row['uploaded_by_name'] ?? null,
+            'download_url' => isset($row['id'])
+                ? "/governance/resolutions/{$resolution->id}/attachments/{$row['id']}/download"
+                : null,
+        ])->all();
     }
 }

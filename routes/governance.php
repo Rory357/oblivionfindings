@@ -85,11 +85,15 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
         Route::get('/packs', [BoardPackController::class, 'index'])->name('packs.index');
         Route::get('/packs/{pack}', [BoardPackController::class, 'show'])->name('packs.show');
         Route::get('/packs/{pack}/download', [BoardPackController::class, 'download'])->name('packs.download');
+        Route::get('/packs/{pack}/attachments/{attachment}/download', [BoardPackController::class, 'downloadAttachment'])->name('packs.attachments.download');
         Route::post('/packs/{pack}/read', [BoardPackController::class, 'markAsRead'])->name('packs.read');
 
         Route::middleware('permission:governance.packs.manage')->group(function () {
             Route::post('/meetings/{meeting}/packs', [BoardPackController::class, 'generate'])->name('packs.generate');
             Route::post('/packs/{pack}/distribute', [BoardPackController::class, 'distribute'])->name('packs.distribute');
+            Route::post('/packs/{pack}/regenerate', [BoardPackController::class, 'regenerate'])->name('packs.regenerate');
+            Route::post('/packs/{pack}/attachments', [BoardPackController::class, 'attachFiles'])->name('packs.attachments.store');
+            Route::delete('/packs/{pack}/attachments/{attachment}', [BoardPackController::class, 'deleteAttachment'])->name('packs.attachments.destroy');
         });
     });
     
@@ -98,18 +102,21 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
         Route::get('/resolutions', [ResolutionController::class, 'index'])->name('resolutions.index');
         Route::get('/resolutions/create', [ResolutionController::class, 'create'])->name('resolutions.create');
         Route::get('/resolutions/{resolution}', [ResolutionController::class, 'show'])->name('resolutions.show');
-        
+        Route::get('/resolutions/{resolution}/attachments/{attachment}/download', [ResolutionController::class, 'downloadAttachment'])->name('resolutions.attachments.download');
+
         Route::middleware('permission:governance.resolutions.vote')->group(function () {
             Route::post('/resolutions/{resolution}/vote', [ResolutionController::class, 'vote'])->name('resolutions.vote');
             Route::post('/resolutions/{resolution}/conflict', [ResolutionController::class, 'declareConflict'])->name('resolutions.conflict.declare');
         });
-        
+
         Route::middleware('permission:governance.resolutions.manage')->group(function () {
             Route::post('/resolutions', [ResolutionController::class, 'store'])->name('resolutions.store');
             Route::put('/resolutions/{resolution}', [ResolutionController::class, 'update'])->name('resolutions.update');
             Route::post('/resolutions/{resolution}/open', [ResolutionController::class, 'openVoting'])->name('resolutions.open');
             Route::post('/resolutions/{resolution}/close', [ResolutionController::class, 'closeVoting'])->name('resolutions.close');
             Route::post('/resolutions/{resolution}/finalize', [ResolutionController::class, 'finalize'])->name('resolutions.finalize');
+            Route::post('/resolutions/{resolution}/attachments', [ResolutionController::class, 'attachFiles'])->name('resolutions.attachments.store');
+            Route::delete('/resolutions/{resolution}/attachments/{attachment}', [ResolutionController::class, 'deleteAttachment'])->name('resolutions.attachments.destroy');
         });
     });
 
@@ -131,6 +138,7 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
         Route::get('/risks/{risk}', [RiskRegisterController::class, 'show'])->name('risks.show');
         
         Route::get('/risks/{risk}/edit', [RiskRegisterController::class, 'edit'])->name('risks.edit');
+        Route::get('/risks/{risk}/treatments/{treatment}/attachments/{attachment}/download', [RiskRegisterController::class, 'downloadTreatmentAttachment'])->name('risks.treatments.attachments.download');
 
         Route::middleware('permission:governance.risks.manage')->group(function () {
             Route::post('/risks', [RiskRegisterController::class, 'store'])->name('risks.store');
@@ -139,6 +147,8 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
             Route::post('/risks/{risk}/close', [RiskRegisterController::class, 'close'])->name('risks.close');
             Route::post('/risks/{risk}/treatments', [RiskRegisterController::class, 'addTreatment'])->name('risks.treatments.add');
             Route::post('/risks/{risk}/link-event', [RiskRegisterController::class, 'linkEvent'])->name('risks.events.link');
+            Route::post('/risks/{risk}/treatments/{treatment}/attachments', [RiskRegisterController::class, 'attachTreatmentFiles'])->name('risks.treatments.attachments.store');
+            Route::delete('/risks/{risk}/treatments/{treatment}/attachments/{attachment}', [RiskRegisterController::class, 'deleteTreatmentAttachment'])->name('risks.treatments.attachments.destroy');
         });
     });
     
@@ -260,12 +270,17 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
     Route::middleware('permission:governance.ceo-reports.view')->group(function () {
         Route::get('/ceo-reports', [\App\Domain\Governance\Http\Controllers\CeoBoardReportController::class, 'index'])->name('ceo-reports.index');
         Route::get('/ceo-reports/create', [\App\Domain\Governance\Http\Controllers\CeoBoardReportController::class, 'create'])->name('ceo-reports.create');
+        Route::get('/ceo-reports/kpi-snapshot', [\App\Domain\Governance\Http\Controllers\CeoBoardReportController::class, 'kpiSnapshot'])->name('ceo-reports.kpi-snapshot');
         Route::get('/ceo-reports/{report}', [\App\Domain\Governance\Http\Controllers\CeoBoardReportController::class, 'show'])->name('ceo-reports.show');
+        Route::get('/ceo-reports/{report}/attachments/{attachment}/download', [\App\Domain\Governance\Http\Controllers\CeoBoardReportController::class, 'downloadAttachment'])->name('ceo-reports.attachments.download');
 
         Route::middleware('permission:governance.ceo-reports.manage')->group(function () {
             Route::post('/ceo-reports', [\App\Domain\Governance\Http\Controllers\CeoBoardReportController::class, 'store'])->name('ceo-reports.store');
             Route::put('/ceo-reports/{report}', [\App\Domain\Governance\Http\Controllers\CeoBoardReportController::class, 'update'])->name('ceo-reports.update');
             Route::post('/ceo-reports/{report}/submit', [\App\Domain\Governance\Http\Controllers\CeoBoardReportController::class, 'submit'])->name('ceo-reports.submit');
+            Route::post('/ceo-reports/{report}/present', [\App\Domain\Governance\Http\Controllers\CeoBoardReportController::class, 'markPresented'])->name('ceo-reports.present');
+            Route::post('/ceo-reports/{report}/attachments', [\App\Domain\Governance\Http\Controllers\CeoBoardReportController::class, 'attachFiles'])->name('ceo-reports.attachments.store');
+            Route::delete('/ceo-reports/{report}/attachments/{attachment}', [\App\Domain\Governance\Http\Controllers\CeoBoardReportController::class, 'deleteAttachment'])->name('ceo-reports.attachments.destroy');
         });
     });
 
@@ -357,12 +372,15 @@ Route::middleware(['auth'])->prefix('governance')->name('governance.')->group(fu
         Route::get('/spend-approvals', [SpendApprovalController::class, 'index'])->name('spend-approvals.index');
         Route::get('/spend-approvals/create', [SpendApprovalController::class, 'create'])->name('spend-approvals.create');
         Route::get('/spend-approvals/{approval}', [SpendApprovalController::class, 'show'])->name('spend-approvals.show');
+        Route::get('/spend-approvals/{approval}/attachments/{attachment}/download', [SpendApprovalController::class, 'downloadAttachment'])->name('spend-approvals.attachments.download');
 
         Route::middleware('permission:governance.spend.request')->group(function () {
             Route::get('/spend-approvals/{approval}/edit', [SpendApprovalController::class, 'edit'])->name('spend-approvals.edit');
             Route::post('/spend-approvals', [SpendApprovalController::class, 'store'])->name('spend-approvals.store');
             Route::put('/spend-approvals/{approval}', [SpendApprovalController::class, 'update'])->name('spend-approvals.update');
             Route::post('/spend-approvals/{approval}/submit', [SpendApprovalController::class, 'submit'])->name('spend-approvals.submit');
+            Route::post('/spend-approvals/{approval}/attachments', [SpendApprovalController::class, 'attachFiles'])->name('spend-approvals.attachments.store');
+            Route::delete('/spend-approvals/{approval}/attachments/{attachment}', [SpendApprovalController::class, 'deleteAttachment'])->name('spend-approvals.attachments.destroy');
         });
 
         Route::middleware('permission:governance.spend.approve')->group(function () {

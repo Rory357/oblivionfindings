@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle, CardDescription } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
-import { CheckCircle, Clock, AlertTriangle, User } from 'lucide-react';
+import { CheckCircle, Clock, AlertTriangle, User, ClipboardList } from 'lucide-react';
 import { PageHero, PageLayout } from '@/components/page';
 import { cn } from '@/lib/utils';
 import { governanceStatusColor } from '@/lib/governance-status';
@@ -90,16 +90,23 @@ export default function ActionItemShow({ auth, action }: Props) {
       <PageLayout
         hero={
           <PageHero
-            variant="compact"
+            category="governance"
             backHref="/governance/actions"
+            icon={ClipboardList}
             title={
-              <span className="flex flex-wrap items-center gap-3">
+              <span className="flex flex-wrap items-center gap-3" dusk="action-heading">
                 {action.action_reference}
                 <Badge className={cn(getStatusColor(action.status))}>{action.status}</Badge>
                 <Badge className={cn(getPriorityColor(action.priority))}>{action.priority}</Badge>
               </span>
             }
             description={action.description}
+            stats={[
+              { label: 'Status', value: action.status },
+              { label: 'Priority', value: action.priority },
+              { label: 'Due', value: formatDate(action.due_date) },
+              { label: 'Assignee', value: action.assigned_to?.name ?? 'Unassigned' },
+            ]}
           />
         }
       >

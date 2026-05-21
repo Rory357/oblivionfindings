@@ -7,10 +7,14 @@ import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/com
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Progress } from '@/components/ui/progress';
-import { CheckCircle, Clock, FileDown, Files, ShieldAlert, Users } from 'lucide-react';
+import { CheckCircle, Clock, FileDown, Files, FolderOpen, Paperclip, RotateCw, ShieldAlert, Users } from 'lucide-react';
 import { PageHero, PageLayout } from '@/components/page';
 import { cn } from '@/lib/utils';
 import axios from 'axios';
+import {
+  GovernanceAttachmentsPanel,
+  type GovernanceAttachment,
+} from '@/components/governance/GovernanceAttachmentsPanel';
 
 interface Props extends PageProps {
   pack: {
@@ -45,9 +49,10 @@ interface Props extends PageProps {
     read_rate: number;
     download_rate: number;
   };
+  supplementaryAttachments: GovernanceAttachment[];
 }
 
-export default function PackShow({ auth, pack, is_distributed, manifestSections, contentSections, distributionStats }: Props) {
+export default function PackShow({ auth, pack, is_distributed, manifestSections, contentSections, distributionStats, supplementaryAttachments }: Props) {
   const [distributing, setDistributing] = useState(false);
   const canManagePack = !!auth.can?.governance?.packs?.manage;
 
@@ -80,32 +85,73 @@ export default function PackShow({ auth, pack, is_distributed, manifestSections,
       <PageLayout
         hero={
           <PageHero
-            variant="compact"
-            backHref="/governance/meetings"
-            title={<span dusk="pack-heading">Board Pack</span>}
-            description={
-              <>
-                {pack.meeting.title}
-                <span className="mt-1 block text-xs">
-                  Generated {new Date(pack.generated_at).toLocaleString('en-NZ', { timeZone: 'Pacific/Auckland' })}
-                </span>
-              </>
+            category="governance"
+            backHref="/governance/packs"
+            icon={FolderOpen}
+            title={
+              <span className="flex flex-wrap items-center gap-3" dusk="pack-heading">
+                Board Pack
+                <Badge
+                  className={cn(
+                    'border text-xs uppercase',
+                    is_distributed
+                      ? 'border-status-success/30 bg-status-success-bg text-status-success'
+                      : 'border-status-warning/30 bg-status-warning-bg text-status-warning',
+                  )}
+                >
+                  {is_distributed ? 'Distributed' : 'Draft'}
+                </Badge>
+              </span>
             }
+            description={
+              <span className="flex flex-col gap-1">
+                <span className="font-medium">{pack.meeting.title}</span>
+                <span className="text-xs">
+                  Generated{' '}
+                  {new Date(pack.generated_at).toLocaleString('en-NZ', {
+                    timeZone: 'Pacific/Auckland',
+                  })}
+                </span>
+              </span>
+            }
+            stats={[
+              { label: 'Sections', value: manifestSections.length },
+              { label: 'Recipients', value: distributionStats.intended_recipients },
+              { label: 'Read', value: distributionStats.read_count },
+              { label: 'Downloads', value: distributionStats.download_count },
+            ]}
             actions={
-              <>
+              <div className="flex flex-wrap items-center gap-2">
+                {canManagePack && (
+                  <Button
+                    variant="outline"
+                    onClick={() =>
+                      router.post(`/governance/packs/${pack.id}/regenerate`, {}, { preserveScroll: true })
+                    }
+                    dusk="regenerate-pack"
+                  >
+                    <RotateCw className="mr-2 h-4 w-4" />
+                    Regenerate
+                  </Button>
+                )}
                 {canManagePack && !is_distributed && (
-                  <Button variant="outline" onClick={distributePack} disabled={distributing} dusk="distribute-pack">
+                  <Button
+                    variant="outline"
+                    onClick={distributePack}
+                    disabled={distributing}
+                    dusk="distribute-pack"
+                  >
                     <Users className="mr-2 h-4 w-4" />
-                    {distributing ? 'Distributing...' : 'Distribute Pack'}
+                    {distributing ? 'Distributing…' : 'Distribute pack'}
                   </Button>
                 )}
                 <Button asChild>
                   <Link href={downloadPack.url({ pack: pack.id })} dusk="download-pack">
                     <FileDown className="mr-2 h-4 w-4" />
-                    Download Pack
+                    Download pack
                   </Link>
                 </Button>
-              </>
+              </div>
             }
           />
         }
@@ -191,6 +237,38 @@ export default function PackShow({ auth, pack, is_distributed, manifestSections,
             </CardContent>
           </Card>
         </div>
+
+        <Card className="mb-6">
+          <CardHeader>
+            <CardTitle className="flex items-center gap-2">
+              <Paperclip className="h-5 w-5" />
+              Supplementary documents
+              <span className="ml-1 text-sm font-normal text-muted-foreground">
+                ({supplementaryAttachments.length})
+              </span>
+            </CardTitle>
+            <CardDescription>
+              Manually-uploaded papers that travel with this pack — legal opinions, external
+              reports, late additions. The auto-generated sections above are unaffected.
+            </CardDescription>
+          </CardHeader>
+          <CardContent>
+            <GovernanceAttachmentsPanel
+              canManage={canManagePack}
+              attachments={supplementaryAttachments}
+              urls={{
+                upload: `/governance/packs/${pack.id}/attachments`,
+                delete: (id) => `/governance/packs/${pack.id}/attachments/${id}`,
+              }}
+              reloadProp="supplementaryAttachments"
+              helperText="PDF, Office, images, CSV / TXT — up to 20 MB each. These do not change the audit checksum."
+              emptyText={{
+                managed: 'No supplementary documents yet. Drop files above to attach one.',
+                readOnly: 'No supplementary documents are attached to this pack.',
+              }}
+            />
+          </CardContent>
+        </Card>
 
         <Card>
           <CardHeader>

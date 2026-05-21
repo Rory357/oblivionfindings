@@ -9,6 +9,7 @@ import { PageHero, PageLayout } from '@/components/page';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { store as storeStrategy } from '@/routes/governance/strategy';
+import { Compass } from 'lucide-react';
 
 export default function CreateStrategy({ auth }: PageProps) {
   const { data, setData, post, processing, errors } = useForm({
@@ -38,8 +39,9 @@ export default function CreateStrategy({ auth }: PageProps) {
       <PageLayout
         hero={
           <PageHero
-            variant="compact"
+            category="governance"
             backHref="/governance/strategy"
+            icon={Compass}
             title="New Strategic Plan"
           />
         }

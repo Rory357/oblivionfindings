@@ -64,7 +64,6 @@ export default function EditSpendApproval({ auth, approval, categories, threshol
           <PageHero
             icon={HandCoins}
             category="governance"
-            variant="compact"
             title={`Edit ${approval.reference}`}
             description="Update the draft. You can only edit while the request is in draft state."
             actions={

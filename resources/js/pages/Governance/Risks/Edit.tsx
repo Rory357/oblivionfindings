@@ -7,6 +7,7 @@ import { Label } from '@/components/ui/label';
 import { PageHero, PageLayout } from '@/components/page';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { ShieldAlert } from 'lucide-react';
 
 interface Risk {
     id: number;
@@ -51,8 +52,9 @@ export default function EditRisk({ auth, risk }: { auth: any; risk: Risk }) {
             <PageLayout
                 hero={
                     <PageHero
-                        variant="compact"
+                        category="governance"
                         backHref="/governance/risks"
+                        icon={ShieldAlert}
                         title="Edit Risk"
                         description={risk.title}
                     />

@@ -54,7 +54,6 @@ export default function DocumentShow({ auth, document }: Props) {
           <PageHero
             icon={FolderOpen}
             category="governance"
-            variant="compact"
             title={document.title}
             description={document.description ?? 'Governance document'}
             badges={[

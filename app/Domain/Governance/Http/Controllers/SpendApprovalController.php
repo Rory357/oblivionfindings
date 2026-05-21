@@ -8,6 +8,8 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -111,6 +113,7 @@ class SpendApprovalController extends Controller
             'approval' => $approval,
             'categories' => SpendApproval::categories(),
             'threshold' => SpendApproval::thresholdFor($approval->category),
+            'attachments' => $this->presentAttachments($approval),
         ]);
     }
 
@@ -237,5 +240,134 @@ class SpendApprovalController extends Controller
         $count = SpendApproval::whereYear('created_at', $year)->count() + 1;
 
         return sprintf('SA-%s-%04d', $year, $count);
+    }
+
+    /**
+     * Upload supporting documents (quotes, contracts, invoices, due diligence)
+     * for a spend approval. Critical for board audit of money decisions.
+     */
+    public function attachFiles(Request $request, SpendApproval $approval): RedirectResponse|Response|\Illuminate\Http\JsonResponse
+    {
+        // Drafts can be edited by their requester; submitted approvals lock
+        // edits to manage-level users (handled by route middleware).
+        if ($approval->status === SpendApproval::STATUS_DRAFT && $approval->requested_by !== auth()->id()) {
+            abort(403, 'Only the requester can attach documents to a draft.');
+        }
+
+        $request->validate([
+            'files' => 'required|array|min:1|max:10',
+            'files.*' => [
+                'required',
+                'file',
+                'max:20480',
+                'mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,jpg,jpeg,png,gif,webp,csv,txt,md',
+            ],
+        ]);
+
+        $existing = is_array($approval->attachments) ? $approval->attachments : [];
+
+        foreach ($request->file('files') as $file) {
+            $directory = "governance/spend-approvals/{$approval->id}";
+            $extension = $file->getClientOriginalExtension() ?: $file->extension();
+            $storedName = Str::uuid()->toString() . ($extension ? ".{$extension}" : '');
+            $path = $file->storeAs($directory, $storedName, 'local');
+
+            $existing[] = [
+                'id' => Str::uuid()->toString(),
+                'path' => $path,
+                'original_name' => $file->getClientOriginalName(),
+                'mime_type' => $file->getMimeType(),
+                'size_bytes' => $file->getSize(),
+                'uploaded_at' => now()->toIso8601String(),
+                'uploaded_by_id' => auth()->id(),
+                'uploaded_by_name' => auth()->user()?->name,
+            ];
+        }
+
+        $approval->update(['attachments' => $existing]);
+
+        GovernanceAuditService::log(
+            'spend_approval.attachment_added',
+            'SpendApproval',
+            $approval->id,
+            ['count' => count($request->file('files'))],
+        );
+
+        return $request->wantsJson()
+            ? response()->json(['attachments' => $this->presentAttachments($approval->fresh())])
+            : redirect()->back()->with('success', 'Document(s) attached.');
+    }
+
+    public function deleteAttachment(Request $request, SpendApproval $approval, string $attachment): RedirectResponse|\Illuminate\Http\JsonResponse
+    {
+        if ($approval->status === SpendApproval::STATUS_DRAFT && $approval->requested_by !== auth()->id()) {
+            abort(403, 'Only the requester can remove documents from a draft.');
+        }
+
+        $existing = is_array($approval->attachments) ? $approval->attachments : [];
+        $target = collect($existing)->firstWhere('id', $attachment);
+
+        if (! $target) {
+            abort(404, 'Attachment not found.');
+        }
+
+        if (isset($target['path']) && Storage::disk('local')->exists($target['path'])) {
+            Storage::disk('local')->delete($target['path']);
+        }
+
+        $remaining = array_values(
+            array_filter($existing, fn (array $row) => ($row['id'] ?? null) !== $attachment),
+        );
+
+        $approval->update(['attachments' => $remaining]);
+
+        GovernanceAuditService::log(
+            'spend_approval.attachment_removed',
+            'SpendApproval',
+            $approval->id,
+            ['attachment_id' => $attachment, 'original_name' => $target['original_name'] ?? null],
+        );
+
+        return $request->wantsJson()
+            ? response()->json(['attachments' => $this->presentAttachments($approval->fresh())])
+            : redirect()->back()->with('success', 'Attachment removed.');
+    }
+
+    public function downloadAttachment(SpendApproval $approval, string $attachment)
+    {
+        // Route is gated by spend.view permission; anyone who can see the
+        // approval can download the supporting documents.
+        $existing = is_array($approval->attachments) ? $approval->attachments : [];
+        $target = collect($existing)->firstWhere('id', $attachment);
+
+        if (! $target || empty($target['path']) || ! Storage::disk('local')->exists($target['path'])) {
+            abort(404, 'Attachment not found.');
+        }
+
+        return Storage::disk('local')->download(
+            $target['path'],
+            $target['original_name'] ?? 'attachment',
+            ['Content-Type' => $target['mime_type'] ?? 'application/octet-stream'],
+        );
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    public function presentAttachments(SpendApproval $approval): array
+    {
+        $existing = is_array($approval->attachments) ? $approval->attachments : [];
+
+        return collect($existing)->map(fn (array $row) => [
+            'id' => $row['id'] ?? null,
+            'original_name' => $row['original_name'] ?? 'attachment',
+            'mime_type' => $row['mime_type'] ?? null,
+            'size_bytes' => $row['size_bytes'] ?? null,
+            'uploaded_at' => $row['uploaded_at'] ?? null,
+            'uploaded_by_name' => $row['uploaded_by_name'] ?? null,
+            'download_url' => isset($row['id'])
+                ? "/governance/spend-approvals/{$approval->id}/attachments/{$row['id']}/download"
+                : null,
+        ])->all();
     }
 }

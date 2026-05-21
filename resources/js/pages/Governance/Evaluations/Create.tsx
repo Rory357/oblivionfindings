@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Plus, Trash2 } from 'lucide-react';
+import { Plus, Trash2, Star } from 'lucide-react';
 import { PageHero, PageLayout } from '@/components/page';
 
 interface Question {
@@ -44,8 +44,9 @@ export default function EvaluationCreate({ auth }: PageProps) {
       <PageLayout
         hero={
           <PageHero
-            variant="compact"
+            category="governance"
             backHref="/governance/evaluations"
+            icon={Star}
             title="Create Board Evaluation"
             description="Configure questions and the evaluation period"
           />

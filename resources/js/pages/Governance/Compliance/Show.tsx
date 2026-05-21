@@ -153,10 +153,11 @@ export default function ComplianceShow({ auth, obligation }: Props) {
       <PageLayout
         hero={
           <PageHero
-            variant="compact"
+            category="governance"
             backHref={complianceIndex.url()}
+            icon={FileCheck}
             title={
-              <span className="flex flex-wrap items-center gap-3">
+              <span className="flex flex-wrap items-center gap-3" dusk="compliance-heading">
                 {obligation.obligation_title}
                 <Badge variant="outline">{getFrameworkLabel(obligation.framework)}</Badge>
                 {obligation.obligation_code && (
@@ -165,6 +166,12 @@ export default function ComplianceShow({ auth, obligation }: Props) {
                 <Badge className={getStatusColor(obligation.status)}>{obligation.status}</Badge>
               </span>
             }
+            stats={[
+              { label: 'Framework', value: getFrameworkLabel(obligation.framework) },
+              { label: 'Due', value: obligation.due_date },
+              { label: 'Status', value: obligation.status },
+              { label: 'Evidence', value: evidenceItems.length },
+            ]}
             actions={
               <div className="flex gap-2">
               <Dialog open={showUploadDialog} onOpenChange={setShowUploadDialog}>

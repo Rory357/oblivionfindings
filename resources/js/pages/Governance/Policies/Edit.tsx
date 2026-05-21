@@ -9,6 +9,7 @@ import { PageHero, PageLayout } from '@/components/page';
 import { Textarea } from '@/components/ui/textarea';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Checkbox } from '@/components/ui/checkbox';
+import { BookOpen } from 'lucide-react';
 
 interface Policy {
   id: number;
@@ -48,8 +49,9 @@ export default function PolicyEdit({ auth, policy }: Props) {
       <PageLayout
         hero={
           <PageHero
-            variant="compact"
+            category="governance"
             backHref="/governance/policies"
+            icon={BookOpen}
             title="Edit Policy"
             description={policy.title}
           />

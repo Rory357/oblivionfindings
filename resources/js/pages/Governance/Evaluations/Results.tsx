@@ -5,7 +5,7 @@ import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardDescription, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { cn } from '@/lib/utils';
-import { BarChart3, CheckCircle2, Users, ClipboardList } from 'lucide-react';
+import { BarChart3, CheckCircle2, Users, ClipboardList, Star } from 'lucide-react';
 
 interface Props extends PageProps {
     evaluation: any;
@@ -56,10 +56,17 @@ export default function EvaluationResults({ auth, evaluation }: Props) {
             <PageLayout
                 hero={
                     <PageHero
-                        variant="compact"
+                        category="governance"
                         backHref="/governance/evaluations"
+                        icon={Star}
                         title={`${evaluation.title} Results`}
                         description="Evaluation outcome summary and analysis."
+                        stats={[
+                            { label: 'Status', value: evaluation.status },
+                            { label: 'Completion', value: `${completionRate}%` },
+                            { label: 'Responses', value: `${completedResponses.length}/${responses.length}` },
+                            { label: 'Questions', value: questions.length },
+                        ]}
                     />
                 }
             >

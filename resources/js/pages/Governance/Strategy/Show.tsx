@@ -110,10 +110,21 @@ export default function StrategyShow({ auth, plan }: Props) {
       <PageLayout
         hero={
           <PageHero
-            variant="compact"
+            category="governance"
             backHref="/governance/strategy"
-            title={plan.title}
+            icon={Compass}
+            title={
+              <span className="flex flex-wrap items-center gap-3" dusk="strategy-heading">
+                {plan.title}
+              </span>
+            }
             description={`${plan.period_start} to ${plan.period_end}`}
+            stats={[
+              { label: 'Status', value: plan.status },
+              { label: 'Goals', value: plan.goals.length },
+              { label: 'Horizon', value: plan.planning_horizon.replace('_', ' ') },
+              { label: 'Version', value: `v${plan.version_number}` },
+            ]}
             actions={
               <div className="flex flex-wrap items-center gap-2">
                 <Badge variant="outline">{plan.planning_horizon.replace('_', ' ')} Plan</Badge>

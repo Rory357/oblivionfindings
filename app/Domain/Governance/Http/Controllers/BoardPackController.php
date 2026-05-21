@@ -10,6 +10,7 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 
 class BoardPackController extends Controller
@@ -35,6 +36,23 @@ class BoardPackController extends Controller
 
         $packs = $query->paginate(25)->withQueryString();
 
+        // Meetings that don't yet have a board pack — the dialog uses these.
+        $meetingsWithoutPack = GovernanceMeeting::query()
+            ->whereDoesntHave('boardPack')
+            ->whereNotIn('status', ['cancelled', 'archived'])
+            ->orderBy('scheduled_at')
+            ->withCount('agendaItems')
+            ->get(['id', 'title', 'scheduled_at', 'status'])
+            ->map(fn (GovernanceMeeting $meeting) => [
+                'id' => $meeting->id,
+                'title' => $meeting->title,
+                'scheduled_at' => $meeting->scheduled_at?->toIso8601String(),
+                'status' => $meeting->status,
+                'agenda_items_count' => (int) ($meeting->agenda_items_count ?? 0),
+            ])
+            ->values()
+            ->all();
+
         return Inertia::render('Governance/Packs/Index', [
             'packs' => [
                 'data' => $packs->items(),
@@ -51,6 +69,7 @@ class BoardPackController extends Controller
                 'distributed' => BoardPack::whereNotNull('distributed_at')->count(),
                 'draft' => BoardPack::whereNull('distributed_at')->count(),
             ],
+            'meetings_without_pack' => $meetingsWithoutPack,
         ]);
     }
 
@@ -67,6 +86,7 @@ class BoardPackController extends Controller
             'manifestSections' => $presented['manifestSections'],
             'contentSections' => $presented['contentSections'],
             'distributionStats' => $presented['distributionStats'],
+            'supplementaryAttachments' => $this->presentSupplementaryAttachments($pack),
         ]);
     }
 
@@ -235,5 +255,153 @@ class BoardPackController extends Controller
 
         return redirect()->route('governance.packs.show', $newPack)
             ->with('success', 'Board pack regenerated with fresh data.');
+    }
+
+    /**
+     * Upload one or more supplementary documents and append them to the pack.
+     * Auto-generated sections remain untouched; these files live alongside.
+     */
+    public function attachFiles(Request $request, BoardPack $pack)
+    {
+        // Route already gated by `governance.packs.manage`; no extra meeting-policy
+        // check because attachments are not constrained by meeting status.
+
+        $request->validate([
+            'files' => 'required|array|min:1|max:10',
+            'files.*' => [
+                'required',
+                'file',
+                'max:20480', // 20 MB per file
+                'mimes:pdf,doc,docx,xls,xlsx,ppt,pptx,jpg,jpeg,png,gif,webp,csv,txt,md',
+            ],
+        ]);
+
+        $existing = is_array($pack->supplementary_attachments) ? $pack->supplementary_attachments : [];
+
+        foreach ($request->file('files') as $file) {
+            $directory = "governance/board-packs/{$pack->id}/supplementary";
+            $extension = $file->getClientOriginalExtension() ?: $file->extension();
+            $storedName = Str::uuid()->toString() . ($extension ? ".{$extension}" : '');
+            $path = $file->storeAs($directory, $storedName, 'local');
+
+            $existing[] = [
+                'id' => Str::uuid()->toString(),
+                'path' => $path,
+                'original_name' => $file->getClientOriginalName(),
+                'mime_type' => $file->getMimeType(),
+                'size_bytes' => $file->getSize(),
+                'uploaded_at' => now()->toIso8601String(),
+                'uploaded_by_id' => auth()->id(),
+                'uploaded_by_name' => auth()->user()?->name,
+            ];
+        }
+
+        $pack->update(['supplementary_attachments' => $existing]);
+
+        \App\Domain\Governance\Services\GovernanceAuditService::log(
+            'board_pack.attachment_added',
+            'BoardPack',
+            $pack->id,
+            ['count' => count($request->file('files'))],
+        );
+
+        return $request->wantsJson()
+            ? response()->json(['attachments' => $this->presentSupplementaryAttachments($pack->fresh())])
+            : redirect()->back()->with('success', 'Document(s) added to the pack.');
+    }
+
+    /**
+     * Remove a supplementary attachment (storage file + JSON entry).
+     */
+    public function deleteAttachment(Request $request, BoardPack $pack, string $attachment)
+    {
+        // Route already gated by `governance.packs.manage`.
+
+        $existing = is_array($pack->supplementary_attachments) ? $pack->supplementary_attachments : [];
+        $target = collect($existing)->firstWhere('id', $attachment);
+
+        if (! $target) {
+            abort(404, 'Attachment not found.');
+        }
+
+        if (isset($target['path']) && Storage::disk('local')->exists($target['path'])) {
+            Storage::disk('local')->delete($target['path']);
+        }
+
+        $remaining = array_values(
+            array_filter($existing, fn (array $row) => ($row['id'] ?? null) !== $attachment),
+        );
+
+        $pack->update(['supplementary_attachments' => $remaining]);
+
+        \App\Domain\Governance\Services\GovernanceAuditService::log(
+            'board_pack.attachment_removed',
+            'BoardPack',
+            $pack->id,
+            ['attachment_id' => $attachment, 'original_name' => $target['original_name'] ?? null],
+        );
+
+        return $request->wantsJson()
+            ? response()->json(['attachments' => $this->presentSupplementaryAttachments($pack->fresh())])
+            : redirect()->back()->with('success', 'Attachment removed from the pack.');
+    }
+
+    /**
+     * Stream a supplementary attachment back to the user.
+     */
+    public function downloadAttachment(BoardPack $pack, string $attachment)
+    {
+        // Manage permission means a secretary/chair downloading their own pack;
+        // otherwise the user must be a distributed-to board member.
+        $boardMember = auth()->user()?->boardMember ?? null;
+        $canManage = auth()->user()?->canDo('governance.packs.manage') ?? false;
+
+        if (! $canManage && (! $boardMember || ! $pack->isDistributed() || ! in_array($boardMember->id, $pack->distributed_to ?? []))) {
+            abort(403, 'Not authorised to access this attachment.');
+        }
+
+        $existing = is_array($pack->supplementary_attachments) ? $pack->supplementary_attachments : [];
+        $target = collect($existing)->firstWhere('id', $attachment);
+
+        if (! $target || empty($target['path']) || ! Storage::disk('local')->exists($target['path'])) {
+            abort(404, 'Attachment not found.');
+        }
+
+        if ($boardMember && ! $canManage) {
+            \App\Domain\Governance\Services\GovernanceAuditService::log(
+                'board_pack.attachment_downloaded',
+                'BoardPack',
+                $pack->id,
+                ['attachment_id' => $attachment, 'board_member_id' => $boardMember->id],
+            );
+        }
+
+        return Storage::disk('local')->download(
+            $target['path'],
+            $target['original_name'] ?? 'attachment',
+            ['Content-Type' => $target['mime_type'] ?? 'application/octet-stream'],
+        );
+    }
+
+    /**
+     * Frontend-friendly view of the pack's supplementary attachments.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function presentSupplementaryAttachments(BoardPack $pack): array
+    {
+        $existing = is_array($pack->supplementary_attachments) ? $pack->supplementary_attachments : [];
+
+        return collect($existing)->map(fn (array $row) => [
+            'id' => $row['id'] ?? null,
+            'original_name' => $row['original_name'] ?? 'attachment',
+            'mime_type' => $row['mime_type'] ?? null,
+            'size_bytes' => $row['size_bytes'] ?? null,
+            'uploaded_at' => $row['uploaded_at'] ?? null,
+            'uploaded_by_name' => $row['uploaded_by_name'] ?? null,
+            'download_url' => isset($row['id'])
+                ? "/governance/packs/{$pack->id}/attachments/{$row['id']}/download"
+                : null,
+        ])->all();
     }
 }

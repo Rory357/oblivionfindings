@@ -326,10 +326,11 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
       <PageLayout
         hero={
           <PageHero
-            variant="compact"
+            category="governance"
             backHref={budgetsIndex.url()}
+            icon={Wallet}
             title={
-              <span className="flex flex-wrap items-center gap-3">
+              <span className="flex flex-wrap items-center gap-3" dusk="budget-heading">
                 {budget.title || `FY${budget.fiscal_year} Budget`}
                 <Badge className={getStatusColor(budget.status)}>{budget.status.replace('_', ' ')}</Badge>
                 <Badge variant="outline">v{budget.version_number}</Badge>
@@ -342,6 +343,12 @@ export default function BudgetShow({ auth, budget, categories, canEdit, canPropo
                 {budget.description && <span className="mt-2 block text-sm">{budget.description}</span>}
               </>
             }
+            stats={[
+              { label: 'Fiscal year', value: budget.fiscal_year },
+              { label: 'Allocated', value: formatCurrency(totals.allocated) },
+              { label: 'Actual', value: formatCurrency(totals.actual) },
+              { label: 'Status', value: budget.status.replace('_', ' ') },
+            ]}
             actions={
               <>
                 {canEdit && (
