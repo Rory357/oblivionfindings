@@ -66,6 +66,7 @@ function StorySection({
     placeholder: string;
 }) {
     return (
+        /* eslint-disable-next-line no-restricted-syntax -- compact story tile rendered in a 3-column grid. */
         <div className="rounded-lg border bg-card p-4">
             <div className="flex items-start gap-3">
                 <span className="mt-0.5 rounded-md bg-primary/10 p-2 text-primary">

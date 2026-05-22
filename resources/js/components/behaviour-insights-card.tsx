@@ -125,6 +125,7 @@ export function BehaviourInsightsCard({
             </CardHeader>
             <CardContent className="space-y-4">
                 <div className="grid gap-3 sm:grid-cols-2">
+                    {/* eslint-disable-next-line no-restricted-syntax -- compact KPI tiles nested inside Card. */}
                     <div className="rounded-lg border bg-card p-3">
                         <div className="flex items-center gap-2">
                             <Activity className="h-4 w-4 text-primary" />
@@ -136,6 +137,7 @@ export function BehaviourInsightsCard({
                             {observationCount}
                         </p>
                     </div>
+                    {/* eslint-disable-next-line no-restricted-syntax -- compact KPI tiles nested inside Card. */}
                     <div className="rounded-lg border bg-card p-3">
                         <div className="flex items-center gap-2">
                             <AlertTriangle className="h-4 w-4 text-status-warning" />

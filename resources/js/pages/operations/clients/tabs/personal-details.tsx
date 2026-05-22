@@ -480,6 +480,7 @@ export function PersonalDetailsTab({
 
 function PersonCard({ person }: { person: PersonRecord }) {
     return (
+        /* eslint-disable-next-line no-restricted-syntax -- compact person card nested inside a parent Card. */
         <div className="rounded-lg border bg-card p-3 text-sm">
             <div className="flex items-start justify-between gap-2">
                 <div className="min-w-0">

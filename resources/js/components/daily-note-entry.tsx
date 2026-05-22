@@ -211,6 +211,7 @@ export function DailyNoteEntry({
             )}
 
             {note.follow_up_action ? (
+                /* eslint-disable-next-line no-restricted-syntax -- intentional nested follow-up surface inside the note article. */
                 <div className="mt-4 rounded-lg border bg-background p-3 text-sm">
                     <p className="font-medium">Follow-up</p>
                     <p className="mt-1 text-muted-foreground">

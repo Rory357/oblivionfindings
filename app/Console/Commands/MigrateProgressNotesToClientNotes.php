@@ -26,14 +26,19 @@ class MigrateProgressNotesToClientNotes extends Command
         $dryRun = (bool) $this->option('dry-run');
         $chunkSize = max(1, (int) $this->option('chunk'));
 
-        $alreadyMigrated = ClientNote::query()
+        $alreadySet = ClientNote::query()
             ->whereNotNull('attachments')
             ->whereRaw("JSON_EXTRACT(attachments, '$.legacy_progress_note_id') IS NOT NULL")
-            ->pluck(DB::raw("JSON_EXTRACT(attachments, '$.legacy_progress_note_id')"))
-            ->map(fn ($value) => (int) trim((string) $value, '"'))
-            ->all();
+            ->get(['attachments'])
+            ->map(function ($row) {
+                $value = ($row->attachments ?? [])['legacy_progress_note_id']
+                    ?? null;
 
-        $alreadySet = array_flip($alreadyMigrated);
+                return $value !== null ? (int) $value : null;
+            })
+            ->filter()
+            ->flip()
+            ->all();
 
         $migrated = 0;
         $skipped = 0;

@@ -92,6 +92,7 @@ function MemberCard({
     badgeTone: 'primary' | 'emergency' | 'family' | 'portal';
 }) {
     return (
+        /* eslint-disable-next-line no-restricted-syntax -- nested member card inside group section's Card. */
         <div className="rounded-lg border bg-card p-4">
             <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">

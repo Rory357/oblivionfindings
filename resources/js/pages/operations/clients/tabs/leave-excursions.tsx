@@ -316,6 +316,7 @@ export function LeaveExcursionsTab({
 }: LeaveExcursionsTabProps) {
     return (
         <div className="space-y-6" data-test="client-leave-excursions-tab">
+            {/* eslint-disable-next-line no-restricted-syntax -- intro panel without full Card chrome. */}
             <div className="rounded-lg border bg-card p-4">
                 <div className="flex items-center justify-between gap-3">
                     <div>
