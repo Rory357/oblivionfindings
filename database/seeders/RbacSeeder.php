@@ -323,6 +323,11 @@ class RbacSeeder extends Seeder
             ['key' => 'timeline.viewAny', 'description' => 'View timelines', 'group' => 'general', 'module' => 'System'],
             ['key' => 'timeline.create', 'description' => 'Create timeline events', 'group' => 'general', 'module' => 'System'],
             ['key' => 'timeline.pin', 'description' => 'Pin/unpin handover notes', 'group' => 'general', 'module' => 'System'],
+            ['key' => 'progress_notes.viewAny', 'description' => 'View progress and daily notes', 'group' => 'progress_notes', 'module' => 'Operations'],
+            ['key' => 'progress_notes.create', 'description' => 'Create progress and daily notes', 'group' => 'progress_notes', 'module' => 'Operations'],
+            ['key' => 'progress_notes.update', 'description' => 'Update progress and daily notes', 'group' => 'progress_notes', 'module' => 'Operations'],
+            ['key' => 'progress_notes.delete', 'description' => 'Delete progress and daily notes', 'group' => 'progress_notes', 'module' => 'Operations'],
+            ['key' => 'progress_notes.review', 'description' => 'Review flagged progress and daily notes', 'group' => 'progress_notes', 'module' => 'Operations'],
 
             // AI summaries
             ['key' => 'summaries.viewAny', 'description' => 'View AI summaries', 'group' => 'general', 'module' => 'System'],
@@ -528,6 +533,7 @@ class RbacSeeder extends Seeder
             'controlRoom.viewAny', 'controlRoom.alerts.manage', 'controlRoom.alerts.assign',
             'controlRoom.alerts.escalate', 'controlRoom.alerts.create', 'controlRoom.reports.view',
             'calendar.viewAny', 'compliance.view', 'timeline.viewAny', 'timeline.create', 'timeline.pin',
+            'progress_notes.viewAny', 'progress_notes.create', 'progress_notes.update', 'progress_notes.delete', 'progress_notes.review',
             'summaries.viewAny', 'summaries.generate', 'unifi.manage',
             'shifts.viewAny', 'shifts.create', 'shifts.update', 'shifts.manageAny', 'shifts.overrideEligibility',
             'timesheets.viewAny', 'timesheets.create', 'timesheets.update', 'timesheets.approve', 'timesheets.manageAny',
@@ -602,6 +608,7 @@ class RbacSeeder extends Seeder
             'shifts.viewAny', 'shifts.create', 'shifts.update', 'shifts.overrideEligibility',
             'timesheets.viewAny', 'timesheets.approve',
             'timeline.viewAny', 'timeline.create', 'timeline.pin',
+            'progress_notes.viewAny', 'progress_notes.create', 'progress_notes.update', 'progress_notes.review',
             'summaries.viewAny', 'summaries.generate', 'calendar.viewAny', 'rag.ask.any',
             'fleet.viewAny', 'fleet.manage', 'fleet.driverSessions.manage', 'fleet.signals.view',
             'fleet.trips.manage', 'fleet.fuel.manage', 'fleet.reports.view',
@@ -633,6 +640,7 @@ class RbacSeeder extends Seeder
         // Support Worker
         $syncPermissions($supportWorker, [
             'clients.viewAssigned', 'medications.view', 'timeline.create',
+            'progress_notes.viewAny', 'progress_notes.create',
             'shifts.viewAssigned', 'shifts.tasks.updateSelf',
             'timesheets.viewAssigned', 'timesheets.create', 'timesheets.update', 'timesheets.submit',
             'incidents.viewAssigned', 'incidents.create', 'incidents.update', 'incidents.submit',
@@ -699,6 +707,7 @@ class RbacSeeder extends Seeder
             'clients.viewAny', 'medications.view', 'medications.audit.view',
             'shifts.viewAny', 'timesheets.viewAny', 'reports.viewAny',
             'timeline.viewAny', 'summaries.viewAny', 'audit.viewAny', 'compliance.view',
+            'progress_notes.viewAny',
             'incidents.viewAny', 'risks.viewAny', 'assets.viewAny',
             'respite.viewAny', 'respite.calendar.view', 'respite.evidence.view',
             'respite.tasks.view', 'respite.handovers.view', 'respite.communications.view',
@@ -736,6 +745,7 @@ class RbacSeeder extends Seeder
             'clinical.events.viewAny',
             'clinical.protocols.viewAny',
             'clinical.dashboard',
+            'progress_notes.viewAny', 'progress_notes.create', 'progress_notes.update', 'progress_notes.review',
         ]);
 
         // Health & Safety Officer

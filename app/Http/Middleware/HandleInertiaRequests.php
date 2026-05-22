@@ -4,7 +4,9 @@ namespace App\Http\Middleware;
 
 use App\Models\Announcement;
 use App\Models\AppSetting;
+use App\Models\OpsMessage;
 use App\Models\ShiftOpenPosition;
+use App\Models\User;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -111,7 +113,7 @@ class HandleInertiaRequests extends Middleware
 
                 'impersonating' => $user ? app('impersonate')->isImpersonating() : false,
                 'impersonator' => $user && app('impersonate')->isImpersonating()
-                    ? \App\Models\User::find(app('impersonate')->getImpersonatorId())?->only('id', 'name')
+                    ? User::find(app('impersonate')->getImpersonatorId())?->only('id', 'name')
                     : null,
 
                 // Portal client data for sidebar navigation
@@ -124,7 +126,7 @@ class HandleInertiaRequests extends Middleware
                     ])->values()->all()
                     : null,
                 'unreadMessageCount' => $user && $hasOpsMessagingTables
-                    ? \App\Models\OpsMessage::query()
+                    ? OpsMessage::query()
                         ->whereExists(fn ($q) => $q->from('ops_conversation_participants')
                             ->whereColumn('ops_conversation_participants.conversation_id', 'ops_messages.conversation_id')
                             ->where('ops_conversation_participants.user_id', $user->id))
@@ -809,6 +811,8 @@ class HandleInertiaRequests extends Middleware
                 'viewAny' => $user->canDo('progress_notes.viewAny'),
                 'create' => $user->canDo('progress_notes.create'),
                 'update' => $user->canDo('progress_notes.update'),
+                'delete' => $user->canDo('progress_notes.delete'),
+                'review' => $user->canDo('progress_notes.review'),
             ],
             'service_agreements' => [
                 'viewAny' => $user->canDo('service_agreements.viewAny'),

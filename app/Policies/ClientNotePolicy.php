@@ -29,6 +29,21 @@ class ClientNotePolicy
 
     public function delete(User $user, ClientNote $note): bool
     {
-        return $user->canDo('progress_notes.update');
+        return $user->canDo('progress_notes.delete') || $user->canDo('progress_notes.update');
+    }
+
+    public function flag(User $user, ClientNote $note): bool
+    {
+        return $user->canDo('progress_notes.update') || $user->canDo('progress_notes.review');
+    }
+
+    public function review(User $user, ClientNote $note): bool
+    {
+        return $user->canDo('progress_notes.review');
+    }
+
+    public function viewFlaggedQueue(User $user): bool
+    {
+        return $user->canDo('progress_notes.review');
     }
 }

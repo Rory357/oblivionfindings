@@ -6,7 +6,6 @@ use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ClientIncidentAttachment;
 use App\Models\IncidentTemplate;
-use App\Models\TimelineEvent;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -22,7 +21,7 @@ class ClientIncidentController extends Controller
         $incidents = ClientIncident::query()
             ->where('client_id', $client->id)
             ->when(
-                !$user?->canDo('hr.cases.view'),
+                ! $user?->canDo('hr.cases.view'),
                 fn ($q) => $q->where(fn ($q2) => $q2->where('is_hr_confidential', false)->orWhereNull('is_hr_confidential'))
             )
             ->with([
@@ -91,10 +90,10 @@ class ClientIncidentController extends Controller
             'status' => 'draft',
             'occurred_at' => $data['occurred_at'] ?? now(),
             'description' => $data['description'] ?? null,
-            'requires_followup' => (bool)($data['requires_followup'] ?? false),
+            'requires_followup' => (bool) ($data['requires_followup'] ?? false),
             'immediate_action_taken' => $data['immediate_action_taken'] ?? null,
             'witnesses' => $data['witnesses'] ?? null,
-            'title' => $data['type'] . ' incident',
+            'title' => $data['type'].' incident',
 
             // Near-miss
             'potential_severity' => $data['potential_severity'] ?? null,
@@ -110,21 +109,7 @@ class ClientIncidentController extends Controller
             'medical_treatment_type' => $data['medical_treatment_type'] ?? null,
 
             // WorkSafe
-            'is_notifiable' => (bool)($data['is_notifiable'] ?? false),
-        ]);
-
-        // Timeline event (client history)
-        TimelineEvent::create([
-            'client_id' => $client->id,
-            'type' => 'incident',
-            'subject' => 'Incident: ' . ($incident->title ?? $incident->type),
-            'body' => $incident->description,
-            'visibility' => 'internal',
-            'occurred_at' => $incident->occurred_at ?? now(),
-            'created_by' => $request->user()?->id,
-            'actor_user_id' => $request->user()?->id,
-            'source_type' => 'client_incident',
-            'source_id' => $incident->id,
+            'is_notifiable' => (bool) ($data['is_notifiable'] ?? false),
         ]);
 
         if ($incident->severity === 'high') {
@@ -162,13 +147,13 @@ class ClientIncidentController extends Controller
     public function uploadAttachment(Request $request, Client $client, ClientIncident $incident)
     {
         $this->authorize('view', $client);
-        abort_unless((int)$incident->client_id === (int)$client->id, 404);
+        abort_unless((int) $incident->client_id === (int) $client->id, 404);
 
         $this->authorize('update', $incident);
 
         // Additional rule: attachments removable only while editable for reporter (admins allowed)
         $user = $request->user();
-        if ($user && !$user->canDo('incidents.viewAny')) {
+        if ($user && ! $user->canDo('incidents.viewAny')) {
             abort_unless($incident->isEditableByReporter($user), 403);
         }
 
@@ -197,13 +182,14 @@ class ClientIncidentController extends Controller
     public function downloadAttachment(Request $request, Client $client, ClientIncident $incident, ClientIncidentAttachment $attachment)
     {
         $this->authorize('view', $client);
-        abort_unless((int)$incident->client_id === (int)$client->id, 404);
-        abort_unless((int)$attachment->incident_id === (int)$incident->id, 404);
+        abort_unless((int) $incident->client_id === (int) $client->id, 404);
+        abort_unless((int) $attachment->incident_id === (int) $incident->id, 404);
 
         // require incident view perms
         $this->authorize('view', $incident);
 
         $disk = $attachment->disk ?: 'public';
+
         return Storage::disk($disk)->download($attachment->path, $attachment->original_name);
     }
 }

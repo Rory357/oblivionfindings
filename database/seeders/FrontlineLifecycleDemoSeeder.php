@@ -334,6 +334,13 @@ class FrontlineLifecycleDemoSeeder extends Seeder
 
         // Attendance session matching the shift so reconciliation does not
         // reject the resubmit later.
+        $this->clearOverlappingSeededAttendance(
+            $worker,
+            $shift->actual_starts_at,
+            $shift->actual_ends_at,
+            $shift->id,
+        );
+
         HrAttendanceSession::firstOrCreate(
             [
                 'shift_id' => $shift->id,
@@ -552,6 +559,8 @@ class FrontlineLifecycleDemoSeeder extends Seeder
             ],
         );
 
+        $this->clearOverlappingSeededAttendance($worker, $startsAt, null, $shift->id);
+
         HrAttendanceSession::updateOrCreate(
             [
                 'shift_id' => $shift->id,
@@ -705,6 +714,8 @@ class FrontlineLifecycleDemoSeeder extends Seeder
 
         $shift->tasks()->delete();
 
+        $this->clearOverlappingSeededAttendance($worker, $startsAt, null, $shift->id);
+
         HrAttendanceSession::updateOrCreate(
             [
                 'shift_id' => $shift->id,
@@ -786,6 +797,8 @@ class FrontlineLifecycleDemoSeeder extends Seeder
             'is_completed' => false,
         ]);
 
+        $this->clearOverlappingSeededAttendance($worker, $startsAt, null, $shift->id);
+
         HrAttendanceSession::updateOrCreate(
             [
                 'shift_id' => $shift->id,
@@ -826,6 +839,8 @@ class FrontlineLifecycleDemoSeeder extends Seeder
         );
 
         $shift->tasks()->delete();
+
+        $this->clearOverlappingSeededAttendance($worker, $startsAt, null, $shift->id);
 
         HrAttendanceSession::updateOrCreate(
             [
@@ -891,6 +906,8 @@ class FrontlineLifecycleDemoSeeder extends Seeder
                 'expected_break_minutes' => 30,
             ],
         );
+
+        $this->clearOverlappingSeededAttendance($worker, $startsAt, $endsAt, $shift->id);
 
         $attendance = HrAttendanceSession::updateOrCreate(
             [
@@ -976,6 +993,31 @@ class FrontlineLifecycleDemoSeeder extends Seeder
         $shift->forceFill(['published_at' => Carbon::now()])->save();
 
         return $shift->fresh(['site']) ?? $shift;
+    }
+
+    private function clearOverlappingSeededAttendance(
+        User $worker,
+        ?Carbon $startsAt,
+        ?Carbon $endsAt,
+        ?int $exceptShiftId = null,
+    ): void {
+        if (! $startsAt) {
+            return;
+        }
+
+        $candidateEnd = $endsAt ?? Carbon::now()->addYears(10);
+
+        HrAttendanceSession::query()
+            ->where('user_id', $worker->id)
+            ->whereIn('source', ['seeder', 'playwright'])
+            ->when($exceptShiftId, fn ($query) => $query->where('shift_id', '!=', $exceptShiftId))
+            ->whereNotNull('clock_in_at')
+            ->where('clock_in_at', '<', $candidateEnd)
+            ->where(function ($query) use ($startsAt) {
+                $query->whereNull('clock_out_at')
+                    ->orWhere('clock_out_at', '>', $startsAt);
+            })
+            ->delete();
     }
 
     /**

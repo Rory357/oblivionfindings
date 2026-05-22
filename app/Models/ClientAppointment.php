@@ -2,10 +2,11 @@
 
 namespace App\Models;
 
+use App\Contracts\Timeline\EmitsToTimeline;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class ClientAppointment extends Model
+class ClientAppointment extends Model implements EmitsToTimeline
 {
     protected $fillable = [
         'client_id',
@@ -55,5 +56,34 @@ class ClientAppointment extends Model
     public function scopeSharedWithFamily($query)
     {
         return $query->where('share_with_family', true);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function toTimelineEvent(): ?array
+    {
+        $this->loadMissing('client');
+
+        return [
+            'type' => 'appointment',
+            'occurred_at' => $this->starts_at ?? $this->created_at ?? now(),
+            'actor_user_id' => $this->created_by,
+            'client_id' => $this->client_id,
+            'site_id' => $this->client?->site_id,
+            'subject' => 'Appointment: '.$this->title,
+            'body' => $this->description,
+            'meta' => array_filter([
+                'appointment_type' => $this->appointment_type,
+                'status' => $this->status,
+                'location' => $this->location,
+                'provider_name' => $this->provider_name,
+                'ends_at' => $this->ends_at?->toISOString(),
+                'share_with_family' => $this->share_with_family,
+            ], fn ($value) => $value !== null && $value !== ''),
+            'visibility' => $this->share_with_family ? 'portal' : 'internal',
+            'is_pinned' => false,
+            'created_by' => $this->created_by,
+        ];
     }
 }

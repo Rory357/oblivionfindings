@@ -17,19 +17,25 @@ use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Services\DeviceRegistryService;
 use App\Http\Requests\StoreClientRequest;
 use App\Http\Requests\UpdateClientRequest;
+use App\Http\Resources\ClientDailyNoteResource;
 use App\Models\AssetGeofence;
 use App\Models\CarePlan;
 use App\Models\Client;
 use App\Models\ClientAppointment;
+use App\Models\ClientBowelEntry;
 use App\Models\ClientConsent;
 use App\Models\ClientDocument;
+use App\Models\ClientFluidEntry;
 use App\Models\ClientIncident;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\ClientNote;
 use App\Models\ClientOnboardingWorkflow;
 use App\Models\ClientPersonalAsset;
 use App\Models\ClientPhoto;
 use App\Models\ClientRisk;
+use App\Models\ClientRoutine;
+use App\Models\ClientSeizureEntry;
 use App\Models\ConsentRequest;
 use App\Models\ConsentType;
 use App\Models\ControlRoomAlert;
@@ -56,6 +62,7 @@ use App\Models\Site;
 use App\Models\TimelineEvent;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\Client\ActionsAggregator;
 use App\Services\ConsentValidationService;
 use App\Services\HealthSafety\HsModuleSummaryService;
 use App\Services\Integration\IntegrationEventHistoryService;
@@ -339,6 +346,32 @@ class ClientController extends Controller
             ))->first();
         }
 
+        $dailyNotes = ClientNote::query()
+            ->where('client_id', $client->id)
+            ->forUser($request->user())
+            ->dailyNotes()
+            ->with(['author:id,name', 'reviewer:id,name', 'shift:id,starts_at,ends_at'])
+            ->orderByDesc('occurred_at')
+            ->orderByDesc('created_at')
+            ->limit(50)
+            ->get();
+
+        $communicationNotes = ClientNote::query()
+            ->where('client_id', $client->id)
+            ->forUser($request->user())
+            ->communication()
+            ->with(['author:id,name', 'reviewer:id,name'])
+            ->orderByDesc('occurred_at')
+            ->orderByDesc('created_at')
+            ->limit(50)
+            ->get();
+
+        $dailyNotesBase = ClientNote::query()
+            ->where('client_id', $client->id)
+            ->forUser($request->user());
+
+        $actionsReviews = app(ActionsAggregator::class)->forClient($client, $request->user());
+
         return inertia('operations/clients/show', [
             'client' => [
                 'id' => $client->id,
@@ -533,6 +566,49 @@ class ClientController extends Controller
                 ->orderByDesc('created_at')
                 ->limit(20)
                 ->get(),
+            'client_daily_notes' => ClientDailyNoteResource::collection($dailyNotes)->resolve($request),
+            'communication_notes' => ClientDailyNoteResource::collection($communicationNotes)->resolve($request),
+            'daily_notes_summary' => [
+                'total' => (clone $dailyNotesBase)->dailyNotes()->count(),
+                'flagged_open' => (clone $dailyNotesBase)->dailyNotes()->reviewQueue()->count(),
+                'drafts' => (clone $dailyNotesBase)->dailyNotes()->where('is_draft', true)->count(),
+                'communication' => (clone $dailyNotesBase)->communication()->count(),
+                'open_follow_ups' => (clone $dailyNotesBase)
+                    ->whereNotNull('follow_up_action')
+                    ->whereNull('follow_up_completed_at')
+                    ->count(),
+            ],
+            'health_monitoring' => [
+                'bowel' => ClientBowelEntry::query()
+                    ->where('client_id', $client->id)
+                    ->with('recorder:id,name')
+                    ->orderByDesc('occurred_at')
+                    ->limit(60)
+                    ->get(),
+                'fluid' => ClientFluidEntry::query()
+                    ->where('client_id', $client->id)
+                    ->with('recorder:id,name')
+                    ->orderByDesc('occurred_at')
+                    ->limit(90)
+                    ->get(),
+                'seizure' => ClientSeizureEntry::query()
+                    ->where('client_id', $client->id)
+                    ->with('recorder:id,name')
+                    ->orderByDesc('occurred_at')
+                    ->limit(60)
+                    ->get(),
+            ],
+            'client_routines' => ClientRoutine::query()
+                ->where('client_id', $client->id)
+                ->with('updater:id,name')
+                ->orderBy('display_order')
+                ->get(),
+            'actions_reviews' => $actionsReviews,
+            'actions_reviews_summary' => [
+                'open' => count($actionsReviews),
+                'critical' => collect($actionsReviews)->where('severity', 'critical')->count(),
+                'warning' => collect($actionsReviews)->where('severity', 'warning')->count(),
+            ],
 
             // Service agreements
             'client_agreements' => ServiceAgreement::where('client_id', $client->id)
