@@ -100,6 +100,10 @@
     --color-category-sites-bg: var(--category-sites-bg);
     --color-category-fleet: var(--category-fleet);
     --color-category-fleet-bg: var(--category-fleet-bg);
+
+    --color-brand-deep: var(--brand-deep);
+    --color-brand-tint-deep: var(--brand-tint-deep);
+    --color-text-faint: var(--text-faint);
 }
 
 :root {
@@ -181,6 +185,13 @@
     --category-fleet: oklch(from var(--primary) l c calc(h + 45));
     --category-fleet-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 45)) 12%, transparent);
 
+    /* Brand-derived shades used by the /my-day redesign. The hero uses
+       --brand-tint-deep for the "now" rule borders, and --text-faint for
+       caps-uppercase microcopy (e.g. tip text below the rail). */
+    --brand-deep: oklch(from var(--primary) calc(l - 0.09) c h);
+    --brand-tint-deep: oklch(from var(--primary) 0.88 0.07 h);
+    --text-faint: oklch(from var(--foreground) 0.58 c h);
+
     /* Map tokens — themable. Status colours (online/offline/idle/moving) stay
        semantic and remain hardcoded inside leaflet-map.tsx. */
     --map-marker-house: var(--primary);
@@ -257,6 +268,11 @@
     --category-sites-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 210)) 20%, transparent);
     --category-fleet: oklch(from var(--primary) l c calc(h + 45));
     --category-fleet-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 45)) 20%, transparent);
+
+    /* Brand-derived shades — dark variants */
+    --brand-deep: oklch(from var(--primary) calc(l + 0.06) c h);
+    --brand-tint-deep: oklch(from var(--primary) 0.42 0.10 h);
+    --text-faint: oklch(from var(--foreground) 0.50 c h);
 }
 
 @layer base {

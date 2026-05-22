@@ -8,9 +8,17 @@ import { isValidElement } from 'react';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 
+import {
+    PageHeroAvatarStack,
+    type PageHeroStackAvatar,
+} from './page-hero-avatar-stack';
 import { PageHeroActions } from './page-hero-actions';
 import { PageHeroBadges, type PageHeroBadge } from './page-hero-badges';
 import { PageHeroMeta, type PageHeroMetaItem } from './page-hero-meta';
+import {
+    PageHeroQuickActions,
+    type PageHeroQuickAction,
+} from './page-hero-quick-actions';
 import { PageHeroStats, type PageHeroStat } from './page-hero-stats';
 
 export type PageHeroVariant = 'hero' | 'compact' | 'inline';
@@ -46,6 +54,11 @@ export interface PageHeroProps {
     icon?: IconLike | ReactNode;
     /** Avatar takes precedence over icon when both supplied (use for person detail). */
     avatar?: PageHeroAvatar;
+    /**
+     * Multi-subject avatar stack. Overrides `avatar` and `icon` when set.
+     * Renders an overlapping ring of avatars with hover popovers.
+     */
+    avatarStack?: PageHeroStackAvatar[];
 
     title: ReactNode;
     description?: ReactNode;
@@ -61,8 +74,20 @@ export interface PageHeroProps {
     /** Right-column buttons. Auto-wrapped in PageHeroActions for hero variant. */
     actions?: ReactNode;
 
+    /** Icon-only quick-action strip rendered in the right column below stats. */
+    quickActions?: PageHeroQuickAction[];
+
+    /** Optional heading shown above the quick-action grid. */
+    quickActionsHeading?: string;
+
     /** Escape hatch — rendered under the badges row, full width. */
     children?: ReactNode;
+
+    /**
+     * Full-width footer rendered inside the banner, separated by a border-top.
+     * Use for resident tabs, secondary filter strips, etc.
+     */
+    footer?: ReactNode;
 
     className?: string;
 }
@@ -85,6 +110,7 @@ function HeroVariant(props: PageHeroProps) {
         backLabel = 'Back',
         icon,
         avatar,
+        avatarStack,
         title,
         description,
         subtitle,
@@ -92,7 +118,10 @@ function HeroVariant(props: PageHeroProps) {
         badges,
         stats,
         actions,
+        quickActions,
+        quickActionsHeading,
         children,
+        footer,
         className,
     } = props;
     const supportingText = description ?? subtitle;
@@ -105,23 +134,29 @@ function HeroVariant(props: PageHeroProps) {
         ? 'bg-[linear-gradient(to_bottom_right,color-mix(in_oklch,var(--hero-base)_90%,transparent),var(--hero-base),color-mix(in_oklch,var(--hero-base)_80%,transparent))]'
         : 'bg-gradient-to-br from-primary/90 via-primary to-primary/80';
 
-    const renderedIcon = avatar ? null : renderIcon(icon, 'h-12 w-12 text-primary-foreground md:h-14 md:w-14');
+    const renderedIcon = avatar || avatarStack ? null : renderIcon(icon, 'h-12 w-12 text-primary-foreground md:h-14 md:w-14');
 
     return (
+        // OUTER: relative + rounded but NOT overflow-hidden, so hover popovers
+        // (e.g. resident popover on the avatar stack) can extend past the
+        // banner's bottom edge.
         <div
             style={style}
             className={cn(
-                'relative overflow-hidden rounded-2xl p-6 text-primary-foreground md:p-8',
+                'relative rounded-2xl text-primary-foreground',
                 gradientClass,
                 className,
             )}
         >
-            {/* Decorative orbs — purely visual, no interactive content */}
-            <div className="pointer-events-none absolute -top-16 -right-16 h-64 w-64 rounded-full bg-primary-foreground/5" />
-            <div className="pointer-events-none absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-primary-foreground/5" />
-            <div className="pointer-events-none absolute top-1/4 right-1/3 h-24 w-24 rounded-full bg-primary-foreground/5" />
+            {/* INNER ORB CLIP — purely visual; clipped to the rounded shape so the
+                three decorative circles don't bleed past the banner. */}
+            <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
+                <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-primary-foreground/5" />
+                <div className="absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-primary-foreground/5" />
+                <div className="absolute right-1/3 top-1/4 h-24 w-24 rounded-full bg-primary-foreground/5" />
+            </div>
 
-            <div className="relative">
+            <div className="relative p-6 md:p-8">
                 {backHref ? (
                     <Link
                         href={backHref}
@@ -133,7 +168,9 @@ function HeroVariant(props: PageHeroProps) {
                 ) : null}
 
                 <div className="flex flex-col items-center gap-6 md:flex-row md:items-start">
-                    {avatar ? (
+                    {avatarStack && avatarStack.length > 0 ? (
+                        <PageHeroAvatarStack residents={avatarStack} />
+                    ) : avatar ? (
                         <Avatar className="h-24 w-24 shrink-0 border-4 border-primary-foreground/20 shadow-xl md:h-28 md:w-28">
                             {avatar.src ? (
                                 <AvatarImage src={avatar.src} alt={avatar.fallback} />
@@ -158,16 +195,28 @@ function HeroVariant(props: PageHeroProps) {
                         {children ? <div className="mt-3">{children}</div> : null}
                     </div>
 
-                    {(actions || (stats && stats.length > 0)) && (
-                        <div className="flex flex-col items-center gap-3 md:items-end">
+                    {(actions || (stats && stats.length > 0) || (quickActions && quickActions.length > 0)) && (
+                        <div className="flex w-full flex-col items-center gap-3 md:w-auto md:items-end">
                             {actions ? <PageHeroActions>{actions}</PageHeroActions> : null}
                             {stats && stats.length > 0 ? (
                                 <PageHeroStats stats={stats} layout="inline" />
+                            ) : null}
+                            {quickActions && quickActions.length > 0 ? (
+                                <PageHeroQuickActions
+                                    heading={quickActionsHeading}
+                                    actions={quickActions}
+                                />
                             ) : null}
                         </div>
                     )}
                 </div>
             </div>
+
+            {footer ? (
+                <div className="relative overflow-hidden rounded-b-2xl border-t border-primary-foreground/20 px-4">
+                    {footer}
+                </div>
+            ) : null}
         </div>
     );
 }
