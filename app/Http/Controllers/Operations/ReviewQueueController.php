@@ -36,61 +36,83 @@ class ReviewQueueController extends Controller
             )
             ->pluck('id');
 
-        $query = ClientNote::query()
+        $baseQuery = ClientNote::query()
             ->where('is_flagged', true)
             ->whereNull('reviewed_at')
-            ->whereIn('client_id', $accessibleClientIds)
-            ->with([
-                'client:id,first_name,last_name,site_id',
-                'client.site:id,name',
-                'author:id,name',
-            ])
-            ->orderByDesc('created_at');
+            ->whereIn('client_id', $accessibleClientIds);
 
         if ($siteFilter) {
-            $query->whereHas(
+            $baseQuery->whereHas(
                 'client',
                 fn ($q) => $q->where('site_id', $siteFilter),
             );
         }
 
         if ($ageFilter === '24h') {
-            $query->where('created_at', '>=', Carbon::now()->subDay());
+            $baseQuery->where('created_at', '>=', Carbon::now()->subDay());
         } elseif ($ageFilter === '7d') {
-            $query->where('created_at', '>=', Carbon::now()->subDays(7));
+            $baseQuery->where('created_at', '>=', Carbon::now()->subDays(7));
         } elseif ($ageFilter === '30d') {
-            $query->where('created_at', '>=', Carbon::now()->subDays(30));
+            $baseQuery->where('created_at', '>=', Carbon::now()->subDays(30));
         }
 
-        $items = $query->limit(200)->get()->map(function (ClientNote $note) {
-            $created = $note->created_at;
-            $hoursOpen = $created ? (int) $created->diffInHours(now()) : 0;
+        // Stats are computed across the full filtered set, not the current
+        // page, so the page hero counters stay accurate as the user pages.
+        $now = Carbon::now();
+        $total = (clone $baseQuery)->count();
+        $critical = (clone $baseQuery)
+            ->where('created_at', '<=', $now->copy()->subHours(48))
+            ->count();
+        $warning = (clone $baseQuery)
+            ->where('created_at', '>', $now->copy()->subHours(48))
+            ->where('created_at', '<=', $now->copy()->subHours(24))
+            ->count();
+        $queueClientIds = (clone $baseQuery)->distinct()->pluck('client_id');
+        $clientsCount = $queueClientIds->count();
+        $sitesCount = Client::query()
+            ->whereIn('id', $queueClientIds)
+            ->whereNotNull('site_id')
+            ->distinct('site_id')
+            ->count('site_id');
 
-            return [
-                'id' => $note->id,
-                'client_id' => $note->client_id,
-                'client_name' => trim(
-                    ($note->client?->first_name ?? '').' '
-                    .($note->client?->last_name ?? ''),
-                ),
-                'site_name' => $note->client?->site?->name,
-                'site_id' => $note->client?->site_id,
-                'subject' => $note->subject,
-                'body' => $note->body,
-                'category' => $note->category,
-                'flagged_reason' => $note->flagged_reason,
-                'mood_rating' => $note->mood_rating,
-                'created_at' => $created?->toISOString(),
-                'hours_open' => $hoursOpen,
-                'age_severity' => $hoursOpen >= 48
-                    ? 'critical'
-                    : ($hoursOpen >= 24 ? 'warning' : 'info'),
-                'author' => $note->author
-                    ? ['id' => $note->author->id, 'name' => $note->author->name]
-                    : null,
-                'deep_link' => "/operations/clients/{$note->client_id}?tab=progress_notes&flagged=1&reviewed=0",
-            ];
-        });
+        $items = $baseQuery
+            ->with([
+                'client:id,first_name,last_name,site_id',
+                'client.site:id,name',
+                'author:id,name',
+            ])
+            ->orderByDesc('created_at')
+            ->paginate(50)
+            ->withQueryString()
+            ->through(function (ClientNote $note) {
+                $created = $note->created_at;
+                $hoursOpen = $created ? (int) $created->diffInHours(now()) : 0;
+
+                return [
+                    'id' => $note->id,
+                    'client_id' => $note->client_id,
+                    'client_name' => trim(
+                        ($note->client?->first_name ?? '').' '
+                        .($note->client?->last_name ?? ''),
+                    ),
+                    'site_name' => $note->client?->site?->name,
+                    'site_id' => $note->client?->site_id,
+                    'subject' => $note->subject,
+                    'body' => $note->body,
+                    'category' => $note->category,
+                    'flagged_reason' => $note->flagged_reason,
+                    'mood_rating' => $note->mood_rating,
+                    'created_at' => $created?->toISOString(),
+                    'hours_open' => $hoursOpen,
+                    'age_severity' => $hoursOpen >= 48
+                        ? 'critical'
+                        : ($hoursOpen >= 24 ? 'warning' : 'info'),
+                    'author' => $note->author
+                        ? ['id' => $note->author->id, 'name' => $note->author->name]
+                        : null,
+                    'deep_link' => "/operations/clients/{$note->client_id}?tab=progress_notes&flagged=1&reviewed=0",
+                ];
+            });
 
         $sites = Client::query()
             ->whereIn('id', $accessibleClientIds)
@@ -103,18 +125,16 @@ class ReviewQueueController extends Controller
             ->map(fn ($site) => ['id' => $site->id, 'name' => $site->name])
             ->all();
 
-        $stats = [
-            'total' => $items->count(),
-            'critical' => $items->where('age_severity', 'critical')->count(),
-            'warning' => $items->where('age_severity', 'warning')->count(),
-            'sites' => $items->pluck('site_id')->filter()->unique()->count(),
-            'clients' => $items->pluck('client_id')->unique()->count(),
-        ];
-
         return Inertia::render('operations/review-queue/index', [
-            'items' => $items->values(),
+            'items' => $items,
             'sites' => $sites,
-            'stats' => $stats,
+            'stats' => [
+                'total' => $total,
+                'critical' => $critical,
+                'warning' => $warning,
+                'sites' => $sitesCount,
+                'clients' => $clientsCount,
+            ],
             'filters' => [
                 'site' => $siteFilter,
                 'age' => $ageFilter,

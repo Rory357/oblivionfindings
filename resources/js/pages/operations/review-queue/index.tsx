@@ -3,6 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { LaravelPagination } from '@/components/ui/laravel-pagination';
 import { PageHero, PageLayout } from '@/components/page';
 import {
     Select,
@@ -52,8 +53,24 @@ type Stats = {
     clients: number;
 };
 
+type PaginationLink = {
+    url: string | null;
+    label: string;
+    active: boolean;
+};
+
+type PaginatedItems = {
+    data: ReviewItem[];
+    links: PaginationLink[];
+    current_page: number;
+    last_page: number;
+    from: number | null;
+    to: number | null;
+    total: number;
+};
+
 type PageProps = {
-    items: ReviewItem[];
+    items: PaginatedItems;
     sites: SiteOption[];
     stats: Stats;
     filters: { site: number | null; age: string };
@@ -200,9 +217,9 @@ export default function ReviewQueuePage({
                         )}
                     </div>
 
-                    {items.length > 0 ? (
+                    {items.data.length > 0 ? (
                         <div className="space-y-3">
-                            {items.map((item) => {
+                            {items.data.map((item) => {
                                 const Icon = severityIcon[item.age_severity];
                                 return (
                                     <Card
@@ -305,6 +322,16 @@ export default function ReviewQueuePage({
                             description="No flagged daily notes are waiting for review across your clients."
                         />
                     )}
+
+                    {items.last_page > 1 ? (
+                        <div className="flex items-center justify-between gap-3 pt-2">
+                            <p className="text-xs text-muted-foreground">
+                                Showing {items.from ?? 0}–{items.to ?? 0} of{' '}
+                                {items.total}
+                            </p>
+                            <LaravelPagination links={items.links} />
+                        </div>
+                    ) : null}
                 </div>
             </PageLayout>
         </AppLayout>
