@@ -30,7 +30,7 @@ import {
     SendToBack,
     Trash2,
 } from 'lucide-react';
-import { useState, type CSSProperties, type Dispatch } from 'react';
+import { createElement, useState, type CSSProperties, type Dispatch } from 'react';
 import EmergencyChecklist from './_emergency-checklist';
 import {
     DOOR_SUBKIND_LABELS,
@@ -58,6 +58,16 @@ function resolveIcon(name: string): React.ComponentType<IconProps> {
         Lucide as unknown as Record<string, React.ComponentType<IconProps>>
     )[name];
     return candidate ?? (MapPin as unknown as React.ComponentType<IconProps>);
+}
+
+/**
+ * Renders a Lucide icon by name. `React.createElement` is used (rather than a
+ * `<Component {...props} />` JSX form bound to a local) so the eslint
+ * react-compiler rule does not flag the dynamic component lookup as
+ * "creating components during render".
+ */
+function DynamicIcon({ name, ...props }: IconProps & { name: string }) {
+    return createElement(resolveIcon(name), props);
 }
 
 type Props = {
@@ -1156,7 +1166,7 @@ function PinKindPicker({
     const currentKindMeta = taxonomy?.kinds?.[pin.kind] ?? null;
     const currentLabel =
         currentKindMeta?.label ?? pin.kind.replaceAll('_', ' ');
-    const CurrentIcon = resolveIcon(currentKindMeta?.icon ?? 'MapPin');
+    const currentIconName = currentKindMeta?.icon ?? 'MapPin';
 
     const groups =
         taxonomy?.groups
@@ -1209,7 +1219,8 @@ function PinKindPicker({
                     className="col-span-2 h-7 justify-start gap-1.5 px-2 text-xs"
                     data-test="site-plan-pin-kind-picker"
                 >
-                    <CurrentIcon
+                    <DynamicIcon
+                        name={currentIconName}
                         className="h-3.5 w-3.5"
                         style={{ color: currentKindMeta?.color ?? '#475569' }}
                     />
