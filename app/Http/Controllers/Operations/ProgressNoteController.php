@@ -6,7 +6,6 @@ use App\Http\Controllers\Concerns\HandlesOfflineSubmission;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ProgressNote;
-use App\Models\TimelineEvent;
 use App\Models\User;
 use Illuminate\Http\Request;
 
@@ -37,12 +36,12 @@ class ProgressNoteController extends Controller
                 'shift:id,starts_at,ends_at',
                 'goal:id,title,care_plan_id',
             ])
-            ->when(!empty($data['client_id']), fn ($q) => $q->where('client_id', $data['client_id']))
-            ->when(!empty($data['note_type']), fn ($q) => $q->where('note_type', $data['note_type']))
-            ->when(!empty($data['author_id']), fn ($q) => $q->where('author_id', $data['author_id']))
-            ->when(!empty($data['date_from']), fn ($q) => $q->whereDate('created_at', '>=', $data['date_from']))
-            ->when(!empty($data['date_to']), fn ($q) => $q->whereDate('created_at', '<=', $data['date_to']))
-            ->when(!empty($data['emotion']), fn ($q) => $q->whereJsonContains('emotions', $data['emotion']))
+            ->when(! empty($data['client_id']), fn ($q) => $q->where('client_id', $data['client_id']))
+            ->when(! empty($data['note_type']), fn ($q) => $q->where('note_type', $data['note_type']))
+            ->when(! empty($data['author_id']), fn ($q) => $q->where('author_id', $data['author_id']))
+            ->when(! empty($data['date_from']), fn ($q) => $q->whereDate('created_at', '>=', $data['date_from']))
+            ->when(! empty($data['date_to']), fn ($q) => $q->whereDate('created_at', '<=', $data['date_to']))
+            ->when(! empty($data['emotion']), fn ($q) => $q->whereJsonContains('emotions', $data['emotion']))
             ->when(isset($data['flagged']) && $data['flagged'], fn ($q) => $q->flagged())
             ->orderByDesc('created_at')
             ->paginate(20)
@@ -118,40 +117,13 @@ class ProgressNoteController extends Controller
             'author_id' => $auth->id,
         ]);
 
-        $client = Client::find($data['client_id']);
-        $emotionEmojis = collect($data['emotions'] ?? [])->map(fn ($e) => match($e) {
-            'happy' => '😊', 'calm' => '😌', 'excited' => '🤩', 'tired' => '😴',
-            'anxious' => '😰', 'sad' => '😢', 'frustrated' => '😤', 'confused' => '😕',
-            default => $e,
-        })->join(' ');
-
-        TimelineEvent::create([
-            'source_type' => ProgressNote::class,
-            'source_id' => $note->id,
-            'occurred_at' => $data['captured_offline_at'] ?? now(),
-            'type' => 'progress_note',
-            'actor_user_id' => $auth->id,
-            'client_id' => $data['client_id'],
-            'shift_id' => $data['shift_id'] ?? null,
-            'site_id' => $client?->site_id,
-            'subject' => 'Progress note: ' . ucfirst(str_replace('_', ' ', $data['note_type'])) . ($emotionEmojis ? ' ' . $emotionEmojis : ''),
-            'body' => \Illuminate\Support\Str::limit($data['content'], 200),
-            'meta' => array_filter([
-                'note_type' => $data['note_type'],
-                'emotions' => $data['emotions'] ?? null,
-            ]),
-            'visibility' => ($data['visibility'] ?? 'staff_only') === 'include_family' ? 'portal' : 'internal',
-            'is_pinned' => false,
-            'created_by' => $auth->id,
-        ]);
-
         return redirect()->back()->with('success', 'Progress note created.');
     }
 
     public function update(Request $request, $note)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('progress_notes.edit'), 403);
+        abort_unless($auth && $auth->canDo('progress_notes.update'), 403);
 
         $note = ProgressNote::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))

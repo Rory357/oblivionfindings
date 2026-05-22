@@ -25,6 +25,8 @@ class OperationsPermissionsSeeder extends Seeder
             ['key' => 'progress_notes.viewAny', 'description' => 'View Progress Notes'],
             ['key' => 'progress_notes.create', 'description' => 'Create Progress Notes'],
             ['key' => 'progress_notes.update', 'description' => 'Update Progress Notes'],
+            ['key' => 'progress_notes.delete', 'description' => 'Delete Progress Notes'],
+            ['key' => 'progress_notes.review', 'description' => 'Review flagged Progress Notes'],
 
             // Service Agreements
             ['key' => 'service_agreements.viewAny', 'description' => 'View Service Agreements'],

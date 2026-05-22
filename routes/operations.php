@@ -1,10 +1,10 @@
 <?php
 
 use App\Http\Controllers\BreakGlassController;
-// Existing controllers (root namespace)
 use App\Http\Controllers\ClientAssessmentController;
 use App\Http\Controllers\ClientAssignmentController;
 use App\Http\Controllers\ClientController;
+// Existing controllers (root namespace)
 use App\Http\Controllers\ClientDocumentController;
 use App\Http\Controllers\ClientIncidentController;
 use App\Http\Controllers\ClientMarController;
@@ -16,6 +16,9 @@ use App\Http\Controllers\ClientPortalUserController;
 use App\Http\Controllers\ClientRagController;
 use App\Http\Controllers\ClientRiskController;
 use App\Http\Controllers\ClientSupportPlanController;
+use App\Http\Controllers\Clinical\ClientBowelChartController;
+use App\Http\Controllers\Clinical\ClientFluidChartController;
+use App\Http\Controllers\Clinical\ClientSeizureChartController;
 use App\Http\Controllers\CoverageGapController;
 use App\Http\Controllers\CoverageReservationController;
 use App\Http\Controllers\MedicationAdministrationCorrectionController;
@@ -27,10 +30,13 @@ use App\Http\Controllers\Operations\CareNoteTemplateController;
 // New Operations controllers
 use App\Http\Controllers\Operations\CarePlanController;
 use App\Http\Controllers\Operations\CarePlanGoalController;
+use App\Http\Controllers\Operations\ClientActionsController;
 use App\Http\Controllers\Operations\ClientCareController;
 use App\Http\Controllers\Operations\ClientConsentController;
+use App\Http\Controllers\Operations\ClientDailyNoteController;
 use App\Http\Controllers\Operations\ClientFundController;
 use App\Http\Controllers\Operations\ClientOnboardingWorkflowController;
+use App\Http\Controllers\Operations\ClientRoutineController;
 use App\Http\Controllers\Operations\ConsentRequestController;
 use App\Http\Controllers\Operations\CustomFormController;
 use App\Http\Controllers\Operations\DashboardController;
@@ -305,6 +311,110 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     Route::post('/clients/{client}/notes/{note}/pin', [ClientNoteController::class, 'togglePin'])
         ->middleware('permission:timeline.pin|clients.update')
         ->name('operations.clients.notes.pin');
+
+    Route::get('/clients/{client}/daily-notes', [ClientDailyNoteController::class, 'index'])
+        ->middleware('permission:progress_notes.viewAny')
+        ->whereNumber('client')
+        ->name('operations.clients.daily-notes.index');
+    Route::post('/clients/{client}/daily-notes', [ClientDailyNoteController::class, 'store'])
+        ->middleware('permission:progress_notes.create|timeline.create')
+        ->whereNumber('client')
+        ->name('operations.clients.daily-notes.store');
+    Route::put('/clients/{client}/daily-notes/{note}', [ClientDailyNoteController::class, 'update'])
+        ->middleware('permission:progress_notes.update')
+        ->whereNumber('client')
+        ->whereNumber('note')
+        ->name('operations.clients.daily-notes.update');
+    Route::delete('/clients/{client}/daily-notes/{note}', [ClientDailyNoteController::class, 'destroy'])
+        ->middleware('permission:progress_notes.delete|progress_notes.update')
+        ->whereNumber('client')
+        ->whereNumber('note')
+        ->name('operations.clients.daily-notes.destroy');
+    Route::post('/clients/{client}/daily-notes/{note}/flag', [ClientDailyNoteController::class, 'flag'])
+        ->middleware('permission:progress_notes.update|progress_notes.review')
+        ->whereNumber('client')
+        ->whereNumber('note')
+        ->name('operations.clients.daily-notes.flag');
+    Route::get('/clients/{client}/daily-notes/review-queue', [ClientDailyNoteController::class, 'reviewQueue'])
+        ->middleware('permission:progress_notes.review')
+        ->whereNumber('client')
+        ->name('operations.clients.daily-notes.review-queue');
+    Route::post('/clients/{client}/daily-notes/{note}/review', [ClientDailyNoteController::class, 'review'])
+        ->middleware('permission:progress_notes.review')
+        ->whereNumber('client')
+        ->whereNumber('note')
+        ->name('operations.clients.daily-notes.review');
+
+    Route::get('/clients/{client}/health/bowel', [ClientBowelChartController::class, 'index'])
+        ->middleware('permission:medications.view')
+        ->whereNumber('client')
+        ->name('operations.clients.health.bowel.index');
+    Route::post('/clients/{client}/health/bowel', [ClientBowelChartController::class, 'store'])
+        ->middleware('permission:medications.administer.record|clients.update')
+        ->whereNumber('client')
+        ->name('operations.clients.health.bowel.store');
+    Route::put('/clients/{client}/health/bowel/{entry}', [ClientBowelChartController::class, 'update'])
+        ->middleware('permission:medications.administer.record|clients.update')
+        ->whereNumber('client')
+        ->whereNumber('entry')
+        ->name('operations.clients.health.bowel.update');
+    Route::delete('/clients/{client}/health/bowel/{entry}', [ClientBowelChartController::class, 'destroy'])
+        ->middleware('permission:medications.administer.record|clients.update')
+        ->whereNumber('client')
+        ->whereNumber('entry')
+        ->name('operations.clients.health.bowel.destroy');
+    Route::get('/clients/{client}/health/fluid', [ClientFluidChartController::class, 'index'])
+        ->middleware('permission:medications.view')
+        ->whereNumber('client')
+        ->name('operations.clients.health.fluid.index');
+    Route::post('/clients/{client}/health/fluid', [ClientFluidChartController::class, 'store'])
+        ->middleware('permission:medications.administer.record|clients.update')
+        ->whereNumber('client')
+        ->name('operations.clients.health.fluid.store');
+    Route::put('/clients/{client}/health/fluid/{entry}', [ClientFluidChartController::class, 'update'])
+        ->middleware('permission:medications.administer.record|clients.update')
+        ->whereNumber('client')
+        ->whereNumber('entry')
+        ->name('operations.clients.health.fluid.update');
+    Route::delete('/clients/{client}/health/fluid/{entry}', [ClientFluidChartController::class, 'destroy'])
+        ->middleware('permission:medications.administer.record|clients.update')
+        ->whereNumber('client')
+        ->whereNumber('entry')
+        ->name('operations.clients.health.fluid.destroy');
+    Route::get('/clients/{client}/health/seizure', [ClientSeizureChartController::class, 'index'])
+        ->middleware('permission:medications.view')
+        ->whereNumber('client')
+        ->name('operations.clients.health.seizure.index');
+    Route::post('/clients/{client}/health/seizure', [ClientSeizureChartController::class, 'store'])
+        ->middleware('permission:medications.administer.record|clients.update')
+        ->whereNumber('client')
+        ->name('operations.clients.health.seizure.store');
+    Route::put('/clients/{client}/health/seizure/{entry}', [ClientSeizureChartController::class, 'update'])
+        ->middleware('permission:medications.administer.record|clients.update')
+        ->whereNumber('client')
+        ->whereNumber('entry')
+        ->name('operations.clients.health.seizure.update');
+    Route::delete('/clients/{client}/health/seizure/{entry}', [ClientSeizureChartController::class, 'destroy'])
+        ->middleware('permission:medications.administer.record|clients.update')
+        ->whereNumber('client')
+        ->whereNumber('entry')
+        ->name('operations.clients.health.seizure.destroy');
+
+    Route::get('/clients/{client}/routines', [ClientRoutineController::class, 'index'])
+        ->whereNumber('client')
+        ->name('operations.clients.routines.index');
+    Route::post('/clients/{client}/routines/reorder', [ClientRoutineController::class, 'reorder'])
+        ->middleware('permission:clients.update')
+        ->whereNumber('client')
+        ->name('operations.clients.routines.reorder');
+    Route::post('/clients/{client}/routines/{block}', [ClientRoutineController::class, 'upsertBlock'])
+        ->middleware('permission:clients.update')
+        ->whereNumber('client')
+        ->name('operations.clients.routines.upsert');
+
+    Route::get('/clients/{client}/actions', [ClientActionsController::class, 'index'])
+        ->whereNumber('client')
+        ->name('operations.clients.actions.index');
 
     // Medication stock updates
     Route::put('/clients/{client}/medical/medications/{medication}/stock', [ClientMedicalController::class, 'updateMedicationStock'])

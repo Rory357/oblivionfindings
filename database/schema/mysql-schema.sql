@@ -1971,6 +1971,7 @@ CREATE TABLE `client_notes` (
   `shift_id` bigint unsigned DEFAULT NULL,
   `user_id` bigint unsigned NOT NULL,
   `type` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'note',
+  `category` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `subject` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `goal` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `body` text COLLATE utf8mb4_unicode_ci NOT NULL,
@@ -1986,17 +1987,136 @@ CREATE TABLE `client_notes` (
   `is_private` tinyint(1) NOT NULL DEFAULT '0',
   `attachments` json DEFAULT NULL,
   `mood_rating` tinyint DEFAULT NULL,
+  `behaviour_tags` json DEFAULT NULL,
+  `concerns_flags` json DEFAULT NULL,
+  `follow_up_action` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `follow_up_due_at` datetime DEFAULT NULL,
+  `follow_up_completed_at` datetime DEFAULT NULL,
+  `appears_on_timeline` tinyint(1) NOT NULL DEFAULT '1',
+  `is_draft` tinyint(1) NOT NULL DEFAULT '0',
+  `contact_person` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `contact_relationship` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `contact_method` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
   `organization_id` bigint unsigned DEFAULT NULL,
   PRIMARY KEY (`id`),
   KEY `client_notes_client_id_foreign` (`client_id`),
   KEY `client_notes_user_id_foreign` (`user_id`),
   KEY `client_notes_shift_id_foreign` (`shift_id`),
   KEY `client_notes_reviewed_by_foreign` (`reviewed_by`),
+  KEY `client_notes_category_index` (`category`),
+  KEY `client_notes_follow_up_due_at_index` (`follow_up_due_at`),
+  KEY `client_notes_is_draft_index` (`is_draft`),
+  KEY `client_notes_review_queue_idx` (`client_id`,`is_flagged`,`reviewed_at`),
   KEY `client_notes_organization_id_index` (`organization_id`),
   CONSTRAINT `client_notes_client_id_foreign` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE,
   CONSTRAINT `client_notes_reviewed_by_foreign` FOREIGN KEY (`reviewed_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
   CONSTRAINT `client_notes_shift_id_foreign` FOREIGN KEY (`shift_id`) REFERENCES `shifts` (`id`) ON DELETE SET NULL,
   CONSTRAINT `client_notes_user_id_foreign` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `client_bowel_entries`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `client_bowel_entries` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `client_id` bigint unsigned NOT NULL,
+  `organization_id` bigint unsigned DEFAULT NULL,
+  `occurred_at` datetime NOT NULL,
+  `bristol_type` tinyint unsigned NOT NULL,
+  `volume` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `notes` text COLLATE utf8mb4_unicode_ci,
+  `recorded_by` bigint unsigned DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `client_bowel_entries_client_id_foreign` (`client_id`),
+  KEY `client_bowel_entries_recorded_by_foreign` (`recorded_by`),
+  KEY `client_bowel_entries_organization_id_index` (`organization_id`),
+  KEY `client_bowel_entries_occurred_at_index` (`occurred_at`),
+  KEY `client_bowel_entries_client_id_occurred_at_index` (`client_id`,`occurred_at`),
+  CONSTRAINT `client_bowel_entries_client_id_foreign` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `client_bowel_entries_recorded_by_foreign` FOREIGN KEY (`recorded_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `client_fluid_entries`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `client_fluid_entries` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `client_id` bigint unsigned NOT NULL,
+  `organization_id` bigint unsigned DEFAULT NULL,
+  `occurred_at` datetime NOT NULL,
+  `direction` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `fluid_type` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `volume_ml` int unsigned NOT NULL,
+  `notes` text COLLATE utf8mb4_unicode_ci,
+  `recorded_by` bigint unsigned DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `client_fluid_entries_client_id_foreign` (`client_id`),
+  KEY `client_fluid_entries_recorded_by_foreign` (`recorded_by`),
+  KEY `client_fluid_entries_organization_id_index` (`organization_id`),
+  KEY `client_fluid_entries_occurred_at_index` (`occurred_at`),
+  KEY `client_fluid_entries_client_id_occurred_at_index` (`client_id`,`occurred_at`),
+  KEY `client_fluid_entries_client_id_direction_occurred_at_index` (`client_id`,`direction`,`occurred_at`),
+  CONSTRAINT `client_fluid_entries_client_id_foreign` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `client_fluid_entries_recorded_by_foreign` FOREIGN KEY (`recorded_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `client_seizure_entries`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `client_seizure_entries` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `client_id` bigint unsigned NOT NULL,
+  `organization_id` bigint unsigned DEFAULT NULL,
+  `occurred_at` datetime NOT NULL,
+  `duration_seconds` int unsigned DEFAULT NULL,
+  `seizure_type` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `trigger` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `response_taken` text COLLATE utf8mb4_unicode_ci,
+  `recovery_notes` text COLLATE utf8mb4_unicode_ci,
+  `escalated` tinyint(1) NOT NULL DEFAULT '0',
+  `follow_up_action` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `recorded_by` bigint unsigned DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `client_seizure_entries_client_id_foreign` (`client_id`),
+  KEY `client_seizure_entries_recorded_by_foreign` (`recorded_by`),
+  KEY `client_seizure_entries_organization_id_index` (`organization_id`),
+  KEY `client_seizure_entries_occurred_at_index` (`occurred_at`),
+  KEY `client_seizure_entries_client_id_occurred_at_index` (`client_id`,`occurred_at`),
+  KEY `client_seizure_entries_client_id_escalated_index` (`client_id`,`escalated`),
+  CONSTRAINT `client_seizure_entries_client_id_foreign` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `client_seizure_entries_recorded_by_foreign` FOREIGN KEY (`recorded_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `client_routines`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `client_routines` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `client_id` bigint unsigned NOT NULL,
+  `organization_id` bigint unsigned DEFAULT NULL,
+  `time_block` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `body` text COLLATE utf8mb4_unicode_ci,
+  `display_order` smallint unsigned NOT NULL DEFAULT '0',
+  `updated_by` bigint unsigned DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `client_routines_client_block_unique` (`client_id`,`time_block`),
+  KEY `client_routines_updated_by_foreign` (`updated_by`),
+  KEY `client_routines_organization_id_index` (`organization_id`),
+  KEY `client_routines_client_id_display_order_index` (`client_id`,`display_order`),
+  CONSTRAINT `client_routines_client_id_foreign` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `client_routines_updated_by_foreign` FOREIGN KEY (`updated_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `client_onboarding_overrides`;
@@ -19097,3 +19217,5 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (543,'2026_05_19_10
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (544,'2026_05_20_100000_governance_audit_log_user_nullable_and_settings',2);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (545,'2026_05_20_100100_create_spend_approvals_and_budget_allocations',2);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (546,'2026_05_21_100000_demote_budget_line_item_gl_account_id_to_advisory',3);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (547,'2026_05_22_000001_add_daily_note_fields_to_client_notes_table',3);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (548,'2026_05_22_000002_create_client_health_and_routine_tables',3);

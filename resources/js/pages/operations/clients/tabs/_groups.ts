@@ -1,16 +1,17 @@
 /**
- * Semantic grouping for the 22 client profile tabs.
+ * Semantic grouping for the phase-one 20-tab client profile rail.
  *
- * Keys here MUST match the `key` field on the ClientTab objects defined in
- * `show.tsx`. Tabs that aren't listed here fall into the "other" group at
- * the end (currently empty, but it's a guardrail for future additions).
+ * Keys here match the visible top-level ClientTab keys in `show.tsx`. Legacy
+ * tabs remain reachable as folded related sections, but do not appear in the
+ * primary web navigation rail.
  */
 export type ClientTabGroupKey =
-    | 'live'
-    | 'care'
-    | 'records'
-    | 'logistics'
-    | 'compliance'
+    | 'snapshot'
+    | 'daily'
+    | 'plans'
+    | 'health'
+    | 'operations'
+    | 'governance'
     | 'other';
 
 export type ClientTabGroup = {
@@ -21,29 +22,49 @@ export type ClientTabGroup = {
 
 export const CLIENT_TAB_GROUPS: ClientTabGroup[] = [
     {
-        key: 'live',
-        label: 'Live status',
-        tabKeys: ['profile', 'onboarding', 'location'],
+        key: 'snapshot',
+        label: 'Snapshot',
+        tabKeys: ['profile', 'personal_details'],
     },
     {
-        key: 'care',
-        label: 'Care delivery',
-        tabKeys: ['medical', 'mar', 'meal_prefs', 'observations', 'care_plans', 'progress_notes'],
+        key: 'daily',
+        label: 'Daily care',
+        tabKeys: [
+            'progress_notes',
+            'timeline',
+            'communication_notes',
+            'rhythms_routines',
+        ],
     },
     {
-        key: 'records',
-        label: 'Records',
-        tabKeys: ['assessments', 'timeline', 'documents', 'photos'],
+        key: 'plans',
+        label: 'Plans & goals',
+        tabKeys: ['care_plans', 'goals_path', 'observations'],
     },
     {
-        key: 'logistics',
-        label: 'Logistics',
-        tabKeys: ['calendar', 'transport', 'personal_assets', 'respite'],
+        key: 'health',
+        label: 'Health & safety',
+        tabKeys: [
+            'health_monitoring',
+            'incidents_accidents',
+            'risk_management',
+        ],
     },
     {
-        key: 'compliance',
-        label: 'Compliance & relationships',
-        tabKeys: ['consents', 'consent-requests', 'service_agreements', 'portal', 'family_notes', 'assignments'],
+        key: 'operations',
+        label: 'Day-to-day operations',
+        tabKeys: [
+            'calendar',
+            'leave_excursions',
+            'personal_assets',
+            'finance',
+            'documents',
+        ],
+    },
+    {
+        key: 'governance',
+        label: 'Relationships & governance',
+        tabKeys: ['family_tree', 'actions_reviews', 'audit_history'],
     },
 ];
 

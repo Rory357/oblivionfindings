@@ -2,22 +2,38 @@
 
 namespace App\Providers;
 
+use App\Domain\Finance\Events\JournalPosted;
 use App\Domain\Hr\Models\HrCourseEnrollment;
 use App\Domain\Hr\Models\HrExpenseClaim;
+use App\Domain\Roadmap\Events\InitiativeScored;
+use App\Domain\Roadmap\Events\QuarterlyPlanPublished;
+use App\Domain\SecurityDevices\Models\DeviceEvent;
 use App\Events\FleetSignalEmitted;
 use App\Events\FleetWanderingAlertTriggered;
+use App\Listeners\Finance\AllocatePayrollCosts;
+use App\Listeners\Finance\LogJournalPosted;
+use App\Listeners\Governance\LogQuarterlyPlanPublished;
+use App\Listeners\Roadmap\LogInitiativeScored;
 use App\Models\AssetMaintenanceLog;
 use App\Models\Client;
+use App\Models\ClientAppointment;
+use App\Models\ClientAssessment;
+use App\Models\ClientBowelEntry;
+use App\Models\ClientDocument;
+use App\Models\ClientFluidEntry;
 use App\Models\ClientFundTransaction;
 use App\Models\ClientIncident;
 use App\Models\ClientLedgerEntry;
 use App\Models\ClientNote;
+use App\Models\ClientRoutine;
+use App\Models\ClientSeizureEntry;
 use App\Models\EmergencyDrill;
 use App\Models\FleetFuelLog;
 use App\Models\FleetIncident;
 use App\Models\FleetWorkOrder;
 use App\Models\FundingClaim;
 use App\Models\HouseLedgerEntry;
+use App\Models\ProgressNote;
 use App\Models\RestraintEvent;
 use App\Models\SafeguardingConcern;
 use App\Models\Shift;
@@ -32,6 +48,7 @@ use App\Observers\ClientFundTransactionObserver;
 use App\Observers\ClientIncidentObserver;
 use App\Observers\ClientLedgerEntryObserver;
 use App\Observers\ClientNoteObserver;
+use App\Observers\DeviceEventObserver;
 use App\Observers\EmergencyDrillObserver;
 use App\Observers\FleetFuelLogObserver;
 use App\Observers\FleetIncidentObserver;
@@ -40,6 +57,7 @@ use App\Observers\FundingClaimObserver;
 use App\Observers\HouseLedgerEntryObserver;
 use App\Observers\HrCourseEnrollmentObserver;
 use App\Observers\HrExpenseClaimObserver;
+use App\Observers\ProjectsToTimelineObserver;
 use App\Observers\RestraintEventObserver;
 use App\Observers\SafeguardingConcernObserver;
 use App\Observers\ShiftObserver;
@@ -49,6 +67,9 @@ use App\Observers\SiteObserver;
 use App\Observers\TimesheetMileageObserver;
 use App\Observers\WorkplaceInjuryObserver;
 use App\Services\AuditLogger;
+use App\Services\Catering\DeliveryProviders\DeliveryProviderManager;
+use App\Services\Integration\Adapters\MilesightAdapter;
+use App\Services\Integration\Adapters\QueclinkAdapter;
 use App\Services\Integration\Adapters\UnifiAdapter;
 use App\Services\Integration\IntegrationAdapterRegistry;
 use App\Services\Notifications\ExpoPushProvider;
@@ -64,6 +85,9 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Event;
 use Illuminate\Support\Facades\RateLimiter;
 use Illuminate\Support\ServiceProvider;
+use SocialiteProviders\Google\GoogleExtendSocialite;
+use SocialiteProviders\Manager\SocialiteWasCalled;
+use SocialiteProviders\Microsoft\MicrosoftExtendSocialite;
 
 class AppServiceProvider extends ServiceProvider
 {
@@ -86,12 +110,12 @@ class AppServiceProvider extends ServiceProvider
             $registry = new IntegrationAdapterRegistry;
             $registry->register('unifi', UnifiAdapter::class);
             $registry->register(
-                \App\Services\Integration\Adapters\QueclinkAdapter::PROVIDER_SLUG,
-                \App\Services\Integration\Adapters\QueclinkAdapter::class,
+                QueclinkAdapter::PROVIDER_SLUG,
+                QueclinkAdapter::class,
             );
             $registry->register(
-                \App\Services\Integration\Adapters\MilesightAdapter::PROVIDER_SLUG,
-                \App\Services\Integration\Adapters\MilesightAdapter::class,
+                MilesightAdapter::PROVIDER_SLUG,
+                MilesightAdapter::class,
             );
 
             return $registry;
@@ -124,7 +148,7 @@ class AppServiceProvider extends ServiceProvider
             };
         });
 
-        $this->app->singleton(\App\Services\Catering\DeliveryProviders\DeliveryProviderManager::class);
+        $this->app->singleton(DeliveryProviderManager::class);
     }
 
     /**
@@ -139,15 +163,24 @@ class AppServiceProvider extends ServiceProvider
 
         Shift::observe(ShiftObserver::class);
         ClientNote::observe(ClientNoteObserver::class);
+        ProgressNote::observe(ProjectsToTimelineObserver::class);
+        ClientBowelEntry::observe(ProjectsToTimelineObserver::class);
+        ClientFluidEntry::observe(ProjectsToTimelineObserver::class);
+        ClientSeizureEntry::observe(ProjectsToTimelineObserver::class);
+        ClientRoutine::observe(ProjectsToTimelineObserver::class);
+        ClientAppointment::observe(ProjectsToTimelineObserver::class);
+        ClientAssessment::observe(ProjectsToTimelineObserver::class);
+        ClientDocument::observe(ProjectsToTimelineObserver::class);
         Site::observe(SiteObserver::class);
         SiteHazard::observe(SiteHazardObserver::class);
         SiteChecklistRun::observe(SiteChecklistRunObserver::class);
-        \App\Domain\SecurityDevices\Models\DeviceEvent::observe(
-            \App\Observers\DeviceEventObserver::class,
+        DeviceEvent::observe(
+            DeviceEventObserver::class,
         );
 
         // H&S → Control Room bridge observers
         ClientIncident::observe(ClientIncidentObserver::class);
+        ClientIncident::observe(ProjectsToTimelineObserver::class);
         SafeguardingConcern::observe(SafeguardingConcernObserver::class);
         FleetIncident::observe(FleetIncidentObserver::class);
         WorkplaceInjury::observe(WorkplaceInjuryObserver::class);
@@ -168,12 +201,12 @@ class AppServiceProvider extends ServiceProvider
 
         // Register Socialite providers (Microsoft + Google)
         Event::listen(
-            \SocialiteProviders\Manager\SocialiteWasCalled::class,
-            [\SocialiteProviders\Microsoft\MicrosoftExtendSocialite::class, 'handle']
+            SocialiteWasCalled::class,
+            [MicrosoftExtendSocialite::class, 'handle']
         );
         Event::listen(
-            \SocialiteProviders\Manager\SocialiteWasCalled::class,
-            [\SocialiteProviders\Google\GoogleExtendSocialite::class, 'handle']
+            SocialiteWasCalled::class,
+            [GoogleExtendSocialite::class, 'handle']
         );
 
         Event::listen(FleetSignalEmitted::class, function (FleetSignalEmitted $event) {
@@ -208,20 +241,20 @@ class AppServiceProvider extends ServiceProvider
 
         // Cross-domain event listeners
         Event::listen(
-            \App\Domain\Finance\Events\JournalPosted::class,
-            \App\Listeners\Finance\LogJournalPosted::class
+            JournalPosted::class,
+            LogJournalPosted::class
         );
         Event::listen(
-            \App\Domain\Finance\Events\JournalPosted::class,
-            \App\Listeners\Finance\AllocatePayrollCosts::class
+            JournalPosted::class,
+            AllocatePayrollCosts::class
         );
         Event::listen(
-            \App\Domain\Roadmap\Events\InitiativeScored::class,
-            \App\Listeners\Roadmap\LogInitiativeScored::class
+            InitiativeScored::class,
+            LogInitiativeScored::class
         );
         Event::listen(
-            \App\Domain\Roadmap\Events\QuarterlyPlanPublished::class,
-            \App\Listeners\Governance\LogQuarterlyPlanPublished::class
+            QuarterlyPlanPublished::class,
+            LogQuarterlyPlanPublished::class
         );
 
         // Treat password setup/reset as email verification if user is not verified yet.
@@ -309,9 +342,10 @@ class AppServiceProvider extends ServiceProvider
             if (str_contains(strtolower($currentPath), strtolower($directory))) {
                 return; // already on PATH
             }
-            putenv('PATH=' . $directory . PATH_SEPARATOR . $currentPath);
-            $_ENV['PATH'] = $directory . PATH_SEPARATOR . $currentPath;
-            $_SERVER['PATH'] = $directory . PATH_SEPARATOR . $currentPath;
+            putenv('PATH='.$directory.PATH_SEPARATOR.$currentPath);
+            $_ENV['PATH'] = $directory.PATH_SEPARATOR.$currentPath;
+            $_SERVER['PATH'] = $directory.PATH_SEPARATOR.$currentPath;
+
             return;
         }
     }

@@ -2,17 +2,17 @@
 
 namespace App\Models;
 
+use App\Contracts\Timeline\EmitsToTimeline;
 use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 use Illuminate\Database\Eloquent\Relations\HasMany;
-use Illuminate\Database\Eloquent\Relations\HasManyThrough;
 
 /**
  * @property string $type e.g. injury, behaviour, medication, safeguarding, near_miss
  */
-class ClientIncident extends Model
+class ClientIncident extends Model implements EmitsToTimeline
 {
     use AuditableChanges;
     use HasFactory;
@@ -155,7 +155,7 @@ class ClientIncident extends Model
 
     public function isShiftLinked(): bool
     {
-        return !empty($this->shift_id);
+        return ! empty($this->shift_id);
     }
 
     public function getCategoryAttribute(): ?string
@@ -170,25 +170,53 @@ class ClientIncident extends Model
 
     public function isSubmitted(): bool
     {
-        return !empty($this->submitted_at) || $this->status !== 'draft';
+        return ! empty($this->submitted_at) || $this->status !== 'draft';
     }
 
     public function isEditableByReporter(User $user): bool
     {
-        if ((int)$this->reported_by !== (int)$user->id) {
+        if ((int) $this->reported_by !== (int) $user->id) {
             return false;
         }
 
         // Shift-linked incidents: editable until the shift ends.
         if ($this->isShiftLinked()) {
             $shift = $this->shift;
-            if (!$shift) {
+            if (! $shift) {
                 return false;
             }
-            return !$shift->isEnded();
+
+            return ! $shift->isEnded();
         }
 
         // Standalone incidents: editable until explicitly submitted.
         return empty($this->submitted_at) && $this->status === 'draft';
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    public function toTimelineEvent(): array
+    {
+        $this->loadMissing('client');
+
+        return [
+            'type' => 'incident',
+            'occurred_at' => $this->occurred_at ?? $this->created_at ?? now(),
+            'actor_user_id' => $this->reported_by,
+            'client_id' => $this->client_id,
+            'shift_id' => $this->shift_id,
+            'site_id' => $this->client?->site_id,
+            'subject' => 'Incident: '.($this->title ?? $this->type),
+            'body' => $this->description,
+            'meta' => array_filter([
+                'severity' => $this->severity,
+                'status' => $this->status,
+                'requires_followup' => $this->requires_followup,
+            ], fn ($value) => $value !== null && $value !== ''),
+            'visibility' => 'internal',
+            'is_pinned' => false,
+            'created_by' => $this->reported_by,
+        ];
     }
 }
