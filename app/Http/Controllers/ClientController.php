@@ -314,7 +314,7 @@ class ClientController extends Controller
         $documents = ClientDocument::query()
             ->where('client_id', $client->id)
             ->orderByDesc('created_at')
-            ->get(['id', 'title', 'category', 'version', 'effective_date', 'expiry_date', 'portal_visible', 'notes', 'original_name', 'mime_type', 'size_bytes', 'created_at']);
+            ->get(['id', 'title', 'category', 'folder', 'version', 'effective_date', 'expiry_date', 'portal_visible', 'notes', 'original_name', 'mime_type', 'size_bytes', 'created_at']);
 
         $events = TimelineEvent::query()
             ->where('client_id', $client->id)
@@ -783,11 +783,12 @@ class ClientController extends Controller
                 ->orderByDesc('created_at')
                 ->get(),
 
-            // Active risks
+            // Risks (active first, inactive shown below for management)
             'client_risks' => ClientRisk::where('client_id', $client->id)
-                ->where('active', true)
-                ->orderByDesc('severity')
-                ->limit(10)
+                ->orderByDesc('active')
+                ->orderByRaw("FIELD(severity, 'critical', 'high', 'medium', 'low')")
+                ->orderBy('label')
+                ->limit(50)
                 ->get(),
 
             // Recent incidents (last 5)
@@ -876,6 +877,11 @@ class ClientController extends Controller
                 'record_observation' => $request->user()?->canDo('clinical.observations.record') ?? false,
                 'record_clinical_observation' => $request->user()?->canDo('clinical.observations.recordClinical') ?? false,
                 'record_event' => $request->user()?->canDo('clinical.events.record') ?? false,
+                'manage_risks' => ($request->user()?->canDo('risks.create') ?? false)
+                    || ($request->user()?->canDo('risks.update') ?? false),
+                'create_risks' => $request->user()?->canDo('risks.create') ?? false,
+                'update_risks' => $request->user()?->canDo('risks.update') ?? false,
+                'delete_risks' => $request->user()?->canDo('risks.delete') ?? false,
             ],
             'pending_visit_count' => FamilyVisitRequest::where('client_id', $client->id)->where('status', 'pending')->count(),
             'pending_consent_requests_count' => $this->buildPendingConsentRequestCount($client),

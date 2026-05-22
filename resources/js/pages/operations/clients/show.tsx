@@ -101,11 +101,13 @@ import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FoodMealPreferences } from './_food-meal-preferences';
 import { BehaviourInsightsCard } from '@/components/behaviour-insights-card';
 import { AuditHistoryTab } from './tabs/audit-history';
+import { DocumentsTab } from './tabs/documents';
 import { FamilyTreeTab } from './tabs/family-tree';
 import { FinanceTab } from './tabs/finance';
 import { GoalsPathTab } from './tabs/goals-path';
 import { LeaveExcursionsTab } from './tabs/leave-excursions';
 import { PersonalDetailsTab } from './tabs/personal-details';
+import { RiskManagementTab } from './tabs/risk-management';
 
 function Field({ label, value }: { label: string; value: string }) {
     return (
@@ -856,7 +858,10 @@ export default function ClientShow({
                 label: 'Risk Management',
                 icon: ShieldAlert,
                 show: true,
-                count: (pageProps.client_risks ?? []).length || undefined,
+                count:
+                    (pageProps.client_risks ?? []).filter(
+                        (r: any) => r.active,
+                    ).length || undefined,
             },
             {
                 key: 'incidents_accidents',
@@ -5335,20 +5340,12 @@ export default function ClientShow({
                 )}
 
                 {tab === 'risk_management' && (
-                    <ClientProfilePlaceholder
-                        title="Risk Management"
-                        description="Active risks remain backed by the existing risk data and review actions."
-                        items={(pageProps.client_risks ?? []).map(
-                            (risk: any) => [
-                                risk.label ?? risk.title ?? 'Risk',
-                                `${risk.severity ?? 'unknown'}${
-                                    risk.review_date
-                                        ? ` - review ${risk.review_date}`
-                                        : ''
-                                }`,
-                            ],
-                        )}
-                        emptyLabel="No active risks are shown for this client."
+                    <RiskManagementTab
+                        clientId={client.id}
+                        risks={(pageProps.client_risks ?? []) as any}
+                        canCreate={Boolean((can as any).create_risks)}
+                        canUpdate={Boolean((can as any).update_risks)}
+                        canDelete={Boolean((can as any).delete_risks)}
                     />
                 )}
 
@@ -5758,215 +5755,14 @@ export default function ClientShow({
                     />
                 )}
 
-                {tab === 'documents' &&
-                    (() => {
-                        const FILE_ICONS: Record<
-                            string,
-                            { color: string; bg: string }
-                        > = {
-                            pdf: {
-                                color: 'text-status-critical',
-                                bg: 'bg-status-critical-bg',
-                            },
-                            doc: {
-                                color: 'text-status-info',
-                                bg: 'bg-status-info-bg',
-                            },
-                            docx: {
-                                color: 'text-status-info',
-                                bg: 'bg-status-info-bg',
-                            },
-                            xls: {
-                                color: 'text-status-success',
-                                bg: 'bg-status-success-bg',
-                            },
-                            xlsx: {
-                                color: 'text-status-success',
-                                bg: 'bg-status-success-bg',
-                            },
-                            jpg: {
-                                color: 'text-status-warning',
-                                bg: 'bg-status-warning-bg',
-                            },
-                            jpeg: {
-                                color: 'text-status-warning',
-                                bg: 'bg-status-warning-bg',
-                            },
-                            png: {
-                                color: 'text-status-warning',
-                                bg: 'bg-status-warning-bg',
-                            },
-                        };
-                        const getFileStyle = (name?: string) => {
-                            const ext =
-                                (name ?? '').split('.').pop()?.toLowerCase() ??
-                                '';
-                            return (
-                                FILE_ICONS[ext] ?? {
-                                    color: 'text-primary',
-                                    bg: 'bg-primary/10',
-                                }
-                            );
-                        };
-                        const CAT_COLORS: Record<string, string> = {
-                            care_plan: 'bg-primary/10 text-primary',
-                            assessment: 'bg-status-info-bg text-status-info',
-                            medical:
-                                'bg-status-critical-bg text-status-critical',
-                            legal: 'bg-status-warning-bg text-status-warning',
-                            policy: 'bg-status-success-bg text-status-success',
-                            consent: 'bg-primary/10 text-primary',
-                        };
+                {tab === 'documents' && (
+                    <DocumentsTab
+                        clientId={client.id}
+                        clientName={client.first_name ?? name}
+                        documents={(documents ?? []) as any}
+                    />
+                )}
 
-                        const grouped = (documents ?? []).reduce(
-                            (acc: Record<string, any[]>, d: any) => {
-                                const folder = d.folder || 'Unfiled';
-                                if (!acc[folder]) acc[folder] = [];
-                                acc[folder].push(d);
-                                return acc;
-                            },
-                            {} as Record<string, any[]>,
-                        );
-
-                        return (
-                            <div className="space-y-4">
-                                {/* Header */}
-                                <div className="flex items-center justify-between">
-                                    <div className="flex items-center gap-2">
-                                        <span className="text-sm font-medium">
-                                            {(documents ?? []).length} documents
-                                        </span>
-                                        {(documents ?? []).some(
-                                            (d: any) =>
-                                                d.expires_at &&
-                                                new Date(d.expires_at) <
-                                                    new Date(),
-                                        ) && (
-                                            <Badge className="border-0 bg-status-critical-bg text-[10px] text-status-critical">
-                                                Has expired
-                                            </Badge>
-                                        )}
-                                    </div>
-                                    <Button
-                                        size="sm"
-                                        className="gap-1.5 bg-primary hover:bg-primary"
-                                        asChild
-                                    >
-                                        <Link
-                                            href={`/operations/clients/${client.id}/documents`}
-                                        >
-                                            Manage Documents
-                                        </Link>
-                                    </Button>
-                                </div>
-
-                                {/* Grid */}
-                                {(documents ?? []).length === 0 ? (
-                                    <Card className="border-dashed">
-                                        <CardContent className="flex flex-col items-center justify-center py-12">
-                                            <div className="mb-3 flex h-14 w-14 items-center justify-center rounded-2xl bg-primary/10">
-                                                <FolderOpen className="h-7 w-7 text-primary" />
-                                            </div>
-                                            <p className="font-medium">
-                                                No Documents
-                                            </p>
-                                            <p className="mt-1 text-sm text-muted-foreground">
-                                                Upload documents for{' '}
-                                                {client.first_name}.
-                                            </p>
-                                        </CardContent>
-                                    </Card>
-                                ) : (
-                                    Object.entries(grouped).map(
-                                        ([folder, docs]) => (
-                                            <div key={folder}>
-                                                <div className="mb-2 flex items-center gap-2">
-                                                    <FolderOpen className="h-4 w-4 text-status-warning" />
-                                                    <span className="text-xs font-semibold tracking-wider text-muted-foreground uppercase">
-                                                        {folder}
-                                                    </span>
-                                                    <Badge
-                                                        variant="secondary"
-                                                        className="text-[10px]"
-                                                    >
-                                                        {(docs as any[]).length}
-                                                    </Badge>
-                                                </div>
-                                                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3 lg:grid-cols-4">
-                                                    {(docs as any[]).map(
-                                                        (d: any) => {
-                                                            const fi =
-                                                                getFileStyle(
-                                                                    d.original_name,
-                                                                );
-                                                            const expired =
-                                                                d.expires_at &&
-                                                                new Date(
-                                                                    d.expires_at,
-                                                                ) < new Date();
-                                                            const expiring =
-                                                                d.expires_at &&
-                                                                !expired &&
-                                                                new Date(
-                                                                    d.expires_at,
-                                                                ).getTime() -
-                                                                    Date.now() <
-                                                                    30 *
-                                                                        86400000;
-                                                            return (
-                                                                <a
-                                                                    key={d.id}
-                                                                    href={`/operations/clients/${client.id}/documents/${d.id}/download`}
-                                                                    className={`group rounded-xl border bg-card p-4 text-center transition-all hover:-translate-y-0.5 hover:shadow-md ${expired ? 'border-status-critical/30' : expiring ? 'border-status-warning/30' : ''}`}
-                                                                >
-                                                                    <div
-                                                                        className={`mx-auto mb-2 flex h-12 w-12 items-center justify-center rounded-xl ${fi.bg}`}
-                                                                    >
-                                                                        <FileText
-                                                                            className={`h-6 w-6 ${fi.color}`}
-                                                                        />
-                                                                    </div>
-                                                                    <p className="line-clamp-2 text-xs leading-tight font-medium">
-                                                                        {d.title ||
-                                                                            d.original_name}
-                                                                    </p>
-                                                                    <div className="mt-1.5 flex items-center justify-center gap-1">
-                                                                        {d.portal_visible && (
-                                                                            <Globe className="h-3 w-3 text-status-info" />
-                                                                        )}
-                                                                        {expired && (
-                                                                            <Badge className="h-4 border-0 bg-status-critical-bg px-1 text-[8px] text-status-critical">
-                                                                                Expired
-                                                                            </Badge>
-                                                                        )}
-                                                                        {expiring && (
-                                                                            <Badge className="h-4 border-0 bg-status-warning-bg px-1 text-[8px] text-status-warning">
-                                                                                Expiring
-                                                                            </Badge>
-                                                                        )}
-                                                                        {d.category && (
-                                                                            <Badge
-                                                                                className={`h-4 border-0 px-1 text-[8px] ${CAT_COLORS[d.category] ?? 'bg-muted text-muted-foreground'}`}
-                                                                            >
-                                                                                {d.category.replace(
-                                                                                    /_/g,
-                                                                                    ' ',
-                                                                                )}
-                                                                            </Badge>
-                                                                        )}
-                                                                    </div>
-                                                                </a>
-                                                            );
-                                                        },
-                                                    )}
-                                                </div>
-                                            </div>
-                                        ),
-                                    )
-                                )}
-                            </div>
-                        );
-                    })()}
 
                 {tab === 'photos' && (
                     <PhotoGalleryTab
