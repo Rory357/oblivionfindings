@@ -180,10 +180,21 @@ export interface MyDayPreShiftBriefing {
     id: number;
     starts_at: string;
     ends_at: string;
-    location?: string;
-    client: { id: number; first_name: string; last_name: string; initials: string; hue: number; photo_url?: string | null };
-    minutes_until_start?: number;
+    location?: string | null;
+    /**
+     * Mirrors `MyShiftResource::fromShift()`'s client snapshot — `name` is the
+     * full "First Last" string. Initials + hue are derived client-side.
+     */
+    client: {
+        id: number;
+        name: string;
+        photo_url?: string | null;
+    };
+    minutes_until_start?: number | null;
+    /** Optional pre-rendered bullets. */
     bullets?: string[];
+    /** Free-text shift notes (the controller copies `shift.notes` here). */
+    what_to_know?: string | null;
     incoming_handover?: { summary?: string } | null;
 }
 
