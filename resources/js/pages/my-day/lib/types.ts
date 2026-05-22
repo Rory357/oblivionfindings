@@ -74,6 +74,32 @@ export interface MyDayMedDue {
     emar_url: string;
 }
 
+export type TimesheetAllocationMethod =
+    | 'single'
+    | 'residential_house'
+    | 'equal_split'
+    | 'manual'
+    | 'time_segmented';
+
+export interface MyDayTimesheetClientAllocation {
+    /** Existing DB row id when persisted; null for synthesised single-row reads. */
+    id: number | null;
+    client_id: number;
+    hours: number;
+    allocation_method: TimesheetAllocationMethod;
+    starts_at: string | null;
+    ends_at: string | null;
+    notes: string | null;
+    sort_order: number;
+}
+
+export interface MyDayTimesheetClientCandidate {
+    id: number;
+    name: string;
+    /** True when this is the timesheet's primary client (shift.client_id). */
+    is_primary: boolean;
+}
+
 export interface MyDayTimesheet {
     id: number;
     work_date: string;
@@ -88,8 +114,19 @@ export interface MyDayTimesheet {
     break_minutes: number;
     mileage_km: number | null;
     notes: string | null;
+    is_residential_billable?: boolean;
     can_edit_inline?: boolean;
     needs?: string | null;
+    /**
+     * Materialised per-client breakdown of the timesheet's total hours. The
+     * controller synthesises a single-row representation for legacy data, so
+     * the array is always at least one element long.
+     */
+    client_allocations: MyDayTimesheetClientAllocation[];
+    /** Default allocation method tile to highlight when the popup opens. */
+    allocation_method: TimesheetAllocationMethod;
+    /** Eligible clients the worker can attribute time to on this timesheet. */
+    clients_candidates: MyDayTimesheetClientCandidate[];
 }
 
 export interface MyDayIncident {

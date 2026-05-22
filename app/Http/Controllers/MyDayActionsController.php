@@ -2,12 +2,16 @@
 
 namespace App\Http\Controllers;
 
+use App\Models\Client;
 use App\Models\ControlRoomAlert;
 use App\Models\ShiftTask;
 use App\Models\Timesheet;
+use App\Models\TimesheetClientAllocation;
 use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\ValidationException;
 
 /**
  * Legacy My Day helpers — now trimmed to the two safe, still-used actions:
@@ -43,21 +47,236 @@ class MyDayActionsController extends Controller
         return back()->with('success', $task->is_completed ? 'Task completed.' : 'Task reopened.');
     }
 
+    /**
+     * Submit a worker's timesheet for approval.
+     *
+     * Accepts an optional `client_allocations` array that lets the worker
+     * attribute the timesheet's total hours across multiple clients (for
+     * residential houses, group activity shifts, weighted shared support,
+     * etc.). The validation enforces:
+     *  - every client_id is one of the shift's allowed clients
+     *  - sum of `hours` equals the timesheet's total hours within 0.01h
+     *  - allocation_method is one of TimesheetClientAllocation::METHODS
+     *  - time_segmented rows carry both starts_at and ends_at
+     *
+     * Allocation rows are saved transactionally with the status flip so a
+     * mid-flight failure can't leave the timesheet submitted-but-unallocated.
+     */
     public function submitTimesheet(Request $request, Timesheet $timesheet)
     {
         abort_unless($request->user(), 403);
         abort_unless($timesheet->user_id === $request->user()->id, 403);
         abort_unless(in_array($timesheet->status, ['draft', 'returned']), 422);
 
-        $timesheet->update([
-            'status' => 'submitted',
-            'submitted_at' => now(),
-            'submitted_by' => $request->user()->id,
+        $allocations = $this->validateAllocations($request, $timesheet);
+
+        DB::transaction(function () use ($request, $timesheet, $allocations): void {
+            if ($allocations !== null) {
+                $this->persistAllocations($timesheet, $allocations);
+            }
+
+            $timesheet->update([
+                'status' => 'submitted',
+                'submitted_at' => now(),
+                'submitted_by' => $request->user()->id,
+            ]);
+        });
+
+        AuditLogger::log('timesheet.submit', $timesheet, [
+            'timesheet_id' => $timesheet->id,
+            'allocation_count' => $allocations !== null ? count($allocations) : null,
+            'allocation_method' => $allocations[0]['allocation_method'] ?? null,
         ]);
 
-        AuditLogger::log('timesheet.submit', $timesheet, ['timesheet_id' => $timesheet->id]);
-
         return back()->with('success', 'Timesheet submitted for approval.');
+    }
+
+    /**
+     * Validate the worker's submitted allocation payload against the
+     * timesheet's total hours and the shift's eligible client roster.
+     *
+     * Returns the normalised allocation array (ready to upsert) or `null`
+     * when the request didn't include `client_allocations` at all — that
+     * way an old client / mobile app calling without allocations still
+     * works exactly like before.
+     *
+     * @return array<int, array<string, mixed>>|null
+     */
+    private function validateAllocations(Request $request, Timesheet $timesheet): ?array
+    {
+        if (! $request->has('client_allocations')) {
+            return null;
+        }
+
+        $data = $request->validate([
+            'client_allocations' => ['array', 'min:1'],
+            'client_allocations.*.client_id' => ['required', 'integer', 'exists:clients,id'],
+            'client_allocations.*.hours' => ['required', 'numeric', 'min:0', 'max:24'],
+            'client_allocations.*.allocation_method' => ['required', 'string', 'in:'.implode(',', TimesheetClientAllocation::METHODS)],
+            'client_allocations.*.starts_at' => ['nullable', 'date'],
+            'client_allocations.*.ends_at' => ['nullable', 'date', 'after_or_equal:client_allocations.*.starts_at'],
+            'client_allocations.*.notes' => ['nullable', 'string', 'max:2000'],
+            'client_allocations.*.sort_order' => ['nullable', 'integer'],
+        ]);
+
+        $allocations = collect($data['client_allocations'])->values();
+        if ($allocations->isEmpty()) {
+            throw ValidationException::withMessages([
+                'client_allocations' => 'At least one client allocation is required.',
+            ]);
+        }
+
+        // No duplicate client_id allocations on the same timesheet.
+        $clientIds = $allocations->pluck('client_id')->map(fn ($id) => (int) $id);
+        if ($clientIds->duplicates()->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'client_allocations' => 'Each client can only appear once in the allocation breakdown.',
+            ]);
+        }
+
+        // Every client must be on the shift's eligible roster: the shift's
+        // primary client, the site's residents, and any explicit shift_clients
+        // pivot rows. Workers can't attribute time to clients they're not
+        // rostered with.
+        $allowedClientIds = $this->allowedClientIdsForTimesheet($timesheet);
+        $stray = $clientIds->diff($allowedClientIds);
+        if ($stray->isNotEmpty()) {
+            throw ValidationException::withMessages([
+                'client_allocations' => 'You can only attribute time to clients on this shift.',
+            ]);
+        }
+
+        // Sum of hours must match the timesheet total within rounding tolerance.
+        // Residential houses skip the strict sum check — the residents share
+        // the same total and the worker isn't attesting per-resident time.
+        $method = $allocations->first()['allocation_method'] ?? null;
+        $isResidential = $method === TimesheetClientAllocation::METHOD_RESIDENTIAL_HOUSE;
+
+        $totalAllocated = (float) $allocations->sum(fn ($a) => (float) $a['hours']);
+        $timesheetHours = (float) $timesheet->total_hours;
+
+        if (! $isResidential && abs($totalAllocated - $timesheetHours) > 0.02) {
+            throw ValidationException::withMessages([
+                'client_allocations' => sprintf(
+                    'Allocations total %.2fh but the timesheet is %.2fh.',
+                    $totalAllocated,
+                    $timesheetHours,
+                ),
+            ]);
+        }
+
+        // time_segmented rows need both ends populated; the other methods
+        // can leave them null.
+        foreach ($allocations as $i => $row) {
+            if (($row['allocation_method'] ?? null) === TimesheetClientAllocation::METHOD_TIME_SEGMENTED) {
+                if (empty($row['starts_at']) || empty($row['ends_at'])) {
+                    throw ValidationException::withMessages([
+                        "client_allocations.{$i}.starts_at" => 'Start and end times are required for time-segmented allocations.',
+                    ]);
+                }
+            }
+        }
+
+        return $allocations->values()->map(fn ($row, $i) => [
+            'client_id' => (int) $row['client_id'],
+            'hours' => round((float) $row['hours'], 2),
+            'allocation_method' => (string) $row['allocation_method'],
+            'starts_at' => isset($row['starts_at']) ? Carbon::parse($row['starts_at']) : null,
+            'ends_at' => isset($row['ends_at']) ? Carbon::parse($row['ends_at']) : null,
+            'notes' => $row['notes'] ?? null,
+            'sort_order' => (int) ($row['sort_order'] ?? $i),
+        ])->all();
+    }
+
+    /**
+     * Returns the set of client_ids this worker may attribute time to on the
+     * given timesheet. Combines:
+     *   - the shift's primary client
+     *   - all residents at the shift's site (residential setting)
+     *   - any explicit shift_clients pivot rows (group shift schema)
+     *
+     * @return \Illuminate\Support\Collection<int, int>
+     */
+    private function allowedClientIdsForTimesheet(Timesheet $timesheet): \Illuminate\Support\Collection
+    {
+        $ids = collect();
+        if ($timesheet->client_id) {
+            $ids->push((int) $timesheet->client_id);
+        }
+
+        $timesheet->loadMissing('shift.client', 'shift.site.clients');
+        $shift = $timesheet->shift;
+        if ($shift) {
+            if ($shift->client_id) {
+                $ids->push((int) $shift->client_id);
+            }
+            // Residents at the same site: residential houses share a roster.
+            $siteClients = $shift->site?->clients ?? collect();
+            foreach ($siteClients as $sc) {
+                $ids->push((int) $sc->id);
+            }
+            // Dormant group-shift schema (kept compatible — see migration
+            // 2026_03_23_006400_add_multi_client_and_tags_to_shifts.php).
+            if (\Illuminate\Support\Facades\Schema::hasTable('shift_clients')) {
+                $groupIds = DB::table('shift_clients')
+                    ->where('shift_id', $shift->id)
+                    ->pluck('client_id');
+                foreach ($groupIds as $gid) {
+                    $ids->push((int) $gid);
+                }
+            }
+        }
+
+        return $ids->unique()->values();
+    }
+
+    /**
+     * Upsert the worker's allocation breakdown for a timesheet. Deletes any
+     * rows the worker removed; updates / inserts the rest. Runs inside a
+     * transaction so a half-written breakdown is impossible.
+     *
+     * @param  array<int, array<string, mixed>>  $allocations
+     */
+    private function persistAllocations(Timesheet $timesheet, array $allocations): void
+    {
+        $keepIds = [];
+
+        foreach ($allocations as $row) {
+            $existing = TimesheetClientAllocation::query()
+                ->where('timesheet_id', $timesheet->id)
+                ->where('client_id', $row['client_id'])
+                ->first();
+
+            if ($existing) {
+                $existing->update([
+                    'hours' => $row['hours'],
+                    'allocation_method' => $row['allocation_method'],
+                    'starts_at' => $row['starts_at'],
+                    'ends_at' => $row['ends_at'],
+                    'notes' => $row['notes'],
+                    'sort_order' => $row['sort_order'],
+                ]);
+                $keepIds[] = $existing->id;
+            } else {
+                $created = TimesheetClientAllocation::create([
+                    'timesheet_id' => $timesheet->id,
+                    'client_id' => $row['client_id'],
+                    'hours' => $row['hours'],
+                    'allocation_method' => $row['allocation_method'],
+                    'starts_at' => $row['starts_at'],
+                    'ends_at' => $row['ends_at'],
+                    'notes' => $row['notes'],
+                    'sort_order' => $row['sort_order'],
+                ]);
+                $keepIds[] = $created->id;
+            }
+        }
+
+        // Anything not in `keepIds` was removed by the worker — wipe it.
+        TimesheetClientAllocation::query()
+            ->where('timesheet_id', $timesheet->id)
+            ->when(! empty($keepIds), fn ($q) => $q->whereNotIn('id', $keepIds))
+            ->delete();
     }
 
     /**

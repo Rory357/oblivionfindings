@@ -2,21 +2,27 @@ import { router } from '@inertiajs/react';
 import {
     Activity,
     AlertTriangle,
+    CheckCircle2,
+    Clock,
     ClipboardList,
     Droplet,
     FileText,
     Heart,
     HeartPulse,
+    Home,
     Loader2,
     Moon,
     Scale,
     Stethoscope,
+    Users,
+    UserRound,
 } from 'lucide-react';
 import {
     type ComponentType,
     type ReactNode,
     useCallback,
     useEffect,
+    useMemo,
     useState,
 } from 'react';
 
@@ -25,6 +31,7 @@ import HandoverWriteForm, {
     emptyHandoverWriteValue,
     type HandoverWriteValue,
 } from '@/components/handover-write-form';
+import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -43,11 +50,19 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import { TabsContent, TabsList, TabsRoot, TabsTrigger } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 
+import { residentHue, residentInitials } from './lib/resident-hue';
 import { ResidentDot } from './components/resident-dot';
-import type { MyDayResident } from './lib/types';
+import type {
+    MyDayResident,
+    MyDayTimesheet,
+    MyDayTimesheetClientAllocation,
+    MyDayTimesheetClientCandidate,
+    TimesheetAllocationMethod,
+} from './lib/types';
 
 /* -------------------------------------------------------------------------- */
 /*  My Day dialogs — popup-pattern per docs/POPUP_STYLE_GUIDE.md              */
@@ -1008,4 +1023,614 @@ function WriteHandoverBody({
             </DialogFooter>
         </form>
     );
+}
+
+// ─── Timesheet review dialog (per-client allocations) ────────────────────────
+
+type AllocationMethodDef = {
+    key: TimesheetAllocationMethod;
+    label: string;
+    description: string;
+    icon: ComponentType<{ className?: string }>;
+    accent: string;
+};
+
+const ALLOCATION_METHODS: AllocationMethodDef[] = [
+    {
+        key: 'single',
+        label: 'Single client',
+        description: 'All hours to one client (1:1 shift).',
+        icon: UserRound,
+        accent: 'text-status-info',
+    },
+    {
+        key: 'residential_house',
+        label: 'Residential house',
+        description: 'House-level billing; system splits per resident.',
+        icon: Home,
+        accent: 'text-primary',
+    },
+    {
+        key: 'equal_split',
+        label: 'Equal split',
+        description: 'Same hours to every client on this shift.',
+        icon: Users,
+        accent: 'text-status-info',
+    },
+    {
+        key: 'manual',
+        label: 'Manual',
+        description: 'Custom hours per client (weighted support).',
+        icon: ClipboardList,
+        accent: 'text-status-warning',
+    },
+    {
+        key: 'time_segmented',
+        label: 'Time segments',
+        description: 'Sequential 1:1 visits with start/end per client.',
+        icon: Clock,
+        accent: 'text-status-warning',
+    },
+];
+
+function getAllocationMethod(key: TimesheetAllocationMethod): AllocationMethodDef {
+    return ALLOCATION_METHODS.find((m) => m.key === key) ?? ALLOCATION_METHODS[0];
+}
+
+// Local editable row — shape mirrors MyDayTimesheetClientAllocation but with
+// string-typed fields for form inputs (so partial edits don't NaN).
+type AllocationRow = {
+    id: number | null;
+    client_id: number;
+    client_name: string;
+    hours_text: string;
+    starts_at: string;
+    ends_at: string;
+    notes: string;
+};
+
+function rowFromAllocation(
+    a: MyDayTimesheetClientAllocation,
+    candidate?: MyDayTimesheetClientCandidate,
+): AllocationRow {
+    return {
+        id: a.id,
+        client_id: a.client_id,
+        client_name: candidate?.name ?? `Client ${a.client_id}`,
+        hours_text: a.hours.toFixed(2),
+        starts_at: a.starts_at?.slice(11, 16) ?? '',
+        ends_at: a.ends_at?.slice(11, 16) ?? '',
+        notes: a.notes ?? '',
+    };
+}
+
+function rowFromCandidate(
+    c: MyDayTimesheetClientCandidate,
+    hours: number,
+): AllocationRow {
+    return {
+        id: null,
+        client_id: c.id,
+        client_name: c.name,
+        hours_text: hours.toFixed(2),
+        starts_at: '',
+        ends_at: '',
+        notes: '',
+    };
+}
+
+export type TimesheetReviewDialogProps = {
+    timesheet: MyDayTimesheet | null;
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+};
+
+/**
+ * Per-client timesheet review + submit popup.
+ *
+ * Lets the worker break their total shift hours down across every client
+ * they supported on the shift (residents at the site, group-shift clients,
+ * etc.). Picking an allocation method tile (residential / equal / manual /
+ * time-segmented / single) changes how the rows behave; the live sum at the
+ * top mirrors the timesheet's total so the worker can see when their split
+ * doesn't balance.
+ *
+ * On submit, POSTs to `/my-tasks/timesheet/{id}/submit` with both the
+ * status flip and the allocation payload — MyDayActionsController
+ * validates the rows in a transaction so the timesheet can't end up
+ * submitted-but-unallocated.
+ */
+export function TimesheetReviewDialog(props: TimesheetReviewDialogProps) {
+    const { timesheet, open, onOpenChange } = props;
+    return (
+        <Dialog open={open && !!timesheet} onOpenChange={(next) => !next && onOpenChange(false)}>
+            <DialogContent
+                className="max-h-[90vh] overflow-y-auto"
+                style={{ maxWidth: 'min(92vw, 900px)', width: 'min(92vw, 900px)' }}
+            >
+                {open && timesheet ? (
+                    <TimesheetReviewBody
+                        timesheet={timesheet}
+                        onOpenChange={onOpenChange}
+                    />
+                ) : null}
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function TimesheetReviewBody({
+    timesheet,
+    onOpenChange,
+}: {
+    timesheet: MyDayTimesheet;
+    onOpenChange: (open: boolean) => void;
+}) {
+    const candidates = timesheet.clients_candidates ?? [];
+    const totalHours = Number(timesheet.hours) || 0;
+
+    // Default the method picker to whatever the server inferred — usually
+    // "single" for legacy 1:1 timesheets, "residential_house" when the site
+    // already flags it, etc.
+    const initialMethod: TimesheetAllocationMethod =
+        timesheet.allocation_method
+        ?? (timesheet.is_residential_billable
+            ? 'residential_house'
+            : candidates.length > 1
+              ? 'equal_split'
+              : 'single');
+
+    const [method, setMethod] = useState<TimesheetAllocationMethod>(initialMethod);
+
+    // Seed the editable rows from the server payload. For methods that
+    // require every candidate to appear (residential, equal_split,
+    // time_segmented), backfill missing clients with zero-hour rows so the
+    // worker can fill them in.
+    const seedRows = (m: TimesheetAllocationMethod): AllocationRow[] => {
+        const byId = new Map(candidates.map((c) => [c.id, c]));
+        const existing = (timesheet.client_allocations ?? []).map((a) =>
+            rowFromAllocation(a, byId.get(a.client_id)),
+        );
+
+        if (m === 'single') {
+            const primary = candidates.find((c) => c.is_primary) ?? candidates[0];
+            if (!primary) return existing;
+            return [
+                existing.find((e) => e.client_id === primary.id) ?? rowFromCandidate(primary, totalHours),
+            ];
+        }
+
+        if (m === 'residential_house' || m === 'equal_split' || m === 'time_segmented') {
+            const per = candidates.length > 0 ? totalHours / candidates.length : totalHours;
+            return candidates.map((c) => {
+                const found = existing.find((e) => e.client_id === c.id);
+                if (found) {
+                    return {
+                        ...found,
+                        hours_text:
+                            m === 'equal_split' || m === 'residential_house'
+                                ? per.toFixed(2)
+                                : found.hours_text,
+                    };
+                }
+                return rowFromCandidate(c, per);
+            });
+        }
+
+        // manual: keep whatever rows we have, drop zero-hour ones the worker
+        // hadn't touched, but always ensure at least one row exists.
+        if (existing.length > 0) return existing;
+        const primary = candidates.find((c) => c.is_primary) ?? candidates[0];
+        return primary ? [rowFromCandidate(primary, totalHours)] : [];
+    };
+
+    const [rows, setRows] = useState<AllocationRow[]>(() => seedRows(initialMethod));
+    const [activeTab, setActiveTab] = useState<string>(
+        rows[0] ? String(rows[0].client_id) : '',
+    );
+    const [submitting, setSubmitting] = useState(false);
+    const [errors, setErrors] = useState<Record<string, string>>({});
+
+    const handleMethodChange = useCallback(
+        (next: TimesheetAllocationMethod) => {
+            setMethod(next);
+            const newRows = seedRows(next);
+            setRows(newRows);
+            if (newRows.length > 0) {
+                setActiveTab(String(newRows[0].client_id));
+            }
+            setErrors({});
+        },
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- seedRows reads the closure-captured timesheet/candidates which don't change while the dialog is open
+        [timesheet],
+    );
+
+    const updateRow = useCallback(
+        (clientId: number, patch: Partial<AllocationRow>) => {
+            setRows((prev) =>
+                prev.map((r) => (r.client_id === clientId ? { ...r, ...patch } : r)),
+            );
+        },
+        [],
+    );
+
+    const applyEqualSplit = useCallback(() => {
+        const per = rows.length > 0 ? totalHours / rows.length : 0;
+        setRows((prev) =>
+            prev.map((r) => ({ ...r, hours_text: per.toFixed(2) })),
+        );
+    }, [rows.length, totalHours]);
+
+    // Live total + variance.
+    const allocatedTotal = useMemo(
+        () =>
+            rows.reduce(
+                (sum, r) => sum + (Number.parseFloat(r.hours_text) || 0),
+                0,
+            ),
+        [rows],
+    );
+    const remaining = totalHours - allocatedTotal;
+    const isResidential = method === 'residential_house';
+    const sumOk = isResidential || Math.abs(remaining) <= 0.02;
+
+    const handleSubmit = useCallback(() => {
+        setSubmitting(true);
+        setErrors({});
+
+        const payload = rows.map((r, i) => ({
+            client_id: r.client_id,
+            hours: Number.parseFloat(r.hours_text) || 0,
+            allocation_method: method,
+            starts_at:
+                method === 'time_segmented' && r.starts_at && timesheet.work_date_iso
+                    ? `${timesheet.work_date_iso}T${r.starts_at}:00`
+                    : null,
+            ends_at:
+                method === 'time_segmented' && r.ends_at && timesheet.work_date_iso
+                    ? `${timesheet.work_date_iso}T${r.ends_at}:00`
+                    : null,
+            notes: r.notes || null,
+            sort_order: i,
+        }));
+
+        router.post(
+            `/my-tasks/timesheet/${timesheet.id}/submit`,
+            { client_allocations: payload },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: () => onOpenChange(false),
+                onError: (errs) => setErrors(errs as Record<string, string>),
+                onFinish: () => setSubmitting(false),
+            },
+        );
+    }, [rows, method, timesheet.id, timesheet.work_date_iso, onOpenChange]);
+
+    return (
+        <>
+            <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                    <FileText className="h-4 w-4 text-primary" />
+                    Review timesheet
+                </DialogTitle>
+                <DialogDescription>
+                    Confirm how this shift&rsquo;s hours split across the people
+                    you supported, then submit for approval.
+                </DialogDescription>
+            </DialogHeader>
+
+            <div className="mt-3 space-y-4">
+                {/* Locked context — timesheet meta */}
+                <div className="flex flex-wrap items-center gap-3 rounded-xl border border-primary/40 bg-primary/10 p-3">
+                    <span className="shrink-0 rounded-lg bg-background/60 p-1.5">
+                        <Clock className="h-4 w-4 text-primary" />
+                    </span>
+                    <div className="min-w-0 flex-1">
+                        <div className="text-sm font-medium">
+                            {timesheet.work_date}
+                        </div>
+                        <div className="text-xs text-muted-foreground">
+                            {totalHours.toFixed(2)}h total
+                            {timesheet.starts_at && timesheet.ends_at
+                                ? ` · ${formatHM(timesheet.starts_at)} – ${formatHM(timesheet.ends_at)}`
+                                : ''}
+                            {timesheet.break_minutes > 0
+                                ? ` · ${timesheet.break_minutes}m break`
+                                : ''}
+                        </div>
+                    </div>
+                    {timesheet.status === 'returned' && timesheet.return_notes ? (
+                        <Badge
+                            variant="outline"
+                            className="border-status-warning/30 bg-status-warning-bg text-[10px] text-status-warning"
+                        >
+                            Returned: {timesheet.return_notes}
+                        </Badge>
+                    ) : null}
+                </div>
+
+                {/* Allocation method tile picker */}
+                <div>
+                    <Label className="mb-2 block">
+                        How is this time allocated?{' '}
+                        <span className="text-status-critical">*</span>
+                    </Label>
+                    <AllocationMethodPicker
+                        value={method}
+                        onChange={handleMethodChange}
+                        disableMultiClient={candidates.length <= 1}
+                    />
+                </div>
+
+                {/* Live total */}
+                <div
+                    className={cn(
+                        'flex items-center justify-between rounded-lg border px-3 py-2 text-sm',
+                        sumOk
+                            ? 'border-status-success/30 bg-status-success-bg text-status-success'
+                            : 'border-status-warning/30 bg-status-warning-bg text-status-warning',
+                    )}
+                >
+                    <div className="flex items-center gap-2">
+                        {sumOk ? (
+                            <CheckCircle2 className="h-4 w-4" />
+                        ) : (
+                            <AlertTriangle className="h-4 w-4" />
+                        )}
+                        <span>
+                            {isResidential
+                                ? 'House-level billing — per-resident split handled downstream.'
+                                : sumOk
+                                  ? `Sum balances at ${allocatedTotal.toFixed(2)}h of ${totalHours.toFixed(2)}h.`
+                                  : `${allocatedTotal.toFixed(2)}h allocated of ${totalHours.toFixed(2)}h — ${remaining > 0 ? `${remaining.toFixed(2)}h left` : `${Math.abs(remaining).toFixed(2)}h over`}.`}
+                        </span>
+                    </div>
+                    {(method === 'equal_split' || method === 'residential_house') && rows.length > 1 ? (
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={applyEqualSplit}
+                        >
+                            Apply equal split
+                        </Button>
+                    ) : null}
+                </div>
+
+                {/* Per-client tabs */}
+                {rows.length > 1 ? (
+                    <TabsRoot value={activeTab} onValueChange={setActiveTab}>
+                        <TabsList className="flex w-full flex-wrap justify-start gap-1">
+                            {rows.map((r) => (
+                                <TabsTrigger
+                                    key={r.client_id}
+                                    value={String(r.client_id)}
+                                    className="flex items-center gap-1.5"
+                                >
+                                    <span>
+                                        <ResidentDot
+                                            hue={residentHue(r.client_id)}
+                                            initials={initialsFor(r.client_name)}
+                                        />
+                                    </span>
+                                    <span className="truncate">{r.client_name}</span>
+                                    <span className="ml-1 text-[10px] text-muted-foreground">
+                                        {(Number.parseFloat(r.hours_text) || 0).toFixed(2)}h
+                                    </span>
+                                </TabsTrigger>
+                            ))}
+                        </TabsList>
+                        {rows.map((r) => (
+                            <TabsContent
+                                key={r.client_id}
+                                value={String(r.client_id)}
+                                className="mt-3"
+                            >
+                                <AllocationRowEditor
+                                    row={r}
+                                    method={method}
+                                    onChange={(patch) => updateRow(r.client_id, patch)}
+                                    errors={errors}
+                                />
+                            </TabsContent>
+                        ))}
+                    </TabsRoot>
+                ) : rows.length === 1 ? (
+                    // Single-row methods (1:1 shift, single allocation) — skip
+                    // the tabs entirely and just render the editor.
+                    <AllocationRowEditor
+                        row={rows[0]}
+                        method={method}
+                        onChange={(patch) => updateRow(rows[0].client_id, patch)}
+                        errors={errors}
+                    />
+                ) : (
+                    <p className="rounded-lg border border-dashed bg-background/70 px-3 py-4 text-sm text-muted-foreground">
+                        No clients on this timesheet&rsquo;s shift.
+                    </p>
+                )}
+
+                {Object.keys(errors).length > 0 ? (
+                    <div className="rounded-md border border-status-critical/30 bg-status-critical-bg p-3">
+                        {Object.entries(errors).map(([k, msg]) => (
+                            <p key={k} className="text-xs text-status-critical">
+                                {msg}
+                            </p>
+                        ))}
+                    </div>
+                ) : null}
+            </div>
+
+            <DialogFooter className="mt-4">
+                <Button
+                    type="button"
+                    variant="outline"
+                    onClick={() => onOpenChange(false)}
+                    disabled={submitting}
+                >
+                    Cancel
+                </Button>
+                <Button
+                    type="button"
+                    onClick={handleSubmit}
+                    disabled={submitting || rows.length === 0 || !sumOk}
+                >
+                    {submitting ? (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    ) : (
+                        <CheckCircle2 className="mr-2 h-4 w-4" />
+                    )}
+                    {timesheet.status === 'returned' ? 'Save and resubmit' : 'Submit timesheet'}
+                </Button>
+            </DialogFooter>
+        </>
+    );
+}
+
+function AllocationMethodPicker({
+    value,
+    onChange,
+    disableMultiClient,
+}: {
+    value: TimesheetAllocationMethod;
+    onChange: (v: TimesheetAllocationMethod) => void;
+    disableMultiClient: boolean;
+}) {
+    return (
+        <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
+            {ALLOCATION_METHODS.map((m) => {
+                const Icon = m.icon;
+                const active = value === m.key;
+                const disabled = disableMultiClient && m.key !== 'single';
+                return (
+                    // eslint-disable-next-line no-restricted-syntax -- Send-Kudos-style tile per POPUP_STYLE_GUIDE.md.
+                    <button
+                        key={m.key}
+                        type="button"
+                        disabled={disabled}
+                        onClick={() => onChange(m.key)}
+                        aria-pressed={active}
+                        className={cn(
+                            'group flex items-start gap-2 rounded-xl border bg-card/40 p-3 text-left transition-all',
+                            'hover:border-primary/50 hover:bg-card focus:outline-none focus-visible:ring-2 focus-visible:ring-primary',
+                            active
+                                ? 'border-primary bg-primary/10 ring-1 ring-primary/40'
+                                : 'border-border',
+                            disabled && 'cursor-not-allowed opacity-50 hover:bg-card/40 hover:border-border',
+                        )}
+                    >
+                        <span className="mt-0.5 shrink-0 rounded-lg bg-background/60 p-1.5">
+                            <Icon className={cn('h-4 w-4', m.accent)} />
+                        </span>
+                        <span className="min-w-0">
+                            <span className="block truncate text-sm font-medium">
+                                {m.label}
+                            </span>
+                            <span className="block truncate text-xs text-muted-foreground">
+                                {m.description}
+                            </span>
+                        </span>
+                    </button>
+                );
+            })}
+        </div>
+    );
+}
+
+function AllocationRowEditor({
+    row,
+    method,
+    onChange,
+    errors,
+}: {
+    row: AllocationRow;
+    method: TimesheetAllocationMethod;
+    onChange: (patch: Partial<AllocationRow>) => void;
+    errors: Record<string, string>;
+}) {
+    const hoursLocked = method === 'residential_house' || method === 'equal_split';
+    return (
+        <div className="space-y-3">
+            <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
+                <div>
+                    <Label className="mb-1 block">
+                        Hours{' '}
+                        <span className="text-status-critical">*</span>
+                    </Label>
+                    <Input
+                        type="number"
+                        step="0.25"
+                        min="0"
+                        max="24"
+                        value={row.hours_text}
+                        onChange={(e) => onChange({ hours_text: e.target.value })}
+                        disabled={hoursLocked}
+                        placeholder="0.00"
+                    />
+                    {hoursLocked ? (
+                        <p className="mt-1 text-[11px] text-muted-foreground">
+                            Use &ldquo;Apply equal split&rdquo; or switch to{' '}
+                            <span className="font-medium">Manual</span> to edit.
+                        </p>
+                    ) : null}
+                </div>
+
+                {method === 'time_segmented' ? (
+                    <>
+                        <div>
+                            <Label className="mb-1 block">Start</Label>
+                            <Input
+                                type="time"
+                                value={row.starts_at}
+                                onChange={(e) => onChange({ starts_at: e.target.value })}
+                            />
+                        </div>
+                        <div className="sm:col-span-1">
+                            <Label className="mb-1 block">End</Label>
+                            <Input
+                                type="time"
+                                value={row.ends_at}
+                                onChange={(e) => onChange({ ends_at: e.target.value })}
+                            />
+                        </div>
+                    </>
+                ) : null}
+            </div>
+
+            <div>
+                <div className="mb-1 flex items-center justify-between gap-2">
+                    <Label htmlFor={`alloc-notes-${row.client_id}`}>
+                        Notes for {row.client_name} (optional)
+                    </Label>
+                </div>
+                <Textarea
+                    id={`alloc-notes-${row.client_id}`}
+                    rows={2}
+                    value={row.notes}
+                    onChange={(e) => onChange({ notes: e.target.value })}
+                    placeholder={`Anything to note about ${row.client_name.split(' ')[0]}'s support?`}
+                />
+            </div>
+
+            {errors[`client_allocations.${row.client_id}.hours`] ? (
+                <p className="text-xs text-status-critical">
+                    {errors[`client_allocations.${row.client_id}.hours`]}
+                </p>
+            ) : null}
+        </div>
+    );
+}
+
+function initialsFor(name: string): string {
+    const trimmed = name.trim();
+    if (!trimmed) return '?';
+    const [first = '', ...rest] = trimmed.split(/\s+/);
+    return residentInitials(first, rest.join(' '));
+}
+
+function formatHM(iso: string): string {
+    const d = new Date(iso);
+    if (Number.isNaN(d.getTime())) return '';
+    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
 }

@@ -18,7 +18,7 @@ import { useUndoableAction } from '@/hooks/use-undoable-action';
 import AppLayout from '@/layouts/app-layout';
 import { StaffHeader } from '@/components/staff-header';
 
-import { VitalsRecordDialog, WriteHandoverDialog } from './_dialogs';
+import { TimesheetReviewDialog, VitalsRecordDialog, WriteHandoverDialog } from './_dialogs';
 
 import { DatePopover } from './components/date-popover';
 import { DigestPanel } from './components/digest-panel';
@@ -119,6 +119,10 @@ export default function MyDay() {
 
     // Vitals & obs picker flow.
     const [vitalsOpen, setVitalsOpen] = useState(false);
+
+    // Per-client timesheet review popup.
+    const [timesheetUnderReview, setTimesheetUnderReview] =
+        useState<MyDayTimesheet | null>(null);
 
     // Live refresh — Inertia partial reload every 60s (unless guarded).
     const { lastUpdatedAt, isRefreshing, refreshNow } = useLiveRefresh({ intervalMs: 60_000 });
@@ -265,7 +269,6 @@ export default function MyDay() {
     // ──────────────────────────────────────────────────────────────────────
 
     const { run: runUndoable } = useUndoableAction();
-    const [pendingTimesheetIds, setPendingTimesheetIds] = useState<Record<number, true>>({});
 
     // PR 4.5 removed the legacy `/my-tasks/clock/{in,out}` shortcuts; the
     // canonical clock flow goes through AttendanceController so the open
@@ -379,41 +382,14 @@ export default function MyDay() {
         );
     }, []);
 
-    const handleTimesheetSubmit = useCallback(
-        (ts: MyDayTimesheet) => {
-            if (pendingTimesheetIds[ts.id]) return;
-            setPendingTimesheetIds((prev) => ({ ...prev, [ts.id]: true }));
-            runUndoable({
-                message: t('toast_timesheet_sending'),
-                durationMs: 5_000,
-                onCommit: () => {
-                    router.post(
-                        `/my-tasks/timesheet/${ts.id}/submit`,
-                        {},
-                        {
-                            preserveScroll: true,
-                            onFinish: () => {
-                                setPendingTimesheetIds((prev) => {
-                                    const next = { ...prev };
-                                    delete next[ts.id];
-                                    return next;
-                                });
-                            },
-                        },
-                    );
-                },
-                onUndo: () => {
-                    setPendingTimesheetIds((prev) => {
-                        const next = { ...prev };
-                        delete next[ts.id];
-                        return next;
-                    });
-                },
-                undoneMessage: t('toast_timesheet_in_draft'),
-            });
-        },
-        [pendingTimesheetIds, runUndoable, t],
-    );
+    // PaperworkPanel's submit button now opens the TimesheetReviewDialog so
+    // the worker can review (and edit) the per-client allocation breakdown
+    // before submitting. The dialog itself owns the POST to
+    // `/my-tasks/timesheet/{id}/submit`; we just expose which timesheet is
+    // under review.
+    const handleTimesheetSubmit = useCallback((ts: MyDayTimesheet) => {
+        setTimesheetUnderReview(ts);
+    }, []);
 
     const handleContextMenuAction = useCallback(
         (action: string) => {
@@ -578,6 +554,14 @@ export default function MyDay() {
                 canRecordClinical={props.can_record_clinical ?? false}
                 open={vitalsOpen}
                 onOpenChange={setVitalsOpen}
+            />
+
+            <TimesheetReviewDialog
+                timesheet={timesheetUnderReview}
+                open={timesheetUnderReview !== null}
+                onOpenChange={(next) => {
+                    if (!next) setTimesheetUnderReview(null);
+                }}
             />
 
             {openSession ? (

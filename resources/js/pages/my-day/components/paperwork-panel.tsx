@@ -56,17 +56,31 @@ function TimesheetRow({
     const date = ts.work_date_iso
         ? new Date(ts.work_date_iso).toLocaleDateString([], { day: '2-digit', month: 'short' })
         : ts.work_date;
+    // Multi-client timesheets get a richer label than just the primary
+    // client name — show the breakdown count so the worker knows what
+    // they'll see when they open the review popup.
+    const allocations = ts.client_allocations ?? [];
+    const isMultiClient = allocations.length > 1;
+    const primaryLabel = ts.client_name ?? 'Timesheet';
+    const summary = isMultiClient
+        ? `${allocations.length} clients · ${ts.hours}h`
+        : `${primaryLabel} · ${ts.hours}h`;
     return (
         <div className="border-b border-border px-4 py-2.5 last:border-b-0">
             <div className="flex items-center gap-2">
                 <Clock className="h-3.5 w-3.5 shrink-0 text-muted-foreground" />
-                <div className="flex-1 text-[12.5px] font-medium">
-                    {ts.client_name ?? 'Timesheet'} · {ts.hours}h
-                </div>
+                <div className="flex-1 text-[12.5px] font-medium">{summary}</div>
                 <div className="text-[11px] text-muted-foreground">{date}</div>
             </div>
             {ts.needs ? (
                 <div className="mt-1 pl-[21px] text-[11px] text-muted-foreground">{ts.needs}</div>
+            ) : null}
+            {isMultiClient ? (
+                <div className="mt-1 pl-[21px] text-[10.5px] text-muted-foreground">
+                    {allocations
+                        .map((a) => `${a.hours.toFixed(2)}h`)
+                        .join(' + ')}
+                </div>
             ) : null}
             <div className="mt-2 pl-[21px]">
                 <Button

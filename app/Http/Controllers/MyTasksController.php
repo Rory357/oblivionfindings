@@ -736,7 +736,14 @@ class MyTasksController extends Controller
         try {
             return Timesheet::where('user_id', $userId)
                 ->whereIn('status', ['draft', 'submitted', 'returned'])
-                ->with('client:id,first_name,last_name')
+                ->with([
+                    'client:id,first_name,last_name',
+                    'clientAllocations',
+                    // Eligible-client roster for the per-client allocation popup
+                    // (residents at the shift's site, plus any explicit group
+                    // pivot rows when the dormant schema starts being used).
+                    'shift.site.clients:id,site_id,first_name,last_name',
+                ])
                 ->orderByDesc('work_date')
                 ->limit(10)
                 ->get()
@@ -744,6 +751,29 @@ class MyTasksController extends Controller
                     $clientName = $ts->client
                         ? trim($ts->client->first_name.' '.$ts->client->last_name)
                         : null;
+
+                    // The popup needs to know which residents/clients the
+                    // worker may attribute time to. Combine the timesheet's
+                    // primary client + the site's residents into a
+                    // deduplicated roster keyed by id.
+                    $candidatesById = [];
+                    if ($ts->client) {
+                        $candidatesById[$ts->client->id] = [
+                            'id' => (int) $ts->client->id,
+                            'name' => $clientName,
+                            'is_primary' => true,
+                        ];
+                    }
+                    $siteClients = $ts->shift?->site?->clients ?? collect();
+                    foreach ($siteClients as $sc) {
+                        if (! isset($candidatesById[$sc->id])) {
+                            $candidatesById[$sc->id] = [
+                                'id' => (int) $sc->id,
+                                'name' => trim($sc->first_name.' '.$sc->last_name),
+                                'is_primary' => false,
+                            ];
+                        }
+                    }
 
                     return [
                         'id' => $ts->id,
@@ -759,8 +789,19 @@ class MyTasksController extends Controller
                         'break_minutes' => (int) ($ts->break_minutes ?? 0),
                         'mileage_km' => $ts->mileage_km !== null ? (float) $ts->mileage_km : null,
                         'notes' => $ts->notes,
+                        'is_residential_billable' => (bool) $ts->is_residential_billable,
                         'can_edit_inline' => in_array($ts->status, ['draft', 'returned'], true)
                             && ! $ts->is_protected_from_changes,
+                        // Multi-client allocation breakdown (see
+                        // `database/migrations/2026_05_23_000010_create_timesheet_client_allocations_table.php`).
+                        // `effectiveClientAllocations` returns a synthesised
+                        // single-row representation when no allocations have
+                        // been saved yet, so the front-end always has a
+                        // consistent shape.
+                        'client_allocations' => $ts->effectiveClientAllocations()->all(),
+                        'allocation_method' => $ts->dominantAllocationMethod(),
+                        // Eligible client roster the worker can attribute time to.
+                        'clients_candidates' => array_values($candidatesById),
                     ];
                 })
                 ->all();
