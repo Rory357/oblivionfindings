@@ -224,13 +224,24 @@ export default function MyDay() {
                   3_600_000,
           )
         : 8;
-    const liveSinceLabel = activeShift?.actual_starts_at
-        ? t('hero_live_since', {
-              time: isoToHourMinute(activeShift.actual_starts_at),
-          })
-        : clockedIn
-          ? t('hero_live_shift')
-          : t('hero_not_clocked_in');
+    // The "Live shift" label only makes sense when there's actually an open
+    // attendance session for this worker. `actual_starts_at` is a property of
+    // the shift, not of the current session — it can be set by a previous
+    // worker on the same shift, so reading it without an open session leaves
+    // the page claiming "Live shift" when the worker is in fact not clocked
+    // in. Gate on `clockedIn` first, then drop in the open session's actual
+    // start time when we have one.
+    const liveSinceTime = clockedIn
+        ? isoToHourMinute(
+              activeShift?.actual_starts_at
+                  ?? (openSession as { clock_in_at?: string } | null)?.clock_in_at,
+          )
+        : '';
+    const liveSinceLabel = !clockedIn
+        ? t('hero_not_clocked_in')
+        : liveSinceTime
+          ? t('hero_live_since', { time: liveSinceTime })
+          : t('hero_live_shift');
     const clockedSubLabel = `of ${shiftDurationHours}h`;
 
     const today = useMemo(() => parsePageDate(props.today ?? props.today_iso ?? null), [props.today, props.today_iso]);
