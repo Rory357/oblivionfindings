@@ -25,6 +25,7 @@ import { MyDayHero } from './components/my-day-hero';
 import { PaperworkPanel } from './components/paperwork-panel';
 import { StreamContextMenu } from './components/stream-context-menu';
 import { TomorrowPanel } from './components/tomorrow-panel';
+import { VitalsRecordFlow } from './components/vitals-record-flow';
 import { WhatsNextRail } from './components/whats-next-rail';
 import { residentHue, residentInitials } from './lib/resident-hue';
 import {
@@ -80,12 +81,20 @@ interface SharedAuth {
 
 interface SharedProps extends Partial<MyDayPageProps> {
     auth?: SharedAuth;
+    /** Worker has `clinical.observations.record` (basic observation types). */
+    can_record_observation?: boolean;
+    /** Worker has `clinical.observations.recordClinical` (vitals + pain). */
+    can_record_clinical?: boolean;
     [key: string]: unknown;
 }
 
 export default function MyDay() {
     const page = usePage<SharedProps>();
-    const props = page.props as MyDayPageProps & { auth?: SharedAuth };
+    const props = page.props as MyDayPageProps & {
+        auth?: SharedAuth;
+        can_record_observation?: boolean;
+        can_record_clinical?: boolean;
+    };
     const auth = props.auth;
     const t = useMyDayLabels();
 
@@ -107,6 +116,9 @@ export default function MyDay() {
     // components already shipped for the legacy clock-in/active-shift cards.
     const [endShiftOpen, setEndShiftOpen] = useState(false);
     const [handoverWriteOpen, setHandoverWriteOpen] = useState(false);
+
+    // Vitals & obs picker flow.
+    const [vitalsOpen, setVitalsOpen] = useState(false);
 
     // Live refresh — Inertia partial reload every 60s (unless guarded).
     const { lastUpdatedAt, isRefreshing, refreshNow } = useLiveRefresh({ intervalMs: 60_000 });
@@ -499,6 +511,7 @@ export default function MyDay() {
                 onBreakToggle={handleBreakToggle}
                 onOpenTimesheet={handleOpenTimesheets}
                 onWriteHandover={handleWriteHandover}
+                onOpenVitals={() => setVitalsOpen(true)}
                 activeResidentId={activeResidentId}
                 onResidentChange={setActiveResidentId}
                 residentTaskCounts={residentTaskCounts}
@@ -551,6 +564,21 @@ export default function MyDay() {
                     onAction={handleContextMenuAction}
                 />
             ) : null}
+
+            <VitalsRecordFlow
+                residents={
+                    residents.length > 0
+                        ? residents
+                        : singleResident
+                          ? [singleResident]
+                          : []
+                }
+                shiftId={activeShift?.id ?? null}
+                canRecordObservation={props.can_record_observation ?? false}
+                canRecordClinical={props.can_record_clinical ?? false}
+                open={vitalsOpen}
+                onOpenChange={setVitalsOpen}
+            />
 
             {openSession ? (
                 <>

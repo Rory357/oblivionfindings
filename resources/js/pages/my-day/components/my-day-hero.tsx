@@ -66,6 +66,13 @@ interface MyDayHeroProps {
     onOpenTimesheet?: () => void;
     /** Open the outgoing-handover sheet (HandoverWriteSheet). */
     onWriteHandover?: () => void;
+    /**
+     * Open the Vitals & obs flow (VitalsRecordFlow). When provided we render
+     * the Vitals quick action as a button that triggers the picker — the
+     * worker chooses which resident the observation is for. When omitted we
+     * fall back to the static single-resident href (1:1 shifts).
+     */
+    onOpenVitals?: () => void;
     activeResidentId: ResidentTab;
     onResidentChange: (next: ResidentTab) => void;
     residentTaskCounts: Map<number, { tasks: number; meds: number; medsOverdue: number }>;
@@ -102,6 +109,7 @@ export function MyDayHero({
     onBreakToggle,
     onOpenTimesheet,
     onWriteHandover,
+    onOpenVitals,
     activeResidentId,
     onResidentChange,
     residentTaskCounts,
@@ -223,18 +231,24 @@ export function MyDayHero({
     // endpoints). Multi-resident shifts drop the resident-specific shortcuts
     // entirely because the org-wide care_plans / clients-list destinations are
     // gated behind manager permissions a support worker doesn't have.
-    // Both Care Note and Vitals deep-link into the client profile's existing
-    // tabs (the `clients/{id}/daily-notes` and `clients/{id}/clinical/observations`
-    // endpoints are JSON-only API resources, not Inertia pages). Using `?tab=`
-    // lands the worker on the profile with the right tab already open, which
-    // is also what the operations clients/show page supports for deep-linking.
+    // Both Care Note and Care Plan deep-link into the client profile's
+    // existing tabs (the `clients/{id}/daily-notes` endpoint is JSON-only,
+    // not an Inertia page). Using `?tab=` lands the worker on the profile
+    // with the right tab already open.
+    //
+    // Vitals & obs is its own flow: VitalsRecordFlow renders a resident
+    // picker (multi-resident shifts) or skips straight to the record sheet
+    // (1:1 shifts). When `onOpenVitals` is wired the quick action becomes a
+    // button; we keep the deep-link as a fallback for callers that don't pass
+    // the handler (older embeddings of this hero).
     const careNoteHref = singleResident
         ? `/clients/${singleResident.id}?tab=progress_notes`
         : '/clients';
     const carePlanHref = singleResident ? `/clients/${singleResident.id}/care` : null;
-    const vitalsHref = singleResident
-        ? `/clients/${singleResident.id}?tab=observations`
-        : null;
+    const vitalsFallbackHref =
+        !onOpenVitals && singleResident
+            ? `/clients/${singleResident.id}?tab=observations`
+            : null;
     const incidentHref = activeShiftId
         ? `/incidents/create?shift_id=${activeShiftId}`
         : '/incidents/create';
@@ -242,7 +256,14 @@ export function MyDayHero({
     const quickActions = [
         { icon: Pill, label: t('qa_give_medication'), badge: totalMeds - medsGiven > 0 ? totalMeds - medsGiven : undefined, href: '/meds/today' },
         { icon: StickyNote, label: t('qa_care_note'), href: careNoteHref },
-        ...(vitalsHref ? [{ icon: Stethoscope, label: t('qa_vitals_obs'), href: vitalsHref }] : []),
+        // Vitals & obs: prefer the picker flow (resolves the right client
+        // even on a multi-resident shift); fall back to the single-resident
+        // deep-link when no flow handler is wired.
+        ...(onOpenVitals
+            ? [{ icon: Stethoscope, label: t('qa_vitals_obs'), onClick: onOpenVitals }]
+            : vitalsFallbackHref
+              ? [{ icon: Stethoscope, label: t('qa_vitals_obs'), href: vitalsFallbackHref }]
+              : []),
         { icon: AlertTriangle, label: t('qa_report_incident'), href: incidentHref },
         ...(carePlanHref ? [{ icon: ShieldCheck, label: t('qa_care_plan'), href: carePlanHref }] : []),
         { icon: FileText, label: t('qa_submit_timesheet'), href: '/operations/timesheets' },

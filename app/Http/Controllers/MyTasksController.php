@@ -145,6 +145,12 @@ class MyTasksController extends Controller
             'active_shift' => $activeShiftCard,
             'next_shift_briefing' => $nextShiftBriefing,
             'previous_shift' => $previousShift,
+            // Per-worker observation capabilities, used by the Vitals & obs
+            // flow on /my-day to gate the observation-type list. We resolve
+            // them here (rather than client-side via auth) because permission
+            // resolution lives behind canDo() and shouldn't round-trip.
+            'can_record_observation' => $user->canDo('clinical.observations.record'),
+            'can_record_clinical' => $user->canDo('clinical.observations.recordClinical'),
             // Namespaced as `my_day_labels` so it does not collide with the
             // `labels` prop shared globally by HandleInertiaRequests for
             // terminology overrides (client.singular, etc.).
