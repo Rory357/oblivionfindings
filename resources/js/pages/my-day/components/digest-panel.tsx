@@ -51,6 +51,7 @@ interface OpenItem {
     id: string;
     kind: OpenItemKind;
     title: string;
+    description?: string | null;
     priority: 'critical' | 'high' | 'medium' | 'low';
     clientName?: string | null;
     occurredAt: string;
@@ -325,7 +326,12 @@ function OpenItemRow({
                 <div className="mt-1 text-[12.5px] font-semibold leading-snug text-pretty">
                     {item.title}
                 </div>
-                <div className="mt-0.5 text-[11px] text-muted-foreground">
+                {item.description ? (
+                    <p className="mt-0.5 line-clamp-2 text-[11.5px] leading-snug text-foreground/85">
+                        {item.description}
+                    </p>
+                ) : null}
+                <div className="mt-1 text-[11px] text-muted-foreground">
                     {[item.clientName, item.sla].filter(Boolean).join(' · ') || '—'}
                 </div>
                 {isCrit && item.raw ? (
@@ -395,6 +401,7 @@ function combineOpenItems(tasks: MyDayTaskFollowup[], incidents: MyDayIncident[]
         id: `task-${t.id}`,
         kind: t.type === 'note_followup' || t.type === 'followup' ? 'followup' : (t.type as OpenItemKind),
         title: t.title,
+        description: t.description ?? null,
         priority: t.priority,
         clientName: t.meta?.client_name ?? null,
         occurredAt: t.created_at,
@@ -408,6 +415,7 @@ function combineOpenItems(tasks: MyDayTaskFollowup[], incidents: MyDayIncident[]
         id: `incident-${i.id}`,
         kind: 'incident',
         title: i.title,
+        description: i.description ?? null,
         priority: mapSeverity(i.severity),
         clientName: i.client_name,
         occurredAt: i.occurred_at,

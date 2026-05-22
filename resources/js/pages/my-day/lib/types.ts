@@ -95,6 +95,8 @@ export interface MyDayTimesheet {
 export interface MyDayIncident {
     id: number;
     title: string;
+    /** Truncated free-text summary shown under the title in the Needs You digest. */
+    description?: string | null;
     client_name: string | null;
     client_id?: number | null;
     severity: string;
@@ -108,6 +110,8 @@ export interface MyDayTaskFollowup {
     id: string;
     type: 'alert' | 'incident' | 'followup' | 'note_followup';
     title: string;
+    /** Truncated free-text summary shown under the title in the Needs You digest. */
+    description?: string | null;
     priority: 'critical' | 'high' | 'medium' | 'low';
     status: string;
     source_url: string;
