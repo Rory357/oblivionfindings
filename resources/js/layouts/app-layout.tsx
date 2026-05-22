@@ -22,6 +22,17 @@ interface AppLayoutProps {
     staffAction?: ReactNode;
     staffBackHref?: string;
     staffBackLabel?: string;
+    /**
+     * Default-experience only: replace the default breadcrumb header with a
+     * custom node (e.g. the desktop-redesigned `/my-day` StaffHeader). Pass
+     * `null` to render no header at all.
+     */
+    header?: ReactNode | null;
+    /**
+     * Default-experience only: override the content wrapper class so pages
+     * can opt out of the default page padding for full-bleed layouts.
+     */
+    contentClassName?: string;
     user?: unknown;
     [key: string]: unknown;
 }
@@ -35,6 +46,8 @@ export default function AppLayout({
     staffAction,
     staffBackHref,
     staffBackLabel,
+    header,
+    contentClassName,
 }: AppLayoutProps) {
     if (experience === 'staff') {
         return (
@@ -51,6 +64,12 @@ export default function AppLayout({
     }
 
     return (
-        <AppLayoutTemplate breadcrumbs={breadcrumbs}>{children}</AppLayoutTemplate>
+        <AppLayoutTemplate
+            breadcrumbs={breadcrumbs}
+            header={header}
+            contentClassName={contentClassName}
+        >
+            {children}
+        </AppLayoutTemplate>
     );
 }

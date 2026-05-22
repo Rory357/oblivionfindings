@@ -39,13 +39,25 @@ export interface PageTabsProps {
     children?: ReactNode;
     /** Sticky tab strip under the hero. Default off (web-first density). */
     sticky?: boolean;
+    /**
+     * Render on a dark/gradient background (e.g. inside a PageHero footer).
+     * Flips the colour palette to use --primary-foreground tokens.
+     */
+    onDark?: boolean;
+    /** Slightly tighter padding/font for in-card tab strips. */
+    dense?: boolean;
     className?: string;
     /** Wrapper class for the tabs list row only. */
     listClassName?: string;
 }
 
-const TRIGGER_BASE =
+const TRIGGER_LIGHT =
     'inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-muted-foreground transition-colors hover:bg-accent hover:text-accent-foreground data-[state=active]:border-primary data-[state=active]:bg-primary/10 data-[state=active]:text-primary data-[state=active]:shadow-none';
+
+const TRIGGER_DARK =
+    'inline-flex h-auto shrink-0 items-center gap-1.5 rounded-md border-0 border-b-2 border-transparent bg-transparent px-3 py-2 text-sm font-medium text-primary-foreground/70 transition-colors hover:bg-primary-foreground/10 hover:text-primary-foreground data-[state=active]:border-primary-foreground data-[state=active]:bg-primary-foreground/15 data-[state=active]:text-primary-foreground data-[state=active]:shadow-none';
+
+const TRIGGER_DENSE_OVERRIDE = 'px-2.5 py-1.5 text-[12.5px]';
 
 export function PageTabs({
     value,
@@ -53,9 +65,19 @@ export function PageTabs({
     items,
     children,
     sticky = false,
+    onDark = false,
+    dense = false,
     className,
     listClassName,
 }: PageTabsProps) {
+    const triggerBase = onDark ? TRIGGER_DARK : TRIGGER_LIGHT;
+    const fadeFromClass = onDark ? 'from-primary' : 'from-background';
+    const fadeFromClassRight = onDark ? 'from-primary' : 'from-background';
+    const stickyBg = onDark ? 'bg-primary' : 'bg-background';
+    const listBorder = onDark ? 'border-primary-foreground/20' : '';
+    const overflowActiveBadge = onDark
+        ? 'border-primary-foreground bg-primary-foreground/15 text-primary-foreground'
+        : 'border-primary bg-primary/10 text-primary';
     const listRef = useRef<HTMLDivElement | null>(null);
     const [canScrollLeft, setCanScrollLeft] = useState(false);
     const [canScrollRight, setCanScrollRight] = useState(false);
@@ -93,18 +115,29 @@ export function PageTabs({
             onValueChange={onValueChange}
             className={cn('space-y-4', className)}
         >
-            <div className={cn('relative', sticky && 'sticky top-0 z-20 bg-background')}>
+            <div className={cn('relative', sticky && 'sticky top-0 z-20', sticky && stickyBg)}>
                 {canScrollLeft ? (
-                    <span className="pointer-events-none absolute left-0 top-0 z-10 h-full w-6 bg-gradient-to-r from-background to-transparent" />
+                    <span
+                        className={cn(
+                            'pointer-events-none absolute left-0 top-0 z-10 h-full w-6 bg-gradient-to-r to-transparent',
+                            fadeFromClass,
+                        )}
+                    />
                 ) : null}
                 {canScrollRight ? (
-                    <span className="pointer-events-none absolute right-0 top-0 z-10 h-full w-6 bg-gradient-to-l from-background to-transparent" />
+                    <span
+                        className={cn(
+                            'pointer-events-none absolute right-0 top-0 z-10 h-full w-6 bg-gradient-to-l to-transparent',
+                            fadeFromClassRight,
+                        )}
+                    />
                 ) : null}
 
                 <TabsList
                     ref={listRef}
                     className={cn(
                         'scrollbar-pretty flex h-auto w-full justify-start gap-1 overflow-x-auto rounded-none border-b bg-transparent p-0 pb-1',
+                        listBorder,
                         listClassName,
                     )}
                 >
@@ -117,13 +150,14 @@ export function PageTabs({
                                 value={item.value}
                                 data-test={item['data-test']}
                                 className={cn(
-                                    TRIGGER_BASE,
+                                    triggerBase,
+                                    dense && TRIGGER_DENSE_OVERRIDE,
                                     inOverflowGroup ? 'hidden 2xl:inline-flex' : 'inline-flex',
                                 )}
                             >
                                 {Icon ? <Icon className="h-4 w-4" /> : null}
                                 <span>{item.label}</span>
-                                {item.badge ? <span className="ml-1">{item.badge}</span> : null}
+                                {item.badge != null ? <span className="ml-1">{item.badge}</span> : null}
                             </TabsTrigger>
                         );
                     })}
@@ -134,9 +168,10 @@ export function PageTabs({
                                 <button
                                     type="button"
                                     className={cn(
-                                        TRIGGER_BASE,
+                                        triggerBase,
+                                        dense && TRIGGER_DENSE_OVERRIDE,
                                         'inline-flex 2xl:hidden',
-                                        activeOverflow ? 'border-primary bg-primary/10 text-primary' : '',
+                                        activeOverflow ? overflowActiveBadge : '',
                                     )}
                                     aria-label="More tabs"
                                 >
@@ -163,7 +198,7 @@ export function PageTabs({
                                         >
                                             {Icon ? <Icon className="h-4 w-4" /> : null}
                                             <span>{item.label}</span>
-                                            {item.badge ? <span className="ml-auto">{item.badge}</span> : null}
+                                            {item.badge != null ? <span className="ml-auto">{item.badge}</span> : null}
                                         </DropdownMenuItem>
                                     );
                                 })}

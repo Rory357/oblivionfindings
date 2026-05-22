@@ -161,6 +161,14 @@ Route::middleware(['auth'])->group(function () {
     // without reaching into the Control Room operator surface.
     Route::post('/my-day/alerts/{alert}/ack', [\App\Http\Controllers\MyDayActionsController::class, 'acknowledgeAlert'])->name('my-day.alert.ack');
     Route::post('/my-day/alerts/{alert}/snooze', [\App\Http\Controllers\MyDayActionsController::class, 'snoozeAlert'])->name('my-day.alert.snooze');
+
+    // Site-first redesign — frontline medication quick actions. The same
+    // ClientMedicationAdministration writes flow through here as via the full
+    // eMAR, but UX-light: one click marks a dose given/refused; snooze hides
+    // the row from this worker's /my-day for 15m without touching the record.
+    Route::post('/my-day/medications/{medication}/administer', [\App\Http\Controllers\MyDayMedicationsController::class, 'administer'])->name('my-day.medications.administer');
+    Route::post('/my-day/medications/{medication}/refuse', [\App\Http\Controllers\MyDayMedicationsController::class, 'refuse'])->name('my-day.medications.refuse');
+    Route::post('/my-day/medications/{medication}/snooze', [\App\Http\Controllers\MyDayMedicationsController::class, 'snooze'])->name('my-day.medications.snooze');
 });
 
 Route::get('/my-calendar', [\App\Http\Controllers\MyCalendarController::class, 'index'])->middleware('auth')->name('my-calendar');

@@ -16,9 +16,11 @@ use App\Models\ShiftHandover;
 use App\Models\ShiftOpenPosition;
 use App\Models\Timesheet;
 use App\Models\User;
+use App\Models\Client;
 use App\Services\GuidedRoundService;
 use App\Services\ShiftHandoverService;
 use App\Support\EmarUrl;
+use App\Support\ResidentHue;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Lang;
@@ -52,8 +54,19 @@ class MyTasksController extends Controller
         // 2. Shifts today + tomorrow
         $shifts = $this->getShifts($user, $today, $tomorrowEnd, $workerNow);
 
-        // 3. Medications due
-        $clientIds = $shifts->pluck('client.id')->filter()->unique()->values()->all();
+        // 2b. Active shift + site (site-first redesign). Multi-resident houses
+        //     expose every co-resident so the hero/avatar stack and resident
+        //     filter tabs render correctly. Falls back to the shift's
+        //     single client for 1:1 visits.
+        $activeShift = $this->resolveActiveShiftModel($user, $queryNow);
+        $activeSitePayload = $this->buildActiveSitePayload($activeShift);
+
+        // 3. Medications due — aggregate across every resident at the active
+        //    site when present, otherwise fall back to the shifts' client list
+        //    (preserves the legacy single-client behaviour).
+        $clientIds = $activeSitePayload
+            ? array_column($activeSitePayload['residents'], 'id')
+            : $shifts->pluck('client.id')->filter()->unique()->values()->all();
         $medicationsDue = $this->getMedicationsDue($clientIds, $workerNow);
 
         // 4. Timesheets
@@ -104,8 +117,19 @@ class MyTasksController extends Controller
             ? null
             : $this->getPreviousShift($user, $workerNow);
 
+        // 14. Active-shift card (site-first). The new /my-day hero reads this
+        //     instead of the legacy `clock.open_session.shift`. The card
+        //     mirrors MyShiftResource so the front-end can use one TS type.
+        $activeShiftCard = $activeShift
+            ? array_merge(
+                MyShiftResource::fromShift($activeShift, $workerNow),
+                ['site' => $activeSitePayload]
+            )
+            : null;
+
         return Inertia::render('my-day/index', [
             'today' => $todayFormatted,
+            'today_iso' => $workerNow->toDateString(),
             'shifts' => $shifts->values()->all(),
             'medications_due' => $medicationsDue,
             'timesheets' => $timesheets,
@@ -118,6 +142,7 @@ class MyTasksController extends Controller
             'manager_data' => $managerData,
             'clock' => $clock,
             'active_round' => $activeRound,
+            'active_shift' => $activeShiftCard,
             'next_shift_briefing' => $nextShiftBriefing,
             'previous_shift' => $previousShift,
             // Namespaced as `my_day_labels` so it does not collide with the
@@ -125,6 +150,99 @@ class MyTasksController extends Controller
             // terminology overrides (client.singular, etc.).
             'my_day_labels' => Lang::get('my-day'),
         ]);
+    }
+
+    /**
+     * Find the worker's currently-relevant shift model (in progress or imminent),
+     * eager-loading the site + all co-resident clients. Used by the new site-
+     * first hero so the avatar stack and resident filter render the full house.
+     *
+     * Returns null when no in-progress / upcoming shift exists today.
+     */
+    private function resolveActiveShiftModel(User $user, Carbon $now): ?Shift
+    {
+        try {
+            $todayStart = $now->copy()->startOfDay();
+            $todayEnd = $now->copy()->endOfDay();
+
+            // Prefer the shift bound to an open attendance session, falling
+            // back to the next "in_progress" shift that overlaps now.
+            $shift = Shift::query()
+                ->where('user_id', $user->id)
+                ->visibleToFrontline($user->organization_id)
+                ->whereBetween('starts_at', [$todayStart, $todayEnd])
+                ->orderByRaw("FIELD(status, 'in_progress', 'scheduled', 'draft')")
+                ->orderBy('starts_at')
+                ->with([
+                    'client:id,first_name,last_name,profile_photo_path,site_id',
+                    'site:id,name,type,address_line_1,address_line_2,suburb,city,postcode',
+                    'site.clients:id,first_name,last_name,profile_photo_path,site_id,status',
+                    'serviceContext:id,name',
+                    'tasks',
+                ])
+                ->first();
+
+            return $shift;
+        } catch (\Throwable) {
+            return null;
+        }
+    }
+
+    /**
+     * Assemble the `active_shift.site` payload — the multi-resident house
+     * snapshot used by the new /my-day hero. Returns null when the active
+     * shift has no site or no residents.
+     */
+    private function buildActiveSitePayload(?Shift $shift): ?array
+    {
+        if (! $shift || ! $shift->site) {
+            return null;
+        }
+        $site = $shift->site;
+        $residents = $site->clients
+            ->filter(fn (Client $c) => ($c->status ?? 'active') !== 'archived')
+            ->values();
+
+        if ($residents->isEmpty()) {
+            return null;
+        }
+
+        return [
+            'id' => $site->id,
+            'name' => $site->name,
+            'type' => $site->type ? Str::headline((string) $site->type) : 'Site',
+            'address' => $this->formatSiteAddress($site),
+            'href' => '/sites/'.$site->id,
+            'residents' => $residents->map(function (Client $c) {
+                $name = trim($c->first_name.' '.$c->last_name);
+
+                return [
+                    'id' => $c->id,
+                    'first_name' => $c->first_name,
+                    'name' => $name === '' ? 'Resident #'.$c->id : $name,
+                    'initials' => ResidentHue::initials($c->first_name, $c->last_name),
+                    'hue' => ResidentHue::for($c->id),
+                    'photo_url' => $c->profile_photo_url ?? null,
+                    'care_note_preview' => null, // populated by a future query; null is safe today
+                ];
+            })->all(),
+        ];
+    }
+
+    /**
+     * Render the human-readable address line shown in the hero meta.
+     */
+    private function formatSiteAddress(\App\Models\Site $site): string
+    {
+        $parts = array_filter([
+            $site->address_line_1,
+            $site->address_line_2,
+            $site->suburb,
+            $site->city,
+            $site->postcode,
+        ], fn ($p) => $p !== null && $p !== '');
+
+        return implode(', ', $parts) ?: ($site->name.' — address unavailable');
     }
 
     /**
@@ -381,10 +499,16 @@ class MyTasksController extends Controller
                         : 'Unknown';
 
                     $result[] = [
+                        // Compound id: medication + dose-time slot. Stable per
+                        // dose-row so the front-end can target mutations
+                        // (administer/refuse/snooze) at the right occurrence.
+                        'id' => $med->id,
                         'client_id' => $med->client_id,
                         'client_name' => $clientName,
                         'medication_name' => $med->name,
                         'dose' => $med->dosage,
+                        'route' => $med->route ?? 'Oral',
+                        'flag' => $med->is_prn ? 'PRN' : null,
                         'scheduled_for' => $scheduled->toIso8601String(),
                         'status' => $status,
                         'emar_url' => EmarUrl::mar($med->client_id, $scheduled->toDateString()),

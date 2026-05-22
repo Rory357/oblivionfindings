@@ -8,12 +8,12 @@ import {
 } from './helpers';
 
 /**
- * F-3: end-of-shift checklist with embedded shift tasks and a live blocker
- * count that updates as tasks are ticked. Only runs when the demo worker is
- * already clocked in — otherwise the End shift button is not present.
+ * Clock out — in the desktop redesign, the action lives in the hero (no
+ * separate end-of-shift Sheet). We assert that when the demo worker has an
+ * active shift, the hero exposes a Clock out button.
  */
-test.describe('end-of-shift checklist', () => {
-    test('shows embedded shift tasks if the demo worker is on an active shift', async ({
+test.describe('clock out from the hero', () => {
+    test('exposes Clock out in the hero when the demo worker is on shift', async ({
         page,
     }) => {
         const consoleErrors = collectConsoleErrors(page);
@@ -21,28 +21,20 @@ test.describe('end-of-shift checklist', () => {
         await loginAsFrontlineDemoWorker(page);
         await gotoMyDay(page);
 
-        const endShiftButton = page
-            .getByRole('button', { name: /^End shift$/i })
+        const clockOut = page
+            .getByRole('button', { name: /Clock out/i })
             .first();
 
-        // If the worker isn't currently clocked in (the briefing shift hasn't
-        // crossed its start time yet), skip — this scenario is timing-bound.
-        if (!(await endShiftButton.isVisible().catch(() => false))) {
+        // Skip when the seeded shift hasn't started yet — the hero shows
+        // "Clock in" instead.
+        if (!(await clockOut.isVisible().catch(() => false))) {
             test.skip(true, 'Demo worker is not currently clocked in');
         }
 
-        await endShiftButton.click();
-
+        await expect(clockOut).toBeVisible();
+        // The Today's timesheet shortcut is always present alongside it.
         await expect(
-            page.getByRole('heading', { name: /End shift for/i }),
-        ).toBeVisible();
-
-        // Embedded shift tasks section + counter (F-3).
-        await expect(page.getByText(/Shift tasks/i).first()).toBeVisible();
-        await expect(
-            page
-                .getByText(/(All complete|of \d+ still to do)/i)
-                .first(),
+            page.getByRole('button', { name: /Today.s timesheet/i }).first(),
         ).toBeVisible();
 
         expectNoConsoleErrors(consoleErrors);

@@ -7,6 +7,8 @@ import { cn } from '@/lib/utils';
 export type PageHeroStat = {
     label: ReactNode;
     value: ReactNode;
+    /** Optional secondary line under the value (e.g. "of 8h", "1 overdue"). */
+    sub?: ReactNode;
     icon?: LucideIcon;
     href?: string;
     /** Hide this stat below md. Default true to match the Site Detail reference. */
@@ -63,8 +65,13 @@ export function PageHeroStats({ stats, layout = 'inline', className }: PageHeroS
                             stat.hideOnMobile === false ? '' : 'hidden md:block',
                         )}
                     >
-                        <p className="text-2xl font-bold tabular-nums">{stat.value}</p>
-                        <p className="text-xs text-primary-foreground/60">{stat.label}</p>
+                        <p className="text-[10px] font-semibold uppercase tracking-wider text-primary-foreground/70">
+                            {stat.label}
+                        </p>
+                        <p className="text-xl font-bold tabular-nums">{stat.value}</p>
+                        {stat.sub ? (
+                            <p className="text-[11px] text-primary-foreground/70">{stat.sub}</p>
+                        ) : null}
                     </div>
                 );
 

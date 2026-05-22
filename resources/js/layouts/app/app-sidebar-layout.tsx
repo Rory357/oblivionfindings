@@ -4,12 +4,32 @@ import { useAppSidebarState } from '@/hooks/use-app-sidebar-state';
 import { cn } from '@/lib/utils';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { usePage } from '@inertiajs/react';
-import { type PropsWithChildren, useCallback, useState } from 'react';
+import { type PropsWithChildren, type ReactNode, useCallback, useState } from 'react';
+
+interface AppSidebarLayoutProps {
+    breadcrumbs?: BreadcrumbItem[];
+    /**
+     * Replace the default breadcrumb header with a custom node (e.g. the
+     * `/my-day` extended StaffHeader). When `null`, the header row is omitted
+     * entirely. When `undefined`, the default AppSidebarHeader renders.
+     */
+    header?: ReactNode | null;
+    /**
+     * Override the inner content wrapper class so pages can opt out of the
+     * default `px-5 py-6 md:px-8 md:py-10` padding (e.g. for full-bleed heroes
+     * or pages that manage their own gutters).
+     */
+    contentClassName?: string;
+}
+
+const DEFAULT_CONTENT_CLASS = 'w-full px-5 py-6 md:px-8 md:py-10';
 
 export default function AppSidebarLayout({
     children,
     breadcrumbs = [],
-}: PropsWithChildren<{ breadcrumbs?: BreadcrumbItem[] }>) {
+    header,
+    contentClassName,
+}: PropsWithChildren<AppSidebarLayoutProps>) {
     const defaultSidebarOpen = usePage<SharedData>().props.sidebarOpen ?? true;
     const { collapsed, setExpanded } = useAppSidebarState(defaultSidebarOpen);
     const [mobileOpen, setMobileOpen] = useState(false);
@@ -37,11 +57,13 @@ export default function AppSidebarLayout({
                     collapsed ? 'md:ml-16' : 'md:ml-64',
                 )}
             >
-                <AppSidebarHeader
-                    breadcrumbs={breadcrumbs}
-                    onMobileMenuToggle={() => setMobileOpen(true)}
-                />
-                <div className="w-full px-5 py-6 md:px-8 md:py-10">
+                {header === undefined ? (
+                    <AppSidebarHeader
+                        breadcrumbs={breadcrumbs}
+                        onMobileMenuToggle={() => setMobileOpen(true)}
+                    />
+                ) : header}
+                <div className={cn(contentClassName ?? DEFAULT_CONTENT_CLASS)}>
                     {children}
                 </div>
             </main>
