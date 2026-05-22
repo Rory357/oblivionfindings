@@ -223,16 +223,17 @@ export function MyDayHero({
     // endpoints). Multi-resident shifts drop the resident-specific shortcuts
     // entirely because the org-wide care_plans / clients-list destinations are
     // gated behind manager permissions a support worker doesn't have.
+    // Both Care Note and Vitals deep-link into the client profile's existing
+    // tabs (the `clients/{id}/daily-notes` and `clients/{id}/clinical/observations`
+    // endpoints are JSON-only API resources, not Inertia pages). Using `?tab=`
+    // lands the worker on the profile with the right tab already open, which
+    // is also what the operations clients/show page supports for deep-linking.
     const careNoteHref = singleResident
-        ? `/clients/${singleResident.id}/daily-notes`
+        ? `/clients/${singleResident.id}?tab=progress_notes`
         : '/clients';
     const carePlanHref = singleResident ? `/clients/${singleResident.id}/care` : null;
-    // `/clients/{id}/medical` exists but redirects workers to /emar/medications,
-    // which isn't what "Vitals & obs" should land on. The clinical observations
-    // index (vitals + obs) is gated by clinical.observations.viewAssigned which
-    // support workers do have.
     const vitalsHref = singleResident
-        ? `/clients/${singleResident.id}/clinical/observations`
+        ? `/clients/${singleResident.id}?tab=observations`
         : null;
     const incidentHref = activeShiftId
         ? `/incidents/create?shift_id=${activeShiftId}`
@@ -272,9 +273,9 @@ export function MyDayHero({
                   primaryAction: { label: t('res_open_profile'), href: `/clients/${r.id}` },
                   actions: [
                       { icon: Pill, label: t('res_give_meds'), href: `/meds/today?client=${r.id}` },
-                      { icon: StickyNote, label: t('res_care_note'), href: `/clients/${r.id}/daily-notes` },
+                      { icon: StickyNote, label: t('res_care_note'), href: `/clients/${r.id}?tab=progress_notes` },
                       { icon: ShieldCheck, label: t('res_care_plan'), href: `/clients/${r.id}/care` },
-                      { icon: Stethoscope, label: t('res_vitals'), href: `/clients/${r.id}/clinical/observations` },
+                      { icon: Stethoscope, label: t('res_vitals'), href: `/clients/${r.id}?tab=observations` },
                       { icon: AlertTriangle, label: t('res_incident'), href: `/incidents/create?client_id=${r.id}` },
                   ],
               },

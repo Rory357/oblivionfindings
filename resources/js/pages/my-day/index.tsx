@@ -301,7 +301,9 @@ export default function MyDay() {
             router.visit('/clients');
             return;
         }
-        router.visit(`/clients/${clientId}/daily-notes`);
+        // The clients/{id}/daily-notes endpoint is JSON-only — land the worker
+        // on the client profile's Daily Notes tab instead (Inertia page).
+        router.visit(`/clients/${clientId}?tab=progress_notes`);
     }, []);
 
     const handleToggleTask = useCallback((taskId: number) => {
