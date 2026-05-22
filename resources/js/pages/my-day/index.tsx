@@ -18,7 +18,6 @@ import { StaffHeader } from '@/components/staff-header';
 import { DatePopover } from './components/date-popover';
 import { DigestPanel } from './components/digest-panel';
 import { MyDayHero } from './components/my-day-hero';
-import { OpenItemsSection } from './components/open-items-section';
 import { PaperworkPanel } from './components/paperwork-panel';
 import { StreamContextMenu } from './components/stream-context-menu';
 import { TomorrowPanel } from './components/tomorrow-panel';
@@ -56,8 +55,10 @@ import type {
  *   • Extended StaffHeader (date popover + global links + search + live + bell)
  *   • MyDayHero (gradient banner with avatar stack, badges-with-popovers, stats,
  *     quick actions, resident PageTabs footer)
- *   • Two-column body: WhatsNextRail | DigestPanel + PaperworkPanel + TomorrowPanel
- *   • OpenItemsSection — open items grid with PageTabs filter
+ *   • Two-column body: WhatsNextRail | DigestPanel (handover/needs-you/updates)
+ *     + PaperworkPanel + TomorrowPanel. The Digest "Needs you" tab absorbs
+ *     the open items (alerts/incidents/follow-ups) that used to sit in a
+ *     separate full-width grid below the rail.
  */
 
 interface AuthUser {
@@ -426,7 +427,8 @@ export default function MyDay() {
                         tab={digestTab}
                         onTabChange={setDigestTab}
                         handover={(props.handover ?? null) as MyDayHandover | null}
-                        alerts={alertTasks}
+                        alertTasks={openItemTasks}
+                        incidents={props.incidents ?? []}
                         notifications={(props.notifications ?? []) as MyDayNotification[]}
                         onAckAlert={handleAckAlert}
                         onSnoozeAlert={handleSnoozeAlert}
@@ -440,14 +442,6 @@ export default function MyDay() {
                         briefing={(props.next_shift_briefing ?? null) as MyDayPreShiftBriefing | null}
                     />
                 </aside>
-            </div>
-
-            <div id="open-items">
-                <OpenItemsSection
-                    tasks={openItemTasks}
-                    incidents={props.incidents ?? []}
-                    onAckAlert={handleAckAlert}
-                />
             </div>
 
             <div className="h-16" />

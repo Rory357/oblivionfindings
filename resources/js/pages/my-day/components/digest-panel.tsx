@@ -1,4 +1,16 @@
-import { Activity, AlertTriangle, Bell, Check, StickyNote } from 'lucide-react';
+import { Link } from '@inertiajs/react';
+import {
+    Activity,
+    AlertTriangle,
+    ArrowRight,
+    Bell,
+    Check,
+    ClipboardList,
+    ShieldCheck,
+    StickyNote,
+    type LucideIcon,
+} from 'lucide-react';
+import { useMemo } from 'react';
 
 import { PageTabs } from '@/components/page/page-tabs';
 import { Avatar, AvatarFallback } from '@/components/ui/avatar';
@@ -9,6 +21,7 @@ import { cn } from '@/lib/utils';
 
 import type {
     MyDayHandover,
+    MyDayIncident,
     MyDayNotification,
     MyDayTaskFollowup,
 } from '../lib/types';
@@ -17,23 +30,67 @@ interface DigestPanelProps {
     tab: 'handover' | 'alerts' | 'notifs';
     onTabChange: (tab: 'handover' | 'alerts' | 'notifs') => void;
     handover?: MyDayHandover | null;
-    alerts: MyDayTaskFollowup[];
+    /** Control-room alerts + note follow-ups from /my-day's `tasks` payload. */
+    alertTasks: MyDayTaskFollowup[];
+    /** Client incidents reported by this worker. */
+    incidents: MyDayIncident[];
     notifications: MyDayNotification[];
     onAckAlert?: (alert: MyDayTaskFollowup) => void;
     onSnoozeAlert?: (alert: MyDayTaskFollowup) => void;
     onConfirmHandoverRead?: () => void;
 }
 
+/**
+ * Unified open-item shape that lets the Alerts pane render alerts, incidents
+ * and follow-ups in one priority-sorted stream — replacing the deprecated
+ * "Things that need you" grid that used to sit below the rail.
+ */
+type OpenItemKind = 'alert' | 'incident' | 'followup';
+
+interface OpenItem {
+    id: string;
+    kind: OpenItemKind;
+    title: string;
+    priority: 'critical' | 'high' | 'medium' | 'low';
+    clientName?: string | null;
+    occurredAt: string;
+    sla?: string | null;
+    href?: string | null;
+    canAck?: boolean;
+    raw?: MyDayTaskFollowup;
+}
+
+const KIND_META: Record<OpenItemKind, { label: string; tone: 'critical' | 'warning' | 'info'; icon: LucideIcon }> = {
+    alert: { label: 'Alert', tone: 'critical', icon: AlertTriangle },
+    incident: { label: 'Incident', tone: 'warning', icon: ShieldCheck },
+    followup: { label: 'Follow-up', tone: 'info', icon: ClipboardList },
+};
+
+const TONE_TILE: Record<'critical' | 'warning' | 'info', string> = {
+    critical: 'bg-status-critical-bg text-status-critical',
+    warning: 'bg-status-warning-bg text-status-warning',
+    info: 'bg-accent text-primary',
+};
+
+const TONE_BADGE: Record<'critical' | 'warning' | 'info', string> = {
+    critical: 'border-status-critical/30 bg-status-critical-bg text-status-critical',
+    warning: 'border-status-warning/30 bg-status-warning-bg text-status-warning',
+    info: 'border-status-info/30 bg-status-info-bg text-status-info',
+};
+
 export function DigestPanel({
     tab,
     onTabChange,
     handover,
-    alerts,
+    alertTasks,
+    incidents,
     notifications,
     onAckAlert,
     onSnoozeAlert,
     onConfirmHandoverRead,
 }: DigestPanelProps) {
+    const openItems = useMemo(() => combineOpenItems(alertTasks, incidents), [alertTasks, incidents]);
+
     return (
         <div
             data-test="my-day-digest"
@@ -57,9 +114,9 @@ export function DigestPanel({
                         },
                         {
                             value: 'alerts',
-                            label: 'Alerts',
+                            label: 'Needs you',
                             icon: AlertTriangle,
-                            badge: alerts.length > 0 ? alerts.length : null,
+                            badge: openItems.length > 0 ? openItems.length : null,
                         },
                         {
                             value: 'notifs',
@@ -73,8 +130,8 @@ export function DigestPanel({
                         <HandoverPane handover={handover} onConfirmRead={onConfirmHandoverRead} />
                     </TabsContent>
                     <TabsContent value="alerts" className="m-0">
-                        <AlertsPane
-                            alerts={alerts}
+                        <NeedsYouPane
+                            items={openItems}
                             onAck={onAckAlert}
                             onSnooze={onSnoozeAlert}
                         />
@@ -177,64 +234,120 @@ function HandoverPane({
     );
 }
 
-function AlertsPane({
-    alerts,
+function NeedsYouPane({
+    items,
     onAck,
     onSnooze,
 }: {
-    alerts: MyDayTaskFollowup[];
+    items: OpenItem[];
     onAck?: (alert: MyDayTaskFollowup) => void;
     onSnooze?: (alert: MyDayTaskFollowup) => void;
 }) {
-    if (alerts.length === 0) {
+    if (items.length === 0) {
         return (
             <div className="px-4 py-6 text-center text-sm text-muted-foreground">
-                No open alerts.
+                Nothing needs you right now.
             </div>
         );
     }
+
+    const p1 = items.filter((i) => i.priority === 'critical').length;
+
     return (
         <div>
-            {alerts.map((alert) => {
-                const isCrit = alert.priority === 'critical';
-                return (
-                    <div
-                        key={alert.id}
-                        className={cn(
-                            'flex items-start gap-2.5 border-b border-border px-4 py-3 last:border-b-0',
-                            isCrit && 'bg-status-critical-bg',
-                        )}
+            <div className="flex items-center gap-2 px-4 py-2 text-[11px] text-muted-foreground">
+                <span>{items.length} open</span>
+                {p1 > 0 ? (
+                    <Badge
+                        variant="outline"
+                        className="border-status-critical/30 bg-status-critical-bg text-[10px] text-status-critical"
                     >
-                        <div
-                            className={cn(
-                                'flex h-7 w-7 shrink-0 items-center justify-center rounded-md',
-                                isCrit
-                                    ? 'bg-status-critical-bg text-status-critical'
-                                    : 'bg-status-warning-bg text-status-warning',
-                            )}
+                        {p1} P1
+                    </Badge>
+                ) : null}
+            </div>
+            {items.map((item) => (
+                <OpenItemRow
+                    key={item.id}
+                    item={item}
+                    onAck={onAck}
+                    onSnooze={onSnooze}
+                />
+            ))}
+        </div>
+    );
+}
+
+function OpenItemRow({
+    item,
+    onAck,
+    onSnooze,
+}: {
+    item: OpenItem;
+    onAck?: (alert: MyDayTaskFollowup) => void;
+    onSnooze?: (alert: MyDayTaskFollowup) => void;
+}) {
+    const meta = KIND_META[item.kind];
+    const Icon = meta.icon;
+    const isCrit = item.priority === 'critical';
+    return (
+        <div
+            className={cn(
+                'flex items-start gap-2.5 border-b border-border px-4 py-3 last:border-b-0',
+                isCrit && 'bg-status-critical-bg/40',
+            )}
+        >
+            <div
+                className={cn(
+                    'flex h-7 w-7 shrink-0 items-center justify-center rounded-md',
+                    TONE_TILE[meta.tone],
+                )}
+            >
+                <Icon className="h-3.5 w-3.5" />
+            </div>
+            <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-1.5">
+                    <Badge variant="outline" className={cn('text-[10px]', TONE_BADGE[meta.tone])}>
+                        {meta.label}
+                    </Badge>
+                    {isCrit ? (
+                        <Badge
+                            variant="outline"
+                            className="border-status-critical/30 bg-status-critical-bg text-[10px] text-status-critical"
                         >
-                            <AlertTriangle className="h-3.5 w-3.5" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                            <div className="text-[12.5px] font-semibold leading-snug">{alert.title}</div>
-                            <div className="mt-0.5 text-[11px] text-muted-foreground">
-                                {alert.meta?.client_name ?? '—'} · {timeSince(alert.created_at)}
-                                {alert.meta?.sla_status ? ` · ${alert.meta.sla_status.replace('_', ' ')}` : ''}
-                            </div>
-                            {isCrit ? (
-                                <div className="mt-2 flex gap-1.5">
-                                    <Button size="sm" onClick={() => onAck?.(alert)}>
-                                        Acknowledge
-                                    </Button>
-                                    <Button size="sm" variant="ghost" onClick={() => onSnooze?.(alert)}>
-                                        Snooze 5m
-                                    </Button>
-                                </div>
-                            ) : null}
-                        </div>
+                            P1
+                        </Badge>
+                    ) : null}
+                    <span className="ml-auto text-[10.5px] text-muted-foreground">
+                        {timeSince(item.occurredAt)}
+                    </span>
+                </div>
+                <div className="mt-1 text-[12.5px] font-semibold leading-snug text-pretty">
+                    {item.title}
+                </div>
+                <div className="mt-0.5 text-[11px] text-muted-foreground">
+                    {[item.clientName, item.sla].filter(Boolean).join(' · ') || '—'}
+                </div>
+                {isCrit && item.raw ? (
+                    <div className="mt-2 flex gap-1.5">
+                        <Button size="sm" onClick={() => onAck?.(item.raw!)}>
+                            Acknowledge
+                        </Button>
+                        <Button size="sm" variant="ghost" onClick={() => onSnooze?.(item.raw!)}>
+                            Snooze 5m
+                        </Button>
                     </div>
-                );
-            })}
+                ) : item.href ? (
+                    <div className="mt-2">
+                        <Button asChild size="sm" variant="ghost">
+                            <Link href={item.href}>
+                                Open
+                                <ArrowRight className="ml-1 h-2.5 w-2.5" />
+                            </Link>
+                        </Button>
+                    </div>
+                ) : null}
+            </div>
         </div>
     );
 }
@@ -270,6 +383,55 @@ function NotifsPane({ notifications }: { notifications: MyDayNotification[] }) {
             ))}
         </div>
     );
+}
+
+/**
+ * Combine the controller's `tasks` (control-room alerts + note follow-ups) and
+ * `incidents` payload into a single priority-sorted open-item list. Sort order:
+ * critical > high > medium > low; ties broken by most-recent.
+ */
+function combineOpenItems(tasks: MyDayTaskFollowup[], incidents: MyDayIncident[]): OpenItem[] {
+    const fromTasks: OpenItem[] = tasks.map((t) => ({
+        id: `task-${t.id}`,
+        kind: t.type === 'note_followup' || t.type === 'followup' ? 'followup' : (t.type as OpenItemKind),
+        title: t.title,
+        priority: t.priority,
+        clientName: t.meta?.client_name ?? null,
+        occurredAt: t.created_at,
+        sla: t.meta?.sla_status ? humaniseSla(t.meta.sla_status) : null,
+        href: t.source_url,
+        canAck: !!t.meta?.can_ack,
+        raw: t,
+    }));
+
+    const fromIncidents: OpenItem[] = incidents.map((i) => ({
+        id: `incident-${i.id}`,
+        kind: 'incident',
+        title: i.title,
+        priority: mapSeverity(i.severity),
+        clientName: i.client_name,
+        occurredAt: i.occurred_at,
+        sla: i.requires_followup ? 'Follow-up required' : null,
+        href: i.url,
+    }));
+
+    return [...fromTasks, ...fromIncidents].sort((a, b) => {
+        const rank: Record<string, number> = { critical: 0, high: 1, medium: 2, low: 3 };
+        const diff = (rank[a.priority] ?? 3) - (rank[b.priority] ?? 3);
+        if (diff !== 0) return diff;
+        return new Date(b.occurredAt).getTime() - new Date(a.occurredAt).getTime();
+    });
+}
+
+function mapSeverity(s: string): 'critical' | 'high' | 'medium' | 'low' {
+    if (s === 'critical' || s === 'high' || s === 'medium' || s === 'low') return s;
+    return 'medium';
+}
+
+function humaniseSla(s: 'on_track' | 'at_risk' | 'breached'): string {
+    if (s === 'breached') return 'SLA breached';
+    if (s === 'at_risk') return 'SLA at risk';
+    return 'On track';
 }
 
 function timeSince(iso: string): string {

@@ -150,7 +150,9 @@ export function MyDayHero({
                               ? ('warning' as const)
                               : ('info' as const),
                 })),
-                action: { label: 'See all open items', href: '#open-items' },
+                // No footer action — the same items live in the Digest panel's
+                // "Needs you" tab right next to the hero, so a deep-link would
+                // duplicate the navigation.
             },
         });
     }
