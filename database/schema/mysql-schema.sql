@@ -1611,6 +1611,37 @@ CREATE TABLE `client_excursion_requests` (
   CONSTRAINT `client_excursion_requests_requested_by_foreign` FOREIGN KEY (`requested_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `client_financial_discrepancies`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `client_financial_discrepancies` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `client_id` bigint unsigned NOT NULL,
+  `organization_id` bigint unsigned DEFAULT NULL,
+  `description` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `amount` decimal(10,2) NOT NULL,
+  `status` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'open',
+  `raised_at` timestamp NULL DEFAULT NULL,
+  `raised_by` bigint unsigned DEFAULT NULL,
+  `resolved_by` bigint unsigned DEFAULT NULL,
+  `resolved_at` timestamp NULL DEFAULT NULL,
+  `resolution_notes` text COLLATE utf8mb4_unicode_ci,
+  `notes` text COLLATE utf8mb4_unicode_ci,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `client_financial_discrepancies_raised_by_foreign` (`raised_by`),
+  KEY `client_financial_discrepancies_resolved_by_foreign` (`resolved_by`),
+  KEY `client_financial_discrepancies_client_id_status_index` (`client_id`,`status`),
+  KEY `client_financial_discrepancies_client_id_raised_at_index` (`client_id`,`raised_at`),
+  KEY `client_financial_discrepancies_organization_id_index` (`organization_id`),
+  KEY `client_financial_discrepancies_status_index` (`status`),
+  CONSTRAINT `client_financial_discrepancies_client_id_foreign` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `client_financial_discrepancies_raised_by_foreign` FOREIGN KEY (`raised_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `client_financial_discrepancies_resolved_by_foreign` FOREIGN KEY (`resolved_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `client_fluid_entries`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -2340,6 +2371,37 @@ CREATE TABLE `client_portal_users` (
   KEY `client_portal_users_user_id_foreign` (`user_id`),
   CONSTRAINT `client_portal_users_client_id_foreign` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE,
   CONSTRAINT `client_portal_users_user_id_foreign` FOREIGN KEY (`user_id`) REFERENCES `users` (`id`) ON DELETE CASCADE
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `client_purchase_requests`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `client_purchase_requests` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `client_id` bigint unsigned NOT NULL,
+  `organization_id` bigint unsigned DEFAULT NULL,
+  `description` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL,
+  `amount` decimal(10,2) NOT NULL,
+  `category` varchar(255) COLLATE utf8mb4_unicode_ci DEFAULT NULL,
+  `status` varchar(255) COLLATE utf8mb4_unicode_ci NOT NULL DEFAULT 'requested',
+  `requested_at` timestamp NULL DEFAULT NULL,
+  `requested_by` bigint unsigned DEFAULT NULL,
+  `approved_by` bigint unsigned DEFAULT NULL,
+  `approved_at` timestamp NULL DEFAULT NULL,
+  `notes` text COLLATE utf8mb4_unicode_ci,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  KEY `client_purchase_requests_requested_by_foreign` (`requested_by`),
+  KEY `client_purchase_requests_approved_by_foreign` (`approved_by`),
+  KEY `client_purchase_requests_client_id_status_index` (`client_id`,`status`),
+  KEY `client_purchase_requests_client_id_requested_at_index` (`client_id`,`requested_at`),
+  KEY `client_purchase_requests_organization_id_index` (`organization_id`),
+  KEY `client_purchase_requests_status_index` (`status`),
+  CONSTRAINT `client_purchase_requests_approved_by_foreign` FOREIGN KEY (`approved_by`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `client_purchase_requests_client_id_foreign` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `client_purchase_requests_requested_by_foreign` FOREIGN KEY (`requested_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `client_risks`;
@@ -19335,3 +19397,4 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (550,'2026_05_22_00
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (551,'2026_05_22_000003_create_client_leave_and_excursion_tables',7);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (552,'2026_05_22_000004_add_health_thresholds_to_clients',7);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (553,'2026_05_22_000005_create_client_path_plans_table',8);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (554,'2026_05_22_000006_create_client_purchase_requests_and_discrepancies',9);

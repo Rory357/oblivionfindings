@@ -3,9 +3,11 @@
 use App\Enums\NextOfKinRelationship;
 use App\Models\Client;
 use App\Models\ClientExcursionRequest;
+use App\Models\ClientFinancialDiscrepancy;
 use App\Models\ClientLeaveRequest;
 use App\Models\ClientNote;
 use App\Models\ClientPathPlan;
+use App\Models\ClientPurchaseRequest;
 use App\Models\ClientSeizureEntry;
 use App\Models\NextOfKin;
 use App\Models\Permission;
@@ -338,6 +340,47 @@ it('upserts a PATH plan and surfaces overdue reviews in the actions aggregator',
         ->forClient($client, $manager);
     $types = collect($items)->pluck('type')->all();
     expect($types)->toContain('path_plan_review_due');
+});
+
+it('surfaces purchase requests and financial discrepancies on the client profile payload', function () {
+    $manager = User::factory()->create();
+    grantPhaseTwoThreePermissions($manager, [
+        'clients.viewAny',
+        'clients.update',
+    ]);
+
+    $client = Client::factory()->create();
+
+    ClientPurchaseRequest::query()->create([
+        'client_id' => $client->id,
+        'description' => 'New winter jacket',
+        'amount' => 189.50,
+        'status' => 'requested',
+        'requested_at' => now()->subDay(),
+        'requested_by' => $manager->id,
+    ]);
+
+    ClientFinancialDiscrepancy::query()->create([
+        'client_id' => $client->id,
+        'description' => 'Petty cash receipt missing for community outing',
+        'amount' => 42.75,
+        'status' => 'open',
+        'raised_at' => now()->subHours(3),
+        'raised_by' => $manager->id,
+    ]);
+
+    $this->actingAs($manager)
+        ->get("/operations/clients/{$client->id}")
+        ->assertOk()
+        ->assertInertia(
+            fn ($page) => $page
+                ->where('client_finance.purchase_requests.0.description', 'New winter jacket')
+                ->where('client_finance.purchase_requests.0.amount', 189.5)
+                ->where('client_finance.purchase_requests.0.status', 'requested')
+                ->where('client_finance.discrepancies.0.description', 'Petty cash receipt missing for community outing')
+                ->where('client_finance.discrepancies.0.amount', 42.75)
+                ->where('client_finance.discrepancies.0.status', 'open'),
+        );
 });
 
 it('exposes a categorised relationship for each next-of-kin via the enum', function () {

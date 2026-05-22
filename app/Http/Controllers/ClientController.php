@@ -28,6 +28,7 @@ use App\Models\ClientBowelEntry;
 use App\Models\ClientConsent;
 use App\Models\ClientDocument;
 use App\Models\ClientExcursionRequest;
+use App\Models\ClientFinancialDiscrepancy;
 use App\Models\ClientFluidEntry;
 use App\Models\ClientFund;
 use App\Models\ClientFundTransaction;
@@ -41,6 +42,7 @@ use App\Models\ClientOnboardingWorkflow;
 use App\Models\ClientPathPlan;
 use App\Models\ClientPersonalAsset;
 use App\Models\ClientPhoto;
+use App\Models\ClientPurchaseRequest;
 use App\Models\ClientRisk;
 use App\Models\ClientRoutine;
 use App\Models\ClientSeizureEntry;
@@ -598,11 +600,34 @@ class ClientController extends Controller
                         'approved_at' => $entry->approved_at?->toISOString(),
                     ])
                     ->values(),
-                // Purchase requests + financial discrepancies are tracked as
-                // Phase 2 follow-ups. For now surface empty arrays so the tab
-                // can render the sections with a "no items yet" state.
-                'purchase_requests' => [],
-                'discrepancies' => [],
+                'purchase_requests' => ClientPurchaseRequest::query()
+                    ->where('client_id', $client->id)
+                    ->orderByDesc('requested_at')
+                    ->orderByDesc('created_at')
+                    ->limit(25)
+                    ->get()
+                    ->map(fn ($req) => [
+                        'id' => $req->id,
+                        'description' => $req->description,
+                        'amount' => (float) $req->amount,
+                        'status' => $req->status,
+                        'requested_at' => ($req->requested_at ?? $req->created_at)?->toISOString(),
+                    ])
+                    ->values(),
+                'discrepancies' => ClientFinancialDiscrepancy::query()
+                    ->where('client_id', $client->id)
+                    ->orderByDesc('raised_at')
+                    ->orderByDesc('created_at')
+                    ->limit(25)
+                    ->get()
+                    ->map(fn ($d) => [
+                        'id' => $d->id,
+                        'description' => $d->description,
+                        'amount' => (float) $d->amount,
+                        'status' => $d->status,
+                        'raised_at' => ($d->raised_at ?? $d->created_at)?->toISOString(),
+                    ])
+                    ->values(),
             ],
             'support_plan' => $client->supportPlan,
             'assessments' => $client->assessments
