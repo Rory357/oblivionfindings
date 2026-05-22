@@ -530,6 +530,7 @@ export default function CreateUser({ clients, roles, can }: Props) {
                                             <SelectItem value="aunt_uncle">Aunt/Uncle</SelectItem>
                                             <SelectItem value="niece_nephew">Niece/Nephew</SelectItem>
                                             <SelectItem value="cousin">Cousin</SelectItem>
+                                            <SelectItem value="guardian">Legal Guardian</SelectItem>
                                             <SelectItem value="friend">Friend</SelectItem>
                                             <SelectItem value="other">Other</SelectItem>
                                         </SelectContent>

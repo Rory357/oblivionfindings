@@ -2,19 +2,19 @@
 
 namespace App\Http\Controllers\System;
 
+use App\Enums\NextOfKinRelationship;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\NextOfKin;
 use App\Models\Role;
 use App\Models\Staff;
 use App\Models\User;
-use App\Models\UserInvitation;
 use App\Models\UserLoginLog;
+use App\Services\AuditLogger;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
 use Illuminate\Validation\Rule;
-use App\Services\AuditLogger;
 use Inertia\Inertia;
 
 class UsersController extends Controller
@@ -36,7 +36,7 @@ class UsersController extends Controller
 
         $query = User::query()
             ->with(['roles:id,name,label,level', 'staffProfile:id,user_id,job_title,status'])
-            ->when($search, fn($q) => $q
+            ->when($search, fn ($q) => $q
                 ->where('name', 'like', "%{$search}%")
                 ->orWhere('email', 'like', "%{$search}%")
             );
@@ -53,7 +53,7 @@ class UsersController extends Controller
 
         // Role filter
         if ($roleFilter !== 'all' && is_numeric($roleFilter)) {
-            $query->whereHas('roles', fn($q) => $q->where('roles.id', (int) $roleFilter));
+            $query->whereHas('roles', fn ($q) => $q->where('roles.id', (int) $roleFilter));
         }
 
         // User Type filter
@@ -90,14 +90,14 @@ class UsersController extends Controller
             case 'inactive':
                 $query->where(function ($q) {
                     $q->whereNull('last_login_at')
-                      ->orWhere('last_login_at', '<', now()->subDays(30));
+                        ->orWhere('last_login_at', '<', now()->subDays(30));
                 });
                 break;
         }
 
         $users = $query->orderBy('name')
             ->paginate(20)
-            ->through(fn($user) => [
+            ->through(fn ($user) => [
                 'id' => $user->id,
                 'name' => $user->name,
                 'email' => $user->email,
@@ -105,7 +105,7 @@ class UsersController extends Controller
                 'is_active' => $user->approved_at !== null,
                 'approved_at' => $user->approved_at,
                 'created_at' => $user->created_at,
-                'roles' => $user->roles->map(fn($r) => [
+                'roles' => $user->roles->map(fn ($r) => [
                     'id' => $r->id,
                     'label' => $r->label,
                     'level' => $r->level,
@@ -200,7 +200,7 @@ class UsersController extends Controller
             'client.date_of_birth' => ['nullable', 'date'],
             // Next of Kin specific
             'next_of_kin.client_id' => ['required_if:user_type,next_of_kin', 'nullable', 'integer', 'exists:clients,id'],
-            'next_of_kin.relationship' => ['required_if:user_type,next_of_kin', 'nullable', 'string', 'in:parent,sibling,spouse,child,grandparent,grandchild,aunt_uncle,niece_nephew,cousin,friend,other'],
+            'next_of_kin.relationship' => ['required_if:user_type,next_of_kin', 'nullable', 'string', Rule::enum(NextOfKinRelationship::class)],
             'next_of_kin.is_primary_contact' => ['boolean'],
             'next_of_kin.is_emergency_contact' => ['boolean'],
         ]);
@@ -215,7 +215,7 @@ class UsersController extends Controller
         ]);
 
         // Assign roles
-        if (!empty($data['role_ids'])) {
+        if (! empty($data['role_ids'])) {
             $newUser->roles()->sync($data['role_ids']);
             $primaryRole = $newUser->roles()->orderByDesc('level')->first();
             $newUser->forceFill(['role' => $primaryRole?->name ?? 'support_worker'])->save();
@@ -290,7 +290,7 @@ class UsersController extends Controller
 
         $target->load(['roles.permissions', 'staffProfile']);
 
-        $allRoles = \App\Models\Role::query()->orderBy('label')->get(['id', 'name', 'label']);
+        $allRoles = Role::query()->orderBy('label')->get(['id', 'name', 'label']);
 
         return Inertia::render('settings/users/show', [
             'user' => [
@@ -417,7 +417,7 @@ class UsersController extends Controller
             'approved_by' => $user->id,
         ]);
 
-        if (!empty($data['role_ids'])) {
+        if (! empty($data['role_ids'])) {
             $target->roles()->sync($data['role_ids']);
             $primaryRole = $target->roles()->orderByDesc('level')->first();
             $target->forceFill(['role' => $primaryRole?->name ?? 'support_worker'])->save();
@@ -553,13 +553,13 @@ class UsersController extends Controller
         if ($user->staffProfile) {
             return 'staff';
         }
-        
+
         // Check if user is linked as a client
         $clientCount = Client::where('user_id', $user->id)->count();
         if ($clientCount > 0) {
             return 'client';
         }
-        
+
         // Check if user is linked as next of kin
         $nokCount = NextOfKin::where('user_id', $user->id)->count();
         if ($nokCount > 0) {

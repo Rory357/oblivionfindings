@@ -18,6 +18,8 @@ export type FamilyMember = {
     id: number | string;
     name?: string | null;
     relationship?: string | null;
+    relationship_label?: string | null;
+    relationship_category?: 'family' | 'guardian' | 'friend' | 'other' | null;
     phone?: string | null;
     alternate_phone?: string | null;
     email?: string | null;
@@ -66,8 +68,14 @@ function groupColor(category: string): string {
     );
 }
 
-function categoriseRelationship(rel?: string | null): string {
-    const r = (rel ?? '').toLowerCase();
+function relationshipCategory(member: FamilyMember): string {
+    if (member.relationship_category) {
+        return member.relationship_category;
+    }
+    // Legacy fallback for rows that pre-date NextOfKinRelationship: matches
+    // the original string-bucketing this page shipped with, so previously
+    // categorised rows do not jump groups when the enum lookup misses.
+    const r = (member.relationship ?? '').toLowerCase();
     if (
         ['mother', 'father', 'parent', 'grandparent', 'sibling', 'sister', 'brother'].some(
             (k) => r.includes(k),
@@ -97,9 +105,9 @@ function MemberCard({
             <div className="flex items-start justify-between gap-3">
                 <div className="min-w-0">
                     <p className="font-medium">{person.name ?? 'Unnamed person'}</p>
-                    {person.relationship ? (
+                    {person.relationship_label || person.relationship ? (
                         <p className="text-xs text-muted-foreground capitalize">
-                            {person.relationship}
+                            {person.relationship_label ?? person.relationship}
                         </p>
                     ) : null}
                 </div>
@@ -246,13 +254,13 @@ export function FamilyTreeTab({
 }: FamilyTreeTabProps) {
     const primaryContacts = nextOfKins.filter((k) => k.is_primary);
     const family = nextOfKins.filter(
-        (k) => categoriseRelationship(k.relationship) === 'family' && !k.is_primary,
+        (k) => relationshipCategory(k) === 'family' && !k.is_primary,
     );
     const guardians = nextOfKins.filter(
-        (k) => categoriseRelationship(k.relationship) === 'guardian',
+        (k) => relationshipCategory(k) === 'guardian',
     );
     const others = nextOfKins.filter((k) => {
-        const cat = categoriseRelationship(k.relationship);
+        const cat = relationshipCategory(k);
         return !k.is_primary && cat !== 'family' && cat !== 'guardian';
     });
 
@@ -289,6 +297,7 @@ export function FamilyTreeTab({
 
     return (
         <div className="space-y-6" data-test="client-family-tree-tab">
+            {/* eslint-disable-next-line no-restricted-syntax -- page-level header banner uses a custom rounded panel, not a Card. */}
             <div className="rounded-lg border bg-card p-4">
                 <div className="flex items-center justify-between gap-3">
                     <div>

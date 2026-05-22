@@ -15,22 +15,30 @@ namespace App\Http\Controllers;
 use App\Domain\Clinical\Services\ClinicalHealthSummaryService;
 use App\Domain\SecurityDevices\Models\Device;
 use App\Domain\SecurityDevices\Services\DeviceRegistryService;
+use App\Enums\NextOfKinRelationship;
 use App\Http\Requests\StoreClientRequest;
 use App\Http\Requests\UpdateClientRequest;
 use App\Http\Resources\ClientDailyNoteResource;
 use App\Models\AssetGeofence;
+use App\Models\AuditLog;
 use App\Models\CarePlan;
 use App\Models\Client;
 use App\Models\ClientAppointment;
 use App\Models\ClientBowelEntry;
 use App\Models\ClientConsent;
 use App\Models\ClientDocument;
+use App\Models\ClientExcursionRequest;
 use App\Models\ClientFluidEntry;
+use App\Models\ClientFund;
+use App\Models\ClientFundTransaction;
 use App\Models\ClientIncident;
+use App\Models\ClientLeaveRequest;
+use App\Models\ClientLedgerEntry;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientNote;
 use App\Models\ClientOnboardingWorkflow;
+use App\Models\ClientPathPlan;
 use App\Models\ClientPersonalAsset;
 use App\Models\ClientPhoto;
 use App\Models\ClientRisk;
@@ -63,6 +71,7 @@ use App\Models\TimelineEvent;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\Client\ActionsAggregator;
+use App\Services\Client\BehaviourPatternsService;
 use App\Services\ConsentValidationService;
 use App\Services\HealthSafety\HsModuleSummaryService;
 use App\Services\Integration\IntegrationEventHistoryService;
@@ -424,27 +433,33 @@ class ClientController extends Controller
             'next_of_kins' => $client->nextOfKins()
                 ->with('user:id,name,email')
                 ->get()
-                ->map(fn ($k) => [
-                    'id' => $k->id,
-                    'name' => $k->user?->name,
-                    'email' => $k->user?->email,
-                    'relationship' => $k->relationship,
-                    'phone' => $k->phone,
-                    'alternate_phone' => $k->alternate_phone,
-                    'address' => $k->address,
-                    'is_primary' => (bool) $k->is_primary_contact,
-                    'is_emergency_contact' => (bool) $k->is_emergency_contact,
-                    'can_view_medical' => (bool) $k->can_view_medical,
-                    'can_view_medications' => (bool) $k->can_view_medications,
-                    'can_view_incidents' => (bool) $k->can_view_incidents,
-                    'can_receive_updates' => (bool) $k->can_receive_updates,
-                    'has_portal_access' => $k->hasPortalAccess(),
-                    'notes' => $k->notes,
-                ])
+                ->map(function ($k) {
+                    $relEnum = NextOfKinRelationship::tryFromLegacy($k->relationship);
+
+                    return [
+                        'id' => $k->id,
+                        'name' => $k->user?->name,
+                        'email' => $k->user?->email,
+                        'relationship' => $k->relationship,
+                        'relationship_label' => $relEnum?->label() ?? $k->relationship,
+                        'relationship_category' => $relEnum?->category() ?? 'other',
+                        'phone' => $k->phone,
+                        'alternate_phone' => $k->alternate_phone,
+                        'address' => $k->address,
+                        'is_primary' => (bool) $k->is_primary_contact,
+                        'is_emergency_contact' => (bool) $k->is_emergency_contact,
+                        'can_view_medical' => (bool) $k->can_view_medical,
+                        'can_view_medications' => (bool) $k->can_view_medications,
+                        'can_view_incidents' => (bool) $k->can_view_incidents,
+                        'can_receive_updates' => (bool) $k->can_receive_updates,
+                        'has_portal_access' => $k->hasPortalAccess(),
+                        'notes' => $k->notes,
+                    ];
+                })
                 ->values(),
             'audit_history' => $request->user()?->canDo('audit.viewClient')
                 || $request->user()?->canDo('clients.update')
-                ? \App\Models\AuditLog::query()
+                ? AuditLog::query()
                     ->where('client_id', $client->id)
                     ->with('user:id,name,email')
                     ->orderByDesc('created_at')
@@ -463,9 +478,9 @@ class ClientController extends Controller
                         'created_at' => optional($log->created_at)->toISOString(),
                     ])
                 : [],
-            'behaviour_patterns' => app(\App\Services\Client\BehaviourPatternsService::class)
+            'behaviour_patterns' => app(BehaviourPatternsService::class)
                 ->forClient($client, $request->user()),
-            'path_plan' => \App\Models\ClientPathPlan::query()
+            'path_plan' => ClientPathPlan::query()
                 ->where('client_id', $client->id)
                 ->first()?->only([
                     'id',
@@ -481,7 +496,7 @@ class ClientController extends Controller
                     'next_review_at',
                 ]),
             'leave_excursions' => [
-                'leave' => \App\Models\ClientLeaveRequest::query()
+                'leave' => ClientLeaveRequest::query()
                     ->where('client_id', $client->id)
                     ->with(['requester:id,name', 'approver:id,name'])
                     ->orderByDesc('starts_on')
@@ -502,7 +517,7 @@ class ClientController extends Controller
                         'approval_notes' => $l->approval_notes,
                     ])
                     ->values(),
-                'excursions' => \App\Models\ClientExcursionRequest::query()
+                'excursions' => ClientExcursionRequest::query()
                     ->where('client_id', $client->id)
                     ->with(['requester:id,name', 'approver:id,name'])
                     ->orderByDesc('starts_at')
@@ -526,7 +541,7 @@ class ClientController extends Controller
                     ->values(),
             ],
             'client_finance' => [
-                'funds' => \App\Models\ClientFund::query()
+                'funds' => ClientFund::query()
                     ->where('client_id', $client->id)
                     ->orderBy('fund_name')
                     ->get()
@@ -542,10 +557,10 @@ class ClientController extends Controller
                         'notes' => $fund->notes,
                     ])
                     ->values(),
-                'recent_transactions' => \App\Models\ClientFundTransaction::query()
+                'recent_transactions' => ClientFundTransaction::query()
                     ->whereIn(
                         'client_fund_id',
-                        \App\Models\ClientFund::query()
+                        ClientFund::query()
                             ->where('client_id', $client->id)
                             ->pluck('id'),
                     )
@@ -567,7 +582,7 @@ class ClientController extends Controller
                         'reference' => $tx->reference,
                     ])
                     ->values(),
-                'ledger_entries' => \App\Models\ClientLedgerEntry::query()
+                'ledger_entries' => ClientLedgerEntry::query()
                     ->where('client_id', $client->id)
                     ->orderByDesc('entry_date')
                     ->limit(25)

@@ -1,15 +1,22 @@
 <?php
 
+use App\Enums\NextOfKinRelationship;
 use App\Models\Client;
 use App\Models\ClientExcursionRequest;
 use App\Models\ClientLeaveRequest;
 use App\Models\ClientNote;
+use App\Models\ClientPathPlan;
+use App\Models\ClientSeizureEntry;
+use App\Models\NextOfKin;
 use App\Models\Permission;
+use App\Models\ProgressNote;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\TimelineEvent;
 use App\Models\User;
+use App\Services\Client\ActionsAggregator;
 use App\Services\Client\BehaviourPatternsService;
+use App\Services\Timeline\TimelineEmitter;
 
 function grantPhaseTwoThreePermissions(User $user, array $permissionKeys): void
 {
@@ -142,7 +149,7 @@ it('respects per-client seizure escalation overrides', function () {
         'seizure_duration_escalation_seconds' => 120, // 2-minute override
     ]);
 
-    $entry = \App\Models\ClientSeizureEntry::create([
+    $entry = ClientSeizureEntry::create([
         'client_id' => $client->id,
         'occurred_at' => now(),
         'duration_seconds' => 180, // exceeds per-client 120 even though under default 300
@@ -152,7 +159,7 @@ it('respects per-client seizure escalation overrides', function () {
     ]);
 
     $event = TimelineEvent::query()
-        ->where('source_type', \App\Models\ClientSeizureEntry::class)
+        ->where('source_type', ClientSeizureEntry::class)
         ->where('source_id', $entry->id)
         ->first();
 
@@ -177,7 +184,7 @@ it('preserves manually recorded timeline events when a model projection retypes'
     ]);
 
     // Controller writes its own event tied to the SAME source (no _projected marker).
-    $manualEvent = app(\App\Services\Timeline\TimelineEmitter::class)->record([
+    $manualEvent = app(TimelineEmitter::class)->record([
         'type' => 'note_acknowledged',
         'occurred_at' => now(),
         'source_type' => ClientNote::class,
@@ -225,9 +232,9 @@ it('aggregates behaviour patterns from clinical observations and concern notes',
     expect($payload['window_days'])->toBe(14)
         ->and($payload['concern_note_count'])->toBeGreaterThanOrEqual(1)
         ->and($payload['top_behaviour_tags'])
-            ->toBeArray()
-            ->and(collect($payload['top_behaviour_tags'])->pluck('label')->all())
-            ->toContain('overwhelmed');
+        ->toBeArray()
+        ->and(collect($payload['top_behaviour_tags'])->pluck('label')->all())
+        ->toContain('overwhelmed');
 });
 
 it('returns a manager review queue across multiple clients with site filter', function () {
@@ -310,7 +317,7 @@ it('upserts a PATH plan and surfaces overdue reviews in the actions aggregator',
         ])
         ->assertRedirect();
 
-    $plan = \App\Models\ClientPathPlan::query()
+    $plan = ClientPathPlan::query()
         ->where('client_id', $client->id)
         ->firstOrFail();
 
@@ -320,24 +327,70 @@ it('upserts a PATH plan and surfaces overdue reviews in the actions aggregator',
 
     // Timeline event emitted (and pinned).
     $event = TimelineEvent::query()
-        ->where('source_type', \App\Models\ClientPathPlan::class)
+        ->where('source_type', ClientPathPlan::class)
         ->where('source_id', $plan->id)
         ->first();
     expect($event)->not->toBeNull()
         ->and((bool) $event->is_pinned)->toBeTrue();
 
     // Overdue review shows up in the aggregator.
-    $items = app(\App\Services\Client\ActionsAggregator::class)
+    $items = app(ActionsAggregator::class)
         ->forClient($client, $manager);
     $types = collect($items)->pluck('type')->all();
     expect($types)->toContain('path_plan_review_due');
+});
+
+it('exposes a categorised relationship for each next-of-kin via the enum', function () {
+    $manager = User::factory()->create();
+    grantPhaseTwoThreePermissions($manager, [
+        'clients.viewAny',
+        'clients.update',
+    ]);
+
+    $client = Client::factory()->create();
+
+    $parentUser = User::factory()->create(['name' => 'Sue Parent']);
+    $guardianUser = User::factory()->create(['name' => 'Pat Guardian']);
+    $legacyUser = User::factory()->create(['name' => 'Mx Legacy']);
+
+    NextOfKin::query()->create([
+        'user_id' => $parentUser->id,
+        'client_id' => $client->id,
+        'relationship' => NextOfKinRelationship::Parent->value,
+        'is_primary_contact' => true,
+    ]);
+    NextOfKin::query()->create([
+        'user_id' => $guardianUser->id,
+        'client_id' => $client->id,
+        'relationship' => NextOfKinRelationship::Guardian->value,
+    ]);
+    NextOfKin::query()->create([
+        'user_id' => $legacyUser->id,
+        'client_id' => $client->id,
+        // Free-text value that pre-dates the enum — controller should
+        // still hand back a sensible category fallback.
+        'relationship' => 'second cousin once removed',
+    ]);
+
+    $this->actingAs($manager)
+        ->get("/operations/clients/{$client->id}")
+        ->assertOk()
+        ->assertInertia(
+            fn ($page) => $page
+                ->where('next_of_kins.0.relationship_label', 'Parent')
+                ->where('next_of_kins.0.relationship_category', 'family')
+                ->where('next_of_kins.1.relationship_label', 'Legal Guardian')
+                ->where('next_of_kins.1.relationship_category', 'guardian')
+                ->where('next_of_kins.2.relationship_label', 'second cousin once removed')
+                ->where('next_of_kins.2.relationship_category', 'other'),
+        );
 });
 
 it('migrates a legacy ProgressNote into a ClientNote idempotently', function () {
     $user = User::factory()->create();
     $client = Client::factory()->create();
 
-    $progress = \App\Models\ProgressNote::create([
+    $progress = ProgressNote::create([
         'organization_id' => 1,
         'client_id' => $client->id,
         'author_id' => $user->id,
@@ -359,7 +412,7 @@ it('migrates a legacy ProgressNote into a ClientNote idempotently', function () 
 
     expect($migrated)->not->toBeNull()
         ->and(($migrated->attachments ?? [])['legacy_progress_note_id'] ?? null)
-            ->toBe($progress->id)
+        ->toBe($progress->id)
         ->and($migrated->mood_rating)->toBe(8)
         ->and($migrated->category)->toBe('activity');
 
