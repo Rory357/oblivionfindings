@@ -10,6 +10,7 @@ import { usePage } from '@inertiajs/react';
  * component is mounted on a page that doesn't render the lifecycle).
  */
 export type MyDayLabelKey =
+    | 'today'
     | 'tasks'
     | 'handover'
     | 'before_you_start'
@@ -65,9 +66,107 @@ export type MyDayLabelKey =
     | 'dictate'
     | 'listening'
     | 'start_voice_input'
-    | 'stop_voice_input';
+    | 'stop_voice_input'
+    // Desktop /my-day redesign — added in the PR that wired the page through
+    // the i18n hook (was previously hardcoded English).
+    | 'staff_header_search'
+    | 'hero_on_shift_at'
+    | 'hero_on_shift_with'
+    | 'hero_live_since'
+    | 'hero_live_shift'
+    | 'hero_not_clocked_in'
+    | 'hero_clocked'
+    | 'hero_meds'
+    | 'hero_open'
+    | 'hero_complete'
+    | 'hero_on_track'
+    | 'hero_items'
+    | 'hero_greeting_site'
+    | 'hero_greeting_no_site'
+    | 'hero_quick_actions'
+    | 'qa_give_medication'
+    | 'qa_care_note'
+    | 'qa_vitals_obs'
+    | 'qa_report_incident'
+    | 'qa_care_plan'
+    | 'qa_submit_timesheet'
+    | 'qa_write_handover'
+    | 'btn_clock_in'
+    | 'btn_end_shift'
+    | 'btn_start_break'
+    | 'btn_end_break'
+    | 'btn_todays_timesheet'
+    | 'btn_report_incident'
+    | 'all_residents'
+    | 'resident_at_site'
+    | 'res_open_profile'
+    | 'res_give_meds'
+    | 'res_care_note'
+    | 'res_care_plan'
+    | 'res_vitals'
+    | 'res_incident'
+    | 'open_emar'
+    | 'digest_handover'
+    | 'digest_needs_you'
+    | 'digest_updates'
+    | 'digest_new_badge'
+    | 'digest_unread'
+    | 'digest_previous_shift'
+    | 'digest_no_handover'
+    | 'digest_nothing_needs'
+    | 'digest_nothing_new'
+    | 'digest_confirm_read'
+    | 'digest_open'
+    | 'digest_acknowledge'
+    | 'digest_snooze_15m'
+    | 'digest_alert'
+    | 'digest_incident'
+    | 'digest_followup'
+    | 'paperwork_title'
+    | 'paperwork_x_due'
+    | 'ts_send_for_approval'
+    | 'ts_fix_and_resubmit'
+    | 'hr_open'
+    | 'tomorrow_title'
+    | 'upcoming_shift'
+    | 'read_full_briefing'
+    | 'whats_next'
+    | 'todays_care_for'
+    | 'todays_care_all'
+    | 'see_full_care_plan'
+    | 'no_tasks_or_meds'
+    | 'right_click_tip'
+    | 'care_task'
+    | 'happening_now'
+    | 'mark_complete'
+    | 'mark_incomplete'
+    | 'mark_as_given'
+    | 'already_given'
+    | 'add_note'
+    | 'more'
+    | 'overdue_badge'
+    | 'given'
+    | 'refuse_or_not_given'
+    | 'snooze_15m'
+    | 'snooze_15_min'
+    | 'coming_soon'
+    | 'ctx_medication'
+    | 'ctx_complete_task'
+    | 'ctx_open_care_plan'
+    | 'ctx_open_in_emar'
+    | 'ctx_new_task_here'
+    | 'ctx_reschedule'
+    | 'ctx_skip_task'
+    | 'ctx_why_this_dose'
+    | 'ctx_dictate_update'
+    | 'confirm_refuse_dose'
+    | 'toast_marking_dose_given'
+    | 'toast_dose_left_as_due'
+    | 'toast_timesheet_sending'
+    | 'toast_timesheet_in_draft';
 
 const FALLBACKS: Record<MyDayLabelKey, string> = {
+    today: 'Today',
     tasks: 'Tasks',
     handover: 'Handover',
     before_you_start: 'Before you start',
@@ -131,6 +230,102 @@ const FALLBACKS: Record<MyDayLabelKey, string> = {
     listening: 'Listening',
     start_voice_input: 'Start voice input for :field',
     stop_voice_input: 'Stop voice input',
+    staff_header_search: 'Search…',
+    hero_on_shift_at: 'On shift at',
+    hero_on_shift_with: 'On shift with',
+    hero_live_since: 'Live shift · since :time',
+    hero_live_shift: 'Live shift',
+    hero_not_clocked_in: 'Not clocked in',
+    hero_clocked: 'Clocked',
+    hero_meds: 'Meds',
+    hero_open: 'Open',
+    hero_complete: 'complete',
+    hero_on_track: 'on track',
+    hero_items: 'items',
+    hero_greeting_site:
+        "Kia ora :name. You're supporting :count resident(s) at :site today.",
+    hero_greeting_no_site: "Kia ora :name. Here's your day at a glance.",
+    hero_quick_actions: 'Quick actions',
+    qa_give_medication: 'Give medication',
+    qa_care_note: 'Care note',
+    qa_vitals_obs: 'Vitals & obs',
+    qa_report_incident: 'Report incident',
+    qa_care_plan: 'Care plan',
+    qa_submit_timesheet: 'Submit timesheet',
+    qa_write_handover: 'Write handover',
+    btn_clock_in: 'Clock in',
+    btn_end_shift: 'End shift',
+    btn_start_break: 'Start break',
+    btn_end_break: 'End break',
+    btn_todays_timesheet: "Today's timesheet",
+    btn_report_incident: 'Report incident',
+    all_residents: 'All residents',
+    resident_at_site: 'Resident · :site',
+    res_open_profile: 'Open profile',
+    res_give_meds: 'Give meds',
+    res_care_note: 'Care note',
+    res_care_plan: 'Care plan',
+    res_vitals: 'Vitals',
+    res_incident: 'Incident',
+    open_emar: 'Open eMAR',
+    digest_handover: 'Handover',
+    digest_needs_you: 'Needs you',
+    digest_updates: 'Updates',
+    digest_new_badge: 'New',
+    digest_unread: 'Unread',
+    digest_previous_shift: 'Previous shift',
+    digest_no_handover: 'No handover for this shift.',
+    digest_nothing_needs: 'Nothing needs you right now.',
+    digest_nothing_new: 'Nothing new.',
+    digest_confirm_read: 'Confirm read',
+    digest_open: 'Open',
+    digest_acknowledge: 'Acknowledge',
+    digest_snooze_15m: 'Snooze 15m',
+    digest_alert: 'Alert',
+    digest_incident: 'Incident',
+    digest_followup: 'Follow-up',
+    paperwork_title: 'Paperwork',
+    paperwork_x_due: ':count due',
+    ts_send_for_approval: 'Send for approval',
+    ts_fix_and_resubmit: 'Fix and resubmit',
+    hr_open: 'Open',
+    tomorrow_title: 'Tomorrow',
+    upcoming_shift: 'Upcoming shift',
+    read_full_briefing: 'Read full briefing',
+    whats_next: "What's next",
+    todays_care_for: "today's care for :name",
+    todays_care_all: "today's care across all residents, in order",
+    see_full_care_plan: 'See full care plan →',
+    no_tasks_or_meds: 'No scheduled tasks or meds for this view.',
+    right_click_tip: 'Tip · right-click any row for more options',
+    care_task: 'Care task',
+    happening_now: 'Happening now',
+    mark_complete: 'Mark complete',
+    mark_incomplete: 'Mark incomplete',
+    mark_as_given: 'Mark as given',
+    already_given: 'Already given',
+    add_note: 'Add note',
+    more: 'More',
+    overdue_badge: 'Overdue',
+    given: 'Given',
+    refuse_or_not_given: 'Refuse / not given',
+    snooze_15m: 'Snooze 15m',
+    snooze_15_min: 'Snooze 15 min',
+    coming_soon: 'Coming soon',
+    ctx_medication: 'Medication',
+    ctx_complete_task: 'Complete task',
+    ctx_open_care_plan: 'Open care plan',
+    ctx_open_in_emar: 'Open in eMAR',
+    ctx_new_task_here: 'New task here',
+    ctx_reschedule: 'Reschedule',
+    ctx_skip_task: 'Skip task',
+    ctx_why_this_dose: 'Why this dose?',
+    ctx_dictate_update: 'Dictate update',
+    confirm_refuse_dose: 'Mark this dose as refused / not given?',
+    toast_marking_dose_given: 'Marking dose given…',
+    toast_dose_left_as_due: 'Dose left as due.',
+    toast_timesheet_sending: 'Timesheet sending…',
+    toast_timesheet_in_draft: 'Timesheet still in draft.',
 };
 
 function interpolate(template: string, params?: Record<string, string | number>) {

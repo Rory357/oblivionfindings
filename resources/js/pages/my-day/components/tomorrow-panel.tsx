@@ -1,7 +1,9 @@
+import { Link } from '@inertiajs/react';
 import { ArrowRight } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import { useMyDayLabels } from '@/hooks/use-my-day-labels';
 
 import { residentHue, residentInitials } from '../lib/resident-hue';
 import type { MyDayPreShiftBriefing } from '../lib/types';
@@ -12,8 +14,10 @@ interface TomorrowPanelProps {
     heading?: string;
 }
 
-export function TomorrowPanel({ briefing, heading = 'Tomorrow' }: TomorrowPanelProps) {
+export function TomorrowPanel({ briefing, heading }: TomorrowPanelProps) {
+    const t = useMyDayLabels();
     if (!briefing) return null;
+    const resolvedHeading = heading ?? t('tomorrow_title');
 
     const start = formatTime(briefing.starts_at);
     const end = formatTime(briefing.ends_at);
@@ -38,7 +42,7 @@ export function TomorrowPanel({ briefing, heading = 'Tomorrow' }: TomorrowPanelP
         >
             <div className="mb-2.5 flex items-center gap-2">
                 <div className="text-[10.5px] font-bold uppercase tracking-[0.12em] text-text-faint">
-                    {heading}
+                    {resolvedHeading}
                 </div>
                 <span className="text-[11px] text-muted-foreground">
                     {dayLabel} · {start} start
@@ -59,7 +63,7 @@ export function TomorrowPanel({ briefing, heading = 'Tomorrow' }: TomorrowPanelP
                 </Avatar>
                 <div className="min-w-0">
                     <div className="truncate text-sm font-semibold">
-                        {fullName || 'Upcoming shift'}
+                        {fullName || t('upcoming_shift')}
                     </div>
                     <div className="truncate text-xs text-muted-foreground">
                         {start} – {end}
@@ -74,9 +78,11 @@ export function TomorrowPanel({ briefing, heading = 'Tomorrow' }: TomorrowPanelP
                     ))}
                 </ul>
             ) : null}
-            <Button variant="ghost" size="sm" className="mt-2">
-                Read full briefing
-                <ArrowRight className="ml-1 h-3 w-3" />
+            <Button asChild variant="ghost" size="sm" className="mt-2">
+                <Link href="/my-roster">
+                    {t('read_full_briefing')}
+                    <ArrowRight className="ml-1 h-3 w-3" />
+                </Link>
             </Button>
         </div>
     );

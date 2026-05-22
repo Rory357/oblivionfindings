@@ -3,6 +3,7 @@ import { ArrowRight, CheckCircle2, Clock, FileText } from 'lucide-react';
 
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
+import { useMyDayLabels } from '@/hooks/use-my-day-labels';
 import { cn } from '@/lib/utils';
 
 import type { MyDayHrTask, MyDayTimesheet } from '../lib/types';
@@ -14,6 +15,7 @@ interface PaperworkPanelProps {
 }
 
 export function PaperworkPanel({ timesheets, hrTasks, onSubmitTimesheet }: PaperworkPanelProps) {
+    const t = useMyDayLabels();
     const dueCount = timesheets.length + hrTasks.length;
     if (dueCount === 0) {
         return null;
@@ -25,12 +27,12 @@ export function PaperworkPanel({ timesheets, hrTasks, onSubmitTimesheet }: Paper
         >
             <div className="flex items-center gap-2 border-b border-border px-4 py-3">
                 <FileText className="h-3.5 w-3.5 text-muted-foreground" />
-                <div className="text-[13px] font-semibold">Paperwork</div>
+                <div className="text-[13px] font-semibold">{t('paperwork_title')}</div>
                 <Badge
                     variant="outline"
                     className="ml-auto border-status-warning/30 bg-status-warning-bg text-[10.5px] text-status-warning"
                 >
-                    {dueCount} due
+                    {t('paperwork_x_due', { count: dueCount })}
                 </Badge>
             </div>
             {timesheets.map((ts) => (
@@ -50,6 +52,7 @@ function TimesheetRow({
     timesheet: MyDayTimesheet;
     onSubmit: (timesheet: MyDayTimesheet) => void;
 }) {
+    const t = useMyDayLabels();
     const date = ts.work_date_iso
         ? new Date(ts.work_date_iso).toLocaleDateString([], { day: '2-digit', month: 'short' })
         : ts.work_date;
@@ -72,7 +75,7 @@ function TimesheetRow({
                     variant={ts.status === 'returned' ? 'default' : 'secondary'}
                     onClick={() => onSubmit(ts)}
                 >
-                    {ts.status === 'returned' ? 'Fix and resubmit' : 'Send for approval'}
+                    {ts.status === 'returned' ? t('ts_fix_and_resubmit') : t('ts_send_for_approval')}
                 </Button>
             </div>
         </div>
@@ -80,10 +83,11 @@ function TimesheetRow({
 }
 
 function HrTaskRow({ task }: { task: MyDayHrTask }) {
+    const t = useMyDayLabels();
     const Icon = task.kind === 'signature' ? FileText : CheckCircle2;
     const button = (
         <Button size="sm" variant="ghost">
-            Open <ArrowRight className="ml-1 h-2.5 w-2.5" />
+            {t('hr_open')} <ArrowRight className="ml-1 h-2.5 w-2.5" />
         </Button>
     );
     return (

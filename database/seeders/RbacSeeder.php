@@ -645,6 +645,10 @@ class RbacSeeder extends Seeder
             'timesheets.viewAssigned', 'timesheets.create', 'timesheets.update', 'timesheets.submit',
             'incidents.viewAssigned', 'incidents.create', 'incidents.update', 'incidents.submit',
             'incidents.followups.complete', 'risks.viewAssigned',
+            // Workers need to browse the sites they're rostered at from /my-day's
+            // global links and resident popovers (sites.viewAny gates /sites,
+            // /sites/{id}, and the site-scoped care + house ledger reads).
+            'sites.viewAny',
             'respite.viewAny', 'respite.calendar.view', 'respite.procedures.run',
             'respite.tasks.view', 'respite.tasks.manage',
             'respite.handovers.view', 'respite.handovers.manage',

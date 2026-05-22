@@ -1,6 +1,5 @@
 import { Link } from '@inertiajs/react';
 import {
-    Activity,
     AlertTriangle,
     ArrowRight,
     Bell,
@@ -17,6 +16,7 @@ import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { TabsContent } from '@/components/ui/tabs';
+import { useMyDayLabels } from '@/hooks/use-my-day-labels';
 import { cn } from '@/lib/utils';
 
 import type {
@@ -60,10 +60,15 @@ interface OpenItem {
     raw?: MyDayTaskFollowup;
 }
 
-const KIND_META: Record<OpenItemKind, { label: string; tone: 'critical' | 'warning' | 'info'; icon: LucideIcon }> = {
-    alert: { label: 'Alert', tone: 'critical', icon: AlertTriangle },
-    incident: { label: 'Incident', tone: 'warning', icon: ShieldCheck },
-    followup: { label: 'Follow-up', tone: 'info', icon: ClipboardList },
+/**
+ * Static meta for each open-item kind. The label is resolved through the
+ * i18n hook at render time (since hooks can't run inside this module-level
+ * map), so this carries only the i18n key.
+ */
+const KIND_META: Record<OpenItemKind, { labelKey: 'digest_alert' | 'digest_incident' | 'digest_followup'; tone: 'critical' | 'warning' | 'info'; icon: LucideIcon }> = {
+    alert: { labelKey: 'digest_alert', tone: 'critical', icon: AlertTriangle },
+    incident: { labelKey: 'digest_incident', tone: 'warning', icon: ShieldCheck },
+    followup: { labelKey: 'digest_followup', tone: 'info', icon: ClipboardList },
 };
 
 const TONE_TILE: Record<'critical' | 'warning' | 'info', string> = {
@@ -89,6 +94,7 @@ export function DigestPanel({
     onSnoozeAlert,
     onConfirmHandoverRead,
 }: DigestPanelProps) {
+    const t = useMyDayLabels();
     const openItems = useMemo(() => combineOpenItems(alertTasks, incidents), [alertTasks, incidents]);
 
     return (
@@ -104,23 +110,23 @@ export function DigestPanel({
                     items={[
                         {
                             value: 'handover',
-                            label: 'Handover',
+                            label: t('digest_handover'),
                             icon: StickyNote,
                             badge: handover?.unread ? (
                                 <Badge variant="outline" className="border-status-warning/30 bg-status-warning-bg text-[10px] text-status-warning">
-                                    New
+                                    {t('digest_new_badge')}
                                 </Badge>
                             ) : null,
                         },
                         {
                             value: 'alerts',
-                            label: 'Needs you',
+                            label: t('digest_needs_you'),
                             icon: AlertTriangle,
                             badge: openItems.length > 0 ? openItems.length : null,
                         },
                         {
                             value: 'notifs',
-                            label: 'Updates',
+                            label: t('digest_updates'),
                             icon: Bell,
                             badge: notifications.length > 0 ? notifications.length : null,
                         },
@@ -152,10 +158,11 @@ function HandoverPane({
     handover?: MyDayHandover | null;
     onConfirmRead?: () => void;
 }) {
+    const t = useMyDayLabels();
     if (!handover) {
         return (
             <div className="px-4 py-6 text-center text-sm text-muted-foreground">
-                No handover for this shift.
+                {t('digest_no_handover')}
             </div>
         );
     }
@@ -176,9 +183,9 @@ function HandoverPane({
                     </Avatar>
                 ) : null}
                 <div>
-                    <div className="text-[13.5px] font-semibold">{handover.from?.name ?? 'Previous shift'}</div>
+                    <div className="text-[13.5px] font-semibold">{handover.from?.name ?? t('digest_previous_shift')}</div>
                     <div className="text-[11.5px] text-muted-foreground">
-                        {handover.from?.role ?? 'Previous shift'}
+                        {handover.from?.role ?? t('digest_previous_shift')}
                         {handover.recorded_at ? (
                             <>
                                 {' · '}ended{' '}
@@ -196,7 +203,7 @@ function HandoverPane({
                         variant="outline"
                         className="ml-auto border-status-warning/30 bg-status-warning-bg text-[10px] text-status-warning"
                     >
-                        Unread
+                        {t('digest_unread')}
                     </Badge>
                 ) : null}
             </div>
@@ -222,12 +229,14 @@ function HandoverPane({
                 </div>
             ) : null}
             <div className="mt-3 flex gap-1.5">
-                <Button size="sm" className="flex-1" onClick={() => onConfirmRead?.()}>
-                    Confirm read
+                <Button
+                    size="sm"
+                    className="flex-1"
+                    onClick={() => onConfirmRead?.()}
+                    disabled={!onConfirmRead}
+                >
+                    {t('digest_confirm_read')}
                     <Check className="ml-1 h-3 w-3" />
-                </Button>
-                <Button size="sm" variant="outline" type="button">
-                    <Activity className="h-3 w-3" /> 38s
                 </Button>
             </div>
         </div>
@@ -243,10 +252,11 @@ function NeedsYouPane({
     onAck?: (alert: MyDayTaskFollowup) => void;
     onSnooze?: (alert: MyDayTaskFollowup) => void;
 }) {
+    const t = useMyDayLabels();
     if (items.length === 0) {
         return (
             <div className="px-4 py-6 text-center text-sm text-muted-foreground">
-                Nothing needs you right now.
+                {t('digest_nothing_needs')}
             </div>
         );
     }
@@ -287,6 +297,7 @@ function OpenItemRow({
     onAck?: (alert: MyDayTaskFollowup) => void;
     onSnooze?: (alert: MyDayTaskFollowup) => void;
 }) {
+    const t = useMyDayLabels();
     const meta = KIND_META[item.kind];
     const Icon = meta.icon;
     const isCrit = item.priority === 'critical';
@@ -308,7 +319,7 @@ function OpenItemRow({
             <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-1.5">
                     <Badge variant="outline" className={cn('text-[10px]', TONE_BADGE[meta.tone])}>
-                        {meta.label}
+                        {t(meta.labelKey)}
                     </Badge>
                     {isCrit ? (
                         <Badge
@@ -331,17 +342,17 @@ function OpenItemRow({
                 {isCrit && item.raw ? (
                     <div className="mt-2 flex gap-1.5">
                         <Button size="sm" onClick={() => onAck?.(item.raw!)}>
-                            Acknowledge
+                            {t('digest_acknowledge')}
                         </Button>
                         <Button size="sm" variant="ghost" onClick={() => onSnooze?.(item.raw!)}>
-                            Snooze 5m
+                            {t('digest_snooze_15m')}
                         </Button>
                     </div>
                 ) : item.href ? (
                     <div className="mt-2">
                         <Button asChild size="sm" variant="ghost">
                             <Link href={item.href}>
-                                Open
+                                {t('digest_open')}
                                 <ArrowRight className="ml-1 h-2.5 w-2.5" />
                             </Link>
                         </Button>
@@ -353,10 +364,11 @@ function OpenItemRow({
 }
 
 function NotifsPane({ notifications }: { notifications: MyDayNotification[] }) {
+    const t = useMyDayLabels();
     if (notifications.length === 0) {
         return (
             <div className="px-4 py-6 text-center text-sm text-muted-foreground">
-                Nothing new.
+                {t('digest_nothing_new')}
             </div>
         );
     }

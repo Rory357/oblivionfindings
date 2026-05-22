@@ -1,14 +1,13 @@
 import {
     AlertTriangle,
     ArrowUpRight,
+    ClipboardCheck,
     Clock,
     Coffee,
-    Compass,
     FileText,
     Heart,
     MapPin,
-    Mic,
-    Phone,
+    Pause,
     Pill,
     Play,
     ShieldCheck,
@@ -23,6 +22,7 @@ import { PageHero } from '@/components/page/page-hero';
 import { type PageHeroBadge } from '@/components/page/page-hero-badges';
 import { PageTabs } from '@/components/page/page-tabs';
 import { Button } from '@/components/ui/button';
+import { useMyDayLabels } from '@/hooks/use-my-day-labels';
 
 import type {
     MyDayActiveSite,
@@ -41,6 +41,8 @@ interface MyDayHeroProps {
     site: MyDayActiveSite | null;
     /** Used when the shift is a single-resident 1:1 (no site or only 1 resident). */
     singleResident?: MyDayResident | null;
+    /** Active shift id — used to scope the "Report incident" quick action to this shift. */
+    activeShiftId?: number | null;
     shiftStartLabel: string;
     shiftEndLabel: string;
     shiftDurationHours: number;
@@ -55,9 +57,15 @@ interface MyDayHeroProps {
     overdueMeds: MyDayMedDue[];
     openItems: MyDayTaskFollowup[];
     clockedIn: boolean;
+    /** Worker is currently on a break (within an open attendance session). */
+    isOnBreak?: boolean;
+    /** Outgoing handover for the active shift has already been submitted. */
+    handoverSubmitted?: boolean;
     onClockToggle: () => void;
     onBreakToggle?: () => void;
     onOpenTimesheet?: () => void;
+    /** Open the outgoing-handover sheet (HandoverWriteSheet). */
+    onWriteHandover?: () => void;
     activeResidentId: ResidentTab;
     onResidentChange: (next: ResidentTab) => void;
     residentTaskCounts: Map<number, { tasks: number; meds: number; medsOverdue: number }>;
@@ -73,6 +81,7 @@ export function MyDayHero({
     workerFirstName,
     site,
     singleResident,
+    activeShiftId,
     shiftStartLabel,
     shiftEndLabel,
     shiftDurationHours,
@@ -87,9 +96,12 @@ export function MyDayHero({
     overdueMeds,
     openItems,
     clockedIn,
+    isOnBreak,
+    handoverSubmitted,
     onClockToggle,
     onBreakToggle,
     onOpenTimesheet,
+    onWriteHandover,
     activeResidentId,
     onResidentChange,
     residentTaskCounts,
@@ -97,6 +109,7 @@ export function MyDayHero({
     liveSinceLabel,
     description,
 }: MyDayHeroProps) {
+    const t = useMyDayLabels();
     const residents = site?.residents ?? (singleResident ? [singleResident] : []);
     const multiResident = residents.length > 1;
 
@@ -127,7 +140,7 @@ export function MyDayHero({
                         : undefined,
                     href: med.emar_url,
                 })),
-                action: { label: 'Open eMAR', href: '/meds/today' },
+                action: { label: t('open_emar'), href: '/meds/today' },
             },
         });
     }
@@ -159,7 +172,7 @@ export function MyDayHero({
 
     const heroTitle = site ? (
         <>
-            <span className="font-normal opacity-80">On shift at</span>{' '}
+            <span className="font-normal opacity-80">{t('hero_on_shift_at')}</span>{' '}
             <a
                 href={site.href}
                 className={
@@ -172,10 +185,11 @@ export function MyDayHero({
         </>
     ) : singleResident ? (
         <>
-            <span className="font-normal opacity-80">On shift with</span> {singleResident.name}
+            <span className="font-normal opacity-80">{t('hero_on_shift_with')}</span>{' '}
+            {singleResident.name}
         </>
     ) : (
-        'Today'
+        t('today')
     );
 
     const meta = site
@@ -193,27 +207,56 @@ export function MyDayHero({
           ];
 
     const stats = [
-        { label: 'Clocked', value: clockedLabel, sub: clockedSubLabel ?? '', hideOnMobile: false },
-        { label: 'Tasks', value: `${tasksDone}/${totalTasks}`, sub: 'complete', hideOnMobile: false },
+        { label: t('hero_clocked'), value: clockedLabel, sub: clockedSubLabel ?? '', hideOnMobile: false },
+        { label: t('tasks'), value: `${tasksDone}/${totalTasks}`, sub: t('hero_complete'), hideOnMobile: false },
         {
-            label: 'Meds',
+            label: t('hero_meds'),
             value: `${medsGiven}/${totalMeds}`,
-            sub: medsOverdue > 0 ? `${medsOverdue} overdue` : 'on track',
+            sub: medsOverdue > 0 ? `${medsOverdue} ${t('overdue_badge').toLowerCase()}` : t('hero_on_track'),
             hideOnMobile: false,
         },
-        { label: 'Open', value: openItemsCount, sub: 'items', hideOnMobile: false },
+        { label: t('hero_open'), value: openItemsCount, sub: t('hero_items'), hideOnMobile: false },
     ];
 
+    // Single-resident shifts get resident-scoped care/notes links so the worker
+    // lands directly on the right record (clients.viewAssigned grants those
+    // endpoints). Multi-resident shifts drop the resident-specific shortcuts
+    // entirely because the org-wide care_plans / clients-list destinations are
+    // gated behind manager permissions a support worker doesn't have.
+    const careNoteHref = singleResident
+        ? `/clients/${singleResident.id}/daily-notes`
+        : '/clients';
+    const carePlanHref = singleResident ? `/clients/${singleResident.id}/care` : null;
+    // `/clients/{id}/medical` exists but redirects workers to /emar/medications,
+    // which isn't what "Vitals & obs" should land on. The clinical observations
+    // index (vitals + obs) is gated by clinical.observations.viewAssigned which
+    // support workers do have.
+    const vitalsHref = singleResident
+        ? `/clients/${singleResident.id}/clinical/observations`
+        : null;
+    const incidentHref = activeShiftId
+        ? `/incidents/create?shift_id=${activeShiftId}`
+        : '/incidents/create';
+
     const quickActions = [
-        { icon: Pill, label: 'Give medication', badge: totalMeds - medsGiven > 0 ? totalMeds - medsGiven : undefined, href: '/meds/today' },
-        { icon: StickyNote, label: 'Care note', href: '/clients' },
-        { icon: Stethoscope, label: 'Vitals & obs' },
-        { icon: Mic, label: 'Dictate' },
-        { icon: AlertTriangle, label: 'Report incident', href: '/incidents/new' },
-        { icon: ShieldCheck, label: 'Care plan', href: '/care-plans' },
-        { icon: FileText, label: 'Submit timesheet', href: '/timesheets/mine' },
-        { icon: Compass, label: 'Directions' },
-        { icon: Phone, label: 'Call manager' },
+        { icon: Pill, label: t('qa_give_medication'), badge: totalMeds - medsGiven > 0 ? totalMeds - medsGiven : undefined, href: '/meds/today' },
+        { icon: StickyNote, label: t('qa_care_note'), href: careNoteHref },
+        ...(vitalsHref ? [{ icon: Stethoscope, label: t('qa_vitals_obs'), href: vitalsHref }] : []),
+        { icon: AlertTriangle, label: t('qa_report_incident'), href: incidentHref },
+        ...(carePlanHref ? [{ icon: ShieldCheck, label: t('qa_care_plan'), href: carePlanHref }] : []),
+        { icon: FileText, label: t('qa_submit_timesheet'), href: '/operations/timesheets' },
+        // The "Write handover" button is the worker's outgoing handover — only
+        // useful mid-shift (we have an active shift id) and not yet submitted.
+        // It opens HandoverWriteSheet via the parent's onWriteHandover.
+        ...(clockedIn && onWriteHandover && !handoverSubmitted
+            ? [
+                  {
+                      icon: ClipboardCheck,
+                      label: t('qa_write_handover'),
+                      onClick: onWriteHandover,
+                  },
+              ]
+            : []),
     ];
 
     const avatarStack = multiResident
@@ -224,16 +267,15 @@ export function MyDayHero({
               name: r.name,
               popover: {
                   title: r.name,
-                  subtitle: `Resident · ${site?.name ?? ''}`,
+                  subtitle: t('resident_at_site', { site: site?.name ?? '' }),
                   note: residentNotes?.get(r.id) ?? r.care_note_preview ?? undefined,
-                  primaryAction: { label: 'Open profile', href: `/clients/${r.id}` },
+                  primaryAction: { label: t('res_open_profile'), href: `/clients/${r.id}` },
                   actions: [
-                      { icon: Pill, label: 'Give meds', href: `/meds/today?client=${r.id}` },
-                      { icon: StickyNote, label: 'Care note', href: `/clients/${r.id}/notes/new` },
-                      { icon: ShieldCheck, label: 'Care plan', href: `/clients/${r.id}/care` },
-                      { icon: Stethoscope, label: 'Vitals', href: `/clients/${r.id}/observations` },
-                      { icon: AlertTriangle, label: 'Incident', href: `/incidents/new?client=${r.id}` },
-                      { icon: Phone, label: 'Contacts', href: `/clients/${r.id}/contacts` },
+                      { icon: Pill, label: t('res_give_meds'), href: `/meds/today?client=${r.id}` },
+                      { icon: StickyNote, label: t('res_care_note'), href: `/clients/${r.id}/daily-notes` },
+                      { icon: ShieldCheck, label: t('res_care_plan'), href: `/clients/${r.id}/care` },
+                      { icon: Stethoscope, label: t('res_vitals'), href: `/clients/${r.id}/clinical/observations` },
+                      { icon: AlertTriangle, label: t('res_incident'), href: `/incidents/create?client_id=${r.id}` },
                   ],
               },
           }))
@@ -252,7 +294,7 @@ export function MyDayHero({
             items={[
                 {
                     value: 'all',
-                    label: 'All residents',
+                    label: t('all_residents'),
                     icon: Users,
                     badge: totalAcrossSite,
                 },
@@ -282,14 +324,18 @@ export function MyDayHero({
             description={
                 description ??
                 (site
-                    ? `Kia ora ${workerFirstName}. You're supporting ${residents.length} resident${residents.length === 1 ? '' : 's'} at ${site.name} today.`
-                    : `Kia ora ${workerFirstName}. Here's your day at a glance.`)
+                    ? t('hero_greeting_site', {
+                          name: workerFirstName,
+                          count: residents.length,
+                          site: site.name,
+                      })
+                    : t('hero_greeting_no_site', { name: workerFirstName }))
             }
             meta={meta}
             badges={badges}
             stats={stats}
             quickActions={quickActions}
-            quickActionsHeading="Quick actions"
+            quickActionsHeading={t('hero_quick_actions')}
             actions={
                 <>
                     <Button
@@ -300,13 +346,26 @@ export function MyDayHero({
                         className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
                     >
                         {clockedIn ? <Square className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
-                        {clockedIn ? 'Clock out' : 'Clock in'}
+                        {clockedIn ? t('btn_end_shift') : t('btn_clock_in')}
                     </Button>
-                    <Button type="button" variant="outline" size="sm" onClick={onBreakToggle}>
-                        <Coffee className="h-3.5 w-3.5" /> Break
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={onBreakToggle}
+                        disabled={!clockedIn || !onBreakToggle}
+                    >
+                        {isOnBreak ? <Pause className="h-3.5 w-3.5" /> : <Coffee className="h-3.5 w-3.5" />}
+                        {isOnBreak ? t('btn_end_break') : t('btn_start_break')}
                     </Button>
-                    <Button type="button" variant="outline" size="sm" onClick={onOpenTimesheet}>
-                        <FileText className="h-3.5 w-3.5" /> Today&rsquo;s timesheet
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        onClick={onOpenTimesheet}
+                        disabled={!onOpenTimesheet}
+                    >
+                        <FileText className="h-3.5 w-3.5" /> {t('btn_todays_timesheet')}
                     </Button>
                 </>
             }

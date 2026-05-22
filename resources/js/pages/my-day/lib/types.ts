@@ -136,12 +136,54 @@ export interface MyDayStats {
     notifications_unread: number;
 }
 
+/**
+ * Per-row shape from `clock.open_session.end_of_shift_blockers`. Matches the
+ * `EndOfShiftBlocker` type that `EndOfShiftChecklist` consumes — kept here so
+ * the My Day page doesn't have to import the checklist's type to express the
+ * payload it receives.
+ */
+export interface MyDayEndOfShiftBlocker {
+    key: string;
+    label: string;
+    detail: string;
+    count: number;
+    action_url: string | null;
+    blocking: boolean;
+}
+
+export interface MyDayClockSessionTask {
+    id: number;
+    label: string;
+    is_completed: boolean;
+    completed_at?: string | null;
+}
+
 export interface MyDayClockSession {
-    id?: number;
-    shift_id?: number;
+    id: number;
+    shift_id: number | null;
+    clock_in_at?: string | null;
     started_at?: string;
     clocked_minutes?: number;
-    on_break?: boolean;
+    is_on_break?: boolean;
+    break_minutes?: number;
+    break_count?: number;
+    break_started_at?: string | null;
+    client_name?: string | null;
+    client_photo_url?: string | null;
+    shift_starts_at?: string | null;
+    shift_ends_at?: string | null;
+    location?: string | null;
+    service_type?: string | null;
+    tasks?: MyDayClockSessionTask[];
+    task_progress?: number;
+    handover_submitted?: boolean;
+    end_of_shift_blockers?: MyDayEndOfShiftBlocker[];
+    end_of_shift_ready?: boolean;
+    quick_action_urls?: {
+        incident?: string;
+        emar?: string;
+        escalate?: string;
+    };
 }
 
 export interface MyDayClockState {

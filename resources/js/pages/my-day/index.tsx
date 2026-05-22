@@ -1,16 +1,20 @@
 import { Head, router, usePage } from '@inertiajs/react';
 import {
+    AlertTriangle,
     Calendar,
     FileText,
     Home,
-    Mic,
-    Plus,
     Users,
 } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
+import EndOfShiftChecklist, {
+    type EndOfShiftBlocker,
+} from '@/components/end-of-shift-checklist';
+import HandoverWriteSheet from '@/components/handover-write-sheet';
 import useLiveRefresh from '@/hooks/use-live-refresh';
+import { useMyDayLabels } from '@/hooks/use-my-day-labels';
 import { useUndoableAction } from '@/hooks/use-undoable-action';
 import AppLayout from '@/layouts/app-layout';
 import { StaffHeader } from '@/components/staff-header';
@@ -83,6 +87,7 @@ export default function MyDay() {
     const page = usePage<SharedProps>();
     const props = page.props as MyDayPageProps & { auth?: SharedAuth };
     const auth = props.auth;
+    const t = useMyDayLabels();
 
     const workerFirstName = auth?.user?.first_name ?? auth?.user?.name?.split(' ')[0] ?? 'there';
 
@@ -97,6 +102,11 @@ export default function MyDay() {
 
     // Right-click context menu.
     const [ctxMenu, setCtxMenu] = useState<{ item: StreamItem; x: number; y: number } | null>(null);
+
+    // End-of-shift + outgoing-handover sheets — both reuse the existing
+    // components already shipped for the legacy clock-in/active-shift cards.
+    const [endShiftOpen, setEndShiftOpen] = useState(false);
+    const [handoverWriteOpen, setHandoverWriteOpen] = useState(false);
 
     // Live refresh — Inertia partial reload every 60s (unless guarded).
     const { lastUpdatedAt, isRefreshing, refreshNow } = useLiveRefresh({ intervalMs: 60_000 });
@@ -200,8 +210,10 @@ export default function MyDay() {
         openItemTasks.length + (props.incidents?.length ?? 0) + medsOverdue;
 
     // Clock & shift labels
-    const clockedIn = !!props.clock?.open_session;
-    const clockedMinutes = props.clock?.open_session?.clocked_minutes ?? 0;
+    const openSession = props.clock?.open_session ?? null;
+    const clockedIn = !!openSession;
+    const isOnBreak = !!openSession?.is_on_break;
+    const clockedMinutes = openSession?.clocked_minutes ?? 0;
     const clockedLabel = `${Math.floor(clockedMinutes / 60)}h ${clockedMinutes % 60}m`;
     const shiftStartLabel = isoToHourMinute(activeShift?.starts_at);
     const shiftEndLabel = isoToHourMinute(activeShift?.ends_at);
@@ -213,10 +225,12 @@ export default function MyDay() {
           )
         : 8;
     const liveSinceLabel = activeShift?.actual_starts_at
-        ? `Live shift · since ${isoToHourMinute(activeShift.actual_starts_at)}`
+        ? t('hero_live_since', {
+              time: isoToHourMinute(activeShift.actual_starts_at),
+          })
         : clockedIn
-          ? 'Live shift'
-          : 'Not clocked in';
+          ? t('hero_live_shift')
+          : t('hero_not_clocked_in');
     const clockedSubLabel = `of ${shiftDurationHours}h`;
 
     const today = useMemo(() => parsePageDate(props.today ?? props.today_iso ?? null), [props.today, props.today_iso]);
@@ -232,9 +246,63 @@ export default function MyDay() {
     const { run: runUndoable } = useUndoableAction();
     const [pendingTimesheetIds, setPendingTimesheetIds] = useState<Record<number, true>>({});
 
+    // PR 4.5 removed the legacy `/my-tasks/clock/{in,out}` shortcuts; the
+    // canonical clock flow goes through AttendanceController so the open
+    // HrAttendanceSession + draft timesheet are written through the service.
+    //
+    // Clocking out is a multi-step affair (review tasks, capture break minutes,
+    // optionally write the outgoing handover, attach override reason if there
+    // are still blockers). Delegating to `EndOfShiftChecklist` keeps the same
+    // surface the legacy clock-in/active-shift cards use, so the back-end can
+    // trust the payload it receives.
     const handleClockToggle = () => {
-        router.post(clockedIn ? '/my-tasks/clock/out' : '/my-tasks/clock/in', {}, { preserveScroll: true });
+        if (clockedIn) {
+            setEndShiftOpen(true);
+            return;
+        }
+        const shiftId = activeShift?.id ?? props.shifts?.[0]?.id;
+        router.post(
+            '/attendance/clock-in',
+            shiftId ? { shift_id: shiftId } : {},
+            { preserveScroll: true },
+        );
     };
+
+    const handleWriteHandover = useCallback(() => {
+        if (!openSession?.shift_id) return;
+        setHandoverWriteOpen(true);
+    }, [openSession?.shift_id]);
+
+    const handleBreakToggle = useCallback(() => {
+        if (!openSession?.id) return;
+        router.post(
+            isOnBreak ? '/attendance/break/end' : '/attendance/break/start',
+            { session_id: openSession.id },
+            { preserveScroll: true },
+        );
+    }, [isOnBreak, openSession?.id]);
+
+    const handleOpenTimesheets = useCallback(() => {
+        router.visit('/operations/timesheets');
+    }, []);
+
+    const handleConfirmHandoverRead = useCallback(() => {
+        const handoverId = props.handover?.id;
+        if (!handoverId) return;
+        router.patch(
+            `/attendance/handover/${handoverId}/acknowledge`,
+            {},
+            { preserveScroll: true },
+        );
+    }, [props.handover?.id]);
+
+    const handleAddNote = useCallback((clientId: number | null | undefined) => {
+        if (!clientId) {
+            router.visit('/clients');
+            return;
+        }
+        router.visit(`/clients/${clientId}/daily-notes`);
+    }, []);
 
     const handleToggleTask = useCallback((taskId: number) => {
         router.post(`/my-tasks/shift-task/${taskId}/complete`, {}, { preserveScroll: true });
@@ -242,7 +310,7 @@ export default function MyDay() {
 
     const handleGiveMed = useCallback((medId: number) => {
         runUndoable({
-            message: 'Marking dose given…',
+            message: t('toast_marking_dose_given'),
             durationMs: 5_000,
             onCommit: () => {
                 router.post(
@@ -251,14 +319,14 @@ export default function MyDay() {
                     { preserveScroll: true, only: ['medications_due', 'stats'] as never },
                 );
             },
-            undoneMessage: 'Dose left as due.',
+            undoneMessage: t('toast_dose_left_as_due'),
         });
-    }, [runUndoable]);
+    }, [runUndoable, t]);
 
     const handleRefuseMed = useCallback((medId: number) => {
-        if (!confirm('Mark this dose as refused / not given?')) return;
+        if (!confirm(t('confirm_refuse_dose'))) return;
         router.post(`/my-day/medications/${medId}/refuse`, {}, { preserveScroll: true });
-    }, []);
+    }, [t]);
 
     const handleSnoozeMed = useCallback((medId: number) => {
         router.post(
@@ -277,9 +345,13 @@ export default function MyDay() {
     const handleSnoozeAlert = useCallback((alert: MyDayTaskFollowup) => {
         const alertId = alert.meta?.alert_id;
         if (!alertId) return;
+        // MyDayActionsController::snoozeAlert reads `window` (15m/1h/shift),
+        // not `minutes` — passing the wrong key silently fell through to the
+        // 15-minute default. Match the controller contract so the UI and
+        // backend agree.
         router.post(
             `/my-day/alerts/${alertId}/snooze`,
-            { minutes: 5 },
+            { window: '15m' },
             { preserveScroll: true },
         );
     }, []);
@@ -289,7 +361,7 @@ export default function MyDay() {
             if (pendingTimesheetIds[ts.id]) return;
             setPendingTimesheetIds((prev) => ({ ...prev, [ts.id]: true }));
             runUndoable({
-                message: 'Timesheet sending…',
+                message: t('toast_timesheet_sending'),
                 durationMs: 5_000,
                 onCommit: () => {
                     router.post(
@@ -314,10 +386,10 @@ export default function MyDay() {
                         return next;
                     });
                 },
-                undoneMessage: 'Timesheet still in draft.',
+                undoneMessage: t('toast_timesheet_in_draft'),
             });
         },
-        [pendingTimesheetIds, runUndoable],
+        [pendingTimesheetIds, runUndoable, t],
     );
 
     const handleContextMenuAction = useCallback(
@@ -332,9 +404,12 @@ export default function MyDay() {
             if (action === 'open-care-plan' && item.kind === 'task' && item.clientId) {
                 router.visit(`/clients/${item.clientId}/care`);
             }
+            if (action === 'add-note') {
+                handleAddNote(item.clientId ?? null);
+            }
             setCtxMenu(null);
         },
-        [ctxMenu, handleToggleTask, handleGiveMed, handleSnoozeMed, handleRefuseMed],
+        [ctxMenu, handleToggleTask, handleGiveMed, handleSnoozeMed, handleRefuseMed, handleAddNote],
     );
 
     // ──────────────────────────────────────────────────────────────────────
@@ -343,7 +418,7 @@ export default function MyDay() {
 
     const header = (
         <StaffHeader
-            title="Today"
+            title={t('today')}
             subtitle={today.label}
             titleChevron
             titleOpen={dateOpen}
@@ -362,20 +437,24 @@ export default function MyDay() {
                 { icon: Users, label: 'Clients', href: '/clients' },
                 { icon: Home, label: 'Sites & Locations', href: '/sites' },
                 { icon: Calendar, label: 'My Calendar', href: '/my-calendar' },
-                { icon: FileText, label: 'My Timesheets', href: '/timesheets/mine' },
+                { icon: FileText, label: 'My Timesheets', href: '/operations/timesheets' },
             ]}
-            search={{ placeholder: 'Search…', hint: '⌘K' }}
+            search={{ placeholder: t('staff_header_search'), hint: '⌘K' }}
             liveIndicator={{ lastUpdatedAt, isRefreshing, onRefresh: refreshNow }}
             notifications={{ count: props.stats?.notifications_unread ?? 0, href: '/notifications' }}
             action={
-                <>
-                    <Button type="button" variant="outline" size="sm">
-                        <Mic className="h-3.5 w-3.5" /> Dictate
-                    </Button>
-                    <Button type="button" size="sm">
-                        <Plus className="h-3.5 w-3.5" /> Report incident
-                    </Button>
-                </>
+                <Button
+                    type="button"
+                    size="sm"
+                    onClick={() => {
+                        const shiftId = activeShift?.id ?? props.shifts?.[0]?.id;
+                        router.visit(
+                            shiftId ? `/incidents/create?shift_id=${shiftId}` : '/incidents/create',
+                        );
+                    }}
+                >
+                    <AlertTriangle className="h-3.5 w-3.5" /> {t('btn_report_incident')}
+                </Button>
             }
         />
     );
@@ -388,6 +467,7 @@ export default function MyDay() {
                 workerFirstName={workerFirstName}
                 site={site}
                 singleResident={singleResident}
+                activeShiftId={activeShift?.id ?? null}
                 shiftStartLabel={shiftStartLabel}
                 shiftEndLabel={shiftEndLabel}
                 shiftDurationHours={shiftDurationHours}
@@ -402,7 +482,12 @@ export default function MyDay() {
                 overdueMeds={overdueMeds}
                 openItems={openItemTasks}
                 clockedIn={clockedIn}
+                isOnBreak={isOnBreak}
+                handoverSubmitted={openSession?.handover_submitted ?? false}
                 onClockToggle={handleClockToggle}
+                onBreakToggle={handleBreakToggle}
+                onOpenTimesheet={handleOpenTimesheets}
+                onWriteHandover={handleWriteHandover}
                 activeResidentId={activeResidentId}
                 onResidentChange={setActiveResidentId}
                 residentTaskCounts={residentTaskCounts}
@@ -419,6 +504,7 @@ export default function MyDay() {
                     onGiveMed={handleGiveMed}
                     onSnoozeMed={handleSnoozeMed}
                     onRefuseMed={handleRefuseMed}
+                    onAddNote={(item) => handleAddNote(item.clientId ?? null)}
                     onOpenContextMenu={(item, x, y) => setCtxMenu({ item, x, y })}
                 />
 
@@ -432,6 +518,7 @@ export default function MyDay() {
                         notifications={(props.notifications ?? []) as MyDayNotification[]}
                         onAckAlert={handleAckAlert}
                         onSnoozeAlert={handleSnoozeAlert}
+                        onConfirmHandoverRead={handleConfirmHandoverRead}
                     />
                     <PaperworkPanel
                         timesheets={(props.timesheets ?? []) as MyDayTimesheet[]}
@@ -452,6 +539,43 @@ export default function MyDay() {
                     onClose={() => setCtxMenu(null)}
                     onAction={handleContextMenuAction}
                 />
+            ) : null}
+
+            {openSession ? (
+                <>
+                    <EndOfShiftChecklist
+                        session={{
+                            id: openSession.id,
+                            shift_id: openSession.shift_id,
+                            client_name:
+                                openSession.client_name
+                                ?? activeShift?.client?.name
+                                ?? null,
+                            break_minutes: openSession.break_minutes ?? 0,
+                            handover_submitted:
+                                openSession.handover_submitted ?? false,
+                            // `ShiftTaskListItem` requires a concrete
+                            // `completed_at`. Our payload may omit it on tasks
+                            // that are still open, so default to null.
+                            tasks: (openSession.tasks ?? []).map((task) => ({
+                                id: task.id,
+                                label: task.label,
+                                is_completed: task.is_completed,
+                                completed_at: task.completed_at ?? null,
+                            })),
+                            end_of_shift_blockers:
+                                (openSession.end_of_shift_blockers ?? []) as EndOfShiftBlocker[],
+                        }}
+                        open={endShiftOpen}
+                        onOpenChange={setEndShiftOpen}
+                    />
+                    <HandoverWriteSheet
+                        shiftId={openSession.shift_id ?? null}
+                        alreadySubmitted={openSession.handover_submitted ?? false}
+                        open={handoverWriteOpen}
+                        onOpenChange={setHandoverWriteOpen}
+                    />
+                </>
             ) : null}
         </AppLayout>
     );
