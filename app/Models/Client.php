@@ -59,6 +59,9 @@ class Client extends Model
         'risk_level',
         'safeguarding_flag',
         'house_geofence_id',
+        'fluid_intake_min_ml',
+        'fluid_intake_max_ml',
+        'seizure_duration_escalation_seconds',
     ];
 
     protected $casts = [

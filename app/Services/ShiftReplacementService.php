@@ -380,7 +380,7 @@ class ShiftReplacementService
         $shift = $replacement->shift;
         $client = $shift?->client;
 
-        TimelineEvent::create([
+        app(\App\Services\Timeline\TimelineEmitter::class)->record([
             'source_type' => ShiftReplacementRequest::class,
             'source_id' => $replacement->id,
             'occurred_at' => now(),

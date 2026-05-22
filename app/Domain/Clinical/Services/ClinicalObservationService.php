@@ -150,7 +150,7 @@ class ClinicalObservationService
 
     protected function createTimelineEvent(ClinicalObservation $observation, User $recorder): TimelineEvent
     {
-        return TimelineEvent::create([
+        return app(\App\Services\Timeline\TimelineEmitter::class)->record([
             'type' => self::TIMELINE_TYPE_OBSERVATION,
             'source_type' => ClinicalObservation::class,
             'source_id' => $observation->id,

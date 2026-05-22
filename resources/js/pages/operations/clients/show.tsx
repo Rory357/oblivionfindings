@@ -99,6 +99,13 @@ import {
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
 import { FoodMealPreferences } from './_food-meal-preferences';
+import { BehaviourInsightsCard } from '@/components/behaviour-insights-card';
+import { AuditHistoryTab } from './tabs/audit-history';
+import { FamilyTreeTab } from './tabs/family-tree';
+import { FinanceTab } from './tabs/finance';
+import { GoalsPathTab } from './tabs/goals-path';
+import { LeaveExcursionsTab } from './tabs/leave-excursions';
+import { PersonalDetailsTab } from './tabs/personal-details';
 
 function Field({ label, value }: { label: string; value: string }) {
     return (
@@ -1026,18 +1033,6 @@ export default function ClientShow({
 
     // Lazy-load transport data when tab is first opened
     const [transportLoaded, setTransportLoaded] = useState(!!transport);
-    const handleTabChange = useCallback(
-        (newTab: TabKey) => {
-            setTab(newTab);
-            if (newTab === 'transport' && !transportLoaded) {
-                router.reload({
-                    only: ['transport'],
-                    onSuccess: () => setTransportLoaded(true),
-                });
-            }
-        },
-        [transportLoaded],
-    );
     const updateProfileQuery = useCallback(
         (values: Record<string, string | null>) => {
             if (typeof window === 'undefined') return;
@@ -1054,6 +1049,31 @@ export default function ClientShow({
         },
         [],
     );
+    const handleTabChange = useCallback(
+        (newTab: TabKey) => {
+            setTab(newTab);
+            updateProfileQuery({ tab: newTab });
+            if (newTab === 'transport' && !transportLoaded) {
+                router.reload({
+                    only: ['transport'],
+                    onSuccess: () => setTransportLoaded(true),
+                });
+            }
+        },
+        [transportLoaded, updateProfileQuery],
+    );
+
+    // Browser back/forward should keep the tab state in sync.
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const handlePop = () => {
+            const params = new URLSearchParams(window.location.search);
+            const next = (params.get('tab') as TabKey) || 'profile';
+            setTab(next);
+        };
+        window.addEventListener('popstate', handlePop);
+        return () => window.removeEventListener('popstate', handlePop);
+    }, []);
     const openDailyNotes = useCallback(
         (filter: DailyNotesFilter = 'all') => {
             setDailyNotesFilter(filter);
@@ -4622,17 +4642,25 @@ export default function ClientShow({
                 )}
 
                 {tab === 'observations' && (
-                    <ClientObservationsTab
-                        clientId={client.id}
-                        canRecordObservation={Boolean(
-                            can.record_observation ||
-                            can.record_clinical_observation,
-                        )}
-                        canRecordClinical={Boolean(
-                            can.record_clinical_observation,
-                        )}
-                        canRecordEvent={Boolean(can.record_event)}
-                    />
+                    <div className="space-y-6">
+                        <BehaviourInsightsCard
+                            patterns={
+                                (pageProps as any).behaviour_patterns as any
+                            }
+                            description="Rolled-up trends from clinical observations and flagged daily notes for this client."
+                        />
+                        <ClientObservationsTab
+                            clientId={client.id}
+                            canRecordObservation={Boolean(
+                                can.record_observation ||
+                                can.record_clinical_observation,
+                            )}
+                            canRecordClinical={Boolean(
+                                can.record_clinical_observation,
+                            )}
+                            canRecordEvent={Boolean(can.record_event)}
+                        />
+                    </div>
                 )}
 
                 {tab === 'care_plans' &&
@@ -5212,6 +5240,7 @@ export default function ClientShow({
                         summary={dailyNotesSummary}
                         canReview={Boolean(progressNotesCan.review)}
                         canUpdate={Boolean(progressNotesCan.update)}
+                        currentUserId={auth?.user?.id}
                         onCreateDaily={() => setDailyNoteOpen(true)}
                         onCreateQuick={() => setQuickNoteOpen(true)}
                         filterPreset={dailyNotesFilter}
@@ -5228,6 +5257,22 @@ export default function ClientShow({
                         familyNotes={familyNotes}
                         familyNotesOpenCount={familyNotesOpenCount}
                         onCreate={() => setCommunicationNoteOpen(true)}
+                        canReview={Boolean(progressNotesCan.review)}
+                        canUpdate={Boolean(progressNotesCan.update)}
+                        onMarkReviewed={(noteId) =>
+                            router.post(
+                                `/operations/clients/${client.id}/daily-notes/${noteId}/review`,
+                                {},
+                                { preserveScroll: true },
+                            )
+                        }
+                        onClearFlag={(noteId) =>
+                            router.post(
+                                `/operations/clients/${client.id}/daily-notes/${noteId}/flag`,
+                                { is_flagged: false },
+                                { preserveScroll: true },
+                            )
+                        }
                         isLoading={!hasCommunicationNotesProp}
                     />
                 )}
@@ -5258,36 +5303,32 @@ export default function ClientShow({
                 )}
 
                 {tab === 'personal_details' && (
-                    <ClientProfilePlaceholder
-                        title="Personal Details"
-                        description="Demographics, identifiers, preferred name, funding, site, and key-worker detail from the existing overview data."
-                        items={[
-                            ['Legal name', name],
-                            ['Preferred name', client.preferred_name ?? '—'],
-                            ['NHI', client.nhi_number ?? '—'],
-                            ['Status', client.status],
-                            ['Funding', client.funding_type ?? '—'],
-                            ['Site', client.site?.name ?? '—'],
-                            ['Key worker', client.key_worker?.name ?? '—'],
-                        ]}
+                    <PersonalDetailsTab
+                        client={client as any}
+                        supportWorkers={(client as any).support_workers ?? []}
+                        emergencyContacts={
+                            ((pageProps as any).medical?.emergency_contacts ??
+                                []) as any
+                        }
+                        nextOfKins={
+                            ((pageProps as any).next_of_kins ?? []) as any
+                        }
                     />
                 )}
 
                 {tab === 'goals_path' && (
-                    <ClientProfilePlaceholder
-                        title="Goals Path"
-                        description="Active support goals from the care plan, grouped into a worker-readable path without hiding the full care-plan tab."
-                        items={(carePlansSummary?.active_plan?.goals ?? []).map(
-                            (goal: any) => [
-                                goal.title,
-                                `${goal.status ?? 'open'}${
-                                    goal.progress_percentage != null
-                                        ? ` - ${goal.progress_percentage}%`
-                                        : ''
-                                }`,
-                            ],
-                        )}
-                        emptyLabel="No active goals are attached to the current care plan."
+                    <GoalsPathTab
+                        clientName={name}
+                        activePlanId={
+                            carePlansSummary?.active_plan?.id ?? null
+                        }
+                        goals={carePlansSummary?.active_plan?.goals ?? []}
+                        lifeStory={(client as any).life_story}
+                        strengthsAbilities={
+                            (client as any).strengths_abilities
+                        }
+                        interestsHobbies={(client as any).interests_hobbies}
+                        pathPlan={(pageProps as any).path_plan ?? null}
                     />
                 )}
 
@@ -5326,74 +5367,46 @@ export default function ClientShow({
                 )}
 
                 {tab === 'family_tree' && (
-                    <ClientProfilePlaceholder
-                        title="Family Tree"
-                        description="Portal users and known relationships are grouped here for quick scanning."
-                        items={(portal_users ?? []).map((user: any) => [
-                            user.name,
-                            user.relation ?? user.email ?? 'Portal contact',
-                        ])}
-                        emptyLabel="No family portal users are linked."
+                    <FamilyTreeTab
+                        clientName={name}
+                        nextOfKins={((pageProps as any).next_of_kins ?? []) as any}
+                        portalUsers={(portal_users ?? []) as any}
+                        emergencyContacts={
+                            ((pageProps as any).medical?.emergency_contacts ??
+                                []) as any
+                        }
                     />
                 )}
 
                 {tab === 'audit_history' && (
-                    <ClientProfilePlaceholder
-                        title="Audit History"
-                        description="Timeline events remain the operational audit source on this profile."
-                        items={(events ?? [])
-                            .slice(0, 12)
-                            .map((event: any) => [
-                                event.subject ?? event.type ?? 'Timeline event',
-                                event.occurred_at
-                                    ? formatDateTime(event.occurred_at)
-                                    : 'Recorded',
-                            ])}
-                        emptyLabel="No timeline audit events are available."
+                    <AuditHistoryTab
+                        entries={((pageProps as any).audit_history ?? []) as any}
+                        canView={Boolean(
+                            ((pageProps as any).audit_history ?? []).length > 0
+                                || progressNotesCan.update,
+                        )}
                     />
                 )}
 
                 {tab === 'finance' && (
-                    <ClientProfilePlaceholder
-                        title="Finance"
-                        description="Service-agreement budget and funding information are grouped here without replacing the agreements tab."
-                        items={[
-                            ['Funding type', client.funding_type ?? '—'],
-                            [
-                                'Agreements',
-                                String((clientAgreements ?? []).length),
-                            ],
-                            [
-                                'Active agreement',
-                                clientAgreements.find(
-                                    (agreement: any) =>
-                                        agreement.status === 'active',
-                                )?.title ?? '—',
-                            ],
-                        ]}
+                    <FinanceTab
+                        clientId={client.id}
+                        finance={(pageProps as any).client_finance ?? {}}
                     />
                 )}
 
                 {tab === 'leave_excursions' && (
-                    <ClientProfilePlaceholder
-                        title="Leave & Excursions"
-                        description="Calendar, transport, visit requests, and respite activity are grouped here for day-to-day planning."
-                        items={[
-                            [
-                                'Pending visit requests',
-                                String(pendingVisitCount),
-                            ],
-                            [
-                                'Upcoming outings',
-                                String(
-                                    transport?.upcoming_outings?.length ?? 0,
-                                ),
-                            ],
-                            [
-                                'Respite bookings',
-                                String(respite?.bookings?.length ?? 0),
-                            ],
-                        ]}
+                    <LeaveExcursionsTab
+                        clientId={client.id}
+                        leave={
+                            ((pageProps as any).leave_excursions?.leave ??
+                                []) as any
+                        }
+                        excursions={
+                            ((pageProps as any).leave_excursions?.excursions ??
+                                []) as any
+                        }
+                        canManage={Boolean(can.edit)}
                     />
                 )}
 

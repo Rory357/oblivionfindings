@@ -1,3 +1,7 @@
+import {
+    DailyNoteEntry,
+    type ClientDailyNote,
+} from '@/components/daily-note-entry';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { EmptyState } from '@/components/ui/empty-state';
@@ -7,18 +11,19 @@ import {
     Calendar,
     CheckCircle2,
     MessageSquare,
-    Phone,
     Plus,
-    UserRound,
     Users,
 } from 'lucide-react';
-import type { ClientDailyNote } from './daily-notes';
 
 type CommunicationNotesTabProps = {
     notes: ClientDailyNote[];
     familyNotes: any[];
     familyNotesOpenCount: number;
     onCreate: () => void;
+    canReview?: boolean;
+    canUpdate?: boolean;
+    onMarkReviewed?: (noteId: number) => void;
+    onClearFlag?: (noteId: number) => void;
     isLoading?: boolean;
 };
 
@@ -32,18 +37,15 @@ function dateLabel(value?: string | null) {
     }).format(new Date(value));
 }
 
-const methodIcons: Record<string, typeof MessageSquare> = {
-    phone: Phone,
-    email: MessageSquare,
-    portal: Users,
-    in_person: UserRound,
-};
-
 export function CommunicationNotesTab({
     notes,
     familyNotes,
     familyNotesOpenCount,
     onCreate,
+    canReview = false,
+    canUpdate = false,
+    onMarkReviewed,
+    onClearFlag,
     isLoading = false,
 }: CommunicationNotesTabProps) {
     const openFamilyNotes = familyNotes.filter((note) =>
@@ -122,93 +124,17 @@ export function CommunicationNotesTab({
             <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
                 <div className="space-y-3">
                     {notes.length > 0 ? (
-                        notes.map((note) => {
-                            const Icon =
-                                methodIcons[
-                                    String(note.contact_method ?? '')
-                                ] ?? MessageSquare;
-
-                            return (
-                                <article
-                                    key={note.id}
-                                    className="rounded-lg border bg-card p-4"
-                                >
-                                    <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                                        <div className="min-w-0 space-y-2">
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                <Badge className="bg-status-info-bg text-status-info">
-                                                    <Icon className="mr-1 h-3.5 w-3.5" />
-                                                    {String(
-                                                        note.contact_method ??
-                                                            'contact',
-                                                    ).replace(/_/g, ' ')}
-                                                </Badge>
-                                                {note.is_flagged ? (
-                                                    <Badge className="bg-status-warning-bg text-status-warning">
-                                                        Needs review
-                                                    </Badge>
-                                                ) : null}
-                                                {note.follow_up_action ? (
-                                                    <Badge variant="outline">
-                                                        Follow-up
-                                                    </Badge>
-                                                ) : null}
-                                            </div>
-                                            <h3 className="text-base font-semibold">
-                                                {note.subject ||
-                                                    note.contact_person ||
-                                                    'Communication note'}
-                                            </h3>
-                                            {(note.contact_person ||
-                                                note.contact_relationship) && (
-                                                <p className="text-sm text-muted-foreground">
-                                                    {[
-                                                        note.contact_person,
-                                                        note.contact_relationship,
-                                                    ]
-                                                        .filter(Boolean)
-                                                        .join(' - ')}
-                                                </p>
-                                            )}
-                                        </div>
-                                        <p className="shrink-0 text-sm text-muted-foreground">
-                                            {dateLabel(
-                                                note.occurred_at ??
-                                                    note.created_at,
-                                            )}
-                                        </p>
-                                    </div>
-
-                                    <p className="mt-3 text-sm leading-6 whitespace-pre-wrap">
-                                        {note.body}
-                                    </p>
-
-                                    {note.follow_up_action ? (
-                                        <div className="mt-4 rounded-lg border bg-muted/30 p-3 text-sm">
-                                            <p className="font-medium">
-                                                Follow-up
-                                            </p>
-                                            <p className="mt-1 text-muted-foreground">
-                                                {note.follow_up_action}
-                                            </p>
-                                            {note.follow_up_due_at ? (
-                                                <p className="mt-2 inline-flex items-center gap-1 text-xs text-muted-foreground">
-                                                    <Calendar className="h-3.5 w-3.5" />
-                                                    {dateLabel(
-                                                        note.follow_up_due_at,
-                                                    )}
-                                                </p>
-                                            ) : null}
-                                        </div>
-                                    ) : null}
-
-                                    <div className="mt-4 flex items-center gap-2 text-xs text-muted-foreground">
-                                        <UserRound className="h-3.5 w-3.5" />
-                                        {note.author?.name ?? 'Unknown worker'}
-                                    </div>
-                                </article>
-                            );
-                        })
+                        notes.map((note) => (
+                            <DailyNoteEntry
+                                key={note.id}
+                                note={note}
+                                canReview={canReview}
+                                canUpdate={canUpdate}
+                                onMarkReviewed={onMarkReviewed}
+                                onClearFlag={onClearFlag}
+                                showCommunicationContext
+                            />
+                        ))
                     ) : (
                         <EmptyState
                             icon={MessageSquare}

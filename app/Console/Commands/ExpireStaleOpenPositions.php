@@ -116,7 +116,7 @@ class ExpireStaleOpenPositions extends Command
 
     private function recordTimeline(ShiftOpenPosition $position, string $type, string $subject, string $body): void
     {
-        TimelineEvent::create([
+        app(\App\Services\Timeline\TimelineEmitter::class)->record([
             'source_type' => ShiftOpenPosition::class,
             'source_id' => $position->id,
             'occurred_at' => now(),

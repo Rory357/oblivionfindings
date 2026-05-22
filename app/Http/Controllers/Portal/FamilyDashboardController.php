@@ -460,7 +460,7 @@ class FamilyDashboardController extends Controller
 
         $visitTypeLabel = str_replace('_', ' ', $validated['visit_type']);
         $dateLabel = \Carbon\Carbon::parse($validated['requested_date'])->format('j M');
-        TimelineEvent::create([
+        app(\App\Services\Timeline\TimelineEmitter::class)->record([
             'source_type' => FamilyVisitRequest::class,
             'source_id' => $visit->id,
             'occurred_at' => now(),
@@ -493,7 +493,7 @@ class FamilyDashboardController extends Controller
 
         $visit->update(['status' => 'cancelled']);
 
-        TimelineEvent::create([
+        app(\App\Services\Timeline\TimelineEmitter::class)->record([
             'source_type' => FamilyVisitRequest::class,
             'source_id' => $visit->id,
             'occurred_at' => now(),

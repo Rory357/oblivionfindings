@@ -221,7 +221,7 @@ class GuidedRoundController extends Controller
             $admin->save();
 
             $statusLabel = ucfirst(str_replace('_', ' ', $backendStatus));
-            TimelineEvent::create([
+            app(\App\Services\Timeline\TimelineEmitter::class)->record([
                 'source_type' => ClientMedicationAdministration::class,
                 'source_id' => $admin->id,
                 'occurred_at' => $admin->administered_at ?? now(),

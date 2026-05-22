@@ -97,7 +97,7 @@ class PortalFamilyNoteController extends Controller
             'visibility' => 'portal',
         ]);
 
-        TimelineEvent::create([
+        app(\App\Services\Timeline\TimelineEmitter::class)->record([
             'source_type' => FamilyNote::class,
             'source_id' => $note->id,
             'occurred_at' => now(),

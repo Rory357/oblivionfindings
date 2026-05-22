@@ -162,7 +162,7 @@ class ClinicalEventService
 
     protected function createTimelineEvent(ClinicalEvent $event, User $reporter): TimelineEvent
     {
-        return TimelineEvent::create([
+        return app(\App\Services\Timeline\TimelineEmitter::class)->record([
             'type' => self::TIMELINE_TYPE_CLINICAL_EVENT,
             'source_type' => ClinicalEvent::class,
             'source_id' => $event->id,

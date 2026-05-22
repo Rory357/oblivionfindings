@@ -766,7 +766,7 @@ class MedicationsApiController extends Controller
 
         // Timeline event
         $statusLabel = ucfirst(str_replace('_', ' ', $data['status']));
-        TimelineEvent::create([
+        app(\App\Services\Timeline\TimelineEmitter::class)->record([
             'source_type' => ClientMedicationAdministration::class,
             'source_id' => $administration->id,
             'occurred_at' => $administration->administered_at ?? now(),
@@ -882,7 +882,7 @@ class MedicationsApiController extends Controller
         $correction->save();
 
         // Timeline event
-        TimelineEvent::create([
+        app(\App\Services\Timeline\TimelineEmitter::class)->record([
             'source_type' => ClientMedicationAdministration::class,
             'source_id' => $correction->id,
             'occurred_at' => now(),

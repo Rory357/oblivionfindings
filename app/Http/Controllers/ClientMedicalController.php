@@ -172,7 +172,7 @@ class ClientMedicalController extends Controller
             $m->fill($this->buildMedicationPayload($data));
             $m->save();
 
-            TimelineEvent::create([
+            app(\App\Services\Timeline\TimelineEmitter::class)->record([
                 'source_type' => ClientMedication::class,
                 'source_id' => $m->id,
                 'occurred_at' => now(),
@@ -538,7 +538,7 @@ class ClientMedicalController extends Controller
             $a = $result['administration'];
 
             $statusLabel = ucfirst(str_replace('_', ' ', $data['status']));
-            TimelineEvent::create([
+            app(\App\Services\Timeline\TimelineEmitter::class)->record([
                 'source_type' => ClientMedicationAdministration::class,
                 'source_id' => $a->id,
                 'occurred_at' => $a->administered_at ?? now(),
@@ -681,7 +681,7 @@ class ClientMedicalController extends Controller
             $c->fill($data);
             $c->save();
 
-            TimelineEvent::create([
+            app(\App\Services\Timeline\TimelineEmitter::class)->record([
                 'source_type' => ClientCondition::class,
                 'source_id' => $c->id,
                 'occurred_at' => now(),

@@ -416,6 +416,41 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         ->whereNumber('client')
         ->name('operations.clients.actions.index');
 
+    // Cross-client manager review dashboard (Phase 3 C2)
+    Route::get('/review-queue', [\App\Http\Controllers\Operations\ReviewQueueController::class, 'index'])
+        ->middleware('permission:progress_notes.review')
+        ->name('operations.review_queue.index');
+
+    // Leave & excursion requests
+    Route::post('/clients/{client}/leave', [\App\Http\Controllers\Operations\ClientLeaveExcursionController::class, 'storeLeave'])
+        ->middleware('permission:clients.update')
+        ->whereNumber('client')
+        ->name('operations.clients.leave.store');
+    Route::put('/clients/{client}/leave/{leave}', [\App\Http\Controllers\Operations\ClientLeaveExcursionController::class, 'updateLeave'])
+        ->middleware('permission:clients.update')
+        ->whereNumber('client')
+        ->whereNumber('leave')
+        ->name('operations.clients.leave.update');
+    Route::delete('/clients/{client}/leave/{leave}', [\App\Http\Controllers\Operations\ClientLeaveExcursionController::class, 'destroyLeave'])
+        ->middleware('permission:clients.update')
+        ->whereNumber('client')
+        ->whereNumber('leave')
+        ->name('operations.clients.leave.destroy');
+    Route::post('/clients/{client}/excursions', [\App\Http\Controllers\Operations\ClientLeaveExcursionController::class, 'storeExcursion'])
+        ->middleware('permission:clients.update')
+        ->whereNumber('client')
+        ->name('operations.clients.excursions.store');
+    Route::put('/clients/{client}/excursions/{excursion}', [\App\Http\Controllers\Operations\ClientLeaveExcursionController::class, 'updateExcursion'])
+        ->middleware('permission:clients.update')
+        ->whereNumber('client')
+        ->whereNumber('excursion')
+        ->name('operations.clients.excursions.update');
+    Route::delete('/clients/{client}/excursions/{excursion}', [\App\Http\Controllers\Operations\ClientLeaveExcursionController::class, 'destroyExcursion'])
+        ->middleware('permission:clients.update')
+        ->whereNumber('client')
+        ->whereNumber('excursion')
+        ->name('operations.clients.excursions.destroy');
+
     // Medication stock updates
     Route::put('/clients/{client}/medical/medications/{medication}/stock', [ClientMedicalController::class, 'updateMedicationStock'])
         ->middleware('permission:medications.stock.update|medications.controlled.record|clients.update')

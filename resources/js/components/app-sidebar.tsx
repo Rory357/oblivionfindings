@@ -792,6 +792,12 @@ function buildOperationsSubPanelGroups({
             href: '/operations/progress-notes',
             icon: MessageSquareText,
         });
+    if (can?.progress_notes?.review)
+        clientMgmt.push({
+            title: 'Review Queue',
+            href: '/operations/review-queue',
+            icon: AlertTriangle,
+        });
     if (can?.client_funds?.manage)
         clientMgmt.push({
             title: `${clientLabel} Funds`,

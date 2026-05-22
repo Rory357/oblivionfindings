@@ -274,7 +274,7 @@ class ClientCalendarController extends Controller
             'created_by' => $request->user()->id,
         ]);
 
-        TimelineEvent::create([
+        app(\App\Services\Timeline\TimelineEmitter::class)->record([
             'source_type' => ClientAppointment::class,
             'source_id' => $appointment->id,
             'occurred_at' => now(),

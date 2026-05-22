@@ -100,7 +100,7 @@ class ClientPersonalAssetController extends Controller
                 'returned' => 'returned',
             ];
 
-            TimelineEvent::create([
+            app(\App\Services\Timeline\TimelineEmitter::class)->record([
                 'client_id' => $client->id,
                 'actor_id' => $request->user()->id,
                 'site_id' => $client->site_id,
@@ -149,7 +149,7 @@ class ClientPersonalAssetController extends Controller
                 'returned' => 'returned',
             ];
 
-            TimelineEvent::create([
+            app(\App\Services\Timeline\TimelineEmitter::class)->record([
                 'client_id' => $client->id,
                 'actor_id' => $request->user()->id,
                 'site_id' => $client->site_id,

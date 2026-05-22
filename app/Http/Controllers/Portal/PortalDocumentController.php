@@ -101,7 +101,7 @@ class PortalDocumentController extends Controller
             'portal_visible' => true,
         ]);
 
-        TimelineEvent::create([
+        app(\App\Services\Timeline\TimelineEmitter::class)->record([
             'source_type' => ClientDocument::class,
             'source_id' => $doc->id,
             'occurred_at' => now(),

@@ -148,7 +148,7 @@ class PortalPhotoController extends Controller
             'status' => $status,
         ]);
 
-        TimelineEvent::create([
+        app(\App\Services\Timeline\TimelineEmitter::class)->record([
             'source_type' => ClientPhoto::class,
             'source_id' => $photo->id,
             'occurred_at' => now(),

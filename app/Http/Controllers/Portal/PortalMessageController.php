@@ -367,7 +367,7 @@ class PortalMessageController extends Controller
                     'status' => 'approved',
                 ]);
 
-                TimelineEvent::create([
+                app(\App\Services\Timeline\TimelineEmitter::class)->record([
                     'source_type' => ClientPhoto::class,
                     'source_id' => $photo->id,
                     'occurred_at' => now(),
@@ -414,7 +414,7 @@ class PortalMessageController extends Controller
                     'portal_visible' => true,
                 ]);
 
-                TimelineEvent::create([
+                app(\App\Services\Timeline\TimelineEmitter::class)->record([
                     'source_type' => ClientDocument::class,
                     'source_id' => $doc->id,
                     'occurred_at' => now(),

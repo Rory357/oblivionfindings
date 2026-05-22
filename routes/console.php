@@ -489,3 +489,11 @@ app(Schedule::class)
     ->job(new PruneFinanceAuditExportsJob)
     ->timezone('Pacific/Auckland')
     ->dailyAt('03:00');
+
+// Client profile retention: prune audit_logs and timeline_events older than
+// configured windows (defaults: 2 yrs audit, 5 yrs timeline). Pinned timeline
+// events are preserved.
+app(Schedule::class)
+    ->command('oblivion:prune-retention')
+    ->timezone('Pacific/Auckland')
+    ->weeklyOn(0, '03:30');

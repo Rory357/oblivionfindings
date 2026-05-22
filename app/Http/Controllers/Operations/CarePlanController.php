@@ -133,7 +133,7 @@ class CarePlanController extends Controller
         ]);
 
         $client = Client::find($data['client_id']);
-        TimelineEvent::create([
+        app(\App\Services\Timeline\TimelineEmitter::class)->record([
             'source_type' => CarePlan::class,
             'source_id' => $carePlan->id,
             'occurred_at' => now(),

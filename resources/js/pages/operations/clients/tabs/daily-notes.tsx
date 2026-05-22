@@ -1,8 +1,13 @@
+import {
+    DailyNoteEntry,
+    type ClientDailyNote,
+} from '@/components/daily-note-entry';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import {
     Select,
     SelectContent,
@@ -11,44 +16,24 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Skeleton } from '@/components/ui/skeleton';
-import { cn } from '@/lib/utils';
 import { router } from '@inertiajs/react';
 import {
     AlertTriangle,
     CalendarCheck,
-    CheckCircle2,
     ClipboardList,
+    Eye,
     Flag,
     MessageSquare,
     Search,
     UserRound,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { NOTE_CATEGORIES } from '../dialogs/_note-category-picker';
 
-export type ClientDailyNote = {
-    id: number;
-    type?: string | null;
-    category?: string | null;
-    subject?: string | null;
-    body?: string | null;
-    occurred_at?: string | null;
-    created_at?: string | null;
-    updated_at?: string | null;
-    visibility?: string | null;
-    is_flagged?: boolean;
-    flagged_reason?: string | null;
-    reviewed_at?: string | null;
-    is_draft?: boolean;
-    mood_rating?: number | null;
-    behaviour_tags?: string[] | null;
-    concerns_flags?: string[] | null;
-    follow_up_action?: string | null;
-    follow_up_due_at?: string | null;
-    contact_person?: string | null;
-    contact_relationship?: string | null;
-    contact_method?: string | null;
-    author?: { id: number; name: string } | null;
-};
+// Re-export ClientDailyNote from the canonical home so existing call sites
+// (`import type { ClientDailyNote } from './daily-notes'`) keep working
+// without churn while the component file becomes the source of truth.
+export type { ClientDailyNote };
 
 export type DailyNotesSummary = {
     total?: number;
@@ -64,6 +49,7 @@ type DailyNotesTabProps = {
     summary: DailyNotesSummary;
     canReview?: boolean;
     canUpdate?: boolean;
+    currentUserId?: number;
     onCreateDaily: () => void;
     onCreateQuick: () => void;
     filterPreset?: DailyNotesFilter;
@@ -75,6 +61,10 @@ type DailyNotesTabProps = {
 
 type DailyNotesFilter = 'all' | 'flagged' | 'follow_up' | 'drafts';
 
+function categoryLabel(value?: string | null) {
+    return String(value ?? 'other').replace(/_/g, ' ');
+}
+
 function dateLabel(value?: string | null) {
     if (!value) return 'No date';
     return new Intl.DateTimeFormat('en-NZ', {
@@ -83,10 +73,6 @@ function dateLabel(value?: string | null) {
         hour: 'numeric',
         minute: '2-digit',
     }).format(new Date(value));
-}
-
-function categoryLabel(value?: string | null) {
-    return String(value ?? 'other').replace(/_/g, ' ');
 }
 
 const statCards = [
@@ -135,6 +121,7 @@ export function DailyNotesTab({
     summary,
     canReview = false,
     canUpdate = false,
+    currentUserId,
     onCreateDaily,
     onCreateQuick,
     filterPreset,
@@ -147,6 +134,11 @@ export function DailyNotesTab({
     const [filter, setFilter] = useState<DailyNotesFilter>(
         () => filterPreset ?? filterFromQuery(),
     );
+    const [category, setCategory] = useState<string>('all');
+    const [mineOnly, setMineOnly] = useState(false);
+    const [familyVisibleOnly, setFamilyVisibleOnly] = useState(false);
+    const [dateFrom, setDateFrom] = useState('');
+    const [dateTo, setDateTo] = useState('');
 
     useEffect(() => {
         if (filterPreset) {
@@ -160,14 +152,68 @@ export function DailyNotesTab({
         onFilterChange?.(next);
     };
 
+    const clearFilters = () => {
+        setQuery('');
+        setFilter('all');
+        setCategory('all');
+        setMineOnly(false);
+        setFamilyVisibleOnly(false);
+        setDateFrom('');
+        setDateTo('');
+        onFilterChange?.('all');
+    };
+
+    const activeFilterCount = useMemo(() => {
+        let count = 0;
+        if (query.trim()) count += 1;
+        if (filter !== 'all') count += 1;
+        if (category !== 'all') count += 1;
+        if (mineOnly) count += 1;
+        if (familyVisibleOnly) count += 1;
+        if (dateFrom) count += 1;
+        if (dateTo) count += 1;
+        return count;
+    }, [
+        query,
+        filter,
+        category,
+        mineOnly,
+        familyVisibleOnly,
+        dateFrom,
+        dateTo,
+    ]);
+
     const filteredNotes = useMemo(() => {
         const search = query.trim().toLowerCase();
+        const fromTs = dateFrom ? new Date(dateFrom).getTime() : null;
+        const toTs = dateTo
+            ? new Date(`${dateTo}T23:59:59`).getTime()
+            : null;
 
         return notes.filter((note) => {
             if (filter === 'flagged' && !note.is_flagged) return false;
             if (filter === 'drafts' && !note.is_draft) return false;
             if (filter === 'follow_up' && !note.follow_up_action?.trim()) {
                 return false;
+            }
+            if (category !== 'all' && (note.category ?? 'other') !== category) {
+                return false;
+            }
+            if (mineOnly) {
+                const noteAuthorId = note.author?.id ?? note.user_id ?? null;
+                if (!currentUserId || noteAuthorId !== currentUserId) {
+                    return false;
+                }
+            }
+            if (familyVisibleOnly && note.visibility !== 'portal') {
+                return false;
+            }
+            if (fromTs || toTs) {
+                const when = note.occurred_at ?? note.created_at;
+                if (!when) return false;
+                const whenTs = new Date(when).getTime();
+                if (fromTs && whenTs < fromTs) return false;
+                if (toTs && whenTs > toTs) return false;
             }
             if (!search) return true;
 
@@ -177,13 +223,24 @@ export function DailyNotesTab({
                 note.category,
                 note.author?.name,
                 note.flagged_reason,
+                note.contact_person,
             ]
                 .filter(Boolean)
                 .join(' ')
                 .toLowerCase()
                 .includes(search);
         });
-    }, [filter, notes, query]);
+    }, [
+        category,
+        currentUserId,
+        dateFrom,
+        dateTo,
+        familyVisibleOnly,
+        filter,
+        mineOnly,
+        notes,
+        query,
+    ]);
 
     const reviewQueue = notes.filter(
         (note) => note.is_flagged && !note.reviewed_at,
@@ -264,7 +321,7 @@ export function DailyNotesTab({
                                     </p>
                                 </div>
                                 <span
-                                    className={cn('rounded-lg p-2', stat.tone)}
+                                    className={`rounded-lg p-2 ${stat.tone}`}
                                 >
                                     <Icon className="h-5 w-5" />
                                 </span>
@@ -274,54 +331,155 @@ export function DailyNotesTab({
                 })}
             </div>
 
-            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                <div className="flex flex-1 flex-col gap-2 sm:flex-row">
-                    <div className="relative max-w-xl flex-1">
-                        <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                            value={query}
-                            onChange={(event) => setQuery(event.target.value)}
-                            placeholder="Search notes"
-                            className="min-h-11 pl-9"
-                        />
+            <div className="space-y-3">
+                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
+                    <div className="flex flex-1 flex-col gap-2 sm:flex-row">
+                        <div className="relative max-w-xl flex-1">
+                            <Search className="pointer-events-none absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input
+                                value={query}
+                                onChange={(event) =>
+                                    setQuery(event.target.value)
+                                }
+                                placeholder="Search notes"
+                                className="min-h-11 pl-9"
+                                data-test="client-daily-notes-search"
+                            />
+                        </div>
+                        <Select
+                            value={filter}
+                            onValueChange={handleFilterChange}
+                        >
+                            <SelectTrigger
+                                className="min-h-11 sm:w-44"
+                                data-test="client-daily-notes-filter"
+                            >
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All notes</SelectItem>
+                                <SelectItem value="flagged">
+                                    Needs review
+                                </SelectItem>
+                                <SelectItem value="follow_up">
+                                    Follow-ups
+                                </SelectItem>
+                                <SelectItem value="drafts">Drafts</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <Select value={category} onValueChange={setCategory}>
+                            <SelectTrigger
+                                className="min-h-11 sm:w-44"
+                                data-test="client-daily-notes-category-filter"
+                            >
+                                <SelectValue placeholder="All categories" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">
+                                    All categories
+                                </SelectItem>
+                                {NOTE_CATEGORIES.map((cat) => (
+                                    <SelectItem key={cat.key} value={cat.key}>
+                                        {cat.label}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
                     </div>
-                    <Select value={filter} onValueChange={handleFilterChange}>
-                        <SelectTrigger className="min-h-11 sm:w-44">
-                            <SelectValue />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All notes</SelectItem>
-                            <SelectItem value="flagged">
-                                Needs review
-                            </SelectItem>
-                            <SelectItem value="follow_up">
-                                Follow-ups
-                            </SelectItem>
-                            <SelectItem value="drafts">Drafts</SelectItem>
-                        </SelectContent>
-                    </Select>
+
+                    <div className="flex flex-wrap gap-2">
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={onCreateQuick}
+                            className="min-h-11"
+                            data-test="client-daily-notes-quick-note-button"
+                        >
+                            <MessageSquare className="mr-2 h-4 w-4" />
+                            Quick Note
+                        </Button>
+                        <Button
+                            type="button"
+                            onClick={onCreateDaily}
+                            className="min-h-11"
+                            data-test="client-daily-notes-daily-note-button"
+                        >
+                            <ClipboardList className="mr-2 h-4 w-4" />
+                            Daily Note
+                        </Button>
+                    </div>
                 </div>
 
-                <div className="flex flex-wrap gap-2">
+                <div className="flex flex-wrap items-end gap-3">
+                    <div className="flex flex-col gap-1">
+                        <Label
+                            htmlFor="client-daily-notes-date-from"
+                            className="text-xs text-muted-foreground"
+                        >
+                            From
+                        </Label>
+                        <Input
+                            id="client-daily-notes-date-from"
+                            type="date"
+                            value={dateFrom}
+                            onChange={(event) =>
+                                setDateFrom(event.target.value)
+                            }
+                            className="h-10 w-40"
+                            data-test="client-daily-notes-date-from"
+                        />
+                    </div>
+                    <div className="flex flex-col gap-1">
+                        <Label
+                            htmlFor="client-daily-notes-date-to"
+                            className="text-xs text-muted-foreground"
+                        >
+                            To
+                        </Label>
+                        <Input
+                            id="client-daily-notes-date-to"
+                            type="date"
+                            value={dateTo}
+                            onChange={(event) => setDateTo(event.target.value)}
+                            className="h-10 w-40"
+                            data-test="client-daily-notes-date-to"
+                        />
+                    </div>
                     <Button
                         type="button"
-                        variant="outline"
-                        onClick={onCreateQuick}
-                        className="min-h-11"
-                        data-test="client-daily-notes-quick-note-button"
+                        size="sm"
+                        variant={mineOnly ? 'default' : 'outline'}
+                        onClick={() => setMineOnly((value) => !value)}
+                        disabled={!currentUserId}
+                        className="h-10"
+                        data-test="client-daily-notes-mine-toggle"
                     >
-                        <MessageSquare className="mr-2 h-4 w-4" />
-                        Quick Note
+                        <UserRound className="mr-1.5 h-3.5 w-3.5" />
+                        Mine
                     </Button>
                     <Button
                         type="button"
-                        onClick={onCreateDaily}
-                        className="min-h-11"
-                        data-test="client-daily-notes-daily-note-button"
+                        size="sm"
+                        variant={familyVisibleOnly ? 'default' : 'outline'}
+                        onClick={() => setFamilyVisibleOnly((value) => !value)}
+                        className="h-10"
+                        data-test="client-daily-notes-family-visible-toggle"
                     >
-                        <ClipboardList className="mr-2 h-4 w-4" />
-                        Daily Note
+                        <Eye className="mr-1.5 h-3.5 w-3.5" />
+                        Family visible
                     </Button>
+                    {activeFilterCount > 0 ? (
+                        <Button
+                            type="button"
+                            size="sm"
+                            variant="ghost"
+                            onClick={clearFilters}
+                            className="h-10"
+                            data-test="client-daily-notes-clear-filters"
+                        >
+                            Clear filters ({activeFilterCount})
+                        </Button>
+                    ) : null}
                 </div>
             </div>
 
@@ -329,124 +487,14 @@ export function DailyNotesTab({
                 <div className="space-y-3">
                     {filteredNotes.length > 0 ? (
                         filteredNotes.map((note) => (
-                            <article
+                            <DailyNoteEntry
                                 key={note.id}
-                                className={cn(
-                                    'rounded-lg border bg-card p-4',
-                                    note.is_flagged &&
-                                        !note.reviewed_at &&
-                                        'border-status-warning/40 bg-status-warning-bg/40',
-                                )}
-                            >
-                                <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
-                                    <div className="min-w-0 space-y-2">
-                                        <div className="flex flex-wrap items-center gap-2">
-                                            <Badge variant="secondary">
-                                                {categoryLabel(note.category)}
-                                            </Badge>
-                                            {note.is_draft ? (
-                                                <Badge variant="outline">
-                                                    Draft
-                                                </Badge>
-                                            ) : null}
-                                            {note.is_flagged ? (
-                                                <Badge className="bg-status-warning-bg text-status-warning">
-                                                    Needs review
-                                                </Badge>
-                                            ) : null}
-                                            {note.reviewed_at ? (
-                                                <Badge className="bg-status-success-bg text-status-success">
-                                                    Reviewed
-                                                </Badge>
-                                            ) : null}
-                                        </div>
-                                        {note.subject ? (
-                                            <h3 className="text-base font-semibold">
-                                                {note.subject}
-                                            </h3>
-                                        ) : null}
-                                    </div>
-                                    <p className="shrink-0 text-sm text-muted-foreground">
-                                        {dateLabel(
-                                            note.occurred_at ?? note.created_at,
-                                        )}
-                                    </p>
-                                </div>
-
-                                <p className="mt-3 text-sm leading-6 whitespace-pre-wrap text-foreground">
-                                    {note.body}
-                                </p>
-
-                                <div className="mt-4 flex flex-wrap gap-2">
-                                    {(note.behaviour_tags ?? []).map((tag) => (
-                                        <Badge key={tag} variant="outline">
-                                            {tag}
-                                        </Badge>
-                                    ))}
-                                    {(note.concerns_flags ?? []).map((flag) => (
-                                        <Badge
-                                            key={flag}
-                                            className="bg-status-critical-bg text-status-critical"
-                                        >
-                                            {flag}
-                                        </Badge>
-                                    ))}
-                                    {note.mood_rating ? (
-                                        <Badge variant="outline">
-                                            Mood {note.mood_rating}/10
-                                        </Badge>
-                                    ) : null}
-                                </div>
-
-                                {note.follow_up_action ? (
-                                    <div className="mt-4 rounded-lg border bg-background p-3 text-sm">
-                                        <p className="font-medium">Follow-up</p>
-                                        <p className="mt-1 text-muted-foreground">
-                                            {note.follow_up_action}
-                                        </p>
-                                        {note.follow_up_due_at ? (
-                                            <p className="mt-2 text-xs text-muted-foreground">
-                                                Due{' '}
-                                                {dateLabel(
-                                                    note.follow_up_due_at,
-                                                )}
-                                            </p>
-                                        ) : null}
-                                    </div>
-                                ) : null}
-
-                                <div className="mt-4 flex flex-wrap items-center justify-between gap-3 text-xs text-muted-foreground">
-                                    <span className="inline-flex items-center gap-1.5">
-                                        <UserRound className="h-3.5 w-3.5" />
-                                        {note.author?.name ?? 'Unknown worker'}
-                                    </span>
-                                    {canReview &&
-                                    note.is_flagged &&
-                                    !note.reviewed_at ? (
-                                        <Button
-                                            type="button"
-                                            size="sm"
-                                            onClick={() =>
-                                                markReviewed(note.id)
-                                            }
-                                        >
-                                            <CheckCircle2 className="mr-2 h-4 w-4" />
-                                            Mark Reviewed
-                                        </Button>
-                                    ) : canUpdate &&
-                                      note.is_flagged &&
-                                      note.reviewed_at ? (
-                                        <Button
-                                            type="button"
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() => clearFlag(note.id)}
-                                        >
-                                            Clear Flag
-                                        </Button>
-                                    ) : null}
-                                </div>
-                            </article>
+                                note={note}
+                                canReview={canReview}
+                                canUpdate={canUpdate}
+                                onMarkReviewed={markReviewed}
+                                onClearFlag={clearFlag}
+                            />
                         ))
                     ) : (
                         <EmptyState

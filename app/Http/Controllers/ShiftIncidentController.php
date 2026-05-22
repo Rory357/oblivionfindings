@@ -45,7 +45,7 @@ class ShiftIncidentController extends Controller
             'title' => $data['type'] . ' incident',
         ]);
 
-        TimelineEvent::create([
+        app(\App\Services\Timeline\TimelineEmitter::class)->record([
             'client_id' => $shift->client_id,
             'shift_id' => $shift->id,
             'type' => 'incident',

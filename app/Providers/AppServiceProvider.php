@@ -171,6 +171,8 @@ class AppServiceProvider extends ServiceProvider
         ClientAppointment::observe(ProjectsToTimelineObserver::class);
         ClientAssessment::observe(ProjectsToTimelineObserver::class);
         ClientDocument::observe(ProjectsToTimelineObserver::class);
+        \App\Models\ClientLeaveRequest::observe(ProjectsToTimelineObserver::class);
+        \App\Models\ClientExcursionRequest::observe(ProjectsToTimelineObserver::class);
         Site::observe(SiteObserver::class);
         SiteHazard::observe(SiteHazardObserver::class);
         SiteChecklistRun::observe(SiteChecklistRunObserver::class);

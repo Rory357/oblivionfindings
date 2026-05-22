@@ -45,7 +45,7 @@ class FamilyNoteController extends Controller
             $updates['completed_at'] = now();
             $updates['completed_by'] = $request->user()->id;
 
-            TimelineEvent::create([
+            app(\App\Services\Timeline\TimelineEmitter::class)->record([
                 'source_type' => FamilyNote::class,
                 'source_id' => $familyNote->id,
                 'occurred_at' => now(),
@@ -100,7 +100,7 @@ class FamilyNoteController extends Controller
             'status' => $familyNote->status === 'open' ? 'in_progress' : $familyNote->status,
         ]);
 
-        TimelineEvent::create([
+        app(\App\Services\Timeline\TimelineEmitter::class)->record([
             'source_type' => FamilyNote::class,
             'source_id' => $familyNote->id,
             'occurred_at' => now(),

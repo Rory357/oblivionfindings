@@ -421,6 +421,159 @@ class ClientController extends Controller
                 'conditions' => $client->conditions,
                 'emergency_contacts' => $client->emergencyContacts,
             ],
+            'next_of_kins' => $client->nextOfKins()
+                ->with('user:id,name,email')
+                ->get()
+                ->map(fn ($k) => [
+                    'id' => $k->id,
+                    'name' => $k->user?->name,
+                    'email' => $k->user?->email,
+                    'relationship' => $k->relationship,
+                    'phone' => $k->phone,
+                    'alternate_phone' => $k->alternate_phone,
+                    'address' => $k->address,
+                    'is_primary' => (bool) $k->is_primary_contact,
+                    'is_emergency_contact' => (bool) $k->is_emergency_contact,
+                    'can_view_medical' => (bool) $k->can_view_medical,
+                    'can_view_medications' => (bool) $k->can_view_medications,
+                    'can_view_incidents' => (bool) $k->can_view_incidents,
+                    'can_receive_updates' => (bool) $k->can_receive_updates,
+                    'has_portal_access' => $k->hasPortalAccess(),
+                    'notes' => $k->notes,
+                ])
+                ->values(),
+            'audit_history' => $request->user()?->canDo('audit.viewClient')
+                || $request->user()?->canDo('clients.update')
+                ? \App\Models\AuditLog::query()
+                    ->where('client_id', $client->id)
+                    ->with('user:id,name,email')
+                    ->orderByDesc('created_at')
+                    ->limit(200)
+                    ->get()
+                    ->map(fn ($log) => [
+                        'id' => $log->id,
+                        'action' => $log->action,
+                        'auditable_type' => $log->auditable_type,
+                        'auditable_id' => $log->auditable_id,
+                        'meta' => $log->meta,
+                        'actor' => $log->user
+                            ? ['id' => $log->user->id, 'name' => $log->user->name]
+                            : null,
+                        'ip_address' => $log->ip_address,
+                        'created_at' => optional($log->created_at)->toISOString(),
+                    ])
+                : [],
+            'behaviour_patterns' => app(\App\Services\Client\BehaviourPatternsService::class)
+                ->forClient($client, $request->user()),
+            'leave_excursions' => [
+                'leave' => \App\Models\ClientLeaveRequest::query()
+                    ->where('client_id', $client->id)
+                    ->with(['requester:id,name', 'approver:id,name'])
+                    ->orderByDesc('starts_on')
+                    ->limit(50)
+                    ->get()
+                    ->map(fn ($l) => [
+                        'id' => $l->id,
+                        'starts_on' => $l->starts_on?->toDateString(),
+                        'ends_on' => $l->ends_on?->toDateString(),
+                        'destination' => $l->destination,
+                        'support_required' => $l->support_required,
+                        'risks_and_mitigations' => $l->risks_and_mitigations,
+                        'emergency_contact' => $l->emergency_contact,
+                        'status' => $l->status,
+                        'requester' => $l->requester?->name,
+                        'approver' => $l->approver?->name,
+                        'approved_at' => $l->approved_at?->toISOString(),
+                        'approval_notes' => $l->approval_notes,
+                    ])
+                    ->values(),
+                'excursions' => \App\Models\ClientExcursionRequest::query()
+                    ->where('client_id', $client->id)
+                    ->with(['requester:id,name', 'approver:id,name'])
+                    ->orderByDesc('starts_at')
+                    ->limit(50)
+                    ->get()
+                    ->map(fn ($e) => [
+                        'id' => $e->id,
+                        'starts_at' => $e->starts_at?->toISOString(),
+                        'ends_at' => $e->ends_at?->toISOString(),
+                        'destination' => $e->destination,
+                        'activity_description' => $e->activity_description,
+                        'transport_method' => $e->transport_method,
+                        'risk_assessment' => $e->risk_assessment,
+                        'outcome_notes' => $e->outcome_notes,
+                        'status' => $e->status,
+                        'requester' => $e->requester?->name,
+                        'approver' => $e->approver?->name,
+                        'approved_at' => $e->approved_at?->toISOString(),
+                        'approval_notes' => $e->approval_notes,
+                    ])
+                    ->values(),
+            ],
+            'client_finance' => [
+                'funds' => \App\Models\ClientFund::query()
+                    ->where('client_id', $client->id)
+                    ->orderBy('fund_name')
+                    ->get()
+                    ->map(fn ($fund) => [
+                        'id' => $fund->id,
+                        'name' => $fund->fund_name,
+                        'type' => $fund->fund_type,
+                        'balance' => (float) $fund->balance,
+                        'low_balance_threshold' => $fund->low_balance_threshold
+                            ? (float) $fund->low_balance_threshold
+                            : null,
+                        'is_active' => (bool) $fund->is_active,
+                        'notes' => $fund->notes,
+                    ])
+                    ->values(),
+                'recent_transactions' => \App\Models\ClientFundTransaction::query()
+                    ->whereIn(
+                        'client_fund_id',
+                        \App\Models\ClientFund::query()
+                            ->where('client_id', $client->id)
+                            ->pluck('id'),
+                    )
+                    ->with('recorder:id,name')
+                    ->orderByDesc('transaction_date')
+                    ->limit(25)
+                    ->get()
+                    ->map(fn ($tx) => [
+                        'id' => $tx->id,
+                        'type' => $tx->transaction_type,
+                        'amount' => (float) $tx->amount,
+                        'running_balance' => $tx->running_balance
+                            ? (float) $tx->running_balance
+                            : null,
+                        'description' => $tx->description,
+                        'category' => $tx->category,
+                        'transaction_date' => $tx->transaction_date?->toDateString(),
+                        'recorder' => $tx->recorder?->name,
+                        'reference' => $tx->reference,
+                    ])
+                    ->values(),
+                'ledger_entries' => \App\Models\ClientLedgerEntry::query()
+                    ->where('client_id', $client->id)
+                    ->orderByDesc('entry_date')
+                    ->limit(25)
+                    ->get()
+                    ->map(fn ($entry) => [
+                        'id' => $entry->id,
+                        'type' => $entry->type,
+                        'category' => $entry->category,
+                        'direction' => $entry->direction,
+                        'amount' => (float) $entry->amount,
+                        'description' => $entry->description,
+                        'entry_date' => $entry->entry_date?->toDateString(),
+                        'approved_at' => $entry->approved_at?->toISOString(),
+                    ])
+                    ->values(),
+                // Purchase requests + financial discrepancies are tracked as
+                // Phase 2 follow-ups. For now surface empty arrays so the tab
+                // can render the sections with a "no items yet" state.
+                'purchase_requests' => [],
+                'discrepancies' => [],
+            ],
             'support_plan' => $client->supportPlan,
             'assessments' => $client->assessments
                 ->sortByDesc(fn ($a) => $a->assessed_at ?? $a->created_at)

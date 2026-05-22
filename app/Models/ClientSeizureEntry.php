@@ -54,8 +54,10 @@ class ClientSeizureEntry extends Model implements EmitsToTimeline
             ? sprintf('%d min %d sec', intdiv($this->duration_seconds, 60), $this->duration_seconds % 60)
             : 'duration not recorded';
 
+        $escalationSeconds = $this->client?->seizure_duration_escalation_seconds ?? 300;
+
         return [
-            'type' => ($this->escalated || ($this->duration_seconds ?? 0) > 300) ? 'status_critical' : 'health_seizure',
+            'type' => ($this->escalated || ($this->duration_seconds ?? 0) > $escalationSeconds) ? 'status_critical' : 'health_seizure',
             'occurred_at' => $this->occurred_at ?? $this->created_at ?? now(),
             'actor_user_id' => $this->recorded_by,
             'client_id' => $this->client_id,

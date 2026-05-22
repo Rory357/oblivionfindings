@@ -68,7 +68,7 @@ class ClientVisitRequestController extends Controller
             'review_notes' => $data['review_notes'] ?? null,
         ]);
 
-        TimelineEvent::create([
+        app(\App\Services\Timeline\TimelineEmitter::class)->record([
             'source_type' => FamilyVisitRequest::class,
             'source_id' => $visit->id,
             'occurred_at' => now(),
@@ -103,7 +103,7 @@ class ClientVisitRequestController extends Controller
             'review_notes' => $data['review_notes'] ?? null,
         ]);
 
-        TimelineEvent::create([
+        app(\App\Services\Timeline\TimelineEmitter::class)->record([
             'source_type' => FamilyVisitRequest::class,
             'source_id' => $visit->id,
             'occurred_at' => now(),
