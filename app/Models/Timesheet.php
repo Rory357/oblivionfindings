@@ -226,6 +226,85 @@ class Timesheet extends Model
         return $this->belongsTo(Client::class);
     }
 
+    /**
+     * Per-client time allocations against this timesheet. When empty, the
+     * timesheet behaves as a single-client record using {@see self::client()}
+     * — `effectiveClientAllocations()` returns the synthesised single-row
+     *  representation so reads have a uniform shape.
+     */
+    public function clientAllocations()
+    {
+        return $this->hasMany(TimesheetClientAllocation::class, 'timesheet_id')
+            ->orderBy('sort_order')
+            ->orderBy('id');
+    }
+
+    /**
+     * Materialised allocation rows for downstream consumers. If the database
+     * has explicit rows we return them; otherwise we synthesise one row from
+     * the timesheet's primary client + total hours so legacy data keeps the
+     * same shape without a destructive backfill.
+     *
+     * @return \Illuminate\Support\Collection<int, array{client_id:int,hours:float,allocation_method:string,starts_at:?string,ends_at:?string,notes:?string,sort_order:int}>
+     */
+    public function effectiveClientAllocations(): \Illuminate\Support\Collection
+    {
+        if ($this->relationLoaded('clientAllocations') && $this->clientAllocations->isNotEmpty()) {
+            return $this->clientAllocations->map(fn (TimesheetClientAllocation $a) => [
+                'id' => $a->id,
+                'client_id' => $a->client_id,
+                'hours' => (float) $a->hours,
+                'allocation_method' => $a->allocation_method,
+                'starts_at' => $a->starts_at?->toIso8601String(),
+                'ends_at' => $a->ends_at?->toIso8601String(),
+                'notes' => $a->notes,
+                'sort_order' => $a->sort_order,
+            ])->values();
+        }
+
+        $rows = $this->clientAllocations()->get();
+        if ($rows->isNotEmpty()) {
+            return $rows->map(fn (TimesheetClientAllocation $a) => [
+                'id' => $a->id,
+                'client_id' => $a->client_id,
+                'hours' => (float) $a->hours,
+                'allocation_method' => $a->allocation_method,
+                'starts_at' => $a->starts_at?->toIso8601String(),
+                'ends_at' => $a->ends_at?->toIso8601String(),
+                'notes' => $a->notes,
+                'sort_order' => $a->sort_order,
+            ])->values();
+        }
+
+        // Synthesise a single-row allocation from the timesheet's primary
+        // client. Existing data never wrote allocation rows, so this is the
+        // safe default until the worker explicitly chooses a different
+        // method through the review popup.
+        return collect([
+            [
+                'id' => null,
+                'client_id' => (int) $this->client_id,
+                'hours' => (float) $this->hours,
+                'allocation_method' => TimesheetClientAllocation::METHOD_SINGLE,
+                'starts_at' => null,
+                'ends_at' => null,
+                'notes' => null,
+                'sort_order' => 0,
+            ],
+        ]);
+    }
+
+    /**
+     * Inferred allocation method for the whole timesheet. Picks the first
+     * row's method when allocations exist; otherwise reports SINGLE.
+     */
+    public function dominantAllocationMethod(): string
+    {
+        $first = $this->effectiveClientAllocations()->first();
+
+        return $first['allocation_method'] ?? TimesheetClientAllocation::METHOD_SINGLE;
+    }
+
     public function staff()
     {
         return $this->belongsTo(User::class, 'user_id');
