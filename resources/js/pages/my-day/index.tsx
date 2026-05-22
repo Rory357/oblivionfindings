@@ -224,18 +224,16 @@ export default function MyDay() {
                   3_600_000,
           )
         : 8;
-    // The "Live shift" label only makes sense when there's actually an open
-    // attendance session for this worker. `actual_starts_at` is a property of
-    // the shift, not of the current session — it can be set by a previous
-    // worker on the same shift, so reading it without an open session leaves
-    // the page claiming "Live shift" when the worker is in fact not clocked
-    // in. Gate on `clockedIn` first, then drop in the open session's actual
-    // start time when we have one.
+    // "Live shift · since X" only makes sense when this worker has an open
+    // attendance session. X should be THIS session's clock-in time — the
+    // shift's `actual_starts_at` is the historical first-start (set by the
+    // earliest session on the shift, including a previous worker's), so it
+    // misleadingly survives clock-out and ends up showing a time hours before
+    // the current worker actually arrived. Prefer the open session's
+    // clock_in_at and only fall back to actual_starts_at when the session
+    // hasn't reported one yet.
     const liveSinceTime = clockedIn
-        ? isoToHourMinute(
-              activeShift?.actual_starts_at
-                  ?? (openSession as { clock_in_at?: string } | null)?.clock_in_at,
-          )
+        ? isoToHourMinute(openSession?.clock_in_at ?? activeShift?.actual_starts_at)
         : '';
     const liveSinceLabel = !clockedIn
         ? t('hero_not_clocked_in')
