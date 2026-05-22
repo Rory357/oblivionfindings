@@ -12,12 +12,13 @@ import { Button } from '@/components/ui/button';
 import EndOfShiftChecklist, {
     type EndOfShiftBlocker,
 } from '@/components/end-of-shift-checklist';
-import HandoverWriteSheet from '@/components/handover-write-sheet';
 import useLiveRefresh from '@/hooks/use-live-refresh';
 import { useMyDayLabels } from '@/hooks/use-my-day-labels';
 import { useUndoableAction } from '@/hooks/use-undoable-action';
 import AppLayout from '@/layouts/app-layout';
 import { StaffHeader } from '@/components/staff-header';
+
+import { VitalsRecordDialog, WriteHandoverDialog } from './_dialogs';
 
 import { DatePopover } from './components/date-popover';
 import { DigestPanel } from './components/digest-panel';
@@ -25,7 +26,6 @@ import { MyDayHero } from './components/my-day-hero';
 import { PaperworkPanel } from './components/paperwork-panel';
 import { StreamContextMenu } from './components/stream-context-menu';
 import { TomorrowPanel } from './components/tomorrow-panel';
-import { VitalsRecordFlow } from './components/vitals-record-flow';
 import { WhatsNextRail } from './components/whats-next-rail';
 import { residentHue, residentInitials } from './lib/resident-hue';
 import {
@@ -565,7 +565,7 @@ export default function MyDay() {
                 />
             ) : null}
 
-            <VitalsRecordFlow
+            <VitalsRecordDialog
                 residents={
                     residents.length > 0
                         ? residents
@@ -608,7 +608,7 @@ export default function MyDay() {
                         open={endShiftOpen}
                         onOpenChange={setEndShiftOpen}
                     />
-                    <HandoverWriteSheet
+                    <WriteHandoverDialog
                         shiftId={openSession.shift_id ?? null}
                         alreadySubmitted={openSession.handover_submitted ?? false}
                         open={handoverWriteOpen}
