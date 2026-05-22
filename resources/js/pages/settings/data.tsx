@@ -301,6 +301,7 @@ interface RetentionRow {
 
 const retentionRows: RetentionRow[] = [
     { id: 'audit-logs', label: 'Audit logs', options: [{ value: '1yr', label: '1 year' }, { value: '2yr', label: '2 years' }, { value: '5yr', label: '5 years' }, { value: '7yr', label: '7 years' }, { value: 'forever', label: 'Forever' }], defaultValue: '5yr', count: '54,200' },
+    { id: 'timeline-events', label: 'Timeline events', options: [{ value: '2yr', label: '2 years' }, { value: '5yr', label: '5 years' }, { value: '7yr', label: '7 years' }, { value: 'forever', label: 'Forever' }], defaultValue: '5yr', count: '—' },
     { id: 'timesheets', label: 'Completed timesheets', options: [{ value: '2yr', label: '2 years' }, { value: '5yr', label: '5 years' }, { value: '7yr', label: '7 years' }, { value: 'forever', label: 'Forever' }], defaultValue: '7yr', count: '12,840' },
     { id: 'incidents', label: 'Closed incidents', options: [{ value: '2yr', label: '2 years' }, { value: '5yr', label: '5 years' }, { value: '7yr', label: '7 years' }, { value: 'forever', label: 'Forever' }], defaultValue: '5yr', count: '67' },
     { id: 'archived-clients', label: 'Archived clients', options: [{ value: '1yr', label: '1 year' }, { value: '2yr', label: '2 years' }, { value: '5yr', label: '5 years' }, { value: 'never', label: 'Never auto-delete' }], defaultValue: 'never', count: '23' },

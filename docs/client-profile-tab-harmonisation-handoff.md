@@ -109,14 +109,49 @@ The follow-ups list in [`client-profile-phase-2-3-handoff.md`](client-profile-ph
 
 | # | Item | Status |
 |---|---|---|
-| 1 | Purchase Requests + Financial Discrepancies models for the Finance tab | open |
+| 1 | Purchase Requests + Financial Discrepancies models for the Finance tab | **shipped this session (`8a0fd597`)** |
 | 2 | PATH plan dedicated model | shipped previously (`651c4b80`) |
-| 3 | NextOfKin relationship taxonomy enum | open |
-| 4 | Per-organisation retention overrides UI for `oblivion:prune-retention` | open (note: `config/retention.php` does **not** exist yet — premise needs reframing before picking this up) |
-| 5 | Cross-client review queue pagination (currently capped at 200) | **shipped this follow-up — see below** |
-| 6 | Documents + Risk Management tab harmonisation | **shipped this wave (`e0a2820b`)** |
+| 3 | NextOfKin relationship taxonomy enum | **shipped this session (`51d3cac4`)** |
+| 4 | Per-organisation retention overrides UI for `oblivion:prune-retention` | **shipped this session — reframed as system-wide (see below)** |
+| 5 | Cross-client review queue pagination (currently capped at 200) | **shipped this session (`afb8f2c0`)** |
+| 6 | Documents + Risk Management tab harmonisation | shipped previously (`e0a2820b`) |
 
-The remaining open items (#1, #3, #4) are not "shortest wins" — #4 needs its premise re-scoped (there is no `config/retention.php`); #1 and #3 need fresh design and data-model work.
+All six parent-doc follow-ups are now shipped.
+
+---
+
+## Follow-up #4 shipped — Retention overrides wired into the existing settings UI
+
+The parent doc's framing — "per-organisation retention overrides UI for `oblivion:prune-retention`" — turned out to be wrong on inspection: there is no `organizations` table (only stub columns) and no `config/retention.php` file existed for the docblock to point at. There are however two existing systems that should have been connected and were not:
+
+1. The `oblivion:prune-retention` command, which was reading `config('retention.audit_log_years')` from a config file that never existed.
+2. The Settings > Data & Privacy UI (`DataSettingsController` at `/settings/data`), which was writing `DataRetentionPolicy` rows the prune command silently ignored.
+
+This wave wires them up and creates the missing config file:
+
+- `config/retention.php` now exists with the two keys the prune-command docblock had been claiming all along, so admins can set baseline retention without touching env vars.
+- `PruneTimelineAndAuditLogs` gained a `resolveYears()` helper that prefers, in order: CLI flag → active `DataRetentionPolicy` row for the relevant `model_type` → `config/retention.php` → hard-coded fallback. The docblock now matches reality.
+- `DataSettingsController::RETENTION_ROWS` and `resources/js/pages/settings/data.tsx`'s `retentionRows` gained a `timeline-events` row (defaulting to 5 yr) so admins can configure the timeline retention from the same UI as audit logs.
+
+The "per-organisation" piece in the parent doc was unattainable without a multi-tenancy refactor, so the work was re-scoped to "system-wide retention overrides via the existing Settings > Data UI now actually drive the prune command." That is what every other retention row in that UI already controls.
+
+A new feature test creates two `DataRetentionPolicy` rows (audit_logs → 7 yr, timeline_events → 1 yr) and an audit log + timeline event whose ages would each fall on the *opposite* side of the config defaults; the prune command preserves the audit log and sweeps the timeline event, confirming the override takes precedence over both the config default and the hardcoded fallback.
+
+---
+
+## Follow-up #3 shipped — NextOfKin relationship enum
+
+The `relationship` column on `next_of_kins` was a free-text string, validated against an inline `in:parent,sibling,…` list in `UsersController` and string-matched by the family-tree tab into family / guardian / friend / other buckets. There was no shared source of truth.
+
+`App\Enums\NextOfKinRelationship` is now the canonical taxonomy (12 cases, including `guardian` which the family-tree tab grouped for but no relationship value mapped to). `ClientController::show` now returns `relationship_label` and `relationship_category` per next-of-kin so the frontend no longer needs to keyword-match; `UsersController` validates via `Rule::enum(NextOfKinRelationship::class)` and the Create form gained the Legal Guardian option. Legacy rows that pre-date the enum fall through to a string-matching fallback so they stay in their original groups.
+
+---
+
+## Follow-up #1 shipped — Purchase Requests + Financial Discrepancies models
+
+The Finance tab's `purchase_requests` and `discrepancies` arrays were hard-coded empty on the controller pending the eventual dedicated Finance module. This wave lands the two underlying client-scoped models so the controller can populate the arrays from real tables — the moment any flow starts creating records, the Finance tab will surface them.
+
+CRUD UI is intentionally NOT shipped here. The placeholder text on the tab still says "ships with dedicated Finance module" and that is where the create / edit / approve flows belong. This commit just removes the empty-array placeholder, lands the migrations, and adds a test asserting both models surface through the Inertia payload.
 
 ---
 
@@ -140,19 +175,14 @@ Bug fix bundled in: a note created exactly 48 hours ago would previously have hi
 ## Suggested next-session prompt
 
 ```
-The 20-tab Client Profile is shipped (Phase 1 + 2 + 3), the Documents +
-Risk Management tabs were harmonised with the Phase 2 pattern, and the
-cross-client review queue is now paginated. Read
-docs/client-profile-tab-harmonisation-handoff.md.
+The 20-tab Client Profile is shipped (Phase 1 + 2 + 3) and ALL SIX
+follow-ups from the parent doc are now closed. Read
+docs/client-profile-tab-harmonisation-handoff.md to see what each commit
+addressed.
 
-Remaining open follow-ups from the parent doc:
-  1. Purchase Requests + Financial Discrepancies models for the Finance tab.
-  3. NextOfKin relationship taxonomy enum.
-  4. Per-organisation retention overrides UI — note: `config/retention.php`
-     does NOT exist yet, so the original premise needs reframing first.
-     Confirm with the user whether the intent is a new `config/retention.php`
-     or per-org overrides on existing retention behaviour before scoping.
-
-Pick one and ship it. Run npm run types + ClientProfilePhaseTwoThreeTest
-before committing.
+The next sensible work is the dedicated Finance module the Phase 2/3 doc
+referenced — CRUD UI for ClientPurchaseRequest + ClientFinancialDiscrepancy
+records (the models now exist), approval workflow, and a way to write the
+movements back to ClientLedgerEntry. Touch the Finance tab and the
+operations/client-funds page so they share the new flow.
 ```

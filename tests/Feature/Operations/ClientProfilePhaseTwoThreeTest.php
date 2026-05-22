@@ -1,6 +1,7 @@
 <?php
 
 use App\Enums\NextOfKinRelationship;
+use App\Models\AuditLog;
 use App\Models\Client;
 use App\Models\ClientExcursionRequest;
 use App\Models\ClientFinancialDiscrepancy;
@@ -9,6 +10,7 @@ use App\Models\ClientNote;
 use App\Models\ClientPathPlan;
 use App\Models\ClientPurchaseRequest;
 use App\Models\ClientSeizureEntry;
+use App\Models\DataRetentionPolicy;
 use App\Models\NextOfKin;
 use App\Models\Permission;
 use App\Models\ProgressNote;
@@ -427,6 +429,55 @@ it('exposes a categorised relationship for each next-of-kin via the enum', funct
                 ->where('next_of_kins.2.relationship_label', 'second cousin once removed')
                 ->where('next_of_kins.2.relationship_category', 'other'),
         );
+});
+
+it('honours DataRetentionPolicy overrides when pruning audit logs and timeline events', function () {
+    $client = Client::factory()->create();
+
+    // Stored retention policies override the config defaults of 2 yrs audit /
+    // 5 yrs timeline. Bumping audit to 7 yrs should spare a 3-year-old log;
+    // shrinking timeline to 1 yr should sweep a 2-year-old event.
+    DataRetentionPolicy::query()->create([
+        'model_type' => 'audit_logs',
+        'policy_name' => 'Audit logs',
+        'retention_period_years' => 7,
+        'active' => true,
+    ]);
+    DataRetentionPolicy::query()->create([
+        'model_type' => 'timeline_events',
+        'policy_name' => 'Timeline events',
+        'retention_period_years' => 1,
+        'active' => true,
+    ]);
+
+    AuditLog::query()->create([
+        'action' => 'retention.test.kept',
+        'auditable_type' => Client::class,
+        'auditable_id' => $client->id,
+        'created_at' => now()->subYears(3), // older than 2-yr default, younger than 7-yr override
+        'updated_at' => now()->subYears(3),
+    ]);
+
+    TimelineEvent::query()->create([
+        'type' => 'retention_test_swept',
+        'occurred_at' => now()->subYears(2), // older than 1-yr override, younger than 5-yr default
+        'client_id' => $client->id,
+        'is_pinned' => false,
+    ]);
+
+    $this->artisan('oblivion:prune-retention')->assertSuccessful();
+
+    // The 3-yr-old audit log survives because the override raised retention
+    // from 2 yrs (config default) to 7 yrs.
+    expect(
+        AuditLog::query()->where('action', 'retention.test.kept')->exists(),
+    )->toBeTrue();
+
+    // The 2-yr-old timeline event is swept because the override shrank
+    // retention from 5 yrs (config default) to 1 yr.
+    expect(
+        TimelineEvent::query()->where('type', 'retention_test_swept')->exists(),
+    )->toBeFalse();
 });
 
 it('migrates a legacy ProgressNote into a ClientNote idempotently', function () {

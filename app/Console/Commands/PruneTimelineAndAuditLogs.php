@@ -3,17 +3,23 @@
 namespace App\Console\Commands;
 
 use App\Models\AuditLog;
+use App\Models\DataRetentionPolicy;
 use App\Models\TimelineEvent;
 use Illuminate\Console\Command;
 use Illuminate\Support\Carbon;
 
 /**
  * Phase 3 retention policy: prune ageing audit_logs and timeline_events
- * beyond their configured retention window. Defaults are conservative
- * (2 years audit, 5 years timeline) and can be overridden per
- * organisation by setting `retention.audit_log_years` and
- * `retention.timeline_event_years` in config/retention.php (or via env
- * vars `RETENTION_AUDIT_LOG_YEARS` / `RETENTION_TIMELINE_EVENT_YEARS`).
+ * beyond their configured retention window.
+ *
+ * Resolution order (first match wins):
+ *   1. --audit-years / --timeline-years CLI flags
+ *   2. Active `data_retention_policies` row for the matching model_type
+ *      (`audit_logs` / `timeline_events`) — this is what the Settings >
+ *      Data & Privacy UI (DataSettingsController) writes
+ *   3. `config/retention.php` defaults (themselves env-overridable via
+ *      RETENTION_AUDIT_LOG_YEARS / RETENTION_TIMELINE_EVENT_YEARS)
+ *   4. Hard-coded fallbacks (2 years audit, 5 years timeline)
  */
 class PruneTimelineAndAuditLogs extends Command
 {
@@ -28,12 +34,18 @@ class PruneTimelineAndAuditLogs extends Command
     {
         $dryRun = (bool) $this->option('dry-run');
 
-        $auditYears = (int) ($this->option('audit-years')
-            ?? config('retention.audit_log_years')
-            ?? env('RETENTION_AUDIT_LOG_YEARS', 2));
-        $timelineYears = (int) ($this->option('timeline-years')
-            ?? config('retention.timeline_event_years')
-            ?? env('RETENTION_TIMELINE_EVENT_YEARS', 5));
+        $auditYears = $this->resolveYears(
+            cliValue: $this->option('audit-years'),
+            modelType: 'audit_logs',
+            configKey: 'retention.audit_log_years',
+            fallback: 2,
+        );
+        $timelineYears = $this->resolveYears(
+            cliValue: $this->option('timeline-years'),
+            modelType: 'timeline_events',
+            configKey: 'retention.timeline_event_years',
+            fallback: 5,
+        );
 
         $auditCutoff = Carbon::now()->subYears($auditYears);
         $timelineCutoff = Carbon::now()->subYears($timelineYears);
@@ -67,5 +79,28 @@ class PruneTimelineAndAuditLogs extends Command
         ));
 
         return self::SUCCESS;
+    }
+
+    private function resolveYears(
+        mixed $cliValue,
+        string $modelType,
+        string $configKey,
+        int $fallback,
+    ): int {
+        if ($cliValue !== null) {
+            return (int) $cliValue;
+        }
+
+        $policyYears = DataRetentionPolicy::query()
+            ->where('model_type', $modelType)
+            ->where('active', true)
+            ->whereNotNull('retention_period_years')
+            ->value('retention_period_years');
+
+        if ($policyYears !== null) {
+            return (int) $policyYears;
+        }
+
+        return (int) (config($configKey) ?? $fallback);
     }
 }

@@ -27,6 +27,7 @@ class DataSettingsController extends Controller
      */
     private const RETENTION_ROWS = [
         'audit-logs' => ['label' => 'Audit logs', 'model_type' => 'audit_logs', 'default' => '5yr'],
+        'timeline-events' => ['label' => 'Timeline events', 'model_type' => 'timeline_events', 'default' => '5yr'],
         'timesheets' => ['label' => 'Completed timesheets', 'model_type' => 'timesheets', 'default' => '7yr'],
         'incidents' => ['label' => 'Closed incidents', 'model_type' => 'incidents', 'default' => '5yr'],
         'archived-clients' => ['label' => 'Archived clients', 'model_type' => 'archived_clients', 'default' => 'never'],
@@ -213,14 +214,14 @@ class DataSettingsController extends Controller
 
         $details = trim((string) ($validated['details'] ?? ''));
         $contextLines = array_values(array_filter([
-            ! empty($validated['requester_phone']) ? 'Phone: ' . $validated['requester_phone'] : null,
+            ! empty($validated['requester_phone']) ? 'Phone: '.$validated['requester_phone'] : null,
             ($validated['relationship'] ?? 'self') !== 'self'
-                ? 'Relationship: ' . Str::headline((string) $validated['relationship'])
+                ? 'Relationship: '.Str::headline((string) $validated['relationship'])
                 : null,
         ]));
 
         if ($contextLines !== []) {
-            $details = trim($details . PHP_EOL . PHP_EOL . implode(PHP_EOL, $contextLines));
+            $details = trim($details.PHP_EOL.PHP_EOL.implode(PHP_EOL, $contextLines));
         }
 
         $dsar = DataSubjectRequest::create([
@@ -266,7 +267,7 @@ class DataSettingsController extends Controller
             || in_array($validated['severity'], ['high', 'critical'], true);
 
         $breach = DataBreachLog::create([
-            'breach_reference' => 'BR-' . now()->year . '-' . str_pad(
+            'breach_reference' => 'BR-'.now()->year.'-'.str_pad(
                 DataBreachLog::whereYear('created_at', now()->year)->count() + 1,
                 4,
                 '0',
@@ -375,7 +376,7 @@ class DataSettingsController extends Controller
     }
 
     /**
-     * @param array<string, mixed> $defaults
+     * @param  array<string, mixed>  $defaults
      * @return array<string, mixed>
      */
     private function loadObjectSetting(string $key, array $defaults): array
@@ -388,7 +389,7 @@ class DataSettingsController extends Controller
     }
 
     /**
-     * @param array<string, mixed>|array<int, mixed> $value
+     * @param  array<string, mixed>|array<int, mixed>  $value
      */
     private function storeObjectSetting(string $key, array $value): void
     {
@@ -483,7 +484,6 @@ class DataSettingsController extends Controller
     }
 
     /**
-     * @param string|null $processorId
      * @return array<string, mixed>
      */
     private function normaliseProcessorPayload(Request $request, ?string $processorId = null): array
@@ -492,11 +492,11 @@ class DataSettingsController extends Controller
             'company' => ['required', 'string', 'max:255'],
             'contact' => ['required', 'string', 'max:255'],
             'email' => ['nullable', 'email', 'max:255'],
-            'purpose' => ['required', 'in:' . implode(',', array_keys(self::PROCESSOR_PURPOSE_LABELS))],
+            'purpose' => ['required', 'in:'.implode(',', array_keys(self::PROCESSOR_PURPOSE_LABELS))],
             'data_categories' => ['nullable', 'array'],
             'data_categories.*' => ['string', 'max:255'],
             'agreement_status' => ['required', 'in:dpa_signed,standard_terms,negotiating,no_agreement'],
-            'country' => ['required', 'in:' . implode(',', array_keys(self::COUNTRY_LABELS))],
+            'country' => ['required', 'in:'.implode(',', array_keys(self::COUNTRY_LABELS))],
             'review_date' => ['required', 'date'],
         ]);
 
