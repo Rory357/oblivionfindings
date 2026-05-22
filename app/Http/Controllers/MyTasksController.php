@@ -780,6 +780,12 @@ class MyTasksController extends Controller
                     return [
                         'id' => $incident->id,
                         'title' => $incident->title,
+                        // Single-line summary for the Needs You digest row.
+                        // ClientIncident::description is free-text so we
+                        // truncate to avoid overflowing the right column.
+                        'description' => $incident->description
+                            ? Str::limit(trim((string) $incident->description), 140)
+                            : null,
                         'client_name' => $clientName,
                         'severity' => $incident->severity,
                         'status' => $incident->status,
@@ -897,6 +903,47 @@ class MyTasksController extends Controller
         }
     }
 
+    /**
+     * One-line summary used as the open-item description.
+     *
+     * Preference order: free-text notes → context-driven summary
+     * (e.g. fall detection location, asset+source pairing) → null. Always
+     * truncated to 140 chars so the digest row stays single-line.
+     */
+    private static function summariseAlert(ControlRoomAlert $alert): ?string
+    {
+        $notes = is_string($alert->notes) ? trim($alert->notes) : '';
+        if ($notes !== '') {
+            return Str::limit($notes, 140);
+        }
+
+        $context = is_array($alert->context) ? $alert->context : [];
+        // Common context keys observed across alert sources.
+        $candidates = array_filter([
+            $context['summary'] ?? null,
+            $context['description'] ?? null,
+            $context['message'] ?? null,
+            $context['detail'] ?? null,
+            $context['location'] ?? null,
+        ], fn ($v) => is_string($v) && trim($v) !== '');
+
+        if (!empty($candidates)) {
+            return Str::limit(trim((string) reset($candidates)), 140);
+        }
+
+        // Fall back to a tiny composed summary so the row never lies blank.
+        $assetName = $alert->asset?->name;
+        $source = $alert->source;
+        if ($assetName && $source) {
+            return Str::limit("{$source} · {$assetName}", 140);
+        }
+        if ($assetName) {
+            return Str::limit($assetName, 140);
+        }
+
+        return null;
+    }
+
     private function getAlertTasks(int $userId): array
     {
         try {
@@ -937,6 +984,12 @@ class MyTasksController extends Controller
                         'id' => 'alert-'.$alert->id,
                         'type' => 'alert',
                         'title' => $alert->alert_type,
+                        // PR – /my-day desktop redesign: surface a one-line
+                        // description on each open item so workers don't have
+                        // to click through to read what the alert is about.
+                        // Falls back to a context-derived summary when the
+                        // alert has no free-text notes.
+                        'description' => self::summariseAlert($alert),
                         'priority' => $alert->severity ?? 'medium',
                         'status' => $alert->status,
                         'source_url' => '/control-room/alerts/'.$alert->id,
@@ -972,10 +1025,26 @@ class MyTasksController extends Controller
                         ? trim($incident->client->first_name.' '.$incident->client->last_name)
                         : null;
 
+                    // Prefer the followup's own action text, fall back to a
+                    // snippet of the parent incident so the row carries real
+                    // detail rather than just a generic title.
+                    $description = null;
+                    foreach (['action_required', 'detail', 'notes', 'description'] as $key) {
+                        $value = $followup->{$key} ?? null;
+                        if (is_string($value) && trim($value) !== '') {
+                            $description = Str::limit(trim($value), 140);
+                            break;
+                        }
+                    }
+                    if ($description === null && $incident?->description) {
+                        $description = Str::limit(trim((string) $incident->description), 140);
+                    }
+
                     return [
                         'id' => 'followup-'.$followup->id,
                         'type' => 'followup',
                         'title' => 'Incident follow-up: '.($incident?->title ?? 'Unknown incident'),
+                        'description' => $description,
                         'priority' => $incident?->severity ?? 'medium',
                         'status' => 'pending',
                         'source_url' => '/incidents/'.($followup->client_incident_id),
@@ -1003,10 +1072,14 @@ class MyTasksController extends Controller
                         ? '/control-room/alerts/'.$note->alert_id
                         : '/control-room/shifts';
 
+                    $content = trim((string) $note->content);
+                    // Title stays as the short headline so cards align; the
+                    // longer body becomes the row description.
                     return [
                         'id' => 'note-'.$note->id,
                         'type' => 'note_followup',
-                        'title' => 'Follow-up: '.Str::limit($note->content, 60),
+                        'title' => 'Follow-up: '.Str::limit($content, 60),
+                        'description' => mb_strlen($content) > 60 ? Str::limit($content, 200) : null,
                         'priority' => 'medium',
                         'status' => 'pending',
                         'source_url' => $sourceUrl,
