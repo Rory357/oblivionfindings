@@ -532,11 +532,15 @@ class MyTasksController extends Controller
     private function getNextShiftBriefing(User $user, Carbon $workerNow): ?array
     {
         try {
+            // 36-hour lookahead — wide enough for the desktop "Tomorrow" panel
+            // (a shift starting at 07:30 tomorrow is ~22h away when viewed
+            // late-morning today) but narrow enough that "next week's shift"
+            // doesn't bleed into the briefing card.
             $shift = Shift::query()
                 ->where('user_id', $user->id)
                 ->visibleToFrontline($user->organization_id)
                 ->whereIn('status', ['scheduled', 'draft'])
-                ->where('starts_at', '<=', $workerNow->copy()->addHours(12)->utc())
+                ->where('starts_at', '<=', $workerNow->copy()->addHours(36)->utc())
                 ->where('ends_at', '>=', $workerNow->copy()->utc())
                 ->with([
                     'client:id,first_name,last_name,profile_photo_path',
