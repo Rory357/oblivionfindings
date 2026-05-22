@@ -141,7 +141,7 @@ On the dev environment (`https://oblivionfindings.com`) after deploy:
 ## Risks and follow-ups (out of scope for this wave)
 
 1. **Purchase Requests + Financial Discrepancies models** — Finance tab surfaces empty arrays today with a "ships with dedicated Finance module" hint. When those models land, the controller's `client_finance.purchase_requests` and `discrepancies` arrays just need to be filled.
-2. **PATH plan dedicated model** — the Goals/PATH tab consumes a generic `path_plan` page prop. There is no `PathPlan` model yet; the tab renders all-empty pillars until something supplies the data. When a model is added, plumb it into `ClientController::show` as `path_plan`.
+2. ~~**PATH plan dedicated model**~~ — **SHIPPED** as a follow-up in commit after `8ee4d7d4`. `ClientPathPlan` model + `client_path_plans` migration + `ClientPathPlanController::upsert/destroy` + `Edit PATH plan` dialog in the Goals/PATH tab + actions-aggregator integration for overdue reviews. PATH plans are emitted as **pinned** timeline events (`type=path_plan_updated`).
 3. **NextOfKin relationship taxonomy** — Family Tree categorises members by string-matching the `relationship` field. A formal taxonomy enum would tighten this.
 4. **Audit retention granularity** — `oblivion:prune-retention` uses global defaults. Per-organisation retention is supported via `config/retention.php` but no UI exposes it today.
 5. **Cross-client review queue scaling** — current limit is 200 most-recent flagged items. If volume grows, paginate.

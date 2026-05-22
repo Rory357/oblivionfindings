@@ -27,6 +27,7 @@ class ActionsAggregator
             ->merge($this->riskReviews($client, $user))
             ->merge($this->carePlanReviews($client, $user))
             ->merge($this->assessmentReviews($client, $user))
+            ->merge($this->pathPlanReviews($client, $user))
             ->merge($this->consentRequests($client, $user))
             ->merge($this->visitRequests($client, $user))
             ->sortBy([
@@ -154,6 +155,29 @@ class ActionsAggregator
                 dueAt: $plan->next_review_at,
                 summary: $plan->title.' review due',
                 deepLink: $this->tabLink($client, 'care_plans', $plan->id),
+                sourceId: $plan->id,
+            ));
+    }
+
+    private function pathPlanReviews(Client $client, ?User $user): Collection
+    {
+        if (! $user?->canDo('clients.viewAny') && ! $user?->canDo('clients.viewAssigned')) {
+            return collect();
+        }
+
+        return \App\Models\ClientPathPlan::query()
+            ->where('client_id', $client->id)
+            ->whereNotNull('next_review_at')
+            ->whereDate('next_review_at', '<=', now()->addDays(30))
+            ->orderBy('next_review_at')
+            ->limit(5)
+            ->get()
+            ->map(fn ($plan) => $this->item(
+                type: 'path_plan_review_due',
+                severity: $plan->next_review_at?->isPast() ? 'critical' : 'warning',
+                dueAt: $plan->next_review_at,
+                summary: 'PATH plan review due',
+                deepLink: $this->tabLink($client, 'goals_path', $plan->id),
                 sourceId: $plan->id,
             ));
     }

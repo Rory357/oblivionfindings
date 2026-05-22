@@ -2213,6 +2213,39 @@ CREATE TABLE `client_onboarding_workflows` (
   CONSTRAINT `client_onboarding_workflows_created_by_foreign` FOREIGN KEY (`created_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
 ) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
 /*!40101 SET character_set_client = @saved_cs_client */;
+DROP TABLE IF EXISTS `client_path_plans`;
+/*!40101 SET @saved_cs_client     = @@character_set_client */;
+/*!50503 SET character_set_client = utf8mb4 */;
+CREATE TABLE `client_path_plans` (
+  `id` bigint unsigned NOT NULL AUTO_INCREMENT,
+  `client_id` bigint unsigned NOT NULL,
+  `organization_id` bigint unsigned DEFAULT NULL,
+  `dream` text COLLATE utf8mb4_unicode_ci,
+  `north_star` text COLLATE utf8mb4_unicode_ci,
+  `strengths` json DEFAULT NULL,
+  `action_steps` json DEFAULT NULL,
+  `trusted_people` json DEFAULT NULL,
+  `independence_goals` json DEFAULT NULL,
+  `community` text COLLATE utf8mb4_unicode_ci,
+  `meaningful_outcomes` text COLLATE utf8mb4_unicode_ci,
+  `plan_date` date DEFAULT NULL,
+  `next_review_at` date DEFAULT NULL,
+  `facilitator_id` bigint unsigned DEFAULT NULL,
+  `updated_by` bigint unsigned DEFAULT NULL,
+  `created_at` timestamp NULL DEFAULT NULL,
+  `updated_at` timestamp NULL DEFAULT NULL,
+  `deleted_at` timestamp NULL DEFAULT NULL,
+  PRIMARY KEY (`id`),
+  UNIQUE KEY `client_path_plans_client_unique` (`client_id`),
+  KEY `client_path_plans_facilitator_id_foreign` (`facilitator_id`),
+  KEY `client_path_plans_updated_by_foreign` (`updated_by`),
+  KEY `client_path_plans_next_review_at_index` (`next_review_at`),
+  KEY `client_path_plans_organization_id_index` (`organization_id`),
+  CONSTRAINT `client_path_plans_client_id_foreign` FOREIGN KEY (`client_id`) REFERENCES `clients` (`id`) ON DELETE CASCADE,
+  CONSTRAINT `client_path_plans_facilitator_id_foreign` FOREIGN KEY (`facilitator_id`) REFERENCES `users` (`id`) ON DELETE SET NULL,
+  CONSTRAINT `client_path_plans_updated_by_foreign` FOREIGN KEY (`updated_by`) REFERENCES `users` (`id`) ON DELETE SET NULL
+) ENGINE=InnoDB DEFAULT CHARSET=utf8mb4 COLLATE=utf8mb4_unicode_ci;
+/*!40101 SET character_set_client = @saved_cs_client */;
 DROP TABLE IF EXISTS `client_personal_assets`;
 /*!40101 SET @saved_cs_client     = @@character_set_client */;
 /*!50503 SET character_set_client = utf8mb4 */;
@@ -19301,3 +19334,4 @@ INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (549,'2026_05_22_00
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (550,'2026_05_22_000002_create_client_health_and_routine_tables',6);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (551,'2026_05_22_000003_create_client_leave_and_excursion_tables',7);
 INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (552,'2026_05_22_000004_add_health_thresholds_to_clients',7);
+INSERT INTO `migrations` (`id`, `migration`, `batch`) VALUES (553,'2026_05_22_000005_create_client_path_plans_table',8);

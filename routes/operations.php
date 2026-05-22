@@ -421,6 +421,17 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         ->middleware('permission:progress_notes.review')
         ->name('operations.review_queue.index');
 
+    // PATH plan upsert + delete (Phase 3 follow-up)
+    Route::post('/clients/{client}/path-plan', [\App\Http\Controllers\Operations\ClientPathPlanController::class, 'upsert'])
+        ->middleware('permission:clients.update')
+        ->whereNumber('client')
+        ->name('operations.clients.path_plan.upsert');
+    Route::delete('/clients/{client}/path-plan/{plan}', [\App\Http\Controllers\Operations\ClientPathPlanController::class, 'destroy'])
+        ->middleware('permission:clients.update')
+        ->whereNumber('client')
+        ->whereNumber('plan')
+        ->name('operations.clients.path_plan.destroy');
+
     // Leave & excursion requests
     Route::post('/clients/{client}/leave', [\App\Http\Controllers\Operations\ClientLeaveExcursionController::class, 'storeLeave'])
         ->middleware('permission:clients.update')

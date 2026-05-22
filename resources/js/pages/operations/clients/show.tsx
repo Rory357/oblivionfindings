@@ -5318,6 +5318,7 @@ export default function ClientShow({
 
                 {tab === 'goals_path' && (
                     <GoalsPathTab
+                        clientId={client.id}
                         clientName={name}
                         activePlanId={
                             carePlansSummary?.active_plan?.id ?? null
@@ -5329,6 +5330,7 @@ export default function ClientShow({
                         }
                         interestsHobbies={(client as any).interests_hobbies}
                         pathPlan={(pageProps as any).path_plan ?? null}
+                        canEdit={can.edit}
                     />
                 )}
 

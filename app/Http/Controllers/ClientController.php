@@ -465,6 +465,21 @@ class ClientController extends Controller
                 : [],
             'behaviour_patterns' => app(\App\Services\Client\BehaviourPatternsService::class)
                 ->forClient($client, $request->user()),
+            'path_plan' => \App\Models\ClientPathPlan::query()
+                ->where('client_id', $client->id)
+                ->first()?->only([
+                    'id',
+                    'dream',
+                    'north_star',
+                    'strengths',
+                    'action_steps',
+                    'trusted_people',
+                    'independence_goals',
+                    'community',
+                    'meaningful_outcomes',
+                    'plan_date',
+                    'next_review_at',
+                ]),
             'leave_excursions' => [
                 'leave' => \App\Models\ClientLeaveRequest::query()
                     ->where('client_id', $client->id)

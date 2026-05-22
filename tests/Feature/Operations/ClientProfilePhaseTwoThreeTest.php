@@ -287,6 +287,52 @@ it('returns a manager review queue across multiple clients with site filter', fu
         );
 });
 
+it('upserts a PATH plan and surfaces overdue reviews in the actions aggregator', function () {
+    $manager = User::factory()->create();
+    grantPhaseTwoThreePermissions($manager, [
+        'clients.viewAny',
+        'clients.update',
+    ]);
+
+    $client = Client::factory()->create();
+
+    $this->actingAs($manager)
+        ->post("/operations/clients/{$client->id}/path-plan", [
+            'dream' => 'Live independently in own flat by 2028',
+            'north_star' => 'Independence with community',
+            'strengths' => ['cooking', 'making friends', 'punctuality'],
+            'trusted_people' => ['Mum', 'Uncle Tom', 'Support worker Jess'],
+            'independence_goals' => ['budget weekly', 'catch the bus'],
+            'community' => 'Wednesday art group',
+            'meaningful_outcomes' => 'Belonging and choice',
+            'plan_date' => '2026-05-01',
+            'next_review_at' => now()->subDay()->toDateString(),
+        ])
+        ->assertRedirect();
+
+    $plan = \App\Models\ClientPathPlan::query()
+        ->where('client_id', $client->id)
+        ->firstOrFail();
+
+    expect($plan->dream)->toContain('Live independently')
+        ->and($plan->strengths)->toContain('cooking')
+        ->and($plan->updated_by)->toBe($manager->id);
+
+    // Timeline event emitted (and pinned).
+    $event = TimelineEvent::query()
+        ->where('source_type', \App\Models\ClientPathPlan::class)
+        ->where('source_id', $plan->id)
+        ->first();
+    expect($event)->not->toBeNull()
+        ->and((bool) $event->is_pinned)->toBeTrue();
+
+    // Overdue review shows up in the aggregator.
+    $items = app(\App\Services\Client\ActionsAggregator::class)
+        ->forClient($client, $manager);
+    $types = collect($items)->pluck('type')->all();
+    expect($types)->toContain('path_plan_review_due');
+});
+
 it('migrates a legacy ProgressNote into a ClientNote idempotently', function () {
     $user = User::factory()->create();
     $client = Client::factory()->create();

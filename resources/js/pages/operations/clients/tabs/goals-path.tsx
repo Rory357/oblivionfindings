@@ -1,20 +1,34 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+    DialogTrigger,
+} from '@/components/ui/dialog';
 import { EmptyState } from '@/components/ui/empty-state';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
+import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import { Link } from '@inertiajs/react';
+import { Link, router } from '@inertiajs/react';
 import {
     Compass,
     HandHeart,
     Heart,
+    Pencil,
     Sparkles,
     Star,
     Target,
     Trophy,
     Waves,
 } from 'lucide-react';
+import { useState } from 'react';
 
 type Goal = {
     id?: number | string;
@@ -26,6 +40,7 @@ type Goal = {
 };
 
 type GoalsPathTabProps = {
+    clientId: number;
     clientName: string;
     activePlanId?: number | null;
     goals?: Goal[];
@@ -33,6 +48,7 @@ type GoalsPathTabProps = {
     strengthsAbilities?: string | null;
     interestsHobbies?: string | null;
     pathPlan?: {
+        id?: number;
         dream?: string | null;
         north_star?: string | null;
         strengths?: string[] | null;
@@ -41,8 +57,200 @@ type GoalsPathTabProps = {
         independence_goals?: string[] | null;
         community?: string | null;
         meaningful_outcomes?: string | null;
+        plan_date?: string | null;
+        next_review_at?: string | null;
     } | null;
+    canEdit?: boolean;
 };
+
+function linesToArray(value: string): string[] {
+    return value
+        .split('\n')
+        .map((line) => line.trim())
+        .filter(Boolean);
+}
+
+function arrayToLines(value: string[] | null | undefined): string {
+    return (value ?? []).join('\n');
+}
+
+function PathPlanEditor({
+    clientId,
+    initial,
+}: {
+    clientId: number;
+    initial?: GoalsPathTabProps['pathPlan'];
+}) {
+    const [open, setOpen] = useState(false);
+    const [form, setForm] = useState({
+        dream: initial?.dream ?? '',
+        north_star: initial?.north_star ?? '',
+        strengths: arrayToLines(initial?.strengths),
+        action_steps: arrayToLines(initial?.action_steps),
+        trusted_people: arrayToLines(initial?.trusted_people),
+        independence_goals: arrayToLines(initial?.independence_goals),
+        community: initial?.community ?? '',
+        meaningful_outcomes: initial?.meaningful_outcomes ?? '',
+        plan_date: initial?.plan_date ?? '',
+        next_review_at: initial?.next_review_at ?? '',
+    });
+
+    const submit = () => {
+        router.post(
+            `/operations/clients/${clientId}/path-plan`,
+            {
+                ...form,
+                strengths: linesToArray(form.strengths),
+                action_steps: linesToArray(form.action_steps),
+                trusted_people: linesToArray(form.trusted_people),
+                independence_goals: linesToArray(form.independence_goals),
+            },
+            {
+                preserveScroll: true,
+                onSuccess: () => setOpen(false),
+            },
+        );
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={setOpen}>
+            <DialogTrigger asChild>
+                <Button size="sm" variant="outline">
+                    <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                    Edit PATH plan
+                </Button>
+            </DialogTrigger>
+            <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
+                <DialogHeader>
+                    <DialogTitle>Edit PATH plan</DialogTitle>
+                    <DialogDescription>
+                        Capture the dream, strengths, trusted people, and next
+                        action steps from the PATH planning meeting. Bullet
+                        lists accept one item per line.
+                    </DialogDescription>
+                </DialogHeader>
+
+                <div className="space-y-3">
+                    <Label>The dream</Label>
+                    <Textarea
+                        rows={3}
+                        value={form.dream}
+                        onChange={(e) =>
+                            setForm({ ...form, dream: e.target.value })
+                        }
+                        placeholder="What is this client's biggest hope for their future?"
+                    />
+
+                    <Label className="mt-2">North star (short statement)</Label>
+                    <Input
+                        value={form.north_star}
+                        onChange={(e) =>
+                            setForm({ ...form, north_star: e.target.value })
+                        }
+                    />
+
+                    <Label className="mt-2">Strengths (one per line)</Label>
+                    <Textarea
+                        rows={3}
+                        value={form.strengths}
+                        onChange={(e) =>
+                            setForm({ ...form, strengths: e.target.value })
+                        }
+                    />
+
+                    <Label className="mt-2">Trusted people (one per line)</Label>
+                    <Textarea
+                        rows={3}
+                        value={form.trusted_people}
+                        onChange={(e) =>
+                            setForm({ ...form, trusted_people: e.target.value })
+                        }
+                    />
+
+                    <Label className="mt-2">
+                        Independence goals (one per line)
+                    </Label>
+                    <Textarea
+                        rows={3}
+                        value={form.independence_goals}
+                        onChange={(e) =>
+                            setForm({
+                                ...form,
+                                independence_goals: e.target.value,
+                            })
+                        }
+                    />
+
+                    <Label className="mt-2">Community & belonging</Label>
+                    <Textarea
+                        rows={2}
+                        value={form.community}
+                        onChange={(e) =>
+                            setForm({ ...form, community: e.target.value })
+                        }
+                    />
+
+                    <Label className="mt-2">Action steps (one per line)</Label>
+                    <Textarea
+                        rows={3}
+                        value={form.action_steps}
+                        onChange={(e) =>
+                            setForm({ ...form, action_steps: e.target.value })
+                        }
+                    />
+
+                    <Label className="mt-2">Meaningful outcomes</Label>
+                    <Textarea
+                        rows={2}
+                        value={form.meaningful_outcomes}
+                        onChange={(e) =>
+                            setForm({
+                                ...form,
+                                meaningful_outcomes: e.target.value,
+                            })
+                        }
+                    />
+
+                    <div className="grid gap-3 sm:grid-cols-2">
+                        <div>
+                            <Label>Plan date</Label>
+                            <Input
+                                type="date"
+                                value={form.plan_date}
+                                onChange={(e) =>
+                                    setForm({
+                                        ...form,
+                                        plan_date: e.target.value,
+                                    })
+                                }
+                            />
+                        </div>
+                        <div>
+                            <Label>Next review</Label>
+                            <Input
+                                type="date"
+                                value={form.next_review_at}
+                                onChange={(e) =>
+                                    setForm({
+                                        ...form,
+                                        next_review_at: e.target.value,
+                                    })
+                                }
+                            />
+                        </div>
+                    </div>
+                </div>
+
+                <DialogFooter>
+                    <Button variant="ghost" onClick={() => setOpen(false)}>
+                        Cancel
+                    </Button>
+                    <Button onClick={submit}>Save PATH plan</Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
 
 function statusTone(status?: string | null) {
     const s = (status ?? '').toLowerCase();
@@ -140,6 +348,7 @@ function PathPillar({
 }
 
 export function GoalsPathTab({
+    clientId,
     clientName,
     activePlanId,
     goals = [],
@@ -147,6 +356,7 @@ export function GoalsPathTab({
     strengthsAbilities,
     interestsHobbies,
     pathPlan,
+    canEdit = false,
 }: GoalsPathTabProps) {
     const sortedGoals = [...goals].sort((a, b) => {
         if ((a.status === 'completed') !== (b.status === 'completed')) {
@@ -172,14 +382,38 @@ export function GoalsPathTab({
                             goal progress and the wider PATH framework.
                         </p>
                     </div>
-                    {activePlanId ? (
-                        <Button asChild size="sm" variant="outline">
-                            <Link href={`/operations/care-plans/${activePlanId}`}>
-                                Open care plan
-                            </Link>
-                        </Button>
-                    ) : null}
+                    <div className="flex flex-wrap gap-2">
+                        {canEdit ? (
+                            <PathPlanEditor
+                                clientId={clientId}
+                                initial={pathPlan ?? undefined}
+                            />
+                        ) : null}
+                        {activePlanId ? (
+                            <Button asChild size="sm" variant="outline">
+                                <Link
+                                    href={`/operations/care-plans/${activePlanId}`}
+                                >
+                                    Open care plan
+                                </Link>
+                            </Button>
+                        ) : null}
+                    </div>
                 </div>
+                {pathPlan?.next_review_at ? (
+                    <p className="mt-3 text-xs text-muted-foreground">
+                        Next PATH review:{' '}
+                        <span className="font-medium">
+                            {new Date(
+                                pathPlan.next_review_at,
+                            ).toLocaleDateString('en-NZ', {
+                                day: 'numeric',
+                                month: 'long',
+                                year: 'numeric',
+                            })}
+                        </span>
+                    </p>
+                ) : null}
             </div>
 
             <Card>
