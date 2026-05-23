@@ -153,7 +153,7 @@ class TimesheetApprovalWritePathTest extends TestCase
             $mock->shouldReceive('generateFromTimesheet')
                 ->times($times)
                 ->with(Mockery::type(Timesheet::class))
-                ->andReturnNull();
+                ->andReturn(new \Illuminate\Database\Eloquent\Collection());
         });
     }
 

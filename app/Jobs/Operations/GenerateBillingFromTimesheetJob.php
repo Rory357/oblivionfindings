@@ -22,10 +22,11 @@ class GenerateBillingFromTimesheetJob implements ShouldQueue
     public function handle(BillingService $service): void
     {
         try {
-            $entry = $service->generateFromTimesheet($this->timesheet);
+            $entries = $service->generateFromTimesheet($this->timesheet);
 
-            if ($entry) {
-                Log::info("Generated billing entry {$entry->id} from timesheet {$this->timesheet->id}.");
+            if ($entries->isNotEmpty()) {
+                $ids = $entries->pluck('id')->implode(', ');
+                Log::info("Generated billing entries [{$ids}] from timesheet {$this->timesheet->id}.");
             }
         } catch (\Throwable $e) {
             \Log::error('GenerateBillingFromTimesheetJob failed: ' . $e->getMessage(), ['exception' => $e]);

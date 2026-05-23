@@ -4,11 +4,13 @@ namespace App\Services\Operations;
 
 use App\Domain\Finance\Models\FinInvoice;
 use App\Models\BillingEntry;
+use App\Models\Client;
 use App\Models\ServiceAgreement;
 use App\Models\ServiceAgreementLineItem;
 use App\Models\ServiceAgreementRate;
 use App\Models\Timesheet;
 use Carbon\Carbon;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\DB;
 
 class BillingService
@@ -18,60 +20,121 @@ class BillingService
         protected \App\Services\ShiftOperationalSnapshotService $snapshots,
     ) {}
 
-    public function generateFromTimesheet(Timesheet $timesheet): ?BillingEntry
+    /**
+     * Generate BillingEntry rows from an approved timesheet — one entry per
+     * `timesheet_client_allocations` row. Legacy single-client timesheets
+     * fall through `effectiveClientAllocations()` which synthesises a single
+     * row, so they continue to produce exactly one entry.
+     *
+     * Idempotency: existing pending entries for the timesheet are deleted
+     * before re-creating, so this method can be replayed after the worker
+     * edits the allocation breakdown. Once entries are invoiced/paid the
+     * caller must not re-run generation — we leave those rows alone.
+     */
+    public function generateFromTimesheet(Timesheet $timesheet): Collection
     {
         if ($timesheet->status !== 'approved') {
-            return null;
+            return new Collection();
         }
 
         if (! $timesheet->is_snapshot_complete) {
             throw new \RuntimeException("Timesheet {$timesheet->id} is missing required snapshot data and cannot be billed safely.");
         }
 
-        // Check if already billed
-        if (BillingEntry::where('timesheet_id', $timesheet->id)->exists()) {
-            return null;
+        $allocations = $timesheet->effectiveClientAllocations();
+
+        if ($allocations->isEmpty()) {
+            return new Collection();
         }
 
-        $shift = $timesheet->shift;
-        $client = $timesheet->client;
+        $rateType = $this->determineRateType($timesheet);
+        $payroll = $this->rateResolver->resolve($timesheet);
+        $baseSnapshot = $this->snapshots->billingSnapshotForTimesheet(
+            $timesheet,
+            $payroll['pay_rate'],
+            $payroll['payroll_cost']
+        );
 
+        return DB::transaction(function () use ($timesheet, $allocations, $rateType, $baseSnapshot) {
+            $existing = BillingEntry::where('timesheet_id', $timesheet->id)->get();
+            $invoicedClientIds = $existing
+                ->whereNotIn('status', ['pending'])
+                ->pluck('client_id')
+                ->all();
+
+            // Tear down only pending entries — anything invoiced/paid is
+            // financially locked and must not be replaced.
+            BillingEntry::where('timesheet_id', $timesheet->id)
+                ->where('status', 'pending')
+                ->delete();
+
+            $created = new Collection();
+            foreach ($allocations as $allocation) {
+                $clientId = (int) $allocation['client_id'];
+                if (! $clientId || in_array($clientId, $invoicedClientIds, true)) {
+                    continue;
+                }
+
+                $client = Client::find($clientId);
+                if (! $client) {
+                    continue;
+                }
+
+                $hours = round((float) $allocation['hours'], 2);
+                if ($hours <= 0) {
+                    continue;
+                }
+
+                $agreement = $this->findActiveAgreement($client, $timesheet->work_date);
+                $rate = $this->resolveRate($agreement, $rateType);
+
+                $entry = BillingEntry::create([
+                    'organization_id' => $client->organization_id ?? $timesheet->shift?->organization_id,
+                    'timesheet_id' => $timesheet->id,
+                    'shift_id' => $timesheet->shift_id,
+                    'client_id' => $client->id,
+                    'staff_id' => $timesheet->user_id,
+                    'service_agreement_id' => $agreement?->id,
+                    'line_item_id' => $agreement ? $this->matchLineItem($agreement, $rateType)?->id : null,
+                    'service_date' => $timesheet->work_date,
+                    'hours' => $hours,
+                    'rate' => $rate,
+                    'amount' => round($hours * $rate, 2),
+                    'rate_type' => $rateType,
+                    ...$baseSnapshot,
+                    'client_name_snapshot' => $this->clientName($client) ?: $baseSnapshot['client_name_snapshot'] ?? null,
+                    'status' => 'pending',
+                    'notes' => $allocation['notes'] ?: $timesheet->notes,
+                ]);
+
+                $created->push($entry);
+            }
+
+            return $created;
+        });
+    }
+
+    protected function findActiveAgreement(Client $client, $workDate): ?ServiceAgreement
+    {
+        return ServiceAgreement::where('client_id', $client->id)
+            ->where('status', 'active')
+            ->where('starts_at', '<=', $workDate)
+            ->where(function ($q) use ($workDate) {
+                $q->whereNull('ends_at')
+                    ->orWhere('ends_at', '>=', $workDate);
+            })
+            ->first();
+    }
+
+    protected function clientName(?Client $client): ?string
+    {
         if (! $client) {
             return null;
         }
 
-        // Find active service agreement for this client
-        $agreement = ServiceAgreement::where('client_id', $client->id)
-            ->where('status', 'active')
-            ->where('starts_at', '<=', $timesheet->work_date)
-            ->where(function ($q) use ($timesheet) {
-                $q->whereNull('ends_at')
-                    ->orWhere('ends_at', '>=', $timesheet->work_date);
-            })
-            ->first();
+        $name = trim(($client->first_name ?? '').' '.($client->last_name ?? ''));
 
-        $hours = $this->calculateHours($timesheet);
-        $rateType = $this->determineRateType($timesheet);
-        $rate = $this->resolveRate($agreement, $rateType);
-        $payroll = $this->rateResolver->resolve($timesheet);
-
-        return BillingEntry::create([
-            'organization_id' => $client->organization_id,
-            'timesheet_id' => $timesheet->id,
-            'shift_id' => $timesheet->shift_id,
-            'client_id' => $client->id,
-            'staff_id' => $timesheet->user_id,
-            'service_agreement_id' => $agreement?->id,
-            'line_item_id' => $agreement ? $this->matchLineItem($agreement, $rateType)?->id : null,
-            'service_date' => $timesheet->work_date,
-            'hours' => $hours,
-            'rate' => $rate,
-            'amount' => round($hours * $rate, 2),
-            'rate_type' => $rateType,
-            ...$this->snapshots->billingSnapshotForTimesheet($timesheet, $payroll['pay_rate'], $payroll['payroll_cost']),
-            'status' => 'pending',
-            'notes' => $timesheet->notes,
-        ]);
+        return $name !== '' ? $name : ($client->full_name ?? null);
     }
 
     public function generateInvoice(array $billingEntryIds, int $organizationId, int $createdBy): FinInvoice
@@ -168,18 +231,6 @@ class BillingService
         foreach ($lineItemUsage as $lineItemId => $used) {
             ServiceAgreementLineItem::where('id', $lineItemId)->update(['budget_used' => $used]);
         }
-    }
-
-    protected function calculateHours(Timesheet $timesheet): float
-    {
-        if (! $timesheet->starts_at || ! $timesheet->ends_at) {
-            return 0;
-        }
-
-        $minutes = Carbon::parse($timesheet->starts_at)->diffInMinutes(Carbon::parse($timesheet->ends_at));
-        $breakMinutes = $timesheet->break_minutes ?? 0;
-
-        return round(($minutes - $breakMinutes) / 60, 2);
     }
 
     protected function determineRateType(Timesheet $timesheet): string

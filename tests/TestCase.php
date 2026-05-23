@@ -21,6 +21,8 @@ abstract class TestCase extends BaseTestCase
 
     protected static bool $isolatedMysqlSchemaLoaded = false;
 
+    protected static bool $pendingMigrationsApplied = false;
+
     public function createApplication()
     {
         $this->configureMysqlClientPath();
@@ -34,6 +36,7 @@ abstract class TestCase extends BaseTestCase
         $app->make(Kernel::class)->bootstrap();
 
         if (static::$isolatedMysqlSchemaLoaded) {
+            $this->runPendingMigrationsAfterSchemaLoad($app);
             RefreshDatabaseState::$migrated = true;
         }
 
@@ -137,6 +140,30 @@ abstract class TestCase extends BaseTestCase
         );
 
         static::$isolatedMysqlPrepared = true;
+    }
+
+    /**
+     * Apply migrations that were added after the committed schema dump.
+     *
+     * Running on top of the dump means tests keep their fast cold-boot path,
+     * but new migrations on a feature branch still get picked up without
+     * having to regenerate the (large, MySQL-version-sensitive) dump file.
+     */
+    protected function runPendingMigrationsAfterSchemaLoad(Application $app): void
+    {
+        if (static::$pendingMigrationsApplied) {
+            return;
+        }
+
+        try {
+            $kernel = $app->make(Kernel::class);
+            $kernel->call('migrate', ['--force' => true, '--no-interaction' => true]);
+        } catch (\Throwable) {
+            // Best-effort: if the migrator can't run here we fall back to the
+            // schema-dump-only state, which matches the prior behaviour.
+        }
+
+        static::$pendingMigrationsApplied = true;
     }
 
     protected function resolveProcessToken(): string
