@@ -6,7 +6,7 @@ import {
     Home,
     Users,
 } from 'lucide-react';
-import { useCallback, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import EndOfShiftChecklist, {
@@ -306,12 +306,17 @@ export default function MyDay() {
         );
     }, [isOnBreak, openSession?.id]);
 
-    // The "Today's timesheet" hero button used to navigate straight to
-    // `/operations/timesheets` (a list). For a worker on a live shift the
-    // expected behaviour is "let me complete TODAY's timesheet right now",
-    // so look up the day's draft / returned row and open the per-client
-    // review popup directly. When there isn't one yet (no clock-out has
-    // written a draft), fall back to the list with a friendlier landing.
+    // The "Today's timesheet" hero button is the worker's one-click entry
+    // into the per-client allocation popup for the shift they're on right
+    // now. Behaviour:
+    //   1. If a draft / returned timesheet already exists for today, open
+    //      it in the TimesheetReviewDialog directly.
+    //   2. Otherwise POST `/my-tasks/timesheet/ensure-today` which finds-or-
+    //      creates a draft from the active shift and flashes
+    //      `open_timesheet_id`; the watcher below picks that up once Inertia
+    //      refreshes props and opens the popup for the new draft.
+    //   3. As a last resort (no active shift today), fall through to the
+    //      full list so the worker still has somewhere to land.
     const todaysTimesheet = useMemo<MyDayTimesheet | null>(() => {
         const todayIso = props.today_iso;
         if (!todayIso) return null;
@@ -324,13 +329,47 @@ export default function MyDay() {
         );
     }, [props.timesheets, props.today_iso]) as MyDayTimesheet | null;
 
+    const [ensuringTimesheet, setEnsuringTimesheet] = useState(false);
+
     const handleOpenTimesheets = useCallback(() => {
         if (todaysTimesheet) {
             setTimesheetUnderReview(todaysTimesheet);
             return;
         }
-        router.visit('/operations/timesheets');
-    }, [todaysTimesheet]);
+        if (!activeShift) {
+            router.visit('/operations/timesheets');
+            return;
+        }
+        setEnsuringTimesheet(true);
+        router.post(
+            '/my-tasks/timesheet/ensure-today',
+            {},
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onFinish: () => setEnsuringTimesheet(false),
+            },
+        );
+    }, [todaysTimesheet, activeShift]);
+
+    // Inertia flash `open_timesheet_id` is set by /ensure-today after it
+    // finds-or-creates a draft for today. When we see it land, look up the
+    // matching timesheet in the (now-refreshed) props and pop the review
+    // dialog open. Guard with a ref-like check so we don't re-open if the
+    // user closes the popup and the flash sticks around.
+    const lastHandledFlashId =
+        (props as { flash?: { open_timesheet_id?: number } }).flash
+            ?.open_timesheet_id ?? null;
+    useEffect(() => {
+        if (!lastHandledFlashId) return;
+        if (timesheetUnderReview?.id === lastHandledFlashId) return;
+        const fresh = (props.timesheets ?? []).find(
+            (ts) => ts.id === lastHandledFlashId,
+        );
+        if (fresh) {
+            setTimesheetUnderReview(fresh as MyDayTimesheet);
+        }
+    }, [lastHandledFlashId, props.timesheets, timesheetUnderReview?.id]);
 
     const handleConfirmHandoverRead = useCallback(() => {
         const handoverId = props.handover?.id;

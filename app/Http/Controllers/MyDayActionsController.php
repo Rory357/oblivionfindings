@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Client;
 use App\Models\ControlRoomAlert;
+use App\Models\Shift;
 use App\Models\ShiftTask;
 use App\Models\Timesheet;
 use App\Models\TimesheetClientAllocation;
@@ -45,6 +46,91 @@ class MyDayActionsController extends Controller
         }
 
         return back()->with('success', $task->is_completed ? 'Task completed.' : 'Task reopened.');
+    }
+
+    /**
+     * Find-or-create today's draft timesheet for the worker so the /my-day
+     * "Today's timesheet" button can open the review popup immediately, even
+     * before the worker has clocked out.
+     *
+     * Historically a Timesheet row was only written by AttendanceService on
+     * clock-out, which meant clicking "Today's timesheet" mid-shift had
+     * nothing to show. The popup-driven UX needs an existing draft, so this
+     * endpoint:
+     *
+     *   1. Locates the worker's active (in-progress) shift for today.
+     *   2. Looks up the (shift_id, user_id) timesheet — Timesheet enforces a
+     *      unique pair, so AttendanceService's eventual clock-out call will
+     *      update the SAME row instead of conflicting.
+     *   3. Creates the row with the shift's planned start/end/break if it
+     *      doesn't exist yet.
+     *   4. Flashes `open_timesheet_id` so the front-end knows which draft to
+     *      open in the popup once props refresh.
+     */
+    public function ensureTodayTimesheet(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user, 403);
+
+        $tz = config('app.worker_timezone', 'Pacific/Auckland');
+        $now = Carbon::now($tz);
+        $today = $now->copy()->startOfDay()->utc();
+        $end = $now->copy()->endOfDay()->utc();
+
+        $shift = Shift::query()
+            ->where('user_id', $user->id)
+            ->whereBetween('starts_at', [$today, $end])
+            ->whereNotIn('status', ['cancelled'])
+            ->orderBy('starts_at')
+            ->first();
+
+        if (! $shift) {
+            return back()->withErrors([
+                'timesheet' => 'No shift today to write a timesheet against.',
+            ]);
+        }
+
+        $timesheet = Timesheet::query()
+            ->where('shift_id', $shift->id)
+            ->where('user_id', $user->id)
+            ->first();
+
+        if (! $timesheet) {
+            $client = $shift->client;
+            $timesheet = Timesheet::query()->create([
+                'user_id' => $user->id,
+                'client_id' => $shift->client_id,
+                'shift_id' => $shift->id,
+                'shift_site_id' => $shift->site_id,
+                'shift_service_context_id' => $shift->service_context_id,
+                'work_date' => $shift->starts_at?->copy()->timezone($tz)->toDateString()
+                    ?? $now->toDateString(),
+                'starts_at' => $shift->starts_at,
+                'ends_at' => $shift->ends_at,
+                'break_minutes' => (int) ($shift->expected_break_minutes ?? 30),
+                'status' => 'draft',
+                'is_residential_billable' => false,
+                'created_by' => $user->id,
+                'shift_site_name_snapshot' => $shift->site?->name,
+                'shift_location_snapshot' => $shift->location,
+                'service_context_name_snapshot' => $shift->serviceContext?->name,
+                'client_name_snapshot' => $client
+                    ? trim($client->first_name.' '.$client->last_name)
+                    : null,
+                'staff_name_snapshot' => $user->name,
+                'shift_type_snapshot' => $shift->shift_type ?? 'standard',
+            ]);
+
+            AuditLogger::log('timesheet.draft.ensure', $timesheet, [
+                'timesheet_id' => $timesheet->id,
+                'shift_id' => $shift->id,
+                'created' => true,
+            ]);
+        }
+
+        // The front-end watches for this flash key and opens the popup with
+        // the matching timesheet from `props.timesheets` once it refreshes.
+        return back()->with('open_timesheet_id', $timesheet->id);
     }
 
     /**

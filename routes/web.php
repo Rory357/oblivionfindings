@@ -154,6 +154,7 @@ Route::redirect('/my-tasks', '/my-day')
 // draft Timesheet. Do not re-add quick-clock endpoints here.
 Route::middleware(['auth'])->group(function () {
     Route::post('/my-tasks/shift-task/{task}/complete', [\App\Http\Controllers\MyDayActionsController::class, 'completeShiftTask'])->name('my-day.shift-task.complete');
+    Route::post('/my-tasks/timesheet/ensure-today', [\App\Http\Controllers\MyDayActionsController::class, 'ensureTodayTimesheet'])->name('my-day.timesheet.ensure-today');
     Route::post('/my-tasks/timesheet/{timesheet}/submit', [\App\Http\Controllers\MyDayActionsController::class, 'submitTimesheet'])->name('my-day.timesheet.submit');
 
     // PR 17 — frontline alert quick actions. Scoped to the alert's assignee so
