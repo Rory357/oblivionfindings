@@ -1,0 +1,86 @@
+# Audit: /my-day support-worker shift workflow
+
+Use this file as the seed prompt for a fresh Claude session to continue the audit.
+
+## Context
+
+NZ Supported Living CRM (Pacific/Auckland TZ, NZ currency, residential houses + 1:1 community support). The audit covers the frontline `/my-day` workflow end-to-end: clock-in → shift activities → break → handover → clock-out → timesheet allocation → approval → billing.
+
+Repo: `C:\Users\steph\Herd\oblivionfindings`
+- Worktree workflow: commit on `claude/...` branch → `git push origin HEAD:main` → `cd` to parent → `git pull origin main` → `npm run build` (Vite is in prod-build mode).
+- Live local: `https://oblivionfindings.test` (Herd, parent dir).
+- Memory: `C:\Users\steph\.claude\projects\C--Users-steph-Herd-oblivionfindings\memory\MEMORY.md`.
+
+Seeded test scenario:
+- `sw1@demo.test` (Support Worker 1, user id 26, role `support_worker`).
+- Today's shift #9322 at Rimu House with 3 residents (Margaret Hewitt 9076, Hone Tāmati 9077, Aroha Lee 9078).
+- TS #6 is the multi-client draft (3 allocations × 2.5h = 7.5h).
+- Reseed via `php artisan db:seed --class=SwOneMyDayDemoSeeder` (non-destructive).
+- Cannot enter passwords on the user's behalf — ask the user to log in as admin and impersonate via `/system/users` → ⋯ → "Impersonate".
+
+## Workflow being audited (and key files)
+
+1. Hero "Clock in" — `POST /attendance/clock-in` ([AttendanceController.php:113](../app/Http/Controllers/AttendanceController.php#L113))
+2. Quick actions — meds, care note, vitals, incident, care plan ([my-day-hero.tsx](../resources/js/pages/my-day/components/my-day-hero.tsx))
+3. Stream item interactions — task complete, give/refuse/snooze med, add note ([index.tsx](../resources/js/pages/my-day/index.tsx))
+4. Break start/end — `POST /attendance/break/{start,end}` ([AttendanceController.php:209](../app/Http/Controllers/AttendanceController.php#L209))
+5. Handover read — `PATCH /attendance/handover/{handover}/acknowledge`
+6. Handover write — `WriteHandoverDialog` → `POST /attendance/handover` ([_dialogs.tsx:922](../resources/js/pages/my-day/_dialogs.tsx#L922))
+7. "Today's timesheet" hero button — `POST /my-tasks/timesheet/ensure-today` → flash `open_timesheet_id` → `TimesheetReviewDialog` opens ([_dialogs.tsx:1143](../resources/js/pages/my-day/_dialogs.tsx#L1143))
+8. Allocation method tile picker (single | residential_house | equal_split | manual | time_segmented), per-client tabs, sum balance check
+9. Submit — `POST /my-tasks/timesheet/{id}/submit` ([MyDayActionsController.php:151](../app/Http/Controllers/MyDayActionsController.php#L151))
+10. End shift — `EndOfShiftChecklist` Dialog → `POST /attendance/clock-out` ([end-of-shift-checklist.tsx](../resources/js/components/end-of-shift-checklist.tsx))
+11. Manager approval — `/operations/timesheets/{id}` → `TimesheetApprovalService` → `BillingService::generateFromTimesheet` ([BillingService.php:34](../app/Services/Operations/BillingService.php#L34))
+
+Popup style guide: [docs/POPUP_STYLE_GUIDE.md](POPUP_STYLE_GUIDE.md). All dialogs on `/my-day` must follow it.
+
+## Fixes shipped (commit `227aabc9` on main)
+
+Leaky → Fixed:
+- `ensureTodayTimesheet` now checks `timesheets.create` ([MyDayActionsController.php:75](../app/Http/Controllers/MyDayActionsController.php#L75)).
+- `submitTimesheet` now checks `timesheets.submit` ([MyDayActionsController.php:159-163](../app/Http/Controllers/MyDayActionsController.php#L159)).
+- "Create" button on `/operations/timesheets` hidden for workers' own-list view ([operations/timesheets/index.tsx:271](../resources/js/pages/operations/timesheets/index.tsx#L271)). Page route still works for managers/admins.
+
+Missing → Fixed:
+- Hero "Submit timesheet" quick action now opens the popup instead of bouncing to the list ([my-day-hero.tsx:269](../resources/js/pages/my-day/components/my-day-hero.tsx#L269)).
+- `onError` handler added to ensure-today so "no shift today" surfaces via `window.alert` instead of failing silently ([index.tsx:346](../resources/js/pages/my-day/index.tsx#L346)).
+
+Polish → Fixed:
+- Flash watcher guard via `useRef` so the popup doesn't re-open after the worker closes it ([index.tsx:362](../resources/js/pages/my-day/index.tsx#L362)).
+
+Verified live via probe (`probe.php` deleted after use): permission gates return 403 when stripped, 302/200 otherwise.
+
+## Open decisions / flagged but not fixed
+
+1. **Residential allocation semantics** ([_dialogs.tsx:1203](../resources/js/pages/my-day/_dialogs.tsx#L1203), [MyDayActionsController.php:244](../app/Http/Controllers/MyDayActionsController.php#L244)). The popup divides total hours evenly for `residential_house`. The PHP validator bypasses the sum check for residential. Two interpretations:
+   - (A) Residential = "shared support, divide hours". Seeder uses this (2.5h × 3 = 7.5h). Frontend matches.
+   - (B) Residential = "house bills each resident for full shift". Validator-bypass implies this (7.5h × 3 = 22.5h of billing).
+   Decision needed from user. Then either change `seedRows` or update the description.
+
+2. **`clients_candidates` excludes `shift_clients` pivot** ([MyTasksController.php:758](../app/Http/Controllers/MyTasksController.php#L758)). Validator allows allocating to group-shift clients ([MyDayActionsController.php:306](../app/Http/Controllers/MyDayActionsController.php#L306)) but the popup doesn't list them. Harmless while the schema is dormant; will need a fix when group shifts go live.
+
+3. **Multi-resident shifts lose top-level Care plan quick action** ([my-day-hero.tsx:247](../resources/js/pages/my-day/components/my-day-hero.tsx#L247)). Care plans are still accessible via avatar-stack popovers per resident. Acceptable today.
+
+## What I didn't check (TODO for next session)
+
+- **Mobile sheets** (`active-shift-card`, `clock-in-card` use `Sheet` on mobile) — out of scope per audit instructions (web-only).
+- **Incident creation form** depth-audit — `Report incident` button hands off correctly to `/incidents/create?shift_id=...` but the destination form wasn't audited.
+- **Live end-to-end submit → approve → BillingEntry generation** — couldn't impersonate via browser. Reconciliation guard fires for seeded sw1 because actual clock-in is far off planned (446 min difference). To live-test:
+  - Reset sw1's open session and re-clock-in close to planned 09:00 NZ.
+  - Or seed a fresh shift with planned times aligned to "now".
+- **Care plan / observations dialog drives** — spot-checked for popup style guide only, didn't record each obs type.
+- **Direct `POST /operations/timesheets/store` by a worker** — back-compat path left open because `TimesheetControllerTest::test_staff_can_store_draft_timesheet_for_their_own_shift` expects it. UI button hidden, API path still works.
+- **Time-segmented allocation method** — popup logic for `starts_at`/`ends_at` per row not driven through a full submit cycle.
+- **Returned timesheet re-submit cycle** — clicking "Fix and resubmit" in paperwork panel opens the popup; not driven to a manager rejection + resubmit cycle live.
+
+## How to resume
+
+Open this file and ask: "Continue the /my-day audit from `docs/audit-my-day-shift-workflow.md`. Pick up the open decisions and untested items."
+
+Hard rules to keep:
+- Don't break existing single-client billing or approve flows.
+- Don't seed destructively — demo accounts are shared.
+- Commit each fix on `claude/...` branch → `git push origin HEAD:main` → pull on parent → `npm run build`.
+- Use NZ context (NZD, Pacific/Auckland, residential houses).
+- One Dialog per `/my-day` popup; follow [POPUP_STYLE_GUIDE.md](POPUP_STYLE_GUIDE.md) strictly.
+- Probe DB with a temp `probe.php` at the repo root; delete after use.
