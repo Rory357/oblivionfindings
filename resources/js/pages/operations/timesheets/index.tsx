@@ -67,6 +67,14 @@ type Props = {
         mode?: string | null;
     };
     approvalMode?: boolean;
+    /**
+     * True when the controller restricted the query to the viewer's own
+     * timesheets (worker without `timesheets.manageAny`, list-mode). When set,
+     * the page renders as "My Timesheets" — heading + description swap, and
+     * the Staff column is hidden because every row would otherwise just say
+     * the viewer's own name.
+     */
+    isOwnOnlyView?: boolean;
     clients?: Array<{ id: number; first_name: string; last_name: string }>;
     staff?: Array<{ id: number; name: string; email?: string }>;
     canApprove: boolean;
@@ -79,6 +87,7 @@ export default function TimesheetsIndex({
     timesheets,
     filters,
     approvalMode,
+    isOwnOnlyView,
     clients = [],
     staff = [],
     canApprove,
@@ -87,6 +96,7 @@ export default function TimesheetsIndex({
     const { labels } = usePage().props as any;
     const timesheetPlural = labels?.['timesheet.plural'] ?? 'Timesheets';
     const isApprovalMode = !!approvalMode;
+    const isWorkerView = !!isOwnOnlyView && !isApprovalMode;
 
     const [selected, setSelected] = useState<Record<number, boolean>>({});
     const selectedIds = useMemo(
@@ -207,20 +217,39 @@ export default function TimesheetsIndex({
     }, [timesheets.data]);
 
     return (
-        <AppLayout breadcrumbs={[{ title: timesheetPlural, href: listHref }]}>
+        <AppLayout
+            breadcrumbs={[
+                {
+                    title: isWorkerView ? 'My timesheets' : timesheetPlural,
+                    href: listHref,
+                },
+            ]}
+        >
             <Head
-                title={isApprovalMode ? 'Timesheet Approvals' : timesheetPlural}
+                title={
+                    isApprovalMode
+                        ? 'Timesheet Approvals'
+                        : isWorkerView
+                          ? 'My Timesheets'
+                          : timesheetPlural
+                }
             />
 
             <PageShell>
                 <PageHero
                     title={
-                        isApprovalMode ? 'Timesheet Approvals' : timesheetPlural
+                        isApprovalMode
+                            ? 'Timesheet Approvals'
+                            : isWorkerView
+                              ? 'My Timesheets'
+                              : timesheetPlural
                     }
                     description={
                         isApprovalMode
                             ? 'Submitted timesheets waiting for a decision.'
-                            : 'Work logs, approvals, and timesheet management.'
+                            : isWorkerView
+                              ? 'Your work logs — drafts in progress, what you’ve submitted, and what your manager has approved or returned.'
+                              : 'Work logs, approvals, and timesheet management.'
                     }
                     icon={<FileText className="h-7 w-7 text-white" />}
                     actions={
@@ -637,12 +666,16 @@ export default function TimesheetsIndex({
                                                     {t.client.last_name}
                                                 </Link>
                                             </dd>
-                                            <dt className="text-muted-foreground">
-                                                Staff
-                                            </dt>
-                                            <dd className="min-w-0 truncate">
-                                                {t.staff?.name ?? '—'}
-                                            </dd>
+                                            {isWorkerView ? null : (
+                                                <>
+                                                    <dt className="text-muted-foreground">
+                                                        Staff
+                                                    </dt>
+                                                    <dd className="min-w-0 truncate">
+                                                        {t.staff?.name ?? '—'}
+                                                    </dd>
+                                                </>
+                                            )}
                                             {t.shift ? (
                                                 <>
                                                     <dt className="text-muted-foreground">
@@ -737,9 +770,11 @@ export default function TimesheetsIndex({
                                         <th className="p-3 text-left font-medium">
                                             Client
                                         </th>
-                                        <th className="p-3 text-left font-medium">
-                                            Staff
-                                        </th>
+                                        {isWorkerView ? null : (
+                                            <th className="p-3 text-left font-medium">
+                                                Staff
+                                            </th>
+                                        )}
                                         <th className="p-3 text-left font-medium">
                                             {isApprovalMode
                                                 ? 'Submitted'
@@ -755,9 +790,15 @@ export default function TimesheetsIndex({
                                         const showReturnBanner =
                                             !isApprovalMode &&
                                             t.status === 'returned';
+                                        // Column counts:
+                                        //   - approval mode: 6 (checkbox+date+client+staff+submitted+actions)
+                                        //   - worker (own list): 4 (date+client+status+actions, no staff)
+                                        //   - general manager list: 5 (date+client+staff+status+actions)
                                         const rowColspan = isApprovalMode
                                             ? 6
-                                            : 5;
+                                            : isWorkerView
+                                              ? 4
+                                              : 5;
                                         return (
                                             <React.Fragment key={t.id}>
                                                 <tr className="border-t transition-colors hover:bg-muted/20">
@@ -856,9 +897,11 @@ export default function TimesheetsIndex({
                                                             {t.client.last_name}
                                                         </Link>
                                                     </td>
-                                                    <td className="p-3">
-                                                        {t.staff?.name ?? '—'}
-                                                    </td>
+                                                    {isWorkerView ? null : (
+                                                        <td className="p-3">
+                                                            {t.staff?.name ?? '—'}
+                                                        </td>
+                                                    )}
                                                     {isApprovalMode ? (
                                                         <td className="p-3 text-sm text-muted-foreground">
                                                             {t.submitted_at

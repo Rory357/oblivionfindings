@@ -270,6 +270,13 @@ class TimesheetController extends Controller
                 ->get(['id', 'name', 'email'])
             : [];
 
+        // When the worker doesn't have `timesheets.manageAny`, the controller
+        // already scopes the list to their own user_id (line above). Flag this
+        // for the front-end so the page renders as "My Timesheets" instead of
+        // the generic manager copy + hides the redundant "Staff" column
+        // (every row would just be the viewer's own name).
+        $isOwnOnlyView = ! $auth->canDo('timesheets.manageAny') && ! $approvalMode;
+
         return inertia('operations/timesheets/index', [
             'timesheets' => $timesheets,
             'filters' => [
@@ -281,6 +288,7 @@ class TimesheetController extends Controller
                 'mode' => $approvalMode ? 'approvals' : null,
             ],
             'approvalMode' => $approvalMode,
+            'isOwnOnlyView' => $isOwnOnlyView,
             'clients' => $clients,
             'staff' => $staff,
             'canApprove' => $canApprove,
