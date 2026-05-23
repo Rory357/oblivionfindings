@@ -4,6 +4,8 @@ import {
     CheckCircle2,
     FileText,
     ListChecks,
+    Loader2,
+    LogOut,
     Pill,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -557,25 +559,56 @@ export default function EndOfShiftChecklist({
         );
     }
 
+    // Desktop popup — follows docs/POPUP_STYLE_GUIDE.md: shell + body split,
+    // inline-style width token, header icon + title + description, Cancel
+    // (outline) on the left + primary submit (with Loader2 while processing)
+    // on the right. The body is gated by `{open && ...}` so the form's
+    // internal state resets cleanly between cycles.
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle>{title}</DialogTitle>
-                    <DialogDescription>{description}</DialogDescription>
-                </DialogHeader>
-                {body}
-                <DialogFooter>
-                    <Button
-                        type="button"
-                        data-test="end-shift-submit"
-                        onClick={submit}
-                        disabled={!canSubmit}
-                        variant={force ? 'destructive' : 'default'}
-                    >
-                        {label}
-                    </Button>
-                </DialogFooter>
+            <DialogContent
+                className="max-h-[90vh] overflow-y-auto"
+                style={{
+                    maxWidth: 'min(92vw, 900px)',
+                    width: 'min(92vw, 900px)',
+                }}
+            >
+                {open ? (
+                    <>
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2">
+                                <LogOut className="h-4 w-4 text-primary" />
+                                {title}
+                            </DialogTitle>
+                            <DialogDescription>{description}</DialogDescription>
+                        </DialogHeader>
+                        {body}
+                        <DialogFooter className="mt-4">
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => onOpenChange(false)}
+                                disabled={submitting}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="button"
+                                data-test="end-shift-submit"
+                                onClick={submit}
+                                disabled={!canSubmit}
+                                variant={force ? 'destructive' : 'default'}
+                            >
+                                {submitting ? (
+                                    <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                                ) : (
+                                    <LogOut className="mr-2 h-4 w-4" />
+                                )}
+                                {label}
+                            </Button>
+                        </DialogFooter>
+                    </>
+                ) : null}
             </DialogContent>
         </Dialog>
     );
