@@ -844,7 +844,7 @@ export default function ShiftShow({
 
                 {/* Workflow guidance */}
                 {shift.status === 'in_progress' ? (
-                    <div className="flex items-center gap-3 rounded-xl border border-status-warning/30 bg-status-warning p-4">
+                    <div className="flex items-center gap-3 rounded-xl border border-status-warning/30 bg-status-warning-bg p-4">
                         <AlertTriangle className="h-4 w-4 shrink-0 text-status-warning" />
                         <span className="text-sm text-status-warning dark:text-status-warning">
                             Shift is in progress. Complete the shift when
@@ -853,7 +853,7 @@ export default function ShiftShow({
                         </span>
                     </div>
                 ) : shift.status === 'scheduled' ? (
-                    <div className="flex items-center gap-3 rounded-xl border border-status-info/30 bg-status-info p-4">
+                    <div className="flex items-center gap-3 rounded-xl border border-status-info/30 bg-status-info-bg p-4">
                         <ArrowRight className="h-4 w-4 shrink-0 text-status-info" />
                         <span className="text-sm text-status-info dark:text-status-info">
                             Shift is scheduled. Staff can clock in or start the
@@ -861,7 +861,7 @@ export default function ShiftShow({
                         </span>
                     </div>
                 ) : shift.status === 'cancelled' ? (
-                    <div className="flex items-center gap-3 rounded-xl border border-status-critical/30 bg-status-critical p-4">
+                    <div className="flex items-center gap-3 rounded-xl border border-status-critical/30 bg-status-critical-bg p-4">
                         <AlertTriangle className="h-4 w-4 shrink-0 text-status-critical" />
                         <span className="text-sm text-status-critical dark:text-status-critical">
                             This shift has been cancelled. Downstream records
@@ -1001,7 +1001,7 @@ export default function ShiftShow({
                                     {linkedTimesheet.exported_to_payroll_at ? (
                                         <Badge
                                             variant="outline"
-                                            className="border-status-success/30 bg-status-success text-[10px] text-status-success"
+                                            className="border-status-success/30 bg-status-success-bg text-[10px] text-status-success"
                                         >
                                             Exported to payroll
                                         </Badge>
@@ -1093,10 +1093,10 @@ export default function ShiftShow({
                                         className={
                                             handoverSummary.status ===
                                             'acknowledged'
-                                                ? 'border-status-success/30 bg-status-success text-status-success'
+                                                ? 'border-status-success/30 bg-status-success-bg text-status-success'
                                                 : handoverSummary.status ===
                                                     'submitted'
-                                                  ? 'border-status-warning/30 bg-status-warning text-status-warning'
+                                                  ? 'border-status-warning/30 bg-status-warning-bg text-status-warning'
                                                   : 'bg-muted-foreground/80/10 border-border/30 text-muted-foreground'
                                         }
                                     >

@@ -116,6 +116,7 @@ return [
     'btn_start_break' => 'Start break',
     'btn_end_break' => 'End break',
     'btn_todays_timesheet' => 'Today\'s timesheet',
+    'btn_current_shift_timesheet' => 'Current shift timesheet',
     'btn_report_incident' => 'Report incident',
     'all_residents' => 'All residents',
     'resident_at_site' => 'Resident · :site',

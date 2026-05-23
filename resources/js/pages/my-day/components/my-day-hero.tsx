@@ -396,7 +396,10 @@ export function MyDayHero({
                         onClick={onOpenTimesheet}
                         disabled={!onOpenTimesheet}
                     >
-                        <FileText className="h-3.5 w-3.5" /> {t('btn_todays_timesheet')}
+                        <FileText className="h-3.5 w-3.5" />{' '}
+                        {clockedIn
+                            ? t('btn_current_shift_timesheet')
+                            : t('btn_todays_timesheet')}
                     </Button>
                 </>
             }

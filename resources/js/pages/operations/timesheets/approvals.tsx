@@ -47,6 +47,9 @@ type Props = {
     filters?: Record<string, string | null>;
 };
 
+export const approvalQueueGridColumns =
+    'md:grid-cols-[40px_1.3fr_1fr_1fr_0.9fr_120px]';
+
 function formatDate(value?: string | null): string {
     if (!value) return '-';
 
@@ -57,13 +60,27 @@ function formatDate(value?: string | null): string {
     });
 }
 
-function formatHours(timesheet: PendingTimesheet): string {
+function approvalHours(timesheet: PendingTimesheet): number | null {
+    if (typeof timesheet.total_hours === 'number') {
+        return timesheet.total_hours;
+    }
+
     if (typeof timesheet.hours === 'number') {
-        return `${timesheet.hours.toFixed(2)} hrs`;
+        return timesheet.hours;
     }
 
     if (typeof timesheet.duration_minutes === 'number') {
-        return `${(timesheet.duration_minutes / 60).toFixed(2)} hrs`;
+        return timesheet.duration_minutes / 60;
+    }
+
+    return null;
+}
+
+export function formatHours(timesheet: PendingTimesheet): string {
+    const hours = approvalHours(timesheet);
+
+    if (hours !== null) {
+        return `${hours.toFixed(2)} hrs`;
     }
 
     return '-';
@@ -134,10 +151,7 @@ export default function TimesheetApprovalsPage({ timesheets }: Props) {
                         label: 'Total hours',
                         value: rows
                             .reduce((sum, t) => {
-                                if (typeof t.hours === 'number') return sum + t.hours;
-                                if (typeof t.duration_minutes === 'number')
-                                    return sum + t.duration_minutes / 60;
-                                return sum;
+                                return sum + (approvalHours(t) ?? 0);
                             }, 0)
                             .toFixed(1),
                     },
@@ -232,7 +246,9 @@ export default function TimesheetApprovalsPage({ timesheets }: Props) {
                     {rows.length > 0 && (
                         <Card>
                             <CardContent className="p-0">
-                                <div className="hidden items-center gap-3 border-b px-4 py-3 text-xs font-medium text-muted-foreground md:grid md:grid-cols-[40px,1.3fr,1fr,1fr,0.9fr,120px]">
+                                <div
+                                    className={`hidden items-center gap-3 border-b px-4 py-3 text-xs font-medium text-muted-foreground md:grid ${approvalQueueGridColumns}`}
+                                >
                                     <label className="flex items-center justify-center">
                                         <input
                                             type="checkbox"
@@ -253,7 +269,9 @@ export default function TimesheetApprovalsPage({ timesheets }: Props) {
                                         data-test="approvals-row"
                                         className="border-b px-4 py-4 last:border-b-0"
                                     >
-                                        <div className="grid gap-3 md:grid-cols-[40px,1.3fr,1fr,1fr,0.9fr,120px] md:items-center">
+                                        <div
+                                            className={`grid gap-3 md:items-center ${approvalQueueGridColumns}`}
+                                        >
                                             <label className="flex items-center md:justify-center">
                                                 <input
                                                     type="checkbox"

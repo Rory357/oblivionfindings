@@ -58,7 +58,7 @@ class MyTasksController extends Controller
         //     expose every co-resident so the hero/avatar stack and resident
         //     filter tabs render correctly. Falls back to the shift's
         //     single client for 1:1 visits.
-        $activeShift = $this->resolveActiveShiftModel($user, $queryNow);
+        $activeShift = $this->resolveActiveShiftModel($user, $workerNow);
         $activeSitePayload = $this->buildActiveSitePayload($activeShift);
 
         // 3. Medications due — aggregate across every resident at the active
@@ -165,27 +165,52 @@ class MyTasksController extends Controller
      *
      * Returns null when no in-progress / upcoming shift exists today.
      */
-    private function resolveActiveShiftModel(User $user, Carbon $now): ?Shift
+    private function resolveActiveShiftModel(User $user, Carbon $workerNow): ?Shift
     {
         try {
-            $todayStart = $now->copy()->startOfDay();
-            $todayEnd = $now->copy()->endOfDay();
+            $nowUtc = $workerNow->copy()->utc();
+            $workerDayStart = $workerNow->copy()->startOfDay()->utc();
+            $workerDayEnd = $workerNow->copy()->endOfDay()->utc();
+            $relations = [
+                'client:id,first_name,last_name,profile_photo_path,site_id',
+                'site:id,name,type,address_line_1,address_line_2,suburb,city,postcode',
+                'site.clients:id,first_name,last_name,profile_photo_path,site_id,status',
+                'serviceContext:id,name',
+                'tasks',
+            ];
 
-            // Prefer the shift bound to an open attendance session, falling
-            // back to the next "in_progress" shift that overlaps now.
+            $openSession = HrAttendanceSession::query()
+                ->where('user_id', $user->id)
+                ->open()
+                ->whereHas('shift', fn ($query) => $query
+                    ->where('user_id', $user->id)
+                    ->visibleToFrontline($user->organization_id))
+                ->with(['shift' => fn ($query) => $query->with($relations)])
+                ->latest('clock_in_at')
+                ->first();
+
+            if ($openSession?->shift) {
+                return $openSession->shift;
+            }
+
+            // Fall back to a current/worker-day shift. The worker-day bounds
+            // are calculated before converting to UTC so overnight NZ shifts
+            // do not disappear from the hero after the UTC date rolls over.
             $shift = Shift::query()
                 ->where('user_id', $user->id)
                 ->visibleToFrontline($user->organization_id)
-                ->whereBetween('starts_at', [$todayStart, $todayEnd])
+                ->where(function ($query) use ($nowUtc, $workerDayStart, $workerDayEnd) {
+                    $query
+                        ->where(function ($overlap) use ($nowUtc) {
+                            $overlap
+                                ->where('starts_at', '<=', $nowUtc)
+                                ->where('ends_at', '>=', $nowUtc);
+                        })
+                        ->orWhereBetween('starts_at', [$workerDayStart, $workerDayEnd]);
+                })
                 ->orderByRaw("FIELD(status, 'in_progress', 'scheduled', 'draft')")
                 ->orderBy('starts_at')
-                ->with([
-                    'client:id,first_name,last_name,profile_photo_path,site_id',
-                    'site:id,name,type,address_line_1,address_line_2,suburb,city,postcode',
-                    'site.clients:id,first_name,last_name,profile_photo_path,site_id,status',
-                    'serviceContext:id,name',
-                    'tasks',
-                ])
+                ->with($relations)
                 ->first();
 
             return $shift;

@@ -83,6 +83,9 @@ type Props = {
 
 const ANY = '__any__';
 
+export const needsApprovalBadgeClassName =
+    'border-status-warning/30 bg-status-warning-bg text-[10px] text-status-warning';
+
 export default function TimesheetsIndex({
     timesheets,
     filters,
@@ -341,8 +344,9 @@ export default function TimesheetsIndex({
                 )}
 
                 {/* Filters */}
-                <Card className="flex flex-wrap items-end gap-3 p-4">
-                    {!isApprovalMode ? (
+                <div className="rounded-lg border bg-card p-3 shadow-sm">
+                    <div className="flex flex-wrap items-end gap-3">
+                        {!isApprovalMode ? (
                         <div className="space-y-1">
                             <Label className="text-xs text-muted-foreground">
                                 Status
@@ -385,8 +389,8 @@ export default function TimesheetsIndex({
                                 </SelectContent>
                             </Select>
                         </div>
-                    ) : null}
-                    <div className="space-y-1">
+                        ) : null}
+                        <div className="space-y-1">
                         <Label className="text-xs text-muted-foreground">
                             From
                         </Label>
@@ -406,8 +410,8 @@ export default function TimesheetsIndex({
                                 )
                             }
                         />
-                    </div>
-                    <div className="space-y-1">
+                        </div>
+                        <div className="space-y-1">
                         <Label className="text-xs text-muted-foreground">
                             To
                         </Label>
@@ -427,8 +431,8 @@ export default function TimesheetsIndex({
                                 )
                             }
                         />
-                    </div>
-                    {isApprovalMode ? (
+                        </div>
+                        {isApprovalMode ? (
                         <>
                             <div className="space-y-1">
                                 <Label className="text-xs text-muted-foreground">
@@ -523,21 +527,22 @@ export default function TimesheetsIndex({
                                 </Select>
                             </div>
                         </>
-                    ) : null}
-                    <Button
-                        variant="ghost"
-                        size="sm"
-                        onClick={() =>
-                            router.get(
-                                listUrl(),
-                                {},
-                                { preserveState: true, replace: true },
-                            )
-                        }
-                    >
-                        Clear
-                    </Button>
-                </Card>
+                        ) : null}
+                        <Button
+                            variant="ghost"
+                            size="sm"
+                            onClick={() =>
+                                router.get(
+                                    listUrl(),
+                                    {},
+                                    { preserveState: true, replace: true },
+                                )
+                            }
+                        >
+                            Clear
+                        </Button>
+                    </div>
+                </div>
 
                 {/* List — mobile cards, desktop table */}
                 {timesheets.data.length > 0 ? (
@@ -736,7 +741,7 @@ export default function TimesheetsIndex({
                                             t.status === 'submitted' ? (
                                                 <Badge
                                                     variant="outline"
-                                                    className="border-status-warning/30 bg-status-warning text-[10px] text-status-warning"
+                                                    className={needsApprovalBadgeClassName}
                                                 >
                                                     Needs approval
                                                 </Badge>
@@ -997,7 +1002,9 @@ export default function TimesheetsIndex({
                                                                 'submitted' ? (
                                                                 <Badge
                                                                     variant="outline"
-                                                                    className="border-status-warning/30 bg-status-warning text-[10px] text-status-warning"
+                                                                    className={
+                                                                        needsApprovalBadgeClassName
+                                                                    }
                                                                 >
                                                                     Needs
                                                                     approval

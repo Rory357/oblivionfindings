@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Models\Client;
 use App\Models\Shift;
 use App\Models\Site;
@@ -56,6 +57,54 @@ it('exposes the active shift site with every co-resident', function () {
             ->where('active_shift.site.residents.0.first_name', 'Margaret')
             ->where('active_shift.site.residents.0.initials', 'MH')
             ->where('active_shift.site.residents.0.hue', ResidentHue::for($margaret->id))
+        );
+});
+
+it('uses the open attendance session shift as the active site shift after the UTC date rolls over', function () {
+    Carbon::setTestNow(Carbon::parse('2026-05-23 17:30:00', 'Pacific/Auckland'));
+
+    $worker = User::factory()->frontlineWorker()->create();
+    $site = Site::factory()->create(['name' => 'Rimu House', 'type' => 'house']);
+    $client = Client::factory()->create([
+        'site_id' => $site->id,
+        'first_name' => 'Margaret',
+        'last_name' => 'Hewitt',
+    ]);
+    Client::factory()->create([
+        'site_id' => $site->id,
+        'first_name' => 'Hone',
+        'last_name' => 'Tamati',
+    ]);
+
+    $start = Carbon::parse('2026-05-23 09:00:00', 'Pacific/Auckland');
+    $shift = Shift::factory()
+        ->assignedToday($worker, $start)
+        ->inProgress()
+        ->create([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+            'ends_at' => Carbon::parse('2026-05-23 18:00:00', 'Pacific/Auckland')->utc(),
+        ]);
+
+    HrAttendanceSession::query()->create([
+        'user_id' => $worker->id,
+        'shift_id' => $shift->id,
+        'site_id' => $site->id,
+        'clock_in_at' => $start->copy()->utc(),
+        'status' => 'open',
+        'source' => 'web',
+        'created_by' => $worker->id,
+    ]);
+
+    $this->actingAs($worker)
+        ->get('/my-day')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('my-day/index')
+            ->where('clock.open_session.shift_id', $shift->id)
+            ->where('active_shift.id', $shift->id)
+            ->where('active_shift.site.id', $site->id)
+            ->has('active_shift.site.residents', 2)
         );
 });
 
