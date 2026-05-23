@@ -6,6 +6,7 @@ use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ClientIncidentAttachment;
 use App\Models\IncidentTemplate;
+use App\Models\Shift;
 use App\Models\User;
 use App\Services\NotificationService;
 use Illuminate\Http\Request;
@@ -106,10 +107,37 @@ class IncidentController extends Controller
             }
         }
 
+        // Prefill from query params used by /my-day: ?shift_id=... ?client_id=...
+        // The hero passes shift_id; resident cards pass client_id. We surface the
+        // values so the wizard can both pre-select the client and forward the
+        // shift_id with the draft create so the audit trail keeps the link.
+        $prefill = [
+            'client_id' => null,
+            'shift_id' => null,
+        ];
+        if ($request->filled('shift_id')) {
+            $shift = Shift::query()->find((int) $request->query('shift_id'));
+            if ($shift && ($shift->user_id === $user->id || $user->canDo('incidents.viewAny'))) {
+                $prefill['shift_id'] = $shift->id;
+                // Default to the shift's primary client unless an explicit
+                // client_id overrides below.
+                if ($shift->client_id) {
+                    $prefill['client_id'] = (int) $shift->client_id;
+                }
+            }
+        }
+        if ($request->filled('client_id')) {
+            $clientId = (int) $request->query('client_id');
+            if ($clients->contains('id', $clientId)) {
+                $prefill['client_id'] = $clientId;
+            }
+        }
+
         return inertia('incidents/create', [
             'clients' => $clients,
             'templates' => $templates,
             'resumeIncident' => $resumeIncident,
+            'prefill' => $prefill,
         ]);
     }
 
@@ -119,6 +147,7 @@ class IncidentController extends Controller
 
         $data = $request->validate([
             'client_id' => ['required', 'integer', 'exists:clients,id'],
+            'shift_id' => ['nullable', 'integer', 'exists:shifts,id'],
             'template_id' => ['nullable', 'integer', 'exists:incident_templates,id'],
             'type' => ['required', 'string', 'max:120'],
             'severity' => ['required', 'in:low,medium,high'],
@@ -148,10 +177,20 @@ class IncidentController extends Controller
         $client = Client::query()->findOrFail($data['client_id']);
         $this->authorize('view', $client);
 
+        // Only persist shift_id when the reporter is the assigned worker on
+        // that shift (or a manager). Stops a worker forging the link.
+        $shiftId = null;
+        if (! empty($data['shift_id'])) {
+            $shift = Shift::query()->find((int) $data['shift_id']);
+            if ($shift && ($shift->user_id === $request->user()?->id || $request->user()?->canDo('incidents.viewAny'))) {
+                $shiftId = $shift->id;
+            }
+        }
+
         $incident = ClientIncident::create([
             'client_id' => $client->id,
             'reported_by' => $request->user()?->id,
-            'shift_id' => null,
+            'shift_id' => $shiftId,
             'template_id' => $data['template_id'] ?? null,
             'type' => $data['type'],
             'severity' => $data['severity'],

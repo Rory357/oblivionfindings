@@ -43,10 +43,16 @@ type ResumeIncident = {
     medical_treatment_type: string | null;
 };
 
+type Prefill = {
+    client_id: number | null;
+    shift_id: number | null;
+};
+
 type Props = {
     clients: Client[];
     templates: unknown[];
     resumeIncident?: ResumeIncident | null;
+    prefill?: Prefill | null;
 };
 
 type WizardData = StepOneData & StepTwoData & StepThreeData;
@@ -112,7 +118,7 @@ const WORKFLOW_HELP = [
     'Close after follow-up',
 ];
 
-export default function IncidentCreate({ clients, resumeIncident }: Props) {
+export default function IncidentCreate({ clients, resumeIncident, prefill }: Props) {
     const page = usePage().props as {
         auth?: { user?: { id?: number } };
         labels?: Record<string, string>;
@@ -125,6 +131,10 @@ export default function IncidentCreate({ clients, resumeIncident }: Props) {
     const [data, setData] = useState<WizardData>(DEFAULT_DATA);
     const [step, setStep] = useState(0);
     const [incidentId, setIncidentId] = useState<number | null>(null);
+    // shift_id is not part of the editable wizard data — it's a context tag
+    // captured from /my-day and forwarded with the create call so the
+    // incident keeps its shift link in the audit trail.
+    const [shiftId, setShiftId] = useState<number | null>(prefill?.shift_id ?? null);
     const [errors, setErrors] = useState<
         Partial<Record<keyof WizardData, string>>
     >({});
@@ -191,6 +201,14 @@ export default function IncidentCreate({ clients, resumeIncident }: Props) {
                         ?.incidentId ?? null,
             });
         } else {
+            // No draft to resume — apply prefill (from /my-day shift/client
+            // query params) so the wizard opens with the right client picked.
+            if (prefill?.client_id) {
+                setData((prev) => ({
+                    ...prev,
+                    client_id: String(prefill.client_id),
+                }));
+            }
             setBootstrapped(true);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
@@ -252,6 +270,7 @@ export default function IncidentCreate({ clients, resumeIncident }: Props) {
             '/incidents',
             {
                 client_id: data.client_id,
+                shift_id: shiftId,
                 type: data.type,
                 severity: data.severity,
                 occurred_at: data.occurred_at || null,

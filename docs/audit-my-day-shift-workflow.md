@@ -50,28 +50,44 @@ Polish → Fixed:
 
 Verified live via probe (`probe.php` deleted after use): permission gates return 403 when stripped, 302/200 otherwise.
 
+## Fixes shipped (this session)
+
+Residential allocation semantics — Decision A confirmed (divide hours across residents):
+- Validator no longer bypasses the sum check for `residential_house` ([MyDayActionsController.php:245](../app/Http/Controllers/MyDayActionsController.php#L245)). Frontend's equal-split already produces an exact sum, so this just stops a future caller from sneaking in 3× double-billing without the popup.
+
+Incident `shift_id` audit trail — was being silently dropped:
+- `IncidentController::create` now reads `?shift_id=...` and `?client_id=...` query params (used by `/my-day` hero + resident cards), validates the worker is on that shift, and passes them through as a `prefill` prop ([IncidentController.php:97-117](../app/Http/Controllers/IncidentController.php#L97)).
+- `IncidentController::store` now accepts `shift_id`, re-validates ownership (worker on shift, or `incidents.viewAny`), and persists it instead of hard-coding `null` ([IncidentController.php:163-174](../app/Http/Controllers/IncidentController.php#L163)).
+- `incidents/create.tsx` now accepts the `prefill` prop, seeds `data.client_id` from it, and forwards `shift_id` in the create POST ([incidents/create.tsx:130](../resources/js/pages/incidents/create.tsx#L130)).
+
+Returned → submitted cycle — stale metadata fixed:
+- `MyDayActionsController::submitTimesheet` now mirrors `TimesheetApprovalService::submittedFields()` and clears `returned_at`/`returned_by`/`returned_notes` plus the approval fields when transitioning out of `returned` ([MyDayActionsController.php:174-188](../app/Http/Controllers/MyDayActionsController.php#L174)). Without this, a returned timesheet that was resubmitted via the `/my-day` popup kept the old "returned" stamp alongside the new "submitted" status, confusing manager re-review.
+
 ## Open decisions / flagged but not fixed
 
-1. **Residential allocation semantics** ([_dialogs.tsx:1203](../resources/js/pages/my-day/_dialogs.tsx#L1203), [MyDayActionsController.php:244](../app/Http/Controllers/MyDayActionsController.php#L244)). The popup divides total hours evenly for `residential_house`. The PHP validator bypasses the sum check for residential. Two interpretations:
-   - (A) Residential = "shared support, divide hours". Seeder uses this (2.5h × 3 = 7.5h). Frontend matches.
-   - (B) Residential = "house bills each resident for full shift". Validator-bypass implies this (7.5h × 3 = 22.5h of billing).
-   Decision needed from user. Then either change `seedRows` or update the description.
+1. ~~**Residential allocation semantics**~~ — Resolved in this session: Decision A (divide hours). Validator tightened; see "Fixes shipped (this session)".
 
 2. **`clients_candidates` excludes `shift_clients` pivot** ([MyTasksController.php:758](../app/Http/Controllers/MyTasksController.php#L758)). Validator allows allocating to group-shift clients ([MyDayActionsController.php:306](../app/Http/Controllers/MyDayActionsController.php#L306)) but the popup doesn't list them. Harmless while the schema is dormant; will need a fix when group shifts go live.
 
 3. **Multi-resident shifts lose top-level Care plan quick action** ([my-day-hero.tsx:247](../resources/js/pages/my-day/components/my-day-hero.tsx#L247)). Care plans are still accessible via avatar-stack popovers per resident. Acceptable today.
 
+4. **Time-segmented allocation hours are decoupled from the time range** ([_dialogs.tsx:1579](../resources/js/pages/my-day/_dialogs.tsx#L1579), [MyDayActionsController.php:264](../app/Http/Controllers/MyDayActionsController.php#L264)). The popup shows start/end time inputs per row but doesn't:
+   - Compute hours from the time range automatically (worker can enter `09:00–10:00` but type `5h` in the hours field — the sum check still passes if other rows compensate).
+   - Validate that segments don't overlap (same worker shouldn't be 1:1 with two clients at the same wall-clock time).
+   - Confirm segments stay within the timesheet's `starts_at`/`ends_at` window.
+   The feature works for trusted workers but is currently more "manual mode with extra timestamp fields" than a real time-segmented audit trail. Worth tightening before sequential 1:1 shifts go live.
+
 ## What I didn't check (TODO for next session)
 
 - **Mobile sheets** (`active-shift-card`, `clock-in-card` use `Sheet` on mobile) — out of scope per audit instructions (web-only).
-- **Incident creation form** depth-audit — `Report incident` button hands off correctly to `/incidents/create?shift_id=...` but the destination form wasn't audited.
-- **Live end-to-end submit → approve → BillingEntry generation** — couldn't impersonate via browser. Reconciliation guard fires for seeded sw1 because actual clock-in is far off planned (446 min difference). To live-test:
+- **Live end-to-end submit → approve → BillingEntry generation** — couldn't impersonate via browser. Reconciliation guard fires for seeded sw1 because actual clock-in is far off planned (446 min difference). Static review of `TimesheetApprovalService::approve` → `syncApprovedTimesheet` → `BillingService::generateFromTimesheet` confirms the path is correct; covered by `GenerateFromTimesheetAllocationsTest`. To live-test:
   - Reset sw1's open session and re-clock-in close to planned 09:00 NZ.
   - Or seed a fresh shift with planned times aligned to "now".
-- **Care plan / observations dialog drives** — spot-checked for popup style guide only, didn't record each obs type.
-- **Direct `POST /operations/timesheets/store` by a worker** — back-compat path left open because `TimesheetControllerTest::test_staff_can_store_draft_timesheet_for_their_own_shift` expects it. UI button hidden, API path still works.
-- **Time-segmented allocation method** — popup logic for `starts_at`/`ends_at` per row not driven through a full submit cycle.
-- **Returned timesheet re-submit cycle** — clicking "Fix and resubmit" in paperwork panel opens the popup; not driven to a manager rejection + resubmit cycle live.
+- **Care plan / observations dialog drives** — `RecordObservationDialog` and `VitalsRecordDialog` follow the popup style guide (shell+body, inline width, conditional render); didn't record one of each observation type to the DB.
+- ~~**Direct `POST /operations/timesheets/store` by a worker**~~ — Audited: gated by `timesheets.create`, restricted to own shift, duplicate-prevented, snapshot-built, reconciled. Safe.
+- ~~**Time-segmented allocation method**~~ — Audited statically; popup logic and validator look consistent. Real defects (no overlap check, hours decoupled from range) recorded in "Open decisions" §4 above.
+- ~~**Returned timesheet re-submit cycle**~~ — Audited: wiring correct (paperwork panel → TimesheetReviewDialog → `/my-tasks/timesheet/{id}/submit` accepts both `draft` and `returned`). Fixed stale-metadata bug while in there; see "Fixes shipped (this session)".
+- ~~**Incident creation form**~~ — Audited: found `shift_id` was being silently dropped, fixed. See "Fixes shipped (this session)".
 
 ## How to resume
 

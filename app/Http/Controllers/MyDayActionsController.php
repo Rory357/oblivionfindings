@@ -171,10 +171,19 @@ class MyDayActionsController extends Controller
                 $this->persistAllocations($timesheet, $allocations);
             }
 
+            // Mirror TimesheetApprovalService::submittedFields(): clear the
+            // returned/approval metadata so a returned → submitted cycle
+            // leaves a clean state for the manager re-reviewing it.
             $timesheet->update([
                 'status' => 'submitted',
                 'submitted_at' => now(),
                 'submitted_by' => $user->id,
+                'approved_by' => null,
+                'approved_at' => null,
+                'decision_notes' => null,
+                'returned_at' => null,
+                'returned_by' => null,
+                'returned_notes' => null,
             ]);
         });
 
@@ -243,15 +252,12 @@ class MyDayActionsController extends Controller
         }
 
         // Sum of hours must match the timesheet total within rounding tolerance.
-        // Residential houses skip the strict sum check — the residents share
-        // the same total and the worker isn't attesting per-resident time.
-        $method = $allocations->first()['allocation_method'] ?? null;
-        $isResidential = $method === TimesheetClientAllocation::METHOD_RESIDENTIAL_HOUSE;
-
+        // Residential houses divide the same total across residents (equal
+        // split), so the sum still equals total_hours — no bypass needed.
         $totalAllocated = (float) $allocations->sum(fn ($a) => (float) $a['hours']);
         $timesheetHours = (float) $timesheet->total_hours;
 
-        if (! $isResidential && abs($totalAllocated - $timesheetHours) > 0.02) {
+        if (abs($totalAllocated - $timesheetHours) > 0.02) {
             throw ValidationException::withMessages([
                 'client_allocations' => sprintf(
                     'Allocations total %.2fh but the timesheet is %.2fh.',
