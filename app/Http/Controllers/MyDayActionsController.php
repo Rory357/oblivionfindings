@@ -71,6 +71,11 @@ class MyDayActionsController extends Controller
     {
         $user = $request->user();
         abort_unless($user, 403);
+        // Mirror the timesheet-create permission already required by the
+        // canonical `POST /operations/timesheets` endpoint. Without this gate
+        // a worker who has lost timesheets.create can still mint today's
+        // draft via the /my-day popup path.
+        abort_unless($user->canDo('timesheets.create'), 403);
 
         $tz = config('app.worker_timezone', 'Pacific/Auckland');
         $now = Carbon::now($tz);
@@ -150,13 +155,18 @@ class MyDayActionsController extends Controller
      */
     public function submitTimesheet(Request $request, Timesheet $timesheet)
     {
-        abort_unless($request->user(), 403);
-        abort_unless($timesheet->user_id === $request->user()->id, 403);
+        $user = $request->user();
+        abort_unless($user, 403);
+        // Match the canonical operations.timesheets.submit gate. A worker
+        // whose timesheets.submit was revoked must not be able to submit via
+        // the /my-day popup path either.
+        abort_unless($user->canDo('timesheets.submit'), 403);
+        abort_unless($timesheet->user_id === $user->id, 403);
         abort_unless(in_array($timesheet->status, ['draft', 'returned']), 422);
 
         $allocations = $this->validateAllocations($request, $timesheet);
 
-        DB::transaction(function () use ($request, $timesheet, $allocations): void {
+        DB::transaction(function () use ($user, $timesheet, $allocations): void {
             if ($allocations !== null) {
                 $this->persistAllocations($timesheet, $allocations);
             }
@@ -164,7 +174,7 @@ class MyDayActionsController extends Controller
             $timesheet->update([
                 'status' => 'submitted',
                 'submitted_at' => now(),
-                'submitted_by' => $request->user()->id,
+                'submitted_by' => $user->id,
             ]);
         });
 

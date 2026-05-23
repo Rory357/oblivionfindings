@@ -267,7 +267,19 @@ export default function TimesheetsIndex({
                                     </Link>
                                 </Button>
                             ) : null}
-                            {canCreate && !isApprovalMode ? (
+                            {/*
+                              * Workers create today's timesheet via the
+                              * /my-day "Today's timesheet" popup (find-or-
+                              * creates a draft against their active shift,
+                              * then opens the per-client allocation review).
+                              * The legacy `/operations/timesheets/create`
+                              * form stays available for managers + admins
+                              * who need to mint a retroactive timesheet
+                              * manually, but is hidden from the worker's
+                              * own-list view so we don't ship two parallel
+                              * create paths.
+                              */}
+                            {canCreate && !isApprovalMode && !isWorkerView ? (
                                 <Button asChild>
                                     <Link href={createTimesheet.url()}>
                                         Create
@@ -1036,7 +1048,7 @@ export default function TimesheetsIndex({
                         }
                         itemName="timesheet"
                         createHref={
-                            canCreate && !isApprovalMode
+                            canCreate && !isApprovalMode && !isWorkerView
                                 ? createTimesheet.url()
                                 : undefined
                         }

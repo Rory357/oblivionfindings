@@ -266,7 +266,16 @@ export function MyDayHero({
               : []),
         { icon: AlertTriangle, label: t('qa_report_incident'), href: incidentHref },
         ...(carePlanHref ? [{ icon: ShieldCheck, label: t('qa_care_plan'), href: carePlanHref }] : []),
-        { icon: FileText, label: t('qa_submit_timesheet'), href: '/operations/timesheets' },
+        // "Submit timesheet" used to deep-link to /operations/timesheets,
+        // which duplicates the top-right "Today's timesheet" action and
+        // bounces the worker out of /my-day to a list view. When the popup
+        // handler is wired we prefer it — workers stay on /my-day, the
+        // server find-or-creates today's draft, and the review window opens
+        // immediately. The list link remains the fallback for callers that
+        // don't wire `onOpenTimesheet`.
+        onOpenTimesheet
+            ? { icon: FileText, label: t('qa_submit_timesheet'), onClick: onOpenTimesheet }
+            : { icon: FileText, label: t('qa_submit_timesheet'), href: '/operations/timesheets' },
         // The "Write handover" button is the worker's outgoing handover — only
         // useful mid-shift (we have an active shift id) and not yet submitted.
         // It opens HandoverWriteSheet via the parent's onWriteHandover.

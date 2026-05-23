@@ -6,7 +6,7 @@ import {
     Home,
     Users,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import EndOfShiftChecklist, {
@@ -340,8 +340,8 @@ export default function MyDay() {
         // server find-or-create one. The flash watcher below picks up
         // `open_timesheet_id` once props refresh and opens the popup. The
         // server returns a validation error (no shift today) if there's
-        // genuinely nothing to write against; in that case we leave the
-        // worker on /my-day with the error visible.
+        // genuinely nothing to write against; surface that explicitly so
+        // the worker doesn't click "Today's timesheet" into a void.
         setEnsuringTimesheet(true);
         router.post(
             '/my-tasks/timesheet/ensure-today',
@@ -349,6 +349,14 @@ export default function MyDay() {
             {
                 preserveScroll: true,
                 preserveState: true,
+                onError: (errors) => {
+                    const message =
+                        (errors as Record<string, string>).timesheet
+                        ?? 'Could not open today’s timesheet — you don’t have a shift scheduled today.';
+                    if (typeof window !== 'undefined') {
+                        window.alert(message);
+                    }
+                },
                 onFinish: () => setEnsuringTimesheet(false),
             },
         );
@@ -357,21 +365,28 @@ export default function MyDay() {
     // Inertia flash `open_timesheet_id` is set by /ensure-today after it
     // finds-or-creates a draft for today. When we see it land, look up the
     // matching timesheet in the (now-refreshed) props and pop the review
-    // dialog open. Guard with a ref-like check so we don't re-open if the
-    // user closes the popup and the flash sticks around.
+    // dialog open.
+    //
+    // The flash prop is a one-shot signal but it survives in `props` until
+    // the next Inertia visit. Without a guard the effect re-fires every
+    // time the user closes the popup → state change → re-render → reopen.
+    // Track the last id we handled in a ref so we open the popup exactly
+    // once per ensure-today round-trip.
     const lastHandledFlashId =
         (props as { flash?: { open_timesheet_id?: number } }).flash
             ?.open_timesheet_id ?? null;
+    const handledFlashIdRef = useRef<number | null>(null);
     useEffect(() => {
         if (!lastHandledFlashId) return;
-        if (timesheetUnderReview?.id === lastHandledFlashId) return;
+        if (handledFlashIdRef.current === lastHandledFlashId) return;
         const fresh = (props.timesheets ?? []).find(
             (ts) => ts.id === lastHandledFlashId,
         );
         if (fresh) {
+            handledFlashIdRef.current = lastHandledFlashId;
             setTimesheetUnderReview(fresh as MyDayTimesheet);
         }
-    }, [lastHandledFlashId, props.timesheets, timesheetUnderReview?.id]);
+    }, [lastHandledFlashId, props.timesheets]);
 
     const handleConfirmHandoverRead = useCallback(() => {
         const handoverId = props.handover?.id;
