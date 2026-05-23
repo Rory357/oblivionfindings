@@ -381,7 +381,7 @@ class AttendanceService
             }
 
             if (! in_array($shift->status, ['draft', 'scheduled', 'in_progress'], true)) {
-                throw new \LogicException('This shift cannot be clocked into in its current status.');
+                throw new \LogicException($this->clockInBlockedMessageFor((string) $shift->status));
             }
 
             return $shift;
@@ -394,6 +394,15 @@ class AttendanceService
         }
 
         return $eligibleShifts->first();
+    }
+
+    protected function clockInBlockedMessageFor(string $status): string
+    {
+        return match ($status) {
+            'completed' => 'This shift has already been completed. Ask your manager to create a timesheet amendment if you need to adjust your hours.',
+            'cancelled' => 'This shift was cancelled and cannot be clocked into. Ask your manager if it should be reinstated.',
+            default => "This shift cannot be clocked into in its current status ({$status}).",
+        };
     }
 
     protected function resolveOpenSessionForUser(User $user, ?HrAttendanceSession $session = null): HrAttendanceSession
