@@ -1,4 +1,9 @@
 import PageShell from '@/components/page-shell';
+import TimesheetAllocationsBreakdown, {
+    type AllocationCandidate,
+    type AllocationMethod,
+    type ClientAllocation,
+} from '@/components/timesheet-allocations-breakdown';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
@@ -23,8 +28,12 @@ type PendingTimesheet = {
     submitted_at?: string | null;
     duration_minutes?: number | null;
     hours?: number | null;
+    total_hours?: number | null;
     client?: { id: number; first_name: string; last_name: string } | null;
     staff?: { id: number; name: string } | null;
+    client_allocations?: ClientAllocation[];
+    clients_candidates?: AllocationCandidate[];
+    allocation_method?: AllocationMethod;
 };
 
 type Props = {
@@ -242,83 +251,118 @@ export default function TimesheetApprovalsPage({ timesheets }: Props) {
                                     <div
                                         key={timesheet.id}
                                         data-test="approvals-row"
-                                        className="grid gap-3 border-b px-4 py-4 last:border-b-0 md:grid-cols-[40px,1.3fr,1fr,1fr,0.9fr,120px] md:items-center"
+                                        className="border-b px-4 py-4 last:border-b-0"
                                     >
-                                        <label className="flex items-center md:justify-center">
-                                            <input
-                                                type="checkbox"
-                                                data-test="approvals-row-checkbox"
-                                                checked={selectedIds.includes(
-                                                    timesheet.id,
-                                                )}
-                                                onChange={() =>
-                                                    toggleOne(timesheet.id)
-                                                }
-                                            />
-                                        </label>
-                                        <div>
-                                            <p className="text-sm font-semibold">
-                                                {timesheet.client
-                                                    ? `${timesheet.client.first_name} ${timesheet.client.last_name}`
-                                                    : `Timesheet #${timesheet.id}`}
-                                            </p>
-                                            <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
-                                                <Badge
-                                                    variant="secondary"
-                                                    className="h-4 px-1.5 text-[9px] capitalize"
-                                                >
-                                                    {timesheet.status}
-                                                </Badge>
-                                                <span className="inline-flex items-center gap-1">
-                                                    <Clock3 className="h-3 w-3" />
-                                                    Submitted{' '}
-                                                    {formatDate(
-                                                        timesheet.submitted_at,
+                                        <div className="grid gap-3 md:grid-cols-[40px,1.3fr,1fr,1fr,0.9fr,120px] md:items-center">
+                                            <label className="flex items-center md:justify-center">
+                                                <input
+                                                    type="checkbox"
+                                                    data-test="approvals-row-checkbox"
+                                                    checked={selectedIds.includes(
+                                                        timesheet.id,
                                                     )}
-                                                </span>
+                                                    onChange={() =>
+                                                        toggleOne(timesheet.id)
+                                                    }
+                                                />
+                                            </label>
+                                            <div>
+                                                <p className="text-sm font-semibold">
+                                                    {timesheet.client
+                                                        ? `${timesheet.client.first_name} ${timesheet.client.last_name}`
+                                                        : `Timesheet #${timesheet.id}`}
+                                                </p>
+                                                <div className="mt-1 flex items-center gap-2 text-xs text-muted-foreground">
+                                                    <Badge
+                                                        variant="secondary"
+                                                        className="h-4 px-1.5 text-[9px] capitalize"
+                                                    >
+                                                        {timesheet.status}
+                                                    </Badge>
+                                                    <span className="inline-flex items-center gap-1">
+                                                        <Clock3 className="h-3 w-3" />
+                                                        Submitted{' '}
+                                                        {formatDate(
+                                                            timesheet.submitted_at,
+                                                        )}
+                                                    </span>
+                                                </div>
+                                            </div>
+                                            <p className="text-sm text-muted-foreground">
+                                                {timesheet.staff?.name ?? '-'}
+                                            </p>
+                                            <p className="text-sm text-muted-foreground">
+                                                {formatDate(timesheet.work_date)}
+                                            </p>
+                                            <p className="text-sm text-muted-foreground">
+                                                {formatHours(timesheet)}
+                                            </p>
+                                            <div className="flex items-center gap-2">
+                                                <Button
+                                                    asChild
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    className="h-8 w-8 p-0"
+                                                >
+                                                    <Link
+                                                        href={`/operations/timesheets/${timesheet.id}/edit`}
+                                                    >
+                                                        <Eye className="h-3.5 w-3.5" />
+                                                    </Link>
+                                                </Button>
+                                                <Button
+                                                    size="sm"
+                                                    onClick={() =>
+                                                        runBulkAction(
+                                                            '/operations/timesheets/bulk-approve',
+                                                            {},
+                                                            [timesheet.id],
+                                                        )
+                                                    }
+                                                    disabled={
+                                                        selectedIds.length > 0 &&
+                                                        !selectedIds.includes(
+                                                            timesheet.id,
+                                                        )
+                                                    }
+                                                >
+                                                    Approve
+                                                </Button>
                                             </div>
                                         </div>
-                                        <p className="text-sm text-muted-foreground">
-                                            {timesheet.staff?.name ?? '-'}
-                                        </p>
-                                        <p className="text-sm text-muted-foreground">
-                                            {formatDate(timesheet.work_date)}
-                                        </p>
-                                        <p className="text-sm text-muted-foreground">
-                                            {formatHours(timesheet)}
-                                        </p>
-                                        <div className="flex items-center gap-2">
-                                            <Button
-                                                asChild
-                                                size="sm"
-                                                variant="ghost"
-                                                className="h-8 w-8 p-0"
-                                            >
-                                                <Link
-                                                    href={`/operations/timesheets/${timesheet.id}/edit`}
-                                                >
-                                                    <Eye className="h-3.5 w-3.5" />
-                                                </Link>
-                                            </Button>
-                                            <Button
-                                                size="sm"
-                                                onClick={() =>
-                                                    runBulkAction(
-                                                        '/operations/timesheets/bulk-approve',
-                                                        {},
-                                                        [timesheet.id],
-                                                    )
-                                                }
-                                                disabled={
-                                                    selectedIds.length > 0 &&
-                                                    !selectedIds.includes(
-                                                        timesheet.id,
-                                                    )
-                                                }
-                                            >
-                                                Approve
-                                            </Button>
-                                        </div>
+
+                                        {/* Per-client allocation breakdown for
+                                            the approver. Compact so the queue
+                                            stays scannable; synthesised single-
+                                            row timesheets render as a 1-line
+                                            notice. */}
+                                        {Array.isArray(
+                                            timesheet.client_allocations,
+                                        ) &&
+                                        timesheet.client_allocations.length >
+                                            0 ? (
+                                            <div className="mt-3 md:ml-10">
+                                                <TimesheetAllocationsBreakdown
+                                                    allocations={
+                                                        timesheet.client_allocations
+                                                    }
+                                                    candidates={
+                                                        timesheet.clients_candidates ??
+                                                        []
+                                                    }
+                                                    method={
+                                                        timesheet.allocation_method ??
+                                                        'single'
+                                                    }
+                                                    totalHours={Number(
+                                                        timesheet.total_hours ??
+                                                            timesheet.hours ??
+                                                            0,
+                                                    )}
+                                                    compact
+                                                />
+                                            </div>
+                                        ) : null}
                                     </div>
                                 ))}
                             </CardContent>

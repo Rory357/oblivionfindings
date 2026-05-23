@@ -1,6 +1,7 @@
 import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { ShiftStatusBadge } from '@/components/shift-status-badge';
+import TimesheetAllocationsBreakdown from '@/components/timesheet-allocations-breakdown';
 import TimesheetReturnBanner from '@/components/timesheet-return-banner';
 import { TimesheetStatusBadge } from '@/components/timesheet-status-badge';
 import { Badge } from '@/components/ui/badge';
@@ -251,6 +252,21 @@ export default function TimesheetEdit({
                             </div>
                         </CardContent>
                     </Card>
+                ) : null}
+
+                {/* Per-client allocation breakdown (read-only). Editing lives in
+                    the My Day worker popup; this just lets approvers confirm
+                    time was attributed correctly before clicking Approve. */}
+                {Array.isArray(timesheet.client_allocations) &&
+                timesheet.client_allocations.length > 0 ? (
+                    <div className="max-w-2xl">
+                        <TimesheetAllocationsBreakdown
+                            allocations={timesheet.client_allocations}
+                            candidates={timesheet.clients_candidates ?? []}
+                            method={timesheet.allocation_method ?? 'single'}
+                            totalHours={Number(timesheet.total_hours ?? 0)}
+                        />
+                    </div>
                 ) : null}
 
                 {/* Edit form */}

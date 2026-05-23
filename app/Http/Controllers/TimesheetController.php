@@ -24,17 +24,93 @@ class TimesheetController extends Controller
         abort_unless($this->canReviewTimesheets($auth), 403);
 
         $pending = Timesheet::query()
-            ->with(['client:id,first_name,last_name', 'staff:id,name,email'])
+            ->with([
+                'client:id,first_name,last_name',
+                'staff:id,name,email',
+                // PR — ship the per-client breakdown alongside each row so
+                // approvers can confirm time was attributed correctly before
+                // clicking Approve. Mirrors MyTasksController::getTimesheets.
+                'clientAllocations.client:id,first_name,last_name',
+                'shift.site.clients:id,site_id,first_name,last_name',
+            ])
             ->where('status', 'submitted')
             ->orderByDesc('submitted_at')
             ->tap(fn ($query) => $this->siteAccess()->applyTimesheetScope($query, $auth, $this->timesheetBypassPermissions()))
             ->paginate(25)
             ->withQueryString();
 
+        $pending = $pending->through(fn (Timesheet $ts) => $this->serializeTimesheetForApproval($ts));
+
         return inertia('operations/timesheets/approvals', [
             'timesheets' => $pending,
             'filters' => $request->only(['from', 'to', 'client_id', 'staff_id']),
         ]);
+    }
+
+    /**
+     * Serialise a timesheet for the approval queue: base model attrs + the
+     * per-client allocation breakdown. Same contract as
+     * {@see MyTasksController::getTimesheets} so the front-end can render
+     * either source through the shared breakdown component.
+     *
+     * @return array<string, mixed>
+     */
+    protected function serializeTimesheetForApproval(Timesheet $ts): array
+    {
+        $data = $ts->toArray();
+        $data['total_hours'] = (float) $ts->total_hours;
+        $data['client_allocations'] = $ts->effectiveClientAllocations()->all();
+        $data['allocation_method'] = $ts->dominantAllocationMethod();
+        $data['clients_candidates'] = $this->buildAllocationCandidates($ts);
+
+        return $data;
+    }
+
+    /**
+     * Eligible-client roster the worker may attribute time to. Mirrors the
+     * candidate list built by {@see MyTasksController::getTimesheets} so the
+     * front-end can look up resident names for allocation rows.
+     *
+     * @return array<int, array{id:int,name:string,is_primary:bool}>
+     */
+    protected function buildAllocationCandidates(Timesheet $timesheet): array
+    {
+        $candidatesById = [];
+
+        if ($timesheet->client) {
+            $candidatesById[$timesheet->client->id] = [
+                'id' => (int) $timesheet->client->id,
+                'name' => trim($timesheet->client->first_name.' '.$timesheet->client->last_name),
+                'is_primary' => true,
+            ];
+        }
+
+        $siteClients = $timesheet->shift?->site?->clients ?? collect();
+        foreach ($siteClients as $sc) {
+            if (! isset($candidatesById[$sc->id])) {
+                $candidatesById[$sc->id] = [
+                    'id' => (int) $sc->id,
+                    'name' => trim($sc->first_name.' '.$sc->last_name),
+                    'is_primary' => false,
+                ];
+            }
+        }
+
+        // Defensive: include any allocation-row clients that aren't in the
+        // candidate set (e.g. site changed after the rows were written).
+        if ($timesheet->relationLoaded('clientAllocations')) {
+            foreach ($timesheet->clientAllocations as $a) {
+                if (! isset($candidatesById[$a->client_id]) && $a->client) {
+                    $candidatesById[$a->client_id] = [
+                        'id' => (int) $a->client_id,
+                        'name' => trim($a->client->first_name.' '.$a->client->last_name),
+                        'is_primary' => false,
+                    ];
+                }
+            }
+        }
+
+        return array_values($candidatesById);
     }
 
     public function bulkApprove(Request $request)
@@ -383,6 +459,10 @@ class TimesheetController extends Controller
             'shift:id,client_id,service_context_id,starts_at,ends_at,location,shift_type,is_sleepover,is_on_call,expected_break_minutes,status,user_id',
             'shift.serviceContext:id,name',
             'shift.staff:id,name,email',
+            // PR — per-client allocation breakdown shown read-only in the
+            // approver UI. See `Timesheet::effectiveClientAllocations()`.
+            'clientAllocations.client:id,first_name,last_name',
+            'shift.site.clients:id,site_id,first_name,last_name',
         ]);
         $clients = $this->siteAccess()->applyClientScope(
             Client::query(),
@@ -390,8 +470,15 @@ class TimesheetController extends Controller
             $this->timesheetBypassPermissions(),
         )->orderBy('first_name')->get(['id', 'first_name', 'last_name']);
 
+        $timesheetPayload = array_merge($timesheet->toArray(), [
+            'total_hours' => (float) $timesheet->total_hours,
+            'client_allocations' => $timesheet->effectiveClientAllocations()->all(),
+            'allocation_method' => $timesheet->dominantAllocationMethod(),
+            'clients_candidates' => $this->buildAllocationCandidates($timesheet),
+        ]);
+
         return inertia('operations/timesheets/edit', [
-            'timesheet' => $timesheet,
+            'timesheet' => $timesheetPayload,
             'clients' => $clients,
             'canApprove' => $this->canReviewTimesheets($auth),
             'canSubmit' => $auth->canDo('timesheets.submit') && ($auth->canDo('timesheets.manageAny') || $timesheet->user_id === $auth->id),
