@@ -280,11 +280,14 @@ class Timesheet extends Model
         // client. Existing data never wrote allocation rows, so this is the
         // safe default until the worker explicitly chooses a different
         // method through the review popup.
+        //
+        // The total comes from the `total_hours` accessor (starts_at - ends_at
+        // - break_minutes); there's no raw `hours` column.
         return collect([
             [
                 'id' => null,
                 'client_id' => (int) $this->client_id,
-                'hours' => (float) $this->hours,
+                'hours' => (float) $this->total_hours,
                 'allocation_method' => TimesheetClientAllocation::METHOD_SINGLE,
                 'starts_at' => null,
                 'ends_at' => null,
