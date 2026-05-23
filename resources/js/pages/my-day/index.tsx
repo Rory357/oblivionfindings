@@ -307,24 +307,30 @@ export default function MyDay() {
     }, [isOnBreak, openSession?.id]);
 
     // The "Today's timesheet" hero button used to navigate straight to
-    // `/operations/timesheets` (a list). For a worker on a live shift, the
+    // `/operations/timesheets` (a list). For a worker on a live shift the
     // expected behaviour is "let me complete TODAY's timesheet right now",
     // so look up the day's draft / returned row and open the per-client
     // review popup directly. When there isn't one yet (no clock-out has
     // written a draft), fall back to the list with a friendlier landing.
-    const handleOpenTimesheets = useCallback(() => {
+    const todaysTimesheet = useMemo<MyDayTimesheet | null>(() => {
         const todayIso = props.today_iso;
-        const todays = (props.timesheets ?? []).find(
-            (ts) =>
-                ts.work_date_iso === todayIso
-                && (ts.status === 'draft' || ts.status === 'returned'),
+        if (!todayIso) return null;
+        return (
+            (props.timesheets ?? []).find(
+                (ts) =>
+                    ts.work_date_iso === todayIso
+                    && (ts.status === 'draft' || ts.status === 'returned'),
+            ) ?? null
         );
-        if (todays) {
-            setTimesheetUnderReview(todays as MyDayTimesheet);
+    }, [props.timesheets, props.today_iso]) as MyDayTimesheet | null;
+
+    const handleOpenTimesheets = useCallback(() => {
+        if (todaysTimesheet) {
+            setTimesheetUnderReview(todaysTimesheet);
             return;
         }
         router.visit('/operations/timesheets');
-    }, [props.timesheets, props.today_iso]);
+    }, [todaysTimesheet]);
 
     const handleConfirmHandoverRead = useCallback(() => {
         const handoverId = props.handover?.id;
