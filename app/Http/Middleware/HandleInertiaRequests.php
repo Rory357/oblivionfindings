@@ -189,6 +189,10 @@ class HandleInertiaRequests extends Middleware
                 'info' => session('info'),
                 'clock_out_blockers' => session('clock_out_blockers'),
                 'rostering_report_link' => session('rostering_report_link'),
+                // /my-day's "Today's timesheet" find-or-create flow uses this
+                // to tell the front-end which draft to open in the review
+                // popup once props refresh.
+                'open_timesheet_id' => session('open_timesheet_id'),
             ],
 
             // Header inbox (notifications + announcements). Deferred so the

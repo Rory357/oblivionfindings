@@ -336,10 +336,12 @@ export default function MyDay() {
             setTimesheetUnderReview(todaysTimesheet);
             return;
         }
-        if (!activeShift) {
-            router.visit('/operations/timesheets');
-            return;
-        }
+        // No draft for today yet — POST to /ensure-today and let the
+        // server find-or-create one. The flash watcher below picks up
+        // `open_timesheet_id` once props refresh and opens the popup. The
+        // server returns a validation error (no shift today) if there's
+        // genuinely nothing to write against; in that case we leave the
+        // worker on /my-day with the error visible.
         setEnsuringTimesheet(true);
         router.post(
             '/my-tasks/timesheet/ensure-today',
@@ -350,7 +352,7 @@ export default function MyDay() {
                 onFinish: () => setEnsuringTimesheet(false),
             },
         );
-    }, [todaysTimesheet, activeShift]);
+    }, [todaysTimesheet]);
 
     // Inertia flash `open_timesheet_id` is set by /ensure-today after it
     // finds-or-creates a draft for today. When we see it land, look up the
