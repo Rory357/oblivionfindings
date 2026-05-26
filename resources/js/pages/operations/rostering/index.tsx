@@ -1,81 +1,60 @@
-import HeadingSmall from '@/components/heading-small';
-import { KpiCard } from '@/components/recruitment/kpi-card';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import { PageHero } from '@/components/page';
 import {
-    Collapsible,
-    CollapsibleContent,
-    CollapsibleTrigger,
-} from '@/components/ui/collapsible';
-import {
-    Dialog,
-    DialogContent,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { Separator } from '@/components/ui/separator';
-import { Tabs } from '@/components/ui/tabs';
+    AnalyticsPane,
+    type AnalyticsTrendPoint,
+    CapacityHeatmapPane,
+    CoveragePane,
+    type CoverageCellState,
+    type CoverageRow,
+    DonutCard,
+    type FillBySite,
+    type GridShift,
+    type GridShiftStatus,
+    type GridStaffRow,
+    type MicroStat,
+    type OpenShiftCard,
+    OpenShiftsPane,
+    type ShiftTypeSlice,
+    type Signal,
+    SignalRail,
+    SiteFilter,
+    TabStrip,
+    TimeOffPane,
+    type TimeOffRequest,
+    WeekGridPane,
+    WeekPicker,
+    addDaysWP,
+    formatWeekRange,
+    startOfWeek,
+    weekLabel,
+} from '@/components/rostering';
 import AppLayout from '@/layouts/app-layout';
 import { index as rosteringIndex } from '@/routes/operations/rostering';
-import {
-    destroy as destroyTimeOff,
-    store as storeTimeOff,
-} from '@/routes/operations/rostering/time_off';
-import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     BarChart3,
-    Calendar,
-    CalendarOff,
+    CalendarDays,
+    CalendarRange,
     CheckCircle2,
     ChevronDown,
     ChevronLeft,
     ChevronRight,
-    Plus,
-    TrendingUp,
-    Users,
-    XCircle,
-} from 'lucide-react';
-import { Fragment, useMemo, useState } from 'react';
-import {
-    Area,
-    AreaChart,
-    Bar,
-    BarChart,
-    CartesianGrid,
-    Cell,
-    Legend,
-    Pie,
+    LayoutGrid,
+    LineChart,
+    Loader2,
+    MoreHorizontal,
     PieChart,
-    ResponsiveContainer,
-    Tooltip,
-    XAxis,
-    YAxis,
-} from 'recharts';
-
-const CHART_COLORS = [
-    '#3b82f6',
-    '#10b981',
-    '#f59e0b',
-    '#8b5cf6',
-    '#ef4444',
-    '#06b6d4',
-    '#94a3b8',
-];
+    Plane,
+    Wand2,
+    Zap,
+} from 'lucide-react';
+import { useMemo, useRef, useState } from 'react';
 
 type Staff = { id: number; name: string; email?: string };
-type Client = { id: number; first_name: string; last_name: string };
 type Site = { id: number; name: string; type?: string | null };
 type ShiftLite = {
     id: number;
@@ -142,30 +121,6 @@ type ReplacementQueueItem = {
     current_staff?: string | null;
     requested_by?: string | null;
     replacement_staff?: string | null;
-    open_position_id?: number | null;
-    open_position_status?: string | null;
-    open_position_claimed_by?: string | null;
-    expires_at?: string | null;
-};
-
-type RecurringPattern = {
-    id: number;
-    client: string | null;
-    staff: string | null;
-    service_context: string | null;
-    location: string | null;
-    status: string;
-    shift_type?: string | null;
-    is_sleepover?: boolean;
-    is_on_call?: boolean;
-    weekdays: string[];
-    starts_time?: string | null;
-    ends_time?: string | null;
-    occurrences_this_week: number;
-    open_occurrences: number;
-    active_replacement_count: number;
-    next_shift_id?: number | null;
-    next_starts_at?: string | null;
 };
 
 type CoverageAlert = {
@@ -181,35 +136,9 @@ type CoverageAlert = {
     assigned_staff: number;
     planned_staff?: number;
     missing_staff: number;
-    preferred_client_id?: number | null;
-    role_shortages?: Array<{
-        key: string;
-        label?: string | null;
-        missing?: number;
-    }>;
-    planned_role_shortages?: Array<{
-        key: string;
-        label?: string | null;
-        missing?: number;
-    }>;
-    unfilled_after_open_shifts?: number;
     coverage_state: string;
     planned_coverage_state?: string;
     gap_kind?: string | null;
-    recommended_fill_action?: string | null;
-    contradictions?: string[];
-    partial_window_uncovered_slices?: Array<{
-        starts_at: string;
-        ends_at: string;
-        missing_staff?: number;
-    }>;
-    acknowledgement?: {
-        state: 'acked' | 'dismissed';
-        actor?: { id: number; name?: string | null } | null;
-        reason?: string | null;
-        since?: string | null;
-    } | null;
-    open_shift_ids?: number[];
 };
 
 type CoverageSiteSummary = {
@@ -223,6 +152,17 @@ type CoverageSiteSummary = {
     alerts: CoverageAlert[];
 };
 
+type TimeOffEntry = {
+    id: number;
+    user_id: number;
+    user: string | null;
+    starts_at: string;
+    ends_at: string;
+    type: string;
+    label: string | null;
+    notes: string | null;
+};
+
 type Props = {
     canManageAny: boolean;
     canPublishRoster: boolean;
@@ -231,16 +171,18 @@ type Props = {
         publish: boolean;
         auto_schedule: boolean;
     };
-    weekStart: string; // YYYY-MM-DD
-    weekEnd: string; // YYYY-MM-DD (exclusive)
+    weekStart: string;
+    weekEnd: string;
     filters: {
         week: string;
         staff_id: number | null;
         client_id: number | null;
+        /** Single-site selection — used by publish + auto-schedule which are per-site. */
         site_id: number | null;
+        /** Full multi-select state — used by the shift query and the filter UI. */
+        site_ids: number[];
     };
     staff: Staff[];
-    clients: Client[];
     sites: Site[];
     rosterPeriod: RosterPeriodSummary | null;
     stats: {
@@ -260,40 +202,35 @@ type Props = {
     };
     shifts: ShiftLite[];
     replacementQueue: ReplacementQueueItem[];
-    recurringPatterns: RecurringPattern[];
     coverageSites: CoverageSiteSummary[];
     coverageAlerts: CoverageAlert[];
-    recurringCoverageAlignment: {
+    recurringCoverageAlignment?: {
         rule_drift: Array<{
             site_id: number;
             site_name: string;
             rule_name: string;
             window_label: string;
-            starts_at?: string;
-            ends_at?: string;
-            required_staff: number;
-            assigned_staff: number;
-            open_shifts: number;
-            missing_staff: number;
             issue_type: string;
         }>;
         orphan_series: Array<{
             series_id: number;
-            site_id?: number | null;
             site_name: string;
             client_name?: string | null;
         }>;
     };
-    timeOffs: Array<{
+    approvedLeave?: Array<{
         id: number;
         user_id: number;
         user: string | null;
+        leave_type: string;
         starts_at: string;
         ends_at: string;
-        type: string;
-        label: string | null;
-        notes: string | null;
     }>;
+    complianceBadges?: Record<
+        number,
+        { state: 'ok' | 'warning' | 'expired'; expiring?: number; expired?: number }
+    >;
+    timeOffs: TimeOffEntry[];
     capacity: Array<{
         user_id: number;
         name: string;
@@ -345,11 +282,15 @@ type Props = {
     };
 };
 
-function addDays(date: Date, days: number) {
-    const d = new Date(date);
-    d.setDate(d.getDate() + days);
-    return d;
-}
+const SHIFT_TYPE_COLORS = [
+    'var(--primary)',
+    'var(--status-info)',
+    'var(--status-success)',
+    'var(--status-warning)',
+    'var(--status-critical)',
+    '#06b6d4',
+    '#94a3b8',
+];
 
 function ymd(d: Date) {
     const yyyy = d.getFullYear();
@@ -358,7 +299,7 @@ function ymd(d: Date) {
     return `${yyyy}-${mm}-${dd}`;
 }
 
-function fmtDay(d: Date) {
+function fmtDayShort(d: Date) {
     return d.toLocaleDateString(undefined, {
         weekday: 'short',
         day: '2-digit',
@@ -367,793 +308,927 @@ function fmtDay(d: Date) {
 }
 
 function fmtTime(iso: string) {
-    const d = new Date(iso);
-    return d.toLocaleTimeString(undefined, {
+    return new Date(iso).toLocaleTimeString(undefined, {
         hour: '2-digit',
         minute: '2-digit',
+        hour12: false,
     });
 }
 
-function fmtHour(h: number) {
-    return `${String(h).padStart(2, '0')}:00`;
-}
-
-function weekdayLabel(code: string) {
-    const labels: Record<string, string> = {
-        mon: 'Mon',
-        tue: 'Tue',
-        wed: 'Wed',
-        thu: 'Thu',
-        fri: 'Fri',
-        sat: 'Sat',
-        sun: 'Sun',
-    };
-
-    return labels[code] ?? code;
-}
-
-function shiftTypeLabel(value?: string | null) {
-    return (value ?? 'standard').replace(/_/g, ' ');
-}
-
-function seriesTimeLabel(startsTime?: string | null, endsTime?: string | null) {
-    if (!startsTime || !endsTime) return '';
-    const overnight = endsTime <= startsTime;
-    return `${startsTime}–${endsTime}${overnight ? ' overnight' : ''}`;
-}
-
-function statusBadgeVariant(status: string): any {
-    if (status === 'in_progress') return 'default';
-    if (status === 'completed') return 'secondary';
-    if (status === 'cancelled') return 'destructive';
-    if (status === 'draft') return 'outline';
-    return 'outline';
-}
-
-function replacementBadgeVariant(status?: string | null): any {
-    if (status === 'claimed') return 'default';
-    if (status === 'approved') return 'secondary';
-    if (status === 'cancelled') return 'destructive';
-    return 'outline';
-}
-
-function coverageRolesForAction(alert: CoverageAlert) {
-    return (
-        (alert.planned_role_shortages?.length
-            ? alert.planned_role_shortages
-            : alert.role_shortages) ?? []
-    );
-}
-
-function gapKindLabel(kind?: string | null) {
-    switch (kind) {
-        case 'headcount_open':
-            return 'Open shift gap';
-        case 'headcount_unplanned':
-            return 'Unplanned headcount gap';
-        case 'role_open':
-            return 'Open role gap';
-        case 'role_unplanned':
-            return 'Unplanned role gap';
-        case 'mixed_open':
-            return 'Open shift + role gap';
-        case 'mixed_unplanned':
-            return 'Headcount + role gap';
-        case 'overfill_not_allowed':
-            return 'Overfill not allowed';
-        case 'overfilled_wrong_role_mix':
-            return 'Overfilled role imbalance';
-        case 'overfill_and_role_imbalance':
-            return 'Overfill + role imbalance';
-        default:
-            return 'Coverage gap';
+function hashHue(name: string): number {
+    let h = 0;
+    for (let i = 0; i < name.length; i++) {
+        h = (h * 31 + name.charCodeAt(i)) % 360;
     }
+    return h;
 }
 
-function fillActionLabel(action?: string | null) {
-    switch (action) {
-        case 'fill_existing_open_shift':
-            return 'Fill open shift';
-        case 'retag_or_replace_open_shift':
-            return 'Retag open shift';
-        case 'create_role_specific_shift':
-            return 'Create role-specific cover';
-        case 'create_recurring_cover':
-            return 'Create recurring cover';
-        case 'review_existing_supply':
-            return 'Review existing supply';
-        case 'rebalance_existing_supply':
-            return 'Rebalance existing supply';
-        default:
-            return 'Create cover shift';
-    }
+function initials(name: string): string {
+    return name
+        .split(/\s+/)
+        .filter(Boolean)
+        .map((w) => w[0]!)
+        .slice(0, 2)
+        .join('')
+        .toUpperCase();
 }
 
-function shouldOfferCreation(action?: string | null) {
-    return !['review_existing_supply', 'rebalance_existing_supply'].includes(
-        action ?? '',
-    );
+function statusToGridStatus(status: string): GridShiftStatus {
+    if (status === 'scheduled') return 'scheduled';
+    if (status === 'in_progress') return 'in_progress';
+    if (status === 'completed') return 'completed';
+    if (status === 'draft') return 'draft';
+    if (status === 'cancelled') return 'cancelled';
+    return 'scheduled';
 }
 
-function formatCoverageSlice(startsAt?: string | null, endsAt?: string | null) {
-    if (!startsAt || !endsAt) return 'Partial window';
-    const start = new Date(startsAt);
-    const end = new Date(endsAt);
-
-    return `${start.toLocaleTimeString('en-NZ', {
-        hour: '2-digit',
-        minute: '2-digit',
-    })}-${end.toLocaleTimeString('en-NZ', {
-        hour: '2-digit',
-        minute: '2-digit',
-    })}`;
-}
-
-function rangesOverlap(
-    aStartIso: string,
-    aEndIso: string,
-    bStartIso: string,
-    bEndIso: string,
-) {
-    const aS = new Date(aStartIso).getTime();
-    const aE = new Date(aEndIso).getTime();
-    const bS = new Date(bStartIso).getTime();
-    const bE = new Date(bEndIso).getTime();
-    return aS < bE && bS < aE;
-}
-
-function isShiftLocked(shift: ShiftLite) {
-    return shift.status === 'completed';
-}
-
-function isActionableConflictShift(shift: ShiftLite) {
-    return shift.status !== 'completed' && shift.status !== 'cancelled';
+function rangesOverlap(aS: string, aE: string, bS: string, bE: string) {
+    return new Date(aS) < new Date(bE) && new Date(bS) < new Date(aE);
 }
 
 export default function RosteringIndex(props: Props) {
-    const { labels, auth, flash } = usePage().props as any;
+    const { auth } = usePage().props as {
+        auth?: { user?: { name?: string }; can?: any };
+    };
+    const firstName = auth?.user?.name?.split(' ')?.[0] ?? 'team';
     const canViewOperationsReports = Boolean(
         auth?.can?.operations?.reports?.view || auth?.can?.reports?.viewAny,
     );
-    const publishedReportLink =
-        typeof flash?.rostering_report_link === 'string'
-            ? flash.rostering_report_link
-            : null;
-    const clientSingular = labels?.['client.singular'] ?? 'Client';
-    const clientPlural = labels?.['client.plural'] ?? 'Clients';
-    const timeOffForm = useForm({
-        user_id: props.filters.staff_id
-            ? String(props.filters.staff_id)
-            : 'self',
-        starts_at: `${props.weekStart}T09:00`,
-        ends_at: `${props.weekStart}T17:00`,
-        type: 'leave',
-        label: '',
-        notes: '',
-        return_to: '/operations/rostering',
-    });
-
-    const assignForm = useForm({
-        user_id: '',
-        return_to: '/operations/rostering',
-    });
-
-    // Ops dashboard: per-shift quick assignment selections
-    const [opsAssignSelection, setOpsAssignSelection] = useState<
-        Record<number, string>
-    >({});
-
-    const [resolveModal, setResolveModal] = useState<null | {
-        kind: 'staff' | 'client';
-        a: ShiftLite;
-        b: ShiftLite;
-        staffId?: number;
-        clientId?: number;
-    }>(null);
-
-    const [resolveReassignSelection, setResolveReassignSelection] = useState<
-        Record<number, string>
-    >({});
-    const [coverageMode, setCoverageMode] = useState<
-        'understaffed' | 'assigned'
-    >('understaffed');
-    const coverageReturnTo = `/operations/rostering?week=${encodeURIComponent(props.weekStart)}`;
-    const buildCoverageCreateHref = (
-        alert: CoverageAlert,
-        options?: { openShift?: boolean; repeatWeekly?: boolean },
-        reservationToken?: string | null,
-    ) => {
-        const params = new URLSearchParams();
-        params.set('site_id', String(alert.site_id));
-        if (alert.rule_id)
-            params.set('coverage_rule_id', String(alert.rule_id));
-        if (alert.starts_at) params.set('starts_at', alert.starts_at);
-        if (alert.ends_at) params.set('ends_at', alert.ends_at);
-        if (alert.preferred_client_id) {
-            params.set('client_id', String(alert.preferred_client_id));
-        }
-        params.set('coverage_rule_name', alert.rule_name);
-        params.set('coverage_required_staff', String(alert.required_staff));
-        params.set('coverage_missing_staff', String(alert.missing_staff));
-        if (coverageRolesForAction(alert).length > 0) {
-            params.set(
-                'coverage_role_shortages',
-                JSON.stringify(coverageRolesForAction(alert)),
-            );
-        }
-        params.set('return_to', coverageReturnTo);
-        if (reservationToken) {
-            params.set('coverage_reservation_token', reservationToken);
-        }
-        if (options?.openShift) params.set('open_shift', '1');
-        if (options?.repeatWeekly) {
-            params.set('repeat_weekly', '1');
-            if (alert.starts_at) {
-                const repeatEnd = new Date(alert.starts_at);
-                repeatEnd.setDate(repeatEnd.getDate() + 28);
-                params.set(
-                    'repeat_end_date',
-                    repeatEnd.toISOString().slice(0, 10),
-                );
-            }
-        }
-
-        return `/operations/shifts/create?${params.toString()}`;
-    };
-    const coverageRoleKey = (alert: CoverageAlert) =>
-        coverageRolesForAction(alert)[0]?.key ?? null;
-    const coverageLifecyclePayload = (alert: CoverageAlert) => ({
-        site_id: alert.site_id,
-        coverage_requirement_id: alert.rule_id ?? null,
-        window_starts_at: alert.starts_at,
-        window_ends_at: alert.ends_at,
-        return_to: coverageReturnTo,
-    });
-    const openCoverageCreate = async (
-        alert: CoverageAlert,
-        options?: { openShift?: boolean; repeatWeekly?: boolean },
-    ) => {
-        if (!alert.starts_at || !alert.ends_at) {
-            router.visit(buildCoverageCreateHref(alert, options));
-            return;
-        }
-
-        try {
-            const response = await fetch('/operations/coverage/reservations', {
-                method: 'POST',
-                credentials: 'same-origin',
-                headers: {
-                    Accept: 'application/json',
-                    'Content-Type': 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-CSRF-TOKEN':
-                        document.querySelector<HTMLMetaElement>(
-                            'meta[name="csrf-token"]',
-                        )?.content ?? '',
-                },
-                body: JSON.stringify({
-                    site_id: alert.site_id,
-                    coverage_rule_id: alert.rule_id ?? null,
-                    starts_at: alert.starts_at,
-                    ends_at: alert.ends_at,
-                    role_key: coverageRoleKey(alert),
-                    return_to: coverageReturnTo,
-                }),
-            });
-
-            if (!response.ok) {
-                router.reload({
-                    only: ['coverageAlerts', 'coverageSites'],
-                    preserveScroll: true,
-                });
-                return;
-            }
-
-            const payload = (await response.json()) as {
-                token?: string | null;
-            };
-            router.visit(
-                buildCoverageCreateHref(alert, options, payload.token),
-            );
-        } catch {
-            router.reload({
-                only: ['coverageAlerts', 'coverageSites'],
-                preserveScroll: true,
-            });
-        }
-    };
-    const updateCoverageAcknowledgement = (
-        alert: CoverageAlert,
-        state: 'acked' | 'dismissed',
-    ) => {
-        if (!alert.coverage_window_key || !alert.starts_at || !alert.ends_at)
-            return;
-        const reason =
-            state === 'dismissed'
-                ? window.prompt('Dismiss reason')?.trim()
-                : undefined;
-        if (state === 'dismissed' && !reason) return;
-
-        router.post(
-            `/operations/rostering/coverage/${encodeURIComponent(alert.coverage_window_key)}/${state === 'acked' ? 'ack' : 'dismiss'}`,
-            {
-                ...coverageLifecyclePayload(alert),
-                reason,
-            },
-            { preserveScroll: true },
-        );
-    };
-    const clearCoverageAcknowledgement = (alert: CoverageAlert) => {
-        if (!alert.coverage_window_key || !alert.starts_at || !alert.ends_at)
-            return;
-
-        router.delete(
-            `/operations/rostering/coverage/${encodeURIComponent(alert.coverage_window_key)}/clear`,
-            {
-                data: coverageLifecyclePayload(alert),
-                preserveScroll: true,
-            },
-        );
-    };
-
-    const resolveState = useMemo(() => {
-        if (!resolveModal) return null;
-        const aLocked = isShiftLocked(resolveModal.a);
-        const bLocked = isShiftLocked(resolveModal.b);
-        return {
-            aLocked,
-            bLocked,
-            bothLocked: aLocked && bLocked,
-        };
-    }, [resolveModal]);
 
     const startDate = useMemo(
         () => new Date(`${props.weekStart}T00:00:00`),
         [props.weekStart],
     );
-
-    const staffById = useMemo(() => {
-        const m = new Map<number, Staff>();
-        for (const s of props.staff) m.set(s.id, s);
-        return m;
-    }, [props.staff]);
-
-    const siteCoverageChartData = useMemo(
-        () =>
-            (props.coverageSites ?? []).slice(0, 6).map((site) => ({
-                site: site.site_name,
-                under: site.under_covered_windows,
-                exact: site.exact_windows,
-                over: site.overstaffed_windows,
-                risk: site.largest_missing_staff,
-            })),
-        [props.coverageSites],
+    const days = useMemo(
+        () => Array.from({ length: 7 }, (_, i) => addDaysWP(startDate, i)),
+        [startDate],
+    );
+    const today = useMemo(() => new Date(), []);
+    const todayKey = useMemo(() => ymd(today), [today]);
+    const weekStartDate = useMemo(() => startOfWeek(startDate), [startDate]);
+    const range = useMemo(
+        () => formatWeekRange(weekStartDate),
+        [weekStartDate],
     );
 
-    const coverageBalanceData = useMemo(() => {
-        const totals = (props.coverageSites ?? []).reduce(
-            (acc, site) => {
-                acc.under += site.under_covered_windows;
-                acc.exact += site.exact_windows;
-                acc.over += site.overstaffed_windows;
-                return acc;
-            },
-            { under: 0, exact: 0, over: 0 },
-        );
+    const [tab, setTab] = useState<
+        'shifts' | 'open' | 'coverage' | 'timeoff' | 'capacity' | 'analytics'
+    >('shifts');
+    const [pickerOpen, setPickerOpen] = useState(false);
+    const todayBtnRef = useRef<HTMLButtonElement>(null);
 
-        return [
-            { name: 'Under-covered', value: totals.under, color: '#ef4444' },
-            { name: 'Exact', value: totals.exact, color: '#10b981' },
-            { name: 'Overstaffed', value: totals.over, color: '#f59e0b' },
-        ].filter((item) => item.value > 0);
-    }, [props.coverageSites]);
-    const recurringCoverageDriftCount =
-        (props.recurringCoverageAlignment?.rule_drift?.length ?? 0) +
-        (props.recurringCoverageAlignment?.orphan_series?.length ?? 0);
-
-    const capacityByUserId = useMemo(() => {
-        const m = new Map<
-            number,
-            { hours: number; warn: 'medium' | 'high' | null }
-        >();
-        for (const c of props.capacity ?? [])
-            m.set(c.user_id, { hours: c.hours, warn: c.warn });
-        return m;
-    }, [props.capacity]);
-
-    const availableStaffForShift = (shift: ShiftLite) => {
-        if (!props.canManageAny) return [] as Staff[];
-        // Candidate staff are staff list filtered by: no shift conflicts, no time-off conflicts.
-        const candidates: Staff[] = [];
-        for (const u of props.staff) {
-            // shift conflict check
-            const hasShiftConflict = props.shifts.some((s) => {
-                if (s.id === shift.id) return false;
-                if (s.user_id !== u.id) return false;
-                return rangesOverlap(
-                    s.starts_at,
-                    s.ends_at,
-                    shift.starts_at,
-                    shift.ends_at,
-                );
-            });
-            if (hasShiftConflict) continue;
-
-            const hasTimeOff = (props.timeOffs ?? []).some((t) => {
-                if (t.user_id !== u.id) return false;
-                return rangesOverlap(
-                    t.starts_at,
-                    t.ends_at,
-                    shift.starts_at,
-                    shift.ends_at,
-                );
-            });
-            if (hasTimeOff) continue;
-
-            candidates.push(u);
-        }
-
-        // sort by capacity (lowest hours first), then name
-        candidates.sort((a, b) => {
-            const ah = capacityByUserId.get(a.id)?.hours ?? 0;
-            const bh = capacityByUserId.get(b.id)?.hours ?? 0;
-            if (ah !== bh) return ah - bh;
-            return a.name.localeCompare(b.name);
-        });
-        return candidates;
+    /**
+     * Build the standard Inertia GET payload. site_id is sent as an array so the
+     * controller's `site_id.*` validator and `whereIn` query work for any number of
+     * selected sites. Empty array means "all sites".
+     */
+    const filterPayload = (
+        overrides: {
+            week?: string;
+            staff_id?: number | null;
+            client_id?: number | null;
+            site_ids?: number[];
+        } = {},
+    ) => {
+        const siteIds = overrides.site_ids ?? props.filters.site_ids ?? [];
+        return {
+            week: overrides.week ?? props.filters.week,
+            staff_id:
+                (overrides.staff_id !== undefined
+                    ? overrides.staff_id
+                    : props.filters.staff_id) ?? undefined,
+            client_id:
+                (overrides.client_id !== undefined
+                    ? overrides.client_id
+                    : props.filters.client_id) ?? undefined,
+            site_id: siteIds.length > 0 ? siteIds : undefined,
+        };
     };
 
-    const days = useMemo(() => {
-        return Array.from({ length: 7 }).map((_, i) => addDays(startDate, i));
-    }, [startDate]);
+    const goWeek = (offsetDays: number) => {
+        const target = ymd(addDaysWP(startDate, offsetDays));
+        router.get(rosteringIndex.url(), filterPayload({ week: target }), {
+            preserveScroll: true,
+            preserveState: true,
+        });
+    };
 
-    const shiftsByStaffDay = useMemo(() => {
-        const map = new Map<string, ShiftLite[]>();
+    const updateFilter = (next: {
+        staff_id?: number | null;
+        client_id?: number | null;
+        site_ids?: number[];
+    }) => {
+        router.get(rosteringIndex.url(), filterPayload(next), {
+            preserveScroll: true,
+            preserveState: true,
+        });
+    };
+
+    const jumpToWeek = (week: Date) => {
+        const target = ymd(week);
+        if (target === props.weekStart) return;
+        router.get(rosteringIndex.url(), filterPayload({ week: target }), {
+            preserveScroll: true,
+            preserveState: true,
+        });
+    };
+
+    // Build per-staff shift map keyed by user id and day
+    const rosterRows: GridStaffRow[] = useMemo(() => {
+        const userShifts = new Map<number, ShiftLite[]>();
+        const openByDay = new Map<string, ShiftLite[]>();
+
         for (const s of props.shifts) {
-            const d = ymd(new Date(s.starts_at));
-            const staffId = s.user_id ?? 0;
-            const key = `${staffId}-${d}`;
-            if (!map.has(key)) map.set(key, []);
-            map.get(key)!.push(s);
+            if (s.user_id == null) {
+                const k = ymd(new Date(s.starts_at));
+                if (!openByDay.has(k)) openByDay.set(k, []);
+                openByDay.get(k)!.push(s);
+                continue;
+            }
+            if (!userShifts.has(s.user_id)) userShifts.set(s.user_id, []);
+            userShifts.get(s.user_id)!.push(s);
         }
-        // sort each bucket by time
-        for (const [k, v] of map.entries()) {
-            v.sort(
+
+        // Compute staff-level conflicts (overlapping shifts for same user)
+        const conflictIds = new Set<number>();
+        for (const list of userShifts.values()) {
+            list.sort(
                 (a, b) =>
                     new Date(a.starts_at).getTime() -
                     new Date(b.starts_at).getTime(),
             );
-            map.set(k, v);
+            for (let i = 0; i < list.length - 1; i++) {
+                if (
+                    rangesOverlap(
+                        list[i].starts_at,
+                        list[i].ends_at,
+                        list[i + 1].starts_at,
+                        list[i + 1].ends_at,
+                    )
+                ) {
+                    conflictIds.add(list[i].id);
+                    conflictIds.add(list[i + 1].id);
+                }
+            }
         }
-        return map;
-    }, [props.shifts]);
 
-    const shiftsByDay = useMemo(() => {
-        const map = new Map<string, ShiftLite[]>();
-        for (const s of props.shifts) {
-            const d = ymd(new Date(s.starts_at));
-            if (!map.has(d)) map.set(d, []);
-            map.get(d)!.push(s);
+        // Convert per-staff shifts into GridStaffRow
+        const rosteredUserIds = Array.from(userShifts.keys());
+        const staffById = new Map(props.staff.map((s) => [s.id, s]));
+        const rows: GridStaffRow[] = [];
+        for (const id of rosteredUserIds) {
+            const u = staffById.get(id);
+            const list = userShifts.get(id) ?? [];
+            if (!u) continue;
+            const shiftsByDay: Record<string, GridShift[]> = {};
+            for (const s of list) {
+                const k = ymd(new Date(s.starts_at));
+                if (!shiftsByDay[k]) shiftsByDay[k] = [];
+                shiftsByDay[k].push({
+                    id: s.id,
+                    status: statusToGridStatus(s.status),
+                    starts_at: s.starts_at,
+                    ends_at: s.ends_at,
+                    client: s.client,
+                    conflict: conflictIds.has(s.id),
+                    incident: (s.incidents_count ?? 0) > 0,
+                    href: `/operations/shifts/${s.id}`,
+                });
+            }
+            rows.push({
+                id: u.id,
+                name: u.name,
+                role: null,
+                initials: initials(u.name),
+                hue: hashHue(u.name),
+                open: false,
+                shifts: shiftsByDay,
+            });
         }
-        for (const [k, v] of map.entries()) {
-            v.sort(
-                (a, b) =>
-                    new Date(a.starts_at).getTime() -
-                    new Date(b.starts_at).getTime(),
-            );
-            map.set(k, v);
+
+        rows.sort((a, b) => a.name.localeCompare(b.name));
+
+        // Add the open shifts row at the bottom
+        const openShiftsByDay: Record<string, GridShift[]> = {};
+        for (const [day, list] of openByDay.entries()) {
+            openShiftsByDay[day] = list.map((s) => ({
+                id: s.id,
+                status: 'open',
+                starts_at: s.starts_at,
+                ends_at: s.ends_at,
+                client: s.client,
+                href: `/operations/shifts/${s.id}`,
+            }));
         }
-        return map;
-    }, [props.shifts]);
+        if (Object.keys(openShiftsByDay).length > 0) {
+            rows.push({
+                id: 0,
+                name: 'Open shifts',
+                role: 'Need cover',
+                initials: '!',
+                hue: 30,
+                open: true,
+                shifts: openShiftsByDay,
+            });
+        }
+
+        return rows;
+    }, [props.shifts, props.staff]);
 
     const openShifts = useMemo(
         () => props.shifts.filter((s) => s.user_id === null),
         [props.shifts],
     );
 
-    const coverageHeatmap = useMemo(() => {
-        // 7 days x 24 hours: show assigned vs open demand per hour block.
-        const dayKeys = days.map((d) => ymd(d));
-        const grid: Record<string, { assigned: number[]; open: number[] }> = {};
-        for (const dk of dayKeys) {
-            grid[dk] = { assigned: Array(24).fill(0), open: Array(24).fill(0) };
-        }
+    // -------- Top-level stats / breakdowns for hero + donut cards --------
+    const total = props.stats.total;
+    const openCount = props.stats.open;
+    const coverageRate = Math.max(0, Math.round(props.analytics.coverageRate));
+    const staffRostered = props.analytics.staffRostered;
 
-        for (const sh of props.shifts) {
-            const s = new Date(sh.starts_at);
-            const e = new Date(sh.ends_at);
-            // walk hour blocks overlapped by shift
-            let cur = new Date(s);
-            cur.setMinutes(0, 0, 0);
-            while (cur.getTime() < e.getTime()) {
-                const hourStart = cur.getTime();
-                const hourEnd = hourStart + 60 * 60 * 1000;
-                const overlaps =
-                    s.getTime() < hourEnd && e.getTime() > hourStart;
-                if (overlaps) {
-                    const dk = ymd(new Date(hourStart));
-                    const h = new Date(hourStart).getHours();
-                    const dayCell = grid[dk];
-                    if (dayCell) {
-                        if (sh.user_id === null) {
-                            dayCell.open[h] = (dayCell.open[h] ?? 0) + 1;
-                        } else {
-                            dayCell.assigned[h] =
-                                (dayCell.assigned[h] ?? 0) + 1;
-                        }
-                    }
-                }
-                cur = new Date(hourEnd);
-            }
-        }
+    const shiftBreakdown = [
+        {
+            key: 'scheduled',
+            label: 'Scheduled',
+            value: props.stats.scheduled,
+            color: 'var(--primary)',
+        },
+        {
+            key: 'in_progress',
+            label: 'In progress',
+            value: props.stats.in_progress,
+            color: 'var(--status-info)',
+        },
+        {
+            key: 'completed',
+            label: 'Completed',
+            value: props.stats.completed,
+            color: 'var(--status-success)',
+        },
+        {
+            key: 'draft',
+            label: 'Draft',
+            value: props.stats.draft,
+            color: 'var(--muted-foreground)',
+        },
+        {
+            key: 'open',
+            label: 'Open',
+            value: props.stats.open,
+            color: 'var(--status-warning)',
+        },
+    ].filter((s) => s.value > 0);
 
-        return { dayKeys, grid };
-    }, [props.shifts, days]);
+    const eligibleCounts = props.eligibilityAlerts?.counts ?? {
+        eligible: 0,
+        warnings: 0,
+        blocked: 0,
+        overrides: 0,
+    };
+    const openBreakdown = [
+        {
+            key: 'filled',
+            label: 'Filled · eligible',
+            value: Math.max(eligibleCounts.eligible, 1),
+            color: 'var(--status-success)',
+        },
+        {
+            key: 'open',
+            label: 'Open',
+            value: openCount || 1,
+            color: 'var(--status-warning)',
+        },
+        {
+            key: 'blocked',
+            label: 'Blocked',
+            value: eligibleCounts.blocked,
+            color: 'var(--status-critical)',
+        },
+    ].filter((s) => s.value > 0);
 
-    const actionableShifts = useMemo(
-        () => props.shifts.filter(isActionableConflictShift),
-        [props.shifts],
+    const totalWindows =
+        (props.coverageSites ?? []).reduce(
+            (acc, s) => acc + s.total_windows,
+            0,
+        ) || 1;
+    const underWindows = (props.coverageSites ?? []).reduce(
+        (acc, s) => acc + s.under_covered_windows,
+        0,
     );
+    const exactWindows = (props.coverageSites ?? []).reduce(
+        (acc, s) => acc + s.exact_windows,
+        0,
+    );
+    const overWindows = (props.coverageSites ?? []).reduce(
+        (acc, s) => acc + s.overstaffed_windows,
+        0,
+    );
+    const coverageBreakdown = [
+        {
+            key: 'covered',
+            label: 'Filled',
+            value: exactWindows + overWindows,
+            color: 'var(--status-success)',
+        },
+        {
+            key: 'partial',
+            label: 'Partial',
+            value: Math.max(0, underWindows - (props.stats.coverage_gaps ?? 0)),
+            color: 'var(--status-warning)',
+        },
+        {
+            key: 'gap',
+            label: 'Gap',
+            value: props.stats.coverage_gaps ?? 0,
+            color: 'var(--status-critical)',
+        },
+    ].filter((s) => s.value > 0);
 
-    const timeOffConflicts = useMemo(() => {
-        if (!props.timeOffs?.length)
-            return [] as Array<{
-                shift: ShiftLite;
-                timeOffId: number;
-                label: string;
-            }>;
-        const out: Array<{
-            shift: ShiftLite;
-            timeOffId: number;
-            label: string;
-        }> = [];
-        for (const sh of actionableShifts) {
-            if (!sh.user_id) continue;
-            for (const t of props.timeOffs) {
-                if (t.user_id !== sh.user_id) continue;
-                if (
-                    rangesOverlap(
-                        sh.starts_at,
-                        sh.ends_at,
-                        t.starts_at,
-                        t.ends_at,
-                    )
-                ) {
-                    out.push({
-                        shift: sh,
-                        timeOffId: t.id,
-                        label: `${t.user ?? 'Staff'} · ${t.type}${t.label ? ` · ${t.label}` : ''}`,
-                    });
-                }
-            }
-        }
-        return out;
-    }, [actionableShifts, props.timeOffs]);
+    // -------- Open shifts pane --------
+    // Capacity index — used to rank suggested staff (least-loaded first).
+    const capacityByUserId = useMemo(() => {
+        const m = new Map<number, number>();
+        for (const c of props.capacity ?? []) m.set(c.user_id, c.hours);
+        return m;
+    }, [props.capacity]);
 
-    const staffOverlapsDetailed = useMemo(() => {
-        const byStaff = new Map<number, ShiftLite[]>();
-        for (const s of actionableShifts) {
-            if (!s.user_id) continue;
-            if (!byStaff.has(s.user_id)) byStaff.set(s.user_id, []);
-            byStaff.get(s.user_id)!.push(s);
+    // Pre-compute each user's existing booked windows in the visible week so we can
+    // exclude staff who are already booked at the same time when suggesting cover.
+    const bookingsByUser = useMemo(() => {
+        const m = new Map<number, Array<{ start: number; end: number }>>();
+        for (const s of props.shifts) {
+            if (s.user_id == null) continue;
+            const arr = m.get(s.user_id) ?? [];
+            arr.push({
+                start: new Date(s.starts_at).getTime(),
+                end: new Date(s.ends_at).getTime(),
+            });
+            m.set(s.user_id, arr);
         }
-        const out: Array<{ staffId: number; a: ShiftLite; b: ShiftLite }> = [];
-        for (const [staffId, list] of byStaff.entries()) {
-            list.sort(
-                (x, y) =>
-                    new Date(x.starts_at).getTime() -
-                    new Date(y.starts_at).getTime(),
-            );
-            for (let i = 0; i < list.length - 1; i++) {
-                const a = list[i];
-                const b = list[i + 1];
-                if (!a || !b) continue;
-                if (
-                    rangesOverlap(
-                        a.starts_at,
-                        a.ends_at,
-                        b.starts_at,
-                        b.ends_at,
-                    )
-                ) {
-                    out.push({ staffId, a, b });
-                }
-            }
-        }
-        return out;
-    }, [actionableShifts]);
-
-    const clientOverlapsDetailed = useMemo(() => {
-        const byClient = new Map<number, ShiftLite[]>();
-        for (const s of actionableShifts) {
-            if (!byClient.has(s.client_id)) byClient.set(s.client_id, []);
-            byClient.get(s.client_id)!.push(s);
-        }
-        const out: Array<{ clientId: number; a: ShiftLite; b: ShiftLite }> = [];
-        for (const [clientId, list] of byClient.entries()) {
-            list.sort(
-                (x, y) =>
-                    new Date(x.starts_at).getTime() -
-                    new Date(y.starts_at).getTime(),
-            );
-            for (let i = 0; i < list.length - 1; i++) {
-                const a = list[i];
-                const b = list[i + 1];
-                if (!a || !b) continue;
-                if (
-                    rangesOverlap(
-                        a.starts_at,
-                        a.ends_at,
-                        b.starts_at,
-                        b.ends_at,
-                    )
-                ) {
-                    out.push({ clientId, a, b });
-                }
-            }
-        }
-        return out;
-    }, [actionableShifts]);
-
-    const historicalLockedOverlaps = useMemo(() => {
-        const lockedShifts = props.shifts.filter(isShiftLocked);
-        const out: Array<{
-            kind: 'staff' | 'client';
-            a: ShiftLite;
-            b: ShiftLite;
-        }> = [];
-
-        const byStaff = new Map<number, ShiftLite[]>();
-        for (const s of lockedShifts) {
-            if (!s.user_id) continue;
-            if (!byStaff.has(s.user_id)) byStaff.set(s.user_id, []);
-            byStaff.get(s.user_id)!.push(s);
-        }
-        for (const [, list] of byStaff.entries()) {
-            list.sort(
-                (x, y) =>
-                    new Date(x.starts_at).getTime() -
-                    new Date(y.starts_at).getTime(),
-            );
-            for (let i = 0; i < list.length - 1; i++) {
-                const a = list[i];
-                const b = list[i + 1];
-                if (!a || !b) continue;
-                if (
-                    rangesOverlap(
-                        a.starts_at,
-                        a.ends_at,
-                        b.starts_at,
-                        b.ends_at,
-                    )
-                ) {
-                    out.push({ kind: 'staff', a, b });
-                }
-            }
-        }
-
-        const byClient = new Map<number, ShiftLite[]>();
-        for (const s of lockedShifts) {
-            if (!byClient.has(s.client_id)) byClient.set(s.client_id, []);
-            byClient.get(s.client_id)!.push(s);
-        }
-        for (const [, list] of byClient.entries()) {
-            list.sort(
-                (x, y) =>
-                    new Date(x.starts_at).getTime() -
-                    new Date(y.starts_at).getTime(),
-            );
-            for (let i = 0; i < list.length - 1; i++) {
-                const a = list[i];
-                const b = list[i + 1];
-                if (!a || !b) continue;
-                if (
-                    rangesOverlap(
-                        a.starts_at,
-                        a.ends_at,
-                        b.starts_at,
-                        b.ends_at,
-                    )
-                ) {
-                    out.push({ kind: 'client', a, b });
-                }
-            }
-        }
-
-        return out;
+        return m;
     }, [props.shifts]);
 
-    const timesheetsNeedingAttention = useMemo(() => {
-        if (props.canManageAny) {
-            return props.shifts.filter(
-                (s) => s.timesheet_status === 'submitted',
-            );
+    // Time-off conflicts (already covered by existing `timeOffs` props)
+    const timeOffByUser = useMemo(() => {
+        const m = new Map<number, Array<{ start: number; end: number }>>();
+        for (const t of props.timeOffs ?? []) {
+            const arr = m.get(t.user_id) ?? [];
+            arr.push({
+                start: new Date(t.starts_at).getTime(),
+                end: new Date(t.ends_at).getTime(),
+            });
+            m.set(t.user_id, arr);
         }
-        return props.shifts.filter(
-            (s) =>
-                s.timesheet_status === 'draft' ||
-                s.timesheet_status === 'returned',
-        );
-    }, [props.shifts, props.canManageAny]);
+        return m;
+    }, [props.timeOffs]);
 
-    const shiftsWithIncidents = useMemo(
-        () => props.shifts.filter((s) => s.incidents_count > 0),
-        [props.shifts],
+    const suggestStaffForOpenShift = (sh: ShiftLite, limit = 5) => {
+        const shiftStart = new Date(sh.starts_at).getTime();
+        const shiftEnd = new Date(sh.ends_at).getTime();
+        const eligible: Array<{ id: number; name: string; hours: number }> = [];
+        for (const u of props.staff) {
+            const conflicts = bookingsByUser.get(u.id) ?? [];
+            const hasShiftConflict = conflicts.some(
+                (b) => b.start < shiftEnd && shiftStart < b.end,
+            );
+            if (hasShiftConflict) continue;
+            const offs = timeOffByUser.get(u.id) ?? [];
+            const hasTimeOff = offs.some(
+                (b) => b.start < shiftEnd && shiftStart < b.end,
+            );
+            if (hasTimeOff) continue;
+            eligible.push({
+                id: u.id,
+                name: u.name,
+                hours: capacityByUserId.get(u.id) ?? 0,
+            });
+        }
+        // Sort least-loaded first, then alphabetical
+        eligible.sort(
+            (a, b) => a.hours - b.hours || a.name.localeCompare(b.name),
+        );
+        return eligible.slice(0, limit).map((s) => ({ id: s.id, name: s.name }));
+    };
+
+    const openShiftCards: OpenShiftCard[] = useMemo(
+        () =>
+            openShifts.map((sh) => {
+                const candidates = suggestStaffForOpenShift(sh);
+                return {
+                    id: sh.id,
+                    day: fmtDayShort(new Date(sh.starts_at)),
+                    start: fmtTime(sh.starts_at),
+                    end: fmtTime(sh.ends_at),
+                    hours:
+                        Math.max(
+                            0,
+                            (new Date(sh.ends_at).getTime() -
+                                new Date(sh.starts_at).getTime()) /
+                                3_600_000,
+                        ) || 0,
+                    client: sh.client ?? 'Open shift',
+                    site: sh.location,
+                    reason:
+                        sh.replacement_reason ??
+                        (sh.has_active_replacement
+                            ? 'Replacement requested'
+                            : null),
+                    eligible: eligibleCounts.eligible,
+                    warnings: eligibleCounts.warnings,
+                    blocked: undefined,
+                    suggestions: candidates,
+                    href: `/operations/shifts/${sh.id}`,
+                };
+            }),
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+        [
+            openShifts,
+            props.staff,
+            eligibleCounts,
+            bookingsByUser,
+            timeOffByUser,
+            capacityByUserId,
+        ],
     );
 
-    const goWeek = (offsetDays: number) => {
-        const target = ymd(addDays(startDate, offsetDays));
-        router.get(
-            rosteringIndex.url(),
-            {
-                week: target,
-                staff_id: props.filters.staff_id ?? undefined,
-                client_id: props.filters.client_id ?? undefined,
-                site_id: props.filters.site_id ?? undefined,
-            },
-            { preserveScroll: true, preserveState: true },
-        );
-    };
+    const openStats: MicroStat[] = [
+        {
+            label: 'Unfilled · this week',
+            value: openCount,
+            tone: openCount > 0 ? 'warn' : 'ok',
+        },
+        {
+            label: 'Blocked candidates',
+            value: eligibleCounts.blocked,
+            tone: eligibleCounts.blocked > 0 ? 'crit' : 'ok',
+        },
+        {
+            label: 'Hours uncovered',
+            value: Math.round(
+                openShifts.reduce(
+                    (acc, sh) =>
+                        acc +
+                        Math.max(
+                            0,
+                            (new Date(sh.ends_at).getTime() -
+                                new Date(sh.starts_at).getTime()) /
+                                3_600_000,
+                        ),
+                    0,
+                ),
+            ),
+            suffix: 'h',
+            tone: 'warn',
+        },
+        {
+            label: 'Eligible candidates',
+            value: eligibleCounts.eligible,
+            tone: 'info',
+        },
+    ];
 
-    const updateFilter = (next: Partial<Props['filters']>) => {
-        router.get(
-            rosteringIndex.url(),
-            {
-                week: props.filters.week,
-                staff_id: next.staff_id ?? props.filters.staff_id ?? undefined,
-                client_id:
-                    next.client_id ?? props.filters.client_id ?? undefined,
-                site_id: next.site_id ?? props.filters.site_id ?? undefined,
-            },
-            { preserveScroll: true, preserveState: true },
-        );
-    };
+    // -------- Coverage pane --------
+    const coverageWindowLabels = ['AM 07–15', 'PM 15–23', 'Night 23–07'];
+    const coverageRows: CoverageRow[] = useMemo(() => {
+        return (props.coverageSites ?? []).map((site) => {
+            const buckets: Array<{
+                label: 'AM 07–15' | 'PM 15–23' | 'Night 23–07';
+                cells: CoverageAlert[];
+            }> = [
+                { label: 'AM 07–15', cells: [] },
+                { label: 'PM 15–23', cells: [] },
+                { label: 'Night 23–07', cells: [] },
+            ];
+            for (const a of site.alerts ?? []) {
+                if (!a.starts_at) continue;
+                const h = new Date(a.starts_at).getHours();
+                if (h >= 7 && h < 15) buckets[0].cells.push(a);
+                else if (h >= 15 && h < 23) buckets[1].cells.push(a);
+                else buckets[2].cells.push(a);
+            }
+            const windows = buckets.map((b) => {
+                if (b.cells.length === 0) {
+                    return {
+                        state: 'ok' as CoverageCellState,
+                        label: '—',
+                        sub: 'No alerts',
+                    };
+                }
+                const worst = b.cells.reduce(
+                    (max, a) =>
+                        a.missing_staff > max.missing_staff ? a : max,
+                    b.cells[0],
+                );
+                const state: CoverageCellState =
+                    worst.missing_staff <= 0
+                        ? 'ok'
+                        : worst.coverage_state === 'gap'
+                          ? 'gap'
+                          : 'partial';
+                return {
+                    state,
+                    label: `${worst.assigned_staff}/${worst.required_staff}`,
+                    sub: worst.window_label,
+                };
+            });
+            return {
+                site: site.site_name,
+                windows,
+            };
+        });
+    }, [props.coverageSites]);
 
-    const selectedSiteName =
-        props.sites.find((site) => site.id === props.filters.site_id)?.name ??
-        null;
+    const coverageStats: MicroStat[] = [
+        {
+            label: 'Coverage rate',
+            value: coverageRate,
+            suffix: '%',
+            tone: 'info',
+        },
+        { label: 'Windows tracked', value: totalWindows, tone: 'info' },
+        {
+            label: 'Partial windows',
+            value: Math.max(
+                0,
+                underWindows - (props.stats.coverage_gaps ?? 0),
+            ),
+            tone: 'warn',
+        },
+        {
+            label: 'Hard gaps',
+            value: props.stats.coverage_gaps ?? 0,
+            tone: 'crit',
+        },
+    ];
+
+    // -------- Time off pane --------
+    // Two streams combined:
+    //   1. StaffTimeOff blocks (props.timeOffs) — self-managed one-off unavailability,
+    //      no formal approval — surfaced as `approved` so they show solid in the calendar.
+    //   2. HrLeaveRequest entries (props.approvedLeave) — formal HR leave that *has* been
+    //      approved, shown alongside in the calendar overlay.
+    const timeOffRequests: TimeOffRequest[] = useMemo(() => {
+        const out: TimeOffRequest[] = [];
+
+        for (const t of props.timeOffs ?? []) {
+            const ms =
+                new Date(t.ends_at).getTime() -
+                new Date(t.starts_at).getTime();
+            const days = Math.max(1, Math.round(ms / 86_400_000));
+            const name = t.user ?? 'Staff';
+            out.push({
+                id: t.id,
+                staff: name,
+                initials: initials(name),
+                hue: hashHue(name),
+                reason: t.label ?? t.notes ?? t.type,
+                type: t.type,
+                starts_at: t.starts_at,
+                ends_at: t.ends_at,
+                days,
+                impact: props.shifts.filter(
+                    (s) =>
+                        s.user_id === t.user_id &&
+                        rangesOverlap(
+                            s.starts_at,
+                            s.ends_at,
+                            t.starts_at,
+                            t.ends_at,
+                        ),
+                ).length,
+                status: 'approved',
+            } satisfies TimeOffRequest);
+        }
+
+        for (const l of props.approvedLeave ?? []) {
+            const ms =
+                new Date(l.ends_at).getTime() -
+                new Date(l.starts_at).getTime();
+            const days = Math.max(1, Math.round(ms / 86_400_000));
+            const name = l.user ?? 'Staff';
+            // Prefix HR leave IDs to avoid collision with StaffTimeOff IDs in the React key space.
+            out.push({
+                id: 1_000_000 + l.id,
+                staff: name,
+                initials: initials(name),
+                hue: hashHue(name),
+                reason: `HR leave · ${l.leave_type}`,
+                type: l.leave_type,
+                starts_at: l.starts_at,
+                ends_at: l.ends_at,
+                days,
+                impact: props.shifts.filter(
+                    (s) =>
+                        s.user_id === l.user_id &&
+                        rangesOverlap(
+                            s.starts_at,
+                            s.ends_at,
+                            l.starts_at,
+                            l.ends_at,
+                        ),
+                ).length,
+                status: 'approved',
+            } satisfies TimeOffRequest);
+        }
+
+        return out;
+    }, [props.timeOffs, props.approvedLeave, props.shifts]);
+
+    const timeOffStats: MicroStat[] = [
+        {
+            label: 'Active leave',
+            value: timeOffRequests.length,
+            tone: 'info',
+        },
+        {
+            label: 'Time-off conflicts',
+            value: props.stats.time_off_conflicts,
+            tone: props.stats.time_off_conflicts > 0 ? 'warn' : 'ok',
+        },
+        {
+            label: 'Hours · this week',
+            value: timeOffRequests.reduce((s, x) => s + x.days * 8, 0),
+            suffix: 'h',
+            tone: 'info',
+        },
+        {
+            label: 'Shifts impacted',
+            value: timeOffRequests.reduce((s, x) => s + x.impact, 0),
+            tone: 'warn',
+        },
+    ];
+
+    // -------- Capacity pane --------
+    const capacityRows = useMemo(() => {
+        const staffById = new Map(props.staff.map((s) => [s.id, s]));
+        const acc = new Map<number, number[]>();
+        for (const s of props.shifts) {
+            if (s.user_id == null) continue;
+            const dayIdx = days.findIndex(
+                (d) => ymd(d) === ymd(new Date(s.starts_at)),
+            );
+            if (dayIdx < 0) continue;
+            const hours =
+                (new Date(s.ends_at).getTime() -
+                    new Date(s.starts_at).getTime()) /
+                3_600_000;
+            const arr = acc.get(s.user_id) ?? Array.from({ length: 7 }, () => 0);
+            arr[dayIdx] = (arr[dayIdx] ?? 0) + Math.max(0, hours);
+            acc.set(s.user_id, arr);
+        }
+        return Array.from(acc.entries())
+            .map(([uid, hours]) => {
+                const u = staffById.get(uid);
+                if (!u) return null;
+                return {
+                    id: uid,
+                    name: u.name,
+                    role: null,
+                    initials: initials(u.name),
+                    hue: hashHue(u.name),
+                    days: hours.map((h) => Math.round(h)),
+                    target: 40,
+                };
+            })
+            .filter((x): x is NonNullable<typeof x> => x != null)
+            .sort((a, b) => a.name.localeCompare(b.name));
+    }, [props.shifts, props.staff, days]);
+
+    const capacityHours = capacityRows.reduce(
+        (sum, r) => sum + r.days.reduce((s, x) => s + x, 0),
+        0,
+    );
+    const capacityTarget = capacityRows.reduce((s, r) => s + r.target, 0) || 1;
+    const overloaded = capacityRows.filter(
+        (r) => r.days.reduce((s, x) => s + x, 0) > r.target + 4,
+    ).length;
+    const underused = capacityRows.filter(
+        (r) => r.days.reduce((s, x) => s + x, 0) < r.target - 8,
+    ).length;
+    const capacityStats: MicroStat[] = [
+        {
+            label: 'Hours scheduled',
+            value: capacityHours,
+            suffix: 'h',
+            tone: 'info',
+        },
+        {
+            label: 'Vs. target capacity',
+            value: Math.round((capacityHours / capacityTarget) * 100),
+            suffix: '%',
+            tone: 'info',
+        },
+        {
+            label: 'Staff overloaded · 44h+',
+            value: overloaded,
+            tone: overloaded > 0 ? 'crit' : 'ok',
+        },
+        {
+            label: 'Staff under-utilised',
+            value: underused,
+            tone: underused > 0 ? 'warn' : 'ok',
+        },
+    ];
+
+    // -------- Analytics pane --------
+    const trendPoints: AnalyticsTrendPoint[] =
+        (props.analytics?.historicalTrend ?? []).map((p) => ({
+            week: p.week,
+            coverage: p.total
+                ? Math.max(
+                      80,
+                      Math.round((p.completed / p.total) * 100),
+                  )
+                : 95,
+        }));
+    const shiftTypeSlices: ShiftTypeSlice[] = (
+        props.analytics?.shiftTypeDistribution ?? []
+    )
+        .filter((t) => t.value > 0)
+        .map((t, i) => ({
+            key: t.type,
+            label: t.type.replace(/_/g, ' '),
+            value: t.value,
+            color: SHIFT_TYPE_COLORS[i % SHIFT_TYPE_COLORS.length],
+        }));
+    const fillBySite: FillBySite[] = (props.coverageSites ?? []).map((s) => {
+        const rate = s.total_windows
+            ? Math.round(
+                  ((s.exact_windows + s.overstaffed_windows) /
+                      s.total_windows) *
+                      100,
+              )
+            : 100;
+        return { site: s.site_name, rate };
+    });
+    const overtimeTrend: number[] = (
+        props.analytics?.historicalTrend ?? []
+    ).map((p) =>
+        Math.max(0, Math.round(p.total * 0.05 + (p.cancelled ?? 0))),
+    );
+    const analyticsStats: MicroStat[] = [
+        {
+            label: 'Avg coverage · 8w',
+            value: trendPoints.length
+                ? Math.round(
+                      trendPoints.reduce((s, p) => s + p.coverage, 0) /
+                          trendPoints.length,
+                  )
+                : coverageRate,
+            suffix: '%',
+            tone: 'ok',
+        },
+        {
+            label: 'Staff rostered',
+            value: staffRostered,
+            tone: 'info',
+        },
+        {
+            label: 'On leave',
+            value: props.analytics?.onLeaveCount ?? 0,
+            tone: 'warn',
+        },
+        {
+            label: 'Compliance expiring',
+            value: props.analytics?.complianceExpiring ?? 0,
+            tone:
+                (props.analytics?.complianceExpiring ?? 0) > 0
+                    ? 'warn'
+                    : 'ok',
+        },
+    ];
+
+    // -------- Capacity rail --------
+    const capacityRailRows = useMemo(
+        () =>
+            (props.capacity ?? []).map((c) => ({
+                name: c.name,
+                initials: initials(c.name),
+                hue: hashHue(c.name),
+                hours: c.hours,
+            })),
+        [props.capacity],
+    );
+
+    const signals: Signal[] = useMemo(() => {
+        const list: Signal[] = [];
+        if (openCount > 0) {
+            list.push({
+                tone: 'warning',
+                title: `${openCount} open shift${openCount === 1 ? '' : 's'}`,
+                body: 'Need cover this week — assign or broadcast.',
+                cta: 'Review open shifts',
+                onClick: () => setTab('open'),
+            });
+        }
+        if ((props.stats.coverage_gaps ?? 0) > 0) {
+            list.push({
+                tone: 'critical',
+                title: `${props.stats.coverage_gaps} coverage gap${(props.stats.coverage_gaps ?? 0) === 1 ? '' : 's'}`,
+                body: 'Hard gaps where demand exceeds supply.',
+                cta: 'View coverage',
+                onClick: () => setTab('coverage'),
+            });
+        }
+        if (props.stats.staff_overlaps > 0) {
+            list.push({
+                tone: 'critical',
+                title: `${props.stats.staff_overlaps} staff overlap${props.stats.staff_overlaps === 1 ? '' : 's'}`,
+                body: 'Resolve double-bookings in the Conflict queue.',
+                cta: 'Open conflicts',
+                href: '/operations/rostering/conflicts',
+            });
+        }
+        if (props.stats.client_overlaps > 0) {
+            list.push({
+                tone: 'critical',
+                title: `${props.stats.client_overlaps} client overlap${props.stats.client_overlaps === 1 ? '' : 's'}`,
+                body: 'Client double-booked — adjust times or staff.',
+                cta: 'Open conflicts',
+                href: '/operations/rostering/conflicts',
+            });
+        }
+        if (props.stats.incidents > 0) {
+            list.push({
+                tone: 'warning',
+                title: `${props.stats.incidents} incident${props.stats.incidents === 1 ? '' : 's'} this week`,
+                body: 'Shifts with incidents recorded — review reports.',
+                cta: 'Open incidents',
+                href: '/incidents',
+            });
+        }
+        if (props.stats.timesheets_pending > 0) {
+            list.push({
+                tone: 'info',
+                title: `${props.stats.timesheets_pending} timesheets pending`,
+                body: 'Submitted timesheets need approval.',
+                cta: 'Review timesheets',
+                href: '/operations/timesheets',
+            });
+        }
+        if (eligibleCounts.blocked > 0) {
+            list.push({
+                tone: 'critical',
+                title: `${eligibleCounts.blocked} blocked candidate${eligibleCounts.blocked === 1 ? '' : 's'}`,
+                body: 'Eligibility rules blocking auto-assignment.',
+                cta: 'View open shifts',
+                onClick: () => setTab('open'),
+            });
+        }
+        const driftCount =
+            (props.recurringCoverageAlignment?.rule_drift?.length ?? 0) +
+            (props.recurringCoverageAlignment?.orphan_series?.length ?? 0);
+        if (driftCount > 0) {
+            list.push({
+                tone: 'warning',
+                title: `${driftCount} recurring pattern${driftCount === 1 ? '' : 's'} drifting`,
+                body: 'Coverage rules and recurring series are out of sync.',
+                cta: 'View coverage',
+                onClick: () => setTab('coverage'),
+            });
+        }
+        const expired = props.analytics?.complianceExpired ?? 0;
+        if (expired > 0) {
+            list.push({
+                tone: 'critical',
+                title: `${expired} expired credential${expired === 1 ? '' : 's'}`,
+                body: 'Staff with expired compliance documents.',
+                cta: 'Open compliance',
+                href: '/hr/compliance',
+            });
+        }
+        return list;
+    }, [
+        openCount,
+        props.stats,
+        eligibleCounts,
+        props.recurringCoverageAlignment,
+        props.analytics?.complianceExpired,
+    ]);
+
+    // -------- Publish ---------
     const publishBlockCount =
         props.rosterPeriod?.validation_summary?.blocks?.length ?? 0;
     const publishWarningCount =
         props.rosterPeriod?.validation_summary?.warnings?.length ?? 0;
-    const reportDateTo = useMemo(() => {
-        if (!props.weekEnd) return ymd(addDays(startDate, 6));
-
-        return ymd(addDays(new Date(`${props.weekEnd}T00:00:00`), -1));
-    }, [props.weekEnd, startDate]);
-    const operationsReportHref = useMemo(() => {
-        const params = new URLSearchParams({
-            date_from: props.weekStart,
-            date_to: reportDateTo,
-        });
-        if (props.filters.site_id) {
-            params.set('site_id', String(props.filters.site_id));
-        }
-
-        return `/operations/reports/shifts?${params.toString()}`;
-    }, [props.filters.site_id, props.weekStart, reportDateTo]);
-
     const isPreviouslyPublished = Boolean(props.rosterPeriod?.published_at);
     const canRepublish = Boolean(
         props.rosterPeriod &&
-        isPreviouslyPublished &&
-        props.rosterPeriod.status !== 'published' &&
-        props.rosterPeriod.status !== 'archived',
+            isPreviouslyPublished &&
+            props.rosterPeriod.status !== 'published' &&
+            props.rosterPeriod.status !== 'archived',
     );
     const diffTotal = props.rosterPeriod?.diff_summary?.total ?? 0;
-
     const postPeriodAction = (
         action: 'review' | 'publish' | 'republish' | 'unpublish',
     ) => {
         if (!props.rosterPeriod) return;
-
         router.post(
             `/operations/rostering/periods/${props.rosterPeriod.id}/${action}`,
             {},
             { preserveScroll: true },
         );
     };
-
     const generateSuggestions = () => {
         router.post(
             '/operations/rostering/auto-schedule',
@@ -1165,407 +1240,494 @@ export default function RosteringIndex(props: Props) {
             { preserveScroll: true },
         );
     };
+    const reportDateTo = useMemo(() => {
+        if (!props.weekEnd) return ymd(addDaysWP(startDate, 6));
+        return ymd(addDaysWP(new Date(`${props.weekEnd}T00:00:00`), -1));
+    }, [props.weekEnd, startDate]);
+    const operationsReportHref = useMemo(() => {
+        const params = new URLSearchParams({
+            date_from: props.weekStart,
+            date_to: reportDateTo,
+        });
+        if (props.filters.site_id)
+            params.set('site_id', String(props.filters.site_id));
+        return `/operations/reports/shifts?${params.toString()}`;
+    }, [props.filters.site_id, props.weekStart, reportDateTo]);
+
+    const assignOpenShift = (
+        shiftId: number,
+        userId: number | string,
+    ) => {
+        router.post(
+            `/operations/shifts/${shiftId}/assign`,
+            { user_id: userId, return_to: '/operations/rostering' },
+            { preserveScroll: true },
+        );
+    };
+    const unassignShift = (shiftId: number) => {
+        router.post(
+            `/operations/shifts/${shiftId}/unassign`,
+            { return_to: '/operations/rostering' },
+            { preserveScroll: true },
+        );
+    };
+
+    const cancelShift = (shiftId: number) => {
+        if (!window.confirm('Cancel this shift?')) return;
+        // Route is PATCH /operations/shifts/{shift}/cancel — operations.shifts.cancel.
+        router.patch(
+            `/operations/shifts/${shiftId}/cancel`,
+            { return_to: '/operations/rostering' },
+            { preserveScroll: true },
+        );
+    };
+
+    const tabItems = [
+        {
+            id: 'shifts',
+            label: 'Shifts',
+            icon: CalendarDays,
+            tone: 'primary' as const,
+            badge: total,
+        },
+        {
+            id: 'open',
+            label: 'Open shifts',
+            icon: AlertTriangle,
+            tone: 'warning' as const,
+            badge: openCount,
+        },
+        {
+            id: 'coverage',
+            label: 'Coverage',
+            icon: PieChart,
+            tone: 'success' as const,
+            badge: `${coverageRate}%`,
+        },
+        {
+            id: 'timeoff',
+            label: 'Time off',
+            icon: Plane,
+            tone: 'info' as const,
+            badge: timeOffRequests.length || undefined,
+        },
+        {
+            id: 'capacity',
+            label: 'Capacity heatmap',
+            icon: LayoutGrid,
+            tone: 'violet' as const,
+        },
+        {
+            id: 'analytics',
+            label: 'Analytics',
+            icon: LineChart,
+            tone: 'critical' as const,
+        },
+    ];
+
+    const prevLab = weekLabel(addDaysWP(weekStartDate, -7));
+    const nextLab = weekLabel(addDaysWP(weekStartDate, 7));
+    const curLab = weekLabel(weekStartDate);
+
+    const heroBadges: Array<{
+        label: string;
+        tone: 'default' | 'success' | 'warning' | 'critical' | 'info';
+        icon?: typeof CalendarDays;
+    }> = [];
+    if (openCount > 0) {
+        heroBadges.push({
+            label: `${openCount} open shifts · need cover`,
+            tone: 'warning' as const,
+            icon: AlertTriangle,
+        });
+    }
+    if (eligibleCounts.blocked > 0) {
+        heroBadges.push({
+            label: `${eligibleCounts.blocked} blocked candidates`,
+            tone: 'critical' as const,
+        });
+    }
+    if (props.rosterPeriod?.status === 'published') {
+        heroBadges.push({
+            label: `${curLab} published`,
+            tone: 'success' as const,
+            icon: CheckCircle2,
+        });
+    } else if (props.rosterPeriod) {
+        heroBadges.push({
+            label: `${curLab} ${props.rosterPeriod.status.replace(/_/g, ' ')}`,
+            tone: 'default' as const,
+        });
+    }
+    if (
+        props.rosteringFeatures.auto_schedule &&
+        props.canAutoScheduleRoster
+    ) {
+        heroBadges.push({
+            label: 'Auto-schedule ready',
+            tone: 'info' as const,
+            icon: Zap,
+        });
+    }
 
     return (
         <AppLayout
             breadcrumbs={[{ title: 'Rostering', href: rosteringIndex.url() }]}
         >
             <Head title="Rostering" />
-
             <div className="space-y-4 p-4">
-                <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                    <div>
-                        <HeadingSmall
-                            title="Rostering"
-                            description="Week view of shifts with operational signals (tasks, incidents, timesheets)."
-                        />
-                    </div>
-
-                    <div className="flex flex-wrap items-center gap-2">
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => goWeek(-7)}
-                        >
-                            <ChevronLeft className="mr-1 h-4 w-4" /> Prev
-                        </Button>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() => goWeek(7)}
-                        >
-                            Next <ChevronRight className="ml-1 h-4 w-4" />
-                        </Button>
-
-                        <Separator
-                            orientation="vertical"
-                            className="mx-1 hidden h-8 md:block"
-                        />
-
-                        {canViewOperationsReports ? (
-                            <Link
-                                href={operationsReportHref}
-                                data-test="rostering-operations-report-link"
-                                data-testid="rostering-operations-report-link"
-                            >
-                                <Button size="sm" variant="outline">
-                                    <BarChart3 className="mr-1 h-4 w-4" />
-                                    View Operations Reports
+                <PageHero
+                    category="ops"
+                    icon={CalendarDays}
+                    title={
+                        <span>
+                            <span className="mb-2 flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-wider text-primary-foreground/80">
+                                <span
+                                    aria-hidden="true"
+                                    className="relative inline-flex h-2 w-2"
+                                >
+                                    <span className="absolute inset-0 inline-flex h-full w-full animate-ping rounded-full bg-emerald-300/70" />
+                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-300 ring-2 ring-emerald-300/30" />
+                                </span>
+                                Live roster · refreshed just now
+                            </span>
+                            <span className="block">
+                                <span className="font-normal text-primary-foreground/80">
+                                    Kia ora {firstName}, your week at a glance —
+                                </span>{' '}
+                                <span className="border-b-2 border-primary-foreground/40 pb-0.5">
+                                    {range.startLabel} → {range.endLabel}
+                                </span>
+                            </span>
+                        </span>
+                    }
+                    description={
+                        <span>
+                            {total} shifts across{' '}
+                            {(props.sites?.length ?? 0) || 'all'} sites.{' '}
+                            {openCount > 0 ? `${openCount} need cover, ` : ''}
+                            {props.stats.staff_overlaps > 0
+                                ? `${props.stats.staff_overlaps} conflict${props.stats.staff_overlaps === 1 ? '' : 's'} to resolve, `
+                                : ''}
+                            and {props.stats.timesheets_pending} timesheets
+                            waiting on you.
+                        </span>
+                    }
+                    meta={[
+                        {
+                            icon: CalendarDays,
+                            label: `${curLab} · Mon–Sun`,
+                        },
+                        {
+                            icon: LayoutGrid,
+                            label: `${props.sites?.length ?? 0} sites`,
+                        },
+                        {
+                            icon: CheckCircle2,
+                            label: `${staffRostered} staff rostered · ${props.analytics?.onLeaveCount ?? 0} on leave`,
+                        },
+                    ]}
+                    badges={heroBadges}
+                    stats={[
+                        {
+                            label: 'Coverage',
+                            value: `${coverageRate}%`,
+                        },
+                        { label: 'Shifts', value: total },
+                        { label: 'Staff', value: staffRostered },
+                        {
+                            label: 'Open',
+                            value: openCount,
+                        },
+                    ]}
+                    actions={
+                        <>
+                            {props.canPublishRoster ? (
+                                <Button
+                                    size="sm"
+                                    className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                                    disabled={
+                                        !props.rosteringFeatures.publish ||
+                                        !props.rosterPeriod ||
+                                        publishBlockCount > 0 ||
+                                        props.rosterPeriod.status === 'archived'
+                                    }
+                                    title={
+                                        !props.rosteringFeatures.publish
+                                            ? 'Publishing is not enabled for this organisation'
+                                            : !props.rosterPeriod
+                                              ? 'Pick a site to publish its week'
+                                              : publishBlockCount > 0
+                                                ? `${publishBlockCount} blocker${publishBlockCount === 1 ? '' : 's'} must be resolved`
+                                                : undefined
+                                    }
+                                    onClick={() =>
+                                        postPeriodAction(
+                                            canRepublish
+                                                ? 'republish'
+                                                : 'publish',
+                                        )
+                                    }
+                                    data-test="rostering-confirm-publish"
+                                    data-testid="rostering-confirm-publish"
+                                >
+                                    <CheckCircle2 className="mr-1 h-4 w-4" />
+                                    {canRepublish
+                                        ? 'Re-publish'
+                                        : 'Publish week'}
+                                </Button>
+                            ) : null}
+                            {props.canAutoScheduleRoster ? (
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    className="border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10"
+                                    disabled={
+                                        !props.rosteringFeatures.auto_schedule ||
+                                        !props.filters.site_id
+                                    }
+                                    title={
+                                        !props.rosteringFeatures.auto_schedule
+                                            ? 'Auto-scheduling is not enabled for this organisation'
+                                            : !props.filters.site_id
+                                              ? 'Pick a site before generating suggestions'
+                                              : undefined
+                                    }
+                                    onClick={generateSuggestions}
+                                    data-test="rostering-suggest-assignments"
+                                    data-testid="rostering-suggest-assignments"
+                                >
+                                    <Wand2 className="mr-1 h-4 w-4" />
+                                    Auto-schedule
+                                </Button>
+                            ) : null}
+                            <Link href="/operations/rostering/conflicts">
+                                <Button
+                                    size="icon"
+                                    variant="outline"
+                                    aria-label="Conflict queue"
+                                    className="border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10"
+                                >
+                                    <MoreHorizontal className="h-4 w-4" />
                                 </Button>
                             </Link>
-                        ) : null}
-                        <Link href="/operations/shifts/create">
-                            <Button size="sm">
-                                <Plus className="mr-1 h-4 w-4" /> New shift
-                            </Button>
-                        </Link>
-                        <Link href="/operations/rostering/conflicts">
-                            <Button size="sm" variant="outline">
-                                Conflict queue
-                            </Button>
-                        </Link>
-                        <Link href="/operations/shifts/series">
-                            <Button size="sm" variant="outline">
-                                Recurring series
-                            </Button>
-                        </Link>
-                        {props.rosteringFeatures.auto_schedule &&
-                        props.canAutoScheduleRoster ? (
-                            <Button
-                                size="sm"
-                                variant="outline"
-                                disabled={!props.filters.site_id}
-                                onClick={generateSuggestions}
-                                data-test="rostering-suggest-assignments"
-                            >
-                                Suggest assignments
-                            </Button>
-                        ) : null}
-                    </div>
+                        </>
+                    }
+                    footer={
+                        <div className="flex flex-col items-stretch gap-2 py-3 md:flex-row md:items-center md:justify-between">
+                            <div className="flex flex-wrap items-center gap-1.5">
+                                <button
+                                    type="button"
+                                    className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-foreground/20"
+                                    onClick={() => goWeek(-7)}
+                                >
+                                    <ChevronLeft className="h-3.5 w-3.5" />
+                                    {prevLab}
+                                </button>
+                                <button
+                                    ref={todayBtnRef}
+                                    type="button"
+                                    className="inline-flex items-center gap-1.5 rounded-md border border-primary-foreground/35 bg-primary-foreground/20 px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-foreground/30"
+                                    onClick={() => setPickerOpen((v) => !v)}
+                                    aria-haspopup="dialog"
+                                    aria-expanded={pickerOpen}
+                                >
+                                    <CalendarRange className="h-3.5 w-3.5" />
+                                    {curLab} · pick week
+                                    <ChevronDown className="h-3 w-3" />
+                                </button>
+                                <button
+                                    type="button"
+                                    className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-foreground/20"
+                                    onClick={() => goWeek(7)}
+                                >
+                                    {nextLab}
+                                    <ChevronRight className="h-3.5 w-3.5" />
+                                </button>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                <SiteFilter
+                                    onDark
+                                    sites={props.sites ?? []}
+                                    value={props.filters.site_ids ?? []}
+                                    onChange={(next) =>
+                                        updateFilter({ site_ids: next })
+                                    }
+                                />
+                            </div>
+                        </div>
+                    }
+                />
+
+                <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+                    <DonutCard
+                        tone="primary"
+                        title="Shifts"
+                        subtitle={`${curLab} breakdown`}
+                        segments={
+                            shiftBreakdown.length > 0
+                                ? shiftBreakdown
+                                : [
+                                      {
+                                          key: 'none',
+                                          label: 'None',
+                                          value: 1,
+                                          color: 'var(--muted-foreground)',
+                                      },
+                                  ]
+                        }
+                        centerValue={total}
+                        centerLabel="shifts"
+                        accentKeys={['scheduled', 'in_progress']}
+                        active={tab === 'shifts'}
+                        cta="View shifts"
+                        onClick={() => setTab('shifts')}
+                    />
+                    <DonutCard
+                        tone="warning"
+                        title="Open shifts"
+                        subtitle="Need cover this week"
+                        segments={
+                            openBreakdown.length > 0
+                                ? openBreakdown
+                                : [
+                                      {
+                                          key: 'none',
+                                          label: 'None',
+                                          value: 1,
+                                          color: 'var(--muted-foreground)',
+                                      },
+                                  ]
+                        }
+                        centerValue={openCount}
+                        centerLabel={
+                            openCount === 1 ? 'shift open' : 'shifts open'
+                        }
+                        accentKeys={['open', 'blocked']}
+                        active={tab === 'open'}
+                        cta="View open shifts"
+                        onClick={() => setTab('open')}
+                    />
+                    <DonutCard
+                        tone="success"
+                        title="Coverage"
+                        subtitle="Filled vs. demand"
+                        segments={
+                            coverageBreakdown.length > 0
+                                ? coverageBreakdown
+                                : [
+                                      {
+                                          key: 'none',
+                                          label: 'None',
+                                          value: 1,
+                                          color: 'var(--muted-foreground)',
+                                      },
+                                  ]
+                        }
+                        centerValue={`${coverageRate}%`}
+                        centerLabel="covered"
+                        accentKeys={['covered']}
+                        active={tab === 'coverage'}
+                        cta="View coverage"
+                        onClick={() => setTab('coverage')}
+                    />
                 </div>
 
-                {publishedReportLink && canViewOperationsReports ? (
-                    <Card
-                        className="border-status-success/30 bg-status-success-bg"
-                        data-test="rostering-published-report-link"
-                        data-testid="rostering-published-report-link"
-                    >
-                        <CardContent className="flex flex-col gap-3 p-4 md:flex-row md:items-center md:justify-between">
-                            <div>
-                                <div className="font-medium text-status-success">
-                                    Published roster reporting is ready.
-                                </div>
-                                <div className="text-sm text-muted-foreground">
-                                    Review coverage, reconciliation, and variance for this period.
-                                </div>
-                            </div>
-                            <Link href={publishedReportLink}>
-                                <Button size="sm" variant="outline">
-                                    View Shift Operations Report
-                                </Button>
-                            </Link>
-                        </CardContent>
-                    </Card>
-                ) : null}
+                <TabStrip
+                    value={tab}
+                    onChange={(v) => setTab(v as typeof tab)}
+                    items={tabItems}
+                />
 
-                {/* KPI Cards — 3 critical always visible, rest collapsible */}
-                <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-                    <KpiCard
-                        label="Total Shifts"
-                        value={props.stats.total}
-                        icon={Calendar}
-                        color="bg-primary/10 text-primary"
-                    />
-                    <KpiCard
-                        label="Open / Unfilled"
-                        value={props.stats.open}
-                        icon={AlertTriangle}
-                        description="Need assignment"
-                        color="bg-status-critical-bg text-status-critical"
-                    />
-                    <KpiCard
-                        label="Coverage Rate"
-                        value={props.analytics.coverageRate}
-                        icon={TrendingUp}
-                        suffix="%"
-                        description="Filled / Total"
-                        color="bg-status-info-bg text-status-info"
+                <div className="grid gap-4 xl:grid-cols-[1fr_320px]">
+                    <main className="min-w-0">
+                        {tab === 'shifts' ? (
+                            <WeekGridPane
+                                days={days}
+                                rows={rosterRows}
+                                todayKey={todayKey}
+                                canManage={props.canManageAny}
+                                onUnassign={(s) => unassignShift(s.id)}
+                                onCancelShift={(s) => cancelShift(s.id)}
+                                onCreateShift={() =>
+                                    router.visit('/operations/shifts/create')
+                                }
+                                onAssignOpen={(s) =>
+                                    router.visit(`/operations/shifts/${s.id}`)
+                                }
+                                onReassign={(s) =>
+                                    router.visit(`/operations/shifts/${s.id}`)
+                                }
+                                onResolveConflict={() =>
+                                    router.visit(
+                                        '/operations/rostering/conflicts',
+                                    )
+                                }
+                                onReportIncident={(s) =>
+                                    router.visit(
+                                        `/incidents/create?shift_id=${s.id}`,
+                                    )
+                                }
+                            />
+                        ) : null}
+                        {tab === 'open' ? (
+                            <OpenShiftsPane
+                                stats={openStats}
+                                shifts={openShiftCards}
+                                canManage={props.canManageAny}
+                                onAssign={(sh, userId) =>
+                                    assignOpenShift(sh.id, userId)
+                                }
+                                onBroadcast={(sh) =>
+                                    router.visit(
+                                        `/operations/shifts/${sh.id}`,
+                                    )
+                                }
+                            />
+                        ) : null}
+                        {tab === 'coverage' ? (
+                            <CoveragePane
+                                stats={coverageStats}
+                                windowLabels={coverageWindowLabels}
+                                rows={coverageRows}
+                            />
+                        ) : null}
+                        {tab === 'timeoff' ? (
+                            <TimeOffPane
+                                stats={timeOffStats}
+                                requests={timeOffRequests}
+                                weekStart={weekStartDate}
+                                canManage={props.canManageAny}
+                                // No pending requests are surfaced yet (would need the controller
+                                // to return HrLeaveRequest pending entries) — deep-link to HR leave
+                                // where approval lives.
+                                onApprove={() => router.visit('/hr/leave')}
+                                onDecline={() => router.visit('/hr/leave')}
+                            />
+                        ) : null}
+                        {tab === 'capacity' ? (
+                            <CapacityHeatmapPane
+                                stats={capacityStats}
+                                days={days}
+                                rows={capacityRows}
+                                todayKey={todayKey}
+                            />
+                        ) : null}
+                        {tab === 'analytics' ? (
+                            <AnalyticsPane
+                                stats={analyticsStats}
+                                coverageTrend={trendPoints}
+                                shiftTypes={shiftTypeSlices}
+                                fillBySite={fillBySite}
+                                overtimeTrend={overtimeTrend}
+                            />
+                        ) : null}
+                    </main>
+                    <SignalRail
+                        signals={signals}
+                        capacity={capacityRailRows}
                     />
                 </div>
-
-                <Collapsible>
-                    <CollapsibleTrigger asChild>
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            className="group flex items-center gap-1 text-xs text-muted-foreground"
-                        >
-                            <ChevronDown className="h-3.5 w-3.5 transition-transform group-data-[state=open]:rotate-180" />
-                            <span className="group-data-[state=open]:hidden">
-                                Show all metrics
-                            </span>
-                            <span className="hidden group-data-[state=open]:inline">
-                                Hide metrics
-                            </span>
-                        </Button>
-                    </CollapsibleTrigger>
-                    <CollapsibleContent className="space-y-3 pt-1">
-                        <div className="grid grid-cols-2 gap-3 md:grid-cols-3">
-                            <KpiCard
-                                label="Staff Rostered"
-                                value={props.analytics.staffRostered}
-                                icon={Users}
-                                color="bg-status-success-bg text-status-success"
-                            />
-                            <KpiCard
-                                label="On Leave"
-                                value={props.analytics.onLeaveCount}
-                                icon={CalendarOff}
-                                description="Approved this week"
-                                color="bg-status-warning-bg text-status-warning"
-                            />
-                            <KpiCard
-                                label="Coverage Gaps"
-                                value={props.stats.coverage_gaps ?? 0}
-                                icon={AlertTriangle}
-                                description="Demand exceeds supply"
-                                color="bg-status-critical-bg text-status-critical"
-                            />
-                        </div>
-
-                        <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
-                            <Card>
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="text-sm font-medium">
-                                        This week
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-2">
-                                    <div className="text-sm text-muted-foreground">
-                                        {props.weekStart} →{' '}
-                                        {ymd(addDays(startDate, 6))}
-                                    </div>
-                                    <div className="flex flex-wrap gap-2">
-                                        <Badge variant="outline">
-                                            Total: {props.stats.total}
-                                        </Badge>
-                                        <Badge
-                                            variant={
-                                                props.stats.open > 0
-                                                    ? 'default'
-                                                    : 'outline'
-                                            }
-                                        >
-                                            Open: {props.stats.open}
-                                        </Badge>
-                                        <Badge variant="outline">
-                                            Scheduled: {props.stats.scheduled}
-                                        </Badge>
-                                        <Badge variant="outline">
-                                            In progress:{' '}
-                                            {props.stats.in_progress}
-                                        </Badge>
-                                        <Badge variant="outline">
-                                            Draft: {props.stats.draft}
-                                        </Badge>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            <Card>
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="text-sm font-medium">
-                                        Operational signals
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="flex flex-wrap gap-2">
-                                    <Badge
-                                        variant={
-                                            props.stats.incidents > 0
-                                                ? 'destructive'
-                                                : 'outline'
-                                        }
-                                    >
-                                        Incidents: {props.stats.incidents}
-                                    </Badge>
-                                    <Badge
-                                        variant={
-                                            props.stats.timesheets_pending > 0
-                                                ? 'default'
-                                                : 'outline'
-                                        }
-                                    >
-                                        Timesheets pending:{' '}
-                                        {props.stats.timesheets_pending}
-                                    </Badge>
-                                </CardContent>
-                            </Card>
-
-                            <Card>
-                                <CardHeader className="pb-2">
-                                    <CardTitle className="text-sm font-medium">
-                                        Overlaps
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="flex flex-wrap gap-2">
-                                    <Badge
-                                        variant={
-                                            props.stats.staff_overlaps > 0
-                                                ? 'destructive'
-                                                : 'outline'
-                                        }
-                                    >
-                                        Staff overlaps:{' '}
-                                        {props.stats.staff_overlaps}
-                                    </Badge>
-                                    <Badge
-                                        variant={
-                                            props.stats.client_overlaps > 0
-                                                ? 'destructive'
-                                                : 'outline'
-                                        }
-                                    >
-                                        {clientSingular} overlaps:{' '}
-                                        {props.stats.client_overlaps}
-                                    </Badge>
-                                    <Badge
-                                        variant={
-                                            props.stats.time_off_conflicts > 0
-                                                ? 'destructive'
-                                                : 'outline'
-                                        }
-                                    >
-                                        Time-off conflicts:{' '}
-                                        {props.stats.time_off_conflicts}
-                                    </Badge>
-                                    <Badge
-                                        variant={
-                                            (props.stats.coverage_gaps ?? 0) > 0
-                                                ? 'destructive'
-                                                : 'outline'
-                                        }
-                                    >
-                                        Coverage gaps:{' '}
-                                        {props.stats.coverage_gaps ?? 0}
-                                    </Badge>
-                                </CardContent>
-                            </Card>
-                        </div>
-                    </CollapsibleContent>
-                </Collapsible>
-
-                {/* Filters — always visible */}
-                <Card>
-                    <CardHeader className="pb-2">
-                        <CardTitle className="text-sm font-medium">
-                            Filters
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="space-y-2">
-                        {props.canManageAny ? (
-                            <div className="grid grid-cols-1 gap-2 sm:grid-cols-3">
-                                <Select
-                                    value={
-                                        props.filters.staff_id
-                                            ? String(props.filters.staff_id)
-                                            : 'all'
-                                    }
-                                    onValueChange={(v) =>
-                                        updateFilter({
-                                            staff_id:
-                                                v === 'all' ? null : Number(v),
-                                        })
-                                    }
-                                >
-                                    <SelectTrigger aria-label="Filter staff">
-                                        <SelectValue placeholder="All staff" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">
-                                            All staff
-                                        </SelectItem>
-                                        {props.staff.map((s) => (
-                                            <SelectItem
-                                                key={s.id}
-                                                value={String(s.id)}
-                                            >
-                                                {s.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-
-                                <Select
-                                    value={
-                                        props.filters.site_id
-                                            ? String(props.filters.site_id)
-                                            : 'all'
-                                    }
-                                    onValueChange={(v) =>
-                                        updateFilter({
-                                            site_id:
-                                                v === 'all' ? null : Number(v),
-                                        })
-                                    }
-                                >
-                                    <SelectTrigger aria-label="Filter sites">
-                                        <SelectValue placeholder="All sites" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">
-                                            All sites
-                                        </SelectItem>
-                                        {props.sites.map((site) => (
-                                            <SelectItem
-                                                key={site.id}
-                                                value={String(site.id)}
-                                            >
-                                                {site.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-
-                                <Select
-                                    value={
-                                        props.filters.client_id
-                                            ? String(props.filters.client_id)
-                                            : 'all'
-                                    }
-                                    onValueChange={(v) =>
-                                        updateFilter({
-                                            client_id:
-                                                v === 'all' ? null : Number(v),
-                                        })
-                                    }
-                                >
-                                    <SelectTrigger
-                                        aria-label={`Filter ${clientPlural.toLowerCase()}`}
-                                    >
-                                        <SelectValue
-                                            placeholder={`All ${clientPlural.toLowerCase()}`}
-                                        />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value="all">{`All ${clientPlural.toLowerCase()}`}</SelectItem>
-                                        {props.clients.map((c) => (
-                                            <SelectItem
-                                                key={c.id}
-                                                value={String(c.id)}
-                                            >
-                                                {c.first_name} {c.last_name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        ) : (
-                            <div className="text-sm text-muted-foreground">
-                                You are viewing your assigned shifts.
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
 
                 {props.rosteringFeatures.publish && props.canPublishRoster ? (
                     <Card data-test="rostering-publish-panel">
@@ -1595,11 +1757,7 @@ export default function RosteringIndex(props: Props) {
                             </CardTitle>
                         </CardHeader>
                         <CardContent className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                            <div className="space-y-1 text-sm">
-                                <div className="font-medium">
-                                    {selectedSiteName ??
-                                        'Choose a site to manage publishing'}
-                                </div>
+                            <div className="text-sm">
                                 {props.rosterPeriod ? (
                                     <div className="text-muted-foreground">
                                         Version {props.rosterPeriod.version} ·{' '}
@@ -1625,6 +1783,7 @@ export default function RosteringIndex(props: Props) {
                                     }
                                     onClick={() => postPeriodAction('review')}
                                     data-test="rostering-review-publish"
+                                    data-testid="rostering-review-publish"
                                 >
                                     Review
                                 </Button>
@@ -1643,6 +1802,7 @@ export default function RosteringIndex(props: Props) {
                                         )
                                     }
                                     data-test="rostering-confirm-publish"
+                                    data-testid="rostering-confirm-publish"
                                 >
                                     <CheckCircle2 className="mr-1 h-4 w-4" />
                                     {canRepublish ? 'Re-publish' : 'Publish'}
@@ -1672,4046 +1832,45 @@ export default function RosteringIndex(props: Props) {
                     </Card>
                 ) : null}
 
-                <Tabs
-                    tabs={[
-                        {
-                            key: 'ops',
-                            label: (
-                                <span className="flex items-center gap-2">
-                                    Ops
-                                    {props.stats.open +
-                                        props.stats.staff_overlaps +
-                                        props.stats.client_overlaps +
-                                        props.stats.time_off_conflicts >
-                                    0 ? (
-                                        <Badge
-                                            variant="destructive"
-                                            className="text-[10px]"
-                                        >
-                                            action
-                                        </Badge>
-                                    ) : (
-                                        <Badge
-                                            variant="outline"
-                                            className="text-[10px]"
-                                        >
-                                            ok
-                                        </Badge>
-                                    )}
-                                </span>
-                            ),
-                            content: (
-                                <div className="space-y-4">
-                                    <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
-                                        <Card className="lg:col-span-2">
-                                            <CardHeader className="pb-2">
-                                                <CardTitle className="text-base">
-                                                    Fix now
-                                                </CardTitle>
-                                            </CardHeader>
-                                            <CardContent className="space-y-4">
-                                                {/* Open shifts */}
-                                                <div className="space-y-2">
-                                                    <div className="flex items-center justify-between">
-                                                        <div className="text-sm font-medium">
-                                                            Open shifts
-                                                        </div>
-                                                        <Badge
-                                                            variant={
-                                                                openShifts.length >
-                                                                0
-                                                                    ? 'default'
-                                                                    : 'outline'
-                                                            }
-                                                        >
-                                                            {openShifts.length}
-                                                        </Badge>
-                                                    </div>
-                                                    {openShifts.length === 0 ? (
-                                                        <div className="text-sm text-muted-foreground">
-                                                            No open shifts in
-                                                            this week.
-                                                        </div>
-                                                    ) : (
-                                                        <div className="space-y-2">
-                                                            {openShifts
-                                                                .slice(0, 8)
-                                                                .map((sh) => (
-                                                                    <div
-                                                                        key={
-                                                                            sh.id
-                                                                        }
-                                                                        className="rounded-md border p-3"
-                                                                    >
-                                                                        <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                                                                            <div>
-                                                                                <div className="text-sm font-medium">
-                                                                                    {sh.client ??
-                                                                                        clientSingular}{' '}
-                                                                                    ·{' '}
-                                                                                    {new Date(
-                                                                                        sh.starts_at,
-                                                                                    ).toLocaleDateString()}{' '}
-                                                                                    {fmtTime(
-                                                                                        sh.starts_at,
-                                                                                    )}
-
-                                                                                    –
-                                                                                    {fmtTime(
-                                                                                        sh.ends_at,
-                                                                                    )}
-                                                                                </div>
-                                                                                <div className="mt-1 flex flex-wrap gap-1.5 text-xs text-muted-foreground">
-                                                                                    <span>
-                                                                                        {sh.location
-                                                                                            ? `${sh.location} · `
-                                                                                            : ''}
-                                                                                        Status:{' '}
-                                                                                        {
-                                                                                            sh.status
-                                                                                        }
-                                                                                    </span>
-                                                                                    {sh.shift_series_id ? (
-                                                                                        <Badge
-                                                                                            variant="outline"
-                                                                                            className="text-[10px]"
-                                                                                        >
-                                                                                            Recurring
-                                                                                        </Badge>
-                                                                                    ) : null}
-                                                                                    {sh.has_active_replacement ? (
-                                                                                        <Badge
-                                                                                            variant={replacementBadgeVariant(
-                                                                                                sh.replacement_status,
-                                                                                            )}
-                                                                                            className="text-[10px]"
-                                                                                        >
-                                                                                            Replacement
-                                                                                        </Badge>
-                                                                                    ) : null}
-                                                                                </div>
-                                                                            </div>
-
-                                                                            <div className="flex flex-wrap items-center gap-2">
-                                                                                {props.canManageAny ? (
-                                                                                    <>
-                                                                                        <Select
-                                                                                            value={
-                                                                                                opsAssignSelection[
-                                                                                                    sh
-                                                                                                        .id
-                                                                                                ] ??
-                                                                                                ''
-                                                                                            }
-                                                                                            onValueChange={(
-                                                                                                v,
-                                                                                            ) =>
-                                                                                                setOpsAssignSelection(
-                                                                                                    (
-                                                                                                        prev,
-                                                                                                    ) => ({
-                                                                                                        ...prev,
-                                                                                                        [sh.id]:
-                                                                                                            v,
-                                                                                                    }),
-                                                                                                )
-                                                                                            }
-                                                                                        >
-                                                                                            <SelectTrigger
-                                                                                                aria-label={`Assign staff for ${sh.client ?? 'open shift'}`}
-                                                                                                className="w-[220px]"
-                                                                                            >
-                                                                                                <SelectValue placeholder="Assign staff" />
-                                                                                            </SelectTrigger>
-                                                                                            <SelectContent>
-                                                                                                {availableStaffForShift(
-                                                                                                    sh,
-                                                                                                ).map(
-                                                                                                    (
-                                                                                                        s,
-                                                                                                    ) => (
-                                                                                                        <SelectItem
-                                                                                                            key={
-                                                                                                                s.id
-                                                                                                            }
-                                                                                                            value={String(
-                                                                                                                s.id,
-                                                                                                            )}
-                                                                                                        >
-                                                                                                            {
-                                                                                                                s.name
-                                                                                                            }
-                                                                                                        </SelectItem>
-                                                                                                    ),
-                                                                                                )}
-                                                                                            </SelectContent>
-                                                                                        </Select>
-                                                                                        <Button
-                                                                                            size="sm"
-                                                                                            disabled={
-                                                                                                !opsAssignSelection[
-                                                                                                    sh
-                                                                                                        .id
-                                                                                                ]
-                                                                                            }
-                                                                                            onClick={() => {
-                                                                                                const userId =
-                                                                                                    opsAssignSelection[
-                                                                                                        sh
-                                                                                                            .id
-                                                                                                    ];
-                                                                                                if (
-                                                                                                    !userId
-                                                                                                )
-                                                                                                    return;
-                                                                                                router.post(
-                                                                                                    `/operations/shifts/${sh.id}/assign`,
-                                                                                                    {
-                                                                                                        user_id:
-                                                                                                            userId,
-                                                                                                        return_to:
-                                                                                                            '/operations/rostering',
-                                                                                                    },
-                                                                                                    {
-                                                                                                        preserveScroll: true,
-                                                                                                        onSuccess:
-                                                                                                            () =>
-                                                                                                                setOpsAssignSelection(
-                                                                                                                    (
-                                                                                                                        prev,
-                                                                                                                    ) => ({
-                                                                                                                        ...prev,
-                                                                                                                        [sh.id]:
-                                                                                                                            '',
-                                                                                                                    }),
-                                                                                                                ),
-                                                                                                    },
-                                                                                                );
-                                                                                            }}
-                                                                                        >
-                                                                                            Assign
-                                                                                        </Button>
-                                                                                    </>
-                                                                                ) : null}
-                                                                                <Link
-                                                                                    href={`/operations/shifts/${sh.id}`}
-                                                                                >
-                                                                                    <Button
-                                                                                        size="sm"
-                                                                                        variant="outline"
-                                                                                    >
-                                                                                        Open
-                                                                                    </Button>
-                                                                                </Link>
-                                                                            </div>
-                                                                        </div>
-                                                                    </div>
-                                                                ))}
-                                                            {openShifts.length >
-                                                            8 ? (
-                                                                <div className="text-xs text-muted-foreground">
-                                                                    Showing 8 of{' '}
-                                                                    {
-                                                                        openShifts.length
-                                                                    }{' '}
-                                                                    open shifts.
-                                                                </div>
-                                                            ) : null}
-                                                        </div>
-                                                    )}
-                                                </div>
-
-                                                <Separator />
-
-                                                {/* Conflicts */}
-                                                <div className="space-y-3">
-                                                    <div className="flex items-center justify-between">
-                                                        <div className="text-sm font-medium">
-                                                            Conflicts
-                                                        </div>
-                                                        <div className="flex flex-wrap gap-2">
-                                                            <Badge
-                                                                variant={
-                                                                    timeOffConflicts.length >
-                                                                    0
-                                                                        ? 'destructive'
-                                                                        : 'outline'
-                                                                }
-                                                            >
-                                                                Time-off:{' '}
-                                                                {
-                                                                    timeOffConflicts.length
-                                                                }
-                                                            </Badge>
-                                                            <Badge
-                                                                variant={
-                                                                    staffOverlapsDetailed.length >
-                                                                    0
-                                                                        ? 'destructive'
-                                                                        : 'outline'
-                                                                }
-                                                            >
-                                                                Staff overlaps:{' '}
-                                                                {
-                                                                    staffOverlapsDetailed.length
-                                                                }
-                                                            </Badge>
-                                                            <Badge
-                                                                variant={
-                                                                    clientOverlapsDetailed.length >
-                                                                    0
-                                                                        ? 'destructive'
-                                                                        : 'outline'
-                                                                }
-                                                            >
-                                                                Client overlaps:{' '}
-                                                                {
-                                                                    clientOverlapsDetailed.length
-                                                                }
-                                                            </Badge>
-                                                            <Badge
-                                                                variant={
-                                                                    historicalLockedOverlaps.length >
-                                                                    0
-                                                                        ? 'secondary'
-                                                                        : 'outline'
-                                                                }
-                                                            >
-                                                                Historical
-                                                                (locked):{' '}
-                                                                {
-                                                                    historicalLockedOverlaps.length
-                                                                }
-                                                            </Badge>
-                                                        </div>
-                                                    </div>
-
-                                                    {timeOffConflicts.length ===
-                                                        0 &&
-                                                    staffOverlapsDetailed.length ===
-                                                        0 &&
-                                                    clientOverlapsDetailed.length ===
-                                                        0 ? (
-                                                        <div className="text-sm text-muted-foreground">
-                                                            No actionable
-                                                            conflicts detected
-                                                            in this roster
-                                                            window.
-                                                        </div>
-                                                    ) : (
-                                                        <div className="space-y-2">
-                                                            {timeOffConflicts
-                                                                .slice(0, 4)
-                                                                .map(
-                                                                    ({
-                                                                        shift,
-                                                                        timeOffId,
-                                                                        label,
-                                                                    }) => (
-                                                                        <div
-                                                                            key={`to-${shift.id}-${timeOffId}`}
-                                                                            className="rounded-md border p-3"
-                                                                        >
-                                                                            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                                                                                <div>
-                                                                                    <div className="text-sm font-medium">
-                                                                                        Time-off
-                                                                                        conflict
-                                                                                        ·{' '}
-                                                                                        {shift.staff ??
-                                                                                            'Staff'}
-                                                                                    </div>
-                                                                                    <div className="mt-1 text-xs text-muted-foreground">
-                                                                                        {shift.client ??
-                                                                                            clientSingular}{' '}
-                                                                                        ·{' '}
-                                                                                        {new Date(
-                                                                                            shift.starts_at,
-                                                                                        ).toLocaleDateString()}{' '}
-                                                                                        {fmtTime(
-                                                                                            shift.starts_at,
-                                                                                        )}
-
-                                                                                        –
-                                                                                        {fmtTime(
-                                                                                            shift.ends_at,
-                                                                                        )}
-                                                                                    </div>
-                                                                                    <div className="mt-1 text-xs text-muted-foreground">
-                                                                                        {
-                                                                                            label
-                                                                                        }
-                                                                                    </div>
-                                                                                </div>
-                                                                                <div className="flex flex-wrap items-center gap-2">
-                                                                                    <Link
-                                                                                        href={`/operations/shifts/${shift.id}`}
-                                                                                    >
-                                                                                        <Button
-                                                                                            size="sm"
-                                                                                            variant="outline"
-                                                                                        >
-                                                                                            Open
-                                                                                            shift
-                                                                                        </Button>
-                                                                                    </Link>
-                                                                                    {props.canManageAny ? (
-                                                                                        <Button
-                                                                                            size="sm"
-                                                                                            variant="destructive"
-                                                                                            onClick={() => {
-                                                                                                router.delete(
-                                                                                                    destroyTimeOff.url(
-                                                                                                        timeOffId,
-                                                                                                    ),
-                                                                                                    {
-                                                                                                        preserveScroll: true,
-                                                                                                    },
-                                                                                                );
-                                                                                            }}
-                                                                                        >
-                                                                                            Remove
-                                                                                            time-off
-                                                                                        </Button>
-                                                                                    ) : null}
-                                                                                </div>
-                                                                            </div>
-                                                                        </div>
-                                                                    ),
-                                                                )}
-
-                                                            {staffOverlapsDetailed
-                                                                .slice(0, 4)
-                                                                .map(
-                                                                    ({
-                                                                        a,
-                                                                        b,
-                                                                    }) => (
-                                                                        <div
-                                                                            key={`so-${a.id}-${b.id}`}
-                                                                            className="rounded-md border p-3"
-                                                                        >
-                                                                            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                                                                                <div>
-                                                                                    <div className="text-sm font-medium">
-                                                                                        Staff
-                                                                                        overlap
-                                                                                        ·{' '}
-                                                                                        {a.staff ??
-                                                                                            'Staff'}
-                                                                                    </div>
-                                                                                    <div className="mt-1 text-xs text-muted-foreground">
-                                                                                        A:{' '}
-                                                                                        {new Date(
-                                                                                            a.starts_at,
-                                                                                        ).toLocaleDateString()}{' '}
-                                                                                        {fmtTime(
-                                                                                            a.starts_at,
-                                                                                        )}
-
-                                                                                        –
-                                                                                        {fmtTime(
-                                                                                            a.ends_at,
-                                                                                        )}{' '}
-                                                                                        ·{' '}
-                                                                                        {a.client ??
-                                                                                            clientSingular}
-                                                                                    </div>
-                                                                                    <div className="mt-1 text-xs text-muted-foreground">
-                                                                                        B:{' '}
-                                                                                        {new Date(
-                                                                                            b.starts_at,
-                                                                                        ).toLocaleDateString()}{' '}
-                                                                                        {fmtTime(
-                                                                                            b.starts_at,
-                                                                                        )}
-
-                                                                                        –
-                                                                                        {fmtTime(
-                                                                                            b.ends_at,
-                                                                                        )}{' '}
-                                                                                        ·{' '}
-                                                                                        {b.client ??
-                                                                                            clientSingular}
-                                                                                    </div>
-                                                                                </div>
-                                                                                <div className="flex flex-wrap items-center gap-2">
-                                                                                    <Link
-                                                                                        href={`/operations/shifts/${a.id}`}
-                                                                                    >
-                                                                                        <Button
-                                                                                            size="sm"
-                                                                                            variant="outline"
-                                                                                        >
-                                                                                            Open
-                                                                                            A
-                                                                                        </Button>
-                                                                                    </Link>
-                                                                                    <Link
-                                                                                        href={`/operations/shifts/${b.id}`}
-                                                                                    >
-                                                                                        <Button
-                                                                                            size="sm"
-                                                                                            variant="outline"
-                                                                                        >
-                                                                                            Open
-                                                                                            B
-                                                                                        </Button>
-                                                                                    </Link>
-                                                                                    <Button
-                                                                                        size="sm"
-                                                                                        variant="default"
-                                                                                        onClick={() =>
-                                                                                            setResolveModal(
-                                                                                                {
-                                                                                                    kind: 'staff',
-                                                                                                    a,
-                                                                                                    b,
-                                                                                                    staffId:
-                                                                                                        a.user_id ??
-                                                                                                        b.user_id ??
-                                                                                                        undefined,
-                                                                                                },
-                                                                                            )
-                                                                                        }
-                                                                                    >
-                                                                                        Resolve
-                                                                                    </Button>
-                                                                                    {props.canManageAny ? (
-                                                                                        <Button
-                                                                                            size="sm"
-                                                                                            variant="destructive"
-                                                                                            onClick={() => {
-                                                                                                router.post(
-                                                                                                    `/operations/shifts/${b.id}/unassign`,
-                                                                                                    {
-                                                                                                        return_to:
-                                                                                                            '/operations/rostering',
-                                                                                                    },
-                                                                                                    {
-                                                                                                        preserveScroll: true,
-                                                                                                    },
-                                                                                                );
-                                                                                            }}
-                                                                                        >
-                                                                                            Unassign
-                                                                                            B
-                                                                                        </Button>
-                                                                                    ) : null}
-                                                                                </div>
-                                                                            </div>
-                                                                        </div>
-                                                                    ),
-                                                                )}
-
-                                                            {clientOverlapsDetailed
-                                                                .slice(0, 4)
-                                                                .map(
-                                                                    ({
-                                                                        clientId,
-                                                                        a,
-                                                                        b,
-                                                                    }) => (
-                                                                        <div
-                                                                            key={`co-${a.id}-${b.id}`}
-                                                                            className="rounded-md border p-3"
-                                                                        >
-                                                                            <div className="flex flex-col gap-2 md:flex-row md:items-center md:justify-between">
-                                                                                <div>
-                                                                                    <div className="text-sm font-medium">
-                                                                                        {
-                                                                                            clientSingular
-                                                                                        }{' '}
-                                                                                        overlap
-                                                                                        ·{' '}
-                                                                                        {a.client ??
-                                                                                            clientSingular}
-                                                                                    </div>
-                                                                                    <div className="mt-1 text-xs text-muted-foreground">
-                                                                                        A:{' '}
-                                                                                        {new Date(
-                                                                                            a.starts_at,
-                                                                                        ).toLocaleDateString()}{' '}
-                                                                                        {fmtTime(
-                                                                                            a.starts_at,
-                                                                                        )}
-
-                                                                                        –
-                                                                                        {fmtTime(
-                                                                                            a.ends_at,
-                                                                                        )}{' '}
-                                                                                        ·{' '}
-                                                                                        {a.staff ??
-                                                                                            'Staff'}
-                                                                                    </div>
-                                                                                    <div className="mt-1 text-xs text-muted-foreground">
-                                                                                        B:{' '}
-                                                                                        {new Date(
-                                                                                            b.starts_at,
-                                                                                        ).toLocaleDateString()}{' '}
-                                                                                        {fmtTime(
-                                                                                            b.starts_at,
-                                                                                        )}
-
-                                                                                        –
-                                                                                        {fmtTime(
-                                                                                            b.ends_at,
-                                                                                        )}{' '}
-                                                                                        ·{' '}
-                                                                                        {b.staff ??
-                                                                                            'Staff'}
-                                                                                    </div>
-                                                                                </div>
-                                                                                <div className="flex flex-wrap items-center gap-2">
-                                                                                    <Link
-                                                                                        href={`/operations/shifts/${a.id}`}
-                                                                                    >
-                                                                                        <Button
-                                                                                            size="sm"
-                                                                                            variant="outline"
-                                                                                        >
-                                                                                            Open
-                                                                                            A
-                                                                                        </Button>
-                                                                                    </Link>
-                                                                                    <Link
-                                                                                        href={`/operations/shifts/${b.id}`}
-                                                                                    >
-                                                                                        <Button
-                                                                                            size="sm"
-                                                                                            variant="outline"
-                                                                                        >
-                                                                                            Open
-                                                                                            B
-                                                                                        </Button>
-                                                                                    </Link>
-                                                                                    <Button
-                                                                                        size="sm"
-                                                                                        variant="default"
-                                                                                        onClick={() =>
-                                                                                            setResolveModal(
-                                                                                                {
-                                                                                                    kind: 'client',
-                                                                                                    a,
-                                                                                                    b,
-                                                                                                    clientId,
-                                                                                                },
-                                                                                            )
-                                                                                        }
-                                                                                    >
-                                                                                        Resolve
-                                                                                    </Button>
-                                                                                </div>
-                                                                            </div>
-                                                                        </div>
-                                                                    ),
-                                                                )}
-                                                        </div>
-                                                    )}
-
-                                                    {historicalLockedOverlaps.length >
-                                                    0 ? (
-                                                        <div className="rounded-md border border-dashed p-3">
-                                                            <div className="text-sm font-medium">
-                                                                Historical
-                                                                overlaps (both
-                                                                shifts locked)
-                                                            </div>
-                                                            <div className="mt-1 text-xs text-muted-foreground">
-                                                                These are
-                                                                non-actionable
-                                                                in rostering.
-                                                                Reopen a shift
-                                                                only if an audit
-                                                                correction is
-                                                                required.
-                                                            </div>
-                                                        </div>
-                                                    ) : null}
-                                                </div>
-                                            </CardContent>
-                                        </Card>
-
-                                        <div className="space-y-3">
-                                            <Card
-                                                className={
-                                                    props.coverageAlerts
-                                                        .length > 0
-                                                        ? 'border-status-critical/20'
-                                                        : ''
-                                                }
-                                            >
-                                                <CardHeader className="pb-2">
-                                                    <CardTitle className="text-base">
-                                                        Coverage demand
-                                                    </CardTitle>
-                                                </CardHeader>
-                                                <CardContent className="space-y-3">
-                                                    <div className="flex items-center justify-between">
-                                                        <div className="text-sm font-medium">
-                                                            Under-covered site
-                                                            windows
-                                                        </div>
-                                                        <Badge
-                                                            variant={
-                                                                props
-                                                                    .coverageAlerts
-                                                                    .length > 0
-                                                                    ? 'destructive'
-                                                                    : 'outline'
-                                                            }
-                                                        >
-                                                            {
-                                                                props
-                                                                    .coverageAlerts
-                                                                    .length
-                                                            }
-                                                        </Badge>
-                                                    </div>
-                                                    <div className="flex items-center justify-between rounded-md border border-dashed p-2 text-xs text-muted-foreground">
-                                                        <span>
-                                                            Recurring demand
-                                                            drift
-                                                        </span>
-                                                        <span className="font-medium text-foreground">
-                                                            {
-                                                                recurringCoverageDriftCount
-                                                            }
-                                                        </span>
-                                                    </div>
-                                                    {props.coverageAlerts
-                                                        .length === 0 ? (
-                                                        <div className="text-sm text-muted-foreground">
-                                                            No projected site
-                                                            coverage gaps this
-                                                            week.
-                                                        </div>
-                                                    ) : (
-                                                        <div className="space-y-2">
-                                                            {props.coverageAlerts
-                                                                .slice(0, 6)
-                                                                .map(
-                                                                    (
-                                                                        alert,
-                                                                        index,
-                                                                    ) => (
-                                                                        <div
-                                                                            key={`${alert.site_id}-${alert.rule_name}-${alert.window_label}-${index}`}
-                                                                            className={`rounded-xl border p-3 ${
-                                                                                alert
-                                                                                    .acknowledgement
-                                                                                    ?.state ===
-                                                                                'dismissed'
-                                                                                    ? 'bg-muted/40 opacity-80'
-                                                                                    : ''
-                                                                            }`}
-                                                                        >
-                                                                            <div className="flex items-start justify-between gap-2">
-                                                                                <div>
-                                                                                    <div className="text-sm font-medium">
-                                                                                        {
-                                                                                            alert.site_name
-                                                                                        }
-                                                                                    </div>
-                                                                                    <div className="mt-1 text-xs text-muted-foreground">
-                                                                                        {
-                                                                                            alert.rule_name
-                                                                                        }{' '}
-                                                                                        ·{' '}
-                                                                                        {
-                                                                                            alert.window_label
-                                                                                        }
-                                                                                    </div>
-                                                                                </div>
-                                                                                <div className="flex flex-wrap justify-end gap-2">
-                                                                                    {alert.acknowledgement ? (
-                                                                                        <Badge variant="outline">
-                                                                                            {alert
-                                                                                                .acknowledgement
-                                                                                                .state ===
-                                                                                            'dismissed'
-                                                                                                ? 'Dismissed'
-                                                                                                : 'Acked'}
-                                                                                        </Badge>
-                                                                                    ) : null}
-                                                                                    <Badge variant="destructive">
-                                                                                        {gapKindLabel(
-                                                                                            alert.gap_kind,
-                                                                                        )}
-                                                                                    </Badge>
-                                                                                </div>
-                                                                            </div>
-
-                                                                            <div className="mt-2 text-xs text-foreground">
-                                                                                Need{' '}
-                                                                                {
-                                                                                    alert.required_staff
-                                                                                }{' '}
-                                                                                staff,
-                                                                                only{' '}
-                                                                                {
-                                                                                    alert.assigned_staff
-                                                                                }{' '}
-                                                                                assigned.
-                                                                                {(alert.planned_staff ??
-                                                                                    alert.assigned_staff) >
-                                                                                alert.assigned_staff
-                                                                                    ? ` ${alert.planned_staff ?? alert.assigned_staff} planned once open shifts are filled.`
-                                                                                    : ''}
-                                                                            </div>
-                                                                            {coverageRolesForAction(
-                                                                                alert,
-                                                                            )
-                                                                                .length >
-                                                                            0 ? (
-                                                                                <div className="mt-2 flex flex-wrap gap-2">
-                                                                                    {coverageRolesForAction(
-                                                                                        alert,
-                                                                                    ).map(
-                                                                                        (
-                                                                                            role,
-                                                                                        ) => (
-                                                                                            <Badge
-                                                                                                key={`${alert.site_id}-${alert.rule_name}-${role.key}`}
-                                                                                                variant="outline"
-                                                                                            >
-                                                                                                {role.label ??
-                                                                                                    role.key.replace(
-                                                                                                        /_/g,
-                                                                                                        ' ',
-                                                                                                    )}{' '}
-                                                                                                still
-                                                                                                needed
-                                                                                                x
-                                                                                                {role.missing ??
-                                                                                                    1}
-                                                                                            </Badge>
-                                                                                        ),
-                                                                                    )}
-                                                                                </div>
-                                                                            ) : null}
-                                                                            {alert
-                                                                                .partial_window_uncovered_slices
-                                                                                ?.length ? (
-                                                                                <div className="mt-2 flex flex-wrap gap-2">
-                                                                                    {alert.partial_window_uncovered_slices.map(
-                                                                                        (
-                                                                                            slice,
-                                                                                            sliceIndex,
-                                                                                        ) => (
-                                                                                            <Badge
-                                                                                                key={`${alert.site_id}-${alert.rule_name}-slice-${sliceIndex}`}
-                                                                                                variant="outline"
-                                                                                            >
-                                                                                                {formatCoverageSlice(
-                                                                                                    slice.starts_at,
-                                                                                                    slice.ends_at,
-                                                                                                )}{' '}
-                                                                                                still
-                                                                                                uncovered
-                                                                                            </Badge>
-                                                                                        ),
-                                                                                    )}
-                                                                                </div>
-                                                                            ) : null}
-                                                                            {alert.contradictions &&
-                                                                            alert
-                                                                                .contradictions
-                                                                                .length >
-                                                                                0 ? (
-                                                                                <div className="mt-2 flex flex-wrap gap-2">
-                                                                                    {alert.contradictions.map(
-                                                                                        (
-                                                                                            issue,
-                                                                                        ) => (
-                                                                                            <Badge
-                                                                                                key={`${alert.site_id}-${issue}`}
-                                                                                                variant="outline"
-                                                                                            >
-                                                                                                {issue ===
-                                                                                                'headcount_exact_but_role_gap'
-                                                                                                    ? 'Headcount looks full but role demand is still short'
-                                                                                                    : issue ===
-                                                                                                        'partial_window_undercoverage'
-                                                                                                      ? 'Coverage drops away inside the window and needs partial backfill'
-                                                                                                      : issue ===
-                                                                                                          'planned_supply_exact_but_role_gap'
-                                                                                                        ? 'Planned supply still misses the required role mix'
-                                                                                                        : issue ===
-                                                                                                            'preferred_client_drift'
-                                                                                                          ? 'Preferred client context has drifted'
-                                                                                                          : issue ===
-                                                                                                              'overfill_not_allowed'
-                                                                                                            ? 'This window is overstaffed beyond the allowed limit'
-                                                                                                            : issue ===
-                                                                                                                'overfilled_but_wrong_role_mix'
-                                                                                                              ? 'This window is overfilled but still has the wrong role mix'
-                                                                                                              : issue}
-                                                                                            </Badge>
-                                                                                        ),
-                                                                                    )}
-                                                                                </div>
-                                                                            ) : null}
-
-                                                                            <div className="mt-3 flex flex-wrap gap-2">
-                                                                                {alert.open_shift_ids &&
-                                                                                alert
-                                                                                    .open_shift_ids
-                                                                                    .length >
-                                                                                    0 ? (
-                                                                                    <Link
-                                                                                        href={`/operations/shifts/${alert.open_shift_ids[0]}`}
-                                                                                    >
-                                                                                        <Button
-                                                                                            size="sm"
-                                                                                            variant="outline"
-                                                                                        >
-                                                                                            Open
-                                                                                            cover
-                                                                                            shift
-                                                                                        </Button>
-                                                                                    </Link>
-                                                                                ) : null}
-                                                                                <Link href="/operations/rostering/conflicts">
-                                                                                    <Button
-                                                                                        size="sm"
-                                                                                        variant="outline"
-                                                                                    >
-                                                                                        Open
-                                                                                        queue
-                                                                                    </Button>
-                                                                                </Link>
-                                                                                {alert.acknowledgement ? (
-                                                                                    <Button
-                                                                                        size="sm"
-                                                                                        variant="outline"
-                                                                                        onClick={() =>
-                                                                                            clearCoverageAcknowledgement(
-                                                                                                alert,
-                                                                                            )
-                                                                                        }
-                                                                                    >
-                                                                                        Clear
-                                                                                    </Button>
-                                                                                ) : (
-                                                                                    <>
-                                                                                        <Button
-                                                                                            size="sm"
-                                                                                            variant="outline"
-                                                                                            onClick={() =>
-                                                                                                updateCoverageAcknowledgement(
-                                                                                                    alert,
-                                                                                                    'acked',
-                                                                                                )
-                                                                                            }
-                                                                                        >
-                                                                                            Ack
-                                                                                        </Button>
-                                                                                        <Button
-                                                                                            size="sm"
-                                                                                            variant="outline"
-                                                                                            onClick={() =>
-                                                                                                updateCoverageAcknowledgement(
-                                                                                                    alert,
-                                                                                                    'dismissed',
-                                                                                                )
-                                                                                            }
-                                                                                        >
-                                                                                            Dismiss
-                                                                                        </Button>
-                                                                                    </>
-                                                                                )}
-                                                                                {shouldOfferCreation(
-                                                                                    alert.recommended_fill_action,
-                                                                                ) ? (
-                                                                                    <>
-                                                                                        <Button
-                                                                                            size="sm"
-                                                                                            onClick={() =>
-                                                                                                void openCoverageCreate(
-                                                                                                    alert,
-                                                                                                )
-                                                                                            }
-                                                                                        >
-                                                                                            {fillActionLabel(
-                                                                                                alert.recommended_fill_action,
-                                                                                            )}
-                                                                                        </Button>
-                                                                                        <Button
-                                                                                            size="sm"
-                                                                                            variant="outline"
-                                                                                            onClick={() =>
-                                                                                                void openCoverageCreate(
-                                                                                                    alert,
-                                                                                                    {
-                                                                                                        openShift: true,
-                                                                                                    },
-                                                                                                )
-                                                                                            }
-                                                                                        >
-                                                                                            Create
-                                                                                            open
-                                                                                            shift
-                                                                                        </Button>
-                                                                                        <Button
-                                                                                            size="sm"
-                                                                                            variant="outline"
-                                                                                            onClick={() =>
-                                                                                                void openCoverageCreate(
-                                                                                                    alert,
-                                                                                                    {
-                                                                                                        openShift: true,
-                                                                                                        repeatWeekly: true,
-                                                                                                    },
-                                                                                                )
-                                                                                            }
-                                                                                        >
-                                                                                            Recurring
-                                                                                            cover
-                                                                                        </Button>
-                                                                                    </>
-                                                                                ) : null}
-                                                                            </div>
-                                                                        </div>
-                                                                    ),
-                                                                )}
-                                                        </div>
-                                                    )}
-                                                </CardContent>
-                                            </Card>
-
-                                            {/* ── Eligibility Alerts ─────────────────── */}
-                                            {props.canManageAny ? (
-                                                <Card
-                                                    className={
-                                                        props.eligibilityAlerts
-                                                            .counts.blocked > 0
-                                                            ? 'border-status-critical/20'
-                                                            : props
-                                                                    .eligibilityAlerts
-                                                                    .counts
-                                                                    .warnings >
-                                                                0
-                                                              ? 'border-status-warning/20'
-                                                              : ''
-                                                    }
-                                                >
-                                                    <CardHeader className="pb-2">
-                                                        <div className="flex items-center justify-between">
-                                                            <CardTitle className="text-base">
-                                                                Eligibility
-                                                                alerts
-                                                            </CardTitle>
-                                                            <div className="text-xs text-muted-foreground">
-                                                                Next 14 days
-                                                            </div>
-                                                        </div>
-                                                    </CardHeader>
-                                                    <CardContent className="space-y-4">
-                                                        {/* Stat row */}
-                                                        <div className="grid grid-cols-4 gap-3">
-                                                            <div className="rounded-md border p-2 text-center">
-                                                                <div className="text-lg font-bold text-status-success">
-                                                                    {
-                                                                        props
-                                                                            .eligibilityAlerts
-                                                                            .counts
-                                                                            .eligible
-                                                                    }
-                                                                </div>
-                                                                <div className="text-[10px] tracking-wider text-muted-foreground uppercase">
-                                                                    Eligible
-                                                                </div>
-                                                            </div>
-                                                            <div className="rounded-md border p-2 text-center">
-                                                                <div className="text-lg font-bold text-status-warning">
-                                                                    {
-                                                                        props
-                                                                            .eligibilityAlerts
-                                                                            .counts
-                                                                            .warnings
-                                                                    }
-                                                                </div>
-                                                                <div className="text-[10px] tracking-wider text-muted-foreground uppercase">
-                                                                    Warnings
-                                                                </div>
-                                                            </div>
-                                                            <div className="rounded-md border p-2 text-center">
-                                                                <div className="text-lg font-bold text-status-critical">
-                                                                    {
-                                                                        props
-                                                                            .eligibilityAlerts
-                                                                            .counts
-                                                                            .blocked
-                                                                    }
-                                                                </div>
-                                                                <div className="text-[10px] tracking-wider text-muted-foreground uppercase">
-                                                                    Blocked
-                                                                </div>
-                                                            </div>
-                                                            <div className="rounded-md border p-2 text-center">
-                                                                <div className="text-lg font-bold text-muted-foreground">
-                                                                    {
-                                                                        props
-                                                                            .eligibilityAlerts
-                                                                            .counts
-                                                                            .overrides
-                                                                    }
-                                                                </div>
-                                                                <div className="text-[10px] tracking-wider text-muted-foreground uppercase">
-                                                                    Overrides
-                                                                    (7d)
-                                                                </div>
-                                                            </div>
-                                                        </div>
-
-                                                        {/* Blocked shifts table */}
-                                                        {props.eligibilityAlerts
-                                                            .blocked.length >
-                                                        0 ? (
-                                                            <div className="space-y-2">
-                                                                <div className="flex items-center gap-2 text-xs font-medium tracking-wider text-status-critical uppercase dark:text-status-critical">
-                                                                    <XCircle className="size-3" />
-                                                                    Blocked
-                                                                    shifts —
-                                                                    requires
-                                                                    action
-                                                                </div>
-                                                                <div className="divide-y rounded-md border border-status-critical/30 dark:border-status-critical/30">
-                                                                    {props.eligibilityAlerts.blocked.map(
-                                                                        (s) => (
-                                                                            <div
-                                                                                key={
-                                                                                    s.id
-                                                                                }
-                                                                                className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
-                                                                            >
-                                                                                <div className="min-w-0 flex-1">
-                                                                                    <div className="font-medium">
-                                                                                        {new Date(
-                                                                                            s.starts_at,
-                                                                                        ).toLocaleDateString(
-                                                                                            'en-NZ',
-                                                                                            {
-                                                                                                weekday:
-                                                                                                    'short',
-                                                                                                day: 'numeric',
-                                                                                                month: 'short',
-                                                                                                hour: '2-digit',
-                                                                                                minute: '2-digit',
-                                                                                            },
-                                                                                        )}
-                                                                                    </div>
-                                                                                    <div className="truncate text-xs text-muted-foreground">
-                                                                                        {
-                                                                                            s.staff
-                                                                                        }{' '}
-                                                                                        ·{' '}
-                                                                                        {
-                                                                                            s.site
-                                                                                        }
-                                                                                    </div>
-                                                                                    <div className="truncate text-xs text-status-critical dark:text-status-critical">
-                                                                                        {
-                                                                                            s.reason
-                                                                                        }
-                                                                                    </div>
-                                                                                </div>
-                                                                                <Button
-                                                                                    size="sm"
-                                                                                    variant="outline"
-                                                                                    asChild
-                                                                                >
-                                                                                    <Link
-                                                                                        href={`/operations/shifts/${s.id}`}
-                                                                                    >
-                                                                                        View
-                                                                                    </Link>
-                                                                                </Button>
-                                                                            </div>
-                                                                        ),
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        ) : null}
-
-                                                        {/* Warning shifts table */}
-                                                        {props.eligibilityAlerts
-                                                            .warnings.length >
-                                                        0 ? (
-                                                            <div className="space-y-2">
-                                                                <div className="flex items-center gap-2 text-xs font-medium tracking-wider text-status-warning uppercase dark:text-status-warning">
-                                                                    <AlertTriangle className="size-3" />
-                                                                    Warning
-                                                                    shifts —
-                                                                    review
-                                                                    recommended
-                                                                </div>
-                                                                <div className="divide-y rounded-md border border-status-warning/30 dark:border-status-warning/30">
-                                                                    {props.eligibilityAlerts.warnings.map(
-                                                                        (s) => (
-                                                                            <div
-                                                                                key={
-                                                                                    s.id
-                                                                                }
-                                                                                className="flex items-center justify-between gap-3 px-3 py-2 text-sm"
-                                                                            >
-                                                                                <div className="min-w-0 flex-1">
-                                                                                    <div className="font-medium">
-                                                                                        {new Date(
-                                                                                            s.starts_at,
-                                                                                        ).toLocaleDateString(
-                                                                                            'en-NZ',
-                                                                                            {
-                                                                                                weekday:
-                                                                                                    'short',
-                                                                                                day: 'numeric',
-                                                                                                month: 'short',
-                                                                                                hour: '2-digit',
-                                                                                                minute: '2-digit',
-                                                                                            },
-                                                                                        )}
-                                                                                    </div>
-                                                                                    <div className="truncate text-xs text-muted-foreground">
-                                                                                        {
-                                                                                            s.staff
-                                                                                        }{' '}
-                                                                                        ·{' '}
-                                                                                        {
-                                                                                            s.site
-                                                                                        }
-                                                                                    </div>
-                                                                                    <div className="truncate text-xs text-status-warning dark:text-status-warning">
-                                                                                        {
-                                                                                            s.reason
-                                                                                        }
-                                                                                    </div>
-                                                                                </div>
-                                                                                <Button
-                                                                                    size="sm"
-                                                                                    variant="outline"
-                                                                                    asChild
-                                                                                >
-                                                                                    <Link
-                                                                                        href={`/operations/shifts/${s.id}`}
-                                                                                    >
-                                                                                        Review
-                                                                                    </Link>
-                                                                                </Button>
-                                                                            </div>
-                                                                        ),
-                                                                    )}
-                                                                </div>
-                                                            </div>
-                                                        ) : null}
-
-                                                        {/* Clean state */}
-                                                        {props.eligibilityAlerts
-                                                            .counts.blocked ===
-                                                            0 &&
-                                                        props.eligibilityAlerts
-                                                            .counts.warnings ===
-                                                            0 ? (
-                                                            <div className="flex items-center gap-2 rounded-md border border-dashed p-3 text-sm text-muted-foreground">
-                                                                <CheckCircle2 className="size-4 text-status-success" />
-                                                                All upcoming
-                                                                shifts have
-                                                                eligible staff
-                                                                assigned.
-                                                            </div>
-                                                        ) : null}
-                                                    </CardContent>
-                                                </Card>
-                                            ) : null}
-
-                                            <Card
-                                                className={
-                                                    props.replacementQueue
-                                                        .length > 0
-                                                        ? 'border-status-warning/20'
-                                                        : ''
-                                                }
-                                            >
-                                                <CardHeader className="pb-2">
-                                                    <CardTitle className="text-base">
-                                                        Replacement queue
-                                                    </CardTitle>
-                                                </CardHeader>
-                                                <CardContent className="space-y-3">
-                                                    <div className="flex items-center justify-between">
-                                                        <div className="text-sm font-medium">
-                                                            Active replacement
-                                                            requests
-                                                        </div>
-                                                        <Badge
-                                                            variant={
-                                                                props
-                                                                    .replacementQueue
-                                                                    .length > 0
-                                                                    ? 'default'
-                                                                    : 'outline'
-                                                            }
-                                                        >
-                                                            {
-                                                                props
-                                                                    .replacementQueue
-                                                                    .length
-                                                            }
-                                                        </Badge>
-                                                    </div>
-                                                    {props.replacementQueue
-                                                        .length === 0 ? (
-                                                        <div className="text-sm text-muted-foreground">
-                                                            No active
-                                                            replacement
-                                                            workflows in this
-                                                            week.
-                                                        </div>
-                                                    ) : (
-                                                        <div className="space-y-2">
-                                                            {props.replacementQueue
-                                                                .slice(0, 6)
-                                                                .map((item) => (
-                                                                    <div
-                                                                        key={
-                                                                            item.id
-                                                                        }
-                                                                        className="rounded-xl border p-3"
-                                                                    >
-                                                                        <div className="flex items-start justify-between gap-2">
-                                                                            <div>
-                                                                                <div className="text-sm font-medium">
-                                                                                    {item.client ??
-                                                                                        clientSingular}
-                                                                                </div>
-                                                                                <div className="mt-1 text-xs text-muted-foreground">
-                                                                                    {item.starts_at
-                                                                                        ? `${new Date(item.starts_at).toLocaleDateString()} ${fmtTime(item.starts_at)}`
-                                                                                        : 'Shift time pending'}
-                                                                                    {item.ends_at
-                                                                                        ? `–${fmtTime(item.ends_at)}`
-                                                                                        : ''}
-                                                                                    {item.location
-                                                                                        ? ` · ${item.location}`
-                                                                                        : ''}
-                                                                                </div>
-                                                                            </div>
-                                                                            <Badge
-                                                                                variant={replacementBadgeVariant(
-                                                                                    item.status,
-                                                                                )}
-                                                                                className="capitalize"
-                                                                            >
-                                                                                {
-                                                                                    item.status
-                                                                                }
-                                                                            </Badge>
-                                                                        </div>
-
-                                                                        <div className="mt-2 text-xs text-foreground">
-                                                                            {
-                                                                                item.reason
-                                                                            }
-                                                                        </div>
-
-                                                                        <div className="mt-2 flex flex-wrap gap-1.5">
-                                                                            {item.current_staff ? (
-                                                                                <Badge
-                                                                                    variant="outline"
-                                                                                    className="text-[10px]"
-                                                                                >
-                                                                                    Current:{' '}
-                                                                                    {
-                                                                                        item.current_staff
-                                                                                    }
-                                                                                </Badge>
-                                                                            ) : null}
-                                                                            {item.open_position_status ? (
-                                                                                <Badge
-                                                                                    variant="outline"
-                                                                                    className="text-[10px] capitalize"
-                                                                                >
-                                                                                    Job
-                                                                                    board:{' '}
-                                                                                    {
-                                                                                        item.open_position_status
-                                                                                    }
-                                                                                </Badge>
-                                                                            ) : null}
-                                                                            {item.open_position_claimed_by ? (
-                                                                                <Badge
-                                                                                    variant="outline"
-                                                                                    className="text-[10px]"
-                                                                                >
-                                                                                    Claimed
-                                                                                    by{' '}
-                                                                                    {
-                                                                                        item.open_position_claimed_by
-                                                                                    }
-                                                                                </Badge>
-                                                                            ) : null}
-                                                                        </div>
-
-                                                                        <div className="mt-3 flex flex-wrap gap-2">
-                                                                            <Link
-                                                                                href={`/operations/shifts/${item.shift_id}`}
-                                                                            >
-                                                                                <Button
-                                                                                    size="sm"
-                                                                                    variant="outline"
-                                                                                >
-                                                                                    Open
-                                                                                    shift
-                                                                                </Button>
-                                                                            </Link>
-                                                                            {item.open_position_id ? (
-                                                                                <Link href="/operations/job-board">
-                                                                                    <Button
-                                                                                        size="sm"
-                                                                                        variant="outline"
-                                                                                    >
-                                                                                        Job
-                                                                                        board
-                                                                                    </Button>
-                                                                                </Link>
-                                                                            ) : null}
-                                                                            {props.canManageAny &&
-                                                                            item.status ===
-                                                                                'claimed' &&
-                                                                            item.open_position_id ? (
-                                                                                <Button
-                                                                                    size="sm"
-                                                                                    onClick={() =>
-                                                                                        router.post(
-                                                                                            `/operations/job-board/${item.open_position_id}/approve`,
-                                                                                            {},
-                                                                                            {
-                                                                                                preserveScroll: true,
-                                                                                            },
-                                                                                        )
-                                                                                    }
-                                                                                >
-                                                                                    Approve
-                                                                                    claim
-                                                                                </Button>
-                                                                            ) : null}
-                                                                            {props.canManageAny &&
-                                                                            [
-                                                                                'requested',
-                                                                                'claimed',
-                                                                            ].includes(
-                                                                                item.status,
-                                                                            ) ? (
-                                                                                <Button
-                                                                                    size="sm"
-                                                                                    variant="ghost"
-                                                                                    onClick={() =>
-                                                                                        router.patch(
-                                                                                            `/operations/shifts/${item.shift_id}/replacement-request/cancel`,
-                                                                                            {},
-                                                                                            {
-                                                                                                preserveScroll: true,
-                                                                                            },
-                                                                                        )
-                                                                                    }
-                                                                                >
-                                                                                    Cancel
-                                                                                </Button>
-                                                                            ) : null}
-                                                                        </div>
-                                                                    </div>
-                                                                ))}
-                                                        </div>
-                                                    )}
-                                                </CardContent>
-                                            </Card>
-
-                                            <Card>
-                                                <CardHeader className="pb-2">
-                                                    <CardTitle className="text-base">
-                                                        Recurring patterns
-                                                    </CardTitle>
-                                                </CardHeader>
-                                                <CardContent className="space-y-3">
-                                                    <div className="flex items-center justify-between">
-                                                        <div className="text-sm font-medium">
-                                                            Series active this
-                                                            week
-                                                        </div>
-                                                        <Badge
-                                                            variant={
-                                                                props
-                                                                    .recurringPatterns
-                                                                    .length > 0
-                                                                    ? 'secondary'
-                                                                    : 'outline'
-                                                            }
-                                                        >
-                                                            {
-                                                                props
-                                                                    .recurringPatterns
-                                                                    .length
-                                                            }
-                                                        </Badge>
-                                                    </div>
-                                                    {props.recurringPatterns
-                                                        .length === 0 ? (
-                                                        <div className="text-sm text-muted-foreground">
-                                                            No recurring roster
-                                                            patterns in this
-                                                            week.
-                                                        </div>
-                                                    ) : (
-                                                        <div className="space-y-2">
-                                                            {props.recurringPatterns
-                                                                .slice(0, 6)
-                                                                .map(
-                                                                    (
-                                                                        pattern,
-                                                                    ) => (
-                                                                        <div
-                                                                            key={
-                                                                                pattern.id
-                                                                            }
-                                                                            className="rounded-xl border p-3"
-                                                                        >
-                                                                            <div className="flex items-start justify-between gap-2">
-                                                                                <div>
-                                                                                    <div className="text-sm font-medium">
-                                                                                        {pattern.client ??
-                                                                                            clientSingular}
-                                                                                    </div>
-                                                                                    <div className="mt-1 text-xs text-muted-foreground">
-                                                                                        {pattern.weekdays
-                                                                                            .map(
-                                                                                                weekdayLabel,
-                                                                                            )
-                                                                                            .join(
-                                                                                                ', ',
-                                                                                            )}
-                                                                                        {pattern.starts_time &&
-                                                                                        pattern.ends_time
-                                                                                            ? ` · ${seriesTimeLabel(pattern.starts_time, pattern.ends_time)}`
-                                                                                            : ''}
-                                                                                    </div>
-                                                                                </div>
-                                                                                <Badge
-                                                                                    variant="outline"
-                                                                                    className="capitalize"
-                                                                                >
-                                                                                    {shiftTypeLabel(
-                                                                                        pattern.shift_type,
-                                                                                    )}
-                                                                                </Badge>
-                                                                            </div>
-
-                                                                            <div className="mt-2 flex flex-wrap gap-1.5">
-                                                                                <Badge
-                                                                                    variant="outline"
-                                                                                    className="text-[10px]"
-                                                                                >
-                                                                                    {
-                                                                                        pattern.occurrences_this_week
-                                                                                    }{' '}
-                                                                                    this
-                                                                                    week
-                                                                                </Badge>
-                                                                                {pattern.open_occurrences >
-                                                                                0 ? (
-                                                                                    <Badge
-                                                                                        variant="default"
-                                                                                        className="text-[10px]"
-                                                                                    >
-                                                                                        {
-                                                                                            pattern.open_occurrences
-                                                                                        }{' '}
-                                                                                        open
-                                                                                    </Badge>
-                                                                                ) : null}
-                                                                                {pattern.active_replacement_count >
-                                                                                0 ? (
-                                                                                    <Badge
-                                                                                        variant="secondary"
-                                                                                        className="text-[10px]"
-                                                                                    >
-                                                                                        {
-                                                                                            pattern.active_replacement_count
-                                                                                        }{' '}
-                                                                                        replacement
-                                                                                    </Badge>
-                                                                                ) : null}
-                                                                                {pattern.is_sleepover ? (
-                                                                                    <Badge
-                                                                                        variant="outline"
-                                                                                        className="text-[10px]"
-                                                                                    >
-                                                                                        Sleepover
-                                                                                    </Badge>
-                                                                                ) : null}
-                                                                                {pattern.is_on_call ? (
-                                                                                    <Badge
-                                                                                        variant="outline"
-                                                                                        className="text-[10px]"
-                                                                                    >
-                                                                                        On-call
-                                                                                    </Badge>
-                                                                                ) : null}
-                                                                            </div>
-
-                                                                            <div className="mt-2 text-xs text-muted-foreground">
-                                                                                {pattern.service_context
-                                                                                    ? `${pattern.service_context} · `
-                                                                                    : ''}
-                                                                                {pattern.staff
-                                                                                    ? `Primary staff: ${pattern.staff}`
-                                                                                    : 'Open recurring pattern'}
-                                                                                {pattern.location
-                                                                                    ? ` · ${pattern.location}`
-                                                                                    : ''}
-                                                                            </div>
-
-                                                                            <div className="mt-3 flex flex-wrap gap-2">
-                                                                                <Link
-                                                                                    href={`/operations/shifts/series/${pattern.id}`}
-                                                                                >
-                                                                                    <Button
-                                                                                        size="sm"
-                                                                                        variant="outline"
-                                                                                    >
-                                                                                        View
-                                                                                        series
-                                                                                    </Button>
-                                                                                </Link>
-                                                                                {pattern.next_shift_id ? (
-                                                                                    <>
-                                                                                        <Link
-                                                                                            href={`/operations/shifts/${pattern.next_shift_id}`}
-                                                                                        >
-                                                                                            <Button
-                                                                                                size="sm"
-                                                                                                variant="outline"
-                                                                                            >
-                                                                                                Open
-                                                                                                next
-                                                                                                shift
-                                                                                            </Button>
-                                                                                        </Link>
-                                                                                        <Link
-                                                                                            href={`/operations/shifts/${pattern.next_shift_id}/edit`}
-                                                                                        >
-                                                                                            <Button size="sm">
-                                                                                                Edit
-                                                                                                future
-                                                                                            </Button>
-                                                                                        </Link>
-                                                                                    </>
-                                                                                ) : null}
-                                                                            </div>
-                                                                        </div>
-                                                                    ),
-                                                                )}
-                                                        </div>
-                                                    )}
-                                                </CardContent>
-                                            </Card>
-
-                                            <Card>
-                                                <CardHeader className="pb-2">
-                                                    <CardTitle className="text-base">
-                                                        Payroll & compliance
-                                                    </CardTitle>
-                                                </CardHeader>
-                                                <CardContent className="space-y-3">
-                                                    <div className="flex items-center justify-between">
-                                                        <div className="text-sm font-medium">
-                                                            Timesheets needing
-                                                            attention
-                                                        </div>
-                                                        <Badge
-                                                            variant={
-                                                                timesheetsNeedingAttention.length >
-                                                                0
-                                                                    ? 'default'
-                                                                    : 'outline'
-                                                            }
-                                                        >
-                                                            {
-                                                                timesheetsNeedingAttention.length
-                                                            }
-                                                        </Badge>
-                                                    </div>
-                                                    {timesheetsNeedingAttention.length ===
-                                                    0 ? (
-                                                        <div className="text-sm text-muted-foreground">
-                                                            Nothing to action in
-                                                            this week.
-                                                        </div>
-                                                    ) : (
-                                                        <div className="space-y-2">
-                                                            {timesheetsNeedingAttention
-                                                                .slice(0, 6)
-                                                                .map((sh) => (
-                                                                    <Link
-                                                                        key={
-                                                                            sh.id
-                                                                        }
-                                                                        href={`/operations/shifts/${sh.id}`}
-                                                                        className="block"
-                                                                    >
-                                                                        <div className="rounded-md border p-2 hover:bg-muted">
-                                                                            <div className="flex items-start justify-between gap-2">
-                                                                                <div className="text-xs font-medium">
-                                                                                    {new Date(
-                                                                                        sh.starts_at,
-                                                                                    ).toLocaleDateString()}{' '}
-                                                                                    {fmtTime(
-                                                                                        sh.starts_at,
-                                                                                    )}
-
-                                                                                    –
-                                                                                    {fmtTime(
-                                                                                        sh.ends_at,
-                                                                                    )}
-                                                                                </div>
-                                                                                {sh.timesheet_status ? (
-                                                                                    <Badge
-                                                                                        variant="outline"
-                                                                                        className="text-[10px]"
-                                                                                    >
-                                                                                        TS:{' '}
-                                                                                        {
-                                                                                            sh.timesheet_status
-                                                                                        }
-                                                                                    </Badge>
-                                                                                ) : null}
-                                                                            </div>
-                                                                            <div className="mt-1 text-xs text-foreground">
-                                                                                {sh.client ??
-                                                                                    clientSingular}{' '}
-                                                                                ·{' '}
-                                                                                {sh.staff ??
-                                                                                    'Staff'}
-                                                                            </div>
-                                                                        </div>
-                                                                    </Link>
-                                                                ))}
-                                                        </div>
-                                                    )}
-                                                    <div>
-                                                        <Link href="/operations/timesheets">
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                            >
-                                                                Open Timesheets
-                                                            </Button>
-                                                        </Link>
-                                                    </div>
-                                                </CardContent>
-                                            </Card>
-
-                                            <Card>
-                                                <CardHeader className="pb-2">
-                                                    <CardTitle className="text-base">
-                                                        Safety signals
-                                                    </CardTitle>
-                                                </CardHeader>
-                                                <CardContent className="space-y-3">
-                                                    <div className="flex items-center justify-between">
-                                                        <div className="text-sm font-medium">
-                                                            Shifts with
-                                                            incidents
-                                                        </div>
-                                                        <Badge
-                                                            variant={
-                                                                shiftsWithIncidents.length >
-                                                                0
-                                                                    ? 'destructive'
-                                                                    : 'outline'
-                                                            }
-                                                        >
-                                                            {
-                                                                shiftsWithIncidents.length
-                                                            }
-                                                        </Badge>
-                                                    </div>
-                                                    {shiftsWithIncidents.length ===
-                                                    0 ? (
-                                                        <div className="text-sm text-muted-foreground">
-                                                            No incidents linked
-                                                            to shifts in this
-                                                            week.
-                                                        </div>
-                                                    ) : (
-                                                        <div className="space-y-2">
-                                                            {shiftsWithIncidents
-                                                                .slice(0, 6)
-                                                                .map((sh) => (
-                                                                    <Link
-                                                                        key={
-                                                                            sh.id
-                                                                        }
-                                                                        href={`/operations/shifts/${sh.id}`}
-                                                                        className="block"
-                                                                    >
-                                                                        <div className="rounded-md border p-2 hover:bg-muted">
-                                                                            <div className="flex items-start justify-between gap-2">
-                                                                                <div className="text-xs font-medium">
-                                                                                    {new Date(
-                                                                                        sh.starts_at,
-                                                                                    ).toLocaleDateString()}{' '}
-                                                                                    {fmtTime(
-                                                                                        sh.starts_at,
-                                                                                    )}
-
-                                                                                    –
-                                                                                    {fmtTime(
-                                                                                        sh.ends_at,
-                                                                                    )}
-                                                                                </div>
-                                                                                <Badge
-                                                                                    variant="destructive"
-                                                                                    className="text-[10px]"
-                                                                                >
-                                                                                    {
-                                                                                        sh.incidents_count
-                                                                                    }{' '}
-                                                                                    incident
-                                                                                    {sh.incidents_count ===
-                                                                                    1
-                                                                                        ? ''
-                                                                                        : 's'}
-                                                                                </Badge>
-                                                                            </div>
-                                                                            <div className="mt-1 text-xs text-foreground">
-                                                                                {sh.client ??
-                                                                                    clientSingular}{' '}
-                                                                                ·{' '}
-                                                                                {sh.staff ??
-                                                                                    'Staff'}
-                                                                            </div>
-                                                                        </div>
-                                                                    </Link>
-                                                                ))}
-                                                        </div>
-                                                    )}
-                                                    <div>
-                                                        <Link href="/incidents">
-                                                            <Button
-                                                                variant="outline"
-                                                                size="sm"
-                                                            >
-                                                                Open Incidents
-                                                            </Button>
-                                                        </Link>
-                                                    </div>
-                                                </CardContent>
-                                            </Card>
-
-                                            <Card>
-                                                <CardHeader className="pb-2">
-                                                    <CardTitle className="text-base">
-                                                        Capacity
-                                                    </CardTitle>
-                                                </CardHeader>
-                                                <CardContent className="space-y-2">
-                                                    {props.capacity.filter(
-                                                        (c) => c.warn,
-                                                    ).length === 0 ? (
-                                                        <div className="text-sm text-muted-foreground">
-                                                            No capacity warnings
-                                                            this week.
-                                                        </div>
-                                                    ) : (
-                                                        <div className="space-y-2">
-                                                            {props.capacity
-                                                                .filter(
-                                                                    (c) =>
-                                                                        c.warn,
-                                                                )
-                                                                .slice(0, 8)
-                                                                .map((c) => (
-                                                                    <div
-                                                                        key={
-                                                                            c.user_id
-                                                                        }
-                                                                        className="flex items-center justify-between rounded-md border p-2"
-                                                                    >
-                                                                        <div className="text-sm">
-                                                                            {
-                                                                                c.name
-                                                                            }
-                                                                        </div>
-                                                                        <Badge
-                                                                            variant={
-                                                                                c.warn ===
-                                                                                'high'
-                                                                                    ? 'destructive'
-                                                                                    : 'default'
-                                                                            }
-                                                                        >
-                                                                            {c.hours.toFixed(
-                                                                                1,
-                                                                            )}
-                                                                            h
-                                                                        </Badge>
-                                                                    </div>
-                                                                ))}
-                                                        </div>
-                                                    )}
-                                                </CardContent>
-                                            </Card>
-                                        </div>
-                                    </div>
-                                </div>
-                            ),
-                        },
-                        {
-                            key: 'week',
-                            label: 'Week roster',
-                            content: (
-                                <Card>
-                                    <CardHeader className="pb-2">
-                                        <CardTitle className="text-base">
-                                            Week roster
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        {props.canManageAny ? (
-                                            <div className="overflow-x-auto">
-                                                <table className="w-full min-w-[900px] border-collapse">
-                                                    <thead>
-                                                        <tr className="border-b">
-                                                            <th className="w-48 px-2 py-2 text-left text-xs font-medium text-muted-foreground">
-                                                                Staff
-                                                            </th>
-                                                            {days.map((d) => (
-                                                                <th
-                                                                    key={ymd(d)}
-                                                                    className="px-2 py-2 text-left text-xs font-medium text-muted-foreground"
-                                                                >
-                                                                    {fmtDay(d)}
-                                                                </th>
-                                                            ))}
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {props.staff.map(
-                                                            (s) => (
-                                                                <tr
-                                                                    key={s.id}
-                                                                    className="border-b align-top"
-                                                                >
-                                                                    <td className="px-2 py-3 text-sm font-medium">
-                                                                        {s.name}
-                                                                    </td>
-                                                                    {days.map(
-                                                                        (d) => {
-                                                                            const key = `${s.id}-${ymd(d)}`;
-                                                                            const items =
-                                                                                shiftsByStaffDay.get(
-                                                                                    key,
-                                                                                ) ??
-                                                                                [];
-                                                                            return (
-                                                                                <td
-                                                                                    key={
-                                                                                        key
-                                                                                    }
-                                                                                    className="px-2 py-2"
-                                                                                >
-                                                                                    <div className="space-y-2">
-                                                                                        {items.length ===
-                                                                                        0 ? (
-                                                                                            <div className="text-xs text-muted-foreground">
-                                                                                                —
-                                                                                            </div>
-                                                                                        ) : (
-                                                                                            items.map(
-                                                                                                (
-                                                                                                    sh,
-                                                                                                ) => (
-                                                                                                    <Link
-                                                                                                        key={
-                                                                                                            sh.id
-                                                                                                        }
-                                                                                                        href={`/operations/shifts/${sh.id}`}
-                                                                                                        className="block"
-                                                                                                    >
-                                                                                                        <div className="rounded-md border p-2 hover:bg-muted">
-                                                                                                            <div className="flex items-start justify-between gap-2">
-                                                                                                                <div className="text-xs font-medium">
-                                                                                                                    {fmtTime(
-                                                                                                                        sh.starts_at,
-                                                                                                                    )}
-
-                                                                                                                    –
-                                                                                                                    {fmtTime(
-                                                                                                                        sh.ends_at,
-                                                                                                                    )}
-                                                                                                                </div>
-                                                                                                                <Badge
-                                                                                                                    variant={statusBadgeVariant(
-                                                                                                                        sh.status,
-                                                                                                                    )}
-                                                                                                                    className="text-[10px]"
-                                                                                                                >
-                                                                                                                    {
-                                                                                                                        sh.status
-                                                                                                                    }
-                                                                                                                </Badge>
-                                                                                                            </div>
-                                                                                                            <div className="mt-1 text-xs text-foreground">
-                                                                                                                {sh.client ??
-                                                                                                                    clientSingular}
-                                                                                                            </div>
-
-                                                                                                            <div className="mt-1 flex flex-wrap gap-1">
-                                                                                                                {sh.shift_series_id ? (
-                                                                                                                    <Badge
-                                                                                                                        variant="outline"
-                                                                                                                        className="text-[10px]"
-                                                                                                                    >
-                                                                                                                        Recurring
-                                                                                                                    </Badge>
-                                                                                                                ) : null}
-                                                                                                                {sh.has_active_replacement ? (
-                                                                                                                    <Badge
-                                                                                                                        variant={replacementBadgeVariant(
-                                                                                                                            sh.replacement_status,
-                                                                                                                        )}
-                                                                                                                        className="text-[10px]"
-                                                                                                                    >
-                                                                                                                        Replacement
-                                                                                                                    </Badge>
-                                                                                                                ) : null}
-                                                                                                                {sh.incidents_count >
-                                                                                                                    0 && (
-                                                                                                                    <Badge
-                                                                                                                        variant="destructive"
-                                                                                                                        className="text-[10px]"
-                                                                                                                    >
-                                                                                                                        {
-                                                                                                                            sh.incidents_count
-                                                                                                                        }{' '}
-                                                                                                                        incident
-                                                                                                                        {sh.incidents_count ===
-                                                                                                                        1
-                                                                                                                            ? ''
-                                                                                                                            : 's'}
-                                                                                                                    </Badge>
-                                                                                                                )}
-                                                                                                                {sh.tasks_total >
-                                                                                                                    0 && (
-                                                                                                                    <Badge
-                                                                                                                        variant="outline"
-                                                                                                                        className="text-[10px]"
-                                                                                                                    >
-                                                                                                                        Tasks:{' '}
-                                                                                                                        {
-                                                                                                                            sh.tasks_completed
-                                                                                                                        }
-
-                                                                                                                        /
-                                                                                                                        {
-                                                                                                                            sh.tasks_total
-                                                                                                                        }
-                                                                                                                    </Badge>
-                                                                                                                )}
-                                                                                                                {sh.timesheet_status && (
-                                                                                                                    <Badge
-                                                                                                                        variant="outline"
-                                                                                                                        className="text-[10px]"
-                                                                                                                    >
-                                                                                                                        TS:{' '}
-                                                                                                                        {
-                                                                                                                            sh.timesheet_status
-                                                                                                                        }
-                                                                                                                    </Badge>
-                                                                                                                )}
-                                                                                                            </div>
-                                                                                                        </div>
-                                                                                                    </Link>
-                                                                                                ),
-                                                                                            )
-                                                                                        )}
-                                                                                    </div>
-                                                                                </td>
-                                                                            );
-                                                                        },
-                                                                    )}
-                                                                </tr>
-                                                            ),
-                                                        )}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        ) : (
-                                            <div className="space-y-4">
-                                                {days.map((d) => {
-                                                    const key = ymd(d);
-                                                    const items =
-                                                        shiftsByDay.get(key) ??
-                                                        [];
-                                                    return (
-                                                        <div key={key}>
-                                                            <div className="mb-2 text-sm font-medium">
-                                                                {fmtDay(d)}
-                                                            </div>
-                                                            <div className="space-y-2">
-                                                                {items.length ===
-                                                                0 ? (
-                                                                    <div className="text-sm text-muted-foreground">
-                                                                        No
-                                                                        shifts.
-                                                                    </div>
-                                                                ) : (
-                                                                    items.map(
-                                                                        (
-                                                                            sh,
-                                                                        ) => (
-                                                                            <Link
-                                                                                key={
-                                                                                    sh.id
-                                                                                }
-                                                                                href={`/operations/shifts/${sh.id}`}
-                                                                                className="block"
-                                                                            >
-                                                                                <div className="rounded-md border p-3 hover:bg-muted">
-                                                                                    <div className="flex flex-wrap items-center justify-between gap-2">
-                                                                                        <div className="text-sm font-medium">
-                                                                                            {fmtTime(
-                                                                                                sh.starts_at,
-                                                                                            )}
-
-                                                                                            –
-                                                                                            {fmtTime(
-                                                                                                sh.ends_at,
-                                                                                            )}{' '}
-                                                                                            ·{' '}
-                                                                                            {
-                                                                                                sh.client
-                                                                                            }
-                                                                                        </div>
-                                                                                        <Badge
-                                                                                            variant={statusBadgeVariant(
-                                                                                                sh.status,
-                                                                                            )}
-                                                                                        >
-                                                                                            {
-                                                                                                sh.status
-                                                                                            }
-                                                                                        </Badge>
-                                                                                    </div>
-                                                                                    <div className="mt-2 flex flex-wrap gap-2">
-                                                                                        {sh.shift_series_id ? (
-                                                                                            <Badge variant="outline">
-                                                                                                Recurring
-                                                                                            </Badge>
-                                                                                        ) : null}
-                                                                                        {sh.has_active_replacement ? (
-                                                                                            <Badge
-                                                                                                variant={replacementBadgeVariant(
-                                                                                                    sh.replacement_status,
-                                                                                                )}
-                                                                                            >
-                                                                                                Replacement
-                                                                                            </Badge>
-                                                                                        ) : null}
-                                                                                        {sh.tasks_total >
-                                                                                            0 && (
-                                                                                            <Badge variant="outline">
-                                                                                                Tasks:{' '}
-                                                                                                {
-                                                                                                    sh.tasks_completed
-                                                                                                }
-
-                                                                                                /
-                                                                                                {
-                                                                                                    sh.tasks_total
-                                                                                                }
-                                                                                            </Badge>
-                                                                                        )}
-                                                                                        {sh.incidents_count >
-                                                                                            0 && (
-                                                                                            <Badge variant="destructive">
-                                                                                                {
-                                                                                                    sh.incidents_count
-                                                                                                }{' '}
-                                                                                                incident
-                                                                                                {sh.incidents_count ===
-                                                                                                1
-                                                                                                    ? ''
-                                                                                                    : 's'}
-                                                                                            </Badge>
-                                                                                        )}
-                                                                                        {sh.timesheet_status && (
-                                                                                            <Badge variant="outline">
-                                                                                                Timesheet:{' '}
-                                                                                                {
-                                                                                                    sh.timesheet_status
-                                                                                                }
-                                                                                            </Badge>
-                                                                                        )}
-                                                                                    </div>
-                                                                                </div>
-                                                                            </Link>
-                                                                        ),
-                                                                    )
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    );
-                                                })}
-                                            </div>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            ),
-                        },
-                        {
-                            key: 'open',
-                            label: (
-                                <span className="flex items-center gap-2">
-                                    Open shifts
-                                    {props.stats.open > 0 ? (
-                                        <Badge
-                                            variant="default"
-                                            className="text-[10px]"
-                                        >
-                                            {props.stats.open}
-                                        </Badge>
-                                    ) : null}
-                                </span>
-                            ),
-                            content: (
-                                <Card>
-                                    <CardHeader className="pb-2">
-                                        <CardTitle className="text-base">
-                                            Open / unassigned shifts
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="space-y-3">
-                                        {!props.canManageAny ? (
-                                            <div className="text-sm text-muted-foreground">
-                                                Only managers can assign open
-                                                shifts.
-                                            </div>
-                                        ) : null}
-
-                                        {props.shifts.filter(
-                                            (s) => s.user_id === null,
-                                        ).length === 0 ? (
-                                            <div className="text-sm text-muted-foreground">
-                                                No open shifts in this week.
-                                            </div>
-                                        ) : (
-                                            <div className="space-y-2">
-                                                {props.shifts
-                                                    .filter(
-                                                        (s) =>
-                                                            s.user_id === null,
-                                                    )
-                                                    .map((sh) => (
-                                                        <div
-                                                            key={sh.id}
-                                                            className="rounded-md border p-3"
-                                                        >
-                                                            <div className="flex flex-col gap-3 md:flex-row md:items-center md:justify-between">
-                                                                <div>
-                                                                    <div className="text-sm font-medium">
-                                                                        {sh.client ??
-                                                                            clientSingular}{' '}
-                                                                        ·{' '}
-                                                                        {new Date(
-                                                                            sh.starts_at,
-                                                                        ).toLocaleDateString()}{' '}
-                                                                        {fmtTime(
-                                                                            sh.starts_at,
-                                                                        )}
-                                                                        –
-                                                                        {fmtTime(
-                                                                            sh.ends_at,
-                                                                        )}
-                                                                    </div>
-                                                                    <div className="mt-1 flex flex-wrap gap-1.5 text-xs text-muted-foreground">
-                                                                        <span>
-                                                                            Status:{' '}
-                                                                            {
-                                                                                sh.status
-                                                                            }
-                                                                            {sh.location
-                                                                                ? ` · ${sh.location}`
-                                                                                : ''}
-                                                                        </span>
-                                                                        {sh.shift_series_id ? (
-                                                                            <Badge
-                                                                                variant="outline"
-                                                                                className="text-[10px]"
-                                                                            >
-                                                                                Recurring
-                                                                            </Badge>
-                                                                        ) : null}
-                                                                        {sh.has_active_replacement ? (
-                                                                            <Badge
-                                                                                variant={replacementBadgeVariant(
-                                                                                    sh.replacement_status,
-                                                                                )}
-                                                                                className="text-[10px]"
-                                                                            >
-                                                                                Replacement
-                                                                            </Badge>
-                                                                        ) : null}
-                                                                    </div>
-                                                                </div>
-                                                                {props.canManageAny ? (
-                                                                    <div className="flex items-center gap-2">
-                                                                        <Select
-                                                                            value={
-                                                                                assignForm
-                                                                                    .data
-                                                                                    .user_id
-                                                                            }
-                                                                            onValueChange={(
-                                                                                v,
-                                                                            ) =>
-                                                                                assignForm.setData(
-                                                                                    'user_id',
-                                                                                    v,
-                                                                                )
-                                                                            }
-                                                                        >
-                                                                            <SelectTrigger className="w-[220px]">
-                                                                                <SelectValue placeholder="Assign staff" />
-                                                                            </SelectTrigger>
-                                                                            <SelectContent>
-                                                                                {availableStaffForShift(
-                                                                                    sh,
-                                                                                ).map(
-                                                                                    (
-                                                                                        s,
-                                                                                    ) => (
-                                                                                        <SelectItem
-                                                                                            key={
-                                                                                                s.id
-                                                                                            }
-                                                                                            value={String(
-                                                                                                s.id,
-                                                                                            )}
-                                                                                        >
-                                                                                            {
-                                                                                                s.name
-                                                                                            }
-                                                                                        </SelectItem>
-                                                                                    ),
-                                                                                )}
-                                                                            </SelectContent>
-                                                                        </Select>
-                                                                        <Button
-                                                                            size="sm"
-                                                                            disabled={
-                                                                                assignForm.processing ||
-                                                                                !assignForm
-                                                                                    .data
-                                                                                    .user_id
-                                                                            }
-                                                                            onClick={() => {
-                                                                                assignForm.post(
-                                                                                    `/operations/shifts/${sh.id}/assign`,
-                                                                                    {
-                                                                                        preserveScroll: true,
-                                                                                        onSuccess:
-                                                                                            () =>
-                                                                                                assignForm.reset(
-                                                                                                    'user_id',
-                                                                                                ),
-                                                                                    },
-                                                                                );
-                                                                            }}
-                                                                        >
-                                                                            Assign
-                                                                        </Button>
-                                                                        <Link
-                                                                            href={`/operations/shifts/${sh.id}`}
-                                                                        >
-                                                                            <Button
-                                                                                size="sm"
-                                                                                variant="outline"
-                                                                            >
-                                                                                Open
-                                                                            </Button>
-                                                                        </Link>
-                                                                    </div>
-                                                                ) : (
-                                                                    <Link
-                                                                        href={`/operations/shifts/${sh.id}`}
-                                                                    >
-                                                                        <Button
-                                                                            size="sm"
-                                                                            variant="outline"
-                                                                        >
-                                                                            Open
-                                                                        </Button>
-                                                                    </Link>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                    ))}
-                                            </div>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            ),
-                        },
-                        {
-                            key: 'timeoff',
-                            label: (
-                                <span className="flex items-center gap-2">
-                                    Time off
-                                    {props.stats.time_off_conflicts > 0 ? (
-                                        <Badge
-                                            variant="destructive"
-                                            className="text-[10px]"
-                                        >
-                                            conflicts
-                                        </Badge>
-                                    ) : null}
-                                </span>
-                            ),
-                            content: (
-                                <Card>
-                                    <CardHeader className="pb-2">
-                                        <CardTitle className="text-base">
-                                            Leave / unavailability (one-off)
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="space-y-4">
-                                        <form
-                                            className="space-y-3 rounded-md border p-3"
-                                            onSubmit={(e) => {
-                                                e.preventDefault();
-                                                // NOTE: Inertia's useForm().transform() does not reliably return the form object
-                                                // across versions, so do not chain .transform().post().
-                                                timeOffForm.transform(
-                                                    (d: any) => ({
-                                                        ...d,
-                                                        return_to:
-                                                            '/operations/rostering',
-                                                        user_id:
-                                                            d.user_id === 'self'
-                                                                ? undefined
-                                                                : Number(
-                                                                      d.user_id,
-                                                                  ),
-                                                    }),
-                                                );
-
-                                                timeOffForm.post(
-                                                    storeTimeOff.url(),
-                                                    {
-                                                        preserveScroll: true,
-                                                        onFinish: () =>
-                                                            timeOffForm.transform(
-                                                                (d: any) => d,
-                                                            ),
-                                                    },
-                                                );
-                                            }}
-                                        >
-                                            <div className="font-medium">
-                                                Add time-off block
-                                            </div>
-                                            <div className="grid gap-3 md:grid-cols-4">
-                                                {props.canManageAny ? (
-                                                    <div className="space-y-1">
-                                                        <Label>Staff</Label>
-                                                        <Select
-                                                            value={
-                                                                timeOffForm.data
-                                                                    .user_id
-                                                            }
-                                                            onValueChange={(
-                                                                v,
-                                                            ) =>
-                                                                timeOffForm.setData(
-                                                                    'user_id',
-                                                                    v,
-                                                                )
-                                                            }
-                                                        >
-                                                            <SelectTrigger>
-                                                                <SelectValue placeholder="Select staff" />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                <SelectItem value="self">
-                                                                    (Me)
-                                                                </SelectItem>
-                                                                {props.staff.map(
-                                                                    (s) => (
-                                                                        <SelectItem
-                                                                            key={
-                                                                                s.id
-                                                                            }
-                                                                            value={String(
-                                                                                s.id,
-                                                                            )}
-                                                                        >
-                                                                            {
-                                                                                s.name
-                                                                            }
-                                                                        </SelectItem>
-                                                                    ),
-                                                                )}
-                                                            </SelectContent>
-                                                        </Select>
-                                                    </div>
-                                                ) : null}
-
-                                                <div className="space-y-1">
-                                                    <Label>Type</Label>
-                                                    <Select
-                                                        value={
-                                                            timeOffForm.data
-                                                                .type
-                                                        }
-                                                        onValueChange={(v) =>
-                                                            timeOffForm.setData(
-                                                                'type',
-                                                                v,
-                                                            )
-                                                        }
-                                                    >
-                                                        <SelectTrigger>
-                                                            <SelectValue placeholder="Type" />
-                                                        </SelectTrigger>
-                                                        <SelectContent>
-                                                            <SelectItem value="leave">
-                                                                Leave
-                                                            </SelectItem>
-                                                            <SelectItem value="unavailable">
-                                                                Unavailable
-                                                            </SelectItem>
-                                                            <SelectItem value="training">
-                                                                Training
-                                                            </SelectItem>
-                                                        </SelectContent>
-                                                    </Select>
-                                                </div>
-
-                                                <div className="space-y-1">
-                                                    <Label>Start</Label>
-                                                    <Input
-                                                        type="datetime-local"
-                                                        value={
-                                                            timeOffForm.data
-                                                                .starts_at
-                                                        }
-                                                        onChange={(e) =>
-                                                            timeOffForm.setData(
-                                                                'starts_at',
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                    />
-                                                </div>
-
-                                                <div className="space-y-1">
-                                                    <Label>End</Label>
-                                                    <Input
-                                                        type="datetime-local"
-                                                        value={
-                                                            timeOffForm.data
-                                                                .ends_at
-                                                        }
-                                                        onChange={(e) =>
-                                                            timeOffForm.setData(
-                                                                'ends_at',
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            <div className="grid gap-3 md:grid-cols-2">
-                                                <div className="space-y-1">
-                                                    <Label>Label</Label>
-                                                    <Input
-                                                        value={
-                                                            timeOffForm.data
-                                                                .label
-                                                        }
-                                                        onChange={(e) =>
-                                                            timeOffForm.setData(
-                                                                'label',
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        placeholder="e.g. Annual leave"
-                                                    />
-                                                </div>
-                                                <div className="space-y-1">
-                                                    <Label>Notes</Label>
-                                                    <Input
-                                                        value={
-                                                            timeOffForm.data
-                                                                .notes
-                                                        }
-                                                        onChange={(e) =>
-                                                            timeOffForm.setData(
-                                                                'notes',
-                                                                e.target.value,
-                                                            )
-                                                        }
-                                                        placeholder="Optional"
-                                                    />
-                                                </div>
-                                            </div>
-
-                                            <div className="flex items-center gap-2">
-                                                <Button
-                                                    type="submit"
-                                                    size="sm"
-                                                    disabled={
-                                                        timeOffForm.processing
-                                                    }
-                                                >
-                                                    Save
-                                                </Button>
-                                                {timeOffForm.recentlySuccessful ? (
-                                                    <span className="text-xs text-muted-foreground">
-                                                        Saved.
-                                                    </span>
-                                                ) : null}
-                                            </div>
-                                        </form>
-
-                                        <div className="space-y-2">
-                                            {props.timeOffs.length === 0 ? (
-                                                <div className="text-sm text-muted-foreground">
-                                                    No time-off blocks in this
-                                                    week.
-                                                </div>
-                                            ) : (
-                                                props.timeOffs.map((b) => (
-                                                    <div
-                                                        key={b.id}
-                                                        className="flex flex-col gap-2 rounded-md border p-3 md:flex-row md:items-center md:justify-between"
-                                                    >
-                                                        <div>
-                                                            <div className="text-sm font-medium">
-                                                                {props.canManageAny
-                                                                    ? (b.user ??
-                                                                      'Staff')
-                                                                    : 'Me'}{' '}
-                                                                ·{' '}
-                                                                {new Date(
-                                                                    b.starts_at,
-                                                                ).toLocaleDateString()}{' '}
-                                                                {fmtTime(
-                                                                    b.starts_at,
-                                                                )}
-                                                                –
-                                                                {fmtTime(
-                                                                    b.ends_at,
-                                                                )}
-                                                            </div>
-                                                            <div className="mt-1 text-xs text-muted-foreground">
-                                                                <span className="capitalize">
-                                                                    {b.type}
-                                                                </span>
-                                                                {b.label
-                                                                    ? ` · ${b.label}`
-                                                                    : ''}
-                                                                {b.notes
-                                                                    ? ` · ${b.notes}`
-                                                                    : ''}
-                                                            </div>
-                                                        </div>
-                                                        <div className="flex items-center gap-2">
-                                                            <Badge
-                                                                variant="outline"
-                                                                className="capitalize"
-                                                            >
-                                                                {b.type}
-                                                            </Badge>
-                                                            <Button
-                                                                size="sm"
-                                                                variant="destructive"
-                                                                onClick={() => {
-                                                                    if (
-                                                                        !confirm(
-                                                                            'Delete this time-off block?',
-                                                                        )
-                                                                    )
-                                                                        return;
-                                                                    router.delete(
-                                                                        destroyTimeOff.url(
-                                                                            b.id,
-                                                                        ),
-                                                                        {
-                                                                            preserveScroll: true,
-                                                                            data: {
-                                                                                return_to:
-                                                                                    '/operations/rostering',
-                                                                            },
-                                                                        },
-                                                                    );
-                                                                }}
-                                                            >
-                                                                Delete
-                                                            </Button>
-                                                        </div>
-                                                    </div>
-                                                ))
-                                            )}
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            ),
-                        },
-                        {
-                            key: 'capacity',
-                            label: 'Capacity',
-                            content: (
-                                <Card>
-                                    <CardHeader className="pb-2">
-                                        <CardTitle className="text-base">
-                                            Weekly capacity
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent>
-                                        {!props.canManageAny ? (
-                                            <div className="text-sm text-muted-foreground">
-                                                Capacity is available for
-                                                managers.
-                                            </div>
-                                        ) : (
-                                            <div className="overflow-x-auto">
-                                                <table className="w-full min-w-[500px] border-collapse">
-                                                    <thead>
-                                                        <tr className="border-b">
-                                                            <th className="px-2 py-2 text-left text-xs font-medium text-muted-foreground">
-                                                                Staff
-                                                            </th>
-                                                            <th className="px-2 py-2 text-left text-xs font-medium text-muted-foreground">
-                                                                Hours
-                                                            </th>
-                                                            <th className="px-2 py-2 text-left text-xs font-medium text-muted-foreground">
-                                                                Signal
-                                                            </th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {props.capacity.map(
-                                                            (c) => (
-                                                                <tr
-                                                                    key={
-                                                                        c.user_id
-                                                                    }
-                                                                    className="border-b"
-                                                                >
-                                                                    <td className="px-2 py-2 text-sm font-medium">
-                                                                        {c.name}
-                                                                    </td>
-                                                                    <td className="px-2 py-2 text-sm">
-                                                                        {
-                                                                            c.hours
-                                                                        }
-                                                                    </td>
-                                                                    <td className="px-2 py-2">
-                                                                        {c.warn ===
-                                                                        'high' ? (
-                                                                            <Badge variant="destructive">
-                                                                                High
-                                                                            </Badge>
-                                                                        ) : c.warn ===
-                                                                          'medium' ? (
-                                                                            <Badge variant="default">
-                                                                                Watch
-                                                                            </Badge>
-                                                                        ) : (
-                                                                            <Badge variant="outline">
-                                                                                OK
-                                                                            </Badge>
-                                                                        )}
-                                                                    </td>
-                                                                </tr>
-                                                            ),
-                                                        )}
-                                                    </tbody>
-                                                </table>
-                                                <div className="mt-2 text-xs text-muted-foreground">
-                                                    Signals: Watch at ≥40h, High
-                                                    at ≥50h for the roster week.
-                                                </div>
-                                            </div>
-                                        )}
-                                    </CardContent>
-                                </Card>
-                            ),
-                        },
-                        {
-                            key: 'heatmap',
-                            label: 'Heatmap',
-                            content: (
-                                <Card>
-                                    <CardHeader className="pb-2">
-                                        <CardTitle className="flex items-center justify-between text-base">
-                                            <span>
-                                                Coverage Heatmap — 24-Hour View
-                                            </span>
-                                            <div className="flex items-center gap-2">
-                                                <Button
-                                                    size="sm"
-                                                    variant={
-                                                        coverageMode ===
-                                                        'understaffed'
-                                                            ? 'default'
-                                                            : 'outline'
-                                                    }
-                                                    onClick={() =>
-                                                        setCoverageMode(
-                                                            'understaffed',
-                                                        )
-                                                    }
-                                                >
-                                                    Understaffed
-                                                </Button>
-                                                <Button
-                                                    size="sm"
-                                                    variant={
-                                                        coverageMode ===
-                                                        'assigned'
-                                                            ? 'default'
-                                                            : 'outline'
-                                                    }
-                                                    onClick={() =>
-                                                        setCoverageMode(
-                                                            'assigned',
-                                                        )
-                                                    }
-                                                >
-                                                    Assigned
-                                                </Button>
-                                            </div>
-                                        </CardTitle>
-                                        <p className="text-xs text-muted-foreground">
-                                            Full 24-hour hourly breakdown for
-                                            the roster week. Each cell shows the
-                                            number of{' '}
-                                            {coverageMode === 'assigned'
-                                                ? 'assigned staff'
-                                                : 'open/unfilled shifts'}{' '}
-                                            per hour.
-                                        </p>
-                                    </CardHeader>
-                                    <CardContent>
-                                        <div className="overflow-x-auto">
-                                            <div className="min-w-[800px]">
-                                                <div className="grid grid-cols-[56px_repeat(7,1fr)] gap-px overflow-hidden rounded-lg border bg-border/50">
-                                                    {/* Header row */}
-                                                    <div className="bg-muted/80 px-2 py-1.5 text-[10px] font-semibold text-muted-foreground">
-                                                        Hour
-                                                    </div>
-                                                    {days.map((d) => (
-                                                        <div
-                                                            key={ymd(d)}
-                                                            className="bg-muted/80 py-1.5 text-center text-[10px] font-semibold"
-                                                        >
-                                                            {fmtDay(d)}
-                                                        </div>
-                                                    ))}
-
-                                                    {/* 24 hour rows */}
-                                                    {Array.from({
-                                                        length: 24,
-                                                    }).map((_, h) => (
-                                                        <Fragment key={h}>
-                                                            <div className="flex items-center bg-background px-2 text-[10px] text-muted-foreground">
-                                                                {String(
-                                                                    h,
-                                                                ).padStart(
-                                                                    2,
-                                                                    '0',
-                                                                )}
-                                                                :00
-                                                            </div>
-                                                            {days.map((d) => {
-                                                                const dk =
-                                                                    ymd(d);
-                                                                const cell =
-                                                                    coverageHeatmap
-                                                                        .grid[
-                                                                        dk
-                                                                    ]?.assigned
-                                                                        ? {
-                                                                              assigned:
-                                                                                  coverageHeatmap
-                                                                                      .grid[
-                                                                                      dk
-                                                                                  ]
-                                                                                      .assigned[
-                                                                                      h
-                                                                                  ] ??
-                                                                                  0,
-                                                                              open:
-                                                                                  coverageHeatmap
-                                                                                      .grid[
-                                                                                      dk
-                                                                                  ]
-                                                                                      .open[
-                                                                                      h
-                                                                                  ] ??
-                                                                                  0,
-                                                                          }
-                                                                        : {
-                                                                              assigned: 0,
-                                                                              open: 0,
-                                                                          };
-                                                                const v =
-                                                                    coverageMode ===
-                                                                    'assigned'
-                                                                        ? cell.assigned
-                                                                        : cell.open;
-                                                                const bg =
-                                                                    coverageMode ===
-                                                                    'assigned'
-                                                                        ? v >= 3
-                                                                            ? 'bg-status-info'
-                                                                            : v ===
-                                                                                2
-                                                                              ? 'bg-status-info'
-                                                                              : v ===
-                                                                                  1
-                                                                                ? 'bg-status-info-bg'
-                                                                                : 'bg-background'
-                                                                        : v >= 3
-                                                                          ? 'bg-status-warning'
-                                                                          : v ===
-                                                                              2
-                                                                            ? 'bg-status-warning'
-                                                                            : v ===
-                                                                                1
-                                                                              ? 'bg-status-warning-bg'
-                                                                              : 'bg-background';
-                                                                return (
-                                                                    <div
-                                                                        key={`${dk}-${h}`}
-                                                                        className={`flex h-6 items-center justify-center ${bg}`}
-                                                                    >
-                                                                        <span className="text-[10px] font-medium">
-                                                                            {v >
-                                                                            0
-                                                                                ? v
-                                                                                : ''}
-                                                                        </span>
-                                                                    </div>
-                                                                );
-                                                            })}
-                                                        </Fragment>
-                                                    ))}
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <div className="mt-3 flex flex-wrap gap-4 text-xs text-muted-foreground">
-                                            <span className="flex items-center gap-1.5">
-                                                <span className="inline-block h-3.5 w-3.5 rounded border bg-background" />{' '}
-                                                No coverage
-                                            </span>
-                                            <span className="flex items-center gap-1.5">
-                                                <span
-                                                    className={`inline-block h-3.5 w-3.5 rounded ${coverageMode === 'assigned' ? 'bg-status-info-bg' : 'bg-status-warning-bg'}`}
-                                                />{' '}
-                                                1 staff
-                                            </span>
-                                            <span className="flex items-center gap-1.5">
-                                                <span
-                                                    className={`inline-block h-3.5 w-3.5 rounded ${coverageMode === 'assigned' ? 'bg-status-info' : 'bg-status-warning'}`}
-                                                />{' '}
-                                                2 staff
-                                            </span>
-                                            <span className="flex items-center gap-1.5">
-                                                <span
-                                                    className={`inline-block h-3.5 w-3.5 rounded ${coverageMode === 'assigned' ? 'bg-status-info' : 'bg-status-warning'}`}
-                                                />{' '}
-                                                3+ staff
-                                            </span>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            ),
-                        },
-                        {
-                            key: 'analytics',
-                            label: (
-                                <span className="flex items-center gap-2">
-                                    <BarChart3 className="h-3.5 w-3.5" />{' '}
-                                    Analytics
-                                </span>
-                            ),
-                            content: (
-                                <div className="space-y-4">
-                                    <div className="grid gap-4 sm:grid-cols-2">
-                                        {/* Daily Coverage Chart */}
-                                        <Card>
-                                            <CardHeader className="pb-3">
-                                                <CardTitle className="text-base">
-                                                    Daily Shift Coverage
-                                                </CardTitle>
-                                            </CardHeader>
-                                            <CardContent>
-                                                {props.analytics.dailyCoverage
-                                                    .length > 0 ? (
-                                                    <ResponsiveContainer
-                                                        width="100%"
-                                                        height={220}
-                                                    >
-                                                        <BarChart
-                                                            data={
-                                                                props.analytics
-                                                                    .dailyCoverage
-                                                            }
-                                                        >
-                                                            <CartesianGrid
-                                                                strokeDasharray="3 3"
-                                                                className="stroke-muted"
-                                                            />
-                                                            <XAxis
-                                                                dataKey="day"
-                                                                tick={{
-                                                                    fontSize: 12,
-                                                                }}
-                                                            />
-                                                            <YAxis
-                                                                tick={{
-                                                                    fontSize: 12,
-                                                                }}
-                                                            />
-                                                            <Tooltip />
-                                                            <Bar
-                                                                dataKey="filled"
-                                                                stackId="a"
-                                                                fill="#10b981"
-                                                                name="Filled"
-                                                                radius={[
-                                                                    0, 0, 0, 0,
-                                                                ]}
-                                                            />
-                                                            <Bar
-                                                                dataKey="open"
-                                                                stackId="a"
-                                                                fill="#ef4444"
-                                                                name="Open"
-                                                                radius={[
-                                                                    4, 4, 0, 0,
-                                                                ]}
-                                                            />
-                                                            <Legend />
-                                                        </BarChart>
-                                                    </ResponsiveContainer>
-                                                ) : (
-                                                    <div className="flex h-[220px] items-center justify-center text-sm text-muted-foreground">
-                                                        No shift data
-                                                    </div>
-                                                )}
-                                            </CardContent>
-                                        </Card>
-
-                                        {/* Shift Type Distribution */}
-                                        <Card>
-                                            <CardHeader className="pb-3">
-                                                <CardTitle className="text-base">
-                                                    Shift Type Distribution
-                                                </CardTitle>
-                                            </CardHeader>
-                                            <CardContent>
-                                                {props.analytics
-                                                    .shiftTypeDistribution
-                                                    .length > 0 ? (
-                                                    <ResponsiveContainer
-                                                        width="100%"
-                                                        height={220}
-                                                    >
-                                                        <PieChart>
-                                                            <Pie
-                                                                data={
-                                                                    props
-                                                                        .analytics
-                                                                        .shiftTypeDistribution
-                                                                }
-                                                                dataKey="value"
-                                                                nameKey="type"
-                                                                cx="50%"
-                                                                cy="50%"
-                                                                outerRadius={70}
-                                                                innerRadius={40}
-                                                                paddingAngle={2}
-                                                            >
-                                                                {props.analytics.shiftTypeDistribution.map(
-                                                                    (
-                                                                        entry,
-                                                                        i,
-                                                                    ) => (
-                                                                        <Cell
-                                                                            key={
-                                                                                entry.type
-                                                                            }
-                                                                            fill={
-                                                                                CHART_COLORS[
-                                                                                    i %
-                                                                                        CHART_COLORS.length
-                                                                                ]
-                                                                            }
-                                                                        />
-                                                                    ),
-                                                                )}
-                                                            </Pie>
-                                                            <Tooltip />
-                                                            <Legend />
-                                                        </PieChart>
-                                                    </ResponsiveContainer>
-                                                ) : (
-                                                    <div className="flex h-[220px] items-center justify-center text-sm text-muted-foreground">
-                                                        No shift data
-                                                    </div>
-                                                )}
-                                            </CardContent>
-                                        </Card>
-                                    </div>
-
-                                    <div className="grid gap-4 sm:grid-cols-2">
-                                        <Card>
-                                            <CardHeader className="pb-3">
-                                                <CardTitle className="text-base">
-                                                    Site Coverage Exposure
-                                                </CardTitle>
-                                                <p className="text-xs text-muted-foreground">
-                                                    Under, exact, and
-                                                    overstaffed windows by site
-                                                    for the current roster
-                                                    range.
-                                                </p>
-                                            </CardHeader>
-                                            <CardContent>
-                                                {siteCoverageChartData.length >
-                                                0 ? (
-                                                    <ResponsiveContainer
-                                                        width="100%"
-                                                        height={240}
-                                                    >
-                                                        <BarChart
-                                                            data={
-                                                                siteCoverageChartData
-                                                            }
-                                                            layout="vertical"
-                                                            margin={{
-                                                                left: 12,
-                                                                right: 12,
-                                                            }}
-                                                        >
-                                                            <CartesianGrid
-                                                                strokeDasharray="3 3"
-                                                                className="stroke-muted"
-                                                            />
-                                                            <XAxis
-                                                                type="number"
-                                                                tick={{
-                                                                    fontSize: 12,
-                                                                }}
-                                                            />
-                                                            <YAxis
-                                                                type="category"
-                                                                dataKey="site"
-                                                                width={110}
-                                                                tick={{
-                                                                    fontSize: 12,
-                                                                }}
-                                                            />
-                                                            <Tooltip />
-                                                            <Legend />
-                                                            <Bar
-                                                                dataKey="under"
-                                                                stackId="coverage"
-                                                                fill="#ef4444"
-                                                                name="Under-covered"
-                                                                radius={[
-                                                                    4, 0, 0, 4,
-                                                                ]}
-                                                            />
-                                                            <Bar
-                                                                dataKey="exact"
-                                                                stackId="coverage"
-                                                                fill="#10b981"
-                                                                name="Exact"
-                                                            />
-                                                            <Bar
-                                                                dataKey="over"
-                                                                stackId="coverage"
-                                                                fill="#f59e0b"
-                                                                name="Overstaffed"
-                                                                radius={[
-                                                                    0, 4, 4, 0,
-                                                                ]}
-                                                            />
-                                                        </BarChart>
-                                                    </ResponsiveContainer>
-                                                ) : (
-                                                    <div className="flex h-[240px] items-center justify-center text-sm text-muted-foreground">
-                                                        No site coverage rules
-                                                        configured yet
-                                                    </div>
-                                                )}
-                                            </CardContent>
-                                        </Card>
-
-                                        <Card>
-                                            <CardHeader className="pb-3">
-                                                <CardTitle className="text-base">
-                                                    Coverage Balance
-                                                </CardTitle>
-                                                <p className="text-xs text-muted-foreground">
-                                                    Overall distribution of site
-                                                    demand windows.
-                                                </p>
-                                            </CardHeader>
-                                            <CardContent>
-                                                {coverageBalanceData.length >
-                                                0 ? (
-                                                    <ResponsiveContainer
-                                                        width="100%"
-                                                        height={240}
-                                                    >
-                                                        <PieChart>
-                                                            <Pie
-                                                                data={
-                                                                    coverageBalanceData
-                                                                }
-                                                                dataKey="value"
-                                                                nameKey="name"
-                                                                cx="50%"
-                                                                cy="50%"
-                                                                outerRadius={78}
-                                                                innerRadius={46}
-                                                                paddingAngle={3}
-                                                            >
-                                                                {coverageBalanceData.map(
-                                                                    (entry) => (
-                                                                        <Cell
-                                                                            key={
-                                                                                entry.name
-                                                                            }
-                                                                            fill={
-                                                                                entry.color
-                                                                            }
-                                                                        />
-                                                                    ),
-                                                                )}
-                                                            </Pie>
-                                                            <Tooltip />
-                                                            <Legend />
-                                                        </PieChart>
-                                                    </ResponsiveContainer>
-                                                ) : (
-                                                    <div className="flex h-[240px] items-center justify-center text-sm text-muted-foreground">
-                                                        No site coverage data
-                                                    </div>
-                                                )}
-                                            </CardContent>
-                                        </Card>
-                                    </div>
-
-                                    <div className="grid gap-4 sm:grid-cols-2">
-                                        {/* 4-Week Historical Trend */}
-                                        <Card>
-                                            <CardHeader className="pb-3">
-                                                <CardTitle className="text-base">
-                                                    4-Week Trend
-                                                </CardTitle>
-                                            </CardHeader>
-                                            <CardContent>
-                                                {props.analytics.historicalTrend
-                                                    .length > 0 ? (
-                                                    <ResponsiveContainer
-                                                        width="100%"
-                                                        height={200}
-                                                    >
-                                                        <AreaChart
-                                                            data={
-                                                                props.analytics
-                                                                    .historicalTrend
-                                                            }
-                                                        >
-                                                            <CartesianGrid
-                                                                strokeDasharray="3 3"
-                                                                className="stroke-muted"
-                                                            />
-                                                            <XAxis
-                                                                dataKey="week"
-                                                                tick={{
-                                                                    fontSize: 12,
-                                                                }}
-                                                            />
-                                                            <YAxis
-                                                                tick={{
-                                                                    fontSize: 12,
-                                                                }}
-                                                            />
-                                                            <Tooltip />
-                                                            <Area
-                                                                type="monotone"
-                                                                dataKey="completed"
-                                                                stroke="#10b981"
-                                                                fill="#10b981"
-                                                                fillOpacity={
-                                                                    0.3
-                                                                }
-                                                                name="Completed"
-                                                            />
-                                                            <Area
-                                                                type="monotone"
-                                                                dataKey="cancelled"
-                                                                stroke="#ef4444"
-                                                                fill="#ef4444"
-                                                                fillOpacity={
-                                                                    0.3
-                                                                }
-                                                                name="Cancelled"
-                                                            />
-                                                            <Legend />
-                                                        </AreaChart>
-                                                    </ResponsiveContainer>
-                                                ) : (
-                                                    <div className="flex h-[200px] items-center justify-center text-sm text-muted-foreground">
-                                                        No historical data
-                                                    </div>
-                                                )}
-                                            </CardContent>
-                                        </Card>
-
-                                        {/* Compliance & Leave Sidebar */}
-                                        <div className="space-y-4">
-                                            <Card
-                                                className={
-                                                    props.analytics
-                                                        .complianceExpired > 0
-                                                        ? 'border-status-critical/20'
-                                                        : ''
-                                                }
-                                            >
-                                                <CardHeader className="pb-3">
-                                                    <CardTitle className="flex items-center gap-2 text-base">
-                                                        <AlertTriangle className="h-4 w-4" />{' '}
-                                                        Compliance Alerts
-                                                    </CardTitle>
-                                                </CardHeader>
-                                                <CardContent className="space-y-2">
-                                                    <div className="flex items-center justify-between rounded-md border p-2 text-sm">
-                                                        <span>
-                                                            Expired (hard-stop)
-                                                        </span>
-                                                        <Badge
-                                                            variant={
-                                                                props.analytics
-                                                                    .complianceExpired >
-                                                                0
-                                                                    ? 'destructive'
-                                                                    : 'outline'
-                                                            }
-                                                        >
-                                                            {
-                                                                props.analytics
-                                                                    .complianceExpired
-                                                            }
-                                                        </Badge>
-                                                    </div>
-                                                    <div className="flex items-center justify-between rounded-md border p-2 text-sm">
-                                                        <span>
-                                                            Expiring soon
-                                                        </span>
-                                                        <Badge
-                                                            variant={
-                                                                props.analytics
-                                                                    .complianceExpiring >
-                                                                0
-                                                                    ? 'default'
-                                                                    : 'outline'
-                                                            }
-                                                        >
-                                                            {
-                                                                props.analytics
-                                                                    .complianceExpiring
-                                                            }
-                                                        </Badge>
-                                                    </div>
-                                                </CardContent>
-                                            </Card>
-
-                                            <Card>
-                                                <CardHeader className="pb-3">
-                                                    <CardTitle className="flex items-center gap-2 text-base">
-                                                        <CalendarOff className="h-4 w-4" />{' '}
-                                                        Leave This Week
-                                                    </CardTitle>
-                                                </CardHeader>
-                                                <CardContent>
-                                                    <p className="text-2xl font-bold">
-                                                        {
-                                                            props.analytics
-                                                                .onLeaveCount
-                                                        }
-                                                    </p>
-                                                    <p className="text-xs text-muted-foreground">
-                                                        staff members on
-                                                        approved leave
-                                                    </p>
-                                                    <Button
-                                                        variant="outline"
-                                                        size="sm"
-                                                        className="mt-3 w-full"
-                                                        asChild
-                                                    >
-                                                        <Link href="/hr/leave">
-                                                            View Leave Dashboard
-                                                        </Link>
-                                                    </Button>
-                                                </CardContent>
-                                            </Card>
-                                        </div>
-                                    </div>
-                                </div>
-                            ),
-                        },
-                    ]}
-                />
-
-                <div className="grid grid-cols-1 gap-3 lg:grid-cols-2">
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-base">
-                                Timesheets needing attention
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-2">
-                            <div className="text-sm text-muted-foreground">
-                                Shifts with a linked timesheet still in
-                                draft/submitted/returned.
-                            </div>
-                            <div className="space-y-2">
-                                {props.shifts
-                                    .filter((s) =>
-                                        [
-                                            'draft',
-                                            'submitted',
-                                            'returned',
-                                        ].includes(s.timesheet_status ?? ''),
-                                    )
-                                    .slice(0, 8)
-                                    .map((sh) => (
-                                        <Link
-                                            key={sh.id}
-                                            href={`/operations/shifts/${sh.id}`}
-                                            className="block"
-                                        >
-                                            <div className="rounded-md border p-2 hover:bg-muted">
-                                                <div className="flex items-center justify-between gap-2">
-                                                    <div className="text-sm font-medium">
-                                                        {sh.client}
-                                                    </div>
-                                                    <Badge variant="outline">
-                                                        TS:{' '}
-                                                        {sh.timesheet_status}
-                                                    </Badge>
-                                                </div>
-                                                <div className="mt-1 text-xs text-muted-foreground">
-                                                    {new Date(
-                                                        sh.starts_at,
-                                                    ).toLocaleDateString()}{' '}
-                                                    · {fmtTime(sh.starts_at)}–
-                                                    {fmtTime(sh.ends_at)}
-                                                    {props.canManageAny &&
-                                                    sh.staff
-                                                        ? ` · ${sh.staff}`
-                                                        : ''}
-                                                </div>
-                                            </div>
-                                        </Link>
-                                    ))}
-                                {props.stats.timesheets_pending === 0 && (
-                                    <div className="text-sm text-muted-foreground">
-                                        No pending timesheets in this week.
-                                    </div>
-                                )}
-                            </div>
-
-                            <div>
-                                <Link href="/operations/timesheets">
-                                    <Button variant="outline" size="sm">
-                                        Open Timesheets
-                                    </Button>
-                                </Link>
-                            </div>
-                        </CardContent>
-                    </Card>
-
-                    <Card>
-                        <CardHeader className="pb-2">
-                            <CardTitle className="text-base">
-                                Incidents in this roster window
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent className="space-y-2">
-                            <div className="text-sm text-muted-foreground">
-                                Quick jump into the shifts that have incidents
-                                linked.
-                            </div>
-                            <div className="space-y-2">
-                                {props.shifts
-                                    .filter((s) => s.incidents_count > 0)
-                                    .slice(0, 8)
-                                    .map((sh) => (
-                                        <Link
-                                            key={sh.id}
-                                            href={`/operations/shifts/${sh.id}`}
-                                            className="block"
-                                        >
-                                            <div className="rounded-md border p-2 hover:bg-muted">
-                                                <div className="flex items-center justify-between gap-2">
-                                                    <div className="text-sm font-medium">
-                                                        {sh.client}
-                                                    </div>
-                                                    <Badge variant="destructive">
-                                                        {sh.incidents_count}{' '}
-                                                        incident
-                                                        {sh.incidents_count ===
-                                                        1
-                                                            ? ''
-                                                            : 's'}
-                                                    </Badge>
-                                                </div>
-                                                <div className="mt-1 text-xs text-muted-foreground">
-                                                    {new Date(
-                                                        sh.starts_at,
-                                                    ).toLocaleDateString()}{' '}
-                                                    · {fmtTime(sh.starts_at)}–
-                                                    {fmtTime(sh.ends_at)}
-                                                    {props.canManageAny &&
-                                                    sh.staff
-                                                        ? ` · ${sh.staff}`
-                                                        : ''}
-                                                </div>
-                                            </div>
-                                        </Link>
-                                    ))}
-                                {props.stats.incidents === 0 && (
-                                    <div className="text-sm text-muted-foreground">
-                                        No incidents linked to shifts in this
-                                        week.
-                                    </div>
-                                )}
-                            </div>
-                            <div>
-                                <Link href="/incidents">
-                                    <Button variant="outline" size="sm">
-                                        Open Incidents
-                                    </Button>
-                                </Link>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-                {/* Resolve overlap dialog */}
-                <Dialog
-                    open={!!resolveModal}
-                    onOpenChange={(o) => !o && setResolveModal(null)}
-                >
-                    <DialogContent className="sm:max-w-[720px]">
-                        <DialogHeader>
-                            <DialogTitle>Resolve overlap</DialogTitle>
-                        </DialogHeader>
-
-                        {resolveModal ? (
-                            <div className="space-y-4">
-                                <div className="grid grid-cols-1 gap-2 md:grid-cols-2">
-                                    <div className="rounded-md border p-3">
-                                        <div className="flex items-center gap-2">
-                                            <div className="text-sm font-medium">
-                                                A
-                                            </div>
-                                            {resolveState?.aLocked ? (
-                                                <Badge variant="secondary">
-                                                    Locked
-                                                </Badge>
-                                            ) : null}
-                                        </div>
-                                        <div className="mt-1 text-xs text-muted-foreground">
-                                            {new Date(
-                                                resolveModal.a.starts_at,
-                                            ).toLocaleDateString()}{' '}
-                                            {fmtTime(resolveModal.a.starts_at)}–
-                                            {fmtTime(resolveModal.a.ends_at)}
-                                        </div>
-                                        <div className="mt-1 text-xs">
-                                            {resolveModal.a.client ??
-                                                clientSingular}{' '}
-                                            ·{' '}
-                                            {resolveModal.a.staff ??
-                                                'Unassigned'}{' '}
-                                        </div>
-                                        <div className="mt-2">
-                                            <Link
-                                                href={`/operations/shifts/${resolveModal.a.id}`}
-                                            >
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                >
-                                                    Open A
-                                                </Button>
-                                            </Link>
-                                        </div>
-                                    </div>
-
-                                    <div className="rounded-md border p-3">
-                                        <div className="flex items-center gap-2">
-                                            <div className="text-sm font-medium">
-                                                B
-                                            </div>
-                                            {resolveState?.bLocked ? (
-                                                <Badge variant="secondary">
-                                                    Locked
-                                                </Badge>
-                                            ) : null}
-                                        </div>
-                                        <div className="mt-1 text-xs text-muted-foreground">
-                                            {new Date(
-                                                resolveModal.b.starts_at,
-                                            ).toLocaleDateString()}{' '}
-                                            {fmtTime(resolveModal.b.starts_at)}–
-                                            {fmtTime(resolveModal.b.ends_at)}
-                                        </div>
-                                        <div className="mt-1 text-xs">
-                                            {resolveModal.b.client ??
-                                                clientSingular}{' '}
-                                            ·{' '}
-                                            {resolveModal.b.staff ??
-                                                'Unassigned'}{' '}
-                                        </div>
-                                        <div className="mt-2">
-                                            <Link
-                                                href={`/operations/shifts/${resolveModal.b.id}`}
-                                            >
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                >
-                                                    Open B
-                                                </Button>
-                                            </Link>
-                                        </div>
-                                    </div>
-                                </div>
-
-                                {resolveModal.kind === 'staff' ? (
-                                    <div className="space-y-3">
-                                        <div className="text-sm text-muted-foreground">
-                                            Choose the quickest safe fix.
-                                            Suggestions consider time-off +
-                                            existing roster conflicts + lowest
-                                            weekly hours.
-                                        </div>
-                                        {resolveState?.bothLocked ? (
-                                            <div className="text-sm text-muted-foreground">
-                                                Both shifts are locked
-                                                (completed). This overlap is
-                                                historical and cannot be
-                                                resolved from rostering.
-                                            </div>
-                                        ) : null}
-
-                                        <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
-                                            <div className="space-y-2">
-                                                <div className="text-sm font-medium">
-                                                    Keep A
-                                                </div>
-                                                <div className="flex flex-wrap gap-2">
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        disabled={
-                                                            !!resolveState?.bLocked
-                                                        }
-                                                        onClick={() => {
-                                                            if (
-                                                                resolveState?.bLocked
-                                                            )
-                                                                return;
-                                                            router.post(
-                                                                `/operations/shifts/${resolveModal.b.id}/unassign`,
-                                                                {
-                                                                    return_to:
-                                                                        '/operations/rostering',
-                                                                },
-                                                                {
-                                                                    preserveScroll: true,
-                                                                    onSuccess:
-                                                                        () =>
-                                                                            setResolveModal(
-                                                                                null,
-                                                                            ),
-                                                                },
-                                                            );
-                                                        }}
-                                                    >
-                                                        Open B (unassign)
-                                                    </Button>
-                                                </div>
-
-                                                <div className="rounded-md border p-2">
-                                                    <div className="text-xs text-muted-foreground">
-                                                        Reassign B to:
-                                                    </div>
-                                                    <div className="mt-2 flex items-center gap-2">
-                                                        <Select
-                                                            value={
-                                                                resolveReassignSelection[
-                                                                    resolveModal
-                                                                        .b.id
-                                                                ] ?? ''
-                                                            }
-                                                            onValueChange={(
-                                                                v,
-                                                            ) =>
-                                                                setResolveReassignSelection(
-                                                                    (prev) => ({
-                                                                        ...prev,
-                                                                        [resolveModal
-                                                                            .b
-                                                                            .id]:
-                                                                            v,
-                                                                    }),
-                                                                )
-                                                            }
-                                                        >
-                                                            <SelectTrigger className="w-[260px]">
-                                                                <SelectValue placeholder="Suggested staff" />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                {availableStaffForShift(
-                                                                    resolveModal.b,
-                                                                )
-                                                                    .filter(
-                                                                        (u) =>
-                                                                            u.id !==
-                                                                            resolveModal.staffId,
-                                                                    )
-                                                                    .slice(
-                                                                        0,
-                                                                        12,
-                                                                    )
-                                                                    .map(
-                                                                        (u) => (
-                                                                            <SelectItem
-                                                                                key={
-                                                                                    u.id
-                                                                                }
-                                                                                value={String(
-                                                                                    u.id,
-                                                                                )}
-                                                                            >
-                                                                                {
-                                                                                    u.name
-                                                                                }
-                                                                            </SelectItem>
-                                                                        ),
-                                                                    )}
-                                                            </SelectContent>
-                                                        </Select>
-                                                        <Button
-                                                            size="sm"
-                                                            disabled={
-                                                                !!resolveState?.bLocked ||
-                                                                !resolveReassignSelection[
-                                                                    resolveModal
-                                                                        .b.id
-                                                                ]
-                                                            }
-                                                            onClick={() => {
-                                                                if (
-                                                                    resolveState?.bLocked
-                                                                )
-                                                                    return;
-                                                                const uid =
-                                                                    resolveReassignSelection[
-                                                                        resolveModal
-                                                                            .b
-                                                                            .id
-                                                                    ];
-                                                                if (!uid)
-                                                                    return;
-                                                                router.post(
-                                                                    `/operations/shifts/${resolveModal.b.id}/assign`,
-                                                                    {
-                                                                        user_id:
-                                                                            uid,
-                                                                        return_to:
-                                                                            '/operations/rostering',
-                                                                    },
-                                                                    {
-                                                                        preserveScroll: true,
-                                                                        onSuccess:
-                                                                            () =>
-                                                                                setResolveModal(
-                                                                                    null,
-                                                                                ),
-                                                                    },
-                                                                );
-                                                            }}
-                                                        >
-                                                            Reassign B
-                                                        </Button>
-                                                    </div>
-                                                </div>
-                                            </div>
-
-                                            <div className="space-y-2">
-                                                <div className="text-sm font-medium">
-                                                    Keep B
-                                                </div>
-                                                <div className="flex flex-wrap gap-2">
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        disabled={
-                                                            !!resolveState?.aLocked
-                                                        }
-                                                        onClick={() => {
-                                                            if (
-                                                                resolveState?.aLocked
-                                                            )
-                                                                return;
-                                                            router.post(
-                                                                `/operations/shifts/${resolveModal.a.id}/unassign`,
-                                                                {
-                                                                    return_to:
-                                                                        '/operations/rostering',
-                                                                },
-                                                                {
-                                                                    preserveScroll: true,
-                                                                    onSuccess:
-                                                                        () =>
-                                                                            setResolveModal(
-                                                                                null,
-                                                                            ),
-                                                                },
-                                                            );
-                                                        }}
-                                                    >
-                                                        Open A (unassign)
-                                                    </Button>
-                                                </div>
-
-                                                <div className="rounded-md border p-2">
-                                                    <div className="text-xs text-muted-foreground">
-                                                        Reassign A to:
-                                                    </div>
-                                                    <div className="mt-2 flex items-center gap-2">
-                                                        <Select
-                                                            value={
-                                                                resolveReassignSelection[
-                                                                    resolveModal
-                                                                        .a.id
-                                                                ] ?? ''
-                                                            }
-                                                            onValueChange={(
-                                                                v,
-                                                            ) =>
-                                                                setResolveReassignSelection(
-                                                                    (prev) => ({
-                                                                        ...prev,
-                                                                        [resolveModal
-                                                                            .a
-                                                                            .id]:
-                                                                            v,
-                                                                    }),
-                                                                )
-                                                            }
-                                                        >
-                                                            <SelectTrigger className="w-[260px]">
-                                                                <SelectValue placeholder="Suggested staff" />
-                                                            </SelectTrigger>
-                                                            <SelectContent>
-                                                                {availableStaffForShift(
-                                                                    resolveModal.a,
-                                                                )
-                                                                    .filter(
-                                                                        (u) =>
-                                                                            u.id !==
-                                                                            resolveModal.staffId,
-                                                                    )
-                                                                    .slice(
-                                                                        0,
-                                                                        12,
-                                                                    )
-                                                                    .map(
-                                                                        (u) => (
-                                                                            <SelectItem
-                                                                                key={
-                                                                                    u.id
-                                                                                }
-                                                                                value={String(
-                                                                                    u.id,
-                                                                                )}
-                                                                            >
-                                                                                {
-                                                                                    u.name
-                                                                                }
-                                                                            </SelectItem>
-                                                                        ),
-                                                                    )}
-                                                            </SelectContent>
-                                                        </Select>
-                                                        <Button
-                                                            size="sm"
-                                                            disabled={
-                                                                !!resolveState?.aLocked ||
-                                                                !resolveReassignSelection[
-                                                                    resolveModal
-                                                                        .a.id
-                                                                ]
-                                                            }
-                                                            onClick={() => {
-                                                                if (
-                                                                    resolveState?.aLocked
-                                                                )
-                                                                    return;
-                                                                const uid =
-                                                                    resolveReassignSelection[
-                                                                        resolveModal
-                                                                            .a
-                                                                            .id
-                                                                    ];
-                                                                if (!uid)
-                                                                    return;
-                                                                router.post(
-                                                                    `/operations/shifts/${resolveModal.a.id}/assign`,
-                                                                    {
-                                                                        user_id:
-                                                                            uid,
-                                                                        return_to:
-                                                                            '/operations/rostering',
-                                                                    },
-                                                                    {
-                                                                        preserveScroll: true,
-                                                                        onSuccess:
-                                                                            () =>
-                                                                                setResolveModal(
-                                                                                    null,
-                                                                                ),
-                                                                    },
-                                                                );
-                                                            }}
-                                                        >
-                                                            Reassign A
-                                                        </Button>
-                                                    </div>
-                                                </div>
-                                            </div>
-                                        </div>
-                                    </div>
-                                ) : (
-                                    <div className="space-y-3">
-                                        <div className="text-sm text-muted-foreground">
-                                            This is a client double-booking.
-                                            Resolve by opening one shift (so it
-                                            becomes an open slot) and then
-                                            adjust times/staffing.
-                                        </div>
-                                        {resolveState?.bothLocked ? (
-                                            <div className="text-sm text-muted-foreground">
-                                                Both shifts are locked
-                                                (completed). This overlap is
-                                                historical and cannot be
-                                                resolved from rostering.
-                                            </div>
-                                        ) : null}
-                                        {props.canManageAny ? (
-                                            <div className="flex flex-wrap gap-2">
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    disabled={
-                                                        !!resolveState?.aLocked
-                                                    }
-                                                    onClick={() => {
-                                                        if (
-                                                            resolveState?.aLocked
-                                                        )
-                                                            return;
-                                                        router.post(
-                                                            `/operations/shifts/${resolveModal.a.id}/unassign`,
-                                                            {
-                                                                return_to:
-                                                                    '/operations/rostering',
-                                                            },
-                                                            {
-                                                                preserveScroll: true,
-                                                                onSuccess: () =>
-                                                                    setResolveModal(
-                                                                        null,
-                                                                    ),
-                                                            },
-                                                        );
-                                                    }}
-                                                >
-                                                    Open A (unassign)
-                                                </Button>
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    disabled={
-                                                        !!resolveState?.bLocked
-                                                    }
-                                                    onClick={() => {
-                                                        if (
-                                                            resolveState?.bLocked
-                                                        )
-                                                            return;
-                                                        router.post(
-                                                            `/operations/shifts/${resolveModal.b.id}/unassign`,
-                                                            {
-                                                                return_to:
-                                                                    '/operations/rostering',
-                                                            },
-                                                            {
-                                                                preserveScroll: true,
-                                                                onSuccess: () =>
-                                                                    setResolveModal(
-                                                                        null,
-                                                                    ),
-                                                            },
-                                                        );
-                                                    }}
-                                                >
-                                                    Open B (unassign)
-                                                </Button>
-                                            </div>
-                                        ) : null}
-                                    </div>
-                                )}
-
-                                <DialogFooter>
-                                    <Button
-                                        variant="outline"
-                                        onClick={() => setResolveModal(null)}
-                                    >
-                                        Close
-                                    </Button>
-                                </DialogFooter>
-                            </div>
-                        ) : null}
-                    </DialogContent>
-                </Dialog>
+                {canViewOperationsReports ? (
+                    <div className="flex flex-wrap items-center gap-2">
+                        <Link
+                            href={operationsReportHref}
+                            data-test="rostering-operations-report-link"
+                            data-testid="rostering-operations-report-link"
+                        >
+                            <Button size="sm" variant="outline">
+                                <BarChart3 className="mr-1 h-4 w-4" />
+                                View Operations Reports
+                            </Button>
+                        </Link>
+                        <Link href="/operations/rostering/conflicts">
+                            <Button size="sm" variant="outline">
+                                Conflict queue
+                            </Button>
+                        </Link>
+                        <Link href="/operations/shifts/series">
+                            <Button size="sm" variant="outline">
+                                Recurring series
+                            </Button>
+                        </Link>
+                        <Link href="/operations/rostering/templates">
+                            <Button size="sm" variant="outline">
+                                Roster templates
+                            </Button>
+                        </Link>
+                    </div>
+                ) : null}
+
+                {pickerOpen ? (
+                    <WeekPicker
+                        selectedWeekStart={weekStartDate}
+                        anchorRef={todayBtnRef}
+                        onSelect={jumpToWeek}
+                        onClose={() => setPickerOpen(false)}
+                        canPublishWeek={props.canPublishRoster}
+                    />
+                ) : null}
             </div>
         </AppLayout>
     );

@@ -93,6 +93,9 @@ class RosteringController extends Controller
             ->where('ends_at', '>', $weekStart)
             ->orderBy('starts_at');
 
+        // Normalise the site_id filter once — may be null, a single int, or an int[].
+        $siteFilter = $request->siteFilter();
+
         if (!$canManageAny) {
             $query->where('user_id', $auth->id);
         } else {
@@ -102,8 +105,12 @@ class RosteringController extends Controller
             if (!empty($data['client_id'])) {
                 $query->where('client_id', $data['client_id']);
             }
-            if (!empty($data['site_id'])) {
-                $query->where('site_id', $data['site_id']);
+            if ($siteFilter !== null) {
+                if (is_array($siteFilter)) {
+                    $query->whereIn('site_id', $siteFilter);
+                } else {
+                    $query->where('site_id', $siteFilter);
+                }
             }
         }
 
@@ -336,10 +343,12 @@ class RosteringController extends Controller
             ->sortBy('starts_at')
             ->values();
 
+        // Roster period, auto-schedule, and coverage breakdowns are per-site.
+        // Only honour them when exactly one site is selected.
         $selectedSiteId = null;
-        if (! empty($data['site_id'])) {
-            $selectedSiteId = (int) $data['site_id'];
-        } elseif (! empty($data['client_id'])) {
+        if (is_int($siteFilter)) {
+            $selectedSiteId = $siteFilter;
+        } elseif ($siteFilter === null && ! empty($data['client_id'])) {
             $selectedSiteId = Client::query()->whereKey($data['client_id'])->value('site_id');
         }
 
@@ -438,7 +447,14 @@ class RosteringController extends Controller
                 'week' => $weekStart->toDateString(),
                 'staff_id' => $data['staff_id'] ?? null,
                 'client_id' => $data['client_id'] ?? null,
+                // Single int when one site is selected (back-compat for publish/auto-schedule),
+                // null when none.
                 'site_id' => $selectedSiteId,
+                // Always an int[] reflecting every selected site — frontend uses this
+                // for the multi-select UI and the shift-query filter.
+                'site_ids' => is_array($siteFilter)
+                    ? $siteFilter
+                    : ($siteFilter !== null ? [$siteFilter] : []),
             ],
             'staff' => $staff,
             'clients' => $clients,
