@@ -112,18 +112,25 @@ type Props = {
 type TabKey = 'all' | 'open' | 'today' | 'unassigned' | 'completed';
 type ViewMode = 'list' | 'calendar';
 
-function todayIsoDate(): string {
-    const d = new Date();
+// Format a Date as yyyy-mm-dd using local components. We deliberately avoid
+// `toISOString().slice(0, 10)` because that converts to UTC — in any timezone
+// east of UTC (e.g. Pacific/Auckland) midnight local rolls back to the previous
+// day, which silently shifted the week-anchor by one day.
+function toLocalIsoDate(d: Date): string {
     const yyyy = d.getFullYear();
     const mm = String(d.getMonth() + 1).padStart(2, '0');
     const dd = String(d.getDate()).padStart(2, '0');
     return `${yyyy}-${mm}-${dd}`;
 }
 
+function todayIsoDate(): string {
+    return toLocalIsoDate(new Date());
+}
+
 function addDaysIso(iso: string, days: number): string {
     const d = new Date(iso + 'T00:00:00');
     d.setDate(d.getDate() + days);
-    return d.toISOString().slice(0, 10);
+    return toLocalIsoDate(d);
 }
 
 function weekStartFor(iso: string): string {
@@ -131,7 +138,7 @@ function weekStartFor(iso: string): string {
     const dow = d.getDay(); // 0=Sun..6=Sat
     const monOffset = dow === 0 ? -6 : 1 - dow;
     d.setDate(d.getDate() + monOffset);
-    return d.toISOString().slice(0, 10);
+    return toLocalIsoDate(d);
 }
 
 function weekLabel(fromIso: string, toIso: string): string {
