@@ -10,6 +10,11 @@ export type CapacityRow = {
     hue: number;
     days: number[];
     target: number;
+    complianceBadge?: {
+        state: 'ok' | 'warning' | 'expired';
+        expiring?: number;
+        expired?: number;
+    } | null;
     open?: boolean;
 };
 
@@ -66,7 +71,7 @@ export function CapacityHeatmapPane({
                         gridTemplateColumns: `220px repeat(${days.length}, minmax(0, 1fr)) 120px`,
                     }}
                 >
-                    <div className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <div className="px-3 py-2 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
                         Staff · {rows.length} rostered
                     </div>
                     {days.map((d, i) => {
@@ -96,7 +101,7 @@ export function CapacityHeatmapPane({
                             </div>
                         );
                     })}
-                    <div className="px-2 py-2 text-center text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                    <div className="px-2 py-2 text-center text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
                         Total · Target
                     </div>
                 </div>
@@ -110,7 +115,9 @@ export function CapacityHeatmapPane({
                         const total = totals[ri];
                         const overload = total > row.target + 4;
                         const under =
-                            !row.open && total < row.target - 8 && row.target > 0;
+                            !row.open &&
+                            total < row.target - 8 &&
+                            row.target > 0;
                         return (
                             <div
                                 key={row.id}
@@ -130,8 +137,13 @@ export function CapacityHeatmapPane({
                                         {row.initials}
                                     </div>
                                     <div className="min-w-0">
-                                        <div className="truncate text-sm font-semibold">
-                                            {row.name}
+                                        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                                            <div className="truncate text-sm font-semibold">
+                                                {row.name}
+                                            </div>
+                                            <ComplianceChip
+                                                badge={row.complianceBadge}
+                                            />
                                         </div>
                                         {row.role ? (
                                             <div className="truncate text-[11px] text-muted-foreground">
@@ -141,7 +153,8 @@ export function CapacityHeatmapPane({
                                     </div>
                                 </div>
                                 {row.days.map((h, di) => {
-                                    const isToday = todayKey === ymdKey(days[di]);
+                                    const isToday =
+                                        todayKey === ymdKey(days[di]);
                                     return (
                                         <div
                                             key={di}
@@ -162,7 +175,8 @@ export function CapacityHeatmapPane({
                                         'flex flex-col items-center justify-center border-l border-border',
                                         overload &&
                                             'bg-status-critical-bg text-status-critical',
-                                        under && 'bg-status-warning-bg text-status-warning',
+                                        under &&
+                                            'bg-status-warning-bg text-status-warning',
                                     )}
                                 >
                                     <div className="text-sm font-bold tabular-nums">
@@ -172,11 +186,11 @@ export function CapacityHeatmapPane({
                                         / {row.target || '—'}h
                                     </div>
                                     {overload ? (
-                                        <span className="mt-1 rounded bg-status-critical px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">
+                                        <span className="mt-1 rounded bg-status-critical px-1.5 py-0.5 text-[9px] font-bold text-white uppercase">
                                             Overload
                                         </span>
                                     ) : under ? (
-                                        <span className="mt-1 rounded bg-status-warning px-1.5 py-0.5 text-[9px] font-bold uppercase text-white">
+                                        <span className="mt-1 rounded bg-status-warning px-1.5 py-0.5 text-[9px] font-bold text-white uppercase">
                                             Under
                                         </span>
                                     ) : null}
@@ -190,7 +204,7 @@ export function CapacityHeatmapPane({
                             gridTemplateColumns: `220px repeat(${days.length}, minmax(0, 1fr)) 120px`,
                         }}
                     >
-                        <div className="px-3 py-2 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">
+                        <div className="px-3 py-2 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
                             Day totals
                         </div>
                         {dayTotals.map((t, i) => (
@@ -209,7 +223,7 @@ export function CapacityHeatmapPane({
             </div>
 
             <div className="flex flex-wrap items-center gap-2 text-[11px] text-muted-foreground">
-                <span className="font-semibold uppercase tracking-wider text-muted-foreground">
+                <span className="font-semibold tracking-wider text-muted-foreground uppercase">
                     Load
                 </span>
                 <span className="inline-block h-3 w-5 rounded bg-muted" />
@@ -220,6 +234,32 @@ export function CapacityHeatmapPane({
                 <span>Off · 0–4h · 4–8h · 8–12h · 12h+ ⚠</span>
             </div>
         </div>
+    );
+}
+
+function ComplianceChip({ badge }: { badge?: CapacityRow['complianceBadge'] }) {
+    if (!badge || badge.state === 'ok') return null;
+
+    const expired = badge.expired ?? 0;
+    const expiring = badge.expiring ?? 0;
+    const isExpired = badge.state === 'expired' || expired > 0;
+    const label = isExpired ? 'Expired compliance' : 'Expiring soon';
+    const title = isExpired
+        ? `${expired || 1} expired compliance item${(expired || 1) === 1 ? '' : 's'}`
+        : `${expiring || 1} compliance item${(expiring || 1) === 1 ? '' : 's'} expiring soon`;
+
+    return (
+        <span
+            className={cn(
+                'inline-flex max-w-full items-center rounded-full border px-1.5 py-0.5 text-[10px] leading-none font-semibold',
+                isExpired
+                    ? 'border-status-critical/30 bg-status-critical-bg text-status-critical'
+                    : 'border-status-warning/30 bg-status-warning-bg text-status-warning',
+            )}
+            title={title}
+        >
+            {label}
+        </span>
     );
 }
 

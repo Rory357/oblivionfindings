@@ -1,5 +1,3 @@
-import type { ReactNode } from 'react';
-
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
@@ -7,6 +5,8 @@ import { MicroStats, type MicroStat } from './micro-stats';
 
 export type TimeOffRequest = {
     id: number;
+    source?: 'staff_time_off' | 'hr_leave';
+    sourceId?: number;
     staff: string;
     initials: string;
     hue: number;
@@ -236,7 +236,7 @@ export function TimeOffPane({
                                                 'mx-px h-5 rounded',
                                                 req.status === 'approved'
                                                     ? 'bg-status-success'
-                                                    : 'bg-[repeating-linear-gradient(45deg,var(--status-warning)_0_4px,transparent_4px_8px)] border border-status-warning/50',
+                                                    : 'border border-status-warning/50 bg-[repeating-linear-gradient(45deg,var(--status-warning)_0_4px,transparent_4px_8px)]',
                                             )}
                                             aria-label={`${req.staff} on leave`}
                                         />

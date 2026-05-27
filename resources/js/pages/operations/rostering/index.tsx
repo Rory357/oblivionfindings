@@ -1,22 +1,23 @@
-import { Badge } from '@/components/ui/badge';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHero } from '@/components/page';
 import {
     AnalyticsPane,
     type AnalyticsTrendPoint,
     CapacityHeatmapPane,
-    CoveragePane,
     type CoverageCellState,
+    CoveragePane,
     type CoverageRow,
     DonutCard,
+    EntityFilter,
+    type EntityFilterOption,
     type FillBySite,
+    type GridConflictPeer,
     type GridShift,
     type GridShiftStatus,
     type GridStaffRow,
     type MicroStat,
     type OpenShiftCard,
     OpenShiftsPane,
+    ResolveConflictDialog,
     type ShiftTypeSlice,
     type Signal,
     SignalRail,
@@ -31,6 +32,9 @@ import {
     startOfWeek,
     weekLabel,
 } from '@/components/rostering';
+import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
 import { index as rosteringIndex } from '@/routes/operations/rostering';
 import { Head, Link, router, usePage } from '@inertiajs/react';
@@ -45,7 +49,6 @@ import {
     ChevronRight,
     LayoutGrid,
     LineChart,
-    Loader2,
     MoreHorizontal,
     PieChart,
     Plane,
@@ -55,6 +58,12 @@ import {
 import { useMemo, useRef, useState } from 'react';
 
 type Staff = { id: number; name: string; email?: string };
+type Client = {
+    id: number;
+    first_name?: string | null;
+    last_name?: string | null;
+    name?: string | null;
+};
 type Site = { id: number; name: string; type?: string | null };
 type ShiftLite = {
     id: number;
@@ -75,6 +84,7 @@ type ShiftLite = {
     tasks_total: number;
     tasks_completed: number;
     incidents_count: number;
+    timesheet_id?: number | null;
     timesheet_status: string | null;
     has_active_replacement?: boolean;
     replacement_status?: string | null;
@@ -121,6 +131,30 @@ type ReplacementQueueItem = {
     current_staff?: string | null;
     requested_by?: string | null;
     replacement_staff?: string | null;
+    open_position_id?: number | null;
+    open_position_status?: string | null;
+    open_position_claimed_by?: string | null;
+    expires_at?: string | null;
+};
+
+type RecurringPattern = {
+    id: number;
+    client?: string | null;
+    staff?: string | null;
+    service_context?: string | null;
+    location?: string | null;
+    status?: string | null;
+    shift_type?: string | null;
+    is_sleepover?: boolean;
+    is_on_call?: boolean;
+    weekdays?: unknown[];
+    starts_time?: string | null;
+    ends_time?: string | null;
+    occurrences_this_week: number;
+    open_occurrences: number;
+    active_replacement_count: number;
+    next_shift_id?: number | null;
+    next_starts_at?: string | null;
 };
 
 type CoverageAlert = {
@@ -163,8 +197,30 @@ type TimeOffEntry = {
     notes: string | null;
 };
 
+type HrLeaveEntry = {
+    id: number;
+    user_id: number;
+    user: string | null;
+    leave_type: string;
+    reason?: string | null;
+    status?: string | null;
+    starts_at: string;
+    ends_at: string;
+};
+
+type ComplianceBadge = {
+    user_id?: number | string;
+    state?: 'ok' | 'warning' | 'expired';
+    expiring?: number;
+    expired?: number;
+    expiring_count?: number;
+    expired_count?: number;
+    has_hard_stop?: boolean;
+};
+
 type Props = {
     canManageAny: boolean;
+    canApproveLeave: boolean;
     canPublishRoster: boolean;
     canAutoScheduleRoster: boolean;
     rosteringFeatures: {
@@ -183,6 +239,7 @@ type Props = {
         site_ids: number[];
     };
     staff: Staff[];
+    clients: Client[];
     sites: Site[];
     rosterPeriod: RosterPeriodSummary | null;
     stats: {
@@ -202,6 +259,7 @@ type Props = {
     };
     shifts: ShiftLite[];
     replacementQueue: ReplacementQueueItem[];
+    recurringPatterns?: RecurringPattern[];
     coverageSites: CoverageSiteSummary[];
     coverageAlerts: CoverageAlert[];
     recurringCoverageAlignment?: {
@@ -218,18 +276,9 @@ type Props = {
             client_name?: string | null;
         }>;
     };
-    approvedLeave?: Array<{
-        id: number;
-        user_id: number;
-        user: string | null;
-        leave_type: string;
-        starts_at: string;
-        ends_at: string;
-    }>;
-    complianceBadges?: Record<
-        number,
-        { state: 'ok' | 'warning' | 'expired'; expiring?: number; expired?: number }
-    >;
+    approvedLeave?: HrLeaveEntry[];
+    pendingLeave?: HrLeaveEntry[];
+    complianceBadges?: Record<number, ComplianceBadge> | ComplianceBadge[];
     timeOffs: TimeOffEntry[];
     capacity: Array<{
         user_id: number;
@@ -333,6 +382,30 @@ function initials(name: string): string {
         .toUpperCase();
 }
 
+function clientName(client: Client): string {
+    if (client.name) return client.name;
+    return (
+        [client.first_name, client.last_name].filter(Boolean).join(' ') ||
+        `Client ${client.id}`
+    );
+}
+
+function normalizeComplianceBadge(badge?: ComplianceBadge | null) {
+    if (!badge) return null;
+
+    const expired = badge.expired ?? badge.expired_count ?? 0;
+    const expiring = badge.expiring ?? badge.expiring_count ?? 0;
+    const state =
+        badge.state ??
+        (badge.has_hard_stop || expired > 0
+            ? 'expired'
+            : expiring > 0
+              ? 'warning'
+              : 'ok');
+
+    return { state, expired, expiring };
+}
+
 function statusToGridStatus(status: string): GridShiftStatus {
     if (status === 'scheduled') return 'scheduled';
     if (status === 'in_progress') return 'in_progress';
@@ -375,7 +448,56 @@ export default function RosteringIndex(props: Props) {
         'shifts' | 'open' | 'coverage' | 'timeoff' | 'capacity' | 'analytics'
     >('shifts');
     const [pickerOpen, setPickerOpen] = useState(false);
+    const [resolveConflictShift, setResolveConflictShift] =
+        useState<GridShift | null>(null);
     const todayBtnRef = useRef<HTMLButtonElement>(null);
+
+    const staffFilterItems: EntityFilterOption[] = useMemo(
+        () =>
+            (props.staff ?? []).map((staff) => ({
+                id: staff.id,
+                name: staff.name,
+                description: staff.email,
+            })),
+        [props.staff],
+    );
+    const clientFilterItems: EntityFilterOption[] = useMemo(
+        () =>
+            (props.clients ?? []).map((client) => ({
+                id: client.id,
+                name: clientName(client),
+            })),
+        [props.clients],
+    );
+    const complianceByUserId = useMemo(() => {
+        const map = new Map<
+            number,
+            {
+                state: 'ok' | 'warning' | 'expired';
+                expired: number;
+                expiring: number;
+            }
+        >();
+        const raw = props.complianceBadges ?? {};
+
+        if (Array.isArray(raw)) {
+            for (const badge of raw) {
+                const id = Number(badge.user_id);
+                const normalized = normalizeComplianceBadge(badge);
+                if (Number.isFinite(id) && normalized) {
+                    map.set(id, normalized);
+                }
+            }
+            return map;
+        }
+
+        for (const [key, badge] of Object.entries(raw)) {
+            const normalized = normalizeComplianceBadge(badge);
+            if (normalized) map.set(Number(key), normalized);
+        }
+
+        return map;
+    }, [props.complianceBadges]);
 
     /**
      * Build the standard Inertia GET payload. site_id is sent as an array so the
@@ -449,8 +571,36 @@ export default function RosteringIndex(props: Props) {
             userShifts.get(s.user_id)!.push(s);
         }
 
+        const staffById = new Map(props.staff.map((s) => [s.id, s]));
+        const toConflictPeer = (
+            shift: ShiftLite,
+            staffName: string | null,
+        ): GridConflictPeer => ({
+            id: shift.id,
+            status: statusToGridStatus(shift.status),
+            starts_at: shift.starts_at,
+            ends_at: shift.ends_at,
+            client: shift.client,
+            staff: staffName,
+            timesheet_id: shift.timesheet_id,
+            href: `/operations/shifts/${shift.id}`,
+        });
+
         // Compute staff-level conflicts (overlapping shifts for same user)
         const conflictIds = new Set<number>();
+        const conflictPeersByShiftId = new Map<number, GridConflictPeer[]>();
+        const addConflictPeer = (
+            shift: ShiftLite,
+            peer: ShiftLite,
+            staffName: string | null,
+        ) => {
+            const peers = conflictPeersByShiftId.get(shift.id) ?? [];
+            if (!peers.some((item) => item.id === peer.id)) {
+                peers.push(toConflictPeer(peer, staffName));
+            }
+            conflictPeersByShiftId.set(shift.id, peers);
+        };
+
         for (const list of userShifts.values()) {
             list.sort(
                 (a, b) =>
@@ -468,13 +618,16 @@ export default function RosteringIndex(props: Props) {
                 ) {
                     conflictIds.add(list[i].id);
                     conflictIds.add(list[i + 1].id);
+                    const staffName =
+                        staffById.get(list[i].user_id ?? 0)?.name ?? null;
+                    addConflictPeer(list[i], list[i + 1], staffName);
+                    addConflictPeer(list[i + 1], list[i], staffName);
                 }
             }
         }
 
         // Convert per-staff shifts into GridStaffRow
         const rosteredUserIds = Array.from(userShifts.keys());
-        const staffById = new Map(props.staff.map((s) => [s.id, s]));
         const rows: GridStaffRow[] = [];
         for (const id of rosteredUserIds) {
             const u = staffById.get(id);
@@ -490,8 +643,11 @@ export default function RosteringIndex(props: Props) {
                     starts_at: s.starts_at,
                     ends_at: s.ends_at,
                     client: s.client,
+                    staff: u.name,
                     conflict: conflictIds.has(s.id),
+                    conflictPeers: conflictPeersByShiftId.get(s.id) ?? [],
                     incident: (s.incidents_count ?? 0) > 0,
+                    timesheet_id: s.timesheet_id,
                     href: `/operations/shifts/${s.id}`,
                 });
             }
@@ -501,6 +657,7 @@ export default function RosteringIndex(props: Props) {
                 role: null,
                 initials: initials(u.name),
                 hue: hashHue(u.name),
+                complianceBadge: complianceByUserId.get(u.id),
                 open: false,
                 shifts: shiftsByDay,
             });
@@ -517,6 +674,7 @@ export default function RosteringIndex(props: Props) {
                 starts_at: s.starts_at,
                 ends_at: s.ends_at,
                 client: s.client,
+                timesheet_id: s.timesheet_id,
                 href: `/operations/shifts/${s.id}`,
             }));
         }
@@ -533,7 +691,7 @@ export default function RosteringIndex(props: Props) {
         }
 
         return rows;
-    }, [props.shifts, props.staff]);
+    }, [props.shifts, props.staff, complianceByUserId]);
 
     const openShifts = useMemo(
         () => props.shifts.filter((s) => s.user_id === null),
@@ -576,6 +734,12 @@ export default function RosteringIndex(props: Props) {
             label: 'Open',
             value: props.stats.open,
             color: 'var(--status-warning)',
+        },
+        {
+            key: 'cancelled',
+            label: 'Cancelled',
+            value: props.stats.cancelled,
+            color: 'var(--muted-foreground)',
         },
     ].filter((s) => s.value > 0);
 
@@ -707,7 +871,9 @@ export default function RosteringIndex(props: Props) {
         eligible.sort(
             (a, b) => a.hours - b.hours || a.name.localeCompare(b.name),
         );
-        return eligible.slice(0, limit).map((s) => ({ id: s.id, name: s.name }));
+        return eligible
+            .slice(0, limit)
+            .map((s) => ({ id: s.id, name: s.name }));
     };
 
     const openShiftCards: OpenShiftCard[] = useMemo(
@@ -815,8 +981,7 @@ export default function RosteringIndex(props: Props) {
                     };
                 }
                 const worst = b.cells.reduce(
-                    (max, a) =>
-                        a.missing_staff > max.missing_staff ? a : max,
+                    (max, a) => (a.missing_staff > max.missing_staff ? a : max),
                     b.cells[0],
                 );
                 const state: CoverageCellState =
@@ -848,10 +1013,7 @@ export default function RosteringIndex(props: Props) {
         { label: 'Windows tracked', value: totalWindows, tone: 'info' },
         {
             label: 'Partial windows',
-            value: Math.max(
-                0,
-                underWindows - (props.stats.coverage_gaps ?? 0),
-            ),
+            value: Math.max(0, underWindows - (props.stats.coverage_gaps ?? 0)),
             tone: 'warn',
         },
         {
@@ -872,12 +1034,13 @@ export default function RosteringIndex(props: Props) {
 
         for (const t of props.timeOffs ?? []) {
             const ms =
-                new Date(t.ends_at).getTime() -
-                new Date(t.starts_at).getTime();
+                new Date(t.ends_at).getTime() - new Date(t.starts_at).getTime();
             const days = Math.max(1, Math.round(ms / 86_400_000));
             const name = t.user ?? 'Staff';
             out.push({
                 id: t.id,
+                source: 'staff_time_off',
+                sourceId: t.id,
                 staff: name,
                 initials: initials(name),
                 hue: hashHue(name),
@@ -902,17 +1065,18 @@ export default function RosteringIndex(props: Props) {
 
         for (const l of props.approvedLeave ?? []) {
             const ms =
-                new Date(l.ends_at).getTime() -
-                new Date(l.starts_at).getTime();
+                new Date(l.ends_at).getTime() - new Date(l.starts_at).getTime();
             const days = Math.max(1, Math.round(ms / 86_400_000));
             const name = l.user ?? 'Staff';
             // Prefix HR leave IDs to avoid collision with StaffTimeOff IDs in the React key space.
             out.push({
                 id: 1_000_000 + l.id,
+                source: 'hr_leave',
+                sourceId: l.id,
                 staff: name,
                 initials: initials(name),
                 hue: hashHue(name),
-                reason: `HR leave · ${l.leave_type}`,
+                reason: l.reason ?? `HR leave · ${l.leave_type}`,
                 type: l.leave_type,
                 starts_at: l.starts_at,
                 ends_at: l.ends_at,
@@ -931,8 +1095,39 @@ export default function RosteringIndex(props: Props) {
             } satisfies TimeOffRequest);
         }
 
+        for (const l of props.pendingLeave ?? []) {
+            const ms =
+                new Date(l.ends_at).getTime() - new Date(l.starts_at).getTime();
+            const days = Math.max(1, Math.round(ms / 86_400_000));
+            const name = l.user ?? 'Staff';
+            out.push({
+                id: 2_000_000 + l.id,
+                source: 'hr_leave',
+                sourceId: l.id,
+                staff: name,
+                initials: initials(name),
+                hue: hashHue(name),
+                reason: l.reason ?? `HR leave · ${l.leave_type}`,
+                type: l.leave_type,
+                starts_at: l.starts_at,
+                ends_at: l.ends_at,
+                days,
+                impact: props.shifts.filter(
+                    (s) =>
+                        s.user_id === l.user_id &&
+                        rangesOverlap(
+                            s.starts_at,
+                            s.ends_at,
+                            l.starts_at,
+                            l.ends_at,
+                        ),
+                ).length,
+                status: 'pending',
+            } satisfies TimeOffRequest);
+        }
+
         return out;
-    }, [props.timeOffs, props.approvedLeave, props.shifts]);
+    }, [props.timeOffs, props.approvedLeave, props.pendingLeave, props.shifts]);
 
     const timeOffStats: MicroStat[] = [
         {
@@ -972,7 +1167,8 @@ export default function RosteringIndex(props: Props) {
                 (new Date(s.ends_at).getTime() -
                     new Date(s.starts_at).getTime()) /
                 3_600_000;
-            const arr = acc.get(s.user_id) ?? Array.from({ length: 7 }, () => 0);
+            const arr =
+                acc.get(s.user_id) ?? Array.from({ length: 7 }, () => 0);
             arr[dayIdx] = (arr[dayIdx] ?? 0) + Math.max(0, hours);
             acc.set(s.user_id, arr);
         }
@@ -988,11 +1184,12 @@ export default function RosteringIndex(props: Props) {
                     hue: hashHue(u.name),
                     days: hours.map((h) => Math.round(h)),
                     target: 40,
+                    complianceBadge: complianceByUserId.get(uid),
                 };
             })
             .filter((x): x is NonNullable<typeof x> => x != null)
             .sort((a, b) => a.name.localeCompare(b.name));
-    }, [props.shifts, props.staff, days]);
+    }, [props.shifts, props.staff, days, complianceByUserId]);
 
     const capacityHours = capacityRows.reduce(
         (sum, r) => sum + r.days.reduce((s, x) => s + x, 0),
@@ -1031,16 +1228,14 @@ export default function RosteringIndex(props: Props) {
     ];
 
     // -------- Analytics pane --------
-    const trendPoints: AnalyticsTrendPoint[] =
-        (props.analytics?.historicalTrend ?? []).map((p) => ({
-            week: p.week,
-            coverage: p.total
-                ? Math.max(
-                      80,
-                      Math.round((p.completed / p.total) * 100),
-                  )
-                : 95,
-        }));
+    const trendPoints: AnalyticsTrendPoint[] = (
+        props.analytics?.historicalTrend ?? []
+    ).map((p) => ({
+        week: p.week,
+        coverage: p.total
+            ? Math.max(80, Math.round((p.completed / p.total) * 100))
+            : 95,
+    }));
     const shiftTypeSlices: ShiftTypeSlice[] = (
         props.analytics?.shiftTypeDistribution ?? []
     )
@@ -1063,9 +1258,7 @@ export default function RosteringIndex(props: Props) {
     });
     const overtimeTrend: number[] = (
         props.analytics?.historicalTrend ?? []
-    ).map((p) =>
-        Math.max(0, Math.round(p.total * 0.05 + (p.cancelled ?? 0))),
-    );
+    ).map((p) => Math.max(0, Math.round(p.total * 0.05 + (p.cancelled ?? 0))));
     const analyticsStats: MicroStat[] = [
         {
             label: 'Avg coverage · 8w',
@@ -1092,9 +1285,7 @@ export default function RosteringIndex(props: Props) {
             label: 'Compliance expiring',
             value: props.analytics?.complianceExpiring ?? 0,
             tone:
-                (props.analytics?.complianceExpiring ?? 0) > 0
-                    ? 'warn'
-                    : 'ok',
+                (props.analytics?.complianceExpiring ?? 0) > 0 ? 'warn' : 'ok',
         },
     ];
 
@@ -1187,6 +1378,23 @@ export default function RosteringIndex(props: Props) {
                 onClick: () => setTab('coverage'),
             });
         }
+        const recurringCount = props.recurringPatterns?.length ?? 0;
+        const recurringOpen = (props.recurringPatterns ?? []).reduce(
+            (sum, pattern) => sum + (pattern.open_occurrences ?? 0),
+            0,
+        );
+        if (recurringCount > 0) {
+            list.push({
+                tone: recurringOpen > 0 ? 'warning' : 'info',
+                title: `${recurringCount} recurring series this week`,
+                body:
+                    recurringOpen > 0
+                        ? `${recurringOpen} recurring occurrence${recurringOpen === 1 ? '' : 's'} still need cover.`
+                        : 'Recurring patterns are generating this week.',
+                cta: 'Open recurring series',
+                href: '/operations/shifts/series',
+            });
+        }
         const expired = props.analytics?.complianceExpired ?? 0;
         if (expired > 0) {
             list.push({
@@ -1203,6 +1411,7 @@ export default function RosteringIndex(props: Props) {
         props.stats,
         eligibleCounts,
         props.recurringCoverageAlignment,
+        props.recurringPatterns,
         props.analytics?.complianceExpired,
     ]);
 
@@ -1214,9 +1423,9 @@ export default function RosteringIndex(props: Props) {
     const isPreviouslyPublished = Boolean(props.rosterPeriod?.published_at);
     const canRepublish = Boolean(
         props.rosterPeriod &&
-            isPreviouslyPublished &&
-            props.rosterPeriod.status !== 'published' &&
-            props.rosterPeriod.status !== 'archived',
+        isPreviouslyPublished &&
+        props.rosterPeriod.status !== 'published' &&
+        props.rosterPeriod.status !== 'archived',
     );
     const diffTotal = props.rosterPeriod?.diff_summary?.total ?? 0;
     const postPeriodAction = (
@@ -1254,10 +1463,7 @@ export default function RosteringIndex(props: Props) {
         return `/operations/reports/shifts?${params.toString()}`;
     }, [props.filters.site_id, props.weekStart, reportDateTo]);
 
-    const assignOpenShift = (
-        shiftId: number,
-        userId: number | string,
-    ) => {
+    const assignOpenShift = (shiftId: number, userId: number | string) => {
         router.post(
             `/operations/shifts/${shiftId}/assign`,
             { user_id: userId, return_to: '/operations/rostering' },
@@ -1277,6 +1483,22 @@ export default function RosteringIndex(props: Props) {
         // Route is PATCH /operations/shifts/{shift}/cancel — operations.shifts.cancel.
         router.patch(
             `/operations/shifts/${shiftId}/cancel`,
+            { return_to: '/operations/rostering' },
+            { preserveScroll: true },
+        );
+    };
+
+    const reviewLeaveRequest = (
+        request: TimeOffRequest,
+        action: 'approve' | 'decline',
+    ) => {
+        if (request.source !== 'hr_leave' || !request.sourceId) {
+            router.visit('/hr/leave');
+            return;
+        }
+
+        router.post(
+            `/hr/leave/${request.sourceId}/${action}`,
             { return_to: '/operations/rostering' },
             { preserveScroll: true },
         );
@@ -1359,10 +1581,7 @@ export default function RosteringIndex(props: Props) {
             tone: 'default' as const,
         });
     }
-    if (
-        props.rosteringFeatures.auto_schedule &&
-        props.canAutoScheduleRoster
-    ) {
+    if (props.rosteringFeatures.auto_schedule && props.canAutoScheduleRoster) {
         heroBadges.push({
             label: 'Auto-schedule ready',
             tone: 'info' as const,
@@ -1381,7 +1600,7 @@ export default function RosteringIndex(props: Props) {
                     icon={CalendarDays}
                     title={
                         <span>
-                            <span className="mb-2 flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-wider text-primary-foreground/80">
+                            <span className="mb-2 flex items-center gap-2 text-[10.5px] font-semibold tracking-wider text-primary-foreground/80 uppercase">
                                 <span
                                     aria-hidden="true"
                                     className="relative inline-flex h-2 w-2"
@@ -1483,7 +1702,8 @@ export default function RosteringIndex(props: Props) {
                                     variant="outline"
                                     className="border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10"
                                     disabled={
-                                        !props.rosteringFeatures.auto_schedule ||
+                                        !props.rosteringFeatures
+                                            .auto_schedule ||
                                         !props.filters.site_id
                                     }
                                     title={
@@ -1545,7 +1765,27 @@ export default function RosteringIndex(props: Props) {
                                     <ChevronRight className="h-3.5 w-3.5" />
                                 </button>
                             </div>
-                            <div className="flex items-center gap-2">
+                            <div className="flex flex-wrap items-center justify-end gap-2">
+                                <EntityFilter
+                                    onDark
+                                    label="Staff"
+                                    allLabel="All staff"
+                                    items={staffFilterItems}
+                                    value={props.filters.staff_id}
+                                    onChange={(next) =>
+                                        updateFilter({ staff_id: next })
+                                    }
+                                />
+                                <EntityFilter
+                                    onDark
+                                    label="Client"
+                                    allLabel="All clients"
+                                    items={clientFilterItems}
+                                    value={props.filters.client_id}
+                                    onChange={(next) =>
+                                        updateFilter({ client_id: next })
+                                    }
+                                />
                                 <SiteFilter
                                     onDark
                                     sites={props.sites ?? []}
@@ -1658,10 +1898,8 @@ export default function RosteringIndex(props: Props) {
                                 onReassign={(s) =>
                                     router.visit(`/operations/shifts/${s.id}`)
                                 }
-                                onResolveConflict={() =>
-                                    router.visit(
-                                        '/operations/rostering/conflicts',
-                                    )
+                                onResolveConflict={(s) =>
+                                    setResolveConflictShift(s)
                                 }
                                 onReportIncident={(s) =>
                                     router.visit(
@@ -1675,13 +1913,23 @@ export default function RosteringIndex(props: Props) {
                                 stats={openStats}
                                 shifts={openShiftCards}
                                 canManage={props.canManageAny}
+                                replacementRequests={props.replacementQueue}
+                                eligibilityAlerts={{
+                                    blocked:
+                                        props.eligibilityAlerts?.blocked ?? [],
+                                    warnings:
+                                        props.eligibilityAlerts?.warnings ?? [],
+                                }}
                                 onAssign={(sh, userId) =>
                                     assignOpenShift(sh.id, userId)
                                 }
-                                onBroadcast={(sh) =>
+                                onFindReplacement={(request) =>
                                     router.visit(
-                                        `/operations/shifts/${sh.id}`,
+                                        `/operations/shifts/${request.shift_id}`,
                                     )
+                                }
+                                onBroadcast={(sh) =>
+                                    router.visit(`/operations/shifts/${sh.id}`)
                                 }
                             />
                         ) : null}
@@ -1697,12 +1945,13 @@ export default function RosteringIndex(props: Props) {
                                 stats={timeOffStats}
                                 requests={timeOffRequests}
                                 weekStart={weekStartDate}
-                                canManage={props.canManageAny}
-                                // No pending requests are surfaced yet (would need the controller
-                                // to return HrLeaveRequest pending entries) — deep-link to HR leave
-                                // where approval lives.
-                                onApprove={() => router.visit('/hr/leave')}
-                                onDecline={() => router.visit('/hr/leave')}
+                                canManage={props.canApproveLeave}
+                                onApprove={(request) =>
+                                    reviewLeaveRequest(request, 'approve')
+                                }
+                                onDecline={(request) =>
+                                    reviewLeaveRequest(request, 'decline')
+                                }
                             />
                         ) : null}
                         {tab === 'capacity' ? (
@@ -1717,17 +1966,36 @@ export default function RosteringIndex(props: Props) {
                             <AnalyticsPane
                                 stats={analyticsStats}
                                 coverageTrend={trendPoints}
+                                dailyCoverage={
+                                    props.analytics?.dailyCoverage ?? []
+                                }
                                 shiftTypes={shiftTypeSlices}
                                 fillBySite={fillBySite}
                                 overtimeTrend={overtimeTrend}
                             />
                         ) : null}
                     </main>
-                    <SignalRail
-                        signals={signals}
-                        capacity={capacityRailRows}
-                    />
+                    <SignalRail signals={signals} capacity={capacityRailRows} />
                 </div>
+
+                <ResolveConflictDialog
+                    open={Boolean(resolveConflictShift)}
+                    shift={resolveConflictShift}
+                    peers={resolveConflictShift?.conflictPeers ?? []}
+                    onOpenChange={(open) => {
+                        if (!open) setResolveConflictShift(null);
+                    }}
+                    onUnassign={(shift) => {
+                        unassignShift(shift.id);
+                        setResolveConflictShift(null);
+                    }}
+                    onReassign={(shift) => {
+                        router.visit(`/operations/shifts/${shift.id}`);
+                    }}
+                    onOpenQueue={() => {
+                        router.visit('/operations/rostering/conflicts');
+                    }}
+                />
 
                 {props.rosteringFeatures.publish && props.canPublishRoster ? (
                     <Card data-test="rostering-publish-panel">

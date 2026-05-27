@@ -42,6 +42,7 @@ class RosteringController extends Controller
         abort_unless($auth && $auth->canDo('rostering.viewAny'), 403);
 
         $canManageAny = $auth->canDo('shifts.manageAny');
+        $canApproveLeave = $auth->canDo('hr.leave.approve') || $auth->canDo('hr.leave.manage');
 
         $data = $request->validated();
 
@@ -433,8 +434,35 @@ class RosteringController extends Controller
             }
         }
 
+        $leaveLookaheadEnd = $weekStart->copy()->addDays(14);
+        $approvedLeave = collect();
+        $pendingLeave = collect();
+
+        if ($canManageAny) {
+            $approvedLeave = HrLeaveRequest::query()
+                ->where('status', 'approved')
+                ->where('starts_at', '<', $leaveLookaheadEnd)
+                ->where('ends_at', '>', $weekStart)
+                ->when(! empty($data['staff_id']), fn ($query) => $query->where('user_id', $data['staff_id']))
+                ->with('user:id,name')
+                ->orderBy('starts_at')
+                ->get();
+        }
+
+        if ($canApproveLeave) {
+            $pendingLeave = HrLeaveRequest::query()
+                ->where('status', 'pending')
+                ->where('starts_at', '<', $leaveLookaheadEnd)
+                ->where('ends_at', '>', $weekStart)
+                ->when(! empty($data['staff_id']), fn ($query) => $query->where('user_id', $data['staff_id']))
+                ->with('user:id,name')
+                ->orderBy('starts_at')
+                ->get();
+        }
+
         return inertia('operations/rostering/index', [
             'canManageAny' => $canManageAny,
+            'canApproveLeave' => $canApproveLeave,
             'canPublishRoster' => $auth->canDo('rostering.publish'),
             'canAutoScheduleRoster' => $auth->canDo('rostering.autoSchedule'),
             'rosteringFeatures' => [
@@ -500,6 +528,7 @@ class RosteringController extends Controller
                     'tasks_total' => (int) ($shift->tasks_total ?? 0),
                     'tasks_completed' => (int) ($shift->tasks_completed ?? 0),
                     'incidents_count' => (int) ($shift->incidents_count ?? 0),
+                    'timesheet_id' => $ts?->id,
                     'timesheet_status' => $ts ? $ts->status : null,
                     'has_active_replacement' => (bool) $activeReplacement,
                     'replacement_status' => $activeReplacement?->status,
@@ -526,20 +555,29 @@ class RosteringController extends Controller
             ])->values(),
             'capacity' => $capacity,
 
-            // HR leave overlay: approved leave requests overlapping this week
-            'approvedLeave' => $canManageAny ? HrLeaveRequest::where('status', 'approved')
-                ->where('starts_at', '<', $weekEnd)
-                ->where('ends_at', '>', $weekStart)
-                ->with('user:id,name')
-                ->get()
+            // HR leave overlay: formal leave requests in the visible 14-day time-off window.
+            'approvedLeave' => $approvedLeave
                 ->map(fn ($l) => [
                     'id' => $l->id,
                     'user_id' => $l->user_id,
                     'user' => $l->user?->name,
                     'leave_type' => $l->leave_type,
+                    'reason' => $l->reason,
+                    'status' => $l->status,
                     'starts_at' => $l->starts_at?->toIso8601String(),
                     'ends_at' => $l->ends_at?->toIso8601String(),
-                ])->values() : [],
+                ])->values(),
+            'pendingLeave' => $pendingLeave
+                ->map(fn ($l) => [
+                    'id' => $l->id,
+                    'user_id' => $l->user_id,
+                    'user' => $l->user?->name,
+                    'leave_type' => $l->leave_type,
+                    'reason' => $l->reason,
+                    'status' => $l->status,
+                    'starts_at' => $l->starts_at?->toIso8601String(),
+                    'ends_at' => $l->ends_at?->toIso8601String(),
+                ])->values(),
 
             // HR compliance badges per staff member
             'complianceBadges' => $canManageAny ? $this->getComplianceBadges($auth->tenant_id) : [],

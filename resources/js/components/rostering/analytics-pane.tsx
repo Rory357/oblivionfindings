@@ -3,6 +3,13 @@ import { cn } from '@/lib/utils';
 import { MicroStats, type MicroStat } from './micro-stats';
 
 export type AnalyticsTrendPoint = { week: string; coverage: number };
+export type DailyCoveragePoint = {
+    day: string;
+    date: string;
+    scheduled: number;
+    filled: number;
+    open: number;
+};
 export type ShiftTypeSlice = {
     key: string;
     label: string;
@@ -14,6 +21,7 @@ export type FillBySite = { site: string; rate: number };
 export type AnalyticsPaneProps = {
     stats: MicroStat[];
     coverageTrend: AnalyticsTrendPoint[];
+    dailyCoverage?: DailyCoveragePoint[];
     shiftTypes: ShiftTypeSlice[];
     fillBySite: FillBySite[];
     overtimeTrend?: number[];
@@ -22,16 +30,22 @@ export type AnalyticsPaneProps = {
 export function AnalyticsPane({
     stats,
     coverageTrend,
+    dailyCoverage = [],
     shiftTypes,
     fillBySite,
     overtimeTrend = [],
 }: AnalyticsPaneProps) {
     const totalShifts = shiftTypes.reduce((s, x) => s + x.value, 0) || 1;
+    const maxDailyScheduled = Math.max(
+        1,
+        ...dailyCoverage.map((d) => d.scheduled),
+    );
 
     const W = 520;
     const H = 170;
     const PAD = 28;
-    const points = coverageTrend.length > 0 ? coverageTrend : [{ week: '—', coverage: 0 }];
+    const points =
+        coverageTrend.length > 0 ? coverageTrend : [{ week: '—', coverage: 0 }];
     const xs = points.map(
         (_, i) =>
             PAD +
@@ -44,11 +58,13 @@ export function AnalyticsPane({
     const yFor = (v: number) =>
         H - PAD - ((v - ymin) / (ymax - ymin)) * (H - 2 * PAD - 12);
     const linePath = points
-        .map((p, i) => `${i === 0 ? 'M' : 'L'}${xs[i]},${yFor(Math.max(ymin, Math.min(ymax, p.coverage)))}`)
+        .map(
+            (p, i) =>
+                `${i === 0 ? 'M' : 'L'}${xs[i]},${yFor(Math.max(ymin, Math.min(ymax, p.coverage)))}`,
+        )
         .join(' ');
     const areaPath =
-        linePath +
-        ` L${xs[xs.length - 1]},${H - PAD} L${xs[0]},${H - PAD} Z`;
+        linePath + ` L${xs[xs.length - 1]},${H - PAD} L${xs[0]},${H - PAD} Z`;
 
     const maxOt = Math.max(1, ...overtimeTrend);
     const otDelta =
@@ -182,6 +198,83 @@ export function AnalyticsPane({
                 <section className="rounded-[14px] border border-border bg-card p-4 shadow-sm">
                     <div className="mb-3">
                         <h3 className="text-sm font-bold tracking-tight">
+                            Daily coverage
+                        </h3>
+                        <div className="text-[11px] text-muted-foreground">
+                            Filled vs. open shifts this week
+                        </div>
+                    </div>
+                    <div className="space-y-2">
+                        {dailyCoverage.length === 0 ? (
+                            <div className="text-xs text-muted-foreground">
+                                No daily coverage data this week.
+                            </div>
+                        ) : null}
+                        {dailyCoverage.map((day) => {
+                            const filledWidth =
+                                (day.filled / maxDailyScheduled) * 100;
+                            const openWidth =
+                                (day.open / maxDailyScheduled) * 100;
+
+                            return (
+                                <div
+                                    key={day.date}
+                                    className="grid grid-cols-[48px_1fr_96px] items-center gap-2 text-xs"
+                                >
+                                    <div>
+                                        <div className="font-semibold">
+                                            {day.day}
+                                        </div>
+                                        <div className="text-[10px] text-muted-foreground">
+                                            {new Date(
+                                                `${day.date}T00:00:00`,
+                                            ).toLocaleDateString(undefined, {
+                                                day: '2-digit',
+                                                month: 'short',
+                                            })}
+                                        </div>
+                                    </div>
+                                    <div
+                                        className="flex h-2.5 overflow-hidden rounded-full bg-muted"
+                                        title={`${day.filled}/${day.scheduled} filled · ${day.open} open`}
+                                    >
+                                        <span
+                                            className="block h-full bg-status-success"
+                                            style={{
+                                                width: `${Math.max(0, filledWidth)}%`,
+                                            }}
+                                        />
+                                        <span
+                                            className="block h-full bg-status-warning"
+                                            style={{
+                                                width: `${Math.max(0, openWidth)}%`,
+                                            }}
+                                        />
+                                    </div>
+                                    <div className="text-right">
+                                        <div className="font-semibold tabular-nums">
+                                            {day.filled}/{day.scheduled} filled
+                                        </div>
+                                        <div
+                                            className={cn(
+                                                'text-[10px] tabular-nums',
+                                                day.open > 0
+                                                    ? 'text-status-warning'
+                                                    : 'text-muted-foreground',
+                                            )}
+                                        >
+                                            {day.open} open
+                                        </div>
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                </section>
+
+                <section className="rounded-[14px] border border-border bg-card p-4 shadow-sm">
+                    <div className="mb-3">
+                        <h3 className="text-sm font-bold tracking-tight">
                             Shift type mix
                         </h3>
                         <div className="text-[11px] text-muted-foreground">
@@ -217,7 +310,11 @@ export function AnalyticsPane({
                                     <span className="font-semibold tabular-nums">
                                         {t.value}
                                         <span className="ml-1 text-[10px] text-muted-foreground">
-                                            · {Math.round((t.value / totalShifts) * 100)}%
+                                            ·{' '}
+                                            {Math.round(
+                                                (t.value / totalShifts) * 100,
+                                            )}
+                                            %
                                         </span>
                                     </span>
                                 </li>
@@ -311,10 +408,7 @@ export function AnalyticsPane({
                             </div>
                         ) : null}
                         {overtimeTrend.map((v, i) => (
-                            <div
-                                key={i}
-                                className="flex flex-col items-center"
-                            >
+                            <div key={i} className="flex flex-col items-center">
                                 <span
                                     className={cn(
                                         'w-full rounded-t',
