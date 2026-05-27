@@ -73,6 +73,7 @@ class ShiftController extends Controller
                 'client:id,first_name,last_name,site_id',
                 'staff:id,name,email',
                 'site:id,name,type',
+                'tasks:id,shift_id,label,sort_order,is_completed',
             ])
             ->whereBetween('starts_at', [$start, $end])
             ->orderBy('starts_at');

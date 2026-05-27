@@ -7,13 +7,8 @@ import {
     Clock,
     Eye,
     List,
-    MoreVertical,
     Pencil,
-    Plus,
     Rotate3D,
-    Sparkles,
-    Trash,
-    User,
     UserPlus,
     Users,
     X,
@@ -374,13 +369,6 @@ export default function ShiftsIndex({
         );
     }
 
-    function deleteShift(s: ShiftRow) {
-        router.delete(showShift.url(s.id), {
-            preserveScroll: true,
-            onSuccess: () => notify('Shift deleted'),
-        });
-    }
-
     function buildMenuItems(shift: ShiftRow): ContextMenuItem[] {
         const isOpen = isOpenShift(shift);
         const inProg = shift.status === 'in_progress';
@@ -403,7 +391,7 @@ export default function ShiftsIndex({
                 label: 'Edit shift',
                 icon: Pencil,
                 onClick: () => openEdit(shift),
-                disabled: !canEdit,
+                disabled: !canEdit || completed || cancelled,
             },
             { type: 'separator' },
         ];
@@ -416,14 +404,9 @@ export default function ShiftsIndex({
                 disabled: !canEdit,
             });
             items.push({
-                label: 'Suggest best cover',
-                icon: Sparkles,
-                onClick: () => notify('Suggesting best cover…'),
-            });
-            items.push({
                 label: 'Find replacement',
                 icon: Users,
-                onClick: () => router.visit(showShift.url(shift.id) + '#replacement'),
+                onClick: () => router.visit(showShift.url(shift.id)),
             });
         } else {
             items.push({
@@ -435,7 +418,7 @@ export default function ShiftsIndex({
             items.push({
                 label: 'Find replacement',
                 icon: UserPlus,
-                onClick: () => router.visit(showShift.url(shift.id) + '#replacement'),
+                onClick: () => router.visit(showShift.url(shift.id)),
                 disabled: completed || cancelled,
             });
         }
@@ -497,16 +480,6 @@ export default function ShiftsIndex({
                         cancelShift.url(shift.id),
                         `${clientFullName(shift.client)} · cancelled`,
                     ),
-            });
-        }
-        if (draft) {
-            items.push({
-                label: 'Delete shift',
-                icon: Trash,
-                destructive: true,
-                onClick: () => {
-                    if (window.confirm('Delete this draft shift?')) deleteShift(shift);
-                },
             });
         }
         return items;
@@ -815,6 +788,15 @@ export default function ShiftsIndex({
                                   location: editShiftRow.location ?? null,
                                   is_sleepover: editShiftRow.is_sleepover,
                                   is_on_call: editShiftRow.is_on_call,
+                                  notes: editShiftRow.notes ?? null,
+                                  expected_break_minutes:
+                                      editShiftRow.expected_break_minutes ??
+                                      null,
+                                  service_context_id:
+                                      editShiftRow.service_context_id ?? null,
+                                  coverage_roles:
+                                      editShiftRow.coverage_roles ?? [],
+                                  tasks: editShiftRow.tasks ?? [],
                                   client: editShiftRow.client
                                       ? { id: editShiftRow.client.id }
                                       : null,
@@ -856,9 +838,7 @@ export default function ShiftsIndex({
                             );
                             setViewShift(null);
                         } else if (action === 'timesheet') {
-                            router.visit(
-                                showShift.url(viewShift.id) + '#timesheet',
-                            );
+                            router.visit(showShift.url(viewShift.id));
                         }
                     }}
                 />

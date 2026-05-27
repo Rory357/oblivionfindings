@@ -196,6 +196,8 @@ function ShiftRowItem({
 }) {
     const open = isOpenShift(shift);
     const inProgress = shift.status === 'in_progress';
+    const locked =
+        shift.status === 'completed' || shift.status === 'cancelled';
     const hours = shiftHours(shift.starts_at, shift.ends_at);
     const start = shiftStartTime(shift.starts_at);
     const end = shiftEndTime(shift.ends_at);
@@ -290,17 +292,19 @@ function ShiftRowItem({
                 >
                     <Eye className="h-4 w-4" />
                 </button>
-                <button
-                    type="button"
-                    onClick={(e) => {
-                        e.stopPropagation();
-                        onEditClick();
-                    }}
-                    className="hidden h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground group-hover:inline-flex"
-                    aria-label="Edit"
-                >
-                    <Pencil className="h-4 w-4" />
-                </button>
+                {locked ? null : (
+                    <button
+                        type="button"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onEditClick();
+                        }}
+                        className="hidden h-8 w-8 items-center justify-center rounded-md text-muted-foreground transition hover:bg-muted hover:text-foreground group-hover:inline-flex"
+                        aria-label="Edit"
+                    >
+                        <Pencil className="h-4 w-4" />
+                    </button>
+                )}
                 <button
                     type="button"
                     onClick={(e) => {

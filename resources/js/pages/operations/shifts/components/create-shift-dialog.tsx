@@ -85,6 +85,8 @@ export type EditableShift = {
     staff?: { id: number } | null;
     site?: { id: number; name: string } | null;
     service_context_id?: number | null;
+    coverage_roles?: string[] | null;
+    tasks?: Array<{ id: number; label: string }>;
 };
 
 type Props = {
@@ -218,8 +220,15 @@ export function CreateShiftDialog({
             initialShift?.expected_break_minutes != null
                 ? String(initialShift.expected_break_minutes)
                 : '30',
-        coverage_roles: [] as string[],
-        tasks: [] as Array<{ label: string }>,
+        // Hydrate from initialShift in edit mode so submitting doesn't wipe
+        // existing coverage roles / tasks on the server. We keep the task id
+        // for existing rows so syncShiftTasks updates them in place instead of
+        // recreating them.
+        coverage_roles: (initialShift?.coverage_roles ?? []) as string[],
+        tasks: (initialShift?.tasks?.map((t) => ({
+            id: t.id,
+            label: t.label,
+        })) ?? []) as Array<{ id?: number; label: string }>,
         repeat_weekly: false,
         repeat_end_date: '' as string,
         repeat_by_weekday: [
@@ -291,7 +300,7 @@ export function CreateShiftDialog({
     }
     function setTask(i: number, label: string) {
         const next = [...form.data.tasks];
-        next[i] = { label };
+        next[i] = { ...next[i], label };
         form.setData('tasks', next);
     }
     function removeTask(i: number) {

@@ -211,13 +211,6 @@ export function ShiftsHero({
                                     <Plus className="h-4 w-4" /> Create shift
                                 </button>
                             ) : null}
-                            <button
-                                type="button"
-                                aria-label="More"
-                                className="inline-flex h-8 w-8 items-center justify-center rounded-md border border-primary-foreground/30 text-primary-foreground transition hover:bg-primary-foreground/10"
-                            >
-                                <MoreHorizontal className="h-4 w-4" />
-                            </button>
                         </div>
 
                         <div className="grid grid-cols-4 gap-3 text-right md:gap-5">

@@ -490,10 +490,8 @@ function WeekRowContextMenu({
             icon: <Copy className="h-3.5 w-3.5" />,
             label: 'Duplicate last week here',
             sub: "Copies the prior week's pattern",
-            onClick: () => {
-                onSelect(ctx.week);
-                onPickerClose();
-            },
+            // Not yet wired — leaving the entry visible but inert so the
+            // menu is consistent with future capability work.
         },
         {
             icon: <Stamp className="h-3.5 w-3.5" />,
@@ -559,12 +557,17 @@ function WeekRowContextMenu({
                         <li
                             key={i}
                             role="menuitem"
+                            aria-disabled={!it.onClick}
                             onClick={() => {
-                                if (it.onClick) it.onClick();
+                                if (!it.onClick) return; // disabled items: leave menu open, do nothing
+                                it.onClick();
                                 onClose();
                             }}
                             className={cn(
-                                'grid grid-cols-[24px_1fr_auto] items-center gap-2.5 rounded-md px-2 py-1.5 text-[12.5px] cursor-pointer transition-colors hover:bg-accent',
+                                'grid grid-cols-[24px_1fr_auto] items-center gap-2.5 rounded-md px-2 py-1.5 text-[12.5px] transition-colors',
+                                it.onClick
+                                    ? 'cursor-pointer hover:bg-accent'
+                                    : 'cursor-not-allowed opacity-50',
                                 it.tone === 'primary' && 'text-primary',
                                 it.tone === 'critical' &&
                                     'text-status-critical',

@@ -64,6 +64,8 @@ export function ShiftDetailDialog({ open, shift, onClose, onAct, onEdit }: Props
     const open_ = isOpenShift(shift);
     const inProgress = shift.status === 'in_progress';
     const completed = shift.status === 'completed';
+    const cancelled = shift.status === 'cancelled';
+    const locked = completed || cancelled;
     const scheduled = shift.status === 'scheduled' && !!shift.staff;
 
     const dateObj = new Date(shift.starts_at);
@@ -269,7 +271,7 @@ export function ShiftDetailDialog({ open, shift, onClose, onAct, onEdit }: Props
                             >
                                 Close
                             </button>
-                            {onEdit ? (
+                            {locked ? null : onEdit ? (
                                 <button
                                     type="button"
                                     onClick={onEdit}

@@ -17,6 +17,13 @@ export type ShiftRowSite = {
     type?: string | null;
 };
 
+export type ShiftRowTask = {
+    id: number;
+    label: string;
+    sort_order?: number | null;
+    is_completed?: boolean;
+};
+
 export type ShiftRow = {
     id: number;
     starts_at: string;
@@ -26,9 +33,14 @@ export type ShiftRow = {
     shift_type?: string | null;
     is_sleepover?: boolean;
     is_on_call?: boolean;
+    notes?: string | null;
+    expected_break_minutes?: number | null;
+    service_context_id?: number | null;
+    coverage_roles?: string[] | null;
     client: ShiftRowClient;
     staff: ShiftRowStaff | null;
     site?: ShiftRowSite | null;
+    tasks?: ShiftRowTask[];
 };
 
 /** Derive the “open” state used by the UI: scheduled + no staff assigned. */
