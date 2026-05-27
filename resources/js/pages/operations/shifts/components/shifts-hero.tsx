@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useRef, useState } from 'react';
 import {
     AlertTriangle,
     Building,
@@ -33,6 +33,7 @@ import {
     PopoverTrigger,
 } from '@/components/ui/popover';
 import { MultiEntityFilter } from '@/components/rostering/multi-entity-filter';
+import { WeekPicker } from '@/components/rostering/week-picker';
 import { cn } from '@/lib/utils';
 
 export type HeroStats = {
@@ -60,6 +61,8 @@ type EntityItem = { id: number; name: string; description?: string | null };
 type Props = {
     greetingName?: string;
     weekLabel: string;
+    /** Monday of the week currently being viewed — used to seed the WeekPicker. */
+    weekStart: Date;
     stats: HeroStats;
     filters: HeroFilters;
     onChangeFilter: <K extends keyof HeroFilters>(
@@ -71,9 +74,10 @@ type Props = {
     staffItems: EntityItem[];
     clientItems: EntityItem[];
     onCreate?: () => void;
+    /** Called when the user picks a week from the calendar popover or clicks "This week". */
+    onPickWeek: (weekStart: Date) => void;
     onPrevWeek: () => void;
     onNextWeek: () => void;
-    onToday: () => void;
     onExport?: () => void;
     canCreate?: boolean;
 };
@@ -81,6 +85,7 @@ type Props = {
 export function ShiftsHero({
     greetingName,
     weekLabel,
+    weekStart,
     stats,
     filters,
     onChangeFilter,
@@ -91,10 +96,12 @@ export function ShiftsHero({
     onCreate,
     onPrevWeek,
     onNextWeek,
-    onToday,
+    onPickWeek,
     onExport,
     canCreate = true,
 }: Props) {
+    const weekBtnRef = useRef<HTMLButtonElement | null>(null);
+    const [pickerOpen, setPickerOpen] = useState(false);
     return (
         <div
             className="relative overflow-hidden rounded-2xl text-primary-foreground"
@@ -240,8 +247,14 @@ export function ShiftsHero({
                     <HeroPillBtn onClick={onPrevWeek}>
                         <ChevronLeft className="h-3.5 w-3.5" /> Prev week
                     </HeroPillBtn>
-                    <HeroPillBtn onClick={onToday} solid>
-                        <CalendarRange className="h-3.5 w-3.5" /> {weekLabel}
+                    <HeroPillBtn
+                        buttonRef={weekBtnRef}
+                        onClick={() => setPickerOpen((v) => !v)}
+                        solid
+                        ariaHasPopup="dialog"
+                        ariaExpanded={pickerOpen}
+                    >
+                        <CalendarRange className="h-3.5 w-3.5" /> {weekLabel} · pick week
                         <ChevronDown className="h-3 w-3" />
                     </HeroPillBtn>
                     <HeroPillBtn onClick={onNextWeek}>
@@ -285,6 +298,17 @@ export function ShiftsHero({
                     />
                 </div>
             </div>
+
+            {pickerOpen ? (
+                <WeekPicker
+                    selectedWeekStart={weekStart}
+                    anchorRef={weekBtnRef}
+                    onSelect={(next) => {
+                        onPickWeek(next);
+                    }}
+                    onClose={() => setPickerOpen(false)}
+                />
+            ) : null}
         </div>
     );
 }
@@ -342,15 +366,24 @@ function HeroPillBtn({
     children,
     onClick,
     solid,
+    buttonRef,
+    ariaHasPopup,
+    ariaExpanded,
 }: {
     children: React.ReactNode;
     onClick?: () => void;
     solid?: boolean;
+    buttonRef?: React.RefObject<HTMLButtonElement | null>;
+    ariaHasPopup?: 'dialog' | 'menu' | 'listbox';
+    ariaExpanded?: boolean;
 }) {
     return (
         <button
+            ref={buttonRef}
             type="button"
             onClick={onClick}
+            aria-haspopup={ariaHasPopup}
+            aria-expanded={ariaExpanded}
             className={[
                 'inline-flex items-center gap-1.5 whitespace-nowrap rounded-md px-3 py-1.5 text-xs font-semibold transition',
                 solid

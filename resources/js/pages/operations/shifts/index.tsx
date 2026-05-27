@@ -580,7 +580,15 @@ export default function ShiftsIndex({
                     onCreate={() => openCreate()}
                     onPrevWeek={() => gotoWeek(addDaysIso(filters.from, -7))}
                     onNextWeek={() => gotoWeek(addDaysIso(filters.from, 7))}
-                    onToday={() => gotoWeek(todayKey)}
+                    weekStart={
+                        new Date(weekStartFor(filters.from) + 'T00:00:00')
+                    }
+                    onPickWeek={(d) => {
+                        const yyyy = d.getFullYear();
+                        const mm = String(d.getMonth() + 1).padStart(2, '0');
+                        const dd = String(d.getDate()).padStart(2, '0');
+                        gotoWeek(`${yyyy}-${mm}-${dd}`);
+                    }}
                 />
 
                 <div className="grid grid-cols-1 gap-3 md:grid-cols-3">
