@@ -419,7 +419,10 @@ class RosteringController extends Controller
         $openShiftEligibility = [];
         if ($canManageAny) {
             $eligibilityAlerts = $this->buildEligibilityAlerts();
-            $openShiftEligibility = $this->buildOpenShiftEligibility($shifts->whereNull('user_id'));
+            $openShiftEligibility = $this->buildOpenShiftEligibility(
+                $shifts->whereNull('user_id'),
+                $staff,
+            );
         }
 
         $publishEnabled = $this->featureFlags->publishEnabled($auth->organization_id);
@@ -1118,31 +1121,37 @@ class RosteringController extends Controller
     /**
      * Build per-candidate eligibility entries for the visible open shifts.
      *
-     * For each open shift we ask the eligibility service for a cheap prefilter
-     * shortlist, evaluate the top candidates, and only emit warning/blocked
-     * results. Eligible candidates are omitted — the UI treats absence as
-     * eligible to keep the payload small.
+     * The map is keyed by `(shift_id, user_id)` and only contains entries
+     * with status `warning` or `blocked`. Eligible candidates are omitted
+     * — the UI treats absence as eligible to keep the payload small.
+     *
+     * We iterate the same staff pool the page exposes as `props.staff`
+     * (loaded from `User::staff()`) so the IDs line up with what the JS
+     * chip renderer iterates. Full User models are reloaded by ID because
+     * the controller's $staff collection only selects [id, name, email]
+     * and the rule classes lazy-load extra relations.
      *
      * @param  iterable<\App\Models\Shift>  $openShifts
+     * @param  iterable<\App\Models\User>   $staffPool
      * @return array<int, array<int, array{status: string, reasons: array<int, string>}>>
      */
-    protected function buildOpenShiftEligibility(iterable $openShifts, int $candidateLimit = 8): array
+    protected function buildOpenShiftEligibility(iterable $openShifts, iterable $staffPool): array
     {
+        $staffIds = collect($staffPool)->pluck('id')->filter()->values();
+        if ($staffIds->isEmpty()) {
+            return [];
+        }
+
+        $candidates = User::query()->whereIn('id', $staffIds->all())->get();
+        if ($candidates->isEmpty()) {
+            return [];
+        }
+
         $eligibility = app(ShiftStaffEligibilityService::class);
         $result = [];
 
         foreach ($openShifts as $shift) {
             if (! $shift->starts_at || ! $shift->ends_at) {
-                continue;
-            }
-
-            try {
-                $candidates = $eligibility->candidatesFor($shift)->take($candidateLimit);
-            } catch (\Throwable $e) {
-                Log::warning('Per-candidate eligibility prefilter failed', [
-                    'shift_id' => $shift->id,
-                    'error' => $e->getMessage(),
-                ]);
                 continue;
             }
 
