@@ -679,6 +679,9 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     Route::post('/shifts/{shift}/unassign', [ShiftController::class, 'unassign'])
         ->middleware('permission:shifts.manageAny')
         ->name('operations.shifts.unassign');
+    Route::post('/shifts/{shift}/auto-fill', [ShiftController::class, 'autoFill'])
+        ->middleware('permission:shifts.manageAny')
+        ->name('operations.shifts.autoFill');
 
     // Shift lifecycle
     Route::patch('/shifts/{shift}/start', [ShiftController::class, 'start'])
@@ -693,6 +696,15 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     Route::patch('/shifts/{shift}/reopen', [ShiftController::class, 'reopenOccurrence'])
         ->middleware('permission:shifts.manageAny')
         ->name('operations.shifts.reopen');
+    Route::patch('/shifts/{shift}/publish', [ShiftController::class, 'publishShift'])
+        ->middleware('permission:shifts.manageAny')
+        ->name('operations.shifts.publishShift');
+    Route::post('/shifts/{shift}/promote-to-series', [ShiftController::class, 'promoteToSeries'])
+        ->middleware('permission:shifts.manageAny')
+        ->name('operations.shifts.promoteToSeries');
+    Route::post('/shifts/{shift}/broadcast', [ShiftController::class, 'broadcastNeedsCover'])
+        ->middleware('permission:shifts.manageAny')
+        ->name('operations.shifts.broadcast');
     Route::post('/shifts/{shift}/replacement-request', [ShiftController::class, 'requestReplacement'])
         ->middleware('permission:shifts.update|shifts.manageAny')
         ->name('operations.shifts.replacement.request');

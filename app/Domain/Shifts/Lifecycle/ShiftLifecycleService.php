@@ -382,16 +382,18 @@ class ShiftLifecycleService
         return $result['shift'];
     }
 
-    public function reopen(Shift $shift, User $actor): Shift
+    public function reopen(Shift $shift, User $actor, ?string $reason = null): Shift
     {
-        if ($shift->status !== 'cancelled') {
+        if (! in_array($shift->status, ['cancelled', 'completed'], true)) {
             return $shift->fresh() ?? $shift;
         }
 
-        return DB::transaction(function () use ($shift) {
+        $wasCompleted = $shift->status === 'completed';
+
+        return DB::transaction(function () use ($shift, $actor, $reason, $wasCompleted) {
             $locked = Shift::query()->lockForUpdate()->findOrFail($shift->id);
 
-            if ($locked->status !== 'cancelled') {
+            if (! in_array($locked->status, ['cancelled', 'completed'], true)) {
                 return $locked->fresh() ?? $locked;
             }
 
@@ -402,16 +404,46 @@ class ShiftLifecycleService
                 ),
                 'actual_starts_at' => null,
                 'actual_ends_at' => null,
+                'started_by' => null,
+                'completed_by' => null,
             ]);
 
             TimelineEvent::query()
-                ->where('type', ShiftTimelineService::CANCELLED_EVENT_TYPE)
+                ->where('type', $wasCompleted
+                    ? ShiftTimelineService::COMPLETED_EVENT_TYPE
+                    : ShiftTimelineService::CANCELLED_EVENT_TYPE)
                 ->where('source_type', Shift::class)
                 ->where('source_id', $locked->id)
                 ->delete();
 
             $fresh = $locked->fresh() ?? $locked;
             $this->timelineService->syncSnapshot($fresh);
+
+            // Audit entry capturing who reopened it and why. We reuse
+            // the snapshot event with a synthetic 'reopened' meta so the
+            // event remains visible in the shift timeline without
+            // introducing a new event type.
+            TimelineEvent::create([
+                'type' => 'shift_reopened',
+                'source_type' => Shift::class,
+                'source_id' => $fresh->id,
+                'occurred_at' => now(),
+                'actor_user_id' => $actor->id,
+                'client_id' => $fresh->client_id,
+                'shift_id' => $fresh->id,
+                'site_id' => $fresh->site_id ?: $fresh->client?->site_id,
+                'subject' => 'Shift reopened',
+                'body' => $reason
+                    ? 'Reopened from '.($wasCompleted ? 'completed' : 'cancelled').'. Reason: '.$reason
+                    : 'Reopened from '.($wasCompleted ? 'completed' : 'cancelled').'.',
+                'meta' => array_filter([
+                    'event' => 'reopened',
+                    'previous_status' => $wasCompleted ? 'completed' : 'cancelled',
+                    'reason' => $reason,
+                ], fn ($value) => $value !== null && $value !== ''),
+                'visibility' => 'internal',
+                'created_by' => $actor->id,
+            ]);
 
             return $fresh;
         });

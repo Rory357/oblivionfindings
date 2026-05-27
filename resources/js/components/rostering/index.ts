@@ -27,6 +27,31 @@ export {
     type ReplacementRequestCard,
 } from './open-shifts-pane';
 export {
+    BroadcastDialog,
+    type BroadcastDialogProps,
+    type BroadcastShift,
+} from './broadcast-dialog';
+export {
+    CopyToDayDialog,
+    type CopyToDayDialogProps,
+    type CopyToDayShift,
+} from './copy-to-day-dialog';
+export {
+    MakeRecurringDialog,
+    type MakeRecurringDialogProps,
+    type MakeRecurringShift,
+} from './make-recurring-dialog';
+export {
+    MarkEndedEarlyDialog,
+    type MarkEndedEarlyDialogProps,
+    type MarkEndedEarlyShift,
+} from './mark-ended-early-dialog';
+export {
+    ReopenForCorrectionDialog,
+    type ReopenForCorrectionDialogProps,
+    type ReopenForCorrectionShift,
+} from './reopen-for-correction-dialog';
+export {
     ResolveConflictDialog,
     type ResolveConflictDialogProps,
     type ResolveConflictShift,

@@ -407,6 +407,49 @@ describe('rostering redesign follow-up wiring', () => {
         );
     });
 
+    it('offers a copy-to-day action alongside duplicate for editable shifts', () => {
+        const onCopyShiftToDay = vi.fn();
+
+        render(
+            <WeekGridPane
+                days={weekDays}
+                rows={[
+                    {
+                        id: 7,
+                        name: 'Aroha King',
+                        role: null,
+                        initials: 'AK',
+                        hue: 120,
+                        shifts: {
+                            '2026-05-04': [
+                                {
+                                    id: 44,
+                                    status: 'scheduled',
+                                    starts_at: '2026-05-04T09:00:00+12:00',
+                                    ends_at: '2026-05-04T13:00:00+12:00',
+                                    client: 'Ari Kauri',
+                                    href: '/operations/shifts/44',
+                                },
+                            ],
+                        },
+                    },
+                ]}
+                todayKey={null}
+                canManage
+                onCopyShiftToDay={onCopyShiftToDay}
+            />,
+        );
+
+        fireEvent.contextMenu(screen.getByText('Ari Kauri'));
+
+        fireEvent.click(
+            screen.getByRole('menuitem', { name: /Copy to day…/i }),
+        );
+        expect(onCopyShiftToDay).toHaveBeenCalledWith(
+            expect.objectContaining({ id: 44, status: 'scheduled' }),
+        );
+    });
+
     it('offers a duplicate action for editable scheduled shifts', () => {
         const onDuplicateShift = vi.fn();
 

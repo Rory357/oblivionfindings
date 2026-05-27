@@ -17,6 +17,16 @@ import {
     type MicroStat,
     type OpenShiftCard,
     OpenShiftsPane,
+    CopyToDayDialog,
+    type CopyToDayShift,
+    BroadcastDialog,
+    type BroadcastShift,
+    MakeRecurringDialog,
+    type MakeRecurringShift,
+    MarkEndedEarlyDialog,
+    type MarkEndedEarlyShift,
+    ReopenForCorrectionDialog,
+    type ReopenForCorrectionShift,
     ResolveConflictDialog,
     type ShiftTypeSlice,
     type Signal,
@@ -457,6 +467,16 @@ export default function RosteringIndex(props: Props) {
     const [pickerOpen, setPickerOpen] = useState(false);
     const [resolveConflictShift, setResolveConflictShift] =
         useState<GridShift | null>(null);
+    const [copyToDayShift, setCopyToDayShift] =
+        useState<CopyToDayShift | null>(null);
+    const [markEndedEarlyShift, setMarkEndedEarlyShift] =
+        useState<MarkEndedEarlyShift | null>(null);
+    const [reopenForCorrectionShift, setReopenForCorrectionShift] =
+        useState<ReopenForCorrectionShift | null>(null);
+    const [makeRecurringShift, setMakeRecurringShift] =
+        useState<MakeRecurringShift | null>(null);
+    const [broadcastShift, setBroadcastShift] =
+        useState<BroadcastShift | null>(null);
     const todayBtnRef = useRef<HTMLButtonElement>(null);
 
     const staffFilterItems: EntityFilterOption[] = useMemo(
@@ -1510,6 +1530,79 @@ export default function RosteringIndex(props: Props) {
         );
     };
 
+    const copyShiftToDay = (shiftId: number, date: string) => {
+        router.post(
+            `/operations/shifts/${shiftId}/duplicate`,
+            { date, return_to: '/operations/rostering' },
+            { preserveScroll: true },
+        );
+    };
+
+    const markShiftEndedEarly = (shiftId: number, reason: string) => {
+        router.patch(
+            `/operations/shifts/${shiftId}/complete`,
+            {
+                ended_early_reason: reason,
+                final_note_body: `Ended early: ${reason}`,
+                allow_incomplete_tasks: true,
+                incomplete_tasks_reason: `Ended early: ${reason}`,
+                handover_waiver_reason: `Ended early: ${reason}`,
+            },
+            { preserveScroll: true },
+        );
+    };
+
+    const autoFillShift = (shiftId: number) => {
+        if (
+            !window.confirm(
+                'Auto-fill this open shift with the best-match eligible staff?',
+            )
+        )
+            return;
+        router.post(
+            `/operations/shifts/${shiftId}/auto-fill`,
+            { return_to: '/operations/rostering' },
+            { preserveScroll: true },
+        );
+    };
+
+    const reopenCompletedShift = (shiftId: number, reason: string) => {
+        router.patch(
+            `/operations/shifts/${shiftId}/reopen`,
+            { reason },
+            { preserveScroll: true },
+        );
+    };
+
+    const publishShift = (shiftId: number) => {
+        if (!window.confirm('Publish this draft shift?')) return;
+        router.patch(
+            `/operations/shifts/${shiftId}/publish`,
+            {},
+            { preserveScroll: true },
+        );
+    };
+
+    const promoteShiftToSeries = (
+        shiftId: number,
+        weekdays: number[],
+        endDate: string,
+    ) => {
+        router.post(
+            `/operations/shifts/${shiftId}/promote-to-series`,
+            { weekdays, end_date: endDate },
+            { preserveScroll: true },
+        );
+    };
+
+    const broadcastNeedsCover = (shiftId: number, message: string | null) => {
+        router.post(
+            `/operations/shifts/${shiftId}/broadcast`,
+            message ? { message } : {},
+            { preserveScroll: true },
+        );
+    };
+
     const reopenShift = (shiftId: number) => {
         if (
             !window.confirm(
@@ -1949,6 +2042,69 @@ export default function RosteringIndex(props: Props) {
                                         ? (s) => duplicateShift(s.id)
                                         : undefined
                                 }
+                                onCopyShiftToDay={
+                                    props.canManageAny
+                                        ? (s) =>
+                                              setCopyToDayShift({
+                                                  id: s.id,
+                                                  starts_at: s.starts_at,
+                                                  client: s.client,
+                                              })
+                                        : undefined
+                                }
+                                onMarkEndedEarly={
+                                    props.canManageAny
+                                        ? (s) =>
+                                              setMarkEndedEarlyShift({
+                                                  id: s.id,
+                                                  starts_at: s.starts_at,
+                                                  client: s.client,
+                                                  staff: s.staff ?? null,
+                                              })
+                                        : undefined
+                                }
+                                onAutoFillShift={
+                                    props.canManageAny
+                                        ? (s) => autoFillShift(s.id)
+                                        : undefined
+                                }
+                                onReopenCompletedForCorrection={
+                                    props.canManageAny
+                                        ? (s) =>
+                                              setReopenForCorrectionShift({
+                                                  id: s.id,
+                                                  starts_at: s.starts_at,
+                                                  client: s.client,
+                                                  staff: s.staff ?? null,
+                                              })
+                                        : undefined
+                                }
+                                onPublishShift={
+                                    props.canManageAny
+                                        ? (s) => publishShift(s.id)
+                                        : undefined
+                                }
+                                onMakeRecurring={
+                                    props.canManageAny
+                                        ? (s) =>
+                                              setMakeRecurringShift({
+                                                  id: s.id,
+                                                  starts_at: s.starts_at,
+                                                  client: s.client,
+                                              })
+                                        : undefined
+                                }
+                                onBroadcastShift={
+                                    props.canManageAny
+                                        ? (s) =>
+                                              setBroadcastShift({
+                                                  id: s.id,
+                                                  starts_at: s.starts_at,
+                                                  client: s.client,
+                                                  site: null,
+                                              })
+                                        : undefined
+                                }
                                 onReopenShift={
                                     props.canManageAny
                                         ? (s) => reopenShift(s.id)
@@ -2045,6 +2201,66 @@ export default function RosteringIndex(props: Props) {
                     }}
                     onOpenQueue={() => {
                         router.visit('/operations/rostering/conflicts');
+                    }}
+                />
+
+                <CopyToDayDialog
+                    open={Boolean(copyToDayShift)}
+                    shift={copyToDayShift}
+                    onOpenChange={(open) => {
+                        if (!open) setCopyToDayShift(null);
+                    }}
+                    onConfirm={(shift, date) => {
+                        copyShiftToDay(shift.id, date);
+                        setCopyToDayShift(null);
+                    }}
+                />
+
+                <MarkEndedEarlyDialog
+                    open={Boolean(markEndedEarlyShift)}
+                    shift={markEndedEarlyShift}
+                    onOpenChange={(open) => {
+                        if (!open) setMarkEndedEarlyShift(null);
+                    }}
+                    onConfirm={(shift, reason) => {
+                        markShiftEndedEarly(shift.id, reason);
+                        setMarkEndedEarlyShift(null);
+                    }}
+                />
+
+                <ReopenForCorrectionDialog
+                    open={Boolean(reopenForCorrectionShift)}
+                    shift={reopenForCorrectionShift}
+                    onOpenChange={(open) => {
+                        if (!open) setReopenForCorrectionShift(null);
+                    }}
+                    onConfirm={(shift, reason) => {
+                        reopenCompletedShift(shift.id, reason);
+                        setReopenForCorrectionShift(null);
+                    }}
+                />
+
+                <MakeRecurringDialog
+                    open={Boolean(makeRecurringShift)}
+                    shift={makeRecurringShift}
+                    onOpenChange={(open) => {
+                        if (!open) setMakeRecurringShift(null);
+                    }}
+                    onConfirm={(shift, weekdays, endDate) => {
+                        promoteShiftToSeries(shift.id, weekdays, endDate);
+                        setMakeRecurringShift(null);
+                    }}
+                />
+
+                <BroadcastDialog
+                    open={Boolean(broadcastShift)}
+                    shift={broadcastShift}
+                    onOpenChange={(open) => {
+                        if (!open) setBroadcastShift(null);
+                    }}
+                    onConfirm={(shift, message) => {
+                        broadcastNeedsCover(shift.id, message);
+                        setBroadcastShift(null);
                     }}
                 />
 

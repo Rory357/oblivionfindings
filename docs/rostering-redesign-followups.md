@@ -193,15 +193,7 @@ These labels are still deliberately not kept as inert menu items: Copy to anothe
 
 The week-grid context menu deliberately omits these labels until each has a controller endpoint + permission check + a focused feature test. The product decision for each is open.
 
-| Action                                 | Where it would slot in                          | What's missing                                                                                                                                                                                                                                          |
-| -------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Copy to another day** (date picker)  | `buildShiftActions()` scheduled / draft branch  | Duplicate-as-draft is shipped. A separate "Copy to day…" variant that takes a target date would reuse the same controller but needs a date-picker affordance. Treat as polish on top of Duplicate.                                                       |
-| **Make recurring** (one-off → series)  | `buildShiftActions()` scheduled branch          | New `POST /operations/shifts/{shift}/promote-to-series` that hands off to `ShiftSeriesService`. Must define the recurrence input UI before wiring.                                                                                                      |
-| **Broadcast to staff**                 | `buildShiftActions()` open branch + Open pane   | A notification service that pushes "shift needs cover" alerts to an eligible pool. No comparable broadcast endpoint exists for rostering shifts.                                                                                                        |
-| **Auto-fill best match** (single)      | `buildShiftActions()` open branch               | Per-shift assign-best variant of `RosterSuggestionService` (`POST /operations/shifts/{shift}/auto-fill`). Today's `Auto-schedule` button is week-level only.                                                                                            |
-| **Publish draft** (per shift)          | `buildShiftActions()` draft branch              | Currently publishing is per roster period via `/operations/rostering/periods/{period}/publish`. A per-shift draft → published transition would need a new `Shift.status` state machine or a wrapper that bumps just the relevant period.               |
-| **Reopen for correction** (completed)  | `buildShiftActions()` completed branch          | `PATCH /operations/shifts/{shift}/reopen` exists but is cancelled-only (`if ($shift->status !== 'cancelled') return back()`). Reopening completed shifts would need a new state-machine path on `ShiftLifecycleService` plus an audit trail entry.       |
-| **Mark as ended early** (in-progress)  | `buildShiftActions()` in_progress branch        | Closest existing route is `PATCH /operations/shifts/{shift}/complete`. Would need an `ended_early_reason` field on the request and a service-side audit trail entry.                                                                                    |
+All previously-listed backend-needed items are now shipped — see the "Backlog cleanup pass (2026-05-27)" section below.
 
 ### Needs a richer backend payload
 
@@ -334,6 +326,39 @@ Modified:
   app/Http/Controllers/ShiftController.php               ← +assertCanAccessShift in reopenOccurrence
   resources/js/pages/operations/rostering/index.tsx      ← gate onReopenShift on canManageAny; drop unused return_to
   docs/rostering-redesign-followups.md                   ← reflect 1c6aefda + the three audit fixes
+```
+
+### Backlog cleanup pass (Claude, 2026-05-27)
+
+Shipped every previously-listed backend-needed and polish item in one pass:
+
+1. **Copy to another day** — date-picker dialog `CopyToDayDialog` reuses the existing `POST /operations/shifts/{shift}/duplicate` (already accepted a `date` param). Menu item "Copy to day…" on scheduled / draft / in-progress shifts.
+2. **Mark ended early** (in-progress) — new `ended_early_reason` field on `CompleteShiftData` flows through `timelineMeta` so the early-end shows on the audit trail. Dialog `MarkEndedEarlyDialog` collects the reason. Submits to existing `PATCH /operations/shifts/{shift}/complete` with the populated note + waiver fields.
+3. **Per-shift auto-fill best match** — new `POST /operations/shifts/{shift}/auto-fill` that uses `ShiftStaffEligibilityService::candidatesFor()` + `evaluate()` to pick the first fully-eligible candidate (warning-only candidates are a fallback) and assigns via `ShiftLifecycleService::assign`. Menu item "Auto-fill best match" on open shifts.
+4. **Completed-shift reopen for correction** — `ShiftLifecycleService::reopen()` now handles both `cancelled` and `completed` source statuses, clears actual_starts_at / actual_ends_at / started_by / completed_by, records a `shift_reopened` `TimelineEvent` with the reason for audit. Controller requires a non-empty reason for completed-shift reopen. Dialog `ReopenForCorrectionDialog`.
+5. **Per-shift publish** — new `PATCH /operations/shifts/{shift}/publish` transitions draft shifts to scheduled (or keeps them as open when unassigned) and sets `published_at`. Menu item "Publish shift" on draft shifts.
+6. **Make recurring** (one-off → series) — new `POST /operations/shifts/{shift}/promote-to-series` accepting `weekdays[]` (0–6) and `end_date`. Creates a `ShiftSeries` from the source shift's client/site/staff/time/coverage and links the source shift via `shift_series_id`. Dialog `MakeRecurringDialog` provides weekday toggles and an end-date picker. Future occurrences are NOT auto-generated; the existing scheduler tool generates them from the series definition.
+7. **Broadcast to staff** — new `POST /operations/shifts/{shift}/broadcast` finds eligible candidates via `ShiftStaffEligibilityService::candidatesFor()` and notifies each via the new `ShiftBroadcastNotification` (database + mail channels). Dialog `BroadcastDialog` collects an optional message. Menu item "Broadcast to staff…" on open shifts.
+
+```text
+Modified:
+  app/Domain/Shifts/Lifecycle/Data/CompleteShiftData.php             ← +endedEarlyReason; populates timelineMeta
+  app/Domain/Shifts/Lifecycle/ShiftLifecycleService.php              ← reopen() handles completed; records shift_reopened
+  app/Http/Controllers/ShiftController.php                           ← +autoFill, +publishShift, +promoteToSeries, +broadcastNeedsCover; reopenOccurrence accepts reason
+  resources/js/components/rostering/index.ts                         ← re-exports new dialog components
+  resources/js/components/rostering/week-grid-pane.tsx               ← +Copy to day, Mark ended early, Auto-fill, Publish, Make recurring, Broadcast, Reopen for correction menu items
+  resources/js/pages/operations/rostering/index.tsx                  ← state + handlers + dialog renders for all new actions
+  routes/operations.php                                              ← +5 new routes (auto-fill, publish, promote-to-series, broadcast)
+  docs/rostering-redesign-followups.md                               ← retire the backend-needed table
+
+New:
+  app/Notifications/ShiftBroadcastNotification.php                   ← shift-needs-cover notification
+  resources/js/components/rostering/broadcast-dialog.tsx
+  resources/js/components/rostering/copy-to-day-dialog.tsx
+  resources/js/components/rostering/make-recurring-dialog.tsx
+  resources/js/components/rostering/mark-ended-early-dialog.tsx
+  resources/js/components/rostering/reopen-for-correction-dialog.tsx
+  tests/Feature/Rostering/AutoFillShiftTest.php
 ```
 
 ### Per-candidate eligibility reasons pass (Claude, 2026-05-27)

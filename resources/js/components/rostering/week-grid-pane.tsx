@@ -4,10 +4,13 @@ import {
     Copy,
     Edit3,
     FileText,
+    Megaphone,
     Minus,
     Play,
     Plus,
     RefreshCcw,
+    Repeat,
+    Send,
     Users,
     X,
 } from 'lucide-react';
@@ -87,7 +90,14 @@ export type WeekGridPaneProps = {
     onResolveConflict?: (shift: GridShift) => void;
     onReassign?: (shift: GridShift) => void;
     onDuplicateShift?: (shift: GridShift) => void;
+    onCopyShiftToDay?: (shift: GridShift) => void;
     onReopenShift?: (shift: GridShift) => void;
+    onMarkEndedEarly?: (shift: GridShift) => void;
+    onAutoFillShift?: (shift: GridShift) => void;
+    onReopenCompletedForCorrection?: (shift: GridShift) => void;
+    onPublishShift?: (shift: GridShift) => void;
+    onMakeRecurring?: (shift: GridShift) => void;
+    onBroadcastShift?: (shift: GridShift) => void;
     onReportIncident?: (shift: GridShift) => void;
     actionEndSlot?: ReactNode;
 };
@@ -169,7 +179,14 @@ function buildShiftActions(
         onResolveConflict?: (s: GridShift) => void;
         onReassign?: (s: GridShift) => void;
         onDuplicateShift?: (s: GridShift) => void;
+        onCopyShiftToDay?: (s: GridShift) => void;
         onReopenShift?: (s: GridShift) => void;
+        onMarkEndedEarly?: (s: GridShift) => void;
+        onAutoFillShift?: (s: GridShift) => void;
+        onReopenCompletedForCorrection?: (s: GridShift) => void;
+        onPublishShift?: (s: GridShift) => void;
+        onMakeRecurring?: (s: GridShift) => void;
+        onBroadcastShift?: (s: GridShift) => void;
         onReportIncident?: (s: GridShift) => void;
     },
 ): ShiftCtxItem[] {
@@ -190,14 +207,22 @@ function buildShiftActions(
         },
     });
     const pushDuplicateAction = () => {
-        if (!callbacks.onDuplicateShift) return;
-
-        items.push({
-            icon: <Copy className="h-3.5 w-3.5" />,
-            label: 'Duplicate as draft',
-            sub: 'Creates an unassigned copy',
-            onClick: () => callbacks.onDuplicateShift?.(shift),
-        });
+        if (callbacks.onDuplicateShift) {
+            items.push({
+                icon: <Copy className="h-3.5 w-3.5" />,
+                label: 'Duplicate as draft',
+                sub: 'Creates an unassigned copy',
+                onClick: () => callbacks.onDuplicateShift?.(shift),
+            });
+        }
+        if (callbacks.onCopyShiftToDay) {
+            items.push({
+                icon: <Copy className="h-3.5 w-3.5" />,
+                label: 'Copy to day…',
+                sub: 'Pick a target date for the copy',
+                onClick: () => callbacks.onCopyShiftToDay?.(shift),
+            });
+        }
     };
 
     if (shift.conflict) {
@@ -220,6 +245,22 @@ function buildShiftActions(
             kbd: '↵',
             onClick: () => callbacks.onAssignOpen?.(shift),
         });
+        if (callbacks.onAutoFillShift) {
+            items.push({
+                icon: <RefreshCcw className="h-3.5 w-3.5" />,
+                label: 'Auto-fill best match',
+                sub: 'Assign the top eligible candidate',
+                onClick: () => callbacks.onAutoFillShift?.(shift),
+            });
+        }
+        if (callbacks.onBroadcastShift) {
+            items.push({
+                icon: <Megaphone className="h-3.5 w-3.5" />,
+                label: 'Broadcast to staff…',
+                sub: 'Notify every eligible candidate',
+                onClick: () => callbacks.onBroadcastShift?.(shift),
+            });
+        }
         items.push({ sep: true });
         items.push({
             icon: <Edit3 className="h-3.5 w-3.5" />,
@@ -265,6 +306,14 @@ function buildShiftActions(
                 window.location.href = detailHref;
             },
         });
+        if (callbacks.onMarkEndedEarly) {
+            items.push({
+                icon: <AlertTriangle className="h-3.5 w-3.5" />,
+                label: 'Mark ended early…',
+                sub: 'Complete now with a reason',
+                onClick: () => callbacks.onMarkEndedEarly?.(shift),
+            });
+        }
         items.push({ sep: true });
         items.push({
             icon: <AlertTriangle className="h-3.5 w-3.5" />,
@@ -289,6 +338,15 @@ function buildShiftActions(
                     : detailHref;
             },
         });
+        if (callbacks.onReopenCompletedForCorrection) {
+            items.push({
+                icon: <RefreshCcw className="h-3.5 w-3.5" />,
+                label: 'Reopen for correction…',
+                sub: 'Revert and amend with a reason',
+                onClick: () =>
+                    callbacks.onReopenCompletedForCorrection?.(shift),
+            });
+        }
         items.push({
             icon: <AlertTriangle className="h-3.5 w-3.5" />,
             label: 'Report incident',
@@ -319,7 +377,24 @@ function buildShiftActions(
                 editHref,
             ),
         );
+        if (callbacks.onPublishShift) {
+            items.push({
+                icon: <Send className="h-3.5 w-3.5" />,
+                label: 'Publish shift',
+                sub: 'Make this draft visible to staff',
+                tone: 'primary',
+                onClick: () => callbacks.onPublishShift?.(shift),
+            });
+        }
         pushDuplicateAction();
+        if (callbacks.onMakeRecurring) {
+            items.push({
+                icon: <Repeat className="h-3.5 w-3.5" />,
+                label: 'Make recurring…',
+                sub: 'Promote to a weekly series',
+                onClick: () => callbacks.onMakeRecurring?.(shift),
+            });
+        }
         items.push({ sep: true });
         items.push({
             icon: <X className="h-3.5 w-3.5" />,
@@ -336,6 +411,14 @@ function buildShiftActions(
             ),
         );
         pushDuplicateAction();
+        if (callbacks.onMakeRecurring) {
+            items.push({
+                icon: <Repeat className="h-3.5 w-3.5" />,
+                label: 'Make recurring…',
+                sub: 'Promote to a weekly series',
+                onClick: () => callbacks.onMakeRecurring?.(shift),
+            });
+        }
         items.push({
             icon: <RefreshCcw className="h-3.5 w-3.5" />,
             label: 'Reassign staff…',
@@ -401,7 +484,14 @@ export function WeekGridPane({
     onResolveConflict,
     onReassign,
     onDuplicateShift,
+    onCopyShiftToDay,
     onReopenShift,
+    onMarkEndedEarly,
+    onAutoFillShift,
+    onReopenCompletedForCorrection,
+    onPublishShift,
+    onMakeRecurring,
+    onBroadcastShift,
     onReportIncident,
     actionEndSlot,
 }: WeekGridPaneProps) {
@@ -429,7 +519,14 @@ export function WeekGridPane({
                 onResolveConflict,
                 onReassign,
                 onDuplicateShift,
+                onCopyShiftToDay,
                 onReopenShift,
+                onMarkEndedEarly,
+                onAutoFillShift,
+                onReopenCompletedForCorrection,
+                onPublishShift,
+                onMakeRecurring,
+                onBroadcastShift,
                 onReportIncident,
             }),
         });
