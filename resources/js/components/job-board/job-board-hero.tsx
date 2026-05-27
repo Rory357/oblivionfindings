@@ -130,7 +130,7 @@ export function JobBoardHero({
                 },
                 {
                     icon: MapPin,
-                    label: `${sitesCount ?? '—'} sites · ${sitesWorkedThisWeek} site${sitesWorkedThisWeek === 1 ? '' : 's'} you've worked at this week`,
+                    label: `${sitesCount ?? 0} site${sitesCount === 1 ? '' : 's'} · ${sitesWorkedThisWeek} site${sitesWorkedThisWeek === 1 ? '' : 's'} you've worked at this week`,
                 },
                 {
                     icon: UserCheck,

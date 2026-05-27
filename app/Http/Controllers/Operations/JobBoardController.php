@@ -151,6 +151,28 @@ class JobBoardController extends Controller
             })
             ->count();
 
+        $sitesCount = ShiftOpenPosition::query()
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->where('status', 'open')
+            ->where(function ($query) {
+                $query->whereNull('expires_at')
+                    ->orWhere('expires_at', '>', now());
+            })
+            ->join('shifts', 'shifts.id', '=', 'shift_open_positions.shift_id')
+            ->join('clients', 'clients.id', '=', 'shifts.client_id')
+            ->whereNotNull('clients.site_id')
+            ->distinct('clients.site_id')
+            ->count('clients.site_id');
+
+        $sitesWorkedThisWeek = Shift::query()
+            ->where('user_id', $auth->id)
+            ->where('starts_at', '>=', $weekStart)
+            ->where('starts_at', '<=', $weekEnd)
+            ->join('clients', 'clients.id', '=', 'shifts.client_id')
+            ->whereNotNull('clients.site_id')
+            ->distinct('clients.site_id')
+            ->count('clients.site_id');
+
         return inertia('operations/job-board/Index', [
             'jobs' => $formattedJobs,
             'filters' => array_merge($filters, [
@@ -187,6 +209,8 @@ class JobBoardController extends Controller
                 'expiring_soon' => $expiringSoon,
                 'mine' => $myClaimsCount,
                 'replacements' => $replacementsCount,
+                'sites' => $sitesCount,
+                'sites_worked_this_week' => $sitesWorkedThisWeek,
             ],
         ]);
     }

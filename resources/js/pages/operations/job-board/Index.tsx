@@ -91,6 +91,8 @@ export default function JobBoardIndex({
         expiring_soon: 0,
         mine: 0,
         replacements: 0,
+        sites: 0,
+        sites_worked_this_week: 0,
     };
 
     const fallbackWeek: JobBoardWeek = useMemo(() => {
@@ -235,6 +237,8 @@ export default function JobBoardIndex({
                     }}
                     onFilterChange={handleFilterChange}
                     onWeekChange={handleWeekChange}
+                    sitesCount={effectiveStats.sites}
+                    sitesWorkedThisWeek={effectiveStats.sites_worked_this_week}
                 />
 
                 <ScopeTabs

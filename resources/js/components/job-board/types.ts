@@ -88,6 +88,8 @@ export type JobBoardStats = {
     expiring_soon: number;
     mine: number;
     replacements: number;
+    sites: number;
+    sites_worked_this_week: number;
 };
 
 export type JobBoardWeek = {
