@@ -50,22 +50,30 @@ class ShiftController extends Controller
         $from = $request->query('from');
         $to = $request->query('to');
         $timezone = (string) config('app.worker_timezone', 'Pacific/Auckland');
-        $filterFrom = $from
-            ? Carbon::parse((string) $from, $timezone)->toDateString()
-            : ($to
-                ? Carbon::parse((string) $to, $timezone)->toDateString()
-                : now($timezone)->toDateString());
-        $filterTo = $to
-            ? Carbon::parse((string) $to, $timezone)->toDateString()
-            : ($from
+
+        // Default to current week (Mon–Sun) so the hero week-nav has a sensible anchor.
+        if ($from || $to) {
+            $filterFrom = $from
                 ? Carbon::parse((string) $from, $timezone)->toDateString()
-                : now($timezone)->toDateString());
+                : Carbon::parse((string) $to, $timezone)->toDateString();
+            $filterTo = $to
+                ? Carbon::parse((string) $to, $timezone)->toDateString()
+                : Carbon::parse((string) $from, $timezone)->toDateString();
+        } else {
+            $weekStart = now($timezone)->startOfWeek(Carbon::MONDAY);
+            $filterFrom = $weekStart->toDateString();
+            $filterTo = $weekStart->copy()->endOfWeek(Carbon::SUNDAY)->toDateString();
+        }
 
         $start = Carbon::parse($filterFrom, $timezone)->startOfDay()->utc();
         $end = Carbon::parse($filterTo, $timezone)->endOfDay()->utc();
 
         $query = Shift::query()
-            ->with(['client:id,first_name,last_name', 'staff:id,name,email'])
+            ->with([
+                'client:id,first_name,last_name,site_id',
+                'staff:id,name,email',
+                'site:id,name,type',
+            ])
             ->whereBetween('starts_at', [$start, $end])
             ->orderBy('starts_at');
 
@@ -81,6 +89,10 @@ class ShiftController extends Controller
 
         if ($request->filled('user_id')) {
             $query->where('user_id', $request->query('user_id'));
+        }
+
+        if ($request->filled('site_id')) {
+            $query->where('site_id', $request->query('site_id'));
         }
 
         if ($request->query('assigned') === 'assigned') {
@@ -112,7 +124,9 @@ class ShiftController extends Controller
                 ->visibleToFrontline($auth->organization_id);
         }
 
-        $shifts = $query->paginate(25)->withQueryString();
+        // Week-bounded — show all shifts in range rather than paginating, but cap defensively.
+        $rows = $query->limit(500)->get();
+        $shifts = ['data' => $rows];
 
         $clients = $this->siteAccess()->applyClientScope(
             Client::query(),
@@ -120,7 +134,7 @@ class ShiftController extends Controller
             $this->shiftBypassPermissions(),
         )
             ->orderBy('first_name')
-            ->get(['id', 'first_name', 'last_name']);
+            ->get(['id', 'first_name', 'last_name', 'service_context_id', 'site_id']);
 
         $staff = $this->siteAccess()->applyStaffScope(
             User::staff(),
@@ -130,6 +144,40 @@ class ShiftController extends Controller
             ->orderBy('name')
             ->get(['id', 'name', 'email']);
 
+        $sitesQuery = $this->siteAccess()->applySiteScope(
+            \App\Models\Site::query(),
+            $auth,
+            $this->shiftBypassPermissions(),
+        );
+        $sites = $sitesQuery->orderBy('name')->get(['id', 'name', 'type']);
+
+        $serviceContexts = ServiceContext::query()
+            ->orderBy('name')
+            ->get(['id', 'name', 'type', 'is_active']);
+
+        // Stats (server-side, over the whole filtered week — independent of any client tab filter).
+        $todayKey = now($timezone)->toDateString();
+        $statsTotal = $rows->count();
+        $statsInProgress = $rows->where('status', 'in_progress')->count();
+        $statsScheduled = $rows->where('status', 'scheduled')->count();
+        $statsCompleted = $rows->where('status', 'completed')->count();
+        $statsDraft = $rows->where('status', 'draft')->count();
+        $statsCancelled = $rows->where('status', 'cancelled')->count();
+        $statsUnassigned = $rows->whereNull('user_id')->count();
+        // "Open" = scheduled with no staff assigned (the prototype's notion of needing cover).
+        $statsOpen = $rows->where('status', 'scheduled')->whereNull('user_id')->count();
+        $statsToday = $rows->filter(
+            fn ($s) => $s->starts_at?->copy()->timezone($timezone)->toDateString() === $todayKey
+        )->count();
+        $minutes = $rows->sum(function ($s) {
+            if (! $s->starts_at || ! $s->ends_at) {
+                return 0;
+            }
+            return $s->starts_at->diffInMinutes($s->ends_at);
+        });
+        $statsSites = $rows->pluck('site_id')->filter()->unique()->count();
+        $statsStaff = $rows->pluck('user_id')->filter()->unique()->count();
+
         return inertia('operations/shifts/index', [
             'shifts' => $shifts,
             'filters' => [
@@ -138,12 +186,30 @@ class ShiftController extends Controller
                 'status' => $request->query('status'),
                 'client_id' => $request->query('client_id'),
                 'user_id' => $request->query('user_id'),
+                'site_id' => $request->query('site_id'),
                 'assigned' => $request->query('assigned'),
                 'q' => $request->query('q'),
             ],
             'clients' => $clients,
             'staff' => $staff,
+            'sites' => $sites,
+            'serviceContexts' => $serviceContexts,
+            'defaultServiceContextId' => ServiceContext::defaultId(),
             'statuses' => ['draft', 'scheduled', 'in_progress', 'completed', 'cancelled'],
+            'stats' => [
+                'total' => $statsTotal,
+                'open' => $statsOpen,
+                'today' => $statsToday,
+                'in_progress' => $statsInProgress,
+                'scheduled' => $statsScheduled,
+                'completed' => $statsCompleted,
+                'draft' => $statsDraft,
+                'cancelled' => $statsCancelled,
+                'unassigned' => $statsUnassigned,
+                'hours' => (int) round($minutes / 60),
+                'sites' => $statsSites,
+                'staff' => $statsStaff,
+            ],
             'canCreate' => $auth->canDo('shifts.create'),
         ]);
     }

@@ -478,3 +478,91 @@ html[data-density="comfortable"] [data-slot="sidebar-menu-button"] {
     min-height: 2.75rem; /* 44px */
     min-width: 2.75rem;
 }
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Shifts dialog form primitives.
+ *
+ * The shifts redesign uses native <input>/<select>/<textarea> so the form
+ * stays light and the dialog hosts a lot of fields. These utility classes
+ * give them the shadcn-style chrome (height, border, focus ring) without
+ * importing the React components individually for each field. Other modules
+ * are welcome to use these too — they're scoped via the class names only,
+ * not by tag.
+ * ────────────────────────────────────────────────────────────────────────── */
+.input {
+    width: 100%;
+    height: 2.25rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--input);
+    background: var(--background);
+    padding: 0 0.625rem;
+    font-size: 0.875rem;
+    color: var(--foreground);
+}
+.input:focus {
+    outline: 2px solid var(--ring);
+    outline-offset: -1px;
+    border-color: transparent;
+}
+.textarea {
+    width: 100%;
+    min-height: 5rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--input);
+    background: var(--background);
+    padding: 0.5rem 0.625rem;
+    font-size: 0.875rem;
+    color: var(--foreground);
+    resize: vertical;
+}
+.textarea:focus {
+    outline: 2px solid var(--ring);
+    outline-offset: -1px;
+    border-color: transparent;
+}
+.select {
+    width: 100%;
+    height: 2.25rem;
+    border-radius: 0.5rem;
+    border: 1px solid var(--input);
+    background: var(--background);
+    padding: 0 0.625rem;
+    padding-right: 1.75rem;
+    font-size: 0.875rem;
+    color: var(--foreground);
+    appearance: none;
+    background-image: url("data:image/svg+xml,%3Csvg xmlns='http://www.w3.org/2000/svg' width='12' height='12' viewBox='0 0 24 24' fill='none' stroke='%2364748b' stroke-width='2' stroke-linecap='round' stroke-linejoin='round'%3E%3Cpolyline points='6 9 12 15 18 9'%3E%3C/polyline%3E%3C/svg%3E");
+    background-repeat: no-repeat;
+    background-position: right 0.625rem center;
+}
+.select:focus {
+    outline: 2px solid var(--ring);
+    outline-offset: -1px;
+    border-color: transparent;
+}
+
+/* ──────────────────────────────────────────────────────────────────────────
+ * Radix open-state visibility safety net.
+ *
+ * tw-animate-css v1.4 declares `enter` with only a `from` keyframe that
+ * reads `opacity: var(--tw-enter-opacity, 1)`. `data-[state=open]:fade-in-0`
+ * sets that variable to 0 so the animation can fade in. In some Chromium
+ * builds the animation is created but `currentTime` stays at 0 — the
+ * element ends up frozen at the `from` keyframe (opacity 0) instead of
+ * playing through to the underlying value. Resetting the enter custom
+ * properties to their non-animated values on open state keeps the
+ * keyframe-resolved opacity at 1 regardless of whether the animation
+ * actually plays, so the dialog is visible either way.
+ * ────────────────────────────────────────────────────────────────────────── */
+[role='dialog'][data-state='open'],
+[role='menu'][data-state='open'],
+[data-slot='dialog-overlay'][data-state='open'],
+[data-slot='dialog-content'][data-state='open'],
+[data-slot='dropdown-menu-content'][data-state='open'],
+[data-slot='popover-content'][data-state='open'] {
+    --tw-enter-opacity: 1;
+    --tw-enter-scale: 1;
+    --tw-enter-translate-x: 0;
+    --tw-enter-translate-y: 0;
+    --tw-enter-rotate: 0;
+}
