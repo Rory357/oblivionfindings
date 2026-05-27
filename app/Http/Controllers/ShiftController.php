@@ -15,6 +15,7 @@ use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\ShiftHandover;
 use App\Models\ShiftReplacementRequest;
+use App\Models\ShiftSeries;
 use App\Models\ShiftTask;
 use App\Models\Timesheet;
 use App\Models\User;
@@ -1293,6 +1294,7 @@ class ShiftController extends Controller
             'allow_incomplete_tasks' => ['nullable', 'boolean'],
             'incomplete_tasks_reason' => ['nullable', 'string', 'max:2000'],
             'handover_waiver_reason' => ['nullable', 'string', 'max:2000'],
+            'ended_early_reason' => ['nullable', 'string', 'max:2000'],
         ]);
 
         $wasCompleted = $shift->status === 'completed';
@@ -1343,19 +1345,208 @@ class ShiftController extends Controller
         return back()->with('success', 'Shift occurrence cancelled.');
     }
 
+    public function broadcastNeedsCover(Request $request, Shift $shift)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('shifts.manageAny'), 403);
+        $this->assertCanAccessShift($auth, $shift);
+
+        if ($shift->user_id) {
+            return back()->with('error', 'Only unassigned shifts can be broadcast for cover.');
+        }
+
+        if (in_array($shift->status, ['completed', 'cancelled'], true)) {
+            return back()->with('error', 'Locked shifts cannot be broadcast.');
+        }
+
+        if (! $shift->starts_at || ! $shift->ends_at) {
+            return back()->with('error', 'Shift must have a start and end time before broadcasting.');
+        }
+
+        $data = $request->validate([
+            'message' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $eligibility = app(ShiftStaffEligibilityService::class);
+
+        try {
+            $candidates = $eligibility->candidatesFor($shift);
+        } catch (\Throwable $e) {
+            Log::warning('Broadcast candidate enumeration failed', [
+                'shift_id' => $shift->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return back()->with('error', 'Unable to enumerate eligible candidates for broadcast.');
+        }
+
+        $tz = (string) config('app.worker_timezone', 'Pacific/Auckland');
+        $start = $shift->starts_at->copy()->timezone($tz);
+        $end = $shift->ends_at->copy()->timezone($tz);
+        $clientName = $shift->client
+            ? trim($shift->client->first_name.' '.$shift->client->last_name)
+            : null;
+
+        $sent = 0;
+        foreach ($candidates as $candidate) {
+            try {
+                $check = $eligibility->evaluate($shift, $candidate);
+            } catch (\Throwable $e) {
+                continue;
+            }
+
+            if ($check->hasBlocks()) {
+                continue;
+            }
+
+            try {
+                $candidate->notify(new \App\Notifications\ShiftBroadcastNotification(
+                    shiftId: $shift->id,
+                    shiftDate: $start->format('D j M Y'),
+                    shiftTime: $start->format('H:i').' – '.$end->format('H:i'),
+                    clientName: $clientName,
+                    siteName: $shift->site?->name,
+                    message: $data['message'] ?? null,
+                ));
+                $sent++;
+            } catch (\Throwable $e) {
+                Log::warning('Broadcast notify failed', [
+                    'shift_id' => $shift->id,
+                    'user_id' => $candidate->id,
+                    'error' => $e->getMessage(),
+                ]);
+            }
+        }
+
+        if ($sent === 0) {
+            return back()->with('warning', 'No eligible candidates were notified.');
+        }
+
+        return back()->with('success', "Broadcast sent to {$sent} eligible staff.");
+    }
+
+    public function promoteToSeries(Request $request, Shift $shift)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('shifts.manageAny'), 403);
+        $this->assertCanAccessShift($auth, $shift);
+
+        if (! in_array($shift->status, ['draft', 'scheduled'], true)) {
+            return back()->with('error', 'Only draft or scheduled shifts can be promoted to a recurring series.');
+        }
+
+        if ($shift->shift_series_id) {
+            return back()->with('error', 'This shift is already part of a recurring series.');
+        }
+
+        if (! $shift->starts_at || ! $shift->ends_at) {
+            return back()->with('error', 'Source shift must have a start and end time.');
+        }
+
+        $data = $request->validate([
+            'weekdays' => ['required', 'array', 'min:1', 'max:7'],
+            'weekdays.*' => ['integer', 'min:0', 'max:6'],
+            'end_date' => ['required', 'date_format:Y-m-d', 'after_or_equal:today'],
+        ]);
+
+        $timezone = (string) config('app.worker_timezone', 'Pacific/Auckland');
+        $sourceStart = $shift->starts_at->copy()->timezone($timezone);
+        $sourceEnd = $shift->ends_at->copy()->timezone($timezone);
+        $endDate = \Carbon\Carbon::createFromFormat('Y-m-d', $data['end_date'], $timezone)->endOfDay();
+
+        $startDate = $sourceStart->copy()->startOfDay();
+        if ($endDate->lt($startDate)) {
+            return back()->withErrors([
+                'end_date' => 'End date must be on or after the source shift date.',
+            ]);
+        }
+
+        $series = DB::transaction(function () use ($shift, $auth, $sourceStart, $sourceEnd, $startDate, $endDate, $timezone, $data) {
+            $series = ShiftSeries::create([
+                'client_id' => $shift->client_id,
+                'site_id' => $shift->site_id,
+                'service_context_id' => $shift->service_context_id,
+                'user_id' => $shift->user_id,
+                'start_date' => $startDate->toDateString(),
+                'end_date' => $endDate->toDateString(),
+                'timezone' => $timezone,
+                'by_weekday' => array_values(array_unique(array_map('intval', $data['weekdays']))),
+                'starts_time' => $sourceStart->format('H:i:s'),
+                'ends_time' => $sourceEnd->format('H:i:s'),
+                'location' => $shift->location,
+                'notes' => $shift->notes,
+                'status' => 'active',
+                'shift_type' => $shift->shift_type ?? 'standard',
+                'is_sleepover' => (bool) $shift->is_sleepover,
+                'is_on_call' => (bool) $shift->is_on_call,
+                'expected_break_minutes' => $shift->expected_break_minutes,
+                'coverage_roles' => $shift->coverage_roles,
+                'created_by' => $auth->id,
+            ]);
+
+            $shift->forceFill(['shift_series_id' => $series->id])->save();
+
+            return $series;
+        });
+
+        return back()->with('success', "Shift promoted to recurring series (series #{$series->id}). Future occurrences will need to be generated separately.");
+    }
+
+    public function publishShift(Request $request, Shift $shift)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('shifts.manageAny'), 403);
+        $this->assertCanAccessShift($auth, $shift);
+
+        if ($shift->status !== 'draft') {
+            return back()->with('error', 'Only draft shifts can be published.');
+        }
+
+        $hasAssignee = ! empty($shift->user_id);
+
+        $shift->forceFill([
+            'status' => $hasAssignee ? 'scheduled' : 'draft',
+            'published_at' => now(),
+            'publish_dirty_at' => null,
+        ])->save();
+
+        $message = $hasAssignee
+            ? 'Shift published — staff will see it in their roster.'
+            : 'Shift published as open — visible for assignment.';
+
+        return back()->with('success', $message);
+    }
+
     public function reopenOccurrence(Request $request, Shift $shift)
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('shifts.manageAny'), 403);
         $this->assertCanAccessShift($auth, $shift);
 
-        if ($shift->status !== 'cancelled') {
-            return back()->with('error', 'Only cancelled occurrences can be reopened.');
+        if (! in_array($shift->status, ['cancelled', 'completed'], true)) {
+            return back()->with('error', 'Only cancelled or completed occurrences can be reopened.');
         }
 
-        app(ShiftLifecycleService::class)->reopen($shift, $auth);
+        $data = $request->validate([
+            'reason' => ['nullable', 'string', 'max:2000'],
+        ]);
 
-        return back()->with('success', 'Shift occurrence reopened.');
+        // Completed shifts require an audit reason. Cancelled shifts may
+        // omit it (the original cancel event already carries its own
+        // reason).
+        if ($shift->status === 'completed' && empty(trim((string) ($data['reason'] ?? '')))) {
+            return back()->withErrors([
+                'reason' => 'A correction reason is required to reopen a completed shift.',
+            ]);
+        }
+
+        app(ShiftLifecycleService::class)->reopen($shift, $auth, $data['reason'] ?? null);
+
+        $message = $shift->status === 'completed'
+            ? 'Shift occurrence reopened for correction.'
+            : 'Shift occurrence reopened.';
+
+        return back()->with('success', $message);
     }
 
     protected function notifyTimesheetCreationFailure(Shift $shift, string $reason): void
@@ -1495,6 +1686,89 @@ class ShiftController extends Controller
         }
 
         return redirect($data['return_to'] ?? url('/operations/rostering'))->with('success', 'Shift assigned.');
+    }
+
+    public function autoFill(Request $request, Shift $shift)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('shifts.manageAny'), 403);
+        $this->assertCanAccessShift($auth, $shift);
+
+        if (in_array($shift->status, ['completed', 'cancelled'], true)) {
+            return back()->with('error', 'This shift is locked and cannot be auto-filled.');
+        }
+
+        if ($shift->user_id !== null) {
+            return back()->with('error', 'This shift is already assigned.');
+        }
+
+        $data = $request->validate([
+            'return_to' => ['nullable', 'string', 'max:2048'],
+        ]);
+
+        $eligibility = app(ShiftStaffEligibilityService::class);
+
+        try {
+            $candidates = $eligibility->candidatesFor($shift);
+        } catch (\Throwable $e) {
+            Log::warning('Auto-fill candidate prefilter failed', [
+                'shift_id' => $shift->id,
+                'error' => $e->getMessage(),
+            ]);
+
+            return back()->with('error', 'Auto-fill could not enumerate eligible candidates.');
+        }
+
+        $best = null;
+        $fallback = null;
+        foreach ($candidates as $candidate) {
+            try {
+                $result = $eligibility->evaluate($shift, $candidate);
+            } catch (\Throwable $e) {
+                continue;
+            }
+
+            if ($result->hasBlocks()) {
+                continue;
+            }
+
+            if (! $result->hasWarnings()) {
+                $best = $candidate;
+                break;
+            }
+
+            if (! $fallback) {
+                $fallback = $candidate;
+            }
+        }
+
+        $assignee = $best ?? $fallback;
+
+        if (! $assignee) {
+            return back()->with('warning', 'No eligible candidate was found for auto-fill.');
+        }
+
+        $reservation = app(CoverageReservationService::class)->reserveForAssignment($shift, $auth, 'auto_fill');
+        try {
+            app(ShiftLifecycleService::class)->assign(
+                $shift,
+                $auth,
+                $assignee,
+                null,
+                $reservation,
+            );
+        } catch (\Throwable $e) {
+            app(CoverageReservationService::class)->release($reservation);
+            throw $e;
+        }
+
+        $message = $best
+            ? "Auto-filled with {$assignee->name}."
+            : "Auto-filled with {$assignee->name} (warnings present — review on the shift detail).";
+
+        $returnTo = $data['return_to'] ?? url('/operations/rostering');
+
+        return redirect($returnTo)->with('success', $message);
     }
 
     public function unassign(Request $request, Shift $shift)

@@ -19,6 +19,7 @@ class CompleteShiftData
         public readonly bool $allowIncompleteTasks = false,
         public readonly ?string $incompleteTasksReason = null,
         public readonly ?string $handoverWaiverReason = null,
+        public readonly ?string $endedEarlyReason = null,
         public readonly ShiftLifecycleSource $source = ShiftLifecycleSource::Manual,
         public readonly bool $createSummaryNote = true,
         public readonly bool $syncDraftTimesheet = true,
@@ -32,13 +33,20 @@ class CompleteShiftData
      */
     public static function fromManualRequest(array $data): self
     {
+        $endedEarly = isset($data['ended_early_reason'])
+            ? trim((string) $data['ended_early_reason'])
+            : null;
+        $endedEarly = $endedEarly === '' ? null : $endedEarly;
+
         return new self(
             finalNoteSubject: $data['final_note_subject'] ?? null,
             finalNoteBody: $data['final_note_body'] ?? null,
             allowIncompleteTasks: (bool) ($data['allow_incomplete_tasks'] ?? false),
             incompleteTasksReason: $data['incomplete_tasks_reason'] ?? null,
             handoverWaiverReason: $data['handover_waiver_reason'] ?? null,
+            endedEarlyReason: $endedEarly,
             source: ShiftLifecycleSource::Manual,
+            timelineMeta: $endedEarly !== null ? ['ended_early_reason' => $endedEarly] : [],
         );
     }
 
