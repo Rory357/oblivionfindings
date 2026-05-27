@@ -1347,6 +1347,7 @@ class ShiftController extends Controller
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('shifts.manageAny'), 403);
+        $this->assertCanAccessShift($auth, $shift);
 
         if ($shift->status !== 'cancelled') {
             return back()->with('error', 'Only cancelled occurrences can be reopened.');

@@ -1503,10 +1503,9 @@ export default function RosteringIndex(props: Props) {
             )
         )
             return;
-        // Route is PATCH /operations/shifts/{shift}/reopen — operations.shifts.reopen.
         router.patch(
             `/operations/shifts/${shiftId}/reopen`,
-            { return_to: '/operations/rostering' },
+            {},
             { preserveScroll: true },
         );
     };
@@ -1936,7 +1935,11 @@ export default function RosteringIndex(props: Props) {
                                         ? (s) => duplicateShift(s.id)
                                         : undefined
                                 }
-                                onReopenShift={(s) => reopenShift(s.id)}
+                                onReopenShift={
+                                    props.canManageAny
+                                        ? (s) => reopenShift(s.id)
+                                        : undefined
+                                }
                                 onReportIncident={(s) =>
                                     router.visit(
                                         `/incidents/create?shift_id=${s.id}`,

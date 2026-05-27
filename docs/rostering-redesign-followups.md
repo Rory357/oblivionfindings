@@ -1,6 +1,6 @@
 # Rostering Redesign Follow-ups
 
-Status as of the Codex implementation pass on 2026-05-27, plus the Claude audit + live verification pass that immediately followed: the rostering redesign has been audited, Codex's follow-up gaps have been implemented, two real bugs from that pass were caught and fixed, and the result has been exercised end-to-end on `oblivionfindings.com`. The manager rostering page now maps the controller payload more completely, and the roster → worker shift → attendance → draft timesheet loop remains backed by the existing services rather than a rewrite.
+Status as of the Codex implementation pass on 2026-05-27, plus the Claude audit + live verification pass that immediately followed, plus the follow-up actions pass on 2026-05-27 (`1c6aefda`) that shipped Duplicate, Reopen cancelled shift, the top-level Coverage gaps panel, candidate hours sublines, the Time-off empty-state copy, and broadcast-wording removal — followed by a Claude follow-up audit that turned up and fixed three small wiring issues against the new menu items. The manager rostering page now maps the controller payload more completely, and the roster → worker shift → attendance → draft timesheet loop remains backed by the existing services rather than a rewrite.
 
 ### Post-Codex audit fixes (Claude, 2026-05-27)
 
@@ -19,6 +19,27 @@ Verified end-to-end on `https://oblivionfindings.com/operations/rostering` signe
 - Week picker popover opens with banner + calendar + this week / done footer.
 - Right-click context menu on a completed Codex Roster Loop shift shows the expected three-item menu (Open shift detail, View timesheet, Report incident) and each item maps to its real route.
 - All grammar fixes confirmed live after the deploy hash rolled from `Dt1eywfD` → `C1OHydm2`.
+
+### Follow-up actions pass (2026-05-27, `1c6aefda`)
+
+Six of the items previously listed under "Needs backend work first" / "Open product decisions" shipped together as `1c6aefda feat(rostering): complete follow-up actions`:
+
+1. **Duplicate shift as draft** — new `POST /operations/shifts/{shift}/duplicate` route on `ShiftController` with `shifts.create` permission and a roster-period boundary guard. Creates an unassigned `draft` copy that carries over `client_id`, `site_id`, `service_context_id`, `shift_type`, sleepover/on-call flags, expected break, location, notes, coverage roles, and shift tasks (reset to incomplete). Wired into the week-grid context menu on `scheduled`, `draft`, and `in_progress` rows as "Duplicate as draft" with a confirm prompt and `preserveScroll`. Two new feature tests cover the happy path and the cross-period rejection.
+2. **Reopen cancelled shift** — wired the existing `PATCH /operations/shifts/{shift}/reopen` (handled by `ShiftLifecycleService::reopen`) into the week-grid menu on `cancelled` rows as a primary "Reopen cancelled shift" item with a confirm prompt. The handler stays cancelled-only — completed-shift reopen still has no backend support.
+3. **Coverage gaps top-level panel** — the `coverageAlerts` flat list returned by the controller now renders as a "Coverage gaps this week" callout above the Coverage tab grid, with per-alert site/rule/window/shortage/planned context. The duplicate top-level prop has been promoted from a product question to a real surface.
+4. **Candidate hours subline on suggestion chips** — `suggestStaffForOpenShift` now flows `hours` through to each chip, and the Open Shifts pane renders "32h this week" under the candidate name. The weekly cap line ("Up to 30 Apr") is still not wired.
+5. **Time-off empty state copy** — the Time off pane subtitle now reads "All caught up · no pending requests" when there are zero pending requests.
+6. **Broadcast wording removal** — the unsupported per-shift "Broadcast" button was removed from the Open Shifts pane, and the corresponding signal-rail open-shifts copy now reads "Need cover this week — assign from eligible staff." No broadcast endpoint exists for rostering shifts (the `/control-room/broadcast` module is unrelated).
+
+Vitest coverage was extended in the same commit: candidate hours subline, no-broadcast assertion, the cancelled-shift reopen menu (and confirms cancel doesn't surface twice), the duplicate-as-draft menu for scheduled shifts, the top-level coverage-gaps panel, and the new Time-off caught-up copy. Total: 32 tests across the three focused files.
+
+### Claude follow-up audit fixes (2026-05-27)
+
+A read-only audit of `1c6aefda` against the doc's "out-of-scope" list turned up three small issues that were patched immediately on `main`:
+
+1. **`onReopenShift` menu item shown to non-managers** — `onDuplicateShift` was gated on `props.canManageAny` but `onReopenShift` was not, so non-managers saw the menu item and got a 403 only on click. Gated both prop bindings identically in `resources/js/pages/operations/rostering/index.tsx`.
+2. **`reopenOccurrence` missed site-scope assertion** — every other write handler on `ShiftController` calls `$this->assertCanAccessShift($auth, $shift)` after the permission check, but `reopenOccurrence` only checked the global `shifts.manageAny` permission. With the new menu surface, a manager with `manageAny` in one site could reopen cancelled shifts in another site. Added the assertion.
+3. **Unused `return_to` in `reopenShift` JS call** — the JS posted `{ return_to: '/operations/rostering' }` to the controller but the controller returns `back()` and never reads it. Dropped the param.
 
 ---
 
@@ -138,8 +159,10 @@ The context menu now only exposes actions that map to current routes or existing
 | Report incident                              | Visits `/incidents/create?shift_id={id}`.                                                                                   |
 | Resolve overlap                              | Opens the inline Resolve overlap dialog with reassign/unassign actions and a link to the conflict queue.                    |
 | View timesheet                               | Visits `/operations/timesheets/{timesheet_id}/edit` when `timesheet_id` is available; otherwise falls back to shift detail. |
+| Duplicate as draft                           | Posts `/operations/shifts/{id}/duplicate` with a confirm prompt. Available on scheduled, draft, and in-progress rows for users with `shifts.create`. |
+| Reopen cancelled shift                       | Patches `/operations/shifts/{id}/reopen` with a confirm prompt. Only surfaced on cancelled rows for users with `shifts.manageAny` and site access.   |
 
-These labels were deliberately not kept as inert menu items: Duplicate, Copy to another day, Make recurring, Broadcast to staff, Auto-fill best match, Publish draft, Reopen for correction, and Mark as ended early. They need real backend routes or a separate product decision before being reintroduced.
+These labels are still deliberately not kept as inert menu items: Copy to another day, Make recurring, Broadcast to staff, Auto-fill best match, Publish draft, Reopen for correction (completed shifts), and Mark as ended early. They need real backend routes or a separate product decision before being reintroduced.
 
 ---
 
@@ -172,12 +195,12 @@ The week-grid context menu deliberately omits these labels until each has a cont
 
 | Action                                 | Where it would slot in                          | What's missing                                                                                                                                                                                                                                          |
 | -------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Duplicate shift** / **Copy to day**  | `buildShiftActions()` scheduled / draft branch  | New `POST /operations/shifts/{shift}/duplicate` (and/or `?date=YYYY-MM-DD`) on `ShiftController`, with a permission like `shifts.duplicate` or reuse `shifts.create`. Must respect roster-period boundaries.                                            |
+| **Copy to another day** (date picker)  | `buildShiftActions()` scheduled / draft branch  | Duplicate-as-draft is shipped. A separate "Copy to day…" variant that takes a target date would reuse the same controller but needs a date-picker affordance. Treat as polish on top of Duplicate.                                                       |
 | **Make recurring** (one-off → series)  | `buildShiftActions()` scheduled branch          | New `POST /operations/shifts/{shift}/promote-to-series` that hands off to `ShiftSeriesService`. Must define the recurrence input UI before wiring.                                                                                                      |
-| **Broadcast to staff**                 | `buildShiftActions()` open branch + Open pane   | A notification service that pushes "shift needs cover" alerts to an eligible pool. No comparable broadcast endpoint exists yet.                                                                                                                         |
+| **Broadcast to staff**                 | `buildShiftActions()` open branch + Open pane   | A notification service that pushes "shift needs cover" alerts to an eligible pool. No comparable broadcast endpoint exists for rostering shifts.                                                                                                        |
 | **Auto-fill best match** (single)      | `buildShiftActions()` open branch               | Per-shift assign-best variant of `RosterSuggestionService` (`POST /operations/shifts/{shift}/auto-fill`). Today's `Auto-schedule` button is week-level only.                                                                                            |
 | **Publish draft** (per shift)          | `buildShiftActions()` draft branch              | Currently publishing is per roster period via `/operations/rostering/periods/{period}/publish`. A per-shift draft → published transition would need a new `Shift.status` state machine or a wrapper that bumps just the relevant period.               |
-| **Reopen for correction** (completed)  | `buildShiftActions()` completed branch          | The route `PATCH /operations/shifts/{shift}/reopen` already exists. Only the menu item + a "this is audit-tracked, click again to confirm" guard are missing. ~10 minutes once the confirm UX is agreed.                                                |
+| **Reopen for correction** (completed)  | `buildShiftActions()` completed branch          | `PATCH /operations/shifts/{shift}/reopen` exists but is cancelled-only (`if ($shift->status !== 'cancelled') return back()`). Reopening completed shifts would need a new state-machine path on `ShiftLifecycleService` plus an audit trail entry.       |
 | **Mark as ended early** (in-progress)  | `buildShiftActions()` in_progress branch        | Closest existing route is `PATCH /operations/shifts/{shift}/complete`. Would need an `ended_early_reason` field on the request and a service-side audit trail entry.                                                                                    |
 
 ### Needs a richer backend payload
@@ -185,15 +208,15 @@ The week-grid context menu deliberately omits these labels until each has a cont
 | Item                                          | What's needed                                                                                                                                                                                                                                                  |
 | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | **Per-candidate eligibility reasons**         | `ShiftStaffEligibilityService::evaluate()` currently returns shift-level blocker/warning lists. The Open Shifts pane shows these as a watchlist. To get the per-suggestion-chip detail the design called for, the service needs to return reasons keyed by `(shift_id, candidate_user_id)`. |
-| **Candidate availability sub-line**           | Suggestion chips today show just `name` + "best match" tag. The chip could carry "44h this week" or "Up to 30 Apr" if the payload included a candidate availability summary alongside each suggestion. The data already exists on `props.capacity` for hours and could be cross-referenced. |
+| **Candidate availability cap line**           | Partial. The "Xh this week" subline now renders on each suggestion chip from `props.capacity` (shipped in `1c6aefda`). The optional "Up to 30 Apr" availability cap is still not wired — needs an `available_until` field on the candidate payload. |
 
 ### Open product decisions (no work until decided)
 
 | Question                                                                    | Why it's open                                                                                                                                                                                                                                                                                                                                                                                                       |
 | --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
 | Pending HR leave: approve/decline inline vs. deep-link to `/hr/leave`?       | Today the Time off pane shows pending HR leave but the approve/decline buttons currently `router.visit('/hr/leave')` rather than posting directly. Routes `POST /hr/leave/{leaveRequest}/approve|decline` exist; the only question is whether managers should be able to approve from the rostering page or be forced to switch to the HR leave surface (where SLA, escalation, and audit trail context lives). |
-| Empty Time off pane subtitle                                                | When there are no pending requests the subtitle still reads "Awaiting your decision · oldest first" which is misleading. Cosmetic — swap to "All caught up · no pending requests" when empty.                                                                                                                                                                                                                       |
-| `coverageAlerts` top-level prop                                             | Returned by the controller as a flat denormalised list, but the UI consumes the same data from `coverageSites[].alerts`. Either drop the top-level field or surface it as a flat "all coverage gaps this week" panel.                                                                                                                                                                                                |
+
+Resolved in `1c6aefda`: the empty Time off pane subtitle now reads "All caught up · no pending requests", and the top-level `coverageAlerts` array now drives a real "Coverage gaps this week" panel above the Coverage tab grid.
 
 ### Tooling caveats (not product issues)
 
@@ -207,9 +230,9 @@ The week-grid context menu deliberately omits these labels until each has a cont
 
 ### Recommended next step
 
-1. Wire `PATCH /operations/shifts/{shift}/reopen` back into the completed-shift context menu with a confirm prompt — route already exists. ~10 min.
-2. Decide on Duplicate / Make recurring as a roadmap item; both are real product features, not just UI polish, and warrant their own controller + service design.
-3. Extend `ShiftStaffEligibilityService::evaluate()` to return per-candidate detail — highest user-facing value of the remaining items because it turns the suggestion chips into a real triage surface.
+1. Extend `ShiftStaffEligibilityService::evaluate()` to return per-candidate detail — highest user-facing value of the remaining items because it turns the suggestion chips into a real triage surface.
+2. Decide on Make recurring as a roadmap item — needs a controller + service design plus a recurrence input UI before wiring. (Duplicate-as-draft is shipped; "Copy to another day" is the cheap polish that builds on it.)
+3. Decide whether completed-shift reopen is in scope. The existing route is cancelled-only; reopening a completed shift would need a new state-machine path plus an audit entry, and is a separate product call from the cancelled-reopen that just shipped.
 
 ---
 
@@ -280,4 +303,34 @@ Modified by the audit pass:
   resources/js/components/rostering/entity-filter.tsx    ← +pluralLabel prop
   resources/js/pages/operations/rostering/index.tsx      ← pluralisation in hero + signals; pluralLabel wired
   tests/Feature/Rostering/RosteringIndexLeaveTest.php    ← +hr.leave.approve permission; +tenant_id on manager
+```
+
+### Follow-up actions pass commits (2026-05-27)
+
+```text
+1c6aefda feat(rostering): complete follow-up actions
+```
+
+Files touched by `1c6aefda`:
+
+```text
+Modified:
+  app/Http/Controllers/ShiftController.php                                ← +duplicate() action
+  resources/js/components/rostering/coverage-pane.tsx                     ← +CoverageAlertSummary panel
+  resources/js/components/rostering/index.ts                              ← re-export
+  resources/js/components/rostering/open-shifts-pane.tsx                  ← +hours subline, -Broadcast button
+  resources/js/components/rostering/rostering-redesign-followups.test.tsx ← +6 new tests
+  resources/js/components/rostering/time-off-pane.tsx                     ← +caught-up empty state copy
+  resources/js/components/rostering/week-grid-pane.tsx                    ← +Duplicate + Reopen menu items
+  resources/js/pages/operations/rostering/index.tsx                       ← duplicate/reopen handlers, coverageAlerts wiring, signal copy
+  routes/operations.php                                                   ← +operations.shifts.duplicate
+  tests/Feature/ShiftControllerTest.php                                   ← +2 duplicate-shift feature tests
+```
+
+### Follow-up audit fixes (Claude, 2026-05-27)
+
+```text
+  app/Http/Controllers/ShiftController.php               ← +assertCanAccessShift in reopenOccurrence
+  resources/js/pages/operations/rostering/index.tsx      ← gate onReopenShift on canManageAny; drop unused return_to
+  docs/rostering-redesign-followups.md                   ← reflect 1c6aefda + the three audit fixes
 ```
