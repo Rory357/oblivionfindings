@@ -440,6 +440,7 @@ class RosteringController extends Controller
 
         if ($canManageAny) {
             $approvedLeave = HrLeaveRequest::query()
+                ->forTenant($auth->tenant_id)
                 ->where('status', 'approved')
                 ->where('starts_at', '<', $leaveLookaheadEnd)
                 ->where('ends_at', '>', $weekStart)
@@ -451,6 +452,7 @@ class RosteringController extends Controller
 
         if ($canApproveLeave) {
             $pendingLeave = HrLeaveRequest::query()
+                ->forTenant($auth->tenant_id)
                 ->where('status', 'pending')
                 ->where('starts_at', '<', $leaveLookaheadEnd)
                 ->where('ends_at', '>', $weekStart)

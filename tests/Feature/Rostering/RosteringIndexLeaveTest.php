@@ -13,6 +13,9 @@ function userWithRosteringLeavePermissions(): User
 {
     $manager = User::factory()->create([
         'organization_id' => 1,
+        // Leave queries scope by tenant via forTenant($auth->tenant_id),
+        // so the manager must share the leave records' tenant.
+        'tenant_id' => 1,
         'approved_at' => now(),
     ]);
 
@@ -23,7 +26,14 @@ function userWithRosteringLeavePermissions(): User
         'type' => 'custom',
     ]);
 
-    $permissions = collect(['rostering.viewAny', 'shifts.manageAny'])->map(
+    // hr.leave.approve is required to populate the controller's pendingLeave
+    // payload; without it, the page omits pending HR leave even when shift-level
+    // permissions are present.
+    $permissions = collect([
+        'rostering.viewAny',
+        'shifts.manageAny',
+        'hr.leave.approve',
+    ])->map(
         fn (string $key) => Permission::query()->firstOrCreate(
             ['key' => $key],
             [
