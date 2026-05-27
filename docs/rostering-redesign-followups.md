@@ -1,6 +1,24 @@
 # Rostering Redesign Follow-ups
 
-Status as of the Codex implementation pass on 2026-05-27: the rostering redesign has now been audited and the main follow-up gaps from this file have been implemented in this worktree. The manager rostering page now maps the controller payload more completely, and the roster -> worker shift -> attendance -> draft timesheet loop remains backed by the existing services rather than a rewrite.
+Status as of the Codex implementation pass on 2026-05-27, plus the Claude audit + live verification pass that immediately followed: the rostering redesign has been audited, Codex's follow-up gaps have been implemented, two real bugs from that pass were caught and fixed, and the result has been exercised end-to-end on `oblivionfindings.com`. The manager rostering page now maps the controller payload more completely, and the roster → worker shift → attendance → draft timesheet loop remains backed by the existing services rather than a rewrite.
+
+### Post-Codex audit fixes (Claude, 2026-05-27)
+
+After Codex's pass landed on `main`, an audit turned up three issues that were patched in commits `ba7a9884` and `c6435e62` before being verified on live:
+
+1. **HR leave tenant leak** — `RosteringController::index()` queried `HrLeaveRequest::query()` globally for both `approvedLeave` and `pendingLeave`. Other HR controllers (`LeaveController`) consistently use `->forTenant($tenantId)`. Without it the rostering page would surface other tenants' leave on a multi-tenant deploy. Added `->forTenant($auth->tenant_id)` to both queries.
+2. **`RosteringIndexLeaveTest` could not pass as written** — the test role granted `rostering.viewAny` + `shifts.manageAny`, but `pendingLeave` is gated on `hr.leave.approve` or `hr.leave.manage`. The User factory also does not default `tenant_id`, so the manager mismatched the leave fixtures' `tenant_id` once the `forTenant` scope was applied. Added `hr.leave.approve` to the role and set `tenant_id = 1` on the manager.
+3. **Pluralisation grammar** — the live hero description rendered "1 shifts across 6 sites, and 1 timesheets waiting on you.", the signal rail said "1 timesheets pending", and the new Staff `EntityFilter` placeholder produced "Search 27 staffs…" because the component concatenated `${label}s`. Added an optional `pluralLabel` prop to `EntityFilter`, wired `"staff"` for the Staff filter, and pluralised the hero description + the timesheet signal with the standard `=== 1 ? '' : 's'` pattern.
+
+### Live verification (Claude, 2026-05-27)
+
+Verified end-to-end on `https://oblivionfindings.com/operations/rostering` signed in as `admin@demo.test`:
+
+- Hero, donut overview cards, 6-tab strip, and signal rail all render with real data from the deployed payload (`canApproveLeave: true`, `analytics.dailyCoverage` populated, `stats.timesheets_pending` correct).
+- Staff (27), Client (35), and Site (6) filters all open as searchable dropdowns and round-trip through `filterPayload()`.
+- Week picker popover opens with banner + calendar + this week / done footer.
+- Right-click context menu on a completed Codex Roster Loop shift shows the expected three-item menu (Open shift detail, View timesheet, Report incident) and each item maps to its real route.
+- All grammar fixes confirmed live after the deploy hash rolled from `Dt1eywfD` → `C1OHydm2`.
 
 ---
 
@@ -148,17 +166,50 @@ These labels were deliberately not kept as inert menu items: Duplicate, Copy to 
 
 ## Remaining known work
 
-### 1. Rich one-click roster actions
+### Needs backend work first (no route contract today)
 
-The previous checklist included labels such as Duplicate, Copy to another day, Make recurring, Broadcast to staff, Auto-fill best match, Publish draft, Reopen for correction, and Mark as ended early. Those were not reintroduced because no verified safe route contract exists for them from this audit.
+The week-grid context menu deliberately omits these labels until each has a controller endpoint + permission check + a focused feature test. The product decision for each is open.
 
-Recommended next step: add these only when each action has a controller endpoint, permission check, and focused feature test.
+| Action                                 | Where it would slot in                          | What's missing                                                                                                                                                                                                                                          |
+| -------------------------------------- | ----------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Duplicate shift** / **Copy to day**  | `buildShiftActions()` scheduled / draft branch  | New `POST /operations/shifts/{shift}/duplicate` (and/or `?date=YYYY-MM-DD`) on `ShiftController`, with a permission like `shifts.duplicate` or reuse `shifts.create`. Must respect roster-period boundaries.                                            |
+| **Make recurring** (one-off → series)  | `buildShiftActions()` scheduled branch          | New `POST /operations/shifts/{shift}/promote-to-series` that hands off to `ShiftSeriesService`. Must define the recurrence input UI before wiring.                                                                                                      |
+| **Broadcast to staff**                 | `buildShiftActions()` open branch + Open pane   | A notification service that pushes "shift needs cover" alerts to an eligible pool. No comparable broadcast endpoint exists yet.                                                                                                                         |
+| **Auto-fill best match** (single)      | `buildShiftActions()` open branch               | Per-shift assign-best variant of `RosterSuggestionService` (`POST /operations/shifts/{shift}/auto-fill`). Today's `Auto-schedule` button is week-level only.                                                                                            |
+| **Publish draft** (per shift)          | `buildShiftActions()` draft branch              | Currently publishing is per roster period via `/operations/rostering/periods/{period}/publish`. A per-shift draft → published transition would need a new `Shift.status` state machine or a wrapper that bumps just the relevant period.               |
+| **Reopen for correction** (completed)  | `buildShiftActions()` completed branch          | The route `PATCH /operations/shifts/{shift}/reopen` already exists. Only the menu item + a "this is audit-tracked, click again to confirm" guard are missing. ~10 minutes once the confirm UX is agreed.                                                |
+| **Mark as ended early** (in-progress)  | `buildShiftActions()` in_progress branch        | Closest existing route is `PATCH /operations/shifts/{shift}/complete`. Would need an `ended_early_reason` field on the request and a service-side audit trail entry.                                                                                    |
 
-### 2. Candidate-specific eligibility reasons
+### Needs a richer backend payload
 
-The existing controller payload provides shift-level `eligibilityAlerts.blocked` and `eligibilityAlerts.warnings`, and those are now rendered in the Open shifts pane. It does not provide per-open-shift, per-candidate blocker/warning reasons for each suggestion chip.
+| Item                                          | What's needed                                                                                                                                                                                                                                                  |
+| --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| **Per-candidate eligibility reasons**         | `ShiftStaffEligibilityService::evaluate()` currently returns shift-level blocker/warning lists. The Open Shifts pane shows these as a watchlist. To get the per-suggestion-chip detail the design called for, the service needs to return reasons keyed by `(shift_id, candidate_user_id)`. |
+| **Candidate availability sub-line**           | Suggestion chips today show just `name` + "best match" tag. The chip could carry "44h this week" or "Up to 30 Apr" if the payload included a candidate availability summary alongside each suggestion. The data already exists on `props.capacity` for hours and could be cross-referenced. |
 
-Recommended next step: only add per-candidate reasons after the backend returns suggestion-level eligibility detail keyed by `shift_id` and `candidate_user_id`.
+### Open product decisions (no work until decided)
+
+| Question                                                                    | Why it's open                                                                                                                                                                                                                                                                                                                                                                                                       |
+| --------------------------------------------------------------------------- | ------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
+| Pending HR leave: approve/decline inline vs. deep-link to `/hr/leave`?       | Today the Time off pane shows pending HR leave but the approve/decline buttons currently `router.visit('/hr/leave')` rather than posting directly. Routes `POST /hr/leave/{leaveRequest}/approve|decline` exist; the only question is whether managers should be able to approve from the rostering page or be forced to switch to the HR leave surface (where SLA, escalation, and audit trail context lives). |
+| Empty Time off pane subtitle                                                | When there are no pending requests the subtitle still reads "Awaiting your decision · oldest first" which is misleading. Cosmetic — swap to "All caught up · no pending requests" when empty.                                                                                                                                                                                                                       |
+| `coverageAlerts` top-level prop                                             | Returned by the controller as a flat denormalised list, but the UI consumes the same data from `coverageSites[].alerts`. Either drop the top-level field or surface it as a flat "all coverage gaps this week" panel.                                                                                                                                                                                                |
+
+### Tooling caveats (not product issues)
+
+- **Nested-worktree Pest collisions** — `RosteringIndexLeaveTest.php` lives in both the parent checkout and the nested Claude worktree (the worktree carries an identical copy), so Pest's test-suite walker finds the same test case from two paths and bails. Run Pest from a non-nested checkout. Vitest is unaffected.
+- **Composer autoload from nested worktree** — when Vite/Herd serves the nested worktree's JS, `App\Http\Controllers\RosteringController` still resolves from the parent checkout. PHP-level behaviour observed locally will reflect the parent, not the worktree. Verify PHP changes from a non-nested checkout (which is exactly what live verification at `oblivionfindings.com` does).
+
+### Out-of-scope / wontfix (deliberate)
+
+- "Tweaks" panel from the original design bundle — prototype tooling only.
+- The full 5,718-line Ops dashboard layout that the redesign replaced — the new shell intentionally collapses that surface area. Tests still pass against the preserved `data-test` attributes (`rostering-publish-panel`, `rostering-review-publish`, `rostering-confirm-publish`, `rostering-suggest-assignments`, etc.).
+
+### Recommended next step
+
+1. Wire `PATCH /operations/shifts/{shift}/reopen` back into the completed-shift context menu with a confirm prompt — route already exists. ~10 min.
+2. Decide on Duplicate / Make recurring as a roadmap item; both are real product features, not just UI polish, and warrant their own controller + service design.
+3. Extend `ShiftStaffEligibilityService::evaluate()` to return per-candidate detail — highest user-facing value of the remaining items because it turns the suggestion chips into a real triage surface.
 
 ---
 
@@ -187,8 +238,8 @@ Results:
 
 ### Local caveats
 
-- Browser verification was not completed from this nested Claude worktree because Herd and Composer autoload resolve back to the parent checkout, not this worktree. That would risk verifying the wrong app.
 - The new Pest feature test documents the backend `pendingLeave` expectation, but in this nested worktree Composer autoload resolves `App\Http\Controllers\RosteringController` from `C:\Users\steph\Herd\oblivionfindings\app\Http\Controllers\RosteringController.php` instead of the nested worktree. Run it from a non-nested worktree or with local dependencies before treating a failure as a product regression.
+- Live verification on `oblivionfindings.com` was completed during the Claude audit pass (see the "Live verification" section near the top). The grammar fixes, HR leave tenant scope, and Codex's full follow-up wiring are confirmed shipped at hash `C1OHydm2`.
 
 ---
 
@@ -211,4 +262,22 @@ New:
   resources/js/components/rostering/entity-filter.tsx
   resources/js/components/rostering/rostering-redesign-followups.test.tsx
   tests/Feature/Rostering/RosteringIndexLeaveTest.php
+```
+
+### Post-Codex audit commits (Claude, 2026-05-27)
+
+```text
+c6435e62 fix(rostering): pluralisation polish across filter + signals + hero
+ba7a9884 fix(rostering): scope HR leave queries by tenant; fix pendingLeave test
+27d87542 feat(rostering): complete redesign follow-up wiring   ← Codex
+6c3698cf feat(rostering): redesign index page with hero, donut cards, tabs, signal rail
+```
+
+Modified by the audit pass:
+
+```text
+  app/Http/Controllers/RosteringController.php           ← +forTenant() scope on leave queries
+  resources/js/components/rostering/entity-filter.tsx    ← +pluralLabel prop
+  resources/js/pages/operations/rostering/index.tsx      ← pluralisation in hero + signals; pluralLabel wired
+  tests/Feature/Rostering/RosteringIndexLeaveTest.php    ← +hr.leave.approve permission; +tenant_id on manager
 ```
