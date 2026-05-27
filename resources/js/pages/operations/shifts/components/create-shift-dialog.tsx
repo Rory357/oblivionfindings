@@ -30,7 +30,10 @@ import {
     SHIFT_TYPE_ACCENT_CLASSES,
     type ShiftTypeKey,
 } from '@/lib/shift-types';
-import { store as storeShift } from '@/routes/operations/shifts';
+import {
+    store as storeShift,
+    update as updateShift,
+} from '@/routes/operations/shifts';
 import { store as storeShiftSeries } from '@/routes/operations/shifts/series';
 
 type Client = {
@@ -67,6 +70,23 @@ const WEEKDAY_LABEL: Record<Weekday, string> = {
     sun: 'Sun',
 };
 
+export type EditableShift = {
+    id: number;
+    starts_at: string;
+    ends_at: string;
+    status: string;
+    shift_type?: string | null;
+    location?: string | null;
+    is_sleepover?: boolean;
+    is_on_call?: boolean;
+    expected_break_minutes?: number | null;
+    notes?: string | null;
+    client?: { id: number } | null;
+    staff?: { id: number } | null;
+    site?: { id: number; name: string } | null;
+    service_context_id?: number | null;
+};
+
 type Props = {
     open: boolean;
     onClose: () => void;
@@ -80,6 +100,8 @@ type Props = {
     defaultClientId?: number | null;
     defaultSiteId?: number | null;
     lockedContext?: LockedContext;
+    /** When set, the dialog flips into edit mode and pre-fills from this shift. */
+    initialShift?: EditableShift | null;
 };
 
 function weekdayFromDatetime(value: string | null | undefined): Weekday {
@@ -136,8 +158,16 @@ export function CreateShiftDialog({
     defaultClientId = null,
     defaultSiteId = null,
     lockedContext = null,
+    initialShift = null,
 }: Props) {
+    const isEdit = !!initialShift;
     const initialClient = useMemo(() => {
+        if (initialShift?.client?.id) {
+            const found = clients.find(
+                (c) => c.id === initialShift.client?.id,
+            );
+            if (found) return found;
+        }
         if (defaultClientId) {
             const found = clients.find(
                 (c) => String(c.id) === String(defaultClientId),
@@ -154,26 +184,43 @@ export function CreateShiftDialog({
     }, [clients, defaultClientId, defaultSiteId]);
 
     const form = useForm({
-        client_id: (initialClient?.id ?? '') as number | '',
-        service_context_id: (initialClient?.service_context_id ??
+        client_id: (initialShift?.client?.id ??
+            initialClient?.id ??
+            '') as number | '',
+        service_context_id: (initialShift?.service_context_id ??
+            initialClient?.service_context_id ??
             defaultServiceContextId ??
             '') as number | '',
-        user_id: '' as number | '',
-        starts_at: toLocalDatetimeInput(defaultStartsAt) || defaultStartForToday(),
-        ends_at: toLocalDatetimeInput(defaultEndsAt) || defaultEndForToday(),
-        location: '' as string,
-        notes: '' as string,
-        status: 'scheduled' as 'draft' | 'scheduled',
-        shift_type: 'standard' as ShiftTypeKey,
-        is_sleepover: false,
-        is_on_call: false,
-        expected_break_minutes: '30' as string,
+        user_id: (initialShift?.staff?.id ?? '') as number | '',
+        starts_at:
+            toLocalDatetimeInput(
+                initialShift?.starts_at ?? defaultStartsAt,
+            ) || defaultStartForToday(),
+        ends_at:
+            toLocalDatetimeInput(initialShift?.ends_at ?? defaultEndsAt) ||
+            defaultEndForToday(),
+        location: (initialShift?.location ?? '') as string,
+        notes: (initialShift?.notes ?? '') as string,
+        status:
+            initialShift?.status === 'draft'
+                ? ('draft' as const)
+                : ('scheduled' as const),
+        shift_type: ((initialShift?.shift_type as ShiftTypeKey) ??
+            'standard') as ShiftTypeKey,
+        is_sleepover: !!initialShift?.is_sleepover,
+        is_on_call: !!initialShift?.is_on_call,
+        expected_break_minutes:
+            initialShift?.expected_break_minutes != null
+                ? String(initialShift.expected_break_minutes)
+                : '30',
         coverage_roles: [] as string[],
         tasks: [] as Array<{ label: string }>,
         repeat_weekly: false,
         repeat_end_date: '' as string,
         repeat_by_weekday: [
-            weekdayFromDatetime(defaultStartsAt),
+            weekdayFromDatetime(
+                initialShift?.starts_at ?? defaultStartsAt,
+            ),
         ] as Weekday[],
         return_to: '' as string,
     });
@@ -317,6 +364,14 @@ export function CreateShiftDialog({
 
     function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
+        if (isEdit && initialShift) {
+            // Edit mode: PUT to update; recurring options don't apply.
+            form.put(updateShift.url(initialShift.id), {
+                preserveScroll: true,
+                onSuccess: () => onClose(),
+            });
+            return;
+        }
         if (!form.data.repeat_weekly) {
             form.post(storeShift.url(), {
                 preserveScroll: true,
@@ -361,9 +416,13 @@ export function CreateShiftDialog({
                 onInteractOutside={(e) => e.preventDefault()}
             >
                 <VisuallyHidden.Root>
-                    <DialogTitle>Create shift</DialogTitle>
+                    <DialogTitle>
+                        {isEdit ? `Edit shift #${initialShift?.id}` : 'Create shift'}
+                    </DialogTitle>
                     <DialogDescription>
-                        Schedule an appointment or rostered shift. Add tasks and optionally repeat weekly.
+                        {isEdit
+                            ? 'Update the schedule, staff, tasks or notes for this shift.'
+                            : 'Schedule an appointment or rostered shift. Add tasks and optionally repeat weekly.'}
                     </DialogDescription>
                 </VisuallyHidden.Root>
                 <form
@@ -380,13 +439,17 @@ export function CreateShiftDialog({
                             </span>
                             <div className="min-w-0 flex-1">
                                 <div className="text-[10.5px] font-semibold uppercase tracking-wider text-primary">
-                                    New shift
+                                    {isEdit
+                                        ? `Edit · Shift #${initialShift?.id}`
+                                        : 'New shift'}
                                 </div>
                                 <h2 className="mt-0.5 text-xl font-bold tracking-tight text-foreground">
-                                    Create shift
+                                    {isEdit ? 'Edit shift' : 'Create shift'}
                                 </h2>
                                 <p className="mt-0.5 text-sm text-muted-foreground">
-                                    Schedule an appointment or rostered shift. Add tasks and optionally repeat weekly.
+                                    {isEdit
+                                        ? 'Update the schedule, staff, tasks or notes. Changes are saved on submit.'
+                                        : 'Schedule an appointment or rostered shift. Add tasks and optionally repeat weekly.'}
                                 </p>
                             </div>
                             <div className="flex shrink-0 items-center gap-2">
@@ -558,6 +621,7 @@ export function CreateShiftDialog({
                             <FieldError message={form.errors.ends_at} />
                         </Section>
 
+                        {isEdit ? null : (
                         <Section
                             icon={Repeat}
                             title="Repeat weekly"
@@ -634,6 +698,7 @@ export function CreateShiftDialog({
                                 </div>
                             ) : null}
                         </Section>
+                        )}
 
                         <Section
                             icon={Pencil}
@@ -741,7 +806,7 @@ export function CreateShiftDialog({
                             </span>
                             <div className="min-w-0">
                                 <div className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
-                                    Will create
+                                    {isEdit ? 'Will update' : 'Will create'}
                                 </div>
                                 <div className="truncate text-xs text-foreground">
                                     {summary}
@@ -769,7 +834,7 @@ export function CreateShiftDialog({
                                 ) : (
                                     <>
                                         <Check className="h-4 w-4" />
-                                        Create shift
+                                        {isEdit ? 'Save changes' : 'Create shift'}
                                     </>
                                 )}
                             </button>

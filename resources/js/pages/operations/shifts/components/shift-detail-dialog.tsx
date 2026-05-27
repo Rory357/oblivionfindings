@@ -46,9 +46,10 @@ type Props = {
     shift: ShiftRow | null;
     onClose: () => void;
     onAct: (action: 'assign' | 'start' | 'complete' | 'timesheet') => void;
+    onEdit?: () => void;
 };
 
-export function ShiftDetailDialog({ open, shift, onClose, onAct }: Props) {
+export function ShiftDetailDialog({ open, shift, onClose, onAct, onEdit }: Props) {
     useEffect(() => {
         if (!open) return;
         const handler = (e: KeyboardEvent) => {
@@ -268,12 +269,22 @@ export function ShiftDetailDialog({ open, shift, onClose, onAct }: Props) {
                             >
                                 Close
                             </button>
-                            <Link
-                                href={editShift.url(shift.id)}
-                                className="inline-flex items-center gap-1.5 rounded-md border border-border bg-transparent px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted"
-                            >
-                                <Pencil className="h-4 w-4" /> Edit
-                            </Link>
+                            {onEdit ? (
+                                <button
+                                    type="button"
+                                    onClick={onEdit}
+                                    className="inline-flex items-center gap-1.5 rounded-md border border-border bg-transparent px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted"
+                                >
+                                    <Pencil className="h-4 w-4" /> Edit
+                                </button>
+                            ) : (
+                                <Link
+                                    href={editShift.url(shift.id)}
+                                    className="inline-flex items-center gap-1.5 rounded-md border border-border bg-transparent px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted"
+                                >
+                                    <Pencil className="h-4 w-4" /> Edit
+                                </Link>
+                            )}
                             {primary ? (
                                 <button
                                     type="button"

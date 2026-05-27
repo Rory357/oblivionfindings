@@ -195,12 +195,18 @@ export default function ShiftsIndex({
         site_id?: number | null;
     }>({});
     const [viewShift, setViewShift] = useState<ShiftRow | null>(null);
+    const [editShiftRow, setEditShiftRow] = useState<ShiftRow | null>(null);
     const [contextMenu, setContextMenu] = useState<{
         shift: ShiftRow;
         x: number;
         y: number;
     } | null>(null);
     const [toast, setToast] = useState<string | null>(null);
+
+    function openEdit(shift: ShiftRow) {
+        setViewShift(null);
+        setEditShiftRow(shift);
+    }
 
     function notify(msg: string) {
         setToast(msg);
@@ -396,7 +402,7 @@ export default function ShiftsIndex({
             {
                 label: 'Edit shift',
                 icon: Pencil,
-                onClick: () => router.visit(editShift.url(shift.id)),
+                onClick: () => openEdit(shift),
                 disabled: !canEdit,
             },
             { type: 'separator' },
@@ -406,7 +412,7 @@ export default function ShiftsIndex({
             items.push({
                 label: 'Assign staff',
                 icon: UserPlus,
-                onClick: () => router.visit(editShift.url(shift.id)),
+                onClick: () => openEdit(shift),
                 disabled: !canEdit,
             });
             items.push({
@@ -423,7 +429,7 @@ export default function ShiftsIndex({
             items.push({
                 label: 'Reassign staff',
                 icon: Users,
-                onClick: () => router.visit(editShift.url(shift.id)),
+                onClick: () => openEdit(shift),
                 disabled: completed || cancelled || !canEdit,
             });
             items.push({
@@ -709,13 +715,9 @@ export default function ShiftsIndex({
                                 todayKey={todayKey}
                                 dense={dense}
                                 onShiftClick={(s) => setViewShift(s)}
-                                onAssignOpen={(s) =>
-                                    router.visit(editShift.url(s.id))
-                                }
+                                onAssignOpen={(s) => openEdit(s)}
                                 onContextMenu={openShiftMenu}
-                                onEditClick={(s) =>
-                                    router.visit(editShift.url(s.id))
-                                }
+                                onEditClick={(s) => openEdit(s)}
                                 onCreateOnDay={(date) =>
                                     openCreate({
                                         starts_at: `${date}T09:00`,
@@ -793,14 +795,54 @@ export default function ShiftsIndex({
                     defaultSiteId={createDefaults.site_id ?? null}
                 />
 
+                <CreateShiftDialog
+                    key={editShiftRow ? `edit-${editShiftRow.id}` : 'edit-none'}
+                    open={!!editShiftRow}
+                    onClose={() => setEditShiftRow(null)}
+                    clients={clients}
+                    staff={staff}
+                    sites={sites}
+                    serviceContexts={serviceContexts}
+                    defaultServiceContextId={defaultServiceContextId}
+                    initialShift={
+                        editShiftRow
+                            ? {
+                                  id: editShiftRow.id,
+                                  starts_at: editShiftRow.starts_at,
+                                  ends_at: editShiftRow.ends_at,
+                                  status: editShiftRow.status,
+                                  shift_type: editShiftRow.shift_type ?? null,
+                                  location: editShiftRow.location ?? null,
+                                  is_sleepover: editShiftRow.is_sleepover,
+                                  is_on_call: editShiftRow.is_on_call,
+                                  client: editShiftRow.client
+                                      ? { id: editShiftRow.client.id }
+                                      : null,
+                                  staff: editShiftRow.staff
+                                      ? { id: editShiftRow.staff.id }
+                                      : null,
+                                  site: editShiftRow.site
+                                      ? {
+                                            id: editShiftRow.site.id,
+                                            name: editShiftRow.site.name,
+                                        }
+                                      : null,
+                              }
+                            : null
+                    }
+                />
+
                 <ShiftDetailDialog
                     open={!!viewShift}
                     shift={viewShift}
                     onClose={() => setViewShift(null)}
+                    onEdit={
+                        viewShift ? () => openEdit(viewShift) : undefined
+                    }
                     onAct={(action) => {
                         if (!viewShift) return;
                         if (action === 'assign') {
-                            router.visit(editShift.url(viewShift.id));
+                            openEdit(viewShift);
                         } else if (action === 'start') {
                             patchShift(
                                 startShift.url(viewShift.id),
