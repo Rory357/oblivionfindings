@@ -10,6 +10,7 @@ import { SmartMatchesStrip } from '@/components/job-board/smart-matches-strip';
 import type {
     JobBoardScope,
     JobBoardStats,
+    JobBoardViewer,
     JobBoardWeek,
     JobPost,
 } from '@/components/job-board/types';
@@ -38,10 +39,16 @@ interface Props {
     available_skills?: string[];
     stats?: JobBoardStats;
     week?: JobBoardWeek;
-    viewer?: { first_name: string };
+    viewer?: JobBoardViewer;
 }
 
-const SCOPE_VALUES: JobBoardScope[] = ['for-you', 'all', 'mine', 'replacements'];
+const SCOPE_VALUES: JobBoardScope[] = [
+    'for-you',
+    'all',
+    'mine',
+    'replacements',
+    'approvals',
+];
 
 function resolveScope(raw: string | undefined): JobBoardScope {
     if (raw && (SCOPE_VALUES as string[]).includes(raw)) {
@@ -91,6 +98,7 @@ export default function JobBoardIndex({
         expiring_soon: 0,
         mine: 0,
         replacements: 0,
+        pending_approval: 0,
         sites: 0,
         sites_worked_this_week: 0,
     };
@@ -197,6 +205,7 @@ export default function JobBoardIndex({
         all: effectiveStats.open ?? 0,
         mine: effectiveStats.mine ?? 0,
         replacements: effectiveStats.replacements ?? 0,
+        approvals: effectiveStats.pending_approval ?? 0,
     };
 
     const visibleJobs = jobs.data;
@@ -213,7 +222,9 @@ export default function JobBoardIndex({
               ? 'My claims'
               : scope === 'replacements'
                 ? 'Replacement requests'
-                : 'All open positions';
+                : scope === 'approvals'
+                  ? 'Claims awaiting your approval'
+                  : 'All open positions';
 
     return (
         <AppLayout
@@ -245,6 +256,7 @@ export default function JobBoardIndex({
                     scope={scope}
                     counts={counts}
                     onScopeChange={handleScopeChange}
+                    showApprovals={!!viewer?.can_approve}
                 />
 
                 {scope === 'for-you' ? (

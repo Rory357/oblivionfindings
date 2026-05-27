@@ -88,6 +88,7 @@ export type JobBoardStats = {
     expiring_soon: number;
     mine: number;
     replacements: number;
+    pending_approval: number;
     sites: number;
     sites_worked_this_week: number;
 };
@@ -102,4 +103,15 @@ export type JobBoardWeek = {
     is_current: boolean;
 };
 
-export type JobBoardScope = 'for-you' | 'all' | 'mine' | 'replacements';
+export type JobBoardScope =
+    | 'for-you'
+    | 'all'
+    | 'mine'
+    | 'replacements'
+    | 'approvals';
+
+export type JobBoardViewer = {
+    first_name: string;
+    can_approve?: boolean;
+    can_post_position?: boolean;
+};

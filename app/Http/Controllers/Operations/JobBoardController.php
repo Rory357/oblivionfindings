@@ -29,12 +29,14 @@ class JobBoardController extends Controller
         $filters = $request->validate([
             'q' => ['nullable', 'string', 'max:255'],
             'status' => ['nullable', 'string', 'in:open,claimed,filled,cancelled'],
-            'scope' => ['nullable', 'string', 'in:for-you,all,mine,replacements'],
+            'scope' => ['nullable', 'string', 'in:for-you,all,mine,replacements,approvals'],
             'date_range' => ['nullable', 'string', 'in:next_7_days,this_weekend,tonight'],
             'skill' => ['nullable', 'string', 'max:100'],
             'fit' => ['nullable', 'string', 'in:all,eligible,no-conflict,site'],
             'week' => ['nullable', 'date_format:Y-m-d'],
         ]);
+
+        $canApprove = $this->canApprovePositions($auth);
 
         $search = trim((string) ($filters['q'] ?? ''));
         $scope = $filters['scope'] ?? 'for-you';
@@ -79,6 +81,12 @@ class JobBoardController extends Controller
             })
             ->when($scope === 'replacements', function ($query) {
                 $query->whereNotNull('replacement_request_id');
+            })
+            ->when($scope === 'approvals', function ($query) use ($auth) {
+                // Positions waiting on a coordinator to approve a worker's claim.
+                // Exclude the viewer's own claims — they should approve via "My claims" only if they can self-approve.
+                $query->where('status', 'claimed')
+                    ->where('claimed_by', '!=', $auth->id);
             })
             ->when($scope === 'all' || $scope === 'for-you', function ($query) {
                 $query->where('status', 'open')
@@ -151,6 +159,13 @@ class JobBoardController extends Controller
             })
             ->count();
 
+        $pendingApprovalCount = $canApprove
+            ? (clone $statsQuery)
+                ->where('status', 'claimed')
+                ->where('claimed_by', '!=', $auth->id)
+                ->count()
+            : 0;
+
         $sitesCount = ShiftOpenPosition::query()
             ->when($auth->organization_id, fn ($q) => $q->where('shift_open_positions.organization_id', $auth->organization_id))
             ->where('shift_open_positions.status', 'open')
@@ -191,6 +206,8 @@ class JobBoardController extends Controller
             ],
             'viewer' => [
                 'first_name' => $this->viewerFirstName($auth),
+                'can_approve' => $canApprove,
+                'can_post_position' => $this->canCreatePositions($auth),
             ],
             'stats' => [
                 'open' => (clone $statsQuery)
@@ -209,6 +226,7 @@ class JobBoardController extends Controller
                 'expiring_soon' => $expiringSoon,
                 'mine' => $myClaimsCount,
                 'replacements' => $replacementsCount,
+                'pending_approval' => $pendingApprovalCount,
                 'sites' => $sitesCount,
                 'sites_worked_this_week' => $sitesWorkedThisWeek,
             ],

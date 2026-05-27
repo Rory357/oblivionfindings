@@ -1,4 +1,11 @@
-import { Bookmark, Circle, RefreshCw, Sparkles, type LucideIcon } from 'lucide-react';
+import {
+    Bookmark,
+    CheckCircle2,
+    Circle,
+    RefreshCw,
+    Sparkles,
+    type LucideIcon,
+} from 'lucide-react';
 
 import { cn } from '@/lib/utils';
 
@@ -8,6 +15,8 @@ interface ScopeTabsProps {
     scope: JobBoardScope;
     counts: Record<JobBoardScope, number>;
     onScopeChange: (next: JobBoardScope) => void;
+    /** When true, render the coordinator-only "Pending approval" tab. */
+    showApprovals?: boolean;
 }
 
 const TABS: Array<{
@@ -15,6 +24,7 @@ const TABS: Array<{
     label: string;
     icon: LucideIcon;
     testId: string;
+    coordinatorOnly?: boolean;
 }> = [
     {
         id: 'for-you',
@@ -27,6 +37,13 @@ const TABS: Array<{
         label: 'All open',
         icon: Circle,
         testId: 'job-board-all-tab',
+    },
+    {
+        id: 'approvals',
+        label: 'Pending approval',
+        icon: CheckCircle2,
+        testId: 'job-board-scope-approvals-tab',
+        coordinatorOnly: true,
     },
     {
         id: 'mine',
@@ -42,14 +59,22 @@ const TABS: Array<{
     },
 ];
 
-export function ScopeTabs({ scope, counts, onScopeChange }: ScopeTabsProps) {
+export function ScopeTabs({
+    scope,
+    counts,
+    onScopeChange,
+    showApprovals = false,
+}: ScopeTabsProps) {
+    const visibleTabs = TABS.filter(
+        (tab) => !tab.coordinatorOnly || showApprovals,
+    );
     return (
         <nav
             role="tablist"
             aria-label="Job board view"
             className="flex w-max max-w-full gap-1 overflow-x-auto rounded-xl border border-border bg-card p-1 shadow-sm"
         >
-            {TABS.map((tab) => {
+            {visibleTabs.map((tab) => {
                 const Icon = tab.icon;
                 const isActive = scope === tab.id;
                 return (
