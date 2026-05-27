@@ -1351,7 +1351,7 @@ export default function RosteringIndex(props: Props) {
         if (props.stats.timesheets_pending > 0) {
             list.push({
                 tone: 'info',
-                title: `${props.stats.timesheets_pending} timesheets pending`,
+                title: `${props.stats.timesheets_pending} timesheet${props.stats.timesheets_pending === 1 ? '' : 's'} pending`,
                 body: 'Submitted timesheets need approval.',
                 cta: 'Review timesheets',
                 href: '/operations/timesheets',
@@ -1622,13 +1622,17 @@ export default function RosteringIndex(props: Props) {
                     }
                     description={
                         <span>
-                            {total} shifts across{' '}
-                            {(props.sites?.length ?? 0) || 'all'} sites.{' '}
-                            {openCount > 0 ? `${openCount} need cover, ` : ''}
+                            {total} shift{total === 1 ? '' : 's'} across{' '}
+                            {(props.sites?.length ?? 0) || 'all'} site
+                            {(props.sites?.length ?? 0) === 1 ? '' : 's'}.{' '}
+                            {openCount > 0
+                                ? `${openCount} need${openCount === 1 ? 's' : ''} cover, `
+                                : ''}
                             {props.stats.staff_overlaps > 0
                                 ? `${props.stats.staff_overlaps} conflict${props.stats.staff_overlaps === 1 ? '' : 's'} to resolve, `
                                 : ''}
-                            and {props.stats.timesheets_pending} timesheets
+                            and {props.stats.timesheets_pending} timesheet
+                            {props.stats.timesheets_pending === 1 ? '' : 's'}{' '}
                             waiting on you.
                         </span>
                     }
@@ -1639,7 +1643,7 @@ export default function RosteringIndex(props: Props) {
                         },
                         {
                             icon: LayoutGrid,
-                            label: `${props.sites?.length ?? 0} sites`,
+                            label: `${props.sites?.length ?? 0} site${(props.sites?.length ?? 0) === 1 ? '' : 's'}`,
                         },
                         {
                             icon: CheckCircle2,
@@ -1769,6 +1773,7 @@ export default function RosteringIndex(props: Props) {
                                 <EntityFilter
                                     onDark
                                     label="Staff"
+                                    pluralLabel="staff"
                                     allLabel="All staff"
                                     items={staffFilterItems}
                                     value={props.filters.staff_id}

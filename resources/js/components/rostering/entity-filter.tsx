@@ -30,6 +30,12 @@ export type EntityFilterProps = {
     onChange: (next: number | null) => void;
     onDark?: boolean;
     className?: string;
+    /**
+     * Plural label used in placeholders/empty states.
+     * Defaults to `label + 's'` (e.g. "client" → "clients"),
+     * but English uncountables ("staff") need an explicit override.
+     */
+    pluralLabel?: string;
 };
 
 export function EntityFilter({
@@ -40,12 +46,16 @@ export function EntityFilter({
     onChange,
     onDark = false,
     className,
+    pluralLabel,
 }: EntityFilterProps) {
     const [open, setOpen] = useState(false);
     const selected = useMemo(
         () => items.find((item) => item.id === value) ?? null,
         [items, value],
     );
+    const singular = label.toLowerCase();
+    const plural = (pluralLabel ?? `${label}s`).toLowerCase();
+    const noun = items.length === 1 ? singular : plural;
 
     const triggerClass = onDark
         ? cn(
@@ -102,12 +112,10 @@ export function EntityFilter({
             >
                 <Command>
                     <CommandInput
-                        placeholder={`Search ${items.length} ${label.toLowerCase()}${items.length === 1 ? '' : 's'}...`}
+                        placeholder={`Search ${items.length} ${noun}…`}
                     />
                     <CommandList>
-                        <CommandEmpty>
-                            No {label.toLowerCase()} match.
-                        </CommandEmpty>
+                        <CommandEmpty>No {plural} match.</CommandEmpty>
                         <CommandGroup>
                             <CommandItem
                                 value={`__all__ ${allLabel}`}
