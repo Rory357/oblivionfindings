@@ -20,7 +20,6 @@ import {
     cancel as cancelShift,
     complete as completeShift,
     duplicate as duplicateShift,
-    edit as editShift,
     index as shiftsIndex,
     reopen as reopenShift,
     show as showShift,
@@ -99,7 +98,6 @@ type Props = {
     sites: Site[];
     serviceContexts: ServiceContext[];
     defaultServiceContextId: number | null;
-    statuses: string[];
     stats: Stats;
     canCreate: boolean;
 };
