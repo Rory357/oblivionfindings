@@ -1116,6 +1116,7 @@ class ShiftController extends Controller
             'tasks.*.id' => ['sometimes', 'integer', 'exists:shift_tasks,id'],
             'tasks.*.label' => ['required_with:tasks', 'string', 'max:255'],
             'tasks.*.is_completed' => ['sometimes', 'boolean'],
+            'return_to' => ['nullable', 'string', 'max:2048'],
         ]);
 
         $data = $this->normalizeShiftData($data);
@@ -1346,7 +1347,11 @@ class ShiftController extends Controller
             ]);
         }
 
-        return redirect()->route('operations.shifts.index')->with(
+        $returnTo = is_string($data['return_to'] ?? null) && $data['return_to'] !== ''
+            ? $data['return_to']
+            : route('operations.shifts.index');
+
+        return redirect($returnTo)->with(
             'success',
             $seriesScope === 'future' ? 'Recurring shift series updated.' : 'Shift updated.',
         );

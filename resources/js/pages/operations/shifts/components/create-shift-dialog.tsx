@@ -380,6 +380,18 @@ export function CreateShiftDialog({
 
     function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
+        // Round-trip the current URL so the server's redirect after save
+        // lands the user back on the same week / filter combo instead of
+        // resetting to the default index. Transform is invoked right before
+        // the payload is built, so the latest URL is captured even when the
+        // user navigated weeks before opening the dialog.
+        form.transform((data) => ({
+            ...data,
+            return_to:
+                typeof window !== 'undefined'
+                    ? window.location.pathname + window.location.search
+                    : data.return_to,
+        }));
         if (isEdit && initialShift) {
             // Edit mode: PUT to update; recurring options don't apply.
             form.put(updateShift.url(initialShift.id), {
