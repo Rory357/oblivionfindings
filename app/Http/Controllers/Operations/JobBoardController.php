@@ -152,11 +152,11 @@ class JobBoardController extends Controller
             ->count();
 
         $sitesCount = ShiftOpenPosition::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->where('status', 'open')
+            ->when($auth->organization_id, fn ($q) => $q->where('shift_open_positions.organization_id', $auth->organization_id))
+            ->where('shift_open_positions.status', 'open')
             ->where(function ($query) {
-                $query->whereNull('expires_at')
-                    ->orWhere('expires_at', '>', now());
+                $query->whereNull('shift_open_positions.expires_at')
+                    ->orWhere('shift_open_positions.expires_at', '>', now());
             })
             ->join('shifts', 'shifts.id', '=', 'shift_open_positions.shift_id')
             ->join('clients', 'clients.id', '=', 'shifts.client_id')
@@ -165,9 +165,9 @@ class JobBoardController extends Controller
             ->count('clients.site_id');
 
         $sitesWorkedThisWeek = Shift::query()
-            ->where('user_id', $auth->id)
-            ->where('starts_at', '>=', $weekStart)
-            ->where('starts_at', '<=', $weekEnd)
+            ->where('shifts.user_id', $auth->id)
+            ->where('shifts.starts_at', '>=', $weekStart)
+            ->where('shifts.starts_at', '<=', $weekEnd)
             ->join('clients', 'clients.id', '=', 'shifts.client_id')
             ->whereNotNull('clients.site_id')
             ->distinct('clients.site_id')
