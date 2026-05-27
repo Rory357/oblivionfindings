@@ -1,9 +1,10 @@
-import { useEffect, useRef, useState } from 'react';
+import { useMemo, useState } from 'react';
 import {
     AlertTriangle,
     Building,
     CalendarDays,
     CalendarRange,
+    Check,
     CheckCircle2,
     ChevronDown,
     ChevronLeft,
@@ -19,7 +20,20 @@ import {
     Zap,
 } from 'lucide-react';
 
-import { EntityFilter } from '@/components/rostering/entity-filter';
+import {
+    Command,
+    CommandEmpty,
+    CommandGroup,
+    CommandItem,
+    CommandList,
+} from '@/components/ui/command';
+import {
+    Popover,
+    PopoverContent,
+    PopoverTrigger,
+} from '@/components/ui/popover';
+import { MultiEntityFilter } from '@/components/rostering/multi-entity-filter';
+import { cn } from '@/lib/utils';
 
 export type HeroStats = {
     total: number;
@@ -33,9 +47,10 @@ export type HeroStats = {
 };
 
 export type HeroFilters = {
-    status: string | null;
-    site_id: number | null;
-    user_id: number | null;
+    statuses: string[];
+    site_ids: number[];
+    user_ids: number[];
+    client_ids: number[];
     q: string;
 };
 
@@ -47,13 +62,14 @@ type Props = {
     weekLabel: string;
     stats: HeroStats;
     filters: HeroFilters;
-    onChangeFilter: (
-        key: keyof HeroFilters,
-        value: string | number | null,
+    onChangeFilter: <K extends keyof HeroFilters>(
+        key: K,
+        value: HeroFilters[K],
     ) => void;
     statusOptions: StatusOption[];
     siteItems: EntityItem[];
     staffItems: EntityItem[];
+    clientItems: EntityItem[];
     onCreate?: () => void;
     onPrevWeek: () => void;
     onNextWeek: () => void;
@@ -71,6 +87,7 @@ export function ShiftsHero({
     statusOptions,
     siteItems,
     staffItems,
+    clientItems,
     onCreate,
     onPrevWeek,
     onNextWeek,
@@ -237,27 +254,34 @@ export function ShiftsHero({
                         onChange={(v) => onChangeFilter('q', v)}
                     />
                     <StatusChip
-                        value={filters.status}
+                        value={filters.statuses}
                         options={statusOptions}
-                        onSelect={(v) => onChangeFilter('status', v)}
-                        onClear={() => onChangeFilter('status', null)}
+                        onChange={(next) => onChangeFilter('statuses', next)}
                     />
-                    <EntityFilter
+                    <MultiEntityFilter
                         onDark
                         label="Staff"
                         pluralLabel="staff"
                         allLabel="All staff"
                         items={staffItems}
-                        value={filters.user_id}
-                        onChange={(next) => onChangeFilter('user_id', next)}
+                        value={filters.user_ids}
+                        onChange={(next) => onChangeFilter('user_ids', next)}
                     />
-                    <EntityFilter
+                    <MultiEntityFilter
+                        onDark
+                        label="Client"
+                        allLabel="All clients"
+                        items={clientItems}
+                        value={filters.client_ids}
+                        onChange={(next) => onChangeFilter('client_ids', next)}
+                    />
+                    <MultiEntityFilter
                         onDark
                         label="Site"
                         allLabel="All sites"
                         items={siteItems}
-                        value={filters.site_id}
-                        onChange={(next) => onChangeFilter('site_id', next)}
+                        value={filters.site_ids}
+                        onChange={(next) => onChangeFilter('site_ids', next)}
                     />
                 </div>
             </div>
@@ -362,111 +386,142 @@ function HeroSearchBox({
 function StatusChip({
     value,
     options,
-    onSelect,
-    onClear,
+    onChange,
 }: {
-    value: string | null;
+    value: string[];
     options: StatusOption[];
-    onSelect: (v: string) => void;
-    onClear: () => void;
+    onChange: (next: string[]) => void;
 }) {
     const [open, setOpen] = useState(false);
-    const ref = useRef<HTMLDivElement | null>(null);
-    const current = options.find((o) => o.value === value);
+    const selectedSet = useMemo(() => new Set(value), [value]);
+    const selectedCount = value.length;
+    const allSelected = selectedCount === 0;
 
-    useEffect(() => {
-        if (!open) return;
-        const onDown = (e: MouseEvent) => {
-            if (!ref.current?.contains(e.target as Node)) setOpen(false);
-        };
-        window.addEventListener('mousedown', onDown);
-        return () => window.removeEventListener('mousedown', onDown);
-    }, [open]);
+    const triggerLabel = useMemo(() => {
+        if (allSelected) return `All statuses · ${options.length}`;
+        if (selectedCount === 1) {
+            const found = options.find((o) => o.value === value[0]);
+            return found ? found.label : '1 status';
+        }
+        return `${selectedCount} statuses`;
+    }, [allSelected, options, selectedCount, value]);
 
-    const selected = !!current;
+    const toggle = (v: string) => {
+        if (selectedSet.has(v)) {
+            onChange(value.filter((x) => x !== v));
+        } else {
+            onChange([...value, v]);
+        }
+    };
+    const clearAll = () => onChange([]);
 
     return (
-        <div className="relative" ref={ref}>
-            <button
-                type="button"
-                aria-haspopup="listbox"
-                aria-expanded={open}
-                onClick={() => setOpen((x) => !x)}
-                className={[
-                    'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors',
-                    selected
-                        ? 'border-primary-foreground bg-primary-foreground text-primary'
-                        : 'border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20',
-                ].join(' ')}
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <button
+                    type="button"
+                    aria-haspopup="listbox"
+                    aria-expanded={open}
+                    className={cn(
+                        'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors',
+                        allSelected
+                            ? 'border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20'
+                            : 'border-primary-foreground bg-primary-foreground text-primary',
+                    )}
+                >
+                    <Filter className="h-3.5 w-3.5" aria-hidden="true" />
+                    <span className="max-w-[200px] truncate">
+                        {triggerLabel}
+                    </span>
+                    {!allSelected ? (
+                        <button
+                            type="button"
+                            aria-label="Clear status filter"
+                            className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full hover:bg-primary/30"
+                            onClick={(e) => {
+                                e.stopPropagation();
+                                clearAll();
+                            }}
+                        >
+                            <X className="h-3 w-3" />
+                        </button>
+                    ) : (
+                        <ChevronDown className="h-3 w-3 opacity-70" />
+                    )}
+                </button>
+            </PopoverTrigger>
+            <PopoverContent
+                align="end"
+                className="w-[240px] p-0"
+                sideOffset={6}
             >
-                <Filter className="h-3.5 w-3.5" aria-hidden="true" />
-                <span className="max-w-[200px] truncate">
-                    {current ? current.label : `All statuses · ${options.length}`}
-                </span>
-                {selected ? (
-                    <button
-                        type="button"
-                        aria-label="Clear status filter"
-                        className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full hover:bg-primary/30"
-                        onClick={(e) => {
-                            e.stopPropagation();
-                            onClear();
-                        }}
-                    >
-                        <X className="h-3 w-3" />
-                    </button>
-                ) : (
-                    <ChevronDown className="h-3 w-3 opacity-70" />
-                )}
-            </button>
-            {open ? (
-                <div className="absolute right-0 top-full z-30 mt-1.5 w-[220px] rounded-lg border border-border bg-popover text-foreground shadow-lg">
-                    <ul className="max-h-72 overflow-auto py-1 text-sm">
-                        <li>
-                            <button
-                                type="button"
-                                onClick={() => {
-                                    onClear();
-                                    setOpen(false);
-                                }}
-                                className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-muted"
+                <Command>
+                    <CommandList>
+                        <CommandEmpty>No statuses match.</CommandEmpty>
+                        <CommandGroup>
+                            <CommandItem
+                                value="__all__ all statuses"
+                                onSelect={clearAll}
+                                className="flex items-center gap-2"
                             >
-                                <span className="inline-block h-4 w-4 shrink-0" />
                                 <span
-                                    className={
-                                        !selected
-                                            ? 'font-medium text-primary'
-                                            : 'text-muted-foreground'
-                                    }
+                                    className={cn(
+                                        'flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border',
+                                        allSelected
+                                            ? 'border-primary bg-primary text-primary-foreground'
+                                            : 'border-input bg-background',
+                                    )}
+                                    aria-hidden="true"
                                 >
+                                    {allSelected ? (
+                                        <Check className="h-3 w-3" />
+                                    ) : null}
+                                </span>
+                                <span className="flex-1 font-medium">
                                     All statuses
                                 </span>
-                            </button>
-                        </li>
-                        {options.length === 0 ? (
-                            <li className="px-3 py-1.5 text-xs text-muted-foreground">
-                                Nothing to choose
-                            </li>
-                        ) : (
-                            options.map((o) => (
-                                <li key={o.value}>
-                                    <button
-                                        type="button"
-                                        onClick={() => {
-                                            onSelect(o.value);
-                                            setOpen(false);
-                                        }}
-                                        className={`flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-muted ${value === o.value ? 'font-medium text-primary' : ''}`}
+                                <span className="text-[10px] tabular-nums text-muted-foreground">
+                                    {options.length}
+                                </span>
+                            </CommandItem>
+                        </CommandGroup>
+                        <CommandGroup
+                            heading={
+                                selectedCount > 0
+                                    ? `Statuses · ${selectedCount} selected`
+                                    : 'Statuses'
+                            }
+                        >
+                            {options.map((o) => {
+                                const checked = selectedSet.has(o.value);
+                                return (
+                                    <CommandItem
+                                        key={o.value}
+                                        value={o.label}
+                                        onSelect={() => toggle(o.value)}
+                                        className="flex items-center gap-2"
                                     >
-                                        <span className="inline-block h-4 w-4 shrink-0" />
-                                        {o.label}
-                                    </button>
-                                </li>
-                            ))
-                        )}
-                    </ul>
-                </div>
-            ) : null}
-        </div>
+                                        <span
+                                            className={cn(
+                                                'flex h-4 w-4 shrink-0 items-center justify-center rounded-sm border',
+                                                checked
+                                                    ? 'border-primary bg-primary text-primary-foreground'
+                                                    : 'border-input bg-background',
+                                            )}
+                                            aria-hidden="true"
+                                        >
+                                            {checked ? (
+                                                <Check className="h-3 w-3" />
+                                            ) : null}
+                                        </span>
+                                        <span className="flex-1">{o.label}</span>
+                                    </CommandItem>
+                                );
+                            })}
+                        </CommandGroup>
+                    </CommandList>
+                </Command>
+            </PopoverContent>
+        </Popover>
     );
 }

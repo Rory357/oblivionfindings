@@ -79,19 +79,35 @@ class ShiftController extends Controller
 
         $this->siteAccess()->applyShiftScope($query, $auth, $this->shiftBypassPermissions());
 
-        if ($request->filled('status')) {
+        // Status: accept either single `status` or `status_ids[]`/`statuses[]` array.
+        $statusFilter = (array) ($request->query('statuses', $request->query('status_ids', [])));
+        if (! empty($statusFilter)) {
+            $query->whereIn('status', array_values(array_filter($statusFilter, fn ($s) => $s !== null && $s !== '')));
+        } elseif ($request->filled('status')) {
             $query->where('status', $request->query('status'));
         }
 
-        if ($request->filled('client_id')) {
+        // Clients: accept either single `client_id` or `client_ids[]` array.
+        $clientFilter = (array) $request->query('client_ids', []);
+        if (! empty($clientFilter)) {
+            $query->whereIn('client_id', array_values(array_filter($clientFilter, fn ($v) => $v !== null && $v !== '')));
+        } elseif ($request->filled('client_id')) {
             $query->where('client_id', $request->query('client_id'));
         }
 
-        if ($request->filled('user_id')) {
+        // Staff: accept either single `user_id` or `user_ids[]` array.
+        $staffFilter = (array) $request->query('user_ids', []);
+        if (! empty($staffFilter)) {
+            $query->whereIn('user_id', array_values(array_filter($staffFilter, fn ($v) => $v !== null && $v !== '')));
+        } elseif ($request->filled('user_id')) {
             $query->where('user_id', $request->query('user_id'));
         }
 
-        if ($request->filled('site_id')) {
+        // Sites: accept either single `site_id` or `site_ids[]` array.
+        $siteFilter = (array) $request->query('site_ids', []);
+        if (! empty($siteFilter)) {
+            $query->whereIn('site_id', array_values(array_filter($siteFilter, fn ($v) => $v !== null && $v !== '')));
+        } elseif ($request->filled('site_id')) {
             $query->where('site_id', $request->query('site_id'));
         }
 
@@ -178,15 +194,31 @@ class ShiftController extends Controller
         $statsSites = $rows->pluck('site_id')->filter()->unique()->count();
         $statsStaff = $rows->pluck('user_id')->filter()->unique()->count();
 
+        // Normalise array filters back to int arrays for the front end.
+        $intArray = fn ($v) => collect((array) $v)
+            ->map(fn ($x) => (int) $x)
+            ->filter(fn ($x) => $x > 0)
+            ->values()
+            ->all();
+        $stringArray = fn ($v) => collect((array) $v)
+            ->map(fn ($x) => (string) $x)
+            ->filter(fn ($x) => $x !== '')
+            ->values()
+            ->all();
+
         return inertia('operations/shifts/index', [
             'shifts' => $shifts,
             'filters' => [
                 'from' => $filterFrom,
                 'to' => $filterTo,
                 'status' => $request->query('status'),
+                'statuses' => $stringArray($request->query('statuses', $request->query('status_ids', []))),
                 'client_id' => $request->query('client_id'),
+                'client_ids' => $intArray($request->query('client_ids', [])),
                 'user_id' => $request->query('user_id'),
+                'user_ids' => $intArray($request->query('user_ids', [])),
                 'site_id' => $request->query('site_id'),
+                'site_ids' => $intArray($request->query('site_ids', [])),
                 'assigned' => $request->query('assigned'),
                 'q' => $request->query('q'),
             ],

@@ -53,9 +53,13 @@ type Filters = {
     from: string;
     to: string;
     status?: string | null;
+    statuses?: string[];
     client_id?: string | number | null;
+    client_ids?: number[];
     user_id?: string | number | null;
+    user_ids?: number[];
     site_id?: string | number | null;
+    site_ids?: number[];
     assigned?: string | null;
     q?: string | null;
 };
@@ -213,11 +217,17 @@ export default function ShiftsIndex({
         );
     }
 
-    function handleHeroFilter(
-        key: 'status' | 'site_id' | 'user_id' | 'q',
-        value: string | number | null,
-    ) {
-        const next = { ...filters, [key]: value } as Filters;
+    function handleHeroFilter<
+        K extends 'statuses' | 'site_ids' | 'user_ids' | 'client_ids' | 'q',
+    >(key: K, value: string | string[] | number[]) {
+        // Clear the legacy single-key counterparts so we don't apply both at once.
+        const cleared: Partial<Filters> = {};
+        if (key === 'statuses') cleared.status = null;
+        if (key === 'site_ids') cleared.site_id = null;
+        if (key === 'user_ids') cleared.user_id = null;
+        if (key === 'client_ids') cleared.client_id = null;
+
+        const next = { ...filters, ...cleared, [key]: value } as Filters;
         router.get(
             shiftsIndex.url({ query: next as any }),
             {},
@@ -506,6 +516,32 @@ export default function ShiftsIndex({
         name: s.name,
         description: s.email ?? null,
     }));
+    const clientItems = clients.map((c) => ({
+        id: c.id,
+        name: `${c.first_name} ${c.last_name}`.trim(),
+        description: null,
+    }));
+
+    const heroStatusFilter = filters.statuses?.length
+        ? filters.statuses
+        : filters.status
+          ? [String(filters.status)]
+          : [];
+    const heroSiteIds = filters.site_ids?.length
+        ? filters.site_ids
+        : filters.site_id != null
+          ? [Number(filters.site_id)]
+          : [];
+    const heroUserIds = filters.user_ids?.length
+        ? filters.user_ids
+        : filters.user_id != null
+          ? [Number(filters.user_id)]
+          : [];
+    const heroClientIds = filters.client_ids?.length
+        ? filters.client_ids
+        : filters.client_id != null
+          ? [Number(filters.client_id)]
+          : [];
 
     return (
         <AppLayout
@@ -527,23 +563,19 @@ export default function ShiftsIndex({
                         unassigned: stats.unassigned,
                     }}
                     filters={{
-                        status: (filters.status as string) ?? null,
-                        site_id:
-                            filters.site_id != null
-                                ? Number(filters.site_id)
-                                : null,
-                        user_id:
-                            filters.user_id != null
-                                ? Number(filters.user_id)
-                                : null,
+                        statuses: heroStatusFilter,
+                        site_ids: heroSiteIds,
+                        user_ids: heroUserIds,
+                        client_ids: heroClientIds,
                         q: (filters.q as string) ?? '',
                     }}
                     onChangeFilter={(key, value) =>
-                        handleHeroFilter(key as any, value)
+                        handleHeroFilter(key as any, value as any)
                     }
                     statusOptions={statusOptions}
                     siteItems={siteItems}
                     staffItems={staffItems}
+                    clientItems={clientItems}
                     canCreate={canCreate}
                     onCreate={() => openCreate()}
                     onPrevWeek={() => gotoWeek(addDaysIso(filters.from, -7))}
