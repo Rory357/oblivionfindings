@@ -207,8 +207,9 @@ The week-grid context menu deliberately omits these labels until each has a cont
 
 | Item                                          | What's needed                                                                                                                                                                                                                                                  |
 | --------------------------------------------- | -------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------------- |
-| **Per-candidate eligibility reasons**         | `ShiftStaffEligibilityService::evaluate()` currently returns shift-level blocker/warning lists. The Open Shifts pane shows these as a watchlist. To get the per-suggestion-chip detail the design called for, the service needs to return reasons keyed by `(shift_id, candidate_user_id)`. |
 | **Candidate availability cap line**           | Partial. The "Xh this week" subline now renders on each suggestion chip from `props.capacity` (shipped in `1c6aefda`). The optional "Up to 30 Apr" availability cap is still not wired — needs an `available_until` field on the candidate payload. |
+
+Resolved: **per-candidate eligibility reasons** shipped via the additive `openShiftEligibility` payload — `RosteringController::index` now evaluates `ShiftStaffEligibilityService::evaluate()` for the cheap-prefilter shortlist of candidates per open shift and emits `openShiftEligibility[shift_id][user_id] = { status, reasons }` for warning / blocked candidates only. The Open Shifts pane renders warning chips with an amber Warn pill + tooltip and renders blocked chips struck-through, non-clickable, with a Blocked pill + tooltip. Eligible candidates are omitted from the payload and render unchanged.
 
 ### Open product decisions (no work until decided)
 
@@ -230,7 +231,7 @@ Resolved in `1c6aefda`: the empty Time off pane subtitle now reads "All caught u
 
 ### Recommended next step
 
-1. Extend `ShiftStaffEligibilityService::evaluate()` to return per-candidate detail — highest user-facing value of the remaining items because it turns the suggestion chips into a real triage surface.
+1. Add an `available_until` field to the candidate payload so the "Up to 30 Apr" availability cap line can join the existing "Xh this week" subline.
 2. Decide on Make recurring as a roadmap item — needs a controller + service design plus a recurrence input UI before wiring. (Duplicate-as-draft is shipped; "Copy to another day" is the cheap polish that builds on it.)
 3. Decide whether completed-shift reopen is in scope. The existing route is cancelled-only; reopening a completed shift would need a new state-machine path plus an audit entry, and is a separate product call from the cancelled-reopen that just shipped.
 
@@ -333,4 +334,20 @@ Modified:
   app/Http/Controllers/ShiftController.php               ← +assertCanAccessShift in reopenOccurrence
   resources/js/pages/operations/rostering/index.tsx      ← gate onReopenShift on canManageAny; drop unused return_to
   docs/rostering-redesign-followups.md                   ← reflect 1c6aefda + the three audit fixes
+```
+
+### Per-candidate eligibility reasons pass (Claude, 2026-05-27)
+
+Implements the doc's Recommended next step #1 — surface backend eligibility detail on the suggestion chips so the Open Shifts pane becomes a real triage surface (vs only filtering on JS-level shift conflicts + time off).
+
+```text
+Modified:
+  app/Http/Controllers/RosteringController.php                              ← +buildOpenShiftEligibility() helper; +openShiftEligibility payload
+  resources/js/pages/operations/rostering/index.tsx                         ← +openShiftEligibility prop; merge into suggestStaffForOpenShift output
+  resources/js/components/rostering/open-shifts-pane.tsx                    ← +OpenShiftCandidateEligibility; render warning/blocked chip states with tooltip
+  resources/js/components/rostering/rostering-redesign-followups.test.tsx   ← +3 chip-render tests
+  docs/rostering-redesign-followups.md                                      ← move per-candidate eligibility to "Resolved"; update Recommended next step
+New:
+  docs/rostering-per-candidate-eligibility-plan.md                          ← implementation plan
+  tests/Feature/Rostering/RosteringOpenShiftEligibilityTest.php             ← +2 Pest tests for payload shape
 ```

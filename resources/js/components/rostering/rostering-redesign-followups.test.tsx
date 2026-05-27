@@ -144,6 +144,140 @@ describe('rostering redesign follow-up wiring', () => {
         );
     });
 
+    it('renders a warning indicator and tooltip on suggestion chips when a candidate has soft eligibility issues', () => {
+        const onAssign = vi.fn();
+
+        render(
+            <OpenShiftsPane
+                stats={[]}
+                canManage
+                onAssign={onAssign}
+                shifts={[
+                    {
+                        id: 44,
+                        day: 'Mon 04 May',
+                        start: '09:00',
+                        end: '13:00',
+                        hours: 4,
+                        client: 'Ari Kauri',
+                        site: 'Matai House',
+                        reason: null,
+                        eligible: 1,
+                        warnings: 1,
+                        suggestions: [
+                            {
+                                id: 7,
+                                name: 'Aroha King',
+                                hours: 32,
+                                eligibility: {
+                                    status: 'warning',
+                                    reasons: ['Tight turnaround under 8h'],
+                                },
+                            },
+                        ],
+                        href: '/operations/shifts/44',
+                    },
+                ]}
+            />,
+        );
+
+        const chip = screen.getByRole('button', { name: /Aroha King/i });
+        expect(chip).toHaveAttribute('data-eligibility', 'warning');
+        expect(chip).toHaveAttribute(
+            'title',
+            'Tight turnaround under 8h',
+        );
+        expect(chip).not.toBeDisabled();
+
+        fireEvent.click(chip);
+        expect(onAssign).toHaveBeenCalledWith(
+            expect.objectContaining({ id: 44 }),
+            7,
+        );
+    });
+
+    it('renders a blocked chip that cannot be clicked when a candidate fails hard eligibility', () => {
+        const onAssign = vi.fn();
+
+        render(
+            <OpenShiftsPane
+                stats={[]}
+                canManage
+                onAssign={onAssign}
+                shifts={[
+                    {
+                        id: 44,
+                        day: 'Mon 04 May',
+                        start: '09:00',
+                        end: '13:00',
+                        hours: 4,
+                        client: 'Ari Kauri',
+                        site: 'Matai House',
+                        reason: null,
+                        eligible: 0,
+                        warnings: 0,
+                        suggestions: [
+                            {
+                                id: 7,
+                                name: 'Aroha King',
+                                hours: 32,
+                                eligibility: {
+                                    status: 'blocked',
+                                    reasons: [
+                                        'This staff member is already marked unavailable during this time.',
+                                    ],
+                                },
+                            },
+                        ],
+                        href: '/operations/shifts/44',
+                    },
+                ]}
+            />,
+        );
+
+        const chip = screen.getByRole('button', { name: /Aroha King/i });
+        expect(chip).toHaveAttribute('data-eligibility', 'blocked');
+        expect(chip).toBeDisabled();
+
+        fireEvent.click(chip);
+        expect(onAssign).not.toHaveBeenCalled();
+    });
+
+    it('keeps eligible chips unstyled and clickable when no eligibility entry is provided', () => {
+        const onAssign = vi.fn();
+
+        render(
+            <OpenShiftsPane
+                stats={[]}
+                canManage
+                onAssign={onAssign}
+                shifts={[
+                    {
+                        id: 44,
+                        day: 'Mon 04 May',
+                        start: '09:00',
+                        end: '13:00',
+                        hours: 4,
+                        client: 'Ari Kauri',
+                        site: 'Matai House',
+                        reason: null,
+                        eligible: 1,
+                        warnings: 0,
+                        suggestions: [{ id: 7, name: 'Aroha King', hours: 32 }],
+                        href: '/operations/shifts/44',
+                    },
+                ]}
+            />,
+        );
+
+        const chip = screen.getByRole('button', { name: /Aroha King/i });
+        expect(chip).toHaveAttribute('data-eligibility', 'eligible');
+        expect(chip).not.toBeDisabled();
+
+        fireEvent.click(chip);
+        expect(onAssign).toHaveBeenCalled();
+    });
+
     it('does not show an unsupported broadcast action for open shifts', () => {
         render(
             <OpenShiftsPane

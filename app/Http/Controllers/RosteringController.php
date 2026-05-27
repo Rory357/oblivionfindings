@@ -416,8 +416,10 @@ class RosteringController extends Controller
 
         // ── Eligibility dashboard: 14-day lookahead ──────────────────
         $eligibilityAlerts = ['counts' => ['eligible' => 0, 'warnings' => 0, 'blocked' => 0, 'overrides' => 0], 'blocked' => [], 'warnings' => []];
+        $openShiftEligibility = [];
         if ($canManageAny) {
             $eligibilityAlerts = $this->buildEligibilityAlerts();
+            $openShiftEligibility = $this->buildOpenShiftEligibility($shifts->whereNull('user_id'));
         }
 
         $publishEnabled = $this->featureFlags->publishEnabled($auth->organization_id);
@@ -586,6 +588,11 @@ class RosteringController extends Controller
 
             // Eligibility dashboard (14-day lookahead)
             'eligibilityAlerts' => $eligibilityAlerts,
+
+            // Per-candidate eligibility for the visible open shifts.
+            // Shape: { [shift_id]: { [user_id]: { status: 'warning'|'blocked', reasons: string[] } } }
+            // Eligible candidates are omitted; the UI treats absence as eligible.
+            'openShiftEligibility' => $openShiftEligibility,
 
             // Analytics data
             'analytics' => [
@@ -1106,5 +1113,70 @@ class RosteringController extends Controller
             'blocked' => array_slice($blocked, 0, 10),
             'warnings' => array_slice($warnings, 0, 10),
         ];
+    }
+
+    /**
+     * Build per-candidate eligibility entries for the visible open shifts.
+     *
+     * For each open shift we ask the eligibility service for a cheap prefilter
+     * shortlist, evaluate the top candidates, and only emit warning/blocked
+     * results. Eligible candidates are omitted — the UI treats absence as
+     * eligible to keep the payload small.
+     *
+     * @param  iterable<\App\Models\Shift>  $openShifts
+     * @return array<int, array<int, array{status: string, reasons: array<int, string>}>>
+     */
+    protected function buildOpenShiftEligibility(iterable $openShifts, int $candidateLimit = 8): array
+    {
+        $eligibility = app(ShiftStaffEligibilityService::class);
+        $result = [];
+
+        foreach ($openShifts as $shift) {
+            if (! $shift->starts_at || ! $shift->ends_at) {
+                continue;
+            }
+
+            try {
+                $candidates = $eligibility->candidatesFor($shift)->take($candidateLimit);
+            } catch (\Throwable $e) {
+                Log::warning('Per-candidate eligibility prefilter failed', [
+                    'shift_id' => $shift->id,
+                    'error' => $e->getMessage(),
+                ]);
+                continue;
+            }
+
+            $perShift = [];
+            foreach ($candidates as $candidate) {
+                try {
+                    $check = $eligibility->evaluate($shift, $candidate);
+                } catch (\Throwable $e) {
+                    Log::warning('Per-candidate eligibility evaluate failed', [
+                        'shift_id' => $shift->id,
+                        'user_id' => $candidate->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                    continue;
+                }
+
+                if ($check->hasBlocks()) {
+                    $perShift[$candidate->id] = [
+                        'status' => 'blocked',
+                        'reasons' => array_values(array_slice($check->blocking_reasons, 0, 3)),
+                    ];
+                } elseif ($check->hasWarnings()) {
+                    $perShift[$candidate->id] = [
+                        'status' => 'warning',
+                        'reasons' => array_values(array_slice($check->warnings, 0, 3)),
+                    ];
+                }
+            }
+
+            if (! empty($perShift)) {
+                $result[$shift->id] = $perShift;
+            }
+        }
+
+        return $result;
     }
 }

@@ -329,6 +329,13 @@ type Props = {
             reason: string;
         }>;
     };
+    openShiftEligibility?: Record<
+        number,
+        Record<
+            number,
+            { status: 'warning' | 'blocked'; reasons: string[] }
+        >
+    >;
 };
 
 const SHIFT_TYPE_COLORS = [
@@ -849,7 +856,13 @@ export default function RosteringIndex(props: Props) {
     const suggestStaffForOpenShift = (sh: ShiftLite, limit = 5) => {
         const shiftStart = new Date(sh.starts_at).getTime();
         const shiftEnd = new Date(sh.ends_at).getTime();
-        const eligible: Array<{ id: number; name: string; hours: number }> = [];
+        const shiftElig = props.openShiftEligibility?.[sh.id];
+        const eligible: Array<{
+            id: number;
+            name: string;
+            hours: number;
+            eligibility?: { status: 'warning' | 'blocked'; reasons: string[] };
+        }> = [];
         for (const u of props.staff) {
             const conflicts = bookingsByUser.get(u.id) ?? [];
             const hasShiftConflict = conflicts.some(
@@ -865,6 +878,7 @@ export default function RosteringIndex(props: Props) {
                 id: u.id,
                 name: u.name,
                 hours: capacityByUserId.get(u.id) ?? 0,
+                eligibility: shiftElig?.[u.id],
             });
         }
         // Sort least-loaded first, then alphabetical
