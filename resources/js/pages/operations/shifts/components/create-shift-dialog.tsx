@@ -121,7 +121,12 @@ function weekdayFromDatetime(value: string | null | undefined): Weekday {
 
 function toLocalDatetimeInput(value: string | null | undefined): string {
     if (!value) return '';
-    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)) {
+    // Fast path only for "naive" local datetime strings (no timezone suffix) —
+    // anything with a Z or ±HH:MM offset must go through Date so we render the
+    // user's local wall time, not the UTC time-of-day.
+    if (
+        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(value)
+    ) {
         return value.slice(0, 16);
     }
     const parsed = new Date(value);
@@ -226,9 +231,10 @@ export function CreateShiftDialog({
     });
 
     // Reset form when dialog opens with new defaults. Run only on the open→true
-    // transition (or when defaults change while already open) — re-running on
-    // every form mutation restarts the dialog entry animation, which keeps the
-    // dialog at opacity 0.
+    // transition — re-running on every form mutation restarts the dialog entry
+    // animation, which keeps the dialog at opacity 0. In edit mode we let the
+    // useForm() initial state stand (it already pulled from `initialShift`);
+    // this effect only re-syncs the create-mode defaults.
     const wasOpenRef = useRef(false);
     useEffect(() => {
         if (!open) {
@@ -237,6 +243,7 @@ export function CreateShiftDialog({
         }
         if (wasOpenRef.current) return; // already initialised this open
         wasOpenRef.current = true;
+        if (isEdit) return; // useForm initialiser handled edit-mode hydration
         form.setData({
             ...form.data,
             client_id: initialClient?.id ?? '',
