@@ -215,6 +215,12 @@ class RbacSeeder extends Seeder
             ['key' => 'shifts.overrideEligibility', 'description' => 'Override eligibility warnings for shift assignment', 'group' => 'shifts', 'module' => 'Operations'],
             ['key' => 'shifts.tasks.updateSelf', 'description' => 'Complete tasks on own shifts', 'group' => 'shifts', 'module' => 'Operations'],
 
+            // Job Board (open positions / replacements)
+            ['key' => 'job_board.viewAny', 'description' => 'View the Job Board', 'group' => 'job_board', 'module' => 'Operations'],
+            ['key' => 'job_board.create', 'description' => 'Post open positions to the Job Board', 'group' => 'job_board', 'module' => 'Operations'],
+            ['key' => 'job_board.claim', 'description' => 'Claim open positions from the Job Board', 'group' => 'job_board', 'module' => 'Operations'],
+            ['key' => 'job_board.approve', 'description' => 'Approve Job Board claims', 'group' => 'job_board', 'module' => 'Operations'],
+
             // Timesheets
             ['key' => 'timesheets.viewAny', 'description' => 'View timesheets', 'group' => 'timesheets', 'module' => 'Operations'],
             ['key' => 'timesheets.viewAssigned', 'description' => 'View assigned timesheets only', 'group' => 'timesheets', 'module' => 'Operations'],
@@ -536,6 +542,7 @@ class RbacSeeder extends Seeder
             'progress_notes.viewAny', 'progress_notes.create', 'progress_notes.update', 'progress_notes.delete', 'progress_notes.review',
             'summaries.viewAny', 'summaries.generate', 'unifi.manage',
             'shifts.viewAny', 'shifts.create', 'shifts.update', 'shifts.manageAny', 'shifts.overrideEligibility',
+            'job_board.viewAny', 'job_board.create', 'job_board.claim', 'job_board.approve',
             'timesheets.viewAny', 'timesheets.create', 'timesheets.update', 'timesheets.approve', 'timesheets.manageAny',
             'clients.viewAny', 'clients.create', 'clients.update', 'clients.assignments.update', 'clients.onboarding.manage',
             'family_portal.viewAny', 'family_portal.manage',
@@ -606,6 +613,7 @@ class RbacSeeder extends Seeder
             'respite.calendar.view', 'respite.evidence.view', 'respite.evidence.manage', 'respite.evidence.seal',
             'risks.viewAny', 'risks.create', 'risks.update', 'risks.delete',
             'shifts.viewAny', 'shifts.create', 'shifts.update', 'shifts.overrideEligibility',
+            'job_board.viewAny', 'job_board.create', 'job_board.claim', 'job_board.approve',
             'timesheets.viewAny', 'timesheets.approve',
             'timeline.viewAny', 'timeline.create', 'timeline.pin',
             'progress_notes.viewAny', 'progress_notes.create', 'progress_notes.update', 'progress_notes.review',
@@ -642,6 +650,7 @@ class RbacSeeder extends Seeder
             'clients.viewAssigned', 'medications.view', 'timeline.create',
             'progress_notes.viewAny', 'progress_notes.create',
             'shifts.viewAssigned', 'shifts.tasks.updateSelf',
+            'job_board.viewAny', 'job_board.claim',
             'timesheets.viewAssigned', 'timesheets.create', 'timesheets.update', 'timesheets.submit',
             'incidents.viewAssigned', 'incidents.create', 'incidents.update', 'incidents.submit',
             'incidents.followups.complete', 'risks.viewAssigned',
@@ -710,6 +719,7 @@ class RbacSeeder extends Seeder
         $syncPermissions($auditor, [
             'clients.viewAny', 'medications.view', 'medications.audit.view',
             'shifts.viewAny', 'timesheets.viewAny', 'reports.viewAny',
+            'job_board.viewAny',
             'timeline.viewAny', 'summaries.viewAny', 'audit.viewAny', 'compliance.view',
             'progress_notes.viewAny',
             'incidents.viewAny', 'risks.viewAny', 'assets.viewAny',
@@ -741,6 +751,7 @@ class RbacSeeder extends Seeder
             'hr.leave.viewAny', 'hr.leave.approve', 'hr.performance.view', 'hr.performance.manage',
             'hr.policies.view', 'hr.policies.attest', 'hr.onboarding.view',
             'timesheets.viewAny', 'timesheets.approve',
+            'job_board.viewAny', 'job_board.approve',
             'sites.damages.view', 'sites.damages.create', 'sites.damages.manage',
             'sites.ledger.view', 'sites.ledger.create',
             'clinical.observations.view', 'clinical.observations.record',
