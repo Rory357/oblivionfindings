@@ -215,7 +215,7 @@ export default function ShiftsIndex({
 
     function handleHeroFilter(
         key: 'status' | 'site_id' | 'user_id' | 'q',
-        value: string | null,
+        value: string | number | null,
     ) {
         const next = { ...filters, [key]: value } as Filters;
         router.get(
@@ -489,21 +489,23 @@ export default function ShiftsIndex({
         return items;
     }
 
-    const statusOptions: [string, string][] = [
-        ['scheduled', 'Scheduled'],
-        ['in_progress', 'In progress'],
-        ['completed', 'Completed'],
-        ['draft', 'Draft'],
-        ['cancelled', 'Cancelled'],
+    const statusOptions = [
+        { value: 'scheduled', label: 'Scheduled' },
+        { value: 'in_progress', label: 'In progress' },
+        { value: 'completed', label: 'Completed' },
+        { value: 'draft', label: 'Draft' },
+        { value: 'cancelled', label: 'Cancelled' },
     ];
-    const siteOptions: [string, string][] = sites.map((s) => [
-        String(s.id),
-        s.name,
-    ]);
-    const staffOptions: [string, string][] = [
-        ['', '—'],
-        ...staff.map((s) => [String(s.id), s.name] as [string, string]),
-    ];
+    const siteItems = sites.map((s) => ({
+        id: s.id,
+        name: s.name,
+        description: s.type ?? null,
+    }));
+    const staffItems = staff.map((s) => ({
+        id: s.id,
+        name: s.name,
+        description: s.email ?? null,
+    }));
 
     return (
         <AppLayout
@@ -526,16 +528,22 @@ export default function ShiftsIndex({
                     }}
                     filters={{
                         status: (filters.status as string) ?? null,
-                        site_id: filters.site_id != null ? String(filters.site_id) : null,
-                        user_id: filters.user_id != null ? String(filters.user_id) : null,
+                        site_id:
+                            filters.site_id != null
+                                ? Number(filters.site_id)
+                                : null,
+                        user_id:
+                            filters.user_id != null
+                                ? Number(filters.user_id)
+                                : null,
                         q: (filters.q as string) ?? '',
                     }}
                     onChangeFilter={(key, value) =>
                         handleHeroFilter(key as any, value)
                     }
                     statusOptions={statusOptions}
-                    siteOptions={siteOptions}
-                    staffOptions={staffOptions.filter(([v]) => v !== '')}
+                    siteItems={siteItems}
+                    staffItems={staffItems}
                     canCreate={canCreate}
                     onCreate={() => openCreate()}
                     onPrevWeek={() => gotoWeek(addDaysIso(filters.from, -7))}

@@ -8,15 +8,18 @@ import {
     ChevronDown,
     ChevronLeft,
     ChevronRight,
-    ChevronsUpDown,
     Clock,
     Download,
+    Filter,
     MoreHorizontal,
     Plus,
     Search,
     Users,
+    X,
     Zap,
 } from 'lucide-react';
+
+import { EntityFilter } from '@/components/rostering/entity-filter';
 
 export type HeroStats = {
     total: number;
@@ -31,22 +34,26 @@ export type HeroStats = {
 
 export type HeroFilters = {
     status: string | null;
-    site_id: string | null;
-    user_id: string | null;
+    site_id: number | null;
+    user_id: number | null;
     q: string;
 };
 
-type FilterChipOption = [value: string, label: string];
+type StatusOption = { value: string; label: string };
+type EntityItem = { id: number; name: string; description?: string | null };
 
 type Props = {
     greetingName?: string;
     weekLabel: string;
     stats: HeroStats;
     filters: HeroFilters;
-    onChangeFilter: (key: keyof HeroFilters, value: string | null) => void;
-    statusOptions: FilterChipOption[];
-    siteOptions: FilterChipOption[];
-    staffOptions: FilterChipOption[];
+    onChangeFilter: (
+        key: keyof HeroFilters,
+        value: string | number | null,
+    ) => void;
+    statusOptions: StatusOption[];
+    siteItems: EntityItem[];
+    staffItems: EntityItem[];
     onCreate?: () => void;
     onPrevWeek: () => void;
     onNextWeek: () => void;
@@ -62,8 +69,8 @@ export function ShiftsHero({
     filters,
     onChangeFilter,
     statusOptions,
-    siteOptions,
-    staffOptions,
+    siteItems,
+    staffItems,
     onCreate,
     onPrevWeek,
     onNextWeek,
@@ -229,26 +236,28 @@ export function ShiftsHero({
                         value={filters.q}
                         onChange={(v) => onChangeFilter('q', v)}
                     />
-                    <HeroFilterChip
-                        label="Status"
+                    <StatusChip
                         value={filters.status}
                         options={statusOptions}
                         onSelect={(v) => onChangeFilter('status', v)}
                         onClear={() => onChangeFilter('status', null)}
                     />
-                    <HeroFilterChip
-                        label="Site"
-                        value={filters.site_id}
-                        options={siteOptions}
-                        onSelect={(v) => onChangeFilter('site_id', v)}
-                        onClear={() => onChangeFilter('site_id', null)}
-                    />
-                    <HeroFilterChip
+                    <EntityFilter
+                        onDark
                         label="Staff"
+                        pluralLabel="staff"
+                        allLabel="All staff"
+                        items={staffItems}
                         value={filters.user_id}
-                        options={staffOptions}
-                        onSelect={(v) => onChangeFilter('user_id', v)}
-                        onClear={() => onChangeFilter('user_id', null)}
+                        onChange={(next) => onChangeFilter('user_id', next)}
+                    />
+                    <EntityFilter
+                        onDark
+                        label="Site"
+                        allLabel="All sites"
+                        items={siteItems}
+                        value={filters.site_id}
+                        onChange={(next) => onChangeFilter('site_id', next)}
                     />
                 </div>
             </div>
@@ -339,33 +348,31 @@ function HeroSearchBox({
 }) {
     return (
         <div className="relative">
-            <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-primary-foreground/60" />
+            <Search className="absolute left-3 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-primary-foreground/60" />
             <input
                 value={value || ''}
                 onChange={(e) => onChange(e.target.value)}
                 placeholder="Search clients, staff, location"
-                className="w-56 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 py-1.5 pl-8 pr-2.5 text-xs text-primary-foreground placeholder:text-primary-foreground/50 focus:bg-primary-foreground/20 focus:outline-none"
+                className="w-56 rounded-full border border-primary-foreground/30 bg-primary-foreground/10 py-1.5 pl-8 pr-3 text-xs font-semibold text-primary-foreground placeholder:font-normal placeholder:text-primary-foreground/60 focus:bg-primary-foreground/20 focus:outline-none"
             />
         </div>
     );
 }
 
-function HeroFilterChip({
-    label,
+function StatusChip({
     value,
     options,
     onSelect,
     onClear,
 }: {
-    label: string;
     value: string | null;
-    options: FilterChipOption[];
+    options: StatusOption[];
     onSelect: (v: string) => void;
     onClear: () => void;
 }) {
     const [open, setOpen] = useState(false);
     const ref = useRef<HTMLDivElement | null>(null);
-    const current = options.find(([v]) => v === value);
+    const current = options.find((o) => o.value === value);
 
     useEffect(() => {
         if (!open) return;
@@ -376,19 +383,44 @@ function HeroFilterChip({
         return () => window.removeEventListener('mousedown', onDown);
     }, [open]);
 
+    const selected = !!current;
+
     return (
         <div className="relative" ref={ref}>
             <button
                 type="button"
+                aria-haspopup="listbox"
+                aria-expanded={open}
                 onClick={() => setOpen((x) => !x)}
-                className="inline-flex items-center gap-1.5 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-2.5 py-1.5 text-xs font-medium text-primary-foreground hover:bg-primary-foreground/20"
+                className={[
+                    'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors',
+                    selected
+                        ? 'border-primary-foreground bg-primary-foreground text-primary'
+                        : 'border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20',
+                ].join(' ')}
             >
-                <span className="text-primary-foreground/70">{label}:</span>
-                <span>{current ? current[1] : 'All'}</span>
-                <ChevronsUpDown className="h-3 w-3 opacity-70" />
+                <Filter className="h-3.5 w-3.5" aria-hidden="true" />
+                <span className="max-w-[200px] truncate">
+                    {current ? current.label : `All statuses · ${options.length}`}
+                </span>
+                {selected ? (
+                    <button
+                        type="button"
+                        aria-label="Clear status filter"
+                        className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full hover:bg-primary/30"
+                        onClick={(e) => {
+                            e.stopPropagation();
+                            onClear();
+                        }}
+                    >
+                        <X className="h-3 w-3" />
+                    </button>
+                ) : (
+                    <ChevronDown className="h-3 w-3 opacity-70" />
+                )}
             </button>
             {open ? (
-                <div className="absolute right-0 top-full z-30 mt-1 w-52 rounded-lg border border-border bg-popover text-foreground shadow-lg">
+                <div className="absolute right-0 top-full z-30 mt-1.5 w-[220px] rounded-lg border border-border bg-popover text-foreground shadow-lg">
                     <ul className="max-h-72 overflow-auto py-1 text-sm">
                         <li>
                             <button
@@ -397,9 +429,18 @@ function HeroFilterChip({
                                     onClear();
                                     setOpen(false);
                                 }}
-                                className="w-full px-3 py-1.5 text-left text-muted-foreground hover:bg-muted"
+                                className="flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-muted"
                             >
-                                All
+                                <span className="inline-block h-4 w-4 shrink-0" />
+                                <span
+                                    className={
+                                        !selected
+                                            ? 'font-medium text-primary'
+                                            : 'text-muted-foreground'
+                                    }
+                                >
+                                    All statuses
+                                </span>
                             </button>
                         </li>
                         {options.length === 0 ? (
@@ -407,17 +448,18 @@ function HeroFilterChip({
                                 Nothing to choose
                             </li>
                         ) : (
-                            options.map(([v, l]) => (
-                                <li key={v}>
+                            options.map((o) => (
+                                <li key={o.value}>
                                     <button
                                         type="button"
                                         onClick={() => {
-                                            onSelect(v);
+                                            onSelect(o.value);
                                             setOpen(false);
                                         }}
-                                        className={`w-full px-3 py-1.5 text-left hover:bg-muted ${value === v ? 'font-medium text-primary' : ''}`}
+                                        className={`flex w-full items-center gap-2 px-3 py-1.5 text-left hover:bg-muted ${value === o.value ? 'font-medium text-primary' : ''}`}
                                     >
-                                        {l}
+                                        <span className="inline-block h-4 w-4 shrink-0" />
+                                        {o.label}
                                     </button>
                                 </li>
                             ))
