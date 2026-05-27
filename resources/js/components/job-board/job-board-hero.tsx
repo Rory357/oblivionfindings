@@ -1,4 +1,3 @@
-import { router } from '@inertiajs/react';
 import {
     AlertTriangle,
     Bell,
@@ -15,8 +14,9 @@ import {
     Search,
     UserCheck,
 } from 'lucide-react';
-import { type ReactNode } from 'react';
+import { useRef, useState, type ReactNode } from 'react';
 
+import { WeekPicker, ymd } from '@/components/rostering/week-picker';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -55,6 +55,7 @@ interface JobBoardHeroProps {
     availabilityBadge?: PageHeroBadge | null;
     onPostPosition?: () => void;
     onAlertMe?: () => void;
+    alertsEnabled?: boolean;
 }
 
 export function JobBoardHero({
@@ -73,9 +74,13 @@ export function JobBoardHero({
     availabilityBadge,
     onPostPosition,
     onAlertMe,
+    alertsEnabled = false,
 }: JobBoardHeroProps) {
     const weekRange = `${week.start_label} → ${week.end_label}`;
     const openCount = stats.open;
+    const pickerBtnRef = useRef<HTMLButtonElement>(null);
+    const [pickerOpen, setPickerOpen] = useState(false);
+    const selectedWeekStart = new Date(`${week.start}T00:00:00`);
 
     const badges: PageHeroBadge[] = [
         complianceBadge ?? {
@@ -149,10 +154,21 @@ export function JobBoardHero({
                     <Button
                         size="sm"
                         variant="outline"
-                        className="border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10"
+                        data-test="job-board-alert-me"
+                        title={
+                            alertsEnabled
+                                ? 'Notifications on — click to mute'
+                                : 'Get notified when matching shifts open'
+                        }
+                        className={
+                            alertsEnabled
+                                ? 'border-emerald-300/60 bg-emerald-400/15 text-primary-foreground hover:bg-emerald-400/25'
+                                : 'border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10'
+                        }
                         onClick={onAlertMe}
                     >
-                        <Bell className="mr-1 h-4 w-4" /> Alert me
+                        <Bell className="mr-1 h-4 w-4" />
+                        {alertsEnabled ? 'Alerts on' : 'Alert me'}
                     </Button>
                     {canPostPosition ? (
                         <Button
@@ -177,25 +193,16 @@ export function JobBoardHero({
                             <ChevronLeft className="h-3.5 w-3.5" /> Prev week
                         </button>
                         <button
+                            ref={pickerBtnRef}
                             type="button"
                             data-test="job-board-week-pick"
                             className="inline-flex items-center gap-1.5 rounded-md border border-primary-foreground/35 bg-primary-foreground/20 px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-foreground/30"
-                            onClick={() => {
-                                const today = new Date()
-                                    .toISOString()
-                                    .slice(0, 10);
-                                router.get(
-                                    '/operations/job-board',
-                                    { week: today },
-                                    {
-                                        preserveState: true,
-                                        replace: true,
-                                    },
-                                );
-                            }}
+                            onClick={() => setPickerOpen((v) => !v)}
+                            aria-haspopup="dialog"
+                            aria-expanded={pickerOpen}
                         >
                             <CalendarRange className="h-3.5 w-3.5" />
-                            {weekRange} · this week
+                            {weekRange} · pick week
                             <ChevronDown className="h-3 w-3" />
                         </button>
                         <button
@@ -302,6 +309,17 @@ export function JobBoardHero({
                             </SelectContent>
                         </Select>
                     </div>
+                    {pickerOpen ? (
+                        <WeekPicker
+                            selectedWeekStart={selectedWeekStart}
+                            anchorRef={pickerBtnRef}
+                            onSelect={(nextMonday) => {
+                                setPickerOpen(false);
+                                onWeekChange(ymd(nextMonday));
+                            }}
+                            onClose={() => setPickerOpen(false)}
+                        />
+                    ) : null}
                 </div>
             }
         />

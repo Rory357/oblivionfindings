@@ -1064,6 +1064,9 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     Route::get('/job-board', [JobBoardController::class, 'index'])
         ->middleware('permission:job_board.viewAny|shifts.viewAny|shifts.viewAssigned')
         ->name('operations.job_board.index');
+    Route::post('/job-board/alerts/toggle', [JobBoardController::class, 'toggleAlerts'])
+        ->middleware('permission:job_board.viewAny|shifts.viewAny|shifts.viewAssigned')
+        ->name('operations.job_board.alerts.toggle');
     Route::post('/job-board/{position}/claim', [JobBoardController::class, 'claim'])
         ->middleware('permission:job_board.claim|shifts.viewAssigned|shifts.manageAny')
         ->name('operations.job_board.claim');

@@ -185,6 +185,34 @@ export default function JobBoardIndex({
         );
     };
 
+    const handleAlertMe = () => {
+        router.post(
+            '/operations/job-board/alerts/toggle',
+            {},
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: (page) => {
+                    const nowEnabled = !!(page.props.viewer as JobBoardViewer | undefined)
+                        ?.alerts_enabled;
+                    toast.success(
+                        nowEnabled
+                            ? 'Alerts enabled'
+                            : 'Alerts disabled',
+                        {
+                            description: nowEnabled
+                                ? "We'll notify you when matching shifts open."
+                                : "You won't get notified about new shifts.",
+                        },
+                    );
+                },
+                onError: () => {
+                    toast.error("Couldn't update alert preference");
+                },
+            },
+        );
+    };
+
     const handleApprove = (job: JobPost) => {
         router.post(
             `/operations/job-board/${job.id}/approve`,
@@ -248,6 +276,9 @@ export default function JobBoardIndex({
                     }}
                     onFilterChange={handleFilterChange}
                     onWeekChange={handleWeekChange}
+                    onAlertMe={handleAlertMe}
+                    alertsEnabled={!!viewer?.alerts_enabled}
+                    canPostPosition={!!viewer?.can_post_position}
                     sitesCount={effectiveStats.sites}
                     sitesWorkedThisWeek={effectiveStats.sites_worked_this_week}
                 />

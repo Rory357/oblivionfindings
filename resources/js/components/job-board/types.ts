@@ -114,4 +114,5 @@ export type JobBoardViewer = {
     first_name: string;
     can_approve?: boolean;
     can_post_position?: boolean;
+    alerts_enabled?: boolean;
 };

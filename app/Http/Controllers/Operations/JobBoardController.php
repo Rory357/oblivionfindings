@@ -208,6 +208,7 @@ class JobBoardController extends Controller
                 'first_name' => $this->viewerFirstName($auth),
                 'can_approve' => $canApprove,
                 'can_post_position' => $this->canCreatePositions($auth),
+                'alerts_enabled' => (bool) ($auth->job_board_alerts_enabled ?? false),
             ],
             'stats' => [
                 'open' => (clone $statsQuery)
@@ -295,6 +296,25 @@ class JobBoardController extends Controller
         }
 
         return redirect()->back()->with('success', 'Open position published.');
+    }
+
+    /**
+     * Toggle the viewer's "Alert me" subscription. Returns to the job board.
+     */
+    public function toggleAlerts(Request $request)
+    {
+        $auth = $request->user();
+        abort_unless($this->canViewJobBoard($auth), 403);
+
+        $enabled = ! ($auth->job_board_alerts_enabled ?? false);
+        $auth->forceFill(['job_board_alerts_enabled' => $enabled])->save();
+
+        return redirect()->back()->with(
+            'success',
+            $enabled
+                ? 'Alerts enabled — we\'ll notify you when matching shifts open.'
+                : 'Alerts disabled.'
+        );
     }
 
     public function claim(Request $request, $position)

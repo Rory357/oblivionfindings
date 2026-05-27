@@ -58,6 +58,9 @@ class User extends Authenticatable
         'desktop_notifications_enabled',
         'notification_sounds_enabled',
         'email_digest_frequency',
+
+        // Job Board "Alert me" subscription
+        'job_board_alerts_enabled',
     ];
 
     /**
@@ -93,6 +96,7 @@ class User extends Authenticatable
             'dnd_until' => 'datetime',
             'desktop_notifications_enabled' => 'boolean',
             'notification_sounds_enabled' => 'boolean',
+            'job_board_alerts_enabled' => 'boolean',
         ];
     }
 
