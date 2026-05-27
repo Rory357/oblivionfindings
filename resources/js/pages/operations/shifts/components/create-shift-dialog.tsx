@@ -141,6 +141,17 @@ function toLocalDatetimeInput(value: string | null | undefined): string {
     return `${yyyy}-${mm}-${dd}T${hh}:${min}`;
 }
 
+// `<input type="datetime-local">` emits naive wall time like
+// "2026-05-30T09:00". The server's Carbon::parse() reads that as UTC, so
+// we convert through a Date (which interprets naive strings as local) and
+// emit an ISO string with the offset Carbon can normalise correctly.
+function localDatetimeInputToIso(value: string | null | undefined): string | null {
+    if (!value || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)) return null;
+    const d = new Date(value);
+    if (Number.isNaN(d.getTime())) return null;
+    return d.toISOString();
+}
+
 function defaultStartForToday(): string {
     const d = new Date();
     d.setHours(9, 0, 0, 0);
@@ -382,11 +393,16 @@ export function CreateShiftDialog({
         e.preventDefault();
         // Round-trip the current URL so the server's redirect after save
         // lands the user back on the same week / filter combo instead of
-        // resetting to the default index. Transform is invoked right before
-        // the payload is built, so the latest URL is captured even when the
-        // user navigated weeks before opening the dialog.
+        // resetting to the default index. Also convert the local
+        // <input type="datetime-local"> values to an ISO string with the
+        // browser's timezone offset — Carbon::parse() on the server then
+        // stores the correct UTC instant. Otherwise the naive local time
+        // is interpreted as UTC and the saved shift drifts by the user's
+        // offset (e.g. NZST shifts get pushed 12 hours into the future).
         form.transform((data) => ({
             ...data,
+            starts_at: localDatetimeInputToIso(data.starts_at) ?? data.starts_at,
+            ends_at: localDatetimeInputToIso(data.ends_at) ?? data.ends_at,
             return_to:
                 typeof window !== 'undefined'
                     ? window.location.pathname + window.location.search
