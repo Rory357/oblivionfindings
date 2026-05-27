@@ -18,7 +18,12 @@ export type OpenShiftCard = {
     eligible: number;
     warnings: number;
     blocked?: string[];
-    suggestions: Array<{ id: number; name: string }>;
+    suggestions: Array<{
+        id: number;
+        name: string;
+        hours?: number | null;
+        meta?: string | null;
+    }>;
     href?: string;
 };
 
@@ -55,7 +60,6 @@ export type OpenShiftsPaneProps = {
         warnings?: EligibilityAlertItem[];
     };
     onAssign: (shift: OpenShiftCard, candidateUserId: number | string) => void;
-    onBroadcast?: (shift: OpenShiftCard) => void;
     onFindReplacement?: (request: ReplacementRequestCard) => void;
     actionEndSlot?: ReactNode;
 };
@@ -67,7 +71,6 @@ export function OpenShiftsPane({
     replacementRequests = [],
     eligibilityAlerts,
     onAssign,
-    onBroadcast,
     onFindReplacement,
     actionEndSlot,
 }: OpenShiftsPaneProps) {
@@ -262,15 +265,6 @@ export function OpenShiftsPane({
                                         Assign
                                     </Button>
                                 ) : null}
-                                {canManage ? (
-                                    <Button
-                                        size="sm"
-                                        variant="outline"
-                                        onClick={() => onBroadcast?.(sh)}
-                                    >
-                                        Broadcast
-                                    </Button>
-                                ) : null}
                                 {sh.href ? (
                                     <Link href={sh.href}>
                                         <Button size="sm" variant="ghost">
@@ -292,34 +286,56 @@ export function OpenShiftsPane({
                                         criteria
                                     </span>
                                 ) : (
-                                    sh.suggestions.slice(0, 8).map((nm, i) => (
-                                        <button
-                                            key={nm.id}
-                                            type="button"
-                                            disabled={!canManage}
-                                            onClick={() => onAssign(sh, nm.id)}
-                                            className={cn(
-                                                'inline-flex items-center gap-1.5 rounded-full border px-2 py-1 text-xs font-medium transition',
-                                                i === 0
-                                                    ? 'border-primary bg-primary text-primary-foreground'
-                                                    : 'border-border bg-background text-foreground hover:bg-accent',
-                                            )}
-                                        >
-                                            <span className="inline-flex h-5 w-5 items-center justify-center rounded-full bg-background/50 text-[9px] font-bold text-foreground uppercase">
-                                                {nm.name
-                                                    .split(' ')
-                                                    .map((w) => w[0])
-                                                    .slice(0, 2)
-                                                    .join('')}
-                                            </span>
-                                            <span>{nm.name}</span>
-                                            {i === 0 ? (
-                                                <span className="rounded-full bg-primary-foreground/15 px-1.5 py-0.5 text-[9px] font-bold uppercase">
-                                                    best
+                                    sh.suggestions.slice(0, 8).map((nm, i) => {
+                                        const meta = candidateMeta(nm);
+
+                                        return (
+                                            <button
+                                                key={nm.id}
+                                                type="button"
+                                                disabled={!canManage}
+                                                onClick={() =>
+                                                    onAssign(sh, nm.id)
+                                                }
+                                                className={cn(
+                                                    'inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-full border px-2 py-1 text-xs font-medium transition',
+                                                    i === 0
+                                                        ? 'border-primary bg-primary text-primary-foreground'
+                                                        : 'border-border bg-background text-foreground hover:bg-accent',
+                                                )}
+                                            >
+                                                <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-background/50 text-[9px] font-bold text-foreground uppercase">
+                                                    {nm.name
+                                                        .split(' ')
+                                                        .map((w) => w[0])
+                                                        .slice(0, 2)
+                                                        .join('')}
                                                 </span>
-                                            ) : null}
-                                        </button>
-                                    ))
+                                                <span className="flex min-w-0 flex-col items-start leading-tight">
+                                                    <span className="max-w-[9rem] truncate">
+                                                        {nm.name}
+                                                    </span>
+                                                    {meta ? (
+                                                        <span
+                                                            className={cn(
+                                                                'text-[10px] font-medium',
+                                                                i === 0
+                                                                    ? 'text-primary-foreground/75'
+                                                                    : 'text-muted-foreground',
+                                                            )}
+                                                        >
+                                                            {meta}
+                                                        </span>
+                                                    ) : null}
+                                                </span>
+                                                {i === 0 ? (
+                                                    <span className="rounded-full bg-primary-foreground/15 px-1.5 py-0.5 text-[9px] font-bold uppercase">
+                                                        best
+                                                    </span>
+                                                ) : null}
+                                            </button>
+                                        );
+                                    })
                                 )}
                             </div>
                             {sh.blocked && sh.blocked.length > 0 ? (
@@ -406,6 +422,24 @@ function fmtTimeRange(starts?: string | null, ends?: string | null): string {
     if (start && end) return `${start} - ${end}`;
     if (start) return start;
     return 'Time not set';
+}
+
+function formatHours(hours: number): string {
+    const rounded = Math.round(hours * 10) / 10;
+    return Number.isInteger(rounded) ? String(rounded) : rounded.toFixed(1);
+}
+
+function candidateMeta(candidate: {
+    hours?: number | null;
+    meta?: string | null;
+}): string | null {
+    if (candidate.meta) return candidate.meta;
+    if (
+        typeof candidate.hours !== 'number' ||
+        !Number.isFinite(candidate.hours)
+    )
+        return null;
+    return `${formatHours(candidate.hours)}h this week`;
 }
 
 function Stat({

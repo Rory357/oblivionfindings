@@ -8,8 +8,10 @@ use App\Models\Client;
 use App\Models\CoverageGapAcknowledgement;
 use App\Models\CoverageReservation;
 use App\Models\Role;
+use App\Models\RosterPeriod;
 use App\Models\ServiceContext;
 use App\Models\Shift;
+use App\Models\ShiftTask;
 use App\Models\Site;
 use App\Models\SiteCoverageRequirement;
 use App\Models\User;
@@ -341,6 +343,83 @@ class ShiftControllerTest extends TestCase
             'location' => 'Test Location',
             'status' => 'scheduled',
         ]);
+    }
+
+    public function test_manager_can_duplicate_shift_as_unassigned_draft_on_target_date(): void
+    {
+        config(['app.worker_timezone' => 'Pacific/Auckland']);
+
+        $source = Shift::factory()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'service_context_id' => $this->serviceContext->id,
+            'user_id' => $this->staff->id,
+            'starts_at' => Carbon::parse('2026-05-04 09:00:00', 'Pacific/Auckland')->utc(),
+            'ends_at' => Carbon::parse('2026-05-04 13:00:00', 'Pacific/Auckland')->utc(),
+            'location' => 'Matai House',
+            'notes' => 'Medication support',
+            'status' => 'scheduled',
+        ]);
+        ShiftTask::create([
+            'shift_id' => $source->id,
+            'label' => 'Morning handover',
+            'sort_order' => 0,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post(route('operations.shifts.duplicate', $source), [
+                'date' => '2026-05-06',
+                'return_to' => '/operations/rostering',
+            ])
+            ->assertRedirect('/operations/rostering');
+
+        $copy = Shift::query()
+            ->whereKeyNot($source->id)
+            ->where('client_id', $this->client->id)
+            ->firstOrFail();
+
+        $this->assertNull($copy->user_id);
+        $this->assertSame('draft', $copy->status);
+        $this->assertSame('Matai House', $copy->location);
+        $this->assertSame('Medication support', $copy->notes);
+        $this->assertSame('2026-05-06 09:00:00', $copy->starts_at->copy()->timezone('Pacific/Auckland')->format('Y-m-d H:i:s'));
+        $this->assertSame('2026-05-06 13:00:00', $copy->ends_at->copy()->timezone('Pacific/Auckland')->format('Y-m-d H:i:s'));
+        $this->assertDatabaseHas('shift_tasks', [
+            'shift_id' => $copy->id,
+            'label' => 'Morning handover',
+            'sort_order' => 0,
+        ]);
+    }
+
+    public function test_duplicate_shift_respects_roster_period_boundaries(): void
+    {
+        config(['app.worker_timezone' => 'Pacific/Auckland']);
+
+        $period = RosterPeriod::factory()->create([
+            'site_id' => $this->site->id,
+            'week_start' => '2026-05-04',
+            'week_end' => '2026-05-10',
+            'status' => RosterPeriod::STATUS_DRAFT,
+        ]);
+        $source = Shift::factory()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'service_context_id' => $this->serviceContext->id,
+            'roster_period_id' => $period->id,
+            'starts_at' => Carbon::parse('2026-05-04 09:00:00', 'Pacific/Auckland')->utc(),
+            'ends_at' => Carbon::parse('2026-05-04 13:00:00', 'Pacific/Auckland')->utc(),
+            'status' => 'scheduled',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->from('/operations/rostering')
+            ->post(route('operations.shifts.duplicate', $source), [
+                'date' => '2026-05-11',
+            ])
+            ->assertRedirect('/operations/rostering')
+            ->assertSessionHasErrors('date');
+
+        $this->assertSame(1, Shift::query()->count());
     }
 
     public function test_store_resolves_service_context_automatically(): void

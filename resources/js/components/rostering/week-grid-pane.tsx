@@ -1,6 +1,7 @@
 import { Link } from '@inertiajs/react';
 import {
     AlertTriangle,
+    Copy,
     Edit3,
     FileText,
     Minus,
@@ -85,6 +86,8 @@ export type WeekGridPaneProps = {
     onCreateShift?: (staffName: string, day: Date) => void;
     onResolveConflict?: (shift: GridShift) => void;
     onReassign?: (shift: GridShift) => void;
+    onDuplicateShift?: (shift: GridShift) => void;
+    onReopenShift?: (shift: GridShift) => void;
     onReportIncident?: (shift: GridShift) => void;
     actionEndSlot?: ReactNode;
 };
@@ -165,6 +168,8 @@ function buildShiftActions(
         onCancelShift?: (s: GridShift) => void;
         onResolveConflict?: (s: GridShift) => void;
         onReassign?: (s: GridShift) => void;
+        onDuplicateShift?: (s: GridShift) => void;
+        onReopenShift?: (s: GridShift) => void;
         onReportIncident?: (s: GridShift) => void;
     },
 ): ShiftCtxItem[] {
@@ -184,6 +189,16 @@ function buildShiftActions(
             window.location.href = href;
         },
     });
+    const pushDuplicateAction = () => {
+        if (!callbacks.onDuplicateShift) return;
+
+        items.push({
+            icon: <Copy className="h-3.5 w-3.5" />,
+            label: 'Duplicate as draft',
+            sub: 'Creates an unassigned copy',
+            onClick: () => callbacks.onDuplicateShift?.(shift),
+        });
+    };
 
     if (shift.conflict) {
         items.push({
@@ -213,6 +228,7 @@ function buildShiftActions(
                 window.location.href = editHref;
             },
         });
+        pushDuplicateAction();
         items.push({ sep: true });
         items.push({
             icon: <X className="h-3.5 w-3.5" />,
@@ -278,6 +294,23 @@ function buildShiftActions(
             label: 'Report incident',
             onClick: () => callbacks.onReportIncident?.(shift),
         });
+    } else if (shift.status === 'cancelled') {
+        items.push(
+            navAction(
+                'Open cancelled shift',
+                <FileText className="h-3.5 w-3.5" />,
+                detailHref,
+            ),
+        );
+        if (callbacks.onReopenShift) {
+            items.push({
+                icon: <RefreshCcw className="h-3.5 w-3.5" />,
+                label: 'Reopen cancelled shift',
+                sub: 'Restore this occurrence to planning',
+                tone: 'primary',
+                onClick: () => callbacks.onReopenShift?.(shift),
+            });
+        }
     } else if (shift.status === 'draft') {
         items.push(
             navAction(
@@ -286,6 +319,7 @@ function buildShiftActions(
                 editHref,
             ),
         );
+        pushDuplicateAction();
         items.push({ sep: true });
         items.push({
             icon: <X className="h-3.5 w-3.5" />,
@@ -301,6 +335,7 @@ function buildShiftActions(
                 editHref,
             ),
         );
+        pushDuplicateAction();
         items.push({
             icon: <RefreshCcw className="h-3.5 w-3.5" />,
             label: 'Reassign staff…',
@@ -365,6 +400,8 @@ export function WeekGridPane({
     onCreateShift,
     onResolveConflict,
     onReassign,
+    onDuplicateShift,
+    onReopenShift,
     onReportIncident,
     actionEndSlot,
 }: WeekGridPaneProps) {
@@ -391,6 +428,8 @@ export function WeekGridPane({
                 onCancelShift,
                 onResolveConflict,
                 onReassign,
+                onDuplicateShift,
+                onReopenShift,
                 onReportIncident,
             }),
         });

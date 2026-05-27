@@ -871,9 +871,7 @@ export default function RosteringIndex(props: Props) {
         eligible.sort(
             (a, b) => a.hours - b.hours || a.name.localeCompare(b.name),
         );
-        return eligible
-            .slice(0, limit)
-            .map((s) => ({ id: s.id, name: s.name }));
+        return eligible.slice(0, limit);
     };
 
     const openShiftCards: OpenShiftCard[] = useMemo(
@@ -1307,7 +1305,7 @@ export default function RosteringIndex(props: Props) {
             list.push({
                 tone: 'warning',
                 title: `${openCount} open shift${openCount === 1 ? '' : 's'}`,
-                body: 'Need cover this week — assign or broadcast.',
+                body: 'Need cover this week — assign from eligible staff.',
                 cta: 'Review open shifts',
                 onClick: () => setTab('open'),
             });
@@ -1488,6 +1486,31 @@ export default function RosteringIndex(props: Props) {
         );
     };
 
+    const duplicateShift = (shiftId: number) => {
+        if (!window.confirm('Duplicate this shift as an unassigned draft?'))
+            return;
+        router.post(
+            `/operations/shifts/${shiftId}/duplicate`,
+            { return_to: '/operations/rostering' },
+            { preserveScroll: true },
+        );
+    };
+
+    const reopenShift = (shiftId: number) => {
+        if (
+            !window.confirm(
+                'Reopen this cancelled shift and restore it to planning?',
+            )
+        )
+            return;
+        // Route is PATCH /operations/shifts/{shift}/reopen — operations.shifts.reopen.
+        router.patch(
+            `/operations/shifts/${shiftId}/reopen`,
+            { return_to: '/operations/rostering' },
+            { preserveScroll: true },
+        );
+    };
+
     const reviewLeaveRequest = (
         request: TimeOffRequest,
         action: 'approve' | 'decline',
@@ -1632,7 +1655,9 @@ export default function RosteringIndex(props: Props) {
                                 ? `${props.stats.staff_overlaps} conflict${props.stats.staff_overlaps === 1 ? '' : 's'} to resolve, `
                                 : ''}
                             and {props.stats.timesheets_pending} timesheet
-                            {props.stats.timesheets_pending === 1 ? '' : 's'}{' '}
+                            {props.stats.timesheets_pending === 1
+                                ? ''
+                                : 's'}{' '}
                             waiting on you.
                         </span>
                     }
@@ -1906,6 +1931,12 @@ export default function RosteringIndex(props: Props) {
                                 onResolveConflict={(s) =>
                                     setResolveConflictShift(s)
                                 }
+                                onDuplicateShift={
+                                    props.canManageAny
+                                        ? (s) => duplicateShift(s.id)
+                                        : undefined
+                                }
+                                onReopenShift={(s) => reopenShift(s.id)}
                                 onReportIncident={(s) =>
                                     router.visit(
                                         `/incidents/create?shift_id=${s.id}`,
@@ -1933,9 +1964,6 @@ export default function RosteringIndex(props: Props) {
                                         `/operations/shifts/${request.shift_id}`,
                                     )
                                 }
-                                onBroadcast={(sh) =>
-                                    router.visit(`/operations/shifts/${sh.id}`)
-                                }
                             />
                         ) : null}
                         {tab === 'coverage' ? (
@@ -1943,6 +1971,7 @@ export default function RosteringIndex(props: Props) {
                                 stats={coverageStats}
                                 windowLabels={coverageWindowLabels}
                                 rows={coverageRows}
+                                alerts={props.coverageAlerts}
                             />
                         ) : null}
                         {tab === 'timeoff' ? (

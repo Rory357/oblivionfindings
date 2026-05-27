@@ -58,6 +58,10 @@ export function TimeOffPane({
     onDecline,
 }: TimeOffPaneProps) {
     const pending = requests.filter((r) => r.status === 'pending');
+    const pendingSubtitle =
+        pending.length === 0
+            ? 'All caught up · no pending requests'
+            : 'Awaiting your decision · oldest first';
     const days14 = Array.from({ length: 14 }, (_, i) => {
         const d = new Date(weekStart);
         d.setDate(d.getDate() + i);
@@ -76,7 +80,7 @@ export function TimeOffPane({
                                 Pending requests
                             </h3>
                             <div className="text-[11px] text-muted-foreground">
-                                Awaiting your decision · oldest first
+                                {pendingSubtitle}
                             </div>
                         </div>
                         {canManage && pending.length > 0 ? (
