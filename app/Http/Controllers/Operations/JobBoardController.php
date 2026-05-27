@@ -19,6 +19,8 @@ use Illuminate\Validation\ValidationException;
 
 class JobBoardController extends Controller
 {
+    protected const RECENT_WEEKS_LOOKBACK = 26;
+
     public function index(Request $request)
     {
         $auth = $request->user();
@@ -27,21 +29,32 @@ class JobBoardController extends Controller
         $filters = $request->validate([
             'q' => ['nullable', 'string', 'max:255'],
             'status' => ['nullable', 'string', 'in:open,claimed,filled,cancelled'],
-            'scope' => ['nullable', 'string', 'in:mine'],
-            'date_range' => ['nullable', 'string', 'in:next_7_days,this_weekend'],
+            'scope' => ['nullable', 'string', 'in:for-you,all,mine,replacements'],
+            'date_range' => ['nullable', 'string', 'in:next_7_days,this_weekend,tonight'],
             'skill' => ['nullable', 'string', 'max:100'],
+            'fit' => ['nullable', 'string', 'in:all,eligible,no-conflict,site'],
+            'week' => ['nullable', 'date_format:Y-m-d'],
         ]);
 
         $search = trim((string) ($filters['q'] ?? ''));
-        $scope = $filters['scope'] ?? null;
+        $scope = $filters['scope'] ?? 'for-you';
         $skill = trim((string) ($filters['skill'] ?? ''));
+        $fit = $filters['fit'] ?? null;
+
+        $weekFilterRequested = ! empty($filters['week']);
+        $weekAnchor = $weekFilterRequested
+            ? Carbon::createFromFormat('Y-m-d', $filters['week'])->startOfDay()
+            : Carbon::now()->startOfWeek(Carbon::MONDAY);
+        $weekStart = $weekAnchor->copy()->startOfWeek(Carbon::MONDAY);
+        $weekEnd = $weekStart->copy()->endOfWeek(Carbon::SUNDAY);
 
         $positions = ShiftOpenPosition::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with([
-                'shift:id,client_id,starts_at,ends_at,location,status,user_id',
+                'shift:id,client_id,starts_at,ends_at,location,status,user_id,coverage_roles',
                 'shift.client:id,first_name,last_name,site_id,suburb,city',
                 'shift.client.site:id,name,suburb,city',
+                'shift.tasks:id,shift_id,label,sort_order',
                 'claimer:id,name',
                 'approver:id,name',
                 'replacementRequest:id,shift_id,requested_by,current_staff_id,replacement_user_id,status,reason,requested_at,claimed_at,approved_at,cancelled_at',
@@ -63,6 +76,20 @@ class JobBoardController extends Controller
                                     ->where('approved_at', '>=', now()->subDays(14));
                             });
                     });
+            })
+            ->when($scope === 'replacements', function ($query) {
+                $query->whereNotNull('replacement_request_id');
+            })
+            ->when($scope === 'all' || $scope === 'for-you', function ($query) {
+                $query->where('status', 'open')
+                    ->where(function ($nested) {
+                        $nested->whereNull('expires_at')
+                            ->orWhere('expires_at', '>', now());
+                    });
+            })
+            ->when($weekFilterRequested && $scope !== 'mine', function ($query) use ($weekStart, $weekEnd) {
+                $query->whereHas('shift', fn ($shiftQuery) => $shiftQuery
+                    ->whereBetween('starts_at', [$weekStart, $weekEnd]));
             })
             ->when(! empty($filters['status']), fn ($q) => $q->where('status', $filters['status']))
             ->when($search !== '', function ($query) use ($search) {
@@ -91,10 +118,58 @@ class JobBoardController extends Controller
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id));
         $availableSkills = $this->availableSkills($auth);
 
+        $formattedJobs = $positions->through(fn (ShiftOpenPosition $position) => $this->formatPositionForViewer($position, $auth));
+
+        $eligibleForYou = collect($formattedJobs->items())
+            ->filter(fn ($job) => $job['status'] === 'open' && ($job['viewer_eligibility']['is_eligible'] ?? false))
+            ->count();
+
+        $expiringSoon = (clone $statsQuery)
+            ->where('status', 'open')
+            ->whereNotNull('expires_at')
+            ->whereBetween('expires_at', [now(), now()->addHour()])
+            ->count();
+
+        $myClaimsCount = ShiftOpenPosition::query()
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->where('claimed_by', $auth->id)
+            ->where(function ($nested) {
+                $nested->where('status', 'claimed')
+                    ->orWhere(function ($filled) {
+                        $filled->where('status', 'filled')
+                            ->where('approved_at', '>=', now()->subDays(14));
+                    });
+            })
+            ->count();
+
+        $replacementsCount = (clone $statsQuery)
+            ->whereNotNull('replacement_request_id')
+            ->where(function ($query) {
+                $query->where('status', '!=', 'open')
+                    ->orWhereNull('expires_at')
+                    ->orWhere('expires_at', '>', now());
+            })
+            ->count();
+
         return inertia('operations/job-board/Index', [
-            'jobs' => $positions->through(fn (ShiftOpenPosition $position) => $this->formatPositionForViewer($position, $auth)),
-            'filters' => $filters,
+            'jobs' => $formattedJobs,
+            'filters' => array_merge($filters, [
+                'scope' => $scope,
+                'week' => $weekStart->toDateString(),
+            ]),
             'available_skills' => $availableSkills,
+            'week' => [
+                'start' => $weekStart->toDateString(),
+                'end' => $weekEnd->toDateString(),
+                'start_label' => $weekStart->format('j M'),
+                'end_label' => $weekEnd->format('j M'),
+                'prev' => $weekStart->copy()->subWeek()->toDateString(),
+                'next' => $weekStart->copy()->addWeek()->toDateString(),
+                'is_current' => $weekStart->equalTo(Carbon::now()->startOfWeek(Carbon::MONDAY)),
+            ],
+            'viewer' => [
+                'first_name' => $this->viewerFirstName($auth),
+            ],
             'stats' => [
                 'open' => (clone $statsQuery)
                     ->where('status', 'open')
@@ -108,6 +183,10 @@ class JobBoardController extends Controller
                     ->where('status', 'filled')
                     ->whereDate('approved_at', now()->toDateString())
                     ->count(),
+                'eligible_for_you' => $eligibleForYou,
+                'expiring_soon' => $expiringSoon,
+                'mine' => $myClaimsCount,
+                'replacements' => $replacementsCount,
             ],
         ]);
     }
@@ -392,6 +471,15 @@ class JobBoardController extends Controller
     protected function formatPositionForViewer(ShiftOpenPosition $position, User $viewer): array
     {
         $canViewSensitiveDetails = $this->canViewSensitivePositionDetails($position, $viewer);
+        $viewerEligibilityResult = $this->evaluateViewerEligibility($position, $viewer);
+        $viewerEligibility = $viewerEligibilityResult
+            ? $this->formatEligibilityResult($viewerEligibilityResult)
+            : null;
+        $requiredSkills = $position->required_skills ?? [];
+        $coverageRoles = $position->coverage_roles ?? [];
+        $tasksTotal = $position->shift?->tasks?->count() ?? 0;
+        $taskList = $this->buildTaskList($position, $canViewSensitiveDetails);
+        $pastShiftsHere = $this->countPastShiftsHere($position, $viewer);
 
         return [
             'id' => $position->id,
@@ -401,8 +489,10 @@ class JobBoardController extends Controller
             'start_time' => optional($position->shift?->starts_at)->format('H:i'),
             'end_time' => optional($position->shift?->ends_at)->format('H:i'),
             'location' => $this->formatPositionLocation($position, $canViewSensitiveDetails),
-            'required_skills' => $position->required_skills ?? [],
-            'coverage_roles' => $position->coverage_roles ?? [],
+            'required_skills' => $requiredSkills,
+            'your_skills' => $this->resolveViewerSkills($requiredSkills, $viewerEligibilityResult),
+            'coverage_roles' => $coverageRoles,
+            'coverage' => $this->buildCoverageLabel($coverageRoles, $position->shift),
             'privacy' => [
                 'can_view_sensitive_details' => $canViewSensitiveDetails,
             ],
@@ -427,8 +517,187 @@ class JobBoardController extends Controller
                 'name' => $position->claimer->name,
             ] : null,
             'eligibility' => $this->getPositionEligibility($position),
-            'viewer_eligibility' => $this->getViewerEligibility($position, $viewer),
+            'viewer_eligibility' => $viewerEligibility,
+            'your_schedule' => $this->buildYourSchedule($position, $viewerEligibilityResult),
+            'tasks' => $taskList,
+            'tasks_total' => $tasksTotal,
+            'past_shifts_here' => $pastShiftsHere,
+            'site_familiar' => $pastShiftsHere > 0,
         ];
+    }
+
+    protected function buildCoverageLabel(array $coverageRoles, ?Shift $shift): ?string
+    {
+        if (! empty($coverageRoles)) {
+            $role = str_replace('_', ' ', (string) $coverageRoles[0]);
+
+            return '1:1 '.$role;
+        }
+
+        return $shift?->is_sleepover ? '1:1 sleepover' : null;
+    }
+
+    protected function resolveViewerSkills(array $requiredSkills, ?EligibilityResult $eligibility): array
+    {
+        if (empty($requiredSkills)) {
+            return [];
+        }
+
+        if (! $eligibility) {
+            return [];
+        }
+
+        // Compliance rule failures expose which requirements the viewer is missing.
+        // Anything not flagged as a compliance block/warning is treated as held.
+        $missingRequirementNames = $this->extractMissingRequirementNames($eligibility);
+
+        if (empty($missingRequirementNames)) {
+            return array_values($requiredSkills);
+        }
+
+        return array_values(array_filter(
+            $requiredSkills,
+            function (string $skill) use ($missingRequirementNames): bool {
+                $needle = strtolower($skill);
+                foreach ($missingRequirementNames as $missing) {
+                    if (str_contains(strtolower($missing), $needle) || str_contains($needle, strtolower($missing))) {
+                        return false;
+                    }
+                }
+
+                return true;
+            }
+        ));
+    }
+
+    protected function extractMissingRequirementNames(EligibilityResult $eligibility): array
+    {
+        $names = [];
+
+        foreach ($eligibility->checked_rules as $rule) {
+            if (($rule['rule'] ?? null) !== 'compliance') {
+                continue;
+            }
+
+            foreach (($rule['compliance_warnings'] ?? []) as $warning) {
+                if (! empty($warning['requirement'])) {
+                    $names[] = $warning['requirement'];
+                }
+            }
+        }
+
+        return $names;
+    }
+
+    protected function buildYourSchedule(ShiftOpenPosition $position, ?EligibilityResult $eligibility): ?array
+    {
+        if (! $position->shift || $position->status !== 'open') {
+            return null;
+        }
+
+        if (! $eligibility) {
+            return null;
+        }
+
+        $conflict = null;
+        $timeOff = null;
+        $fatigue = null;
+
+        foreach ($eligibility->checked_rules as $rule) {
+            if (($rule['passed'] ?? true) === true) {
+                continue;
+            }
+
+            $ruleName = $rule['rule'] ?? '';
+            $severity = $rule['severity'] ?? 'block';
+            $message = $rule['message'] ?? null;
+
+            if ($ruleName === 'conflict' && $conflict === null) {
+                $conflict = [
+                    'type' => 'shift',
+                    'label' => $message,
+                    'severity' => $severity,
+                ];
+            } elseif ($ruleName === 'time_off' && $timeOff === null) {
+                $timeOff = ['label' => $message];
+            } elseif (str_starts_with($ruleName, 'fatigue') && $fatigue === null) {
+                $fatigue = [
+                    'label' => $message,
+                    'severity' => $severity,
+                ];
+            }
+        }
+
+        return [
+            'conflict' => $conflict,
+            'time_off' => $timeOff,
+            'fatigue' => $fatigue,
+            'free' => $conflict === null && $timeOff === null && $fatigue === null,
+        ];
+    }
+
+    protected function buildTaskList(ShiftOpenPosition $position, bool $canViewSensitiveDetails): array
+    {
+        if (! $position->shift || ! $position->shift->relationLoaded('tasks')) {
+            return [];
+        }
+
+        $tasks = $position->shift->tasks->take(5);
+
+        return $tasks->map(function ($task) use ($canViewSensitiveDetails) {
+            $label = (string) ($task->label ?? '');
+
+            return [
+                'label' => $canViewSensitiveDetails
+                    ? $label
+                    : 'Task details visible after claim approval',
+                'kind' => $this->categoriseTaskKind($label),
+            ];
+        })->all();
+    }
+
+    protected function categoriseTaskKind(string $label): string
+    {
+        $needle = strtolower($label);
+
+        if (preg_match('/\b(med|medication|peg|catheter|injection|dosage|vital)\b/', $needle)) {
+            return 'med';
+        }
+
+        if (preg_match('/\b(meal|breakfast|lunch|dinner|snack|cook|food|grocer|brunch)\b/', $needle)) {
+            return 'meal';
+        }
+
+        if (preg_match('/\b(community|outing|access|library|park|cafe|drive|transport|appointment|garden)\b/', $needle)) {
+            return 'access';
+        }
+
+        return 'care';
+    }
+
+    protected function countPastShiftsHere(ShiftOpenPosition $position, User $viewer): int
+    {
+        $clientId = $position->shift?->client_id;
+        if (! $clientId) {
+            return 0;
+        }
+
+        return Shift::query()
+            ->where('user_id', $viewer->id)
+            ->where('client_id', $clientId)
+            ->where('status', 'completed')
+            ->where('starts_at', '>=', now()->subWeeks(self::RECENT_WEEKS_LOOKBACK))
+            ->count();
+    }
+
+    protected function viewerFirstName(User $viewer): string
+    {
+        $name = trim((string) $viewer->name);
+        if ($name === '') {
+            return 'there';
+        }
+
+        return strtok($name, ' ') ?: $name;
     }
 
     protected function formatPositionTitle(ShiftOpenPosition $position, bool $canViewSensitiveDetails = true): string
@@ -522,6 +791,10 @@ class JobBoardController extends Controller
     {
         [$startsAt, $endsAt] = match ($dateRange) {
             'this_weekend' => $this->weekendRange(),
+            'tonight' => [
+                Carbon::now()->setTime(18, 0),
+                Carbon::tomorrow()->setTime(6, 0),
+            ],
             default => [now()->startOfDay(), now()->addDays(7)->endOfDay()],
         };
 
@@ -586,7 +859,7 @@ class JobBoardController extends Controller
         }
     }
 
-    protected function getViewerEligibility(ShiftOpenPosition $position, User $viewer): ?array
+    protected function evaluateViewerEligibility(ShiftOpenPosition $position, User $viewer): ?EligibilityResult
     {
         if (! $position->shift) {
             return null;
@@ -597,29 +870,27 @@ class JobBoardController extends Controller
         }
 
         if ((int) $position->shift->user_id === (int) $viewer->id) {
-            return $this->formatEligibilityResult(new EligibilityResult(
+            return new EligibilityResult(
                 is_allowed: false,
                 blocking_reasons: ['You are already assigned to this shift.'],
                 warnings: [],
                 checked_rules: [],
                 overrideable_warnings: [],
-            ));
+            );
         }
 
         if (in_array($position->shift->status, ['completed', 'cancelled'], true)) {
-            return $this->formatEligibilityResult(new EligibilityResult(
+            return new EligibilityResult(
                 is_allowed: false,
                 blocking_reasons: ['This shift can no longer be claimed from the job board.'],
                 warnings: [],
                 checked_rules: [],
                 overrideable_warnings: [],
-            ));
+            );
         }
 
         try {
-            return $this->formatEligibilityResult(
-                app(ShiftStaffEligibilityService::class)->evaluate($position->shift, $viewer)
-            );
+            return app(ShiftStaffEligibilityService::class)->evaluate($position->shift, $viewer);
         } catch (\Throwable $e) {
             Log::warning('Viewer eligibility check failed for job board position', [
                 'position_id' => $position->id,
