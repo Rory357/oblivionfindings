@@ -821,6 +821,113 @@ class ShiftController extends Controller
         return redirect($data['return_to'] ?? route('operations.shifts.index'))->with('success', 'Shift created.');
     }
 
+    public function duplicate(Request $request, Shift $shift)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('shifts.create'), 403);
+        $this->assertCanAccessShift($auth, $shift);
+
+        $data = $request->validate([
+            'date' => ['nullable', 'date_format:Y-m-d'],
+            'return_to' => ['nullable', 'string', 'max:255'],
+        ]);
+
+        if (! $shift->starts_at || ! $shift->ends_at) {
+            return back()->withErrors([
+                'shift' => 'Only shifts with a start and end time can be duplicated.',
+            ]);
+        }
+
+        $timezone = (string) config('app.worker_timezone', 'Pacific/Auckland');
+        $sourceStart = $shift->starts_at->copy()->timezone($timezone);
+        $sourceEnd = $shift->ends_at->copy()->timezone($timezone);
+        $durationMinutes = $sourceStart->diffInMinutes($sourceEnd);
+
+        if (! empty($data['date'])) {
+            $targetDate = Carbon::createFromFormat('Y-m-d', $data['date'], $timezone)->startOfDay();
+            $targetStart = $targetDate->copy()->setTime(
+                (int) $sourceStart->format('H'),
+                (int) $sourceStart->format('i'),
+                (int) $sourceStart->format('s'),
+            );
+        } else {
+            $targetStart = $sourceStart->copy();
+        }
+
+        $targetEnd = $targetStart->copy()->addMinutes($durationMinutes);
+        $period = $shift->rosterPeriod;
+        if ($period) {
+            $targetStartDate = $targetStart->toDateString();
+            $targetEndDate = $targetEnd->copy()->subSecond()->toDateString();
+            $periodStart = $period->week_start->toDateString();
+            $periodEnd = $period->week_end->toDateString();
+
+            if ($targetStartDate < $periodStart || $targetEndDate > $periodEnd) {
+                return back()->withErrors([
+                    'date' => "Duplicate stays within the {$periodStart} to {$periodEnd} roster period.",
+                ]);
+            }
+        }
+
+        $copy = DB::transaction(function () use ($auth, $shift, $targetStart, $targetEnd) {
+            $copy = new Shift();
+            $copy->forceFill([
+                'organization_id' => $shift->organization_id,
+                'roster_period_id' => $shift->roster_period_id,
+                'shift_series_id' => null,
+                'client_id' => $shift->client_id,
+                'site_id' => $shift->site_id,
+                'respite_booking_id' => null,
+                'service_context_id' => $shift->service_context_id,
+                'user_id' => null,
+                'starts_at' => $targetStart->copy()->utc(),
+                'ends_at' => $targetEnd->copy()->utc(),
+                'actual_starts_at' => null,
+                'actual_ends_at' => null,
+                'started_by' => null,
+                'completed_by' => null,
+                'handover_waiver_reason' => null,
+                'handover_waived_at' => null,
+                'handover_waived_by' => null,
+                'location' => $shift->location,
+                'notes' => $shift->notes,
+                'status' => 'draft',
+                'shift_type' => $shift->shift_type,
+                'is_sleepover' => $shift->is_sleepover,
+                'is_on_call' => $shift->is_on_call,
+                'expected_break_minutes' => $shift->expected_break_minutes,
+                'coverage_roles' => $shift->coverage_roles,
+                'published_at' => null,
+                'publish_dirty_at' => null,
+                'created_by' => $auth->id,
+            ]);
+            $copy->save();
+
+            $shift->tasks()
+                ->orderBy('sort_order')
+                ->get()
+                ->each(function (ShiftTask $task) use ($copy): void {
+                    ShiftTask::create([
+                        'shift_id' => $copy->id,
+                        'label' => $task->label,
+                        'is_completed' => false,
+                        'completed_at' => null,
+                        'completed_by' => null,
+                        'sort_order' => $task->sort_order,
+                    ]);
+                });
+
+            return $copy;
+        });
+
+        $requestedReturnTo = (string) ($data['return_to'] ?? '');
+        $returnTo = str_starts_with($requestedReturnTo, '/') && ! str_starts_with($requestedReturnTo, '//')
+            ? $requestedReturnTo
+            : route('operations.shifts.edit', $copy);
+
+        return redirect($returnTo)->with('success', 'Shift duplicated as draft.');
+    }
+
     public function edit(Request $request, Shift $shift)
     {
         $auth = $request->user();

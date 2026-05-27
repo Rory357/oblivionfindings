@@ -4,8 +4,10 @@ import { describe, expect, it, vi } from 'vitest';
 
 import AnalyticsPane from './analytics-pane';
 import CapacityHeatmapPane from './capacity-heatmap-pane';
+import CoveragePane from './coverage-pane';
 import OpenShiftsPane from './open-shifts-pane';
 import ResolveConflictDialog from './resolve-conflict-dialog';
+import TimeOffPane from './time-off-pane';
 import WeekGridPane from './week-grid-pane';
 
 vi.mock('@inertiajs/react', () => ({
@@ -106,6 +108,73 @@ describe('rostering redesign follow-up wiring', () => {
         ).toBeVisible();
     });
 
+    it('shows candidate capacity context on suggested staff chips', () => {
+        const onAssign = vi.fn();
+
+        render(
+            <OpenShiftsPane
+                stats={[]}
+                canManage
+                onAssign={onAssign}
+                shifts={[
+                    {
+                        id: 44,
+                        day: 'Mon 04 May',
+                        start: '09:00',
+                        end: '13:00',
+                        hours: 4,
+                        client: 'Ari Kauri',
+                        site: 'Matai House',
+                        reason: null,
+                        eligible: 1,
+                        warnings: 0,
+                        suggestions: [{ id: 7, name: 'Aroha King', hours: 32 }],
+                        href: '/operations/shifts/44',
+                    },
+                ]}
+            />,
+        );
+
+        expect(screen.getByText('32h this week')).toBeVisible();
+
+        fireEvent.click(screen.getByRole('button', { name: /Aroha King/i }));
+        expect(onAssign).toHaveBeenCalledWith(
+            expect.objectContaining({ id: 44 }),
+            7,
+        );
+    });
+
+    it('does not show an unsupported broadcast action for open shifts', () => {
+        render(
+            <OpenShiftsPane
+                stats={[]}
+                canManage
+                onAssign={vi.fn()}
+                shifts={[
+                    {
+                        id: 44,
+                        day: 'Mon 04 May',
+                        start: '09:00',
+                        end: '13:00',
+                        hours: 4,
+                        client: 'Ari Kauri',
+                        site: 'Matai House',
+                        reason: 'vacant',
+                        eligible: 1,
+                        warnings: 0,
+                        suggestions: [],
+                        href: '/operations/shifts/44',
+                    },
+                ]}
+            />,
+        );
+
+        expect(
+            screen.queryByRole('button', { name: /Broadcast/i }),
+        ).not.toBeInTheDocument();
+        expect(screen.getByRole('button', { name: /View/i })).toBeVisible();
+    });
+
     it('shows staff compliance state in the week grid and a clear empty roster state', () => {
         const { rerender } = render(
             <WeekGridPane
@@ -152,6 +221,99 @@ describe('rostering redesign follow-up wiring', () => {
         );
 
         expect(screen.getByText(/No shifts this week/i)).toBeVisible();
+    });
+
+    it('offers a guarded reopen action for cancelled shifts in the week grid menu', () => {
+        const onReopenShift = vi.fn();
+
+        render(
+            <WeekGridPane
+                days={weekDays}
+                rows={[
+                    {
+                        id: 7,
+                        name: 'Aroha King',
+                        role: null,
+                        initials: 'AK',
+                        hue: 120,
+                        shifts: {
+                            '2026-05-04': [
+                                {
+                                    id: 44,
+                                    status: 'cancelled',
+                                    starts_at: '2026-05-04T09:00:00+12:00',
+                                    ends_at: '2026-05-04T13:00:00+12:00',
+                                    client: 'Ari Kauri',
+                                    href: '/operations/shifts/44',
+                                },
+                            ],
+                        },
+                    },
+                ]}
+                todayKey={null}
+                canManage
+                onReopenShift={onReopenShift}
+            />,
+        );
+
+        fireEvent.contextMenu(screen.getByText('Ari Kauri'));
+
+        expect(
+            screen.getByRole('menuitem', { name: /Reopen cancelled shift/i }),
+        ).toBeVisible();
+        expect(
+            screen.queryByRole('menuitem', { name: /Cancel shift/i }),
+        ).not.toBeInTheDocument();
+
+        fireEvent.click(
+            screen.getByRole('menuitem', { name: /Reopen cancelled shift/i }),
+        );
+        expect(onReopenShift).toHaveBeenCalledWith(
+            expect.objectContaining({ id: 44, status: 'cancelled' }),
+        );
+    });
+
+    it('offers a duplicate action for editable scheduled shifts', () => {
+        const onDuplicateShift = vi.fn();
+
+        render(
+            <WeekGridPane
+                days={weekDays}
+                rows={[
+                    {
+                        id: 7,
+                        name: 'Aroha King',
+                        role: null,
+                        initials: 'AK',
+                        hue: 120,
+                        shifts: {
+                            '2026-05-04': [
+                                {
+                                    id: 44,
+                                    status: 'scheduled',
+                                    starts_at: '2026-05-04T09:00:00+12:00',
+                                    ends_at: '2026-05-04T13:00:00+12:00',
+                                    client: 'Ari Kauri',
+                                    href: '/operations/shifts/44',
+                                },
+                            ],
+                        },
+                    },
+                ]}
+                todayKey={null}
+                canManage
+                onDuplicateShift={onDuplicateShift}
+            />,
+        );
+
+        fireEvent.contextMenu(screen.getByText('Ari Kauri'));
+
+        fireEvent.click(
+            screen.getByRole('menuitem', { name: /Duplicate as draft/i }),
+        );
+        expect(onDuplicateShift).toHaveBeenCalledWith(
+            expect.objectContaining({ id: 44, status: 'scheduled' }),
+        );
     });
 
     it('shows compliance state on the capacity heatmap staff rows', () => {
@@ -212,6 +374,51 @@ describe('rostering redesign follow-up wiring', () => {
         expect(screen.getByText('Daily coverage')).toBeVisible();
         expect(screen.getByText('4/5 filled')).toBeVisible();
         expect(screen.getByText('1 open')).toBeVisible();
+    });
+
+    it('surfaces top-level coverage alerts returned by the controller', () => {
+        render(
+            <CoveragePane
+                stats={[]}
+                windowLabels={['AM 07-15']}
+                rows={[]}
+                alerts={[
+                    {
+                        site_name: 'Matai House',
+                        rule_name: 'Night cover',
+                        window_label: 'Night 23-07',
+                        required_staff: 2,
+                        assigned_staff: 1,
+                        missing_staff: 1,
+                        coverage_state: 'gap',
+                    },
+                ]}
+            />,
+        );
+
+        expect(screen.getByText('Coverage gaps this week')).toBeVisible();
+        expect(screen.getByText('Matai House')).toBeVisible();
+        expect(screen.getByText('Night cover')).toBeVisible();
+        expect(screen.getByText('1 short')).toBeVisible();
+        expect(screen.getByText('1/2 assigned')).toBeVisible();
+    });
+
+    it('uses caught-up copy when no leave requests are waiting', () => {
+        render(
+            <TimeOffPane
+                stats={[]}
+                requests={[]}
+                weekStart={new Date('2026-05-04T00:00:00')}
+                canManage
+            />,
+        );
+
+        expect(
+            screen.getByText('All caught up · no pending requests'),
+        ).toBeVisible();
+        expect(
+            screen.queryByText('Awaiting your decision · oldest first'),
+        ).not.toBeInTheDocument();
     });
 
     it('offers inline actions for resolving an overlapping shift', () => {

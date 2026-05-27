@@ -11,6 +11,7 @@ export {
 } from './capacity-heatmap-pane';
 export {
     CoveragePane,
+    type CoverageAlertSummary,
     type CoverageCell,
     type CoverageCellState,
     type CoverageRow,

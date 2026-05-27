@@ -638,6 +638,9 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     Route::post('/shifts', [ShiftController::class, 'store'])
         ->middleware('permission:shifts.create')
         ->name('operations.shifts.store');
+    Route::post('/shifts/{shift}/duplicate', [ShiftController::class, 'duplicate'])
+        ->middleware('permission:shifts.create')
+        ->name('operations.shifts.duplicate');
     Route::post('/coverage/reservations', [CoverageReservationController::class, 'store'])
         ->middleware('permission:shifts.create|shifts.manageAny')
         ->name('operations.coverage.reservations.store');

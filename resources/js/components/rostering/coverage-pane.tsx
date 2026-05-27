@@ -17,10 +17,23 @@ export type CoverageRow = {
     windows: CoverageCell[];
 };
 
+export type CoverageAlertSummary = {
+    site_name: string;
+    rule_name: string;
+    window_label: string;
+    required_staff: number;
+    assigned_staff: number;
+    planned_staff?: number | null;
+    missing_staff: number;
+    coverage_state: CoverageCellState | string;
+    gap_kind?: string | null;
+};
+
 export type CoveragePaneProps = {
     stats: MicroStat[];
     windowLabels: string[];
     rows: CoverageRow[];
+    alerts?: CoverageAlertSummary[];
     actionEndSlot?: ReactNode;
 };
 
@@ -40,11 +53,42 @@ export function CoveragePane({
     stats,
     windowLabels,
     rows,
+    alerts = [],
     actionEndSlot,
 }: CoveragePaneProps) {
+    const visibleAlerts = alerts.filter(
+        (alert) => alert.missing_staff > 0 || alert.coverage_state !== 'ok',
+    );
+
     return (
         <div className="space-y-4">
             <MicroStats stats={stats} />
+            {visibleAlerts.length > 0 ? (
+                <section className="rounded-[14px] border border-status-critical/30 bg-status-critical-bg/30 p-4">
+                    <div className="mb-3 flex flex-wrap items-start justify-between gap-2">
+                        <div>
+                            <h3 className="text-sm font-bold tracking-tight">
+                                Coverage gaps this week
+                            </h3>
+                            <div className="text-[11px] text-muted-foreground">
+                                All under-covered windows returned for this
+                                roster
+                            </div>
+                        </div>
+                        <span className="rounded-full bg-background/70 px-2 py-0.5 text-[11px] font-semibold text-muted-foreground tabular-nums">
+                            {visibleAlerts.length}
+                        </span>
+                    </div>
+                    <div className="grid gap-2 md:grid-cols-2">
+                        {visibleAlerts.map((alert, index) => (
+                            <CoverageAlertRow
+                                key={`${alert.site_name}-${alert.rule_name}-${alert.window_label}-${index}`}
+                                alert={alert}
+                            />
+                        ))}
+                    </div>
+                </section>
+            ) : null}
             <div className="overflow-hidden rounded-[14px] border border-border bg-card">
                 <div
                     className="grid border-b border-border bg-muted/50"
@@ -117,6 +161,56 @@ export function CoveragePane({
                 {actionEndSlot}
             </div>
         </div>
+    );
+}
+
+function CoverageAlertRow({ alert }: { alert: CoverageAlertSummary }) {
+    const missing = Math.max(0, alert.missing_staff);
+    const tone: CoverageCellState = missing > 0 ? 'gap' : 'partial';
+
+    return (
+        <article
+            className={cn(
+                'rounded-md border bg-card p-3',
+                tone === 'gap'
+                    ? 'border-status-critical/30'
+                    : 'border-status-warning/30',
+            )}
+        >
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                <div className="min-w-0">
+                    <div className="truncate text-sm font-semibold">
+                        {alert.site_name}
+                    </div>
+                    <div className="truncate text-xs text-muted-foreground">
+                        {alert.rule_name}
+                    </div>
+                </div>
+                <span
+                    className={cn(
+                        'rounded-full px-2 py-0.5 text-[11px] font-bold tabular-nums',
+                        tone === 'gap'
+                            ? 'bg-status-critical text-white'
+                            : 'bg-status-warning text-white',
+                    )}
+                >
+                    {missing} short
+                </span>
+            </div>
+            <div className="mt-2 flex flex-wrap items-center gap-1.5 text-[11px] text-muted-foreground">
+                <span className="rounded bg-muted px-1.5 py-0.5">
+                    {alert.window_label}
+                </span>
+                <span className="rounded bg-muted px-1.5 py-0.5 tabular-nums">
+                    {alert.assigned_staff}/{alert.required_staff} assigned
+                </span>
+                {typeof alert.planned_staff === 'number' ? (
+                    <span className="rounded bg-muted px-1.5 py-0.5 tabular-nums">
+                        {alert.planned_staff} planned
+                    </span>
+                ) : null}
+            </div>
+        </article>
     );
 }
 
