@@ -6,6 +6,11 @@ import { cn } from '@/lib/utils';
 
 import { MicroStats, type MicroStat } from './micro-stats';
 
+export type OpenShiftCandidateEligibility = {
+    status: 'warning' | 'blocked';
+    reasons: string[];
+};
+
 export type OpenShiftCard = {
     id: number;
     day: string;
@@ -23,6 +28,7 @@ export type OpenShiftCard = {
         name: string;
         hours?: number | null;
         meta?: string | null;
+        eligibility?: OpenShiftCandidateEligibility;
     }>;
     href?: string;
 };
@@ -288,20 +294,46 @@ export function OpenShiftsPane({
                                 ) : (
                                     sh.suggestions.slice(0, 8).map((nm, i) => {
                                         const meta = candidateMeta(nm);
+                                        const elig = nm.eligibility;
+                                        const isBlocked =
+                                            elig?.status === 'blocked';
+                                        const isWarning =
+                                            elig?.status === 'warning';
+                                        const reasonTooltip = elig?.reasons
+                                            ?.length
+                                            ? elig.reasons.join(' · ')
+                                            : undefined;
+                                        const isBest =
+                                            i === 0 && !isBlocked && !isWarning;
 
                                         return (
                                             <button
                                                 key={nm.id}
                                                 type="button"
-                                                disabled={!canManage}
+                                                aria-label={
+                                                    reasonTooltip
+                                                        ? `${nm.name} — ${isBlocked ? 'blocked' : 'warning'}: ${reasonTooltip}`
+                                                        : nm.name
+                                                }
+                                                title={reasonTooltip}
+                                                data-eligibility={
+                                                    elig?.status ?? 'eligible'
+                                                }
+                                                disabled={
+                                                    !canManage || isBlocked
+                                                }
                                                 onClick={() =>
                                                     onAssign(sh, nm.id)
                                                 }
                                                 className={cn(
                                                     'inline-flex min-h-11 max-w-full items-center gap-1.5 rounded-full border px-2 py-1 text-xs font-medium transition',
-                                                    i === 0
-                                                        ? 'border-primary bg-primary text-primary-foreground'
-                                                        : 'border-border bg-background text-foreground hover:bg-accent',
+                                                    isBlocked
+                                                        ? 'cursor-not-allowed border-status-critical/40 bg-status-critical-bg/40 text-muted-foreground line-through'
+                                                        : isWarning
+                                                          ? 'border-status-warning bg-status-warning-bg text-foreground hover:bg-status-warning-bg/80'
+                                                          : isBest
+                                                            ? 'border-primary bg-primary text-primary-foreground'
+                                                            : 'border-border bg-background text-foreground hover:bg-accent',
                                                 )}
                                             >
                                                 <span className="inline-flex h-6 w-6 shrink-0 items-center justify-center rounded-full bg-background/50 text-[9px] font-bold text-foreground uppercase">
@@ -319,7 +351,7 @@ export function OpenShiftsPane({
                                                         <span
                                                             className={cn(
                                                                 'text-[10px] font-medium',
-                                                                i === 0
+                                                                isBest
                                                                     ? 'text-primary-foreground/75'
                                                                     : 'text-muted-foreground',
                                                             )}
@@ -328,7 +360,21 @@ export function OpenShiftsPane({
                                                         </span>
                                                     ) : null}
                                                 </span>
-                                                {i === 0 ? (
+                                                {isBlocked ? (
+                                                    <span
+                                                        aria-hidden="true"
+                                                        className="rounded-full bg-status-critical px-1.5 py-0.5 text-[9px] font-bold text-white uppercase"
+                                                    >
+                                                        Blocked
+                                                    </span>
+                                                ) : isWarning ? (
+                                                    <span
+                                                        aria-hidden="true"
+                                                        className="rounded-full bg-status-warning px-1.5 py-0.5 text-[9px] font-bold text-white uppercase"
+                                                    >
+                                                        Warn
+                                                    </span>
+                                                ) : isBest ? (
                                                     <span className="rounded-full bg-primary-foreground/15 px-1.5 py-0.5 text-[9px] font-bold uppercase">
                                                         best
                                                     </span>
