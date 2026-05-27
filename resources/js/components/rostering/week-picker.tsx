@@ -167,10 +167,14 @@ export function WeekPicker({
         const update = () => {
             const el = anchorRef.current;
             if (!el) return;
+            // The popover is `position: fixed`, so coordinates must be
+            // viewport-relative. `getBoundingClientRect()` already returns
+            // viewport coords — adding window.scrollY/X here caused the
+            // picker to drift down/right as the page scrolled.
             const r = el.getBoundingClientRect();
             setPos({
-                top: r.bottom + 8 + window.scrollY,
-                left: r.left + window.scrollX,
+                top: r.bottom + 8,
+                left: r.left,
             });
         };
         update();
