@@ -389,6 +389,7 @@ export default function TimesheetsIndex({
     isOwnOnlyView,
     clients,
     sites,
+    staff,
     availableShifts,
     canApprove,
     canCreate,
@@ -497,6 +498,8 @@ export default function TimesheetsIndex({
                 <TimesheetsHero
                     summary={heroSummary}
                     canCreate={canCreate}
+                    sitesCount={sites?.length ?? heroSummary.sites_count}
+                    staffCount={staff?.length ?? 0}
                     onCreateTimesheet={() => {
                         setInitialShiftId(null);
                         setCreateOpen(true);

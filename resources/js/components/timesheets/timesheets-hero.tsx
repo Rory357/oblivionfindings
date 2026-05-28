@@ -10,12 +10,11 @@ import {
     DollarSign,
     FilePlus2,
     FileText,
-    Filter,
     MapPin,
     MoreHorizontal,
+    Search,
     Send,
     Users,
-    Zap,
 } from 'lucide-react';
 import { type ReactNode } from 'react';
 
@@ -105,7 +104,9 @@ function HeroBadge({ tone, children }: { tone: 'warning' | 'critical' | 'info' |
     );
 }
 
-function Chip({
+// Week-nav chip — matches rostering's exact styling: rounded-md squared,
+// xs-bold text, white/10 on white/20 border.
+function WeekChip({
     children,
     onClick,
     solid,
@@ -122,10 +123,10 @@ function Chip({
             onClick={onClick}
             title={title}
             className={cn(
-                'inline-flex items-center gap-1.5 rounded-full border px-3 py-1 text-[11.5px] font-medium transition',
+                'inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors',
                 solid
-                    ? 'border-white/40 bg-white/20 text-white hover:bg-white/25'
-                    : 'border-white/20 bg-white/5 text-white/85 hover:bg-white/10',
+                    ? 'border-primary-foreground/35 bg-primary-foreground/20 hover:bg-primary-foreground/30'
+                    : 'border-primary-foreground/20 bg-primary-foreground/10 hover:bg-primary-foreground/20',
             )}
         >
             {children}
@@ -133,14 +134,32 @@ function Chip({
     );
 }
 
-function FilterButton({ children, onClick }: { children: ReactNode; onClick?: () => void }) {
+// Right-hand filter pill — matches rostering's EntityFilter `onDark` styling:
+// rounded-full pill, search icon, count suffix, ChevronDown.
+function FilterPill({
+    icon: Icon,
+    label,
+    count,
+    onClick,
+}: {
+    icon: typeof Search;
+    label: string;
+    count?: number;
+    onClick?: () => void;
+}) {
     return (
         <button
             type="button"
             onClick={onClick}
-            className="inline-flex items-center gap-1.5 rounded-md border border-white/20 bg-white/5 px-2.5 py-1 text-[11.5px] font-medium text-white/85 hover:bg-white/10"
+            aria-haspopup="listbox"
+            className="inline-flex items-center gap-1.5 rounded-full border border-primary-foreground/30 bg-primary-foreground/10 px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary-foreground/20"
         >
-            {children}
+            <Icon className="h-3.5 w-3.5" aria-hidden="true" />
+            <span className="max-w-[200px] truncate">
+                {label}
+                {typeof count === 'number' ? ` · ${count}` : ''}
+            </span>
+            <ChevronDown className="h-3 w-3 opacity-70" />
         </button>
     );
 }
@@ -153,17 +172,21 @@ export default function TimesheetsHero({
     onCreateTimesheet,
     onPrevWeek,
     onNextWeek,
-    onJumpToToday,
+    onPickWeek,
     onMore,
     canCreate,
+    sitesCount,
+    staffCount,
 }: {
     summary: TimesheetsHeroSummary;
     onCreateTimesheet: () => void;
     onPrevWeek?: () => void;
     onNextWeek?: () => void;
-    onJumpToToday?: () => void;
+    onPickWeek?: () => void;
     onMore?: () => void;
     canCreate: boolean;
+    sitesCount?: number;
+    staffCount?: number;
 }) {
     const coveragePct =
         summary.hours_target > 0
@@ -303,41 +326,27 @@ export default function TimesheetsHero({
                 </div>
             </div>
 
-            {/* Footer band: week chips + filters */}
-            <div className="relative border-t border-white/20 px-4 md:px-6">
+            {/* Footer band: week chips + filters — mirrors rostering's layout exactly */}
+            <div className="relative border-t border-primary-foreground/20 px-4 md:px-6">
                 <div className="flex flex-col items-stretch gap-2 py-3 md:flex-row md:items-center md:justify-between">
                     <div className="flex flex-wrap items-center gap-1.5">
-                        <Chip onClick={onPrevWeek} title="Previous week">
+                        <WeekChip onClick={onPrevWeek} title="Previous week">
                             <ChevronLeft className="h-3.5 w-3.5" />
-                            Week {summary.week_number - 1} · {fmtMonthDay(prevWeekStart.toISOString())}
-                        </Chip>
-                        <Chip solid>
+                            Wk {summary.week_number - 1}
+                        </WeekChip>
+                        <WeekChip solid onClick={onPickWeek}>
                             <CalendarRange className="h-3.5 w-3.5" />
-                            Week {summary.week_number} · {fmtMonthDay(summary.week_start)} → {fmtMonthDay(summary.week_end)} · pick week
+                            Wk {summary.week_number} · {fmtMonthDay(summary.week_start)} → {fmtMonthDay(summary.week_end)} · pick week
                             <ChevronDown className="h-3 w-3" />
-                        </Chip>
-                        <Chip onClick={onNextWeek} title="Next week">
-                            Week {summary.week_number + 1} · {fmtMonthDay(nextWeekStart.toISOString())}
+                        </WeekChip>
+                        <WeekChip onClick={onNextWeek} title="Next week">
+                            Wk {summary.week_number + 1}
                             <ChevronRight className="h-3.5 w-3.5" />
-                        </Chip>
-                        <Chip onClick={onJumpToToday}>
-                            <Zap className="h-3.5 w-3.5" />
-                            Jump to today
-                        </Chip>
+                        </WeekChip>
                     </div>
-                    <div className="flex flex-wrap items-center justify-end gap-1.5">
-                        <FilterButton>
-                            <Filter className="h-3.5 w-3.5" /> Status: All
-                            <ChevronDown className="h-3 w-3" />
-                        </FilterButton>
-                        <FilterButton>
-                            <MapPin className="h-3.5 w-3.5" /> All sites
-                            <ChevronDown className="h-3 w-3" />
-                        </FilterButton>
-                        <FilterButton>
-                            <Users className="h-3.5 w-3.5" /> All staff
-                            <ChevronDown className="h-3 w-3" />
-                        </FilterButton>
+                    <div className="flex flex-wrap items-center justify-end gap-2">
+                        <FilterPill icon={Users} label="All staff" count={staffCount} />
+                        <FilterPill icon={MapPin} label="All sites" count={sitesCount ?? summary.sites_count} />
                     </div>
                 </div>
             </div>
