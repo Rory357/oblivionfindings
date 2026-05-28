@@ -890,12 +890,6 @@ function buildOperationsSubPanelGroups({
             href: '/operations/mileage',
             icon: Route,
         });
-    if (can?.payroll?.export || can?.payroll_exports?.viewAny)
-        timeBilling.push({
-            title: 'Payroll Export',
-            href: '/operations/payroll-export',
-            icon: Download,
-        });
     if (timeBilling.length > 0)
         groups.push({ label: 'Time & Billing', items: timeBilling });
 

@@ -17,7 +17,6 @@ import {
     AlertTriangle,
     Archive,
     ArchiveRestore,
-    Banknote,
     CalendarDays,
     Car,
     CheckCircle2,
@@ -274,7 +273,6 @@ function menuItemsFor(t: TimesheetRow): MenuItem[] {
         ],
         approved: [
             { id: 'reopen', label: 'Re-open for correction', icon: Undo2 },
-            { id: 'pay', label: 'Mark as paid', icon: Banknote, tone: 'success' },
             { id: 'payroll', label: 'View payroll impact', icon: DollarSign },
         ],
         paid: [

@@ -10,6 +10,7 @@ use App\Domain\Hr\Models\HrPayrollRunItem;
 use App\Models\Timesheet;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
 use Illuminate\Validation\ValidationException;
@@ -151,14 +152,86 @@ class PayrollExportService
             ]);
         }
 
-        $run->update([
-            'status' => 'locked',
-            'locked_at' => now(),
-            'locked_by' => $lockedBy,
-            'validation_errors' => [],
-        ]);
+        return DB::transaction(function () use ($run, $lockedBy) {
+            $run->update([
+                'status' => 'locked',
+                'locked_at' => now(),
+                'locked_by' => $lockedBy,
+                'validation_errors' => [],
+            ]);
 
-        return $run->fresh();
+            $this->markRunTimesheetsPaid($run);
+
+            return $run->fresh();
+        });
+    }
+
+    /**
+     * Cascade: flip every still-approved timesheet linked to this run to 'paid'.
+     * Idempotent and safe to call repeatedly. 'paid' is terminal — the system has
+     * no reverse-run path, so this is a one-way transition. Returns count newly paid.
+     */
+    public function markRunTimesheetsPaid(HrPayrollRun $run): int
+    {
+        $reference = "hr-payroll-run:{$run->id}";
+
+        $ids = $run->items()
+            ->pluck('timesheet_ids')
+            ->flatMap(fn ($arr) => collect($arr ?? []))
+            ->filter(fn ($id) => is_numeric($id))
+            ->map(fn ($id) => (int) $id)
+            ->unique()
+            ->values();
+
+        if ($ids->isEmpty()) {
+            return 0;
+        }
+
+        return DB::transaction(function () use ($ids, $reference, $run) {
+            $marked = 0;
+
+            $timesheets = Timesheet::query()
+                ->whereIn('id', $ids->all())
+                ->lockForUpdate()
+                ->get();
+
+            foreach ($timesheets as $timesheet) {
+                if ($timesheet->status === 'paid') {
+                    continue; // idempotent skip
+                }
+
+                if ($timesheet->status !== 'approved') {
+                    Log::info('Skipping non-approved timesheet during payroll paid cascade.', [
+                        'payroll_run_id' => $run->id,
+                        'timesheet_id'   => $timesheet->id,
+                        'status'         => $timesheet->status,
+                    ]);
+                    continue; // timesheet_ids array can be stale — never trust it blindly
+                }
+
+                $payload = [
+                    'status'                 => 'paid',
+                    'exported_to_payroll_at' => now(),
+                    'payroll_reference'      => $reference,
+                ];
+
+                $alreadyLinked = filled($timesheet->getOriginal('payroll_reference'))
+                    || filled($timesheet->getOriginal('exported_to_payroll_at'));
+
+                if ($alreadyLinked) {
+                    // Pre-existing legacy-stamped row: a normal update() would hit the
+                    // workflow guard, so bypass it. (New data can't reach this state
+                    // once Workstream 2 removes the legacy export path.)
+                    $timesheet->forceFill($payload)->saveQuietly();
+                } else {
+                    $timesheet->update($payload); // works WITH the guard
+                }
+
+                $marked++;
+            }
+
+            return $marked;
+        });
     }
 
     /**

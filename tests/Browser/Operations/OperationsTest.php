@@ -383,16 +383,6 @@ test('operations geofences page loads', function () {
     });
 });
 
-test('operations payroll export page loads', function () {
-    $this->browse(function (Browser $browser) {
-        $user = User::where('email', 'admin@test.com')->first();
-        $browser->loginAs($user)
-            ->visit('/operations/payroll-export')
-            ->waitForText('Payroll', 10)
-            ->assertSee('Payroll');
-    });
-});
-
 test('operations qualifications page loads', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
@@ -500,16 +490,6 @@ test('operations onboarding create page loads', function () {
             ->visit('/operations/onboarding/create')
             ->waitForText('Onboarding', 10)
             ->assertPathIs('/operations/onboarding/create');
-    });
-});
-
-test('operations payroll export create page loads', function () {
-    $this->browse(function (Browser $browser) {
-        $user = User::where('email', 'admin@test.com')->first();
-        $browser->loginAs($user)
-            ->visit('/operations/payroll-export/create')
-            ->waitForText('Payroll', 10)
-            ->assertPathIs('/operations/payroll-export/create');
     });
 });
 

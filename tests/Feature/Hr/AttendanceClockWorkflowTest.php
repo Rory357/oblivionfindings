@@ -1,6 +1,7 @@
 <?php
 
 use App\Domain\Hr\Models\HrAttendanceSession;
+use App\Domain\Hr\Models\HrTimeEntry;
 use App\Models\Client;
 use App\Models\Permission;
 use App\Models\Role;
@@ -296,3 +297,69 @@ test('clock out with zero break on short session succeeds', function () {
     expect($session->status)->toBe('closed');
     expect((int) $session->break_minutes)->toBe(0);
 });
+
+// ──────────────────────────────────────────────
+// Clock-surface consistency safeguard
+//
+// All three clock entry points funnel through AttendanceService, so a full
+// clock-in → clock-out cycle on any of them must produce exactly one
+// HrAttendanceSession and exactly one canonical draft Timesheet (linked to
+// that session). The two HR surfaces additionally maintain an HrTimeEntry;
+// the canonical /attendance surface does not. Locks in the "not a duplicate"
+// finding so a future refactor can't silently diverge the three paths.
+// ──────────────────────────────────────────────
+
+test('every clock surface funnels into one session and one canonical timesheet', function (array $surface) {
+    // /hr/my/time needs only auth; /hr/time + /attendance ride on the
+    // support_worker role's timesheet permissions. Grant hr.time.viewAny to
+    // mirror the shared-guard test's proven setup.
+    $hrTimePermission = Permission::query()->where('key', 'hr.time.viewAny')->firstOrFail();
+    $this->staff->permissionOverrides()->syncWithoutDetaching([
+        $hrTimePermission->id => ['allowed' => true],
+    ]);
+
+    $this->actingAs($this->staff)
+        ->post($surface['clock_in'])
+        ->assertSessionHas('success');
+
+    // Give the session a non-zero duration so clock-out is valid.
+    $this->travel(2)->hours();
+
+    $this->actingAs($this->staff)
+        ->post($surface['clock_out'], ['break_minutes' => 0])
+        ->assertSessionHas('success');
+
+    $sessions = HrAttendanceSession::query()
+        ->where('user_id', $this->staff->id)
+        ->get();
+    expect($sessions)->toHaveCount(1);
+
+    $session = $sessions->first();
+    expect($session->status)->toBe('closed');
+
+    $timesheets = Timesheet::query()
+        ->where('user_id', $this->staff->id)
+        ->where('status', 'draft')
+        ->get();
+    expect($timesheets)->toHaveCount(1);
+    expect((int) $timesheets->first()->attendance_session_id)->toBe((int) $session->id);
+
+    expect(HrTimeEntry::query()->where('user_id', $this->staff->id)->count())
+        ->toBe($surface['expected_time_entries']);
+})->with([
+    'canonical attendance' => [[
+        'clock_in' => '/attendance/clock-in',
+        'clock_out' => '/attendance/clock-out',
+        'expected_time_entries' => 0,
+    ]],
+    'hr self-service' => [[
+        'clock_in' => '/hr/my/time/clock-in',
+        'clock_out' => '/hr/my/time/clock-out',
+        'expected_time_entries' => 1,
+    ]],
+    'hr time tracking' => [[
+        'clock_in' => '/hr/time/clock-in',
+        'clock_out' => '/hr/time/clock-out',
+        'expected_time_entries' => 1,
+    ]],
+]);

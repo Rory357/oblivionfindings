@@ -148,3 +148,195 @@ test('payroll run cannot be locked when linked timesheets fail validation', func
     expect($run->status)->toBe('draft');
     expect($run->validation_errors)->not->toBeEmpty();
 });
+
+test('locking a run cascades linked approved timesheets to paid', function () {
+    $client = Client::factory()->create();
+
+    HrPayRateRule::query()->create([
+        'tenant_id' => 1,
+        'name' => 'Default Support Rule',
+        'is_active' => true,
+        'priority' => 100,
+        'position_role' => 'support_worker',
+        'regular_multiplier' => 1.00,
+        'overtime_multiplier' => 1.50,
+        'public_holiday_multiplier' => 1.50,
+        'sleepover_flat_rate' => 0,
+        'on_call_hourly_rate' => 0,
+        'created_by' => $this->hr->id,
+    ]);
+
+    $timesheet = Timesheet::query()->create([
+        'user_id' => $this->staff->id,
+        'client_id' => $client->id,
+        'work_date' => now()->subDay()->toDateString(),
+        'starts_at' => now()->subDay()->setTime(9, 0),
+        'ends_at' => now()->subDay()->setTime(17, 0),
+        'break_minutes' => 0,
+        'public_holiday' => false,
+        'status' => 'approved',
+        'submitted_at' => now()->subDay(),
+        'approved_at' => now(),
+        'approved_by' => $this->hr->id,
+        'created_by' => $this->staff->id,
+    ]);
+
+    $service = app(PayrollExportService::class);
+    $run = $service->createRun(1, now()->subWeek()->startOfDay(), now()->endOfDay(), $this->hr->id);
+    $service->lockRun($run->fresh(), $this->hr->id);
+
+    $timesheet->refresh();
+    expect($timesheet->status)->toBe('paid');
+    expect($timesheet->payroll_reference)->toBe("hr-payroll-run:{$run->id}");
+    expect($timesheet->exported_to_payroll_at)->not->toBeNull();
+});
+
+test('paid cascade is idempotent', function () {
+    $client = Client::factory()->create();
+
+    HrPayRateRule::query()->create([
+        'tenant_id' => 1,
+        'name' => 'Default Support Rule',
+        'is_active' => true,
+        'priority' => 100,
+        'position_role' => 'support_worker',
+        'regular_multiplier' => 1.00,
+        'overtime_multiplier' => 1.50,
+        'public_holiday_multiplier' => 1.50,
+        'sleepover_flat_rate' => 0,
+        'on_call_hourly_rate' => 0,
+        'created_by' => $this->hr->id,
+    ]);
+
+    Timesheet::query()->create([
+        'user_id' => $this->staff->id,
+        'client_id' => $client->id,
+        'work_date' => now()->subDay()->toDateString(),
+        'starts_at' => now()->subDay()->setTime(9, 0),
+        'ends_at' => now()->subDay()->setTime(17, 0),
+        'break_minutes' => 0,
+        'public_holiday' => false,
+        'status' => 'approved',
+        'submitted_at' => now()->subDay(),
+        'approved_at' => now(),
+        'approved_by' => $this->hr->id,
+        'created_by' => $this->staff->id,
+    ]);
+
+    $service = app(PayrollExportService::class);
+    $run = $service->createRun(1, now()->subWeek()->startOfDay(), now()->endOfDay(), $this->hr->id);
+    $service->lockRun($run->fresh(), $this->hr->id);
+
+    // Re-running the cascade on an already-paid run marks nothing new and does not error.
+    $newlyPaid = $service->markRunTimesheetsPaid($run->fresh());
+    expect($newlyPaid)->toBe(0);
+});
+
+test('timesheets outside the run period are not marked paid', function () {
+    $client = Client::factory()->create();
+
+    HrPayRateRule::query()->create([
+        'tenant_id' => 1,
+        'name' => 'Default Support Rule',
+        'is_active' => true,
+        'priority' => 100,
+        'position_role' => 'support_worker',
+        'regular_multiplier' => 1.00,
+        'overtime_multiplier' => 1.50,
+        'public_holiday_multiplier' => 1.50,
+        'sleepover_flat_rate' => 0,
+        'on_call_hourly_rate' => 0,
+        'created_by' => $this->hr->id,
+    ]);
+
+    $inPeriod = Timesheet::query()->create([
+        'user_id' => $this->staff->id,
+        'client_id' => $client->id,
+        'work_date' => now()->subDay()->toDateString(),
+        'starts_at' => now()->subDay()->setTime(9, 0),
+        'ends_at' => now()->subDay()->setTime(17, 0),
+        'break_minutes' => 0,
+        'public_holiday' => false,
+        'status' => 'approved',
+        'submitted_at' => now()->subDay(),
+        'approved_at' => now(),
+        'approved_by' => $this->hr->id,
+        'created_by' => $this->staff->id,
+    ]);
+
+    $outOfPeriod = Timesheet::query()->create([
+        'user_id' => $this->staff->id,
+        'client_id' => $client->id,
+        'work_date' => now()->subMonth()->toDateString(),
+        'starts_at' => now()->subMonth()->setTime(9, 0),
+        'ends_at' => now()->subMonth()->setTime(17, 0),
+        'break_minutes' => 0,
+        'public_holiday' => false,
+        'status' => 'approved',
+        'submitted_at' => now()->subMonth(),
+        'approved_at' => now()->subMonth()->addHour(),
+        'approved_by' => $this->hr->id,
+        'created_by' => $this->staff->id,
+    ]);
+
+    $service = app(PayrollExportService::class);
+    $run = $service->createRun(1, now()->subWeek()->startOfDay(), now()->endOfDay(), $this->hr->id);
+    $service->lockRun($run->fresh(), $this->hr->id);
+
+    $inPeriod->refresh();
+    expect($inPeriod->status)->toBe('paid');
+
+    $outOfPeriod->refresh();
+    expect($outOfPeriod->status)->toBe('approved');
+    expect($outOfPeriod->payroll_reference)->toBeNull();
+    expect($outOfPeriod->exported_to_payroll_at)->toBeNull();
+});
+
+test('paid cascade bypasses the workflow guard for a pre-stamped approved timesheet', function () {
+    $client = Client::factory()->create();
+
+    HrPayRateRule::query()->create([
+        'tenant_id' => 1,
+        'name' => 'Default Support Rule',
+        'is_active' => true,
+        'priority' => 100,
+        'position_role' => 'support_worker',
+        'regular_multiplier' => 1.00,
+        'overtime_multiplier' => 1.50,
+        'public_holiday_multiplier' => 1.50,
+        'sleepover_flat_rate' => 0,
+        'on_call_hourly_rate' => 0,
+        'created_by' => $this->hr->id,
+    ]);
+
+    $timesheet = Timesheet::query()->create([
+        'user_id' => $this->staff->id,
+        'client_id' => $client->id,
+        'work_date' => now()->subDay()->toDateString(),
+        'starts_at' => now()->subDay()->setTime(9, 0),
+        'ends_at' => now()->subDay()->setTime(17, 0),
+        'break_minutes' => 0,
+        'public_holiday' => false,
+        'status' => 'approved',
+        'submitted_at' => now()->subDay(),
+        'approved_at' => now(),
+        'approved_by' => $this->hr->id,
+        'created_by' => $this->staff->id,
+    ]);
+
+    // Pre-stamp it as the legacy operations export would have, without tripping the guard.
+    $timesheet->forceFill([
+        'exported_to_payroll_at' => now(),
+        'payroll_reference' => 'operations-payroll-export:99',
+    ])->saveQuietly();
+
+    $service = app(PayrollExportService::class);
+    $run = $service->createRun(1, now()->subWeek()->startOfDay(), now()->endOfDay(), $this->hr->id);
+
+    // Must not throw despite the pre-existing payroll stamp.
+    $service->lockRun($run->fresh(), $this->hr->id);
+
+    $timesheet->refresh();
+    expect($timesheet->status)->toBe('paid');
+    expect($timesheet->payroll_reference)->toBe("hr-payroll-run:{$run->id}");
+});
