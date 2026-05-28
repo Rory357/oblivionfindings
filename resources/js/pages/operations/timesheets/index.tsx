@@ -1,5 +1,4 @@
 import { OpsStatCard } from '@/components/ops-stat-card';
-import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { TimesheetStatusBadge } from '@/components/timesheet-status-badge';
 import CreateTimesheetDialog, {
@@ -7,34 +6,33 @@ import CreateTimesheetDialog, {
     type ShiftOption,
     type SiteOption,
 } from '@/components/timesheets/create-timesheet-dialog';
+import TimesheetsHero from '@/components/timesheets/timesheets-hero';
 import ViewTimesheetDialog, { type ViewTimesheetRow } from '@/components/timesheets/view-timesheet-dialog';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import {
     AlertTriangle,
     Archive,
     ArchiveRestore,
-    AlertCircle,
     Banknote,
     CalendarDays,
+    Car,
     CheckCircle2,
     ClipboardCheck,
+    Coffee,
     Copy,
     DollarSign,
     Eye,
     FileDown,
-    FilePlus2,
     FileText,
     Filter,
     Link2,
     MapPin,
     MessageSquareWarning,
     Moon,
-    Coffee,
-    Car,
     MoreHorizontal,
     Pencil,
     Receipt,
@@ -44,12 +42,12 @@ import {
     Sun,
     Trash2,
     Undo2,
-    UserPlus,
     User,
+    UserPlus,
     Users,
     XCircle,
 } from 'lucide-react';
-import React, { useEffect, useMemo, useRef, useState } from 'react';
+import React, { useEffect, useRef, useState } from 'react';
 
 // ─────────────────────────────────────────────────────────────────────
 // Types
@@ -491,99 +489,18 @@ export default function TimesheetsIndex({
         }
     }
 
-    const coveragePct = useMemo(() => {
-        if (!heroSummary.hours_target) return 0;
-        return Math.min(100, Math.round((heroSummary.hours_this_week / heroSummary.hours_target) * 100));
-    }, [heroSummary]);
-
-    const heroTitle = (
-        <span className="block">
-            <span className="mb-2 flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-wider text-primary-foreground/80">
-                <span aria-hidden="true" className="relative inline-flex h-2 w-2">
-                    <span className="absolute inset-0 inline-flex h-full w-full animate-ping rounded-full bg-emerald-300/70" />
-                    <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-300 ring-2 ring-emerald-300/30" />
-                </span>
-                Live timesheets · refreshed just now
-            </span>
-            <span className="block">
-                <span className="font-normal text-primary-foreground/80">
-                    Kia ora {heroSummary.firstName}, your week of timesheets —
-                </span>{' '}
-                <span className="border-b-2 border-primary-foreground/40 pb-0.5">
-                    {fmtDate(heroSummary.week_start)} → {fmtDate(heroSummary.week_end)}
-                </span>
-            </span>
-        </span>
-    );
-
-    const heroDescription = (
-        <span>
-            <span className="font-semibold tabular-nums text-primary-foreground">{heroSummary.unapproved}</span> timesheet
-            {heroSummary.unapproved === 1 ? '' : 's'} need a decision,{' '}
-            <span className="font-semibold tabular-nums text-primary-foreground">{heroSummary.timesheets_returned}</span> have been
-            returned for changes, and{' '}
-            <span className="font-semibold tabular-nums text-primary-foreground">{heroSummary.hours_this_week}</span> of{' '}
-            <span className="tabular-nums">{heroSummary.hours_target}</span> rostered hours have been logged so far. Payroll closes{' '}
-            <span className="font-semibold text-primary-foreground">{heroSummary.next_payroll_date}</span>.
-        </span>
-    );
-
     return (
         <AppLayout breadcrumbs={[{ title: isOwnOnlyView ? 'My timesheets' : 'Timesheets', href: '/operations/timesheets' }]}>
             <Head title={isOwnOnlyView ? 'My Timesheets' : 'Timesheets'} />
 
             <PageShell>
-                <PageHero
-                    category="ops"
-                    icon={FileText}
-                    title={heroTitle}
-                    description={heroDescription}
-                    meta={[
-                        { icon: CalendarDays, label: `Week ${heroSummary.week_number} · Mon–Sun` },
-                        { icon: MapPin, label: `${heroSummary.sites_count} site${heroSummary.sites_count === 1 ? '' : 's'} · ${heroSummary.regions_count} region${heroSummary.regions_count === 1 ? '' : 's'}` },
-                        { icon: Users, label: `${heroSummary.rostered_today} rostered · ${heroSummary.staff_on_shift} on shift` },
-                    ]}
-                    badges={[
-                        { tone: 'warning', label: `${heroSummary.unapproved} awaiting approval`, icon: AlertCircle },
-                        { tone: 'critical', label: `${heroSummary.timesheets_returned} returned to staff`, icon: Send },
-                        { tone: 'info', label: `Payroll closes ${heroSummary.next_payroll_date}`, icon: DollarSign },
-                    ]}
-                    stats={[
-                        { label: 'Total', value: heroSummary.timesheets_total },
-                        { label: 'Pending', value: heroSummary.timesheets_submitted },
-                        { label: 'Approved', value: heroSummary.timesheets_approved },
-                        { label: 'Returned', value: heroSummary.timesheets_returned },
-                    ]}
-                    actions={
-                        canCreate ? (
-                            <Button
-                                size="sm"
-                                onClick={() => {
-                                    setInitialShiftId(null);
-                                    setCreateOpen(true);
-                                }}
-                                className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
-                                data-testid="open-create-timesheet"
-                            >
-                                <FilePlus2 className="mr-1.5 h-4 w-4" />
-                                Create timesheet
-                            </Button>
-                        ) : null
-                    }
-                    footer={
-                        <div className="flex items-center justify-between gap-2 py-3">
-                            <div className="flex items-center gap-2 text-[11.5px] text-primary-foreground/80">
-                                <CalendarDays className="h-3.5 w-3.5" />
-                                <span>Hours logged vs. rostered</span>
-                                <span className="tabular-nums text-primary-foreground">
-                                    {heroSummary.hours_this_week} / {heroSummary.hours_target}h · {coveragePct}%
-                                </span>
-                            </div>
-                            <div className="h-1.5 flex-1 max-w-[400px] overflow-hidden rounded-full bg-primary-foreground/15">
-                                <div className="h-full rounded-full bg-primary-foreground/80" style={{ width: coveragePct + '%' }} />
-                            </div>
-                        </div>
-                    }
+                <TimesheetsHero
+                    summary={heroSummary}
+                    canCreate={canCreate}
+                    onCreateTimesheet={() => {
+                        setInitialShiftId(null);
+                        setCreateOpen(true);
+                    }}
                 />
 
                 {/* KPI strip */}
