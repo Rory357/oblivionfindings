@@ -40,11 +40,7 @@ describe('PageHeroStats', () => {
             />,
         );
 
-        expect(screen.getByText('4')).toHaveClass(
-            'text-status-warning-foreground',
-        );
-        expect(screen.getByText('1/3')).toHaveClass(
-            'text-status-critical-foreground',
-        );
+        expect(screen.getByText('4')).toHaveClass('text-status-warning');
+        expect(screen.getByText('1/3')).toHaveClass('text-status-critical');
     });
 });

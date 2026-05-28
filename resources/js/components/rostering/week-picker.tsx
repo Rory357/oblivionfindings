@@ -162,6 +162,23 @@ export function WeekPicker({
     } | null>(null);
     const popRef = useRef<HTMLDivElement | null>(null);
 
+    // Autofocus the dialog on mount so ArrowDown/Enter route to
+    // handleDialogKeyDown immediately. Without this, focus stays on the
+    // trigger button that opened the picker and the keyboard handler
+    // never fires until the user manually Tabs into the dialog.
+    //
+    // Defer through requestAnimationFrame: a synchronous focus() in
+    // useEffect races the browser's native click-target focus on the
+    // trigger button (verified in Chrome — focus ended up on <body>).
+    // rAF runs after the click event finishes propagating, so we win
+    // the race deterministically.
+    useEffect(() => {
+        const id = requestAnimationFrame(() => {
+            popRef.current?.focus();
+        });
+        return () => cancelAnimationFrame(id);
+    }, []);
+
     const [pos, setPos] = useState({ top: 0, left: 0 });
     useEffect(() => {
         if (!anchorRef?.current) return;
@@ -292,8 +309,9 @@ export function WeekPicker({
     return createPortal(
         <div
             ref={popRef}
+            tabIndex={-1}
             className={cn(
-                'fixed z-50 w-[360px] rounded-[14px] border border-border bg-popover p-3.5 text-popover-foreground shadow-lg',
+                'fixed z-50 w-[360px] rounded-[14px] border border-border bg-popover p-3.5 text-popover-foreground shadow-lg outline-none',
                 'animate-in fade-in-0 slide-in-from-top-1 zoom-in-95 duration-150',
             )}
             style={{ top: pos.top, left: pos.left }}

@@ -23,12 +23,18 @@ export type PageHeroStat = {
     tone?: PageHeroStatTone;
 };
 
+// Heroes use a brand-tinted (purple) gradient background, so the dark
+// `*-foreground` variants of the status tokens (designed for on-light
+// backgrounds in light mode) read as black-on-purple. Use the base
+// `text-status-*` tokens instead — they sit at ~45% L in light mode and
+// ~70% L in dark mode, which gives a saturated tinted-white that's
+// visible on the brand gradient without needing a tile background.
 const TONE_VALUE_CLASS: Record<PageHeroStatTone, string> = {
     neutral: '',
-    success: 'text-status-success-foreground',
-    warning: 'text-status-warning-foreground',
-    critical: 'text-status-critical-foreground',
-    info: 'text-status-info-foreground',
+    success: 'text-status-success',
+    warning: 'text-status-warning',
+    critical: 'text-status-critical',
+    info: 'text-status-info',
 };
 
 interface PageHeroStatsProps {

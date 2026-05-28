@@ -116,18 +116,14 @@ describe('MyDayHero audit fixes', () => {
         );
 
         expect(screen.getByText('Clocked in')).toHaveClass(
-            'text-status-success-foreground',
+            'text-status-success',
         );
-        expect(screen.getByText('1/3')).toHaveClass(
-            'text-status-critical-foreground',
-        );
+        expect(screen.getByText('1/3')).toHaveClass('text-status-critical');
         expect(
             screen
                 .getAllByText('2')
                 .some((element) =>
-                    element.classList.contains(
-                        'text-status-warning-foreground',
-                    ),
+                    element.classList.contains('text-status-warning'),
                 ),
         ).toBe(true);
     });
