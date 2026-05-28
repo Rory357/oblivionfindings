@@ -319,13 +319,15 @@ export default function MyDay() {
     // into the per-client allocation popup for the shift they're on right
     // now. Behaviour:
     //   1. If a draft / returned timesheet already exists for today, open
-    //      it in the TimesheetReviewDialog directly.
-    //   2. Otherwise POST `/my-tasks/timesheet/ensure-today` which finds-or-
-    //      creates a draft from the active shift and flashes
-    //      `open_timesheet_id`; the watcher below picks that up once Inertia
-    //      refreshes props and opens the popup for the new draft.
-    //   3. As a last resort (no active shift today), fall through to the
-    //      full list so the worker still has somewhere to land.
+    //      it in the TimesheetReviewDialog directly (per-client allocation
+    //      review still lives here — that's the editing surface).
+    //   2. Otherwise redirect to the unified Create Timesheet dialog at
+    //      /operations/timesheets?create=1&shift_id=<active> so creation
+    //      always funnels through the same component. See
+    //      design_handoff_timesheets_redesign/README.md — single create flow
+    //      is a hard requirement.
+    //   3. If there's no active shift today, fall through to the full list
+    //      so the worker can still log a manual timesheet from there.
     const todaysTimesheet = useMemo<MyDayTimesheet | null>(() => {
         const todayIso = props.today_iso;
         if (!todayIso) return null;
@@ -338,38 +340,23 @@ export default function MyDay() {
         );
     }, [props.timesheets, props.today_iso]) as MyDayTimesheet | null;
 
-    const [ensuringTimesheet, setEnsuringTimesheet] = useState(false);
-
     const handleOpenTimesheets = useCallback(() => {
         if (todaysTimesheet) {
             setTimesheetUnderReview(todaysTimesheet);
             return;
         }
-        // No draft for today yet — POST to /ensure-today and let the
-        // server find-or-create one. The flash watcher below picks up
-        // `open_timesheet_id` once props refresh and opens the popup. The
-        // server returns a validation error (no shift today) if there's
-        // genuinely nothing to write against; surface that explicitly so
-        // the worker doesn't click "Today's timesheet" into a void.
-        setEnsuringTimesheet(true);
-        router.post(
-            '/my-tasks/timesheet/ensure-today',
-            {},
-            {
-                preserveScroll: true,
-                preserveState: true,
-                onError: (errors) => {
-                    const message =
-                        (errors as Record<string, string>).timesheet
-                        ?? 'Could not open today’s timesheet — you don’t have a shift scheduled today.';
-                    if (typeof window !== 'undefined') {
-                        window.alert(message);
-                    }
-                },
-                onFinish: () => setEnsuringTimesheet(false),
-            },
-        );
-    }, [todaysTimesheet]);
+        // No draft for today yet — route the worker into the unified
+        // CreateTimesheetDialog on the timesheets index page. The active
+        // shift (if there is one) is pre-selected so they can pull tasks
+        // through and continue without re-picking. When there's no active
+        // shift, the dialog still opens with manual-entry as the fallback.
+        const query: Record<string, string> = { create: '1' };
+        if (activeShift?.id) {
+            query.shift_id = String(activeShift.id);
+        }
+        const qs = new URLSearchParams(query).toString();
+        router.visit(`/operations/timesheets?${qs}`);
+    }, [todaysTimesheet, activeShift?.id]);
 
     // Inertia flash `open_timesheet_id` is set by /ensure-today after it
     // finds-or-creates a draft for today. When we see it land, look up the
