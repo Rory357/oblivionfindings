@@ -69,6 +69,7 @@ class DashboardController extends Controller
             ->groupBy('status')
             ->pluck('count', 'status')
             ->toArray();
+        $shiftsThisWeekTotal = array_sum($shiftStatusBreakdown);
 
         $unassignedShifts = Shift::query()
             ->whereNull('user_id')
@@ -289,8 +290,12 @@ class DashboardController extends Controller
         $timeline = $this->buildTimeline($todayShifts, $sites, $now);
 
         // ── Hero summary ────────────────────────────────────────────
+        $unassignedToday = Shift::query()
+            ->whereDate('starts_at', $today)
+            ->whereNull('user_id')
+            ->count();
         $coveragePct = $shiftsTodayTotal > 0
-            ? (int) round((($shiftsTodayTotal - $urgentUnassigned) / max(1, $shiftsTodayTotal)) * 100)
+            ? (int) round(max(0, ($shiftsTodayTotal - $unassignedToday)) / $shiftsTodayTotal * 100)
             : 100;
 
         // ── Compliance & clock-in (computed from available data, stub fallback) ─
@@ -422,8 +427,10 @@ class DashboardController extends Controller
                     'delta_pct' => $hoursTrendPct,
                     'prev_value' => round($hoursLastWeek, 0),
                     'sparkline' => array_values($sparkline),
-                    'avg_shift' => $shiftsTodayTotal > 0 ? round($hoursThisWeek / max(1, $shiftsTodayTotal * 7), 1) : 6.4,
-                    'overtime_alerts' => 3,
+                    'avg_shift' => $shiftsThisWeekTotal > 0
+                        ? round($hoursThisWeek / $shiftsThisWeekTotal, 1)
+                        : 0,
+                    'overtime_alerts' => 0,
                 ],
                 'clock_in' => $clockIn,
                 'compliance' => $compliance,
