@@ -136,6 +136,12 @@ export default function MyDay() {
     // Live refresh — Inertia partial reload every 60s (unless guarded).
     const { lastUpdatedAt, isRefreshing, refreshNow } = useLiveRefresh({ intervalMs: 60_000 });
 
+    // Wall-clock tick that drives the live CLOCKED counter in the hero. The
+    // backend never sends an elapsed-minutes figure, so the headline is
+    // computed client-side from the open session's clock_in_at and must
+    // re-render on its own — otherwise the timer reads "0h 0m" and never moves.
+    const [now, setNow] = useState(() => Date.now());
+
     // ──────────────────────────────────────────────────────────────────────
     // Derived shapes
     // ──────────────────────────────────────────────────────────────────────
@@ -238,7 +244,20 @@ export default function MyDay() {
     const openSession = props.clock?.open_session ?? null;
     const clockedIn = !!openSession;
     const isOnBreak = !!openSession?.is_on_break;
-    const clockedMinutes = openSession?.clocked_minutes ?? 0;
+
+    // CLOCKED headline ticks up from the session's clock-in time. The backend
+    // doesn't report elapsed minutes, so derive it from clock_in_at against the
+    // ticking `now` above and re-arm a 30s interval while a session is open.
+    const clockInAt = openSession?.clock_in_at ?? null;
+    useEffect(() => {
+        if (!clockInAt) return;
+        setNow(Date.now());
+        const id = setInterval(() => setNow(Date.now()), 30_000);
+        return () => clearInterval(id);
+    }, [clockInAt]);
+    const clockedMinutes = clockInAt
+        ? Math.max(0, Math.floor((now - new Date(clockInAt).getTime()) / 60_000))
+        : 0;
     const clockedLabel = `${Math.floor(clockedMinutes / 60)}h ${clockedMinutes % 60}m`;
     const shiftStartLabel = isoToHourMinute(activeShift?.starts_at);
     const shiftEndLabel = isoToHourMinute(activeShift?.ends_at);
