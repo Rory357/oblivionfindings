@@ -1,1244 +1,848 @@
-import { PageHero } from '@/components/page';
 import { OpsStatCard } from '@/components/ops-stat-card';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
-import TimesheetReturnBanner from '@/components/timesheet-return-banner';
 import { TimesheetStatusBadge } from '@/components/timesheet-status-badge';
-import { Badge } from '@/components/ui/badge';
+import CreateTimesheetDialog, {
+    type ClientOption,
+    type ShiftOption,
+    type SiteOption,
+} from '@/components/timesheets/create-timesheet-dialog';
+import ViewTimesheetDialog, { type ViewTimesheetRow } from '@/components/timesheets/view-timesheet-dialog';
 import { Button } from '@/components/ui/button';
-import { Card } from '@/components/ui/card';
-import { EmptyList } from '@/components/ui/empty-state';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
+import { cn } from '@/lib/utils';
+import { Head, Link, router } from '@inertiajs/react';
 import {
-    bulkApprove as bulkApproveRoute,
-    bulkReject as bulkRejectRoute,
-    bulkReturn as bulkReturnRoute,
-    create as createTimesheet,
-    edit as editTimesheet,
-    approvals as timesheetApprovals,
-    index as timesheetsIndex,
-} from '@/routes/operations/timesheets';
-import { Head, Link, router, usePage } from '@inertiajs/react';
-import { AlertCircle, CheckCircle2, Clock, FileText, Send } from 'lucide-react';
-import React, { useMemo, useState } from 'react';
+    AlertTriangle,
+    Archive,
+    ArchiveRestore,
+    AlertCircle,
+    Banknote,
+    CalendarDays,
+    CheckCircle2,
+    ClipboardCheck,
+    Copy,
+    DollarSign,
+    Eye,
+    FileDown,
+    FilePlus2,
+    FileText,
+    Filter,
+    Link2,
+    MapPin,
+    MessageSquareWarning,
+    Moon,
+    Coffee,
+    Car,
+    MoreHorizontal,
+    Pencil,
+    Receipt,
+    RotateCcw,
+    Search,
+    Send,
+    Sun,
+    Trash2,
+    Undo2,
+    UserPlus,
+    User,
+    Users,
+    XCircle,
+} from 'lucide-react';
+import React, { useEffect, useMemo, useRef, useState } from 'react';
 
-type Timesheet = {
-    id: number;
-    work_date: string;
-    starts_at: string;
-    ends_at: string;
-    break_minutes: number;
-    mileage_km?: number | null;
-    sleepover?: boolean;
-    on_call?: boolean;
-    public_holiday?: boolean;
-    status: string;
-    returned_notes?: string | null;
-    submitted_at?: string | null;
-    client: { id: number; first_name: string; last_name: string };
-    staff: { id: number; name: string };
-    shift?: {
-        id: number;
-        shift_type?: string | null;
-        location?: string | null;
-        expected_break_minutes?: number | null;
-        service_context?: { id: number; name: string } | null;
-        status?: string;
-    } | null;
+// ─────────────────────────────────────────────────────────────────────
+// Types
+// ─────────────────────────────────────────────────────────────────────
+type TimesheetRow = ViewTimesheetRow & {
+    hours?: number;
+    total_hours?: number;
 };
 
+type HeroSummary = {
+    firstName: string;
+    week_start: string;
+    week_end: string;
+    week_number: number;
+    timesheets_total: number;
+    timesheets_submitted: number;
+    timesheets_approved: number;
+    timesheets_returned: number;
+    unapproved: number;
+    hours_this_week: number;
+    hours_target: number;
+    next_payroll_date: string;
+    sites_count: number;
+    regions_count: number;
+    rostered_today: number;
+    staff_on_shift: number;
+};
+
+type TabCounts = Record<string, number>;
+
 type Props = {
-    timesheets: { data: Timesheet[] };
-    filters: {
-        status?: string;
-        from?: string;
-        to?: string;
-        client_id?: string | number;
-        staff_id?: string | number;
-        mode?: string | null;
-    };
-    approvalMode?: boolean;
-    /**
-     * True when the controller restricted the query to the viewer's own
-     * timesheets (worker without `timesheets.manageAny`, list-mode). When set,
-     * the page renders as "My Timesheets" — heading + description swap, and
-     * the Staff column is hidden because every row would otherwise just say
-     * the viewer's own name.
-     */
-    isOwnOnlyView?: boolean;
-    clients?: Array<{ id: number; first_name: string; last_name: string }>;
-    staff?: Array<{ id: number; name: string; email?: string }>;
+    timesheets: { data: TimesheetRow[]; meta?: any };
+    filters: { tab?: string; from?: string; to?: string; client_id?: string; staff_id?: string; search?: string };
+    tabCounts: TabCounts;
+    heroSummary: HeroSummary;
+    isOwnOnlyView: boolean;
+    clients: ClientOption[];
+    sites: SiteOption[];
+    staff: Array<{ id: number; name: string }>;
+    availableShifts: ShiftOption[];
     canApprove: boolean;
     canCreate: boolean;
 };
 
-const ANY = '__any__';
+const TABS: Array<{ key: string; label: string }> = [
+    { key: 'all', label: 'All' },
+    { key: 'draft', label: 'Drafts' },
+    { key: 'submitted', label: 'Pending' },
+    { key: 'returned', label: 'Returned' },
+    { key: 'approved', label: 'Approved' },
+    { key: 'paid', label: 'Paid' },
+    { key: 'archived', label: 'Archive' },
+];
 
+// Preserved export — index.test.ts references this constant.
 export const needsApprovalBadgeClassName =
     'border-status-warning/30 bg-status-warning-bg text-[10px] text-status-warning';
 
+function fmtTime(iso: string) {
+    if (!iso) return '';
+    return new Date(iso).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' });
+}
+function fmtDate(iso: string) {
+    if (!iso) return '';
+    return new Date(iso).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
+}
+function initials(name?: string | null) {
+    if (!name) return '?';
+    return name.split(' ').map((w) => w[0]).slice(0, 2).join('').toUpperCase();
+}
+function hueFor(name?: string | null) {
+    if (!name) return 200;
+    let h = 0;
+    for (let i = 0; i < name.length; i++) h = (h * 31 + name.charCodeAt(i)) % 360;
+    return h;
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Hover popover — appears on row hover after ~350ms.
+// ─────────────────────────────────────────────────────────────────────
+function HoverPopover({ hover }: { hover: { row: TimesheetRow; rect: DOMRect } | null }) {
+    if (!hover) return null;
+    const { row: t, rect } = hover;
+    const W = 340;
+    const margin = 12;
+    const left = rect.right + margin + W > window.innerWidth ? Math.max(margin, rect.left - W - margin) : rect.right + margin;
+    const top = Math.max(margin, Math.min(rect.top, window.innerHeight - 360 - margin));
+    const hours = (t.total_hours ?? t.hours ?? 0) as number;
+    const taskPct = (t.tasks_total ?? 0) > 0 ? Math.round(((t.tasks_completed ?? 0) / (t.tasks_total ?? 1)) * 100) : 0;
+    const blurb: Record<string, string> = {
+        draft: 'In progress — not yet submitted.',
+        submitted: 'Awaiting manager decision.',
+        returned: 'Returned to staff for changes.',
+        approved: 'Approved · ready for payroll.',
+        rejected: 'Rejected — see notes.',
+        paid: 'Paid in the most recent pay run.',
+        archived: 'Archived from the active list.',
+    };
+
+    return (
+        <div className="pointer-events-none fixed z-40" style={{ left, top, width: W }}>
+            <div className="pointer-events-auto overflow-hidden rounded-xl border border-border bg-card shadow-2xl ring-1 ring-black/5">
+                <div className="flex items-center justify-between gap-2 border-b border-border px-3 py-2">
+                    <div className="min-w-0">
+                        <div className="text-[10.5px] uppercase tracking-wider text-muted-foreground">Timesheet #{t.id}</div>
+                        <div className="truncate text-[13px] font-semibold">
+                            {t.client ? `${t.client.first_name} ${t.client.last_name}` : t.activity_type ?? 'Manual entry'}
+                        </div>
+                    </div>
+                    <TimesheetStatusBadge status={t.status} />
+                </div>
+                <div className="space-y-2.5 px-3 py-3 text-xs">
+                    <div className="text-[11.5px] italic text-muted-foreground">{blurb[t.status] ?? ''}</div>
+                    <div className="grid grid-cols-3 gap-1.5">
+                        <div className="rounded-md border border-border bg-muted/30 px-2 py-1.5">
+                            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Hours</div>
+                            <div className="mt-0.5 text-[12.5px] font-semibold tabular-nums">{hours.toFixed(2)}h</div>
+                        </div>
+                        <div className="rounded-md border border-border bg-muted/30 px-2 py-1.5">
+                            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Break</div>
+                            <div className="mt-0.5 text-[12.5px] font-semibold tabular-nums">{t.break_minutes}m</div>
+                        </div>
+                        <div className="rounded-md border border-border bg-muted/30 px-2 py-1.5">
+                            <div className="text-[10px] uppercase tracking-wider text-muted-foreground">Mileage</div>
+                            <div className="mt-0.5 text-[12.5px] font-semibold tabular-nums">
+                                {(t.mileage_km ?? 0) > 0 ? `${t.mileage_km}km` : '—'}
+                            </div>
+                        </div>
+                    </div>
+                    <div className="flex items-center gap-2 rounded-md bg-muted/40 px-2 py-1.5 text-[11.5px] text-muted-foreground">
+                        <span className="tabular-nums">
+                            {fmtTime(t.starts_at)} – {fmtTime(t.ends_at)}
+                        </span>
+                        <span className="ml-auto">{fmtDate(t.work_date)}</span>
+                    </div>
+                    {t.shift ? (
+                        <div className="rounded-md border border-border px-2 py-1.5">
+                            <div className="flex items-center justify-between text-[11.5px]">
+                                <span className="font-medium">Shift #{t.shift.id}</span>
+                                <span className="capitalize text-muted-foreground">
+                                    {(t.shift.shift_type ?? 'standard').replace('_', ' ')}
+                                </span>
+                            </div>
+                            {t.shift.location ? (
+                                <div className="mt-0.5 inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                                    <MapPin className="h-3 w-3" />
+                                    {t.shift.location}
+                                </div>
+                            ) : null}
+                        </div>
+                    ) : null}
+                    {(t.tasks_total ?? 0) > 0 ? (
+                        <div>
+                            <div className="mb-1 flex items-center justify-between">
+                                <span className="text-[11.5px] font-medium">Tasks pulled from shift</span>
+                                <span className="text-[11px] tabular-nums text-muted-foreground">
+                                    {t.tasks_completed ?? 0}/{t.tasks_total ?? 0}
+                                </span>
+                            </div>
+                            <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                                <div
+                                    className={cn('h-full rounded-full', taskPct === 100 ? 'bg-emerald-500' : 'bg-primary')}
+                                    style={{ width: taskPct + '%' }}
+                                />
+                            </div>
+                        </div>
+                    ) : null}
+                    <div className="rounded-md bg-muted/30 px-2 py-1.5 text-[11.5px] text-muted-foreground">
+                        <div>
+                            <span className="text-muted-foreground/70">Worked by</span>{' '}
+                            <span className="font-medium">{t.staff?.name ?? '—'}</span>
+                        </div>
+                    </div>
+                    {t.status === 'returned' && t.returned_notes ? (
+                        <div className="flex items-start gap-1.5 rounded-md bg-rose-50 px-2 py-1.5 text-[11.5px] text-rose-700 dark:bg-rose-950/30 dark:text-rose-200">
+                            <AlertTriangle className="mt-0.5 h-3 w-3 shrink-0" />
+                            <span>{t.returned_notes}</span>
+                        </div>
+                    ) : null}
+                </div>
+                <div className="border-t border-border bg-muted/40 px-3 py-1.5 text-[10.5px] text-muted-foreground">
+                    Click to open · right-click for actions
+                </div>
+            </div>
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Right-click context menu — status-aware.
+// ─────────────────────────────────────────────────────────────────────
+type MenuItem = { id?: string; label?: string; icon?: any; tone?: 'primary' | 'success' | 'warning' | 'danger'; separator?: boolean };
+
+function menuItemsFor(t: TimesheetRow): MenuItem[] {
+    const common: MenuItem[] = [
+        { id: 'view', label: 'View timesheet', icon: Eye },
+        { id: 'shift', label: 'Open linked shift → #' + (t.shift?.id ?? '—'), icon: CalendarDays },
+        { id: 'client', label: 'Open client profile', icon: User },
+        { id: 'staff', label: 'Open staff profile', icon: Users },
+        { separator: true },
+    ];
+    const tail: MenuItem[] = [
+        { separator: true },
+        { id: 'copy', label: 'Copy timesheet link', icon: Link2 },
+        { id: 'pdf', label: 'Export as PDF', icon: FileDown },
+    ];
+    const byStatus: Record<string, MenuItem[]> = {
+        draft: [
+            { id: 'edit', label: 'Edit hours & breaks', icon: Pencil },
+            { id: 'submit', label: 'Submit for approval', icon: Send, tone: 'primary' },
+            { id: 'duplicate', label: 'Duplicate as new draft', icon: Copy },
+            { id: 'discard', label: 'Discard draft', icon: Trash2, tone: 'danger' },
+        ],
+        submitted: [
+            { id: 'approve', label: 'Approve', icon: CheckCircle2, tone: 'success' },
+            { id: 'return', label: 'Return for changes…', icon: RotateCcw, tone: 'warning' },
+            { id: 'reject', label: 'Reject…', icon: XCircle, tone: 'danger' },
+            { id: 'reassign', label: 'Re-assign approver', icon: UserPlus },
+        ],
+        returned: [
+            { id: 'edit', label: 'Edit & resubmit', icon: Pencil },
+            { id: 'notes', label: 'View return notes', icon: MessageSquareWarning },
+            { id: 'discard', label: 'Discard timesheet', icon: Trash2, tone: 'danger' },
+        ],
+        approved: [
+            { id: 'reopen', label: 'Re-open for correction', icon: Undo2 },
+            { id: 'pay', label: 'Mark as paid', icon: Banknote, tone: 'success' },
+            { id: 'payroll', label: 'View payroll impact', icon: DollarSign },
+        ],
+        paid: [
+            { id: 'payslip', label: 'View payslip line', icon: Receipt },
+            { id: 'archive', label: 'Archive timesheet', icon: Archive },
+            { id: 'correction', label: 'Raise correction request', icon: AlertTriangle, tone: 'warning' },
+        ],
+        rejected: [
+            { id: 'reason', label: 'View rejection reason', icon: MessageSquareWarning },
+            { id: 'recreate', label: 'Recreate from this', icon: Copy },
+            { id: 'archive', label: 'Archive timesheet', icon: Archive },
+        ],
+        archived: [
+            { id: 'restore', label: 'Restore to active list', icon: ArchiveRestore, tone: 'primary' },
+            { id: 'pdf', label: 'Download archived copy', icon: FileDown },
+        ],
+    };
+    return [...common, ...(byStatus[t.status] ?? []), ...tail];
+}
+
+function ContextMenu({
+    menu,
+    onClose,
+    onAction,
+}: {
+    menu: { x: number; y: number; row: TimesheetRow } | null;
+    onClose: () => void;
+    onAction: (id: string, row: TimesheetRow) => void;
+}) {
+    const ref = useRef<HTMLDivElement | null>(null);
+    useEffect(() => {
+        const onAway = (e: MouseEvent) => {
+            if (ref.current && !ref.current.contains(e.target as Node)) onClose();
+        };
+        const onKey = (e: KeyboardEvent) => e.key === 'Escape' && onClose();
+        document.addEventListener('mousedown', onAway);
+        document.addEventListener('keydown', onKey);
+        return () => {
+            document.removeEventListener('mousedown', onAway);
+            document.removeEventListener('keydown', onKey);
+        };
+    }, [onClose]);
+
+    if (!menu) return null;
+    const { x, y, row } = menu;
+    const items = menuItemsFor(row);
+    const W = 260;
+    const H = Math.min(440, 36 * items.length + 56);
+    const left = Math.min(x, window.innerWidth - W - 8);
+    const top = Math.min(y, window.innerHeight - H - 8);
+
+    const toneCls: Record<string, string> = {
+        primary: 'text-foreground',
+        success: 'text-emerald-700 hover:bg-emerald-50',
+        warning: 'text-amber-700 hover:bg-amber-50',
+        danger: 'text-rose-700 hover:bg-rose-50',
+    };
+
+    return (
+        <div
+            ref={ref}
+            role="menu"
+            className="fixed z-[60] w-[260px] overflow-hidden rounded-xl border border-border bg-card py-1.5 shadow-2xl ring-1 ring-black/5"
+            style={{ left, top }}
+        >
+            <div className="flex items-center justify-between gap-2 px-3 py-1.5">
+                <div className="min-w-0">
+                    <div className="truncate text-[11.5px] font-semibold">
+                        #{row.id} ·{' '}
+                        {row.client ? `${row.client.first_name} ${row.client.last_name}` : row.activity_type ?? 'Manual'}
+                    </div>
+                    <div className="text-[10.5px] text-muted-foreground">
+                        {row.staff?.name ?? 'Staff'} · {fmtDate(row.work_date)}
+                    </div>
+                </div>
+                <TimesheetStatusBadge status={row.status} />
+            </div>
+            <div className="my-1 h-px bg-border" />
+            {items.map((it, i) => {
+                if (it.separator) return <div key={'s' + i} className="my-1 h-px bg-border" />;
+                const Ic = it.icon;
+                return (
+                    <button
+                        key={i}
+                        onClick={() => {
+                            if (it.id) onAction(it.id, row);
+                            onClose();
+                        }}
+                        className={cn(
+                            'flex w-full items-center gap-2.5 px-3 py-1.5 text-left text-[12.5px] hover:bg-muted',
+                            toneCls[it.tone ?? 'primary'] ?? 'text-foreground',
+                        )}
+                        role="menuitem"
+                    >
+                        {Ic ? <Ic className="h-3.5 w-3.5 opacity-80" /> : null}
+                        <span className="flex-1 truncate">{it.label}</span>
+                    </button>
+                );
+            })}
+        </div>
+    );
+}
+
+// ─────────────────────────────────────────────────────────────────────
+// Page
+// ─────────────────────────────────────────────────────────────────────
 export default function TimesheetsIndex({
     timesheets,
     filters,
-    approvalMode,
+    tabCounts,
+    heroSummary,
     isOwnOnlyView,
-    clients = [],
-    staff = [],
+    clients,
+    sites,
+    availableShifts,
     canApprove,
     canCreate,
 }: Props) {
-    const { labels } = usePage().props as any;
-    const timesheetPlural = labels?.['timesheet.plural'] ?? 'Timesheets';
-    const isApprovalMode = !!approvalMode;
-    const isWorkerView = !!isOwnOnlyView && !isApprovalMode;
+    const [tab, setTab] = useState(filters.tab ?? 'all');
+    const [search, setSearch] = useState(filters.search ?? '');
+    const [menu, setMenu] = useState<{ x: number; y: number; row: TimesheetRow } | null>(null);
+    const [hover, setHover] = useState<{ row: TimesheetRow; rect: DOMRect } | null>(null);
+    const [viewing, setViewing] = useState<TimesheetRow | null>(null);
+    const [createOpen, setCreateOpen] = useState(false);
+    const [initialShiftId, setInitialShiftId] = useState<number | null>(null);
+    const hoverTimer = useRef<number | null>(null);
 
-    const [selected, setSelected] = useState<Record<number, boolean>>({});
-    const selectedIds = useMemo(
-        () =>
-            Object.entries(selected)
-                .filter(([, v]) => v)
-                .map(([k]) => Number(k)),
-        [selected],
+    // Open Create dialog when the URL has ?create=1 (e.g. shift detail page deep link).
+    useEffect(() => {
+        const params = new URLSearchParams(window.location.search);
+        if (params.get('create') === '1') {
+            const sid = params.get('shift_id');
+            setInitialShiftId(sid ? Number(sid) : null);
+            setCreateOpen(true);
+        }
+        const viewId = params.get('view');
+        if (viewId) {
+            const row = timesheets.data.find((r) => String(r.id) === viewId);
+            if (row) setViewing(row);
+        }
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
+
+    const rows = timesheets.data;
+    const submittedCount = tabCounts.submitted ?? 0;
+
+    function switchTab(next: string) {
+        setTab(next);
+        router.get(
+            '/operations/timesheets',
+            { ...filters, tab: next, search: search || undefined },
+            { preserveScroll: true, preserveState: true, replace: true },
+        );
+    }
+
+    function submitSearch() {
+        router.get(
+            '/operations/timesheets',
+            { ...filters, tab, search: search || undefined },
+            { preserveScroll: true, preserveState: true, replace: true },
+        );
+    }
+
+    function handleAction(id: string, row: TimesheetRow) {
+        switch (id) {
+            case 'view':
+                setViewing(row);
+                return;
+            case 'edit':
+                router.visit(`/operations/timesheets/${row.id}/edit`);
+                return;
+            case 'shift':
+                if (row.shift) router.visit(`/operations/shifts/${row.shift.id}`);
+                return;
+            case 'client':
+                if (row.client) router.visit(`/operations/clients/${row.client.id}`);
+                return;
+            case 'staff':
+                if (row.staff) router.visit(`/hr/people/${row.staff.id}`);
+                return;
+            case 'submit':
+                router.post(`/operations/timesheets/${row.id}/submit`, {}, { preserveScroll: true });
+                return;
+            case 'approve':
+                router.post(`/operations/timesheets/${row.id}/approve`, {}, { preserveScroll: true });
+                return;
+            case 'return': {
+                const reason = window.prompt('What needs changing?');
+                if (!reason) return;
+                router.post(`/operations/timesheets/${row.id}/return`, { returned_notes: reason }, { preserveScroll: true });
+                return;
+            }
+            case 'reject': {
+                const reason = window.prompt('Reason for rejection:');
+                if (!reason) return;
+                router.post(`/operations/timesheets/${row.id}/reject`, { decision_notes: reason }, { preserveScroll: true });
+                return;
+            }
+            case 'archive':
+                router.post(`/operations/timesheets/${row.id}/archive`, {}, { preserveScroll: true });
+                return;
+            case 'restore':
+                router.post(`/operations/timesheets/${row.id}/restore`, {}, { preserveScroll: true });
+                return;
+            case 'copy': {
+                const url = `${window.location.origin}/operations/timesheets?view=${row.id}`;
+                navigator.clipboard?.writeText(url);
+                return;
+            }
+            default:
+                return;
+        }
+    }
+
+    const coveragePct = useMemo(() => {
+        if (!heroSummary.hours_target) return 0;
+        return Math.min(100, Math.round((heroSummary.hours_this_week / heroSummary.hours_target) * 100));
+    }, [heroSummary]);
+
+    const heroTitle = (
+        <span className="block">
+            <span className="mb-2 flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-wider text-primary-foreground/80">
+                <span aria-hidden="true" className="relative inline-flex h-2 w-2">
+                    <span className="absolute inset-0 inline-flex h-full w-full animate-ping rounded-full bg-emerald-300/70" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-300 ring-2 ring-emerald-300/30" />
+                </span>
+                Live timesheets · refreshed just now
+            </span>
+            <span className="block">
+                <span className="font-normal text-primary-foreground/80">
+                    Kia ora {heroSummary.firstName}, your week of timesheets —
+                </span>{' '}
+                <span className="border-b-2 border-primary-foreground/40 pb-0.5">
+                    {fmtDate(heroSummary.week_start)} → {fmtDate(heroSummary.week_end)}
+                </span>
+            </span>
+        </span>
     );
-    const allSelected =
-        timesheets.data.length > 0 &&
-        timesheets.data.every((t) => selected[t.id]);
 
-    const [decisionNotes, setDecisionNotes] = useState('');
-    const [returnedNotes, setReturnedNotes] = useState('');
-    const [bulkError, setBulkError] = useState<string | null>(null);
-    const [bulkAction, setBulkAction] = useState<
-        'approve' | 'return' | 'reject' | null
-    >(null);
-    const listHref = isApprovalMode
-        ? timesheetApprovals.url()
-        : timesheetsIndex.url();
-    const listUrl = (query?: Record<string, any>) =>
-        isApprovalMode
-            ? timesheetApprovals.url({ query })
-            : timesheetsIndex.url({ query });
-    const filterQuery = (next: Partial<Props['filters']>) => {
-        const query = { ...filters, ...next };
-        if (isApprovalMode) {
-            delete query.mode;
-        }
-
-        return query;
-    };
-
-    const toggleAll = () => {
-        if (allSelected) {
-            setSelected({});
-            return;
-        }
-        const next: Record<number, boolean> = {};
-        timesheets.data.forEach((t) => (next[t.id] = true));
-        setSelected(next);
-    };
-
-    const bulkApprove = () => {
-        if (selectedIds.length === 0) return;
-        setBulkError(null);
-        router.post(
-            bulkApproveRoute.url(),
-            { ids: selectedIds, decision_notes: decisionNotes || null },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setSelected({});
-                    setDecisionNotes('');
-                    setBulkError(null);
-                    setBulkAction(null);
-                },
-            },
-        );
-    };
-
-    const bulkReturn = () => {
-        if (selectedIds.length === 0) return;
-        if (!returnedNotes.trim()) {
-            setBulkError(
-                'Return notes are required when returning timesheets.',
-            );
-            return;
-        }
-        setBulkError(null);
-        router.post(
-            bulkReturnRoute.url(),
-            { ids: selectedIds, returned_notes: returnedNotes },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setSelected({});
-                    setReturnedNotes('');
-                    setBulkError(null);
-                    setBulkAction(null);
-                },
-            },
-        );
-    };
-
-    const bulkReject = () => {
-        if (selectedIds.length === 0) return;
-        if (!decisionNotes.trim()) {
-            setBulkError('Decision notes are required to reject timesheets.');
-            return;
-        }
-        setBulkError(null);
-        router.post(
-            bulkRejectRoute.url(),
-            { ids: selectedIds, decision_notes: decisionNotes },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setSelected({});
-                    setDecisionNotes('');
-                    setBulkError(null);
-                    setBulkAction(null);
-                },
-            },
-        );
-    };
-
-    const stats = useMemo(() => {
-        const data = timesheets.data;
-        return {
-            total: data.length,
-            draft: data.filter((t) => t.status === 'draft').length,
-            submitted: data.filter((t) => t.status === 'submitted').length,
-            approved: data.filter((t) => t.status === 'approved').length,
-        };
-    }, [timesheets.data]);
+    const heroDescription = (
+        <span>
+            <span className="font-semibold tabular-nums text-primary-foreground">{heroSummary.unapproved}</span> timesheet
+            {heroSummary.unapproved === 1 ? '' : 's'} need a decision,{' '}
+            <span className="font-semibold tabular-nums text-primary-foreground">{heroSummary.timesheets_returned}</span> have been
+            returned for changes, and{' '}
+            <span className="font-semibold tabular-nums text-primary-foreground">{heroSummary.hours_this_week}</span> of{' '}
+            <span className="tabular-nums">{heroSummary.hours_target}</span> rostered hours have been logged so far. Payroll closes{' '}
+            <span className="font-semibold text-primary-foreground">{heroSummary.next_payroll_date}</span>.
+        </span>
+    );
 
     return (
-        <AppLayout
-            breadcrumbs={[
-                {
-                    title: isWorkerView ? 'My timesheets' : timesheetPlural,
-                    href: listHref,
-                },
-            ]}
-        >
-            <Head
-                title={
-                    isApprovalMode
-                        ? 'Timesheet Approvals'
-                        : isWorkerView
-                          ? 'My Timesheets'
-                          : timesheetPlural
-                }
-            />
+        <AppLayout breadcrumbs={[{ title: isOwnOnlyView ? 'My timesheets' : 'Timesheets', href: '/operations/timesheets' }]}>
+            <Head title={isOwnOnlyView ? 'My Timesheets' : 'Timesheets'} />
 
             <PageShell>
                 <PageHero
-                    title={
-                        isApprovalMode
-                            ? 'Timesheet Approvals'
-                            : isWorkerView
-                              ? 'My Timesheets'
-                              : timesheetPlural
-                    }
-                    description={
-                        isApprovalMode
-                            ? 'Submitted timesheets waiting for a decision.'
-                            : isWorkerView
-                              ? 'Your work logs — drafts in progress, what you’ve submitted, and what your manager has approved or returned.'
-                              : 'Work logs, approvals, and timesheet management.'
-                    }
-                    icon={<FileText className="h-7 w-7 text-white" />}
+                    category="ops"
+                    icon={FileText}
+                    title={heroTitle}
+                    description={heroDescription}
+                    meta={[
+                        { icon: CalendarDays, label: `Week ${heroSummary.week_number} · Mon–Sun` },
+                        { icon: MapPin, label: `${heroSummary.sites_count} site${heroSummary.sites_count === 1 ? '' : 's'} · ${heroSummary.regions_count} region${heroSummary.regions_count === 1 ? '' : 's'}` },
+                        { icon: Users, label: `${heroSummary.rostered_today} rostered · ${heroSummary.staff_on_shift} on shift` },
+                    ]}
+                    badges={[
+                        { tone: 'warning', label: `${heroSummary.unapproved} awaiting approval`, icon: AlertCircle },
+                        { tone: 'critical', label: `${heroSummary.timesheets_returned} returned to staff`, icon: Send },
+                        { tone: 'info', label: `Payroll closes ${heroSummary.next_payroll_date}`, icon: DollarSign },
+                    ]}
+                    stats={[
+                        { label: 'Total', value: heroSummary.timesheets_total },
+                        { label: 'Pending', value: heroSummary.timesheets_submitted },
+                        { label: 'Approved', value: heroSummary.timesheets_approved },
+                        { label: 'Returned', value: heroSummary.timesheets_returned },
+                    ]}
                     actions={
-                        <div className="flex items-center gap-2">
-                            {isApprovalMode ? (
-                                <Button asChild>
-                                    <Link href={timesheetsIndex.url()}>
-                                        All timesheets
-                                    </Link>
-                                </Button>
-                            ) : canApprove ? (
-                                <Button asChild>
-                                    <Link href={timesheetApprovals.url()}>
-                                        Approval queue
-                                    </Link>
-                                </Button>
-                            ) : null}
-                            {/*
-                              * Workers create today's timesheet via the
-                              * /my-day "Today's timesheet" popup (find-or-
-                              * creates a draft against their active shift,
-                              * then opens the per-client allocation review).
-                              * The legacy `/operations/timesheets/create`
-                              * form stays available for managers + admins
-                              * who need to mint a retroactive timesheet
-                              * manually, but is hidden from the worker's
-                              * own-list view so we don't ship two parallel
-                              * create paths.
-                              */}
-                            {canCreate && !isApprovalMode && !isWorkerView ? (
-                                <Button asChild>
-                                    <Link href={createTimesheet.url()}>
-                                        Create
-                                    </Link>
-                                </Button>
-                            ) : null}
+                        canCreate ? (
+                            <Button
+                                size="sm"
+                                onClick={() => {
+                                    setInitialShiftId(null);
+                                    setCreateOpen(true);
+                                }}
+                                className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                                data-testid="open-create-timesheet"
+                            >
+                                <FilePlus2 className="mr-1.5 h-4 w-4" />
+                                Create timesheet
+                            </Button>
+                        ) : null
+                    }
+                    footer={
+                        <div className="flex items-center justify-between gap-2 py-3">
+                            <div className="flex items-center gap-2 text-[11.5px] text-primary-foreground/80">
+                                <CalendarDays className="h-3.5 w-3.5" />
+                                <span>Hours logged vs. rostered</span>
+                                <span className="tabular-nums text-primary-foreground">
+                                    {heroSummary.hours_this_week} / {heroSummary.hours_target}h · {coveragePct}%
+                                </span>
+                            </div>
+                            <div className="h-1.5 flex-1 max-w-[400px] overflow-hidden rounded-full bg-primary-foreground/15">
+                                <div className="h-full rounded-full bg-primary-foreground/80" style={{ width: coveragePct + '%' }} />
+                            </div>
                         </div>
                     }
                 />
 
-                {!isApprovalMode ? (
-                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                        <OpsStatCard
-                            label="Total"
-                            value={stats.total}
-                            icon={FileText}
-                            color="indigo"
-                        />
-                        <OpsStatCard
-                            label="Draft"
-                            value={stats.draft}
-                            icon={Clock}
-                            color="slate"
-                        />
-                        <OpsStatCard
-                            label="Submitted"
-                            value={stats.submitted}
-                            icon={Send}
-                            color="amber"
-                        />
-                        <OpsStatCard
-                            label="Approved"
-                            value={stats.approved}
-                            icon={CheckCircle2}
-                            color="emerald"
-                        />
-                    </div>
-                ) : (
-                    <div className="grid gap-3 sm:grid-cols-3">
-                        <OpsStatCard
-                            label="Pending Approval"
-                            value={stats.submitted}
-                            icon={Send}
-                            color="amber"
-                        />
-                        <OpsStatCard
-                            label="Selected"
-                            value={selectedIds.length}
-                            icon={CheckCircle2}
-                            color="indigo"
-                        />
-                        <OpsStatCard
-                            label="Total Shown"
-                            value={stats.total}
-                            icon={FileText}
-                            color="slate"
-                        />
-                    </div>
-                )}
-
-                {/* Filters */}
-                <div className="rounded-lg border bg-card p-3 shadow-sm">
-                    <div className="flex flex-wrap items-end gap-3">
-                        {!isApprovalMode ? (
-                        <div className="space-y-1">
-                            <Label className="text-xs text-muted-foreground">
-                                Status
-                            </Label>
-                            <Select
-                                value={filters.status ?? ANY}
-                                onValueChange={(v) =>
-                                    router.get(
-                                        listUrl(
-                                            filterQuery({
-                                                status:
-                                                    v === ANY ? undefined : v,
-                                            }),
-                                        ),
-                                        {},
-                                        { preserveState: true, replace: true },
-                                    )
-                                }
-                            >
-                                <SelectTrigger className="mt-1 w-36">
-                                    <SelectValue placeholder="All statuses" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value={ANY}>
-                                        All statuses
-                                    </SelectItem>
-                                    <SelectItem value="draft">Draft</SelectItem>
-                                    <SelectItem value="submitted">
-                                        Submitted
-                                    </SelectItem>
-                                    <SelectItem value="returned">
-                                        Returned
-                                    </SelectItem>
-                                    <SelectItem value="approved">
-                                        Approved
-                                    </SelectItem>
-                                    <SelectItem value="rejected">
-                                        Rejected
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        ) : null}
-                        <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">
-                            From
-                        </Label>
-                        <Input
-                            type="date"
-                            className="mt-1"
-                            value={filters.from ?? ''}
-                            onChange={(e) =>
-                                router.get(
-                                    listUrl(
-                                        filterQuery({
-                                            from: e.target.value || undefined,
-                                        }),
-                                    ),
-                                    {},
-                                    { preserveState: true, replace: true },
-                                )
-                            }
-                        />
-                        </div>
-                        <div className="space-y-1">
-                        <Label className="text-xs text-muted-foreground">
-                            To
-                        </Label>
-                        <Input
-                            type="date"
-                            className="mt-1"
-                            value={filters.to ?? ''}
-                            onChange={(e) =>
-                                router.get(
-                                    listUrl(
-                                        filterQuery({
-                                            to: e.target.value || undefined,
-                                        }),
-                                    ),
-                                    {},
-                                    { preserveState: true, replace: true },
-                                )
-                            }
-                        />
-                        </div>
-                        {isApprovalMode ? (
-                        <>
-                            <div className="space-y-1">
-                                <Label className="text-xs text-muted-foreground">
-                                    Client
-                                </Label>
-                                <Select
-                                    value={
-                                        filters.client_id
-                                            ? String(filters.client_id)
-                                            : ANY
-                                    }
-                                    onValueChange={(v) =>
-                                        router.get(
-                                            listUrl(
-                                                filterQuery({
-                                                    client_id:
-                                                        v === ANY
-                                                            ? undefined
-                                                            : v,
-                                                }),
-                                            ),
-                                            {},
-                                            {
-                                                preserveState: true,
-                                                replace: true,
-                                            },
-                                        )
-                                    }
-                                >
-                                    <SelectTrigger className="mt-1 w-44">
-                                        <SelectValue placeholder="All clients" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value={ANY}>
-                                            All clients
-                                        </SelectItem>
-                                        {clients.map((c) => (
-                                            <SelectItem
-                                                key={c.id}
-                                                value={String(c.id)}
-                                            >
-                                                {c.first_name} {c.last_name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="space-y-1">
-                                <Label className="text-xs text-muted-foreground">
-                                    Staff
-                                </Label>
-                                <Select
-                                    value={
-                                        filters.staff_id
-                                            ? String(filters.staff_id)
-                                            : ANY
-                                    }
-                                    onValueChange={(v) =>
-                                        router.get(
-                                            listUrl(
-                                                filterQuery({
-                                                    staff_id:
-                                                        v === ANY
-                                                            ? undefined
-                                                            : v,
-                                                }),
-                                            ),
-                                            {},
-                                            {
-                                                preserveState: true,
-                                                replace: true,
-                                            },
-                                        )
-                                    }
-                                >
-                                    <SelectTrigger className="mt-1 w-44">
-                                        <SelectValue placeholder="All staff" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        <SelectItem value={ANY}>
-                                            All staff
-                                        </SelectItem>
-                                        {staff.map((u) => (
-                                            <SelectItem
-                                                key={u.id}
-                                                value={String(u.id)}
-                                            >
-                                                {u.name}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                        </>
-                        ) : null}
-                        <Button
-                            variant="ghost"
-                            size="sm"
-                            onClick={() =>
-                                router.get(
-                                    listUrl(),
-                                    {},
-                                    { preserveState: true, replace: true },
-                                )
-                            }
-                        >
-                            Clear
-                        </Button>
-                    </div>
+                {/* KPI strip */}
+                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
+                    <OpsStatCard label="Awaiting approval" value={heroSummary.timesheets_submitted} icon={ClipboardCheck} color="amber" />
+                    <OpsStatCard label="Returned to staff" value={heroSummary.timesheets_returned} icon={AlertTriangle} color="red" />
+                    <OpsStatCard label="Approved this week" value={heroSummary.timesheets_approved} icon={Send} color="emerald" />
+                    <OpsStatCard label="Hours logged" value={`${heroSummary.hours_this_week}h`} icon={DollarSign} color="indigo" />
                 </div>
 
-                {/* List — mobile cards, desktop table */}
-                {timesheets.data.length > 0 ? (
-                    <>
-                        {/* Mobile: stacked cards */}
-                        <ul className="space-y-2 md:hidden">
-                            {timesheets.data.map((t) => {
-                                const showReturnBanner =
-                                    !isApprovalMode && t.status === 'returned';
-                                const dateLabel = new Date(
-                                    t.work_date,
-                                ).toLocaleDateString('en-NZ', {
-                                    day: 'numeric',
-                                    month: 'short',
-                                    year: 'numeric',
-                                });
-                                const startLabel = new Date(
-                                    t.starts_at,
-                                ).toLocaleTimeString('en-NZ', {
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                });
-                                const endLabel = new Date(
-                                    t.ends_at,
-                                ).toLocaleTimeString('en-NZ', {
-                                    hour: '2-digit',
-                                    minute: '2-digit',
-                                });
-                                const tagBadges = (
-                                    <>
-                                        {t.sleepover ? (
-                                            <Badge
-                                                variant="outline"
-                                                className="text-[10px]"
-                                            >
-                                                Sleepover
-                                            </Badge>
-                                        ) : null}
-                                        {t.on_call ? (
-                                            <Badge
-                                                variant="outline"
-                                                className="text-[10px]"
-                                            >
-                                                On-call
-                                            </Badge>
-                                        ) : null}
-                                        {t.public_holiday ? (
-                                            <Badge
-                                                variant="outline"
-                                                className="text-[10px]"
-                                            >
-                                                Public holiday
-                                            </Badge>
-                                        ) : null}
-                                        {(t.mileage_km ?? 0) > 0 ? (
-                                            <Badge
-                                                variant="outline"
-                                                className="text-[10px]"
-                                            >
-                                                {t.mileage_km}km
-                                            </Badge>
-                                        ) : null}
-                                    </>
-                                );
-                                return (
-                                    <li
-                                        key={t.id}
-                                        className="rounded-xl border bg-card p-3 text-sm"
-                                    >
-                                        <div className="flex items-start justify-between gap-3">
-                                            <div className="flex min-w-0 items-start gap-3">
-                                                {isApprovalMode ? (
-                                                    <input
-                                                        type="checkbox"
-                                                        className="mt-1 shrink-0"
-                                                        checked={
-                                                            !!selected[t.id]
-                                                        }
-                                                        onChange={(e) =>
-                                                            setSelected(
-                                                                (prev) => ({
-                                                                    ...prev,
-                                                                    [t.id]: e
-                                                                        .target
-                                                                        .checked,
-                                                                }),
-                                                            )
-                                                        }
-                                                        aria-label={`Select timesheet for ${t.client.first_name} ${t.client.last_name} on ${dateLabel}`}
-                                                    />
-                                                ) : null}
-                                                <div className="min-w-0">
-                                                    <div className="font-medium">
-                                                        {dateLabel}
-                                                    </div>
-                                                    <div className="mt-0.5 text-xs text-muted-foreground">
-                                                        {startLabel} –{' '}
-                                                        {endLabel}
-                                                        {t.break_minutes
-                                                            ? ` · ${t.break_minutes}m break`
-                                                            : ''}
-                                                    </div>
-                                                </div>
-                                            </div>
-                                            <div className="shrink-0">
-                                                {isApprovalMode ? (
-                                                    <span className="text-[11px] text-muted-foreground">
-                                                        {t.submitted_at
-                                                            ? new Date(
-                                                                  t.submitted_at,
-                                                              ).toLocaleDateString(
-                                                                  'en-NZ',
-                                                                  {
-                                                                      day: 'numeric',
-                                                                      month: 'short',
-                                                                  },
-                                                              )
-                                                            : '—'}
-                                                    </span>
-                                                ) : (
-                                                    <TimesheetStatusBadge
-                                                        status={t.status}
-                                                    />
-                                                )}
-                                            </div>
-                                        </div>
-
-                                        <dl className="mt-2 grid grid-cols-[auto_1fr] gap-x-3 gap-y-1 text-xs">
-                                            <dt className="text-muted-foreground">
-                                                Client
-                                            </dt>
-                                            <dd className="min-w-0 truncate">
-                                                <Link
-                                                    className="underline"
-                                                    href={`/operations/clients/${t.client.id}`}
-                                                >
-                                                    {t.client.first_name}{' '}
-                                                    {t.client.last_name}
-                                                </Link>
-                                            </dd>
-                                            {isWorkerView ? null : (
-                                                <>
-                                                    <dt className="text-muted-foreground">
-                                                        Staff
-                                                    </dt>
-                                                    <dd className="min-w-0 truncate">
-                                                        {t.staff?.name ?? '—'}
-                                                    </dd>
-                                                </>
-                                            )}
-                                            {t.shift ? (
-                                                <>
-                                                    <dt className="text-muted-foreground">
-                                                        Shift
-                                                    </dt>
-                                                    <dd className="min-w-0 truncate">
-                                                        {String(
-                                                            t.shift
-                                                                .shift_type ??
-                                                                'standard',
-                                                        ).replace('_', ' ')}
-                                                        {t.shift.location
-                                                            ? ` · ${t.shift.location}`
-                                                            : ''}
-                                                    </dd>
-                                                </>
-                                            ) : null}
-                                        </dl>
-
-                                        {!isApprovalMode &&
-                                        (t.sleepover ||
-                                            t.on_call ||
-                                            t.public_holiday ||
-                                            (t.mileage_km ?? 0) > 0) ? (
-                                            <div className="mt-2 flex flex-wrap gap-1">
-                                                {tagBadges}
-                                            </div>
-                                        ) : null}
-
-                                        {showReturnBanner ? (
-                                            <div className="mt-2">
-                                                <TimesheetReturnBanner
-                                                    timesheetId={t.id}
-                                                    returnNote={
-                                                        t.returned_notes
-                                                    }
-                                                    editHref={editTimesheet.url(
-                                                        t.id,
-                                                    )}
-                                                />
-                                            </div>
-                                        ) : null}
-
-                                        <div className="mt-3 flex items-center justify-between gap-2">
-                                            {canApprove &&
-                                            t.status === 'submitted' ? (
-                                                <Badge
-                                                    variant="outline"
-                                                    className={needsApprovalBadgeClassName}
-                                                >
-                                                    Needs approval
-                                                </Badge>
-                                            ) : (
-                                                <span />
-                                            )}
-                                            <Button
-                                                asChild
-                                                size="sm"
-                                                variant="outline"
-                                            >
-                                                <Link
-                                                    href={editTimesheet.url(
-                                                        t.id,
-                                                    )}
-                                                >
-                                                    View
-                                                </Link>
-                                            </Button>
-                                        </div>
-                                    </li>
-                                );
-                            })}
-                        </ul>
-
-                        {/* Desktop: table */}
-                        <div className="hidden rounded-xl border md:block">
-                            <table className="w-full text-sm">
-                                <thead className="bg-muted/40">
-                                    <tr>
-                                        {isApprovalMode ? (
-                                            <th className="w-10 p-3 text-left font-medium">
-                                                <input
-                                                    type="checkbox"
-                                                    checked={allSelected}
-                                                    onChange={toggleAll}
-                                                />
-                                            </th>
-                                        ) : null}
-                                        <th className="p-3 text-left font-medium">
-                                            Date
-                                        </th>
-                                        <th className="p-3 text-left font-medium">
-                                            Client
-                                        </th>
-                                        {isWorkerView ? null : (
-                                            <th className="p-3 text-left font-medium">
-                                                Staff
-                                            </th>
+                {/* Table */}
+                <section className="rounded-2xl border border-border bg-card shadow-sm">
+                    {/* Tab strip */}
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 pt-3 pb-0">
+                        <div className="-mb-px flex flex-wrap items-center gap-1">
+                            {TABS.map((tabDef) => (
+                                <button
+                                    key={tabDef.key}
+                                    onClick={() => switchTab(tabDef.key)}
+                                    className={cn(
+                                        'inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-[12.5px] font-semibold transition',
+                                        tab === tabDef.key
+                                            ? 'border-primary text-primary'
+                                            : 'border-transparent text-muted-foreground hover:text-foreground',
+                                    )}
+                                >
+                                    {tabDef.label}
+                                    <span
+                                        className={cn(
+                                            'rounded-full px-1.5 text-[10.5px] font-semibold tabular-nums',
+                                            tab === tabDef.key ? 'bg-status-info-bg text-primary' : 'bg-muted text-muted-foreground',
                                         )}
-                                        <th className="p-3 text-left font-medium">
-                                            {isApprovalMode
-                                                ? 'Submitted'
-                                                : 'Status'}
-                                        </th>
-                                        <th className="p-3 text-right font-medium">
-                                            Actions
-                                        </th>
-                                    </tr>
-                                </thead>
-                                <tbody>
-                                    {timesheets.data.map((t) => {
-                                        const showReturnBanner =
-                                            !isApprovalMode &&
-                                            t.status === 'returned';
-                                        // Column counts:
-                                        //   - approval mode: 6 (checkbox+date+client+staff+submitted+actions)
-                                        //   - worker (own list): 4 (date+client+status+actions, no staff)
-                                        //   - general manager list: 5 (date+client+staff+status+actions)
-                                        const rowColspan = isApprovalMode
-                                            ? 6
-                                            : isWorkerView
-                                              ? 4
-                                              : 5;
-                                        return (
-                                            <React.Fragment key={t.id}>
-                                                <tr className="border-t transition-colors hover:bg-muted/20">
-                                                    {isApprovalMode ? (
-                                                        <td className="p-3">
-                                                            <input
-                                                                type="checkbox"
-                                                                checked={
-                                                                    !!selected[
-                                                                        t.id
-                                                                    ]
-                                                                }
-                                                                onChange={(e) =>
-                                                                    setSelected(
-                                                                        (
-                                                                            prev,
-                                                                        ) => ({
-                                                                            ...prev,
-                                                                            [t.id]: e
-                                                                                .target
-                                                                                .checked,
-                                                                        }),
-                                                                    )
-                                                                }
-                                                            />
-                                                        </td>
-                                                    ) : null}
-                                                    <td className="p-3">
-                                                        <div className="font-medium">
-                                                            {new Date(
-                                                                t.work_date,
-                                                            ).toLocaleDateString(
-                                                                'en-NZ',
-                                                                {
-                                                                    day: 'numeric',
-                                                                    month: 'short',
-                                                                    year: 'numeric',
-                                                                },
-                                                            )}
-                                                        </div>
-                                                        <div className="text-xs text-muted-foreground">
-                                                            {new Date(
-                                                                t.starts_at,
-                                                            ).toLocaleTimeString(
-                                                                'en-NZ',
-                                                                {
-                                                                    hour: '2-digit',
-                                                                    minute: '2-digit',
-                                                                },
-                                                            )}
-                                                            {' – '}
-                                                            {new Date(
-                                                                t.ends_at,
-                                                            ).toLocaleTimeString(
-                                                                'en-NZ',
-                                                                {
-                                                                    hour: '2-digit',
-                                                                    minute: '2-digit',
-                                                                },
-                                                            )}
-                                                            {t.break_minutes
-                                                                ? ` · ${t.break_minutes}m break`
-                                                                : ''}
-                                                        </div>
-                                                        {t.shift ? (
-                                                            <div className="mt-1 text-[11px] text-muted-foreground">
-                                                                {String(
-                                                                    t.shift
-                                                                        .shift_type ??
-                                                                        'standard',
-                                                                ).replace(
-                                                                    '_',
-                                                                    ' ',
-                                                                )}
-                                                                {t.shift
-                                                                    .service_context
-                                                                    ?.name
-                                                                    ? ` · ${t.shift.service_context.name}`
-                                                                    : ''}
-                                                                {t.shift
-                                                                    .location
-                                                                    ? ` · ${t.shift.location}`
-                                                                    : ''}
-                                                            </div>
-                                                        ) : null}
-                                                    </td>
-                                                    <td className="p-3">
-                                                        <Link
-                                                            className="underline"
-                                                            href={`/operations/clients/${t.client.id}`}
-                                                        >
-                                                            {
-                                                                t.client
-                                                                    .first_name
-                                                            }{' '}
-                                                            {t.client.last_name}
-                                                        </Link>
-                                                    </td>
-                                                    {isWorkerView ? null : (
-                                                        <td className="p-3">
-                                                            {t.staff?.name ?? '—'}
-                                                        </td>
-                                                    )}
-                                                    {isApprovalMode ? (
-                                                        <td className="p-3 text-sm text-muted-foreground">
-                                                            {t.submitted_at
-                                                                ? new Date(
-                                                                      t.submitted_at,
-                                                                  ).toLocaleString()
-                                                                : '—'}
-                                                        </td>
-                                                    ) : (
-                                                        <td className="p-3">
-                                                            <TimesheetStatusBadge
-                                                                status={
-                                                                    t.status
-                                                                }
-                                                            />
-                                                            {t.sleepover ||
-                                                            t.on_call ||
-                                                            t.public_holiday ||
-                                                            (t.mileage_km ??
-                                                                0) > 0 ? (
-                                                                <div className="mt-1 flex flex-wrap gap-1">
-                                                                    {t.sleepover ? (
-                                                                        <Badge
-                                                                            variant="outline"
-                                                                            className="text-[10px]"
-                                                                        >
-                                                                            Sleepover
-                                                                        </Badge>
-                                                                    ) : null}
-                                                                    {t.on_call ? (
-                                                                        <Badge
-                                                                            variant="outline"
-                                                                            className="text-[10px]"
-                                                                        >
-                                                                            On-call
-                                                                        </Badge>
-                                                                    ) : null}
-                                                                    {t.public_holiday ? (
-                                                                        <Badge
-                                                                            variant="outline"
-                                                                            className="text-[10px]"
-                                                                        >
-                                                                            Public
-                                                                            holiday
-                                                                        </Badge>
-                                                                    ) : null}
-                                                                    {(t.mileage_km ??
-                                                                        0) >
-                                                                    0 ? (
-                                                                        <Badge
-                                                                            variant="outline"
-                                                                            className="text-[10px]"
-                                                                        >
-                                                                            {
-                                                                                t.mileage_km
-                                                                            }
-                                                                            km
-                                                                        </Badge>
-                                                                    ) : null}
-                                                                </div>
-                                                            ) : null}
-                                                        </td>
-                                                    )}
-                                                    <td className="p-3">
-                                                        <div className="flex items-center justify-end gap-2">
-                                                            <Link
-                                                                href={editTimesheet.url(
-                                                                    t.id,
-                                                                )}
-                                                            >
-                                                                <Button
-                                                                    variant="ghost"
-                                                                    size="sm"
-                                                                    className="text-xs"
-                                                                >
-                                                                    View
-                                                                </Button>
-                                                            </Link>
-                                                            {canApprove &&
-                                                            t.status ===
-                                                                'submitted' ? (
-                                                                <Badge
-                                                                    variant="outline"
-                                                                    className={
-                                                                        needsApprovalBadgeClassName
-                                                                    }
-                                                                >
-                                                                    Needs
-                                                                    approval
-                                                                </Badge>
-                                                            ) : null}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                                {showReturnBanner ? (
-                                                    <tr className="border-t bg-status-warning-bg">
-                                                        <td
-                                                            colSpan={rowColspan}
-                                                            className="p-3"
-                                                        >
-                                                            <TimesheetReturnBanner
-                                                                timesheetId={
-                                                                    t.id
-                                                                }
-                                                                returnNote={
-                                                                    t.returned_notes
-                                                                }
-                                                                editHref={editTimesheet.url(
-                                                                    t.id,
-                                                                )}
-                                                            />
-                                                        </td>
-                                                    </tr>
-                                                ) : null}
-                                            </React.Fragment>
-                                        );
-                                    })}
-                                </tbody>
-                            </table>
+                                    >
+                                        {tabCounts[tabDef.key] ?? 0}
+                                    </span>
+                                </button>
+                            ))}
                         </div>
-                        <div className="text-xs text-muted-foreground">
-                            Showing {timesheets.data.length}{' '}
-                            {timesheets.data.length === 1
-                                ? 'timesheet'
-                                : 'timesheets'}
-                        </div>
-                    </>
-                ) : (
-                    <EmptyList
-                        title={
-                            isApprovalMode
-                                ? 'No timesheets pending'
-                                : 'No timesheets found'
-                        }
-                        itemName="timesheet"
-                        createHref={
-                            canCreate && !isApprovalMode && !isWorkerView
-                                ? createTimesheet.url()
-                                : undefined
-                        }
-                        createLabel="Create timesheet"
-                        description={
-                            isApprovalMode
-                                ? 'No submitted timesheets awaiting approval.'
-                                : 'No timesheets found for the current filters.'
-                        }
-                    />
-                )}
-
-                {/* Sticky bulk action bar — only visible when rows are selected in approval mode */}
-                {isApprovalMode && selectedIds.length > 0 ? (
-                    <div className="sticky bottom-0 z-10 -mx-5 border-t bg-card/95 p-4 shadow-lg backdrop-blur-sm supports-[backdrop-filter]:bg-card/80 sm:-mx-8">
-                        <div className="mx-auto space-y-3">
-                            <div className="flex flex-col gap-2 sm:flex-row sm:items-center sm:justify-between">
-                                <div className="text-sm">
-                                    <span className="font-medium">
-                                        Selected:
-                                    </span>{' '}
-                                    {selectedIds.length} of{' '}
-                                    {timesheets.data.length}
-                                </div>
-                                {bulkAction === null ? (
-                                    <div className="flex flex-wrap gap-2">
-                                        <Button
-                                            size="sm"
-                                            onClick={() =>
-                                                setBulkAction('approve')
-                                            }
-                                        >
-                                            Approve selected
-                                        </Button>
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() =>
-                                                setBulkAction('return')
-                                            }
-                                        >
-                                            Return selected
-                                        </Button>
-                                        <Button
-                                            size="sm"
-                                            variant="destructive"
-                                            onClick={() =>
-                                                setBulkAction('reject')
-                                            }
-                                        >
-                                            Reject selected
-                                        </Button>
-                                    </div>
-                                ) : null}
+                        <div className="flex items-center gap-2 pb-2">
+                            <div className="relative">
+                                <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
+                                <Input
+                                    value={search}
+                                    onChange={(e) => setSearch(e.target.value)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter') submitSearch();
+                                    }}
+                                    placeholder="Search timesheets…"
+                                    className="h-8 w-56 pl-8 text-xs"
+                                />
                             </div>
-
-                            {bulkError ? (
-                                <div className="flex items-center gap-2 rounded-lg border border-status-critical/30 bg-status-critical-bg px-3 py-2 text-sm text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical">
-                                    <AlertCircle className="h-4 w-4 shrink-0" />
-                                    {bulkError}
-                                </div>
-                            ) : null}
-
-                            {bulkAction === 'approve' ? (
-                                <div className="space-y-2">
-                                    <div className="space-y-1">
-                                        <Label className="text-xs text-muted-foreground">
-                                            Decision notes (optional)
-                                        </Label>
-                                        <Textarea
-                                            rows={2}
-                                            value={decisionNotes}
-                                            onChange={(e) => {
-                                                setDecisionNotes(
-                                                    e.target.value,
-                                                );
-                                                setBulkError(null);
-                                            }}
-                                            placeholder="Optional notes for this approval"
-                                        />
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <Button size="sm" onClick={bulkApprove}>
-                                            Confirm approval
-                                        </Button>
-                                        <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            onClick={() => {
-                                                setBulkAction(null);
-                                                setBulkError(null);
-                                            }}
-                                        >
-                                            Cancel
-                                        </Button>
-                                    </div>
-                                </div>
-                            ) : null}
-
-                            {bulkAction === 'reject' ? (
-                                <div className="space-y-2">
-                                    <div className="space-y-1">
-                                        <Label className="text-xs text-muted-foreground">
-                                            Rejection reason (required)
-                                        </Label>
-                                        <Textarea
-                                            rows={2}
-                                            value={decisionNotes}
-                                            onChange={(e) => {
-                                                setDecisionNotes(
-                                                    e.target.value,
-                                                );
-                                                setBulkError(null);
-                                            }}
-                                            placeholder="Explain why these timesheets are being rejected"
-                                        />
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <Button
-                                            size="sm"
-                                            variant="destructive"
-                                            onClick={bulkReject}
-                                        >
-                                            Confirm rejection
-                                        </Button>
-                                        <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            onClick={() => {
-                                                setBulkAction(null);
-                                                setBulkError(null);
-                                            }}
-                                        >
-                                            Cancel
-                                        </Button>
-                                    </div>
-                                </div>
-                            ) : null}
-
-                            {bulkAction === 'return' ? (
-                                <div className="space-y-2">
-                                    <div className="space-y-1">
-                                        <Label className="text-xs text-muted-foreground">
-                                            Return notes — explain what needs
-                                            changing (required)
-                                        </Label>
-                                        <Textarea
-                                            rows={2}
-                                            value={returnedNotes}
-                                            onChange={(e) => {
-                                                setReturnedNotes(
-                                                    e.target.value,
-                                                );
-                                                setBulkError(null);
-                                            }}
-                                            placeholder="What needs to be corrected before resubmission?"
-                                        />
-                                    </div>
-                                    <div className="flex gap-2">
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={bulkReturn}
-                                        >
-                                            Confirm return
-                                        </Button>
-                                        <Button
-                                            size="sm"
-                                            variant="ghost"
-                                            onClick={() => {
-                                                setBulkAction(null);
-                                                setBulkError(null);
-                                            }}
-                                        >
-                                            Cancel
-                                        </Button>
-                                    </div>
-                                </div>
+                            <Button variant="outline" size="sm" className="gap-1.5 text-xs" onClick={submitSearch}>
+                                <Filter className="h-3.5 w-3.5" /> Search
+                            </Button>
+                            {submittedCount > 0 ? (
+                                <Button size="sm" className="gap-1.5 text-xs" onClick={() => switchTab('submitted')}>
+                                    Review {submittedCount} pending
+                                </Button>
                             ) : null}
                         </div>
                     </div>
-                ) : null}
+
+                    {/* Table */}
+                    <div className="overflow-x-auto">
+                        <table className="w-full text-sm">
+                            <thead className="bg-muted/40 text-[11.5px] uppercase tracking-wider text-muted-foreground">
+                                <tr className="text-left">
+                                    <th className="w-10 py-2.5 pl-4">
+                                        <input type="checkbox" aria-label="Select all" />
+                                    </th>
+                                    <th className="py-2.5 px-2">Date</th>
+                                    {!isOwnOnlyView ? <th className="py-2.5 px-2">Staff</th> : null}
+                                    <th className="py-2.5 px-2">Client &amp; site</th>
+                                    <th className="py-2.5 px-2">Shift / activity</th>
+                                    <th className="py-2.5 px-2">Hours</th>
+                                    <th className="py-2.5 px-2">Tasks</th>
+                                    <th className="py-2.5 px-2">Status</th>
+                                    <th className="py-2.5 pr-4 text-right">Actions</th>
+                                </tr>
+                            </thead>
+                            <tbody>
+                                {rows.map((t) => {
+                                    const hours = (t.total_hours ?? t.hours ?? 0) as number;
+                                    const taskPct = (t.tasks_total ?? 0) > 0 ? Math.round(((t.tasks_completed ?? 0) / (t.tasks_total ?? 1)) * 100) : 0;
+                                    return (
+                                        <tr
+                                            key={t.id}
+                                            className="cursor-pointer border-t border-border transition-colors hover:bg-muted/30"
+                                            onClick={() => setViewing(t)}
+                                            onContextMenu={(e) => {
+                                                e.preventDefault();
+                                                setMenu({ x: e.clientX, y: e.clientY, row: t });
+                                            }}
+                                            onMouseEnter={(e) => {
+                                                const rect = e.currentTarget.getBoundingClientRect();
+                                                if (hoverTimer.current) window.clearTimeout(hoverTimer.current);
+                                                hoverTimer.current = window.setTimeout(() => setHover({ row: t, rect }), 350);
+                                            }}
+                                            onMouseLeave={() => {
+                                                if (hoverTimer.current) window.clearTimeout(hoverTimer.current);
+                                                setHover(null);
+                                            }}
+                                        >
+                                            <td className="py-3 pl-4" onClick={(e) => e.stopPropagation()}>
+                                                <input type="checkbox" />
+                                            </td>
+                                            <td className="py-3 px-2">
+                                                <div className="font-semibold">{fmtDate(t.work_date)}</div>
+                                                <div className="text-[11px] tabular-nums text-muted-foreground">
+                                                    {fmtTime(t.starts_at)} – {fmtTime(t.ends_at)}
+                                                </div>
+                                            </td>
+                                            {!isOwnOnlyView ? (
+                                                <td className="py-3 px-2">
+                                                    <div className="flex items-center gap-2">
+                                                        <div
+                                                            className="grid h-7 w-7 shrink-0 place-items-center rounded-full text-[11px] font-semibold text-white"
+                                                            style={{ background: `oklch(0.55 0.14 ${hueFor(t.staff?.name)})` }}
+                                                        >
+                                                            {initials(t.staff?.name)}
+                                                        </div>
+                                                        <div className="min-w-0">
+                                                            <div className="truncate font-medium">{t.staff?.name ?? '—'}</div>
+                                                            <div className="text-[11px] text-muted-foreground">#{t.staff?.id}</div>
+                                                        </div>
+                                                    </div>
+                                                </td>
+                                            ) : null}
+                                            <td className="py-3 px-2">
+                                                <div className="font-medium">
+                                                    {t.client ? `${t.client.first_name} ${t.client.last_name}` : (
+                                                        <span className="text-muted-foreground italic">{t.activity_type ?? 'Manual entry'}</span>
+                                                    )}
+                                                </div>
+                                                {t.shift?.location || t.site?.name ? (
+                                                    <div className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                                                        <MapPin className="h-3 w-3" />
+                                                        {t.shift?.location ?? t.site?.name}
+                                                    </div>
+                                                ) : null}
+                                            </td>
+                                            <td className="py-3 px-2">
+                                                <div className="text-[12px] capitalize">
+                                                    {t.shift
+                                                        ? (t.shift.shift_type ?? 'standard').replace('_', ' ')
+                                                        : t.activity_type ?? 'manual'}
+                                                </div>
+                                                <div className="text-[11px] text-muted-foreground">
+                                                    {typeof t.shift?.service_context === 'string'
+                                                        ? t.shift?.service_context
+                                                        : t.shift?.service_context?.name ?? ''}
+                                                </div>
+                                            </td>
+                                            <td className="py-3 px-2">
+                                                <div className="font-semibold tabular-nums">{hours.toFixed(2)}h</div>
+                                                <div className="inline-flex items-center gap-1 text-[11px] text-muted-foreground">
+                                                    <Coffee className="h-3 w-3" />
+                                                    {t.break_minutes}m
+                                                    {(t.mileage_km ?? 0) > 0 ? (
+                                                        <>
+                                                            <span>·</span>
+                                                            <Car className="h-3 w-3" />
+                                                            {t.mileage_km}km
+                                                        </>
+                                                    ) : null}
+                                                    {t.sleepover ? (
+                                                        <>
+                                                            <span>·</span>
+                                                            <Moon className="h-3 w-3" />
+                                                            sleepover
+                                                        </>
+                                                    ) : null}
+                                                </div>
+                                            </td>
+                                            <td className="py-3 px-2 w-[120px]">
+                                                {(t.tasks_total ?? 0) > 0 ? (
+                                                    <div className="flex items-center gap-1.5">
+                                                        <div className="h-1.5 flex-1 overflow-hidden rounded-full bg-muted">
+                                                            <div
+                                                                className={cn('h-full rounded-full', taskPct === 100 ? 'bg-emerald-500' : 'bg-primary')}
+                                                                style={{ width: taskPct + '%' }}
+                                                            />
+                                                        </div>
+                                                        <span className="w-9 text-right text-[11px] tabular-nums text-muted-foreground">
+                                                            {t.tasks_completed}/{t.tasks_total}
+                                                        </span>
+                                                    </div>
+                                                ) : (
+                                                    <span className="text-[11px] text-muted-foreground/60">—</span>
+                                                )}
+                                            </td>
+                                            <td className="py-3 px-2">
+                                                <TimesheetStatusBadge status={t.status} />
+                                            </td>
+                                            <td className="py-3 pr-4 text-right" onClick={(e) => e.stopPropagation()}>
+                                                <div className="inline-flex items-center gap-1">
+                                                    <button
+                                                        onClick={() => setViewing(t)}
+                                                        aria-label="View timesheet"
+                                                        title="View timesheet"
+                                                        className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground hover:bg-muted"
+                                                    >
+                                                        <Eye className="h-3.5 w-3.5" />
+                                                    </button>
+                                                    <button
+                                                        onClick={(e) => {
+                                                            const r = e.currentTarget.getBoundingClientRect();
+                                                            setMenu({ x: r.right, y: r.bottom, row: t });
+                                                        }}
+                                                        aria-label="Row actions"
+                                                        title="More actions"
+                                                        className="grid h-7 w-7 place-items-center rounded-md text-muted-foreground hover:bg-muted"
+                                                    >
+                                                        <MoreHorizontal className="h-3.5 w-3.5" />
+                                                    </button>
+                                                </div>
+                                            </td>
+                                        </tr>
+                                    );
+                                })}
+                            </tbody>
+                        </table>
+                        {rows.length === 0 ? (
+                            <div className="grid place-items-center px-6 py-14 text-center text-muted-foreground">
+                                <Sun className="mb-2 h-8 w-8 text-amber-400" />
+                                <div className="text-sm font-medium text-foreground">No timesheets in this tab</div>
+                                <div className="text-xs">Try switching to another status or clear filters.</div>
+                            </div>
+                        ) : null}
+                    </div>
+
+                    {/* Pagination footer */}
+                    <div className="flex items-center justify-between border-t border-border px-4 py-2.5 text-xs text-muted-foreground">
+                        <span>
+                            Showing <span className="font-medium text-foreground">{rows.length}</span> of{' '}
+                            <span className="font-medium text-foreground">{tabCounts[tab] ?? rows.length}</span> timesheets ·{' '}
+                            <span>right-click any row for actions</span>
+                        </span>
+                    </div>
+
+                    <ContextMenu menu={menu} onClose={() => setMenu(null)} onAction={handleAction} />
+                    <HoverPopover hover={hover} />
+                </section>
             </PageShell>
+
+            <ViewTimesheetDialog
+                open={!!viewing}
+                timesheet={viewing}
+                onOpenChange={(o) => !o && setViewing(null)}
+                canApprove={canApprove}
+            />
+            <CreateTimesheetDialog
+                open={createOpen}
+                onOpenChange={setCreateOpen}
+                shifts={availableShifts}
+                clients={clients}
+                sites={sites}
+                initialShiftId={initialShiftId}
+            />
         </AppLayout>
     );
 }

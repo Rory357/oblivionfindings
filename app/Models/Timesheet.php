@@ -22,8 +22,11 @@ class Timesheet extends Model
         'user_id',
         'client_id',
         'shift_id',
+        'activity_type',
+        'activity_items',
         'shift_site_id',
         'shift_service_context_id',
+        'site_id',
         'attendance_session_id',
         'work_date',
         'starts_at',
@@ -65,6 +68,8 @@ class Timesheet extends Model
         'reconciliation_summary',
         'reconciliation_findings',
         'mileage_journal_id',
+        'archived_at',
+        'archived_reason',
     ];
 
     protected $casts = [
@@ -73,6 +78,9 @@ class Timesheet extends Model
         'ends_at' => 'datetime',
         'shift_site_id' => 'integer',
         'shift_service_context_id' => 'integer',
+        'site_id' => 'integer',
+        'activity_items' => 'array',
+        'archived_at' => 'datetime',
         'mileage_km' => 'decimal:2',
         'sleepover' => 'boolean',
         'on_call' => 'boolean',
@@ -339,6 +347,11 @@ class Timesheet extends Model
         return $this->belongsTo(Site::class, 'shift_site_id');
     }
 
+    public function site()
+    {
+        return $this->belongsTo(Site::class, 'site_id');
+    }
+
     public function shiftServiceContext()
     {
         return $this->belongsTo(ServiceContext::class, 'shift_service_context_id');
@@ -427,6 +440,16 @@ class Timesheet extends Model
     public function scopeReconciliationBlocked($query)
     {
         return $query->where('reconciliation_status', 'blocked');
+    }
+
+    public function scopeArchived($query)
+    {
+        return $query->whereNotNull('archived_at');
+    }
+
+    public function scopeNotArchived($query)
+    {
+        return $query->whereNull('archived_at');
     }
 
     public function scopeReconciliationNeedsReview($query)

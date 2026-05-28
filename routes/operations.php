@@ -847,8 +847,14 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     // PR 18 — role_scope redirects frontline staff to `/my-day` (their own
     // timesheet list stays on `operations.timesheets.index`, which is not
     // gated here because workers legitimately review their own sheets).
+    //
+    // The standalone approvals page has been replaced by the Pending tab on
+    // the unified index — the GET route now redirects with ?tab=submitted so
+    // bookmarks and emails keep working.
     Route::middleware(['role_scope:my-day', 'permission:timesheets.approve|timesheets.manageAny'])->group(function () {
-        Route::get('/timesheets/approvals', [TimesheetController::class, 'approvals'])->name('operations.timesheets.approvals');
+        Route::get('/timesheets/approvals', function () {
+            return redirect()->route('operations.timesheets.index', ['tab' => 'submitted']);
+        })->name('operations.timesheets.approvals');
         Route::get('/timesheets/payroll-adjustments', [TimesheetController::class, 'payrollAdjustmentsPending'])->name('operations.timesheets.payrollAdjustments');
         Route::post('/timesheets/amendments/{amendment}/mark-processed', [TimesheetController::class, 'markPayrollAdjustmentProcessed'])->name('operations.timesheets.markPayrollProcessed');
         Route::post('/timesheets/bulk-approve', [TimesheetController::class, 'bulkApprove'])->name('operations.timesheets.bulkApprove');
@@ -857,12 +863,32 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     });
 
     // Timesheet creation
-    Route::get('/timesheets/create', [TimesheetController::class, 'create'])
+    // The standalone /create page has been retired — every Create flow funnels
+    // through the CreateTimesheetDialog on the index page. The GET route now
+    // redirects to /operations/timesheets?create=1 (the dialog auto-opens on
+    // that query param), preserving any `shift_id` passed by callers like the
+    // shift detail page.
+    Route::get('/timesheets/create', function (\Illuminate\Http\Request $request) {
+        $query = ['create' => '1'];
+        if ($request->query('shift_id')) {
+            $query['shift_id'] = $request->query('shift_id');
+        }
+
+        return redirect()->route('operations.timesheets.index', $query);
+    })
         ->middleware('permission:timesheets.create')
         ->name('operations.timesheets.create');
     Route::post('/timesheets', [TimesheetController::class, 'store'])
         ->middleware('permission:timesheets.create')
         ->name('operations.timesheets.store');
+
+    // Archive / restore (used by the row context menu on the index page).
+    Route::post('/timesheets/{timesheet}/archive', [TimesheetController::class, 'archive'])
+        ->middleware('permission:timesheets.manageAny')
+        ->name('operations.timesheets.archive');
+    Route::post('/timesheets/{timesheet}/restore', [TimesheetController::class, 'restore'])
+        ->middleware('permission:timesheets.manageAny')
+        ->name('operations.timesheets.restore');
 
     // Timesheet viewing and editing
     Route::get('/timesheets/{timesheet}', [TimesheetController::class, 'show'])

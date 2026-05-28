@@ -132,16 +132,15 @@ class TimesheetControllerTest extends TestCase
             ->assertRedirect('/my-day');
     }
 
-    public function test_create_page_renders_for_timesheet_creators(): void
+    public function test_legacy_create_route_redirects_into_unified_dialog(): void
     {
+        // The standalone /create page was retired in the redesign — every
+        // create flow now funnels through the CreateTimesheetDialog on the
+        // index page. The legacy GET route is preserved as a redirect so old
+        // links + shift-detail "Create timesheet" buttons keep working.
         $this->actingAs($this->staff)
             ->get(route('operations.timesheets.create'))
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('operations/timesheets/create')
-                ->has('clients', 1)
-                ->where('clients.0.id', $this->client->id)
-            );
+            ->assertRedirect('/operations/timesheets?create=1');
     }
 
     public function test_staff_can_store_draft_timesheet_for_their_own_shift(): void
@@ -153,7 +152,10 @@ class TimesheetControllerTest extends TestCase
 
         $timesheet = Timesheet::query()->latest('id')->firstOrFail();
 
-        $response->assertRedirect(route('operations.timesheets.edit', $timesheet));
+        // The unified store now redirects back to the index page (with the
+        // new timesheet auto-opened in the View dialog) instead of the old
+        // per-row edit page. The DB write contract is unchanged.
+        $response->assertRedirect(route('operations.timesheets.index', ['view' => $timesheet->id]));
         $this->assertDatabaseHas('timesheets', [
             'id' => $timesheet->id,
             'user_id' => $this->staff->id,
@@ -192,8 +194,14 @@ class TimesheetControllerTest extends TestCase
 
     public function test_manual_timesheets_can_be_created_without_a_shift(): void
     {
+        // Manual mode now requires `mode=manual` + an activity_type. Linked
+        // client/site are optional. The test still locks in the original
+        // intent: a worker can log non-shift time that lands as `draft`.
         $response = $this->actingAs($this->staff)
             ->post(route('operations.timesheets.store'), [
+                'mode' => 'manual',
+                'activity_type' => 'travel',
+                'activity_items' => ['Drive Wellington → Karori', 'Stop at Petone'],
                 'client_id' => $this->client->id,
                 'shift_id' => null,
                 'work_date' => '2026-04-11',
@@ -205,14 +213,16 @@ class TimesheetControllerTest extends TestCase
 
         $timesheet = Timesheet::query()->latest('id')->firstOrFail();
 
-        $response->assertRedirect(route('operations.timesheets.edit', $timesheet));
+        $response->assertRedirect(route('operations.timesheets.index', ['view' => $timesheet->id]));
         $this->assertDatabaseHas('timesheets', [
             'id' => $timesheet->id,
             'user_id' => $this->staff->id,
             'shift_id' => null,
             'client_id' => $this->client->id,
             'status' => 'draft',
+            'activity_type' => 'travel',
         ]);
+        $this->assertSame(['Drive Wellington → Karori', 'Stop at Petone'], $timesheet->fresh()->activity_items);
     }
 
     public function test_owner_can_update_a_draft_timesheet(): void
@@ -466,11 +476,19 @@ class TimesheetControllerTest extends TestCase
     {
         $timesheet = $this->makeSubmittedTimesheet($this->staff);
 
+        // The legacy /approvals route now redirects into the Pending tab on
+        // the unified index. Follow the redirect, then assert the submitted
+        // timesheet surfaces on that tab.
         $this->actingAs($this->hrReviewer)
             ->get(route('operations.timesheets.approvals'))
+            ->assertRedirect('/operations/timesheets?tab=submitted');
+
+        $this->actingAs($this->hrReviewer)
+            ->get(route('operations.timesheets.index', ['tab' => 'submitted']))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
-                ->component('operations/timesheets/approvals')
+                ->component('operations/timesheets/index')
+                ->where('filters.tab', 'submitted')
                 ->has('timesheets.data', 1)
                 ->where('timesheets.data.0.id', $timesheet->id)
             );
@@ -489,17 +507,21 @@ class TimesheetControllerTest extends TestCase
         ]);
     }
 
-    public function test_approval_mode_only_returns_submitted_timesheets(): void
+    public function test_pending_tab_only_returns_submitted_timesheets(): void
     {
+        // The old `?mode=approvals` query is replaced by `?tab=submitted` on
+        // the unified index — same outcome, different param name. The
+        // redesign also retired the `approvalMode` prop; the tab is reflected
+        // in `filters.tab` instead.
         $submitted = $this->makeSubmittedTimesheet($this->staff);
         $this->makeDraftTimesheet($this->otherStaff);
 
         $this->actingAs($this->finance)
-            ->get(route('operations.timesheets.index', ['mode' => 'approvals']))
+            ->get(route('operations.timesheets.index', ['tab' => 'submitted']))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('operations/timesheets/index')
-                ->where('approvalMode', true)
+                ->where('filters.tab', 'submitted')
                 ->has('timesheets.data', 1)
                 ->where('timesheets.data.0.id', $submitted->id)
             );
@@ -690,6 +712,7 @@ class TimesheetControllerTest extends TestCase
     protected function validStorePayload(Shift $shift): array
     {
         return [
+            'mode' => 'shift',
             'client_id' => $shift->client_id,
             'shift_id' => $shift->id,
             'work_date' => $shift->starts_at->toDateString(),
