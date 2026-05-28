@@ -51,6 +51,8 @@ export type ViewTimesheetRow = {
     approved_at?: string | null;
     archived_at?: string | null;
     archived_reason?: string | null;
+    exported_to_payroll_at?: string | null;
+    payroll_reference?: string | null;
     total_hours?: number;
     hours?: number;
     tasks_total?: number;
@@ -369,6 +371,28 @@ export default function ViewTimesheetDialog({
                                 </section>
                             ) : null}
 
+                            {t.exported_to_payroll_at || t.payroll_reference ? (
+                                <section className="rounded-xl border border-border bg-card p-4">
+                                    <SectionTitle icon={Banknote}>Payroll</SectionTitle>
+                                    <div className="mt-3 space-y-2">
+                                        {t.exported_to_payroll_at ? (
+                                            <div className="flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50/50 px-3 py-2 text-[12.5px] dark:border-emerald-900/40 dark:bg-emerald-950/20">
+                                                <span className="font-medium text-emerald-800 dark:text-emerald-200">Exported</span>
+                                                <span className="tabular-nums text-emerald-700 dark:text-emerald-300">
+                                                    {fmtDate(t.exported_to_payroll_at)}
+                                                </span>
+                                            </div>
+                                        ) : null}
+                                        {t.payroll_reference ? (
+                                            <div className="rounded-lg border border-border bg-muted/30 px-3 py-2">
+                                                <div className="text-[10.5px] uppercase tracking-wider text-muted-foreground">Reference</div>
+                                                <div className="mt-0.5 break-all text-[12px] font-medium">{t.payroll_reference}</div>
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                </section>
+                            ) : null}
+
                             <section className="rounded-xl border border-border bg-card p-4">
                                 <SectionTitle icon={CalendarDays}>Audit trail</SectionTitle>
                                 <ol className="mt-3 space-y-3 border-l-2 border-border pl-4">
@@ -509,11 +533,6 @@ export default function ViewTimesheetDialog({
                                     disabled={busy}
                                 >
                                     <Send className="h-4 w-4" /> Submit for approval
-                                </Button>
-                            ) : null}
-                            {t.status === 'approved' && canApprove ? (
-                                <Button size="sm" variant="outline" className="gap-1.5">
-                                    <Banknote className="h-4 w-4" /> Mark as paid
                                 </Button>
                             ) : null}
                             <Button size="sm" onClick={() => onOpenChange(false)}>

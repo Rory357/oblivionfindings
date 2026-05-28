@@ -4,10 +4,7 @@ use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\User;
-use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
-
-uses(Tests\TestCase::class, RefreshDatabase::class);
 
 function userWithRosteringLeavePermissions(): User
 {
