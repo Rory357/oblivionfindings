@@ -146,7 +146,7 @@ export function JobBoardHero({
             stats={[
                 { label: 'Open', value: stats.open },
                 { label: 'For you', value: stats.eligible_for_you },
-                { label: 'Pending', value: stats.claimed },
+                { label: 'Pending', value: stats.pending_approval },
                 { label: 'Filled today', value: stats.filled_today },
             ]}
             actions={

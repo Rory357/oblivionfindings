@@ -63,8 +63,9 @@ class AvailabilityRule implements EligibilityRuleInterface
             return self::pass('availability');
         }
 
-        // Load all availability records for this user in one query.
-        $availabilities = StaffAvailability::where('user_id', $user->id)->get();
+        $availabilities = $user->relationLoaded('staffAvailability')
+            ? $user->staffAvailability
+            : StaffAvailability::where('user_id', $user->id)->get();
 
         if ($availabilities->isEmpty()) {
             // No availability records at all — soft warning, not a block.
@@ -132,13 +133,20 @@ class AvailabilityRule implements EligibilityRuleInterface
             return self::pass('availability_leave');
         }
 
-        $leave = HrLeaveRequest::query()
-            ->where('user_id', $user->id)
-            ->where('status', 'approved')
-            ->where('starts_at', '<', $endsAt)
-            ->where('ends_at', '>', $startsAt)
-            ->orderBy('starts_at')
-            ->first();
+        $leave = $user->relationLoaded('hrLeaveRequests')
+            ? $user->hrLeaveRequests
+                ->filter(fn (HrLeaveRequest $request) => $request->status === 'approved'
+                    && $request->starts_at < $endsAt
+                    && $request->ends_at > $startsAt)
+                ->sortBy('starts_at')
+                ->first()
+            : HrLeaveRequest::query()
+                ->where('user_id', $user->id)
+                ->where('status', 'approved')
+                ->where('starts_at', '<', $endsAt)
+                ->where('ends_at', '>', $startsAt)
+                ->orderBy('starts_at')
+                ->first();
 
         if (! $leave) {
             return self::pass('availability_leave');

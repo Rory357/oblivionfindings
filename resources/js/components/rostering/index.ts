@@ -6,6 +6,12 @@ export {
     type ShiftTypeSlice,
 } from './analytics-pane';
 export {
+    AvailabilityPane,
+    type AvailabilityLeaveRequest,
+    type AvailabilityPaneProps,
+    type AvailabilityStaffMember,
+} from './availability-pane';
+export {
     CapacityHeatmapPane,
     type CapacityRow as CapacityHeatmapRow,
 } from './capacity-heatmap-pane';

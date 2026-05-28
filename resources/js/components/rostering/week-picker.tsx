@@ -1,6 +1,7 @@
 import {
     type ReactNode,
     type RefObject,
+    type KeyboardEvent as ReactKeyboardEvent,
     useCallback,
     useEffect,
     useMemo,
@@ -229,10 +230,22 @@ export function WeekPicker({
         return rows;
     }, [viewMonth]);
 
-    const goMonth = (delta: number) =>
+    const goMonth = useCallback((delta: number) =>
         setViewMonth(
             new Date(viewMonth.getFullYear(), viewMonth.getMonth() + delta, 1),
-        );
+        ), [viewMonth]);
+
+    const handleDialogKeyDown = (
+        event: ReactKeyboardEvent<HTMLDivElement>,
+    ) => {
+        if (event.key === 'ArrowLeft') {
+            event.preventDefault();
+            goMonth(-1);
+        } else if (event.key === 'ArrowRight') {
+            event.preventDefault();
+            goMonth(1);
+        }
+    };
 
     const focusedWeek = hoverWeek ?? selectedWeekStart;
     const focusedRange = formatWeekRange(focusedWeek);
@@ -262,6 +275,7 @@ export function WeekPicker({
             style={{ top: pos.top, left: pos.left }}
             role="dialog"
             aria-label="Pick a week"
+            onKeyDown={handleDialogKeyDown}
         >
             <div className="mb-3 flex items-center gap-3 rounded-[11px] bg-gradient-to-br from-primary/90 to-primary p-3 text-primary-foreground shadow-sm">
                 <div className="flex min-w-[50px] flex-col items-center rounded-[9px] border border-primary-foreground/25 bg-primary-foreground/20 px-2 py-1">

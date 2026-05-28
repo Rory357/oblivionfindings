@@ -239,6 +239,11 @@ class Shift extends Model
         return $this->hasMany(\App\Models\ShiftReplacementRequest::class)->orderByDesc('requested_at');
     }
 
+    public function openPositions()
+    {
+        return $this->hasMany(ShiftOpenPosition::class);
+    }
+
     public function isEnded(): bool
     {
         $end = $this->actual_ends_at ?? $this->ends_at;

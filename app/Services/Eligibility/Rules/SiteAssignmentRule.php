@@ -23,9 +23,15 @@ class SiteAssignmentRule implements EligibilityRuleInterface
             return self::pass();
         }
 
-        $profile = HrEmployeeProfile::where('user_id', $user->id)
-            ->where('is_active', true)
-            ->first(['primary_site_id', 'secondary_site_ids']);
+        $profile = $user->relationLoaded('hrEmployeeProfile')
+            ? $user->hrEmployeeProfile
+            : HrEmployeeProfile::where('user_id', $user->id)
+                ->where('is_active', true)
+                ->first(['primary_site_id', 'secondary_site_ids', 'is_active']);
+
+        if ($profile && ! $profile->is_active) {
+            $profile = null;
+        }
 
         if (! $profile) {
             return [

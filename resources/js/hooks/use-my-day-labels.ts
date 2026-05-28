@@ -88,6 +88,7 @@ export type MyDayLabelKey =
     | 'qa_care_note'
     | 'qa_vitals_obs'
     | 'qa_report_incident'
+    | 'qa_set_availability'
     | 'qa_care_plan'
     | 'qa_submit_timesheet'
     | 'qa_write_handover'
@@ -251,6 +252,7 @@ const FALLBACKS: Record<MyDayLabelKey, string> = {
     qa_care_note: 'Care note',
     qa_vitals_obs: 'Vitals & obs',
     qa_report_incident: 'Report incident',
+    qa_set_availability: 'Set availability',
     qa_care_plan: 'Care plan',
     qa_submit_timesheet: 'Submit timesheet',
     qa_write_handover: 'Write handover',

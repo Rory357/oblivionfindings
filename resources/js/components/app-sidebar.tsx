@@ -834,7 +834,7 @@ function buildOperationsSubPanelGroups({
     if (can?.rostering?.viewAny)
         scheduling.push({
             title: 'Availability',
-            href: '/operations/availability',
+            href: '/operations/rostering?tab=availability',
             icon: Clock,
         });
     if (scheduling.length > 0)

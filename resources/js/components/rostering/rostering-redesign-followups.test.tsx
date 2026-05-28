@@ -3,10 +3,12 @@ import type React from 'react';
 import { describe, expect, it, vi } from 'vitest';
 
 import AnalyticsPane from './analytics-pane';
+import AvailabilityPane from './availability-pane';
 import CapacityHeatmapPane from './capacity-heatmap-pane';
 import CoveragePane from './coverage-pane';
 import OpenShiftsPane from './open-shifts-pane';
 import ResolveConflictDialog from './resolve-conflict-dialog';
+import TabStrip from './tab-strip';
 import TimeOffPane from './time-off-pane';
 import WeekGridPane from './week-grid-pane';
 
@@ -80,6 +82,7 @@ describe('rostering redesign follow-up wiring', () => {
                     blocked: [
                         {
                             id: 4,
+                            user_id: 22,
                             starts_at: '2026-05-04T09:00:00+12:00',
                             staff: 'Aroha King',
                             site: 'Matai House',
@@ -89,6 +92,7 @@ describe('rostering redesign follow-up wiring', () => {
                     warnings: [
                         {
                             id: 5,
+                            user_id: 33,
                             starts_at: '2026-05-05T09:00:00+12:00',
                             staff: 'Tama Rangi',
                             site: 'Kauri House',
@@ -106,6 +110,96 @@ describe('rostering redesign follow-up wiring', () => {
         expect(
             screen.getByText('Tight turnaround from previous shift'),
         ).toBeVisible();
+        expect(
+            screen.getByRole('link', { name: /Edit availability for Aroha King/i }),
+        ).toHaveAttribute('href', '/staff/22/availability');
+    });
+
+    it('moves rostering tabs with arrow keys', () => {
+        const onChange = vi.fn();
+
+        render(
+            <TabStrip
+                value="shifts"
+                onChange={onChange}
+                items={[
+                    {
+                        id: 'shifts',
+                        label: 'Shifts',
+                        icon: (() => <span />) as React.ComponentType<{
+                            className?: string;
+                        }>,
+                        tone: 'primary',
+                    },
+                    {
+                        id: 'open',
+                        label: 'Open',
+                        icon: (() => <span />) as React.ComponentType<{
+                            className?: string;
+                        }>,
+                        tone: 'warning',
+                    },
+                    {
+                        id: 'availability',
+                        label: 'Availability',
+                        icon: (() => <span />) as React.ComponentType<{
+                            className?: string;
+                        }>,
+                        tone: 'success',
+                    },
+                ]}
+            />,
+        );
+
+        fireEvent.keyDown(screen.getByRole('tab', { name: /Shifts/i }), {
+            key: 'ArrowRight',
+        });
+
+        expect(onChange).toHaveBeenCalledWith('open');
+    });
+
+    it('shows staff availability in a rostering pane with edit deep links', () => {
+        render(
+            <AvailabilityPane
+                canManage
+                staff={[
+                    {
+                        id: 22,
+                        name: 'Aroha King',
+                        email: 'aroha@example.test',
+                        role: 'support_worker',
+                        staff_availability: [
+                            {
+                                id: 1,
+                                day_of_week: new Date().getDay(),
+                                start_time: '09:00',
+                                end_time: '17:00',
+                            },
+                        ],
+                        staff_time_off: [],
+                    },
+                ]}
+                upcomingLeave={{
+                    22: [
+                        {
+                            id: 10,
+                            leave_type: 'annual_leave',
+                            starts_at: '2026-05-06T00:00:00+12:00',
+                            ends_at: '2026-05-08T23:59:00+12:00',
+                            status: 'approved',
+                        },
+                    ],
+                }}
+            />,
+        );
+
+        expect(screen.getByText('Declared today')).toBeVisible();
+        expect(screen.getByText('Aroha King')).toBeVisible();
+        expect(
+            screen.getByRole('link', {
+                name: /Edit availability for Aroha King/i,
+            }),
+        ).toHaveAttribute('href', '/staff/22/availability');
     });
 
     it('shows candidate capacity context on suggested staff chips', () => {

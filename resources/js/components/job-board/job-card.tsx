@@ -284,11 +284,11 @@ export function JobCard({
                             ? 'Conflict'
                             : schedule?.fatigue
                               ? 'Fatigue flag'
-                              : schedule?.time_off
-                                ? 'On leave'
-                                : schedule?.free
-                                  ? 'Free'
-                                  : '—'
+                                : schedule?.time_off
+                                  ? 'On leave'
+                                  : schedule?.free
+                                    ? 'Free'
+                                    : 'Schedule unknown'
                     }
                     sub={
                         schedule?.conflict?.label ??

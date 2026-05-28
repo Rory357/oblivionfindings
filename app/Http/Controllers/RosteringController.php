@@ -24,6 +24,8 @@ use App\Services\ShiftStaffEligibilityService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
+use Inertia\Inertia;
 
 class RosteringController extends Controller
 {
@@ -43,6 +45,7 @@ class RosteringController extends Controller
 
         $canManageAny = $auth->canDo('shifts.manageAny');
         $canApproveLeave = $auth->canDo('hr.leave.approve') || $auth->canDo('hr.leave.manage');
+        $organizationId = $auth->organization_id;
 
         $data = $request->validated();
 
@@ -263,7 +266,8 @@ class RosteringController extends Controller
             ->all();
 
         // Staff on leave this week
-        $onLeaveCount = $canManageAny ? HrLeaveRequest::where('status', 'approved')
+        $onLeaveCount = $canManageAny ? $this->scopeHrRecordOrganization(HrLeaveRequest::query(), $organizationId)
+            ->where('status', 'approved')
             ->where('starts_at', '<', $weekEnd)
             ->where('ends_at', '>', $weekStart)
             ->distinct('user_id')
@@ -272,11 +276,11 @@ class RosteringController extends Controller
         // Compliance overview
         $complianceExpiring = 0;
         $complianceExpired = 0;
-        if ($canManageAny && $auth->tenant_id) {
-            $complianceExpiring = HrStaffComplianceStatus::where('tenant_id', $auth->tenant_id)
+        if ($canManageAny && $organizationId) {
+            $complianceExpiring = $this->scopeHrRecordOrganization(HrStaffComplianceStatus::query(), $organizationId)
                 ->where('status', 'expiring_soon')
                 ->count();
-            $complianceExpired = HrStaffComplianceStatus::where('tenant_id', $auth->tenant_id)
+            $complianceExpired = $this->scopeHrRecordOrganization(HrStaffComplianceStatus::query(), $organizationId)
                 ->where('status', 'expired')
                 ->whereHas('requirement', fn ($q) => $q->where('hard_stop', true))
                 ->count();
@@ -444,8 +448,7 @@ class RosteringController extends Controller
         $pendingLeave = collect();
 
         if ($canManageAny) {
-            $approvedLeave = HrLeaveRequest::query()
-                ->forTenant($auth->tenant_id)
+            $approvedLeave = $this->scopeHrRecordOrganization(HrLeaveRequest::query(), $organizationId)
                 ->where('status', 'approved')
                 ->where('starts_at', '<', $leaveLookaheadEnd)
                 ->where('ends_at', '>', $weekStart)
@@ -456,8 +459,7 @@ class RosteringController extends Controller
         }
 
         if ($canApproveLeave) {
-            $pendingLeave = HrLeaveRequest::query()
-                ->forTenant($auth->tenant_id)
+            $pendingLeave = $this->scopeHrRecordOrganization(HrLeaveRequest::query(), $organizationId)
                 ->where('status', 'pending')
                 ->where('starts_at', '<', $leaveLookaheadEnd)
                 ->where('ends_at', '>', $weekStart)
@@ -560,6 +562,11 @@ class RosteringController extends Controller
                 'label' => $b->label,
                 'notes' => $b->notes,
             ])->values(),
+            'staffAvailabilitySummary' => $canManageAny
+                ? ($request->query('tab') === 'availability'
+                    ? $this->buildAvailabilitySummary($auth)
+                    : Inertia::optional(fn () => $this->buildAvailabilitySummary($auth)))
+                : ['staff' => [], 'upcomingLeave' => []],
             'capacity' => $capacity,
 
             // HR leave overlay: formal leave requests in the visible 14-day time-off window.
@@ -587,7 +594,7 @@ class RosteringController extends Controller
                 ])->values(),
 
             // HR compliance badges per staff member
-            'complianceBadges' => $canManageAny ? $this->getComplianceBadges($auth->tenant_id) : [],
+            'complianceBadges' => $canManageAny ? $this->getComplianceBadges($organizationId) : [],
 
             // Eligibility dashboard (14-day lookahead)
             'eligibilityAlerts' => $eligibilityAlerts,
@@ -609,6 +616,68 @@ class RosteringController extends Controller
                 'complianceExpired' => $complianceExpired,
             ],
         ]);
+    }
+
+    protected function buildAvailabilitySummary(User $auth): array
+    {
+        $staff = User::query()
+            ->when($auth->organization_id, fn ($query) => $query->where('organization_id', $auth->organization_id))
+            ->staff()
+            ->with([
+                'staffAvailability' => fn ($query) => $query
+                    ->orderBy('day_of_week')
+                    ->orderBy('starts_at'),
+                'staffTimeOff' => fn ($query) => $query
+                    ->where('ends_at', '>=', now())
+                    ->orderBy('starts_at'),
+            ])
+            ->orderBy('name')
+            ->get();
+
+        $upcomingLeave = collect();
+
+        if ($staff->isNotEmpty() && Schema::hasTable('hr_leave_requests')) {
+            $upcomingLeave = HrLeaveRequest::query()
+                ->whereIn('user_id', $staff->pluck('id'))
+                ->where('status', 'approved')
+                ->where('ends_at', '>=', now())
+                ->orderBy('starts_at')
+                ->get()
+                ->groupBy('user_id')
+                ->map(fn ($items) => $items->map(fn ($leave) => [
+                    'id' => $leave->id,
+                    'leave_type' => $leave->leave_type,
+                    'starts_at' => $leave->starts_at?->toIso8601String(),
+                    'ends_at' => $leave->ends_at?->toIso8601String(),
+                    'status' => $leave->status,
+                ])->values());
+        }
+
+        return [
+            'staff' => $staff->map(fn ($member) => [
+                'id' => $member->id,
+                'name' => $member->name,
+                'email' => $member->email,
+                'role' => $member->role,
+                // Each row in staff_availabilities means "this worker is free
+                // on day_of_week between starts_at and ends_at". Absence of a
+                // row for a given day = not declared. The pane treats slot
+                // existence as availability — see availability-pane.tsx.
+                'staff_availability' => $member->staffAvailability->map(fn ($slot) => [
+                    'id' => $slot->id,
+                    'day_of_week' => $slot->day_of_week,
+                    'start_time' => substr((string) $slot->starts_at, 0, 5),
+                    'end_time' => substr((string) $slot->ends_at, 0, 5),
+                ])->values(),
+                'staff_time_off' => $member->staffTimeOff->map(fn ($off) => [
+                    'id' => $off->id,
+                    'reason' => $off->label ?? $off->type,
+                    'starts_at' => $off->starts_at?->toIso8601String(),
+                    'ends_at' => $off->ends_at?->toIso8601String(),
+                ])->values(),
+            ])->values(),
+            'upcomingLeave' => $upcomingLeave->all(),
+        ];
     }
 
     public function conflicts(RosteringConflictsRequest $request)
@@ -1005,13 +1074,13 @@ class RosteringController extends Controller
     /**
      * Get compliance status badges for all active staff (for rostering overlays).
      */
-    protected function getComplianceBadges(?int $tenantId): array
+    protected function getComplianceBadges(?int $organizationId): array
     {
-        if (!$tenantId) {
+        if (!$organizationId) {
             return [];
         }
 
-        return HrStaffComplianceStatus::where('tenant_id', $tenantId)
+        return $this->scopeHrRecordOrganization(HrStaffComplianceStatus::query(), $organizationId)
             ->whereIn('status', ['expired', 'expiring_soon'])
             ->whereHas('requirement', fn ($q) => $q->where('is_active', true))
             ->with('requirement:id,code,name,hard_stop')
@@ -1025,6 +1094,18 @@ class RosteringController extends Controller
             ])
             ->values()
             ->toArray();
+    }
+
+    protected function scopeHrRecordOrganization($query, ?int $organizationId)
+    {
+        if (! $organizationId) {
+            return $query->whereRaw('1 = 0');
+        }
+
+        return $query->whereHas(
+            'user',
+            fn ($userQuery) => $userQuery->where('organization_id', $organizationId),
+        );
     }
 
     protected function serializeConflictShift(Shift $shift): array
@@ -1061,6 +1142,10 @@ class RosteringController extends Controller
             ->with(['staff:id,name', 'site:id,name'])
             ->orderBy('starts_at')
             ->get();
+        $eligibilityResults = $eligibility->evaluateMany(
+            $futureShifts,
+            $futureShifts->pluck('staff')->filter(),
+        );
 
         $blocked = [];
         $warnings = [];
@@ -1072,13 +1157,8 @@ class RosteringController extends Controller
                 continue;
             }
 
-            try {
-                $result = $eligibility->evaluate($shift, $shift->staff);
-            } catch (\Throwable $e) {
-                Log::warning('Eligibility dashboard check failed', [
-                    'shift_id' => $shift->id,
-                    'error' => $e->getMessage(),
-                ]);
+            $result = $eligibilityResults[$shift->id][$shift->staff->id] ?? null;
+            if (! $result) {
                 $eligibleCount++;
                 continue;
             }
@@ -1086,6 +1166,7 @@ class RosteringController extends Controller
             if ($result->hasBlocks()) {
                 $blocked[] = [
                     'id' => $shift->id,
+                    'user_id' => $shift->staff->id,
                     'starts_at' => $shift->starts_at?->toIso8601String(),
                     'staff' => $shift->staff->name,
                     'site' => $shift->site?->name ?? 'Unknown',
@@ -1094,6 +1175,7 @@ class RosteringController extends Controller
             } elseif ($result->hasWarnings()) {
                 $warnings[] = [
                     'id' => $shift->id,
+                    'user_id' => $shift->staff->id,
                     'starts_at' => $shift->starts_at?->toIso8601String(),
                     'staff' => $shift->staff->name,
                     'site' => $shift->site?->name ?? 'Unknown',
@@ -1137,8 +1219,9 @@ class RosteringController extends Controller
      */
     protected function buildOpenShiftEligibility(iterable $openShifts, iterable $staffPool): array
     {
+        $openShiftModels = collect($openShifts)->values();
         $staffIds = collect($staffPool)->pluck('id')->filter()->values();
-        if ($staffIds->isEmpty()) {
+        if ($openShiftModels->isEmpty() || $staffIds->isEmpty()) {
             return [];
         }
 
@@ -1148,23 +1231,18 @@ class RosteringController extends Controller
         }
 
         $eligibility = app(ShiftStaffEligibilityService::class);
+        $eligibilityResults = $eligibility->evaluateMany($openShiftModels, $candidates);
         $result = [];
 
-        foreach ($openShifts as $shift) {
+        foreach ($openShiftModels as $shift) {
             if (! $shift->starts_at || ! $shift->ends_at) {
                 continue;
             }
 
             $perShift = [];
             foreach ($candidates as $candidate) {
-                try {
-                    $check = $eligibility->evaluate($shift, $candidate);
-                } catch (\Throwable $e) {
-                    Log::warning('Per-candidate eligibility evaluate failed', [
-                        'shift_id' => $shift->id,
-                        'user_id' => $candidate->id,
-                        'error' => $e->getMessage(),
-                    ]);
+                $check = $eligibilityResults[$shift->id][$candidate->id] ?? null;
+                if (! $check) {
                     continue;
                 }
 

@@ -75,6 +75,14 @@ class ShiftController extends Controller
                 'site:id,name,type',
                 'tasks:id,shift_id,label,sort_order,is_completed',
             ])
+            ->withExists([
+                'openPositions as cover_requested' => fn ($openPositions) => $openPositions
+                    ->whereIn('status', ['open', 'claimed'])
+                    ->where(function ($query) {
+                        $query->whereNull('expires_at')
+                            ->orWhere('expires_at', '>', now());
+                    }),
+            ])
             ->whereBetween('starts_at', [$start, $end])
             ->orderBy('starts_at');
 

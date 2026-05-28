@@ -77,6 +77,11 @@ interface AuthUser {
 
 interface SharedAuth {
     user?: AuthUser | null;
+    can?: {
+        staff?: {
+            availabilityUpdateSelf?: boolean;
+        };
+    };
 }
 
 interface SharedProps extends Partial<MyDayPageProps> {
@@ -99,6 +104,10 @@ export default function MyDay() {
     const t = useMyDayLabels();
 
     const workerFirstName = auth?.user?.first_name ?? auth?.user?.name?.split(' ')[0] ?? 'there';
+    const availabilityHref =
+        auth?.user?.id && auth?.can?.staff?.availabilityUpdateSelf
+            ? `/staff/${auth.user.id}/availability`
+            : null;
 
     // Date popover — anchored to the title.
     const [dateOpen, setDateOpen] = useState(false);
@@ -571,6 +580,7 @@ export default function MyDay() {
                 residentTaskCounts={residentTaskCounts}
                 residentNotes={residentNotes}
                 liveSinceLabel={liveSinceLabel}
+                availabilityHref={availabilityHref}
             />
 
             <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">

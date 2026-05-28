@@ -35,6 +35,7 @@ export type OpenShiftCard = {
 
 export type EligibilityAlertItem = {
     id: number;
+    user_id?: number | null;
     starts_at: string;
     staff: string;
     site: string;
@@ -415,10 +416,9 @@ function EligibilityAlertRow({
     const blocked = tone === 'blocked';
 
     return (
-        <Link
-            href={`/operations/shifts/${alert.id}`}
+        <article
             className={cn(
-                'rounded-md border p-3 transition hover:bg-accent',
+                'rounded-md border p-3',
                 blocked
                     ? 'border-status-critical/30 bg-status-critical-bg/35'
                     : 'border-status-warning/30 bg-status-warning-bg/35',
@@ -441,7 +441,23 @@ function EligibilityAlertRow({
                 </span>
             </div>
             <div className="mt-1 text-xs text-foreground">{alert.reason}</div>
-        </Link>
+            <div className="mt-2 flex flex-wrap items-center gap-2 text-[11px] font-semibold">
+                <Link
+                    href={`/operations/shifts/${alert.id}`}
+                    className="text-primary underline-offset-2 hover:underline"
+                >
+                    View shift
+                </Link>
+                {alert.user_id ? (
+                    <Link
+                        href={`/staff/${alert.user_id}/availability`}
+                        className="text-primary underline-offset-2 hover:underline"
+                    >
+                        Edit availability for {alert.staff}
+                    </Link>
+                ) : null}
+            </div>
+        </article>
     );
 }
 

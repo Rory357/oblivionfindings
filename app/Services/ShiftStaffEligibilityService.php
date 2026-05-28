@@ -14,6 +14,7 @@ use App\Services\Eligibility\Rules\HsTrainingRule;
 use App\Services\Eligibility\Rules\SiteAssignmentRule;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Log;
 
 class ShiftStaffEligibilityService
 {
@@ -60,6 +61,63 @@ class ShiftStaffEligibilityService
         $checks = array_merge($checks, $this->hsTrainingRule->evaluateAll($shift, $user));
 
         return EligibilityResult::fromChecks($checks);
+    }
+
+    /**
+     * Evaluate multiple shift/user pairs after eager-loading the relations
+     * the rule stack commonly asks for. The result is keyed by shift id, then
+     * user id, so callers can format existing cards without re-querying.
+     *
+     * @param  iterable<Shift>  $shifts
+     * @param  iterable<User>   $users
+     * @return array<int, array<int, EligibilityResult>>
+     */
+    public function evaluateMany(iterable $shifts, iterable $users): array
+    {
+        $shiftModels = collect($shifts)
+            ->filter(fn ($shift) => $shift instanceof Shift && $shift->id)
+            ->values();
+        $userModels = collect($users)
+            ->filter(fn ($user) => $user instanceof User && $user->id)
+            ->values();
+
+        if ($shiftModels->isEmpty() || $userModels->isEmpty()) {
+            return [];
+        }
+
+        (new \Illuminate\Database\Eloquent\Collection($shiftModels->all()))
+            ->loadMissing([
+                'client:id,site_id',
+                'site:id,name',
+                'serviceContext:id,name,type',
+            ]);
+
+        (new \Illuminate\Database\Eloquent\Collection($userModels->all()))
+            ->loadMissing([
+                'staffAvailability',
+                'staffTimeOff',
+                'hrLeaveRequests' => fn ($query) => $query->where('status', 'approved'),
+                'hrEmployeeProfile',
+                'hrComplianceStatuses.requirement:id,code,name,hard_stop,is_active',
+                'hrDriverEligibility',
+            ]);
+
+        $results = [];
+        foreach ($shiftModels as $shift) {
+            foreach ($userModels as $user) {
+                try {
+                    $results[$shift->id][$user->id] = $this->evaluate($shift, $user);
+                } catch (\Throwable $e) {
+                    Log::warning('Batch eligibility evaluate failed', [
+                        'shift_id' => $shift->id,
+                        'user_id' => $user->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+        }
+
+        return $results;
     }
 
     /**

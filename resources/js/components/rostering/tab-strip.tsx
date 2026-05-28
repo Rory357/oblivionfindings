@@ -1,4 +1,4 @@
-import type { ComponentType, ReactNode } from 'react';
+import type { ComponentType, KeyboardEvent, ReactNode } from 'react';
 
 import { cn } from '@/lib/utils';
 
@@ -44,6 +44,40 @@ export function TabStrip({
     items: RosterTabItem[];
     className?: string;
 }) {
+    const handleKeyDown = (
+        event: KeyboardEvent<HTMLButtonElement>,
+        tabId: string,
+    ) => {
+        const currentIndex = items.findIndex((item) => item.id === tabId);
+        if (currentIndex < 0) {
+            return;
+        }
+
+        let nextIndex: number | null = null;
+        if (event.key === 'ArrowRight') {
+            nextIndex = (currentIndex + 1) % items.length;
+        } else if (event.key === 'ArrowLeft') {
+            nextIndex = (currentIndex - 1 + items.length) % items.length;
+        } else if (event.key === 'Home') {
+            nextIndex = 0;
+        } else if (event.key === 'End') {
+            nextIndex = items.length - 1;
+        }
+
+        if (nextIndex == null) {
+            return;
+        }
+
+        event.preventDefault();
+        const next = items[nextIndex];
+        onChange(next.id);
+        const tabs =
+            event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
+                '[role="tab"]',
+            );
+        tabs?.[nextIndex]?.focus();
+    };
+
     return (
         <div
             role="tablist"
@@ -63,6 +97,7 @@ export function TabStrip({
                         role="tab"
                         aria-selected={active}
                         onClick={() => onChange(t.id)}
+                        onKeyDown={(event) => handleKeyDown(event, t.id)}
                         className={cn(
                             'relative inline-flex items-center gap-2 rounded-[9px] px-3 py-2 text-[13px] font-semibold transition-colors',
                             active

@@ -1,6 +1,7 @@
 import {
     AlertTriangle,
     ArrowUpRight,
+    CalendarCheck,
     ClipboardCheck,
     Clock,
     Coffee,
@@ -82,6 +83,8 @@ interface MyDayHeroProps {
     liveSinceLabel: string;
     /** Description override; defaults to a generated message based on the residents. */
     description?: ReactNode;
+    /** Optional self-service availability editor deep link. */
+    availabilityHref?: string | null;
 }
 
 export function MyDayHero({
@@ -116,6 +119,7 @@ export function MyDayHero({
     residentNotes,
     liveSinceLabel,
     description,
+    availabilityHref,
 }: MyDayHeroProps) {
     const t = useMyDayLabels();
     const residents = site?.residents ?? (singleResident ? [singleResident] : []);
@@ -200,9 +204,14 @@ export function MyDayHero({
         t('today')
     );
 
+    const shiftTimeLabel =
+        shiftStartLabel && shiftEndLabel
+            ? `${shiftStartLabel} – ${shiftEndLabel} · ${shiftDurationHours}h`
+            : null;
+
     const meta = site
         ? [
-              { icon: Clock, label: `${shiftStartLabel} – ${shiftEndLabel} · ${shiftDurationHours}h` },
+              ...(shiftTimeLabel ? [{ icon: Clock, label: shiftTimeLabel }] : []),
               { icon: MapPin, label: site.address },
               {
                   icon: Users,
@@ -210,7 +219,7 @@ export function MyDayHero({
               },
           ]
         : [
-              { icon: Clock, label: `${shiftStartLabel} – ${shiftEndLabel} · ${shiftDurationHours}h` },
+              ...(shiftTimeLabel ? [{ icon: Clock, label: shiftTimeLabel }] : []),
               { icon: Heart, label: 'Personal care + community' },
           ];
 
@@ -265,6 +274,15 @@ export function MyDayHero({
               ? [{ icon: Stethoscope, label: t('qa_vitals_obs'), href: vitalsFallbackHref }]
               : []),
         { icon: AlertTriangle, label: t('qa_report_incident'), href: incidentHref },
+        ...(availabilityHref
+            ? [
+                  {
+                      icon: CalendarCheck,
+                      label: t('qa_set_availability'),
+                      href: availabilityHref,
+                  },
+              ]
+            : []),
         ...(carePlanHref ? [{ icon: ShieldCheck, label: t('qa_care_plan'), href: carePlanHref }] : []),
         // "Submit timesheet" used to deep-link to /operations/timesheets,
         // which duplicates the top-right "Today's timesheet" action and

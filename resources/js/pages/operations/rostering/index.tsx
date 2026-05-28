@@ -2,6 +2,9 @@ import { PageHero } from '@/components/page';
 import {
     AnalyticsPane,
     type AnalyticsTrendPoint,
+    AvailabilityPane,
+    type AvailabilityLeaveRequest,
+    type AvailabilityStaffMember,
     CapacityHeatmapPane,
     type CoverageCellState,
     CoveragePane,
@@ -51,6 +54,7 @@ import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     BarChart3,
+    CalendarCheck,
     CalendarDays,
     CalendarRange,
     CheckCircle2,
@@ -290,6 +294,10 @@ type Props = {
     pendingLeave?: HrLeaveEntry[];
     complianceBadges?: Record<number, ComplianceBadge> | ComplianceBadge[];
     timeOffs: TimeOffEntry[];
+    staffAvailabilitySummary?: {
+        staff: AvailabilityStaffMember[];
+        upcomingLeave: Record<number, AvailabilityLeaveRequest[]>;
+    };
     capacity: Array<{
         user_id: number;
         name: string;
@@ -326,6 +334,7 @@ type Props = {
         };
         blocked: Array<{
             id: number;
+            user_id?: number | null;
             starts_at: string;
             staff: string;
             site: string;
@@ -333,6 +342,7 @@ type Props = {
         }>;
         warnings: Array<{
             id: number;
+            user_id?: number | null;
             starts_at: string;
             staff: string;
             site: string;
@@ -347,6 +357,38 @@ type Props = {
         >
     >;
 };
+
+type RosterTab =
+    | 'shifts'
+    | 'open'
+    | 'coverage'
+    | 'timeoff'
+    | 'availability'
+    | 'capacity'
+    | 'analytics';
+
+const ROSTER_TABS: RosterTab[] = [
+    'shifts',
+    'open',
+    'coverage',
+    'timeoff',
+    'availability',
+    'capacity',
+    'analytics',
+];
+
+function isRosterTab(value: unknown): value is RosterTab {
+    return typeof value === 'string' && ROSTER_TABS.includes(value as RosterTab);
+}
+
+function initialRosterTab(): RosterTab {
+    if (typeof window === 'undefined') {
+        return 'shifts';
+    }
+
+    const requested = new URLSearchParams(window.location.search).get('tab');
+    return isRosterTab(requested) ? requested : 'shifts';
+}
 
 const SHIFT_TYPE_COLORS = [
     'var(--primary)',
@@ -461,9 +503,7 @@ export default function RosteringIndex(props: Props) {
         [weekStartDate],
     );
 
-    const [tab, setTab] = useState<
-        'shifts' | 'open' | 'coverage' | 'timeoff' | 'capacity' | 'analytics'
-    >('shifts');
+    const [tab, setTab] = useState<RosterTab>(() => initialRosterTab());
     const [pickerOpen, setPickerOpen] = useState(false);
     const [resolveConflictShift, setResolveConflictShift] =
         useState<GridShift | null>(null);
@@ -477,6 +517,7 @@ export default function RosteringIndex(props: Props) {
         useState<MakeRecurringShift | null>(null);
     const [broadcastShift, setBroadcastShift] =
         useState<BroadcastShift | null>(null);
+    const [loadingAvailability, setLoadingAvailability] = useState(false);
     const todayBtnRef = useRef<HTMLButtonElement>(null);
 
     const staffFilterItems: EntityFilterOption[] = useMemo(
@@ -552,6 +593,30 @@ export default function RosteringIndex(props: Props) {
                     : props.filters.client_id) ?? undefined,
             site_id: siteIds.length > 0 ? siteIds : undefined,
         };
+    };
+
+    const handleTabChange = (next: string) => {
+        if (!isRosterTab(next)) {
+            return;
+        }
+
+        setTab(next);
+        if (next !== 'availability' || props.staffAvailabilitySummary) {
+            return;
+        }
+
+        setLoadingAvailability(true);
+        router.get(
+            rosteringIndex.url(),
+            { ...filterPayload(), tab: 'availability' },
+            {
+                only: ['staffAvailabilitySummary'],
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+                onFinish: () => setLoadingAvailability(false),
+            },
+        );
     };
 
     const goWeek = (offsetDays: number) => {
@@ -1663,6 +1728,13 @@ export default function RosteringIndex(props: Props) {
             badge: timeOffRequests.length || undefined,
         },
         {
+            id: 'availability',
+            label: 'Availability',
+            icon: CalendarCheck,
+            tone: 'success' as const,
+            badge: props.staffAvailabilitySummary?.staff.length,
+        },
+        {
             id: 'capacity',
             label: 'Capacity heatmap',
             icon: LayoutGrid,
@@ -1675,6 +1747,11 @@ export default function RosteringIndex(props: Props) {
             tone: 'critical' as const,
         },
     ];
+
+    const availabilitySummary = props.staffAvailabilitySummary ?? {
+        staff: [],
+        upcomingLeave: {},
+    };
 
     const prevLab = weekLabel(addDaysWP(weekStartDate, -7));
     const nextLab = weekLabel(addDaysWP(weekStartDate, 7));
@@ -1796,24 +1873,22 @@ export default function RosteringIndex(props: Props) {
                     ]}
                     actions={
                         <>
-                            {props.canPublishRoster ? (
+                            {props.rosteringFeatures.publish &&
+                            props.canPublishRoster ? (
                                 <Button
                                     size="sm"
                                     className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
                                     disabled={
-                                        !props.rosteringFeatures.publish ||
                                         !props.rosterPeriod ||
                                         publishBlockCount > 0 ||
                                         props.rosterPeriod.status === 'archived'
                                     }
                                     title={
-                                        !props.rosteringFeatures.publish
-                                            ? 'Publishing is not enabled for this organisation'
-                                            : !props.rosterPeriod
-                                              ? 'Pick a site to publish its week'
-                                              : publishBlockCount > 0
-                                                ? `${publishBlockCount} blocker${publishBlockCount === 1 ? '' : 's'} must be resolved`
-                                                : undefined
+                                        !props.rosterPeriod
+                                            ? 'Pick a site to publish its week'
+                                            : publishBlockCount > 0
+                                              ? `${publishBlockCount} blocker${publishBlockCount === 1 ? '' : 's'} must be resolved`
+                                              : undefined
                                     }
                                     onClick={() =>
                                         postPeriodAction(
@@ -1831,22 +1906,17 @@ export default function RosteringIndex(props: Props) {
                                         : 'Publish week'}
                                 </Button>
                             ) : null}
-                            {props.canAutoScheduleRoster ? (
+                            {props.rosteringFeatures.auto_schedule &&
+                            props.canAutoScheduleRoster ? (
                                 <Button
                                     size="sm"
                                     variant="outline"
                                     className="border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10"
-                                    disabled={
-                                        !props.rosteringFeatures
-                                            .auto_schedule ||
-                                        !props.filters.site_id
-                                    }
+                                    disabled={!props.filters.site_id}
                                     title={
-                                        !props.rosteringFeatures.auto_schedule
-                                            ? 'Auto-scheduling is not enabled for this organisation'
-                                            : !props.filters.site_id
-                                              ? 'Pick a site before generating suggestions'
-                                              : undefined
+                                        !props.filters.site_id
+                                            ? 'Pick a site before generating suggestions'
+                                            : undefined
                                     }
                                     onClick={generateSuggestions}
                                     data-test="rostering-suggest-assignments"
@@ -2011,7 +2081,7 @@ export default function RosteringIndex(props: Props) {
 
                 <TabStrip
                     value={tab}
-                    onChange={(v) => setTab(v as typeof tab)}
+                    onChange={handleTabChange}
                     items={tabItems}
                 />
 
@@ -2160,6 +2230,24 @@ export default function RosteringIndex(props: Props) {
                                     reviewLeaveRequest(request, 'decline')
                                 }
                             />
+                        ) : null}
+                        {tab === 'availability' ? (
+                            props.staffAvailabilitySummary ||
+                            !loadingAvailability ? (
+                                <AvailabilityPane
+                                    staff={availabilitySummary.staff}
+                                    upcomingLeave={
+                                        availabilitySummary.upcomingLeave
+                                    }
+                                    canManage={props.canManageAny}
+                                />
+                            ) : (
+                                <Card>
+                                    <CardContent className="py-8 text-sm text-muted-foreground">
+                                        Loading availability...
+                                    </CardContent>
+                                </Card>
+                            )
                         ) : null}
                         {tab === 'capacity' ? (
                             <CapacityHeatmapPane

@@ -34,7 +34,9 @@ class DriverLicenceExpiryRule implements EligibilityRuleInterface
             return self::pass();
         }
 
-        $eligibility = HrDriverEligibility::where('user_id', $user->id)->first();
+        $eligibility = $user->relationLoaded('hrDriverEligibility')
+            ? $user->hrDriverEligibility
+            : HrDriverEligibility::where('user_id', $user->id)->first();
 
         if (! $eligibility) {
             // CoverageRoleService will already block via missing role.

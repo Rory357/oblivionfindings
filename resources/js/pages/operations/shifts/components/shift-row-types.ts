@@ -41,6 +41,7 @@ export type ShiftRow = {
     staff: ShiftRowStaff | null;
     site?: ShiftRowSite | null;
     tasks?: ShiftRowTask[];
+    cover_requested?: boolean;
 };
 
 /** Derive the “open” state used by the UI: scheduled + no staff assigned. */

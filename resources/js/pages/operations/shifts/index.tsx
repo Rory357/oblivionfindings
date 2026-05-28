@@ -25,6 +25,7 @@ import {
     show as showShift,
     start as startShift,
 } from '@/routes/operations/shifts';
+import { ConfirmDialog } from '@/components/confirm-dialog';
 
 import { CreateShiftDialog } from './components/create-shift-dialog';
 import { DonutCard } from './components/donut-card';
@@ -194,6 +195,13 @@ export default function ShiftsIndex({
         x: number;
         y: number;
     } | null>(null);
+    const [coverShift, setCoverShift] = useState<ShiftRow | null>(null);
+    const [broadcastingCoverIds, setBroadcastingCoverIds] = useState<Set<number>>(
+        () => new Set(),
+    );
+    const [broadcastedCoverIds, setBroadcastedCoverIds] = useState<Set<number>>(
+        () => new Set(),
+    );
     const [toast, setToast] = useState<string | null>(null);
 
     function openEdit(shift: ShiftRow) {
@@ -367,6 +375,30 @@ export default function ShiftsIndex({
         );
     }
 
+    function broadcastCoverRequest(shift: ShiftRow) {
+        setBroadcastingCoverIds((current) => new Set(current).add(shift.id));
+        router.post(
+            `/operations/shifts/${shift.id}/broadcast`,
+            {},
+            {
+                preserveScroll: true,
+                onSuccess: () => {
+                    setBroadcastedCoverIds((current) =>
+                        new Set(current).add(shift.id),
+                    );
+                    notify('Cover broadcast requested');
+                },
+                onFinish: () => {
+                    setBroadcastingCoverIds((current) => {
+                        const next = new Set(current);
+                        next.delete(shift.id);
+                        return next;
+                    });
+                },
+            },
+        );
+    }
+
     function buildMenuItems(shift: ShiftRow): ContextMenuItem[] {
         const isOpen = isOpenShift(shift);
         const inProg = shift.status === 'in_progress';
@@ -526,6 +558,17 @@ export default function ShiftsIndex({
         : filters.client_id != null
           ? [Number(filters.client_id)]
           : [];
+    const coverAwareShifts = useMemo(
+        () =>
+            tabFiltered.map((shift) => ({
+                ...shift,
+                cover_requested:
+                    Boolean(shift.cover_requested) ||
+                    broadcastingCoverIds.has(shift.id) ||
+                    broadcastedCoverIds.has(shift.id),
+            })),
+        [broadcastedCoverIds, broadcastingCoverIds, tabFiltered],
+    );
 
     return (
         <AppLayout
@@ -682,11 +725,12 @@ export default function ShiftsIndex({
                     <div className="bg-muted/30 px-4 py-4 md:px-5 md:py-5">
                         {viewMode === 'list' ? (
                             <ShiftListView
-                                shifts={tabFiltered}
+                                shifts={coverAwareShifts}
                                 todayKey={todayKey}
                                 dense={dense}
                                 onShiftClick={(s) => setViewShift(s)}
                                 onAssignOpen={(s) => openEdit(s)}
+                                onFindCover={(s) => setCoverShift(s)}
                                 onContextMenu={openShiftMenu}
                                 onEditClick={(s) => openEdit(s)}
                                 onCreateOnDay={(date) =>
@@ -837,6 +881,23 @@ export default function ShiftsIndex({
                             setViewShift(null);
                         } else if (action === 'timesheet') {
                             router.visit(showShift.url(viewShift.id));
+                        }
+                    }}
+                />
+                <ConfirmDialog
+                    open={!!coverShift}
+                    title="Broadcast cover request?"
+                    description={
+                        coverShift
+                            ? `Notify eligible staff that ${clientFullName(coverShift.client)} needs cover for this shift.`
+                            : 'Notify eligible staff that this shift needs cover.'
+                    }
+                    confirmText="Broadcast cover"
+                    variant="default"
+                    onClose={() => setCoverShift(null)}
+                    onConfirm={() => {
+                        if (coverShift) {
+                            broadcastCoverRequest(coverShift);
                         }
                     }}
                 />

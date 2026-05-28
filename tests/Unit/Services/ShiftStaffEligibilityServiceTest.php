@@ -12,6 +12,7 @@ use App\Models\Site;
 use App\Models\SiteCoverageRequirement;
 use App\Models\StaffTimeOff;
 use App\Models\User;
+use App\Services\Eligibility\EligibilityResult;
 use App\Services\ShiftStaffEligibilityService;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
@@ -194,6 +195,21 @@ class ShiftStaffEligibilityServiceTest extends TestCase
 
         $this->assertFalse($rechecked['is_eligible']);
         $this->assertSame(['Driver'], $rechecked['missing_roles']);
+    }
+
+    public function test_evaluate_many_returns_results_keyed_by_shift_and_user(): void
+    {
+        $staff = User::factory()->create();
+        $shift = $this->makeShift([
+            'coverage_roles' => ['caregiver'],
+        ]);
+
+        $results = $this->service->evaluateMany([$shift], [$staff]);
+
+        $this->assertArrayHasKey($shift->id, $results);
+        $this->assertArrayHasKey($staff->id, $results[$shift->id]);
+        $this->assertInstanceOf(EligibilityResult::class, $results[$shift->id][$staff->id]);
+        $this->assertTrue($results[$shift->id][$staff->id]->is_allowed);
     }
 
     protected function makeShift(array $attributes = []): Shift

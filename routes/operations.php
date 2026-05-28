@@ -23,7 +23,6 @@ use App\Http\Controllers\CoverageGapController;
 use App\Http\Controllers\CoverageReservationController;
 use App\Http\Controllers\MedicationAdministrationCorrectionController;
 use App\Http\Controllers\Operations\ActivityFeedController;
-use App\Http\Controllers\Operations\AvailabilityController;
 use App\Http\Controllers\Operations\BillingController;
 use App\Http\Controllers\Operations\CalendarSyncController;
 use App\Http\Controllers\Operations\CareNoteTemplateController;
@@ -831,9 +830,8 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     // Availability (NEW)
     // -------------------------------------------------------------------------
 
-    // PR 18 — availability planner is scheduler-first. Permission already
-    // filters support workers; role_scope adds the soft redirect home.
-    Route::get('/availability', [AvailabilityController::class, 'index'])
+    // Availability now lives inside Rostering so there is one scheduler surface.
+    Route::get('/availability', fn () => redirect()->route('operations.rostering.index', ['tab' => 'availability']))
         ->middleware(['role_scope:my-day', 'permission:rostering.viewAny'])
         ->name('operations.availability.index');
 

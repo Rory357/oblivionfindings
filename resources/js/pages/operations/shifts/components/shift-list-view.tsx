@@ -22,6 +22,7 @@ type Props = {
     dense?: boolean;
     onShiftClick: (s: ShiftRow) => void;
     onAssignOpen: (s: ShiftRow) => void;
+    onFindCover?: (s: ShiftRow) => void;
     onContextMenu: (s: ShiftRow, e: React.MouseEvent) => void;
     onEditClick: (s: ShiftRow) => void;
     onCreateOnDay?: (date: string) => void;
@@ -33,6 +34,7 @@ export function ShiftListView({
     dense = false,
     onShiftClick,
     onAssignOpen,
+    onFindCover,
     onContextMenu,
     onEditClick,
     onCreateOnDay,
@@ -76,6 +78,7 @@ export function ShiftListView({
                     isToday={date === todayKey}
                     onShiftClick={onShiftClick}
                     onAssignOpen={onAssignOpen}
+                    onFindCover={onFindCover}
                     onContextMenu={onContextMenu}
                     onEditClick={onEditClick}
                     onCreateOnDay={onCreateOnDay}
@@ -101,6 +104,7 @@ function DayBlock({
     isToday,
     onShiftClick,
     onAssignOpen,
+    onFindCover,
     onContextMenu,
     onEditClick,
     onCreateOnDay,
@@ -111,6 +115,7 @@ function DayBlock({
     isToday: boolean;
     onShiftClick: (s: ShiftRow) => void;
     onAssignOpen: (s: ShiftRow) => void;
+    onFindCover?: (s: ShiftRow) => void;
     onContextMenu: (s: ShiftRow, e: React.MouseEvent) => void;
     onEditClick: (s: ShiftRow) => void;
     onCreateOnDay?: (date: string) => void;
@@ -167,6 +172,7 @@ function DayBlock({
                         last={i === list.length - 1}
                         onClick={() => onShiftClick(s)}
                         onAssign={() => onAssignOpen(s)}
+                        onFindCover={() => onFindCover?.(s)}
                         onContextMenu={onContextMenu}
                         onEditClick={() => onEditClick(s)}
                         dense={dense}
@@ -182,6 +188,7 @@ function ShiftRowItem({
     last,
     onClick,
     onAssign,
+    onFindCover,
     onContextMenu,
     onEditClick,
     dense,
@@ -190,6 +197,7 @@ function ShiftRowItem({
     last: boolean;
     onClick: () => void;
     onAssign: () => void;
+    onFindCover?: () => void;
     onContextMenu: (s: ShiftRow, e: React.MouseEvent) => void;
     onEditClick: () => void;
     dense: boolean;
@@ -198,6 +206,7 @@ function ShiftRowItem({
     const inProgress = shift.status === 'in_progress';
     const locked =
         shift.status === 'completed' || shift.status === 'cancelled';
+    const coverRequested = Boolean(shift.cover_requested);
     const hours = shiftHours(shift.starts_at, shift.ends_at);
     const start = shiftStartTime(shift.starts_at);
     const end = shiftEndTime(shift.ends_at);
@@ -269,11 +278,20 @@ function ShiftRowItem({
                             type="button"
                             onClick={(e) => {
                                 e.stopPropagation();
-                                onAssign();
+                                if (coverRequested || !onFindCover) {
+                                    return;
+                                }
+                                onFindCover();
                             }}
-                            className="block truncate text-left text-xs font-medium text-status-critical hover:underline"
+                            disabled={coverRequested || !onFindCover}
+                            className={[
+                                'block truncate text-left text-xs font-medium',
+                                coverRequested
+                                    ? 'text-muted-foreground'
+                                    : 'text-status-critical hover:underline',
+                            ].join(' ')}
                         >
-                            Find cover
+                            {coverRequested ? 'Cover requested' : 'Find cover'}
                         </button>
                         <ShiftStatusBadge status={effectiveStatus(shift)} />
                     </div>

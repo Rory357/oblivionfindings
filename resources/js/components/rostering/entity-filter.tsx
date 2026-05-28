@@ -75,6 +75,7 @@ export function EntityFilter({
                     type="button"
                     aria-haspopup="listbox"
                     aria-expanded={open}
+                    aria-label={`${label} filter: ${selected ? selected.name : `${allLabel} · ${items.length}`}`}
                     className={cn(triggerClass, className)}
                 >
                     <Search className="h-3.5 w-3.5" aria-hidden="true" />

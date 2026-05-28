@@ -126,7 +126,18 @@ class JobBoardController extends Controller
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id));
         $availableSkills = $this->availableSkills($auth);
 
-        $formattedJobs = $positions->through(fn (ShiftOpenPosition $position) => $this->formatPositionForViewer($position, $auth));
+        $positionItems = $positions->getCollection();
+        $viewerEligibilityResults = $this->batchViewerEligibility($positionItems, $auth);
+        $positionEligibilityResults = $this->batchClaimedPositionEligibility($positionItems);
+
+        $formattedJobs = $positions->through(
+            fn (ShiftOpenPosition $position) => $this->formatPositionForViewer(
+                $position,
+                $auth,
+                $viewerEligibilityResults[$position->id] ?? null,
+                $positionEligibilityResults[$position->id] ?? null,
+            ),
+        );
 
         $eligibleForYou = collect($formattedJobs->items())
             ->filter(fn ($job) => $job['status'] === 'open' && ($job['viewer_eligibility']['is_eligible'] ?? false))
@@ -530,10 +541,15 @@ class JobBoardController extends Controller
         );
     }
 
-    protected function formatPositionForViewer(ShiftOpenPosition $position, User $viewer): array
+    protected function formatPositionForViewer(
+        ShiftOpenPosition $position,
+        User $viewer,
+        ?EligibilityResult $viewerEligibilityResult = null,
+        ?EligibilityResult $positionEligibilityResult = null,
+    ): array
     {
         $canViewSensitiveDetails = $this->canViewSensitivePositionDetails($position, $viewer);
-        $viewerEligibilityResult = $this->evaluateViewerEligibility($position, $viewer);
+        $viewerEligibilityResult ??= $this->evaluateViewerEligibility($position, $viewer);
         $viewerEligibility = $viewerEligibilityResult
             ? $this->formatEligibilityResult($viewerEligibilityResult)
             : null;
@@ -578,7 +594,7 @@ class JobBoardController extends Controller
                 'id' => $position->claimer->id,
                 'name' => $position->claimer->name,
             ] : null,
-            'eligibility' => $this->getPositionEligibility($position),
+            'eligibility' => $this->getPositionEligibility($position, $positionEligibilityResult),
             'viewer_eligibility' => $viewerEligibility,
             'your_schedule' => $this->buildYourSchedule($position, $viewerEligibilityResult),
             'tasks' => $taskList,
@@ -900,14 +916,99 @@ class JobBoardController extends Controller
      * Lightweight eligibility check for a claimed position.
      * Only runs when a claimer exists to avoid unnecessary work.
      */
-    protected function getPositionEligibility($position): ?array
+    protected function batchViewerEligibility(iterable $positions, User $viewer): array
+    {
+        $pending = collect();
+        $results = [];
+
+        foreach ($positions as $position) {
+            if (! $position instanceof ShiftOpenPosition || ! $position->shift) {
+                continue;
+            }
+
+            if ($position->status !== 'open') {
+                continue;
+            }
+
+            if ((int) $position->shift->user_id === (int) $viewer->id) {
+                $results[$position->id] = new EligibilityResult(
+                    is_allowed: false,
+                    blocking_reasons: ['You are already assigned to this shift.'],
+                    warnings: [],
+                    checked_rules: [],
+                    overrideable_warnings: [],
+                );
+                continue;
+            }
+
+            if (in_array($position->shift->status, ['completed', 'cancelled'], true)) {
+                $results[$position->id] = new EligibilityResult(
+                    is_allowed: false,
+                    blocking_reasons: ['This shift can no longer be claimed from the job board.'],
+                    warnings: [],
+                    checked_rules: [],
+                    overrideable_warnings: [],
+                );
+                continue;
+            }
+
+            $pending->push($position);
+        }
+
+        if ($pending->isEmpty()) {
+            return $results;
+        }
+
+        $batch = app(ShiftStaffEligibilityService::class)
+            ->evaluateMany($pending->pluck('shift'), [$viewer]);
+
+        foreach ($pending as $position) {
+            $result = $batch[$position->shift->id][$viewer->id] ?? null;
+            if ($result) {
+                $results[$position->id] = $result;
+            }
+        }
+
+        return $results;
+    }
+
+    protected function batchClaimedPositionEligibility(iterable $positions): array
+    {
+        $pending = collect($positions)
+            ->filter(fn ($position) => $position instanceof ShiftOpenPosition
+                && $position->shift
+                && $position->claimer)
+            ->values();
+
+        if ($pending->isEmpty()) {
+            return [];
+        }
+
+        $batch = app(ShiftStaffEligibilityService::class)
+            ->evaluateMany(
+                $pending->pluck('shift'),
+                $pending->pluck('claimer')->unique('id')->values(),
+            );
+
+        $results = [];
+        foreach ($pending as $position) {
+            $result = $batch[$position->shift->id][$position->claimer->id] ?? null;
+            if ($result) {
+                $results[$position->id] = $result;
+            }
+        }
+
+        return $results;
+    }
+
+    protected function getPositionEligibility($position, ?EligibilityResult $result = null): ?array
     {
         if (! $position->claimer || ! $position->shift) {
             return null;
         }
 
         try {
-            $result = app(ShiftStaffEligibilityService::class)
+            $result ??= app(ShiftStaffEligibilityService::class)
                 ->evaluate($position->shift, $position->claimer);
 
             return [
