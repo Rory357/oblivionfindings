@@ -578,7 +578,11 @@ class TimesheetController extends Controller
             if (! $auth->canDo('timesheets.manageAny') && $linkedShift->user_id !== $auth->id) {
                 abort(403);
             }
-            $userId = $linkedShift->user_id;
+            // Open / unassigned shifts have no `user_id`; default the timesheet
+            // owner to the authenticated user so the row still has a valid
+            // owner. Managers picking an open shift implicitly claim the
+            // timesheet for themselves.
+            $userId = $linkedShift->user_id ?? $auth->id;
             $data['client_id'] = $linkedShift->client_id;
 
             if (Timesheet::query()
