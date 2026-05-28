@@ -43,6 +43,11 @@ export {
     type CopyToDayShift,
 } from './copy-to-day-dialog';
 export {
+    EditAvailabilityDialog,
+    type EditAvailabilityBlock,
+    type EditAvailabilityDialogProps,
+} from './edit-availability-dialog';
+export {
     MakeRecurringDialog,
     type MakeRecurringDialogProps,
     type MakeRecurringShift,

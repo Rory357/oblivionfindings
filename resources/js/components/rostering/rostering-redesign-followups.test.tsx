@@ -158,7 +158,7 @@ describe('rostering redesign follow-up wiring', () => {
         expect(onChange).toHaveBeenCalledWith('open');
     });
 
-    it('shows staff availability in a rostering pane with edit deep links', () => {
+    it('shows staff availability in a rostering pane with an inline edit button', () => {
         render(
             <AvailabilityPane
                 canManage
@@ -195,11 +195,10 @@ describe('rostering redesign follow-up wiring', () => {
 
         expect(screen.getByText('Declared today')).toBeVisible();
         expect(screen.getByText('Aroha King')).toBeVisible();
+        // Edit no longer navigates — it opens an in-page dialog.
         expect(
-            screen.getByRole('link', {
-                name: /Edit availability for Aroha King/i,
-            }),
-        ).toHaveAttribute('href', '/staff/22/availability');
+            screen.getByRole('button', { name: /Edit availability/i }),
+        ).toBeVisible();
     });
 
     it('shows candidate capacity context on suggested staff chips', () => {
