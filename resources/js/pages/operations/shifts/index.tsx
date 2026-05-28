@@ -1,4 +1,4 @@
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type KeyboardEvent } from 'react';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     AlertCircle,
@@ -920,9 +920,46 @@ function TabStrip({
         count: number;
     }>;
 }) {
+    const handleKeyDown = (
+        event: KeyboardEvent<HTMLButtonElement>,
+        currentKey: TabKey,
+    ) => {
+        const currentIndex = items.findIndex((it) => it.key === currentKey);
+        if (currentIndex < 0) {
+            return;
+        }
+
+        let nextIndex: number | null = null;
+        if (event.key === 'ArrowRight') {
+            nextIndex = (currentIndex + 1) % items.length;
+        } else if (event.key === 'ArrowLeft') {
+            nextIndex = (currentIndex - 1 + items.length) % items.length;
+        } else if (event.key === 'Home') {
+            nextIndex = 0;
+        } else if (event.key === 'End') {
+            nextIndex = items.length - 1;
+        }
+
+        if (nextIndex === null) {
+            return;
+        }
+
+        event.preventDefault();
+        onChange(items[nextIndex].key);
+        const tabs =
+            event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
+                '[role="tab"]',
+            );
+        tabs?.[nextIndex]?.focus();
+    };
+
     return (
         <div className="border-b border-border">
-            <div className="flex items-center gap-1 overflow-x-auto">
+            <div
+                role="tablist"
+                aria-label="Shift views"
+                className="flex items-center gap-1 overflow-x-auto"
+            >
                 {items.map((it) => {
                     const active = it.key === value;
                     const Icon = it.icon;
@@ -930,9 +967,16 @@ function TabStrip({
                         <button
                             key={it.key}
                             type="button"
+                            role="tab"
+                            aria-selected={active}
+                            tabIndex={active ? 0 : -1}
                             onClick={() => onChange(it.key)}
+                            onKeyDown={(event) =>
+                                handleKeyDown(event, it.key)
+                            }
                             className={[
                                 'inline-flex items-center gap-2 whitespace-nowrap border-b-2 px-3.5 py-2.5 text-sm font-medium transition-colors',
+                                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
                                 active
                                     ? 'border-primary text-foreground'
                                     : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground',

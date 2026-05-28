@@ -181,6 +181,7 @@ export default function InboxMenus() {
                         <Button
                             variant="ghost"
                             size="sm"
+                            aria-label="Mark all notifications read"
                             className="h-7 px-2 text-xs text-muted-foreground hover:text-foreground"
                             disabled={!unreadNotifications}
                             onClick={() =>

@@ -33,7 +33,10 @@ import {
     PopoverTrigger,
 } from '@/components/ui/popover';
 import { MultiEntityFilter } from '@/components/rostering/multi-entity-filter';
-import { WeekPicker } from '@/components/rostering/week-picker';
+import {
+    WeekPicker,
+    weekLabel as isoWeekLabel,
+} from '@/components/rostering/week-picker';
 import { cn } from '@/lib/utils';
 
 export type HeroStats = {
@@ -102,6 +105,7 @@ export function ShiftsHero({
 }: Props) {
     const weekBtnRef = useRef<HTMLButtonElement | null>(null);
     const [pickerOpen, setPickerOpen] = useState(false);
+    const pickerLabel = `${isoWeekLabel(weekStart)} · ${weekLabel}`;
     return (
         <div
             className="relative overflow-hidden rounded-2xl text-primary-foreground"
@@ -247,7 +251,7 @@ export function ShiftsHero({
                         ariaHasPopup="dialog"
                         ariaExpanded={pickerOpen}
                     >
-                        <CalendarRange className="h-3.5 w-3.5" /> {weekLabel} · pick week
+                        <CalendarRange className="h-3.5 w-3.5" /> {pickerLabel} · pick week
                         <ChevronDown className="h-3 w-3" />
                     </HeroPillBtn>
                     <HeroPillBtn onClick={onNextWeek}>

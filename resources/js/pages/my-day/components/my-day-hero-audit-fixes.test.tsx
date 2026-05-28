@@ -86,4 +86,49 @@ describe('MyDayHero audit fixes', () => {
             screen.getByRole('link', { name: /Set availability/i }),
         ).toHaveAttribute('href', '/staff/7/availability');
     });
+
+    it('uses semantic tones for frontline hero stats', () => {
+        render(
+            <MyDayHero
+                workerFirstName="Sheila"
+                site={null}
+                singleResident={null}
+                activeShiftId={12}
+                shiftStartLabel="09:00"
+                shiftEndLabel="17:00"
+                shiftDurationHours={8}
+                clockedLabel="Clocked in"
+                tasksDone={2}
+                totalTasks={4}
+                medsGiven={1}
+                totalMeds={3}
+                medsOverdue={1}
+                openItemsCount={2}
+                overdueMeds={[]}
+                openItems={[]}
+                clockedIn
+                onClockToggle={vi.fn()}
+                activeResidentId="all"
+                onResidentChange={vi.fn()}
+                residentTaskCounts={new Map()}
+                liveSinceLabel="Since 09:00"
+            />,
+        );
+
+        expect(screen.getByText('Clocked in')).toHaveClass(
+            'text-status-success-foreground',
+        );
+        expect(screen.getByText('1/3')).toHaveClass(
+            'text-status-critical-foreground',
+        );
+        expect(
+            screen
+                .getAllByText('2')
+                .some((element) =>
+                    element.classList.contains(
+                        'text-status-warning-foreground',
+                    ),
+                ),
+        ).toBe(true);
+    });
 });

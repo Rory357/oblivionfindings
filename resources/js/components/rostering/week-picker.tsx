@@ -235,6 +235,20 @@ export function WeekPicker({
             new Date(viewMonth.getFullYear(), viewMonth.getMonth() + delta, 1),
         ), [viewMonth]);
 
+    const focusWeek = useCallback((weekStart: Date) => {
+        setHoverWeek(weekStart);
+        setViewMonth((current) => {
+            if (
+                current.getFullYear() === weekStart.getFullYear() &&
+                current.getMonth() === weekStart.getMonth()
+            ) {
+                return current;
+            }
+
+            return new Date(weekStart.getFullYear(), weekStart.getMonth(), 1);
+        });
+    }, []);
+
     const handleDialogKeyDown = (
         event: ReactKeyboardEvent<HTMLDivElement>,
     ) => {
@@ -244,6 +258,16 @@ export function WeekPicker({
         } else if (event.key === 'ArrowRight') {
             event.preventDefault();
             goMonth(1);
+        } else if (event.key === 'ArrowUp') {
+            event.preventDefault();
+            focusWeek(addDaysWP(hoverWeek ?? selectedWeekStart, -7));
+        } else if (event.key === 'ArrowDown') {
+            event.preventDefault();
+            focusWeek(addDaysWP(hoverWeek ?? selectedWeekStart, 7));
+        } else if (event.key === 'Enter') {
+            event.preventDefault();
+            onSelect(hoverWeek ?? selectedWeekStart);
+            onClose();
         }
     };
 

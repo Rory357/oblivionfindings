@@ -16,7 +16,11 @@ import {
 } from 'lucide-react';
 import { useRef, useState, type ReactNode } from 'react';
 
-import { WeekPicker, ymd } from '@/components/rostering/week-picker';
+import {
+    WeekPicker,
+    weekLabel as isoWeekLabel,
+    ymd,
+} from '@/components/rostering/week-picker';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
 import {
@@ -81,6 +85,7 @@ export function JobBoardHero({
     const pickerBtnRef = useRef<HTMLButtonElement>(null);
     const [pickerOpen, setPickerOpen] = useState(false);
     const selectedWeekStart = new Date(`${week.start}T00:00:00`);
+    const pickerLabel = `${isoWeekLabel(selectedWeekStart)} · ${weekRange}`;
 
     const badges: PageHeroBadge[] = [
         complianceBadge ?? {
@@ -202,7 +207,7 @@ export function JobBoardHero({
                             aria-expanded={pickerOpen}
                         >
                             <CalendarRange className="h-3.5 w-3.5" />
-                            {weekRange} · pick week
+                            {pickerLabel} · pick week
                             <ChevronDown className="h-3 w-3" />
                         </button>
                         <button

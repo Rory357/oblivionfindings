@@ -1756,6 +1756,13 @@ export default function RosteringIndex(props: Props) {
     const prevLab = weekLabel(addDaysWP(weekStartDate, -7));
     const nextLab = weekLabel(addDaysWP(weekStartDate, 7));
     const curLab = weekLabel(weekStartDate);
+    const curCompactRange = `${weekStartDate.toLocaleDateString('en-NZ', {
+        day: 'numeric',
+        month: 'short',
+    })} → ${addDaysWP(weekStartDate, 6).toLocaleDateString('en-NZ', {
+        day: 'numeric',
+        month: 'short',
+    })}`;
 
     const heroBadges: Array<{
         label: string;
@@ -1958,7 +1965,7 @@ export default function RosteringIndex(props: Props) {
                                     aria-expanded={pickerOpen}
                                 >
                                     <CalendarRange className="h-3.5 w-3.5" />
-                                    {curLab} · pick week
+                                    {curLab} · {curCompactRange} · pick week
                                     <ChevronDown className="h-3 w-3" />
                                 </button>
                                 <button

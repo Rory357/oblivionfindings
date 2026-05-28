@@ -36,7 +36,7 @@ class ShoppingListGenerator
 
             if (!$list) {
                 $list = SiteMealShoppingList::create([
-                    'tenant_id' => $site->tenant_id ?? auth()->user()?->tenant_id,
+                    'tenant_id' => $site->tenant_id ?? auth()->user()?->organization_id,
                     'site_id' => $site->id,
                     'status' => 'draft',
                     'covers_from' => $from->toDateString(),

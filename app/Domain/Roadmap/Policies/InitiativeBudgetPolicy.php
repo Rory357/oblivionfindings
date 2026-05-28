@@ -30,10 +30,10 @@ class InitiativeBudgetPolicy
 
     protected function sameTenant(User $user, ?int $tenantId): bool
     {
-        if ($tenantId === null || ! isset($user->tenant_id) || $user->tenant_id === null) {
-            return true;
+        if ($tenantId === null || $user->organization_id === null) {
+            return false;
         }
 
-        return (int) $user->tenant_id === (int) $tenantId;
+        return (int) $user->organization_id === (int) $tenantId;
     }
 }

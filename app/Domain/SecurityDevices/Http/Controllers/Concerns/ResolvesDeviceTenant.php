@@ -8,6 +8,6 @@ trait ResolvesDeviceTenant
 {
     protected function resolveDeviceTenantId(User $user): int
     {
-        return (int) ($user->tenant_id ?? $user->organization_id ?? 1);
+        return (int) ($user->organization_id ?? 1);
     }
 }

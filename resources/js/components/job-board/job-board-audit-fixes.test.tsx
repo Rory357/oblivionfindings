@@ -99,6 +99,26 @@ describe('job board audit fixes', () => {
         expect(screen.getByText('Pending').parentElement).toHaveTextContent('2');
     });
 
+    it('shows the combined week number and date range in the picker button', () => {
+        render(
+            <JobBoardHero
+                firstName="Sheila"
+                week={week}
+                stats={stats}
+                availableSkills={[]}
+                filters={{}}
+                onFilterChange={vi.fn()}
+                onWeekChange={vi.fn()}
+            />,
+        );
+
+        expect(
+            screen.getByRole('button', {
+                name: /Wk 22 · 25 May → 31 May · pick week/i,
+            }),
+        ).toBeVisible();
+    });
+
     it('does not render a bare dash for a missing viewer schedule', () => {
         render(<JobCard job={job()} />);
 

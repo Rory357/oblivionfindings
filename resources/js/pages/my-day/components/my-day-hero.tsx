@@ -21,6 +21,7 @@ import { type ReactNode } from 'react';
 
 import { PageHero } from '@/components/page/page-hero';
 import { type PageHeroBadge } from '@/components/page/page-hero-badges';
+import { type PageHeroStat } from '@/components/page/page-hero-stats';
 import { PageTabs } from '@/components/page/page-tabs';
 import { Button } from '@/components/ui/button';
 import { useMyDayLabels } from '@/hooks/use-my-day-labels';
@@ -223,16 +224,45 @@ export function MyDayHero({
               { icon: Heart, label: 'Personal care + community' },
           ];
 
-    const stats = [
-        { label: t('hero_clocked'), value: clockedLabel, sub: clockedSubLabel ?? '', hideOnMobile: false },
-        { label: t('tasks'), value: `${tasksDone}/${totalTasks}`, sub: t('hero_complete'), hideOnMobile: false },
+    const stats: PageHeroStat[] = [
+        {
+            label: t('hero_clocked'),
+            value: clockedLabel,
+            sub: clockedSubLabel ?? '',
+            hideOnMobile: false,
+            tone: clockedIn ? 'success' : 'neutral',
+        },
+        {
+            label: t('tasks'),
+            value: `${tasksDone}/${totalTasks}`,
+            sub: t('hero_complete'),
+            hideOnMobile: false,
+            tone:
+                totalTasks > 0 && tasksDone === totalTasks
+                    ? 'success'
+                    : tasksDone > 0
+                      ? 'info'
+                      : 'neutral',
+        },
         {
             label: t('hero_meds'),
             value: `${medsGiven}/${totalMeds}`,
             sub: medsOverdue > 0 ? `${medsOverdue} ${t('overdue_badge').toLowerCase()}` : t('hero_on_track'),
             hideOnMobile: false,
+            tone:
+                medsOverdue > 0
+                    ? 'critical'
+                    : totalMeds > 0 && medsGiven === totalMeds
+                      ? 'success'
+                      : 'neutral',
         },
-        { label: t('hero_open'), value: openItemsCount, sub: t('hero_items'), hideOnMobile: false },
+        {
+            label: t('hero_open'),
+            value: openItemsCount,
+            sub: t('hero_items'),
+            hideOnMobile: false,
+            tone: openItemsCount > 0 ? 'warning' : 'success',
+        },
     ];
 
     // Single-resident shifts get resident-scoped care/notes links so the worker

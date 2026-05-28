@@ -4,6 +4,13 @@ import type { ReactNode } from 'react';
 
 import { cn } from '@/lib/utils';
 
+export type PageHeroStatTone =
+    | 'neutral'
+    | 'success'
+    | 'warning'
+    | 'critical'
+    | 'info';
+
 export type PageHeroStat = {
     label: ReactNode;
     value: ReactNode;
@@ -13,6 +20,15 @@ export type PageHeroStat = {
     href?: string;
     /** Hide this stat below md. Default true to match the Site Detail reference. */
     hideOnMobile?: boolean;
+    tone?: PageHeroStatTone;
+};
+
+const TONE_VALUE_CLASS: Record<PageHeroStatTone, string> = {
+    neutral: '',
+    success: 'text-status-success-foreground',
+    warning: 'text-status-warning-foreground',
+    critical: 'text-status-critical-foreground',
+    info: 'text-status-info-foreground',
 };
 
 interface PageHeroStatsProps {
@@ -68,7 +84,16 @@ export function PageHeroStats({ stats, layout = 'inline', className }: PageHeroS
                         <p className="text-[10px] font-semibold uppercase tracking-wider text-primary-foreground/70">
                             {stat.label}
                         </p>
-                        <p className="text-xl font-bold tabular-nums">{stat.value}</p>
+                        <p
+                            className={cn(
+                                'text-xl font-bold tabular-nums',
+                                stat.tone
+                                    ? TONE_VALUE_CLASS[stat.tone]
+                                    : undefined,
+                            )}
+                        >
+                            {stat.value}
+                        </p>
                         {stat.sub ? (
                             <p className="text-[11px] text-primary-foreground/70">{stat.sub}</p>
                         ) : null}

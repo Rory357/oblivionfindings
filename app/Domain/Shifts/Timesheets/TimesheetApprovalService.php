@@ -281,8 +281,7 @@ class TimesheetApprovalService
         $user?->loadMissing('hrEmployeeProfile');
 
         $tenantId = $user?->hrEmployeeProfile?->tenant_id
-            ?? $user?->organization_id
-            ?? $user?->getAttribute('tenant_id');
+            ?? $user?->organization_id;
 
         if (! $tenantId) {
             return;
