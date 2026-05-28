@@ -120,9 +120,12 @@ class DraftTimesheetService
         }
 
         $clientId = $session->shift?->client_id ?? ($data['client_id'] ?? null);
-        if (! $clientId) {
-            return null;
-        }
+
+        // A clock-out with no rostered shift must still log the worker's time
+        // ("shift or no shift, their time is logged"). client_id is nullable on
+        // timesheets, so we record a non-shift draft the worker can categorise
+        // and allocate before submitting instead of dropping the session.
+        $isNonShift = ! $session->shift_id;
 
         $snapshot = $session->shift
             ? $this->snapshots->snapshotForShift($session->shift, User::query()->find($session->user_id))
@@ -132,6 +135,8 @@ class DraftTimesheetService
             'user_id' => $session->user_id,
             'client_id' => $clientId,
             'shift_id' => $session->shift_id,
+            'activity_type' => $isNonShift ? 'other' : null,
+            'site_id' => $isNonShift ? $session->site_id : null,
             'shift_site_id' => $snapshot['site_id'] ?? null,
             'shift_service_context_id' => $snapshot['service_context_id'] ?? null,
             'work_date' => $session->clock_in_at->toDateString(),
