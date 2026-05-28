@@ -50,7 +50,6 @@ use App\Http\Controllers\Operations\JobBoardController;
 use App\Http\Controllers\Operations\MessageController;
 use App\Http\Controllers\Operations\MileageClaimController;
 use App\Http\Controllers\Operations\OpsNotificationController;
-use App\Http\Controllers\Operations\PayrollExportController;
 use App\Http\Controllers\Operations\PriceBookController;
 use App\Http\Controllers\Operations\ProgressNoteController;
 use App\Http\Controllers\Operations\QualificationMatchController;
@@ -1218,18 +1217,6 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         Route::get('/note-templates/{template}/edit', [CareNoteTemplateController::class, 'edit'])->name('operations.note_templates.edit');
         Route::put('/note-templates/{template}', [CareNoteTemplateController::class, 'update'])->name('operations.note_templates.update');
         Route::delete('/note-templates/{template}', [CareNoteTemplateController::class, 'destroy'])->name('operations.note_templates.destroy');
-    });
-
-    // -------------------------------------------------------------------------
-    // Payroll Export (Phase 11)
-    // -------------------------------------------------------------------------
-
-    Route::middleware('permission:payroll.export')->group(function () {
-        Route::get('/payroll-export', [PayrollExportController::class, 'index'])->name('operations.payroll_export.index');
-        Route::get('/payroll-export/create', [PayrollExportController::class, 'create'])->name('operations.payroll_export.create');
-        Route::post('/payroll-export', [PayrollExportController::class, 'generate'])->name('operations.payroll_export.generate');
-        Route::get('/payroll-export/{export}/download', [PayrollExportController::class, 'download'])->name('operations.payroll_export.download');
-        Route::post('/payroll-export/{export}/confirm', [PayrollExportController::class, 'confirm'])->name('operations.payroll_export.confirm');
     });
 
     // -------------------------------------------------------------------------

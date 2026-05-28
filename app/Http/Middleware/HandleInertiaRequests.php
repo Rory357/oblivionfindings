@@ -889,13 +889,6 @@ class HandleInertiaRequests extends Middleware
                 'viewAny' => $user->canDo('recurring_charges.viewAny'),
                 'manage' => $user->canDo('recurring_charges.manage'),
             ],
-            'payroll_exports' => [
-                'viewAny' => $user->canDo('payroll_exports.viewAny'),
-                'manage' => $user->canDo('payroll_exports.manage'),
-            ],
-            'payroll' => [
-                'export' => $user->canDo('payroll.export'),
-            ],
             'family_portal' => [
                 'viewAny' => $user->canDo('family_portal.viewAny'),
                 'manage' => $user->canDo('family_portal.manage'),
