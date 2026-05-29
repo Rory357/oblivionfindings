@@ -1613,7 +1613,6 @@ export default function ClientsIndex() {
             <Head title={clientPlural} />
 
             <PageLayout
-                className="mx-auto max-w-[1400px]"
                 hero={
                     <PageHero
                         category="ops"
