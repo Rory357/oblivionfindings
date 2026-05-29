@@ -195,7 +195,37 @@ class ClientController extends Controller
 
         return inertia('operations/clients/index', [
             'clients' => $clients,
+            // Option lists for the in-context "Add client" wizard so it can
+            // render without an extra round-trip.
+            ...$this->clientFormOptions(),
         ]);
+    }
+
+    /**
+     * Shared option lists for the Add Client wizard (and the legacy create page):
+     * sites, service contexts, assignable key workers and monitored-home
+     * geofences, plus the org default service context.
+     */
+    private function clientFormOptions(): array
+    {
+        return [
+            'sites' => Site::query()
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name']),
+            'serviceContexts' => ServiceContext::query()
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'type', 'name']),
+            'keyWorkers' => User::staff()
+                ->orderBy('name')
+                ->get(['id', 'name']),
+            'geofences' => AssetGeofence::query()
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name']),
+            'defaultServiceContextId' => ServiceContext::defaultId(),
+        ];
     }
 
     /** Two-letter initials from a display name (e.g. "Mere Tipene" → "MT"). */
@@ -298,6 +328,8 @@ class ClientController extends Controller
         $client->load([
             'site:id,name',
             'serviceContext:id,type,name',
+            'keyWorker:id,name',
+            'houseGeofence:id,name',
             'supportWorkers:id,name,email',
             'medicalProfile',
             'medications',
@@ -507,6 +539,27 @@ class ClientController extends Controller
                 // Transport
                 'transport_needs' => $client->transport_needs,
                 'transport_notes' => $client->transport_notes,
+                // Support needs (captured at intake, shown on Personal details)
+                'mobility_needs' => $client->mobility_needs,
+                'sensory_needs' => $client->sensory_needs,
+                'cognitive_needs' => $client->cognitive_needs,
+                'dietary_requirements' => $client->dietary_requirements,
+                'sleep_preferences' => $client->sleep_preferences,
+                'fluid_intake_min_ml' => $client->fluid_intake_min_ml,
+                'fluid_intake_max_ml' => $client->fluid_intake_max_ml,
+                'seizure_duration_escalation_seconds' => $client->seizure_duration_escalation_seconds,
+                // Care setup
+                'service_start_date' => optional($client->service_start_date)->toDateString(),
+                'risk_level' => $client->risk_level,
+                'safeguarding_flag' => (bool) $client->safeguarding_flag,
+                'key_worker' => $client->keyWorker ? [
+                    'id' => $client->keyWorker->id,
+                    'name' => $client->keyWorker->name,
+                ] : null,
+                'house_geofence' => $client->houseGeofence ? [
+                    'id' => $client->houseGeofence->id,
+                    'name' => $client->houseGeofence->name,
+                ] : null,
             ],
             'medical' => [
                 'profile' => $client->medicalProfile,
@@ -1526,21 +1579,7 @@ class ClientController extends Controller
     {
         $this->authorize('create', Client::class);
 
-        $sites = Site::query()
-            ->where('is_active', true)
-            ->orderBy('name')
-            ->get(['id', 'name']);
-
-        $serviceContexts = ServiceContext::query()
-            ->where('is_active', true)
-            ->orderBy('name')
-            ->get(['id', 'type', 'name']);
-
-        return inertia('operations/clients/create', [
-            'sites' => $sites,
-            'serviceContexts' => $serviceContexts,
-            'defaultServiceContextId' => ServiceContext::defaultId(),
-        ]);
+        return inertia('operations/clients/create', $this->clientFormOptions());
     }
 
     public function store(StoreClientRequest $request)
@@ -1555,23 +1594,107 @@ class ClientController extends Controller
                 $data['service_context_id'] = ServiceContext::defaultId();
             }
 
+            // Pull the related-record payloads out of the flat client attributes.
+            $medical = $data['medical'] ?? [];
+            $conditions = $data['conditions'] ?? [];
+            $emergencyContacts = $data['emergency_contacts'] ?? [];
+            $createPortalUser = ! empty($data['create_client_portal_user']);
+
             $clientFields = collect($data)->except([
                 'create_client_portal_user',
+                'profile_photo',
+                'medical',
+                'conditions',
+                'emergency_contacts',
             ])->all();
 
-            // Default to onboarding status for new clients
+            // New clients default to onboarding so an onboarding workflow can be
+            // initialised; only an explicit "inactive" is preserved as-is.
             if (! isset($clientFields['status']) || $clientFields['status'] === 'active') {
                 $clientFields['status'] = 'onboarding';
             }
 
+            // Optional profile photo — square-crop + store, same as updatePhoto().
+            if ($request->hasFile('profile_photo')) {
+                $clientFields['profile_photo_path'] = $this->storeAvatar(
+                    $request->file('profile_photo'),
+                    'profile-photos/clients',
+                );
+            }
+
             $auth = $request->user();
 
-            $client = DB::transaction(function () use ($clientFields, $data, $auth) {
+            $client = DB::transaction(function () use ($clientFields, $medical, $conditions, $emergencyContacts, $createPortalUser, $data, $auth) {
                 $client = Client::create($clientFields);
 
                 ClientOnboardingWorkflow::createForClient($client, $auth->id);
 
-                if (! empty($data['create_client_portal_user'])) {
+                // Medical profile (hasOne) — only persist when something was captured.
+                $medicalFilled = collect($medical)->contains(
+                    fn ($v) => is_array($v) ? count($v) > 0 : (filled($v) && $v !== false && $v !== '0')
+                );
+                if ($medicalFilled) {
+                    $client->medicalProfile()->create([
+                        'gp_name' => $medical['gp_name'] ?? null,
+                        'gp_practice' => $medical['gp_practice'] ?? null,
+                        'gp_phone' => $medical['gp_phone'] ?? null,
+                        'hospital_preference' => $medical['hospital_preference'] ?? null,
+                        'blood_type' => $medical['blood_type'] ?? null,
+                        'organ_donor' => (bool) ($medical['organ_donor'] ?? false),
+                        'allergies' => $medical['allergies'] ?? [],
+                        'disabilities' => $medical['disabilities'] ?? [],
+                        'medical_history' => $medical['medical_history'] ?? null,
+                        'mental_health_history' => $medical['mental_health_history'] ?? null,
+                        'surgical_history' => $medical['surgical_history'] ?? null,
+                        'immunisation_notes' => $medical['immunisation_notes'] ?? null,
+                        'notes' => $medical['notes'] ?? null,
+                    ]);
+                }
+
+                // Diagnosed conditions (hasMany) — skip blank rows.
+                foreach ($conditions as $condition) {
+                    if (blank($condition['label'] ?? null)) {
+                        continue;
+                    }
+                    $client->conditions()->create([
+                        'label' => $condition['label'],
+                        'severity' => $condition['severity'] ?? 'Mild',
+                        'notes' => $condition['notes'] ?? null,
+                    ]);
+                }
+
+                // Emergency contacts (hasMany) — skip rows with neither name nor phone.
+                $order = 0;
+                foreach ($emergencyContacts as $contact) {
+                    $hasName = filled($contact['name'] ?? null);
+                    $hasPhone = filled($contact['phone'] ?? null);
+                    if (! $hasName && ! $hasPhone) {
+                        continue;
+                    }
+                    $order++;
+                    $client->emergencyContacts()->create([
+                        'name' => $contact['name'] ?? '',
+                        'relationship' => $contact['relationship'] ?? null,
+                        'phone' => $contact['phone'] ?? null,
+                        'alternate_phone' => $contact['alternate_phone'] ?? null,
+                        'email' => $contact['email'] ?? null,
+                        'address' => $contact['address'] ?? null,
+                        'notes' => $contact['notes'] ?? null,
+                        'contact_order' => $order,
+                        'is_primary_contact' => $order === 1,
+                        'preferred_method' => $contact['preferred_method'] ?? null,
+                        'availability' => $contact['availability'] ?? null,
+                        'can_view_medical' => (bool) ($contact['can_view_medical'] ?? false),
+                        'can_view_medications' => (bool) ($contact['can_view_medications'] ?? false),
+                        'can_view_incidents' => (bool) ($contact['can_view_incidents'] ?? false),
+                        'can_receive_updates' => (bool) ($contact['can_receive_updates'] ?? true),
+                        // Keep the legacy single health-info flag in step with the
+                        // granular medical-info consent.
+                        'authorised_health_info' => (bool) ($contact['can_view_medical'] ?? false),
+                    ]);
+                }
+
+                if ($createPortalUser) {
                     $clientEmail = trim((string) ($data['email'] ?? $client->email ?? ''));
                     if ($clientEmail !== '') {
                         $name = trim($client->first_name.' '.$client->last_name);
@@ -1590,6 +1713,14 @@ class ClientController extends Controller
                 'title' => "Client created: {$client->first_name} {$client->last_name}",
                 'url' => url("/clients/{$client->id}"),
             ]);
+
+            // The Add Client wizard posts with _modal so it can show its own
+            // in-dialog success pane; flash the new id so "Go to profile" works.
+            if ($request->boolean('_modal')) {
+                return back()
+                    ->with('success', 'Client created successfully.')
+                    ->with('created_client_id', $client->id);
+            }
 
             return redirect()
                 ->route('clients.index')

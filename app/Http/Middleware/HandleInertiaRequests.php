@@ -193,6 +193,9 @@ class HandleInertiaRequests extends Middleware
                 // to tell the front-end which draft to open in the review
                 // popup once props refresh.
                 'open_timesheet_id' => session('open_timesheet_id'),
+                // The Add Client wizard reads this after a successful create so
+                // its success pane can link straight to the new profile.
+                'created_client_id' => session('created_client_id'),
             ],
 
             // Header inbox (notifications + announcements). Deferred so the

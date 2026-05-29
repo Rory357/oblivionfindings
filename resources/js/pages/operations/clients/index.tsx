@@ -33,7 +33,8 @@ import {
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
 import { cn } from '@/lib/utils';
-import { Head, Link, router, usePage } from '@inertiajs/react';
+import { Head, router, usePage } from '@inertiajs/react';
+import { AddClientDialog } from './_create-dialog';
 import {
     Activity,
     AlertTriangle,
@@ -145,10 +146,19 @@ type Can = {
     timeline?: { create?: boolean };
 };
 
+type ClientFormOption = { id: number; name: string };
+type ServiceContextOption = { id: number; type?: string | null; name: string };
+
 type PageProps = {
     clients: Client[];
     auth: { user?: { name?: string; role?: string | null } | null; can?: Can };
     labels?: Record<string, string>;
+    // Option lists for the in-context "Add client" wizard.
+    sites?: ClientFormOption[];
+    serviceContexts?: ServiceContextOption[];
+    keyWorkers?: ClientFormOption[];
+    geofences?: ClientFormOption[];
+    defaultServiceContextId?: number | null;
 };
 
 /* ------------------------------------------------------------------ */
@@ -1075,7 +1085,16 @@ function BulkBar({
 /* ------------------------------------------------------------------ */
 
 export default function ClientsIndex() {
-    const { clients, auth, labels } = usePage<PageProps>().props;
+    const {
+        clients,
+        auth,
+        labels,
+        sites = [],
+        serviceContexts = [],
+        keyWorkers = [],
+        geofences = [],
+        defaultServiceContextId = null,
+    } = usePage<PageProps>().props;
     const can = auth?.can?.clients ?? {};
     const canCreate = !!can.create;
     const canUpdate = !!can.update;
@@ -1102,6 +1121,7 @@ export default function ClientsIndex() {
     const [tab, setTab] = useState<TabKey>('all');
     const [view, setView] = useState<'cards' | 'table'>('cards');
     const [selectMode, setSelectMode] = useState(false);
+    const [addOpen, setAddOpen] = useState(false);
     const [selected, setSelected] = useState<Set<number>>(() => new Set());
     const [ctx, setCtx] = useState<{
         x: number;
@@ -1438,13 +1458,14 @@ export default function ClientsIndex() {
                 {selectMode ? 'Done' : 'Select'}
             </button>
             {canCreate ? (
-                <Link
-                    href="/operations/clients/create"
+                <button
+                    type="button"
+                    onClick={() => setAddOpen(true)}
                     className="inline-flex h-9 items-center gap-1.5 rounded-md bg-primary-foreground px-3.5 text-sm font-semibold text-primary transition hover:bg-primary-foreground/90"
                 >
                     <Plus className="h-4 w-4" />
                     Add {clientSingular.toLowerCase()}
-                </Link>
+                </button>
             ) : null}
         </>
     );
@@ -1683,6 +1704,17 @@ export default function ClientsIndex() {
                 onOpenChange={(isOpen) => {
                     if (!isOpen) setNoteClient(null);
                 }}
+            />
+
+            <AddClientDialog
+                isOpen={addOpen}
+                onClose={() => setAddOpen(false)}
+                sites={sites}
+                serviceContexts={serviceContexts}
+                keyWorkers={keyWorkers}
+                geofences={geofences}
+                defaultServiceContextId={defaultServiceContextId}
+                clientSingular={clientSingular}
             />
         </AppLayout>
     );

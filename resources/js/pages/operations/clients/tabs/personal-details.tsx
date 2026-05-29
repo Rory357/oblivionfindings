@@ -1,9 +1,19 @@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { cn } from '@/lib/utils';
 import {
+    Accessibility,
+    Bed,
+    Brain,
+    Briefcase,
     Cake,
+    Car,
+    Clock,
+    Droplet,
+    Ear,
+    GraduationCap,
     Globe2,
     HandHeart,
     Heart,
@@ -12,9 +22,13 @@ import {
     Mail,
     MapPin,
     Phone,
+    Shield,
+    ShieldAlert,
     Sparkles,
+    Stethoscope,
     UserCircle2,
     Users,
+    Utensils,
 } from 'lucide-react';
 import type { ComponentType } from 'react';
 
@@ -44,6 +58,23 @@ type ClientPersonalDetailsClient = {
     interests_hobbies?: string | null;
     strengths_abilities?: string | null;
     life_story?: string | null;
+    education_level?: string | null;
+    employment_status?: string | null;
+    // Support needs
+    mobility_needs?: string | null;
+    sensory_needs?: string | null;
+    cognitive_needs?: string | null;
+    dietary_requirements?: string | null;
+    sleep_preferences?: string | null;
+    transport_needs?: string[] | null;
+    transport_notes?: string | null;
+    fluid_intake_min_ml?: number | string | null;
+    fluid_intake_max_ml?: number | string | null;
+    seizure_duration_escalation_seconds?: number | string | null;
+    // Care setup
+    risk_level?: string | null;
+    safeguarding_flag?: boolean | null;
+    house_geofence?: { id: number; name?: string | null } | null;
     site?: { id: number; name?: string | null } | null;
     key_worker?: { id: number; name?: string | null } | null;
 };
@@ -53,9 +84,17 @@ type PersonRecord = {
     name?: string | null;
     relationship?: string | null;
     phone?: string | null;
+    alternate_phone?: string | null;
     email?: string | null;
+    address?: string | null;
+    availability?: string | null;
     notes?: string | null;
     is_primary?: boolean;
+    is_primary_contact?: boolean;
+    can_view_medical?: boolean;
+    can_view_medications?: boolean;
+    can_view_incidents?: boolean;
+    can_receive_updates?: boolean;
 };
 
 type PersonalDetailsTabProps = {
@@ -99,6 +138,27 @@ function joinAddress(client: ClientPersonalDetailsClient): string {
     ]
         .filter(Boolean)
         .join(', ');
+}
+
+function riskVariant(level?: string | null): StatusVariant {
+    switch ((level ?? '').toLowerCase()) {
+        case 'low':
+            return 'success';
+        case 'medium':
+            return 'warning';
+        case 'high':
+        case 'critical':
+            return 'critical';
+        default:
+            return 'neutral';
+    }
+}
+
+function fluidTarget(client: ClientPersonalDetailsClient): string | null {
+    const min = client.fluid_intake_min_ml;
+    const max = client.fluid_intake_max_ml;
+    if (min == null && max == null) return null;
+    return `${min ?? '?'}–${max ?? '?'} ml / day`;
 }
 
 function DetailRow({
@@ -423,6 +483,148 @@ export function PersonalDetailsTab({
                 </Card>
             </div>
 
+            <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-base">
+                            <Accessibility className="h-4 w-4 text-primary" />
+                            Support needs
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="divide-y">
+                        <DetailRow
+                            icon={Accessibility}
+                            label="Mobility"
+                            value={client.mobility_needs}
+                        />
+                        <DetailRow
+                            icon={Ear}
+                            label="Sensory"
+                            value={client.sensory_needs}
+                        />
+                        <DetailRow
+                            icon={Brain}
+                            label="Cognitive / communication"
+                            value={client.cognitive_needs}
+                        />
+                        <DetailRow
+                            icon={Utensils}
+                            label="Dietary requirements"
+                            value={client.dietary_requirements}
+                        />
+                        <DetailRow
+                            icon={Bed}
+                            label="Sleep preferences"
+                            value={client.sleep_preferences}
+                        />
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-base">
+                            <Car className="h-4 w-4 text-primary" />
+                            Transport & learning
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="divide-y">
+                        <DetailRow
+                            icon={Car}
+                            label="Transport needs"
+                            value={
+                                (client.transport_needs ?? []).filter(Boolean)
+                                    .length > 0 ? (
+                                    <div className="mt-1 flex flex-wrap gap-1">
+                                        {(client.transport_needs ?? [])
+                                            .filter(Boolean)
+                                            .map((need) => (
+                                                <Badge
+                                                    key={need}
+                                                    variant="outline"
+                                                >
+                                                    {need}
+                                                </Badge>
+                                            ))}
+                                    </div>
+                                ) : null
+                            }
+                        />
+                        <DetailRow
+                            icon={Car}
+                            label="Transport notes"
+                            value={client.transport_notes}
+                        />
+                        <DetailRow
+                            icon={GraduationCap}
+                            label="Education"
+                            value={client.education_level}
+                        />
+                        <DetailRow
+                            icon={Briefcase}
+                            label="Employment"
+                            value={client.employment_status}
+                        />
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-base">
+                            <Shield className="h-4 w-4 text-primary" />
+                            Care & safety
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="divide-y">
+                        <DetailRow
+                            icon={ShieldAlert}
+                            label="Risk level"
+                            value={
+                                client.risk_level ? (
+                                    <StatusBadge
+                                        variant={riskVariant(client.risk_level)}
+                                        className="capitalize"
+                                    >
+                                        {client.risk_level}
+                                    </StatusBadge>
+                                ) : null
+                            }
+                        />
+                        <DetailRow
+                            icon={Shield}
+                            label="Safeguarding"
+                            value={
+                                client.safeguarding_flag ? (
+                                    <StatusBadge variant="critical">
+                                        Active concern
+                                    </StatusBadge>
+                                ) : (
+                                    'No active concern'
+                                )
+                            }
+                        />
+                        <DetailRow
+                            icon={Home}
+                            label="Monitored home"
+                            value={client.house_geofence?.name}
+                        />
+                        <DetailRow
+                            icon={Droplet}
+                            label="Fluid target"
+                            value={fluidTarget(client)}
+                        />
+                        <DetailRow
+                            icon={Clock}
+                            label="Seizure escalation"
+                            value={
+                                client.seizure_duration_escalation_seconds
+                                    ? `${client.seizure_duration_escalation_seconds} s`
+                                    : null
+                            }
+                        />
+                    </CardContent>
+                </Card>
+            </div>
+
             <div className="grid gap-4 md:grid-cols-2">
                 <Card>
                     <CardHeader>
@@ -479,6 +681,14 @@ export function PersonalDetailsTab({
 }
 
 function PersonCard({ person }: { person: PersonRecord }) {
+    const isPrimary = person.is_primary ?? person.is_primary_contact ?? false;
+    const consents = [
+        person.can_view_medical ? 'Medical' : null,
+        person.can_view_medications ? 'Medications' : null,
+        person.can_view_incidents ? 'Incidents' : null,
+        person.can_receive_updates ? 'Updates' : null,
+    ].filter(Boolean) as string[];
+
     return (
         /* eslint-disable-next-line no-restricted-syntax -- compact person card nested inside a parent Card. */
         <div className="rounded-lg border bg-card p-3 text-sm">
@@ -491,13 +701,13 @@ function PersonCard({ person }: { person: PersonRecord }) {
                         </p>
                     ) : null}
                 </div>
-                {person.is_primary ? (
+                {isPrimary ? (
                     <Badge variant="outline" className="shrink-0">
                         Primary
                     </Badge>
                 ) : null}
             </div>
-            {(person.phone || person.email) && (
+            {(person.phone || person.alternate_phone || person.email) && (
                 <div className="mt-2 flex flex-wrap items-center gap-2 text-xs">
                     {person.phone ? (
                         <a
@@ -506,6 +716,15 @@ function PersonCard({ person }: { person: PersonRecord }) {
                         >
                             <Phone className="h-3 w-3" />
                             {person.phone}
+                        </a>
+                    ) : null}
+                    {person.alternate_phone ? (
+                        <a
+                            href={`tel:${person.alternate_phone}`}
+                            className="inline-flex items-center gap-1 text-muted-foreground hover:underline"
+                        >
+                            <Phone className="h-3 w-3" />
+                            {person.alternate_phone}
                         </a>
                     ) : null}
                     {person.email ? (
@@ -519,6 +738,20 @@ function PersonCard({ person }: { person: PersonRecord }) {
                     ) : null}
                 </div>
             )}
+            {person.availability ? (
+                <p className="mt-1.5 text-xs text-muted-foreground">
+                    Available: {person.availability}
+                </p>
+            ) : null}
+            {consents.length > 0 ? (
+                <div className="mt-2 flex flex-wrap gap-1">
+                    {consents.map((c) => (
+                        <Badge key={c} variant="outline" className="text-[10px]">
+                            {c}
+                        </Badge>
+                    ))}
+                </div>
+            ) : null}
             {person.notes ? (
                 <p className="mt-2 text-xs text-muted-foreground">
                     {person.notes}

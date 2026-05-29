@@ -1422,6 +1422,143 @@ class ClientControllerTest extends TestCase
         $this->assertSame('0211234567', $client->phone);
     }
 
+    public function test_store_persists_support_needs_and_care_fields(): void
+    {
+        $data = $this->validClientData([
+            'mobility_needs' => 'Uses a walking frame indoors',
+            'dietary_requirements' => 'Gluten-free',
+            'languages' => ['English', 'Te Reo Māori'],
+            'transport_needs' => ['Own vehicle'],
+            'fluid_intake_min_ml' => 1500,
+            'fluid_intake_max_ml' => 2500,
+            'seizure_duration_escalation_seconds' => 300,
+            'risk_level' => 'medium',
+            'safeguarding_flag' => true,
+            'education_level' => 'NCEA Level 1–3',
+        ]);
+
+        $response = $this->actingAs($this->admin)->post('/clients', $data);
+
+        $response->assertRedirect(route('clients.index'));
+        $client = $this->findClientByEmail('test.client@example.com');
+        $this->assertSame('Uses a walking frame indoors', $client->mobility_needs);
+        $this->assertSame('Gluten-free', $client->dietary_requirements);
+        $this->assertSame('medium', $client->risk_level);
+        $this->assertTrue((bool) $client->safeguarding_flag);
+        $this->assertSame(1500, (int) $client->fluid_intake_min_ml);
+        $this->assertEqualsCanonicalizing(['English', 'Te Reo Māori'], $client->languages);
+        $this->assertEqualsCanonicalizing(['Own vehicle'], $client->transport_needs);
+    }
+
+    public function test_store_persists_medical_conditions_and_emergency_contacts(): void
+    {
+        $data = $this->validClientData([
+            'medical' => [
+                'gp_name' => 'Dr Aroha',
+                'gp_practice' => 'Hamilton East Medical',
+                'blood_type' => 'O+',
+                'organ_donor' => true,
+                'allergies' => ['Penicillin', 'Peanuts'],
+                'disabilities' => ['Epilepsy'],
+                'medical_history' => 'Well-managed epilepsy.',
+            ],
+            'conditions' => [
+                ['label' => 'Type 2 diabetes', 'severity' => 'Moderate', 'notes' => 'Diet-controlled'],
+                // Blank rows are skipped.
+                ['label' => '', 'severity' => 'Mild', 'notes' => ''],
+            ],
+            'emergency_contacts' => [
+                [
+                    'name' => 'Sarah Walker',
+                    'relationship' => 'Mother',
+                    'phone' => '0277654321',
+                    'alternate_phone' => '078385000',
+                    'email' => 'sarah@example.com',
+                    'preferred_method' => 'phone',
+                    'can_view_medical' => true,
+                    'can_view_medications' => false,
+                    'can_view_incidents' => true,
+                    'can_receive_updates' => true,
+                ],
+            ],
+        ]);
+
+        $response = $this->actingAs($this->admin)->post('/clients', $data);
+
+        $response->assertRedirect(route('clients.index'));
+        $client = $this->findClientByEmail('test.client@example.com');
+
+        // Medical profile (hasOne)
+        $this->assertDatabaseHas('client_medical_profiles', [
+            'client_id' => $client->id,
+            'gp_name' => 'Dr Aroha',
+            'blood_type' => 'O+',
+            'organ_donor' => true,
+        ]);
+        $this->assertEqualsCanonicalizing(['Penicillin', 'Peanuts'], $client->medicalProfile->allergies);
+
+        // Conditions (hasMany) — only the labelled row is stored.
+        $this->assertSame(1, $client->conditions()->count());
+        $this->assertDatabaseHas('client_conditions', [
+            'client_id' => $client->id,
+            'label' => 'Type 2 diabetes',
+            'severity' => 'Moderate',
+        ]);
+
+        // Emergency contact (hasMany) with consent + primary flag.
+        $this->assertDatabaseHas('client_emergency_contacts', [
+            'client_id' => $client->id,
+            'name' => 'Sarah Walker',
+            'relationship' => 'Mother',
+            'alternate_phone' => '078385000',
+            'is_primary_contact' => true,
+            'contact_order' => 1,
+            'can_view_medical' => true,
+            'can_view_medications' => false,
+            'can_view_incidents' => true,
+            'authorised_health_info' => true,
+        ]);
+    }
+
+    public function test_store_skips_empty_emergency_contact_rows(): void
+    {
+        // The wizard always sends a blank primary contact; an untouched one must
+        // not create a row and must not trip primary-contact validation.
+        $data = $this->validClientData([
+            'emergency_contacts' => [
+                [
+                    'name' => '',
+                    'phone' => '',
+                    'preferred_method' => 'phone',
+                    'can_receive_updates' => true,
+                ],
+            ],
+        ]);
+
+        $response = $this->actingAs($this->admin)->post('/clients', $data);
+
+        $response->assertRedirect(route('clients.index'));
+        $response->assertSessionHasNoErrors();
+        $client = $this->findClientByEmail('test.client@example.com');
+        $this->assertSame(0, $client->emergencyContacts()->count());
+    }
+
+    public function test_store_requires_primary_contact_details_when_contact_data_entered(): void
+    {
+        $data = $this->validClientData([
+            'emergency_contacts' => [
+                ['name' => '', 'phone' => '', 'relationship' => 'Mother'],
+            ],
+        ]);
+
+        $response = $this->actingAs($this->admin)->post('/clients', $data);
+
+        $response->assertSessionHasErrors([
+            'emergency_contacts.0.name',
+            'emergency_contacts.0.phone',
+        ]);
+    }
+
     public function test_store_returns_validation_errors_for_empty_payload(): void
     {
         $response = $this->actingAs($this->admin)->post('/clients', []);
