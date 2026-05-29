@@ -157,6 +157,112 @@ class SiteControllerTest extends TestCase
     }
 
     // ──────────────────────────────────────
+    // Index - Archived flow + hero summary
+    // ──────────────────────────────────────
+
+    public function test_site_index_excludes_archived_by_default(): void
+    {
+        Site::factory()->count(3)->create(['type' => 'house', 'is_active' => true]);
+        Site::factory()->create(['type' => 'house', 'is_active' => false, 'archived' => true]);
+
+        $this->actingAs($this->admin)
+            ->get('/sites')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('sites', 3)
+                ->where('summary.total', 3)
+                ->where('summary.archived', 1)
+                ->where('savedViewCounts.archived', 1)
+            );
+    }
+
+    public function test_site_index_shows_archived_when_toggled(): void
+    {
+        Site::factory()->count(2)->create(['type' => 'house', 'is_active' => true]);
+        $archived = Site::factory()->create(['type' => 'house', 'is_active' => false, 'archived' => true]);
+
+        $this->actingAs($this->admin)
+            ->get('/sites?show_archived=1&archived=1')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('sites', 1)
+                ->where('sites.0.id', $archived->id)
+                ->where('sites.0.archived', true)
+            );
+    }
+
+    // ──────────────────────────────────────
+    // Active toggle + archive actions
+    // ──────────────────────────────────────
+
+    public function test_site_active_state_can_be_toggled(): void
+    {
+        $site = Site::factory()->create(['type' => 'house', 'is_active' => true]);
+
+        $this->actingAs($this->admin)
+            ->patch("/sites/{$site->id}/active", ['is_active' => false])
+            ->assertRedirect();
+
+        $this->assertFalse((bool) $site->fresh()->is_active);
+    }
+
+    public function test_site_can_be_archived(): void
+    {
+        $site = Site::factory()->create(['type' => 'house', 'is_active' => true]);
+
+        $this->actingAs($this->admin)
+            ->patch("/sites/{$site->id}/archive")
+            ->assertRedirect();
+
+        $site->refresh();
+        $this->assertTrue((bool) $site->archived);
+        $this->assertFalse((bool) $site->is_active);
+        $this->assertNotNull($site->archived_at);
+    }
+
+    public function test_archived_site_can_be_restored(): void
+    {
+        $site = Site::factory()->create([
+            'type' => 'house',
+            'is_active' => false,
+            'archived' => true,
+            'archived_at' => now(),
+        ]);
+
+        $this->actingAs($this->admin)
+            ->patch("/sites/{$site->id}/unarchive")
+            ->assertRedirect();
+
+        $site->refresh();
+        $this->assertFalse((bool) $site->archived);
+        $this->assertNull($site->archived_at);
+    }
+
+    public function test_sites_can_be_bulk_archived(): void
+    {
+        $sites = Site::factory()->count(3)->create(['type' => 'house', 'is_active' => true]);
+
+        $this->actingAs($this->admin)
+            ->post('/sites/bulk/archive', ['ids' => $sites->pluck('id')->all()])
+            ->assertRedirect();
+
+        foreach ($sites as $site) {
+            $this->assertTrue((bool) $site->fresh()->archived);
+        }
+    }
+
+    public function test_archive_blocked_without_permission(): void
+    {
+        $site = Site::factory()->create(['type' => 'house', 'is_active' => true]);
+
+        $this->actingAs($this->supportWorker)
+            ->patch("/sites/{$site->id}/archive")
+            ->assertForbidden();
+
+        $this->assertFalse((bool) $site->fresh()->archived);
+    }
+
+    // ──────────────────────────────────────
     // Show
     // ──────────────────────────────────────
 

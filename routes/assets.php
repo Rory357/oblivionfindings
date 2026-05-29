@@ -70,6 +70,11 @@ Route::middleware(['auth'])->group(function () {
             ->whereNumber('site')
             ->name('sites.safety.update');
 
+        // Quick active/inactive toggle from the index card & context menus.
+        Route::patch('/sites/{site}/active', [SiteController::class, 'toggleActive'])
+            ->whereNumber('site')
+            ->name('sites.active.update');
+
         // Site notes (multi-note log)
         Route::post('/sites/{site}/notes', [\App\Http\Controllers\Sites\SiteNoteController::class, 'store'])
             ->whereNumber('site')
@@ -119,6 +124,19 @@ Route::middleware(['auth'])->group(function () {
         Route::delete('/sites/{site}/documents/{document}', [SiteDocumentController::class, 'destroy'])
             ->whereNumber('site')
             ->name('sites.documents.destroy');
+    });
+
+    // Archiving (distinct from soft-delete): hide a site from the default
+    // views while keeping all its data. Gated by the dedicated permission.
+    Route::middleware('permission:sites.archive')->group(function () {
+        Route::post('/sites/bulk/archive', [SiteController::class, 'bulkArchive'])
+            ->name('sites.bulk.archive');
+        Route::patch('/sites/{site}/archive', [SiteController::class, 'archive'])
+            ->whereNumber('site')
+            ->name('sites.archive');
+        Route::patch('/sites/{site}/unarchive', [SiteController::class, 'unarchive'])
+            ->whereNumber('site')
+            ->name('sites.unarchive');
     });
 
     // Assets
