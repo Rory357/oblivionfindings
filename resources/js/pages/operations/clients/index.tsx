@@ -143,7 +143,7 @@ type Can = {
 
 type PageProps = {
     clients: Client[];
-    auth: { user?: { name?: string } | null; can?: Can };
+    auth: { user?: { name?: string; role?: string | null } | null; can?: Can };
     labels?: Record<string, string>;
 };
 
@@ -1104,6 +1104,9 @@ export default function ClientsIndex() {
     const canCreate = !!can.create;
     const canUpdate = !!can.update;
     const canArchive = !!can.archive;
+    // Support workers land on the frontline care view; everyone else opens the
+    // full client profile by default (the care view stays one click away in the menu).
+    const isSupportWorker = auth?.user?.role === 'support_worker';
 
     const clientSingular = labels?.['client.singular'] ?? 'Client';
     const clientPlural = labels?.['client.plural'] ?? 'Clients';
@@ -1265,7 +1268,11 @@ export default function ClientsIndex() {
         setSelected(new Set(filtered.map((c) => c.id)));
 
     const openClient = (c: Client) =>
-        router.visit(`/operations/clients/${c.id}/care`);
+        router.visit(
+            isSupportWorker
+                ? `/operations/clients/${c.id}/care`
+                : `/operations/clients/${c.id}`,
+        );
     const openCtx = (e: React.MouseEvent, c: Client) => {
         e.preventDefault();
         setCtx({ x: e.clientX, y: e.clientY, client: c });
