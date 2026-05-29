@@ -3,6 +3,10 @@
  * footer) that intentionally uses styled native controls for the tile pickers,
  * chips, segmented controls and toggles. Every colour is sourced from semantic
  * design tokens (never hardcoded hex), per docs/DESIGN_TOKENS.md. */
+import {
+    AddressAutocomplete,
+    type GeocodeResult,
+} from '@/components/address-autocomplete';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -924,6 +928,8 @@ function AddClientBody({
         setData(k, v as any);
     const setMedical = <K extends keyof MedicalShape>(k: K, v: MedicalShape[K]) =>
         setData('medical', { ...data.medical, [k]: v });
+    const setMany = (partial: Partial<ClientWizardForm>) =>
+        setData((prev) => ({ ...prev, ...partial }));
 
     const fieldError = (name: string): string | undefined =>
         errors[name] ?? (form.errors as Record<string, string>)[name];
@@ -982,6 +988,7 @@ function AddClientBody({
         data,
         set,
         setMedical,
+        setMany,
         err: fieldError,
         sites,
         serviceContexts,
@@ -1185,6 +1192,7 @@ type StepCtx = {
     data: ClientWizardForm;
     set: <K extends keyof ClientWizardForm>(k: K, v: ClientWizardForm[K]) => void;
     setMedical: <K extends keyof MedicalShape>(k: K, v: MedicalShape[K]) => void;
+    setMany: (partial: Partial<ClientWizardForm>) => void;
     err: (name: string) => string | undefined;
     sites: Option[];
     serviceContexts: ServiceContextOption[];
@@ -1214,7 +1222,7 @@ function StepBody({ stepKey, ctx }: { stepKey: StepKey; ctx: StepCtx }) {
 }
 
 function StepBasics({ ctx }: { ctx: StepCtx }) {
-    const { data, set, err, sites, serviceContexts } = ctx;
+    const { data, set, setMany, err, sites, serviceContexts } = ctx;
     const age = ageFromDob(data.date_of_birth);
     const nhi = nhiState(data.nhi_number);
     const contextIcon = (i: number) =>
@@ -1381,11 +1389,26 @@ function StepBasics({ ctx }: { ctx: StepCtx }) {
                             aria-invalid={!!err('email')}
                         />
                     </Field>
-                    <Field label="Address line 1" span>
-                        <Input
+                    <Field
+                        label="Address line 1"
+                        span
+                        hint="type to search — powered by OpenStreetMap"
+                    >
+                        <AddressAutocomplete
                             value={data.address_line_1}
-                            onChange={(e) => set('address_line_1', e.target.value)}
-                            placeholder="Street address"
+                            onChange={(v) => set('address_line_1', v)}
+                            onSelect={(r: GeocodeResult) => {
+                                // Only fill fields the result actually provides;
+                                // never clear what the user already typed.
+                                const patch: Partial<ClientWizardForm> = {};
+                                if (r.address_line_1)
+                                    patch.address_line_1 = r.address_line_1;
+                                if (r.suburb) patch.suburb = r.suburb;
+                                if (r.city) patch.city = r.city;
+                                if (r.postcode) patch.postcode = r.postcode;
+                                setMany(patch);
+                            }}
+                            placeholder="Start typing an address…"
                         />
                     </Field>
                     <Field label="Address line 2" span>

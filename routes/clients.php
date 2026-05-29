@@ -80,6 +80,10 @@ Route::middleware(['auth'])->group(function () {
     Route::middleware('permission:clients.create')->group(function () {
         Route::get('/clients/create', [ClientController::class, 'create'])->name('clients.create');
         Route::post('/clients', [ClientController::class, 'store'])->name('clients.store');
+        // Address autocomplete for the Add Client wizard (Nominatim proxy,
+        // reuses the Sites geocoding controller). Gated to client-creators.
+        Route::get('/clients/geocode/search', [\App\Http\Controllers\Sites\SiteGeocodingController::class, 'search'])
+            ->name('clients.geocode.search');
     });
 
     // Client updates
