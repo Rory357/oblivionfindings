@@ -18,9 +18,9 @@ interface StreamItemProps {
     /** Resident lookup for inline dot+name. */
     resident?: MyDayResident;
     onToggleTask: (taskId: number) => void;
-    onGiveMed: (medId: number) => void;
-    onRefuseMed?: (medId: number) => void;
-    onSnoozeMed?: (medId: number) => void;
+    onGiveMed: (medicationId: number, scheduledFor: string) => void;
+    onRefuseMed?: (medicationId: number, scheduledFor: string) => void;
+    onSnoozeMed?: (medicationId: number, scheduledFor: string) => void;
     onAddNote?: (item: Item) => void;
     onOpenContextMenu: (item: Item, x: number, y: number) => void;
 }
@@ -176,7 +176,7 @@ function MedRow({
             {/* eslint-disable-next-line no-restricted-syntax -- 20px circular checkbox with status-tinted border; not a shadcn Button. */}
             <button
                 type="button"
-                onClick={() => !given && onGiveMed(med.id)}
+                onClick={() => !given && onGiveMed(med.medication_id, med.scheduled_for)}
                 title={given ? 'Already given' : 'Mark as given'}
                 aria-pressed={given}
                 className={cn(
@@ -268,18 +268,18 @@ function MedRow({
                         icon={Check}
                         label="Mark as given"
                         tone="success"
-                        onClick={() => onGiveMed(med.id)}
+                        onClick={() => onGiveMed(med.medication_id, med.scheduled_for)}
                     />
                     <HoverAction
                         icon={Clock}
                         label="Snooze 15m"
-                        onClick={() => onSnoozeMed?.(med.id)}
+                        onClick={() => onSnoozeMed?.(med.medication_id, med.scheduled_for)}
                     />
                     <HoverAction
                         icon={AlertTriangle}
                         label="Refuse / not given"
                         tone="danger"
-                        onClick={() => onRefuseMed?.(med.id)}
+                        onClick={() => onRefuseMed?.(med.medication_id, med.scheduled_for)}
                     />
                     <HoverAction
                         icon={MoreHorizontal}

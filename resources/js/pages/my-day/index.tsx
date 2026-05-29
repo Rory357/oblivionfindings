@@ -427,14 +427,18 @@ export default function MyDay() {
         router.post(`/my-tasks/shift-task/${taskId}/complete`, {}, { preserveScroll: true });
     }, []);
 
-    const handleGiveMed = useCallback((medId: number) => {
+    // A medications_due row addresses a single dose occurrence by medication id
+    // (the route-model-bound URL param) + scheduled_for (the slot). The same
+    // ClientMedication can appear twice in the rail (e.g. 09:00 + 13:00), so
+    // scheduled_for is what tells the endpoint which dose was acted on.
+    const handleGiveMed = useCallback((medicationId: number, scheduledFor: string) => {
         runUndoable({
             message: t('toast_marking_dose_given'),
             durationMs: 5_000,
             onCommit: () => {
                 router.post(
-                    `/my-day/medications/${medId}/administer`,
-                    {},
+                    `/my-day/medications/${medicationId}/administer`,
+                    { scheduled_for: scheduledFor },
                     { preserveScroll: true, only: ['medications_due', 'stats'] as never },
                 );
             },
@@ -442,15 +446,19 @@ export default function MyDay() {
         });
     }, [runUndoable, t]);
 
-    const handleRefuseMed = useCallback((medId: number) => {
+    const handleRefuseMed = useCallback((medicationId: number, scheduledFor: string) => {
         if (!confirm(t('confirm_refuse_dose'))) return;
-        router.post(`/my-day/medications/${medId}/refuse`, {}, { preserveScroll: true });
+        router.post(
+            `/my-day/medications/${medicationId}/refuse`,
+            { scheduled_for: scheduledFor },
+            { preserveScroll: true },
+        );
     }, [t]);
 
-    const handleSnoozeMed = useCallback((medId: number) => {
+    const handleSnoozeMed = useCallback((medicationId: number, scheduledFor: string) => {
         router.post(
-            `/my-day/medications/${medId}/snooze`,
-            { minutes: 15 },
+            `/my-day/medications/${medicationId}/snooze`,
+            { minutes: 15, scheduled_for: scheduledFor },
             { preserveScroll: true },
         );
     }, []);
@@ -489,9 +497,9 @@ export default function MyDay() {
             if (!ctxMenu) return;
             const item = ctxMenu.item;
             if (action === 'complete-task' && item.kind === 'task') handleToggleTask(item.data.id);
-            if (action === 'give-med' && item.kind === 'med') handleGiveMed(item.data.id);
-            if (action === 'snooze-med' && item.kind === 'med') handleSnoozeMed(item.data.id);
-            if (action === 'refuse-med' && item.kind === 'med') handleRefuseMed(item.data.id);
+            if (action === 'give-med' && item.kind === 'med') handleGiveMed(item.data.medication_id, item.data.scheduled_for);
+            if (action === 'snooze-med' && item.kind === 'med') handleSnoozeMed(item.data.medication_id, item.data.scheduled_for);
+            if (action === 'refuse-med' && item.kind === 'med') handleRefuseMed(item.data.medication_id, item.data.scheduled_for);
             if (action === 'open-emar' && item.kind === 'med') router.visit(item.data.emar_url);
             if (action === 'open-care-plan' && item.kind === 'task' && item.clientId) {
                 router.visit(`/clients/${item.clientId}/care`);

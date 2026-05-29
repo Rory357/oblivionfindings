@@ -19,9 +19,9 @@ interface WhatsNextRailProps {
     residents: MyDayResident[];
     activeResidentId: 'all' | number;
     onToggleTask: (taskId: number) => void;
-    onGiveMed: (medId: number) => void;
-    onRefuseMed?: (medId: number) => void;
-    onSnoozeMed?: (medId: number) => void;
+    onGiveMed: (medicationId: number, scheduledFor: string) => void;
+    onRefuseMed?: (medicationId: number, scheduledFor: string) => void;
+    onSnoozeMed?: (medicationId: number, scheduledFor: string) => void;
     onAddNote?: (item: StreamItem) => void;
     onOpenContextMenu: (item: StreamItem, x: number, y: number) => void;
     /** Override the "now" wall clock — used in tests + the briefing example. */
@@ -143,9 +143,9 @@ function TimeBlock({
     residentById: Map<number, MyDayResident>;
     showResident: boolean;
     onToggleTask: (taskId: number) => void;
-    onGiveMed: (medId: number) => void;
-    onRefuseMed?: (medId: number) => void;
-    onSnoozeMed?: (medId: number) => void;
+    onGiveMed: (medicationId: number, scheduledFor: string) => void;
+    onRefuseMed?: (medicationId: number, scheduledFor: string) => void;
+    onSnoozeMed?: (medicationId: number, scheduledFor: string) => void;
     onAddNote?: (item: StreamItem) => void;
     onOpenContextMenu: (item: StreamItem, x: number, y: number) => void;
 }) {

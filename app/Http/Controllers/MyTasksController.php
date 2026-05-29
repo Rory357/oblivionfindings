@@ -3,8 +3,11 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Hr\Models\HrAttendanceSession;
+use App\Domain\Hr\Models\HrLeaveBalance;
+use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Services\AttendanceService;
 use App\Http\Resources\MyShiftResource;
+use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ClientMedication;
 use App\Models\ControlRoom\OperatorNote;
@@ -14,15 +17,16 @@ use App\Models\MedicationRound;
 use App\Models\Shift;
 use App\Models\ShiftHandover;
 use App\Models\ShiftOpenPosition;
+use App\Models\Site;
 use App\Models\Timesheet;
 use App\Models\User;
-use App\Models\Client;
 use App\Services\GuidedRoundService;
 use App\Services\ShiftHandoverService;
 use App\Support\EmarUrl;
 use App\Support\ResidentHue;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -263,7 +267,7 @@ class MyTasksController extends Controller
     /**
      * Render the human-readable address line shown in the hero meta.
      */
-    private function formatSiteAddress(\App\Models\Site $site): string
+    private function formatSiteAddress(Site $site): string
     {
         $parts = array_filter([
             $site->address_line_1,
@@ -468,7 +472,7 @@ class MyTasksController extends Controller
         }
     }
 
-    private function getShifts(User $user, Carbon $today, Carbon $tomorrowEnd, Carbon $workerNow): \Illuminate\Support\Collection
+    private function getShifts(User $user, Carbon $today, Carbon $tomorrowEnd, Carbon $workerNow): Collection
     {
         try {
             return Shift::where('user_id', $user->id)
@@ -517,6 +521,8 @@ class MyTasksController extends Controller
                         continue;
                     }
 
+                    $scheduledIso = $scheduled->toIso8601String();
+
                     if ($scheduled->lt($now)) {
                         $status = 'overdue';
                     } elseif ($scheduled->lte($now->copy()->addHour())) {
@@ -531,16 +537,23 @@ class MyTasksController extends Controller
 
                     $result[] = [
                         // Compound id: medication + dose-time slot. Stable per
-                        // dose-row so the front-end can target mutations
-                        // (administer/refuse/snooze) at the right occurrence.
-                        'id' => $med->id,
+                        // dose-row so the front-end can key rows and target
+                        // mutations (administer/refuse/snooze) at the right
+                        // occurrence. A medication with two in-window doses
+                        // (e.g. Paracetamol 09:00 + 13:00) yields distinct ids.
+                        // `medication_id` carries the bare ClientMedication id
+                        // the action endpoints still resolve via route-model
+                        // binding — the occurrence is addressed by that id plus
+                        // `scheduled_for`.
+                        'id' => $med->id.':'.$scheduledIso,
+                        'medication_id' => $med->id,
                         'client_id' => $med->client_id,
                         'client_name' => $clientName,
                         'medication_name' => $med->name,
                         'dose' => $med->dosage,
                         'route' => $med->route ?? 'Oral',
                         'flag' => $med->is_prn ? 'PRN' : null,
-                        'scheduled_for' => $scheduled->toIso8601String(),
+                        'scheduled_for' => $scheduledIso,
                         'status' => $status,
                         'emar_url' => EmarUrl::mar($med->client_id, $scheduled->toDateString()),
                     ];
@@ -904,7 +917,7 @@ class MyTasksController extends Controller
     private function getLeave(int $userId, Carbon $now): array
     {
         try {
-            $balances = \App\Domain\Hr\Models\HrLeaveBalance::where('user_id', $userId)
+            $balances = HrLeaveBalance::where('user_id', $userId)
                 ->where('year', $now->year)
                 ->get()
                 ->map(fn ($b) => [
@@ -914,7 +927,7 @@ class MyTasksController extends Controller
                 ])
                 ->all();
 
-            $pendingRequests = \App\Domain\Hr\Models\HrLeaveRequest::where('user_id', $userId)
+            $pendingRequests = HrLeaveRequest::where('user_id', $userId)
                 ->where('status', 'pending')
                 ->count();
 
@@ -999,7 +1012,7 @@ class MyTasksController extends Controller
             $context['location'] ?? null,
         ], fn ($v) => is_string($v) && trim($v) !== '');
 
-        if (!empty($candidates)) {
+        if (! empty($candidates)) {
             return Str::limit(trim((string) reset($candidates)), 140);
         }
 
@@ -1145,6 +1158,7 @@ class MyTasksController extends Controller
                         : '/control-room/shifts';
 
                     $content = trim((string) $note->content);
+
                     // Title stays as the short headline so cards align; the
                     // longer body becomes the row description.
                     return [

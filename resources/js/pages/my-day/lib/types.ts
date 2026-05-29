@@ -62,7 +62,15 @@ export interface MyDayShift {
 }
 
 export interface MyDayMedDue {
-    id: number;
+    /**
+     * Per-occurrence id: `"{medication_id}:{scheduled_for}"`. Unique per dose
+     * slot so two doses of the same medication in the window (e.g. Paracetamol
+     * 09:00 + 13:00) get distinct React keys. Not the ClientMedication id —
+     * use `medication_id` to address the action endpoints.
+     */
+    id: string;
+    /** ClientMedication id — the route-model-bound target for administer/refuse/snooze. */
+    medication_id: number;
     client_id: number;
     client_name: string;
     medication_name: string;
