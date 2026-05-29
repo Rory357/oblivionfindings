@@ -156,6 +156,30 @@ class SiteControllerTest extends TestCase
             );
     }
 
+    public function test_at_risk_saved_view_count_matches_filtered_results(): void
+    {
+        // The "At risk" saved view rolls up both elevated-attention flags, so
+        // its badge (savedViewCounts.at_risk) and its ?risk=at_risk filter must
+        // agree — otherwise the tab promises a count it can't show.
+        Site::factory()->create(['type' => 'house', 'is_high_risk' => true]);
+        Site::factory()->create(['type' => 'house', 'is_high_needs' => true]);
+        Site::factory()->count(2)->create(['type' => 'house']);
+
+        $this->actingAs($this->admin)
+            ->get('/sites')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('savedViewCounts.at_risk', 2)
+            );
+
+        $this->actingAs($this->admin)
+            ->get('/sites?risk=at_risk')
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('sites', 2)
+            );
+    }
+
     // ──────────────────────────────────────
     // Index - Archived flow + hero summary
     // ──────────────────────────────────────
