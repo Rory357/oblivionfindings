@@ -42,6 +42,13 @@ class SitePolicy
             && $this->canAccessAssignedSite($user, $site);
     }
 
+    public function archive(User $user, Site $site): bool
+    {
+        return $user->canDo('sites.archive')
+            && $this->canViewType($user, $site->type)
+            && $this->canAccessAssignedSite($user, $site);
+    }
+
     private function canViewType(User $user, string $type): bool
     {
         $typePermissions = [

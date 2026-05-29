@@ -54,7 +54,9 @@ class SiteController extends Controller
         $user = $request->user();
         $search = trim((string) $request->input('q', ''));
         $type = $request->input('type');
-        $status = $request->input('status', 'all');
+        // Default to active-only: the index leads with the live roster; inactive
+        // and archived sites live behind their own tabs.
+        $status = $request->input('status', 'active');
         $region = $request->input('region');
         $risk = $request->input('risk');
         $managerId = $request->input('manager_id');
@@ -63,6 +65,9 @@ class SiteController extends Controller
         $maintenance = $request->input('maintenance');
         $readiness = $request->input('readiness');
         $service = $request->input('service');
+        $showArchived = $request->boolean('show_archived');
+        // The Archived tab is only reachable when the "Show archived" toggle is on.
+        $archivedView = $showArchived && $request->boolean('archived');
         $allowedTypes = $this->allowedSiteTypes($request);
         $accessibleSiteIds = $this->siteAccess()->accessibleSiteIds($user);
         $readinessService = app(SiteReadinessService::class);
@@ -84,7 +89,12 @@ class SiteController extends Controller
                         ->orWhere('address_line_1', 'like', "%{$search}%");
                 });
             })
-            ->when(in_array($status, ['active', 'inactive']), fn ($q) => $q->where('is_active', $status === 'active'))
+            // Archived sites surface only in the dedicated Archived view; every
+            // other view excludes them entirely.
+            ->when($archivedView, fn ($q) => $q->where('archived', true))
+            ->when(! $archivedView, fn ($q) => $q->where('archived', false))
+            // Status (active/inactive) does not apply inside the Archived view.
+            ->when(! $archivedView && in_array($status, ['active', 'inactive']), fn ($q) => $q->where('is_active', $status === 'active'))
             ->when($type && in_array($type, ['head_office', 'house', 'facility']), fn ($q) => $q->where('type', $type))
             ->when($region, fn ($q) => $q->where(function ($query) use ($region) {
                 $query->where('region', $region)
@@ -117,6 +127,7 @@ class SiteController extends Controller
                 'postcode',
                 'country',
                 'is_active',
+                'archived',
                 'is_high_risk',
                 'is_high_needs',
                 'primary_contact_user_id',
@@ -143,12 +154,20 @@ class SiteController extends Controller
                 'city',
                 'suburb',
                 'is_active',
+                'archived',
                 'is_high_risk',
                 'is_high_needs',
                 'primary_contact_user_id',
             ])
             ->withCount($this->siteOperationalCounts())
             ->get();
+
+        // Headline counts, saved-view counts and the hero summary all describe
+        // the *live* roster (archived excluded); the Archived tab is counted on
+        // its own. This keeps the hero numbers stable regardless of which view
+        // or filter is active.
+        $liveSites = $visibleSites->filter(fn (Site $site) => ! $site->archived)->values();
+        $archivedCount = $visibleSites->count() - $liveSites->count();
 
         // Get filter options
         $regions = $visibleSites
@@ -166,7 +185,26 @@ class SiteController extends Controller
             ->select(['id', 'name'])
             ->orderBy('name')
             ->get();
-        $savedViewCounts = $this->savedViewCounts($visibleSites, $readinessService);
+        $savedViewCounts = $this->savedViewCounts($liveSites, $readinessService);
+        $savedViewCounts['archived'] = $archivedCount;
+
+        $bedsTotal = (int) $liveSites->sum(fn (Site $site) => (int) ($site->rooms_total ?? 0));
+        $bedsOccupied = (int) $liveSites->sum(fn (Site $site) => (int) ($site->rooms_occupied ?? 0));
+
+        $summary = [
+            'total' => $liveSites->count(),
+            'active' => $liveSites->where('is_active', true)->count(),
+            'inactive' => $liveSites->where('is_active', false)->count(),
+            'incomplete' => $savedViewCounts['active_incomplete'],
+            'hazards' => (int) $liveSites->sum(fn (Site $site) => (int) ($site->open_hazards_count ?? 0)),
+            'overdue' => (int) $liveSites->sum(fn (Site $site) => (int) ($site->overdue_checklists_count ?? 0) + (int) ($site->open_maintenance_count ?? 0)),
+            'regions' => $liveSites->map(fn (Site $site) => $site->resolved_region)->filter()->unique()->count(),
+            'beds_total' => $bedsTotal,
+            'beds_occupied' => $bedsOccupied,
+            'occupancy_percent' => $bedsTotal > 0 ? (int) round(($bedsOccupied / $bedsTotal) * 100) : 0,
+            'clients' => (int) $liveSites->sum(fn (Site $site) => (int) ($site->active_clients_count ?? 0)),
+            'archived' => $archivedCount,
+        ];
 
         return inertia('sites/index', [
             'sites' => $sites,
@@ -182,7 +220,10 @@ class SiteController extends Controller
                 'maintenance' => $maintenance,
                 'readiness' => $readiness,
                 'service' => $service,
+                'show_archived' => $showArchived,
+                'archived' => $archivedView,
             ],
+            'summary' => $summary,
             'filterOptions' => [
                 'regions' => $regions,
                 'managers' => $managers,
@@ -701,6 +742,102 @@ class SiteController extends Controller
         ]);
 
         return back()->with('success', 'Safety information updated.');
+    }
+
+    /**
+     * Toggle (or explicitly set) a site's active flag from the index quick
+     * actions. `is_active` may be passed to force a state; otherwise it flips.
+     */
+    public function toggleActive(Request $request, Site $site)
+    {
+        $this->authorize('update', $site);
+
+        $target = $request->has('is_active')
+            ? $request->boolean('is_active')
+            : ! $site->is_active;
+
+        $site->update(['is_active' => $target]);
+
+        AuditLogger::log('site.active.update', $site, [
+            'site_id' => $site->id,
+            'is_active' => $target,
+        ]);
+
+        return back()->with('success', $target ? 'Site marked active.' : 'Site marked inactive.');
+    }
+
+    public function archive(Request $request, Site $site)
+    {
+        $this->authorize('archive', $site);
+
+        if (! $site->archived) {
+            $site->update([
+                'archived' => true,
+                'archived_at' => now(),
+                // Archiving takes a site out of operation.
+                'is_active' => false,
+            ]);
+
+            AuditLogger::log('site.archive', $site, ['site_id' => $site->id]);
+        }
+
+        return back()->with('success', 'Site archived.');
+    }
+
+    public function unarchive(Request $request, Site $site)
+    {
+        $this->authorize('archive', $site);
+
+        if ($site->archived) {
+            $site->update([
+                'archived' => false,
+                'archived_at' => null,
+            ]);
+
+            AuditLogger::log('site.unarchive', $site, ['site_id' => $site->id]);
+        }
+
+        return back()->with('success', 'Site restored.');
+    }
+
+    /**
+     * Archive several sites at once from the index bulk-action bar. Each site
+     * is authorised individually so a partial selection still archives what the
+     * user is allowed to touch.
+     */
+    public function bulkArchive(Request $request)
+    {
+        $validated = $request->validate([
+            'ids' => ['required', 'array', 'min:1'],
+            'ids.*' => ['integer'],
+        ]);
+
+        $sites = Site::query()
+            ->whereIn('id', $validated['ids'])
+            ->where('archived', false)
+            ->get();
+
+        $archived = 0;
+        foreach ($sites as $site) {
+            if (! $request->user()?->can('archive', $site)) {
+                continue;
+            }
+
+            $site->update([
+                'archived' => true,
+                'archived_at' => now(),
+                'is_active' => false,
+            ]);
+
+            AuditLogger::log('site.archive', $site, [
+                'site_id' => $site->id,
+                'bulk' => true,
+            ]);
+
+            $archived++;
+        }
+
+        return back()->with('success', $archived === 1 ? '1 site archived.' : "{$archived} sites archived.");
     }
 
     private function buildHouseLedgerData(Site $site, ?User $user): ?array
@@ -1612,6 +1749,7 @@ class SiteController extends Controller
             'postcode' => $site->postcode,
             'country' => $site->country,
             'is_active' => (bool) $site->is_active,
+            'archived' => (bool) $site->archived,
             'is_high_risk' => (bool) $site->is_high_risk,
             'is_high_needs' => (bool) $site->is_high_needs,
             'primary_contact' => $site->primaryContact ? [

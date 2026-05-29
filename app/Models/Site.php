@@ -42,6 +42,8 @@ class Site extends Model
         'risk_notes',
         'risk_review_date',
         'is_active',
+        'archived',
+        'archived_at',
         'primary_contact_user_id',
         'rent_amount',
         'rent_frequency',
@@ -53,6 +55,8 @@ class Site extends Model
 
     protected $casts = [
         'is_active' => 'boolean',
+        'archived' => 'boolean',
+        'archived_at' => 'datetime',
         'is_high_risk' => 'boolean',
         'is_high_needs' => 'boolean',
         'latitude' => 'decimal:8',
@@ -352,6 +356,16 @@ class Site extends Model
     public function scopeActive($query)
     {
         return $query->where('is_active', true);
+    }
+
+    public function scopeArchived($query)
+    {
+        return $query->where('archived', true);
+    }
+
+    public function scopeNotArchived($query)
+    {
+        return $query->where('archived', false);
     }
 
     public function scopeHighRisk($query)
