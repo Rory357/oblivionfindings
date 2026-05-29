@@ -103,12 +103,18 @@ class ClientController extends Controller
         $user = auth()->user();
 
         $clients = Client::query()
+            // Include soft-deleted (archived) clients so the redesigned index can
+            // surface them under the "Archived" saved view / "Show archived" toggle.
+            // They are excluded from the live stats and hidden by default client-side.
+            ->withTrashed()
             ->when(
                 $user->hasRole('support_worker') && ! $user->hasRole('admin', 'manager', 'coordinator'),
                 fn ($q) => $q->whereHas('supportWorkers', fn ($q) => $q->whereKey($user->id))
             )
             ->with([
                 'site:id,name,is_active',
+                'keyWorker:id,name',
+                'supportWorkers:id',
                 'onboardingOverrides:id,client_id,key,value',
                 'medicalProfile:id,client_id,allergies,disabilities',
                 'risks:id,client_id,label,severity,active',
@@ -123,11 +129,16 @@ class ClientController extends Controller
                 'supportPlan',
                 'respiteBookings',
                 'respiteBookingRequests',
+                // Daily-style notes recorded in the last 7 days — shown on each card's footer.
+                'notes as notes_week_count' => fn ($q) => $q
+                    ->dailyNotes()
+                    ->where('occurred_at', '>=', now()->subDays(7)),
             ])
             ->orderBy('last_name')
             ->get([
                 'id',
                 'site_id',
+                'key_worker_id',
                 'nhi_number',
                 'first_name',
                 'last_name',
@@ -136,16 +147,26 @@ class ClientController extends Controller
                 'phone',
                 'email',
                 'address_line_1',
+                'address_line_2',
+                'suburb',
                 'city',
                 'postcode',
                 'profile_photo_path',
                 'risk_level',
                 'safeguarding_flag',
+                'deleted_at',
             ]);
 
-        $clients = $clients->map(function (Client $c) {
+        $clients = $clients->map(function (Client $c) use ($user) {
             $summary = $this->buildOnboardingSummaryFromCounts($c);
             $hasRespite = ((int) ($c->respite_bookings_count ?? 0) + (int) ($c->respite_booking_requests_count ?? 0)) > 0;
+
+            $address = collect([$c->address_line_1, $c->suburb, $c->city, $c->postcode])
+                ->filter(fn ($v) => is_string($v) && trim($v) !== '')
+                ->implode(', ');
+
+            $mine = (int) $c->key_worker_id === (int) $user->id
+                || $c->supportWorkers->contains('id', $user->id);
 
             return [
                 'id' => $c->id,
@@ -155,9 +176,19 @@ class ClientController extends Controller
                 'profile_photo_url' => $c->profile_photo_url,
                 'avatar' => $c->avatar,
                 'status' => $c->status,
+                'age' => $c->date_of_birth ? $c->date_of_birth->age : null,
+                'address' => $address !== '' ? $address : null,
                 'site' => $c->site ? ['id' => $c->site->id, 'name' => $c->site->name] : null,
+                'key_worker' => $c->keyWorker ? [
+                    'id' => $c->keyWorker->id,
+                    'name' => $c->keyWorker->name,
+                    'initials' => $this->nameInitials($c->keyWorker->name),
+                ] : null,
+                'notes_week' => (int) ($c->notes_week_count ?? 0),
                 'onboarding' => $summary,
                 'has_respite' => $hasRespite,
+                'archived' => $c->trashed(),
+                'mine' => $mine,
                 'safety' => ClientSafetyPayload::summaryForClient($c),
             ];
         })->values();
@@ -165,6 +196,57 @@ class ClientController extends Controller
         return inertia('operations/clients/index', [
             'clients' => $clients,
         ]);
+    }
+
+    /** Two-letter initials from a display name (e.g. "Mere Tipene" → "MT"). */
+    private function nameInitials(?string $name): ?string
+    {
+        if (! $name) {
+            return null;
+        }
+
+        $parts = array_values(array_filter(preg_split('/\s+/', trim($name)) ?: []));
+
+        if (count($parts) === 0) {
+            return null;
+        }
+
+        $first = mb_substr($parts[0], 0, 1);
+        $last = count($parts) > 1 ? mb_substr($parts[count($parts) - 1], 0, 1) : '';
+
+        return mb_strtoupper($first.$last);
+    }
+
+    /**
+     * Archive (soft-delete) a client from the index context menu / bulk bar.
+     * Archived clients drop out of the live list but remain visible under the
+     * "Show archived" toggle and the "Archived" saved view, and can be restored.
+     */
+    public function archive(Request $request, Client $client)
+    {
+        $this->authorize('update', $client);
+
+        if (! $client->trashed()) {
+            $client->delete();
+            AuditLogger::log('clients.archive', $client, ['client_id' => $client->id]);
+        }
+
+        return back()->with('success', 'Client archived.');
+    }
+
+    /** Restore a previously archived (soft-deleted) client. */
+    public function restore(Request $request, int $client)
+    {
+        $model = Client::withTrashed()->findOrFail($client);
+
+        $this->authorize('update', $model);
+
+        if ($model->trashed()) {
+            $model->restore();
+            AuditLogger::log('clients.restore', $model, ['client_id' => $model->id]);
+        }
+
+        return back()->with('success', 'Client restored.');
     }
 
     private function buildOnboardingSummaryFromCounts(Client $client): array

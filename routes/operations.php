@@ -195,6 +195,16 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         Route::get('/clients/{client}/edit', [ClientController::class, 'edit'])->name('operations.clients.edit');
         Route::put('/clients/{client}', [ClientController::class, 'update'])->name('operations.clients.update');
         Route::patch('/clients/{client}/quick-update', [ClientController::class, 'quickUpdate'])->name('operations.clients.quick_update');
+
+        // Archive (soft-delete) / restore — drives the index "Archive client" action
+        // and the "Show archived" / "Archived" saved view + restore.
+        Route::delete('/clients/{client}', [ClientController::class, 'archive'])
+            ->whereNumber('client')
+            ->name('operations.clients.archive');
+        Route::patch('/clients/{client}/restore', [ClientController::class, 'restore'])
+            ->whereNumber('client')
+            ->name('operations.clients.restore');
+
         Route::post('/clients/{client}/photo', [ClientController::class, 'updatePhoto'])
             ->name('operations.clients.photo.update');
         Route::delete('/clients/{client}/photo', [ClientController::class, 'destroyPhoto'])

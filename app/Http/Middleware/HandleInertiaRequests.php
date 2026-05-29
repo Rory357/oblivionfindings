@@ -277,6 +277,8 @@ class HandleInertiaRequests extends Middleware
                 'viewAssigned' => $user->canDo('clients.viewAssigned'),
                 'create' => $user->canDo('clients.create'),
                 'update' => $user->canDo('clients.update'),
+                // Archiving a client is gated by the same capability as editing one.
+                'archive' => $user->canDo('clients.update'),
                 'assignmentsUpdate' => $user->canDo('clients.assignments.update'),
             ],
             'shifts' => [
