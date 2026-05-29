@@ -120,18 +120,20 @@ function StackedAvatar({ resident, index, total, isHover, anyHover, onEnter, onL
             </button>
 
             {isHover && resident.popover ? (
-                <AvatarPopoverContent popover={resident.popover} resident={resident} />
+                <AvatarPopoverContent popover={resident.popover} initials={resident.initials} hue={resident.hue} />
             ) : null}
         </div>
     );
 }
 
-function AvatarPopoverContent({
+export function AvatarPopoverContent({
     popover,
-    resident,
+    initials,
+    hue,
 }: {
     popover: PageHeroAvatarPopover;
-    resident: PageHeroStackAvatar;
+    initials: string;
+    hue: number;
 }) {
     return (
         <div
@@ -155,11 +157,11 @@ function AvatarPopoverContent({
                     <div
                         className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full text-base font-semibold"
                         style={{
-                            background: `oklch(0.85 0.10 ${resident.hue})`,
-                            color: `oklch(0.28 0.16 ${resident.hue})`,
+                            background: `oklch(0.85 0.10 ${hue})`,
+                            color: `oklch(0.28 0.16 ${hue})`,
                         }}
                     >
-                        {resident.initials}
+                        {initials}
                     </div>
                     <div className="min-w-0 flex-1">
                         <div className="truncate text-sm font-semibold tracking-tight text-foreground">{popover.title}</div>

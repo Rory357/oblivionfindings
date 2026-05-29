@@ -3,13 +3,15 @@
 import { Link } from '@inertiajs/react';
 import { ArrowLeft } from 'lucide-react';
 import type { CSSProperties, ComponentType, ReactNode } from 'react';
-import { isValidElement } from 'react';
+import { isValidElement, useState } from 'react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { cn } from '@/lib/utils';
 
 import {
+    AvatarPopoverContent,
     PageHeroAvatarStack,
+    type PageHeroAvatarPopover,
     type PageHeroStackAvatar,
 } from './page-hero-avatar-stack';
 import { PageHeroActions } from './page-hero-actions';
@@ -37,6 +39,10 @@ type IconLike = ComponentType<{ className?: string }>;
 export type PageHeroAvatar = {
     src?: string | null;
     fallback: string;
+    /** Hue (0-360) for the hover popover's mini-avatar. Only read when `popover` is set. */
+    hue?: number;
+    /** Optional hover popover with quick actions — parity with the multi-resident stack. */
+    popover?: PageHeroAvatarPopover;
 };
 
 export interface PageHeroProps {
@@ -171,14 +177,7 @@ function HeroVariant(props: PageHeroProps) {
                     {avatarStack && avatarStack.length > 0 ? (
                         <PageHeroAvatarStack residents={avatarStack} />
                     ) : avatar ? (
-                        <Avatar className="h-24 w-24 shrink-0 border-4 border-primary-foreground/20 shadow-xl md:h-28 md:w-28">
-                            {avatar.src ? (
-                                <AvatarImage src={avatar.src} alt={avatar.fallback} />
-                            ) : null}
-                            <AvatarFallback className="bg-primary-foreground/10 text-2xl font-semibold text-primary-foreground">
-                                {avatar.fallback}
-                            </AvatarFallback>
-                        </Avatar>
+                        <HeroSingleAvatar avatar={avatar} />
                     ) : renderedIcon ? (
                         <div className="flex h-24 w-24 shrink-0 items-center justify-center rounded-full border-4 border-primary-foreground/20 bg-primary-foreground/10 shadow-xl md:h-28 md:w-28">
                             {renderedIcon}
@@ -216,6 +215,51 @@ function HeroVariant(props: PageHeroProps) {
                 <div className="relative overflow-hidden rounded-b-2xl border-t border-primary-foreground/20 px-4">
                     {footer}
                 </div>
+            ) : null}
+        </div>
+    );
+}
+
+/**
+ * Single-subject hero avatar. When `avatar.popover` is supplied it gains the
+ * same hover quick-actions popover as the multi-resident stack; otherwise it
+ * renders as a plain avatar (the behaviour every other caller relies on). The
+ * popover lives inside the hover wrapper so the cursor can travel from the
+ * avatar into it without the gap dismissing it.
+ */
+function HeroSingleAvatar({ avatar }: { avatar: PageHeroAvatar }) {
+    const [hover, setHover] = useState(false);
+
+    const avatarEl = (
+        <Avatar
+            className={cn(
+                'h-24 w-24 shrink-0 border-4 border-primary-foreground/20 shadow-xl md:h-28 md:w-28',
+                avatar.popover && 'cursor-pointer transition-shadow duration-200',
+                avatar.popover &&
+                    hover &&
+                    'shadow-[0_14px_30px_-10px_rgba(0,0,0,0.45),0_0_0_3px_var(--primary-foreground)]',
+            )}
+        >
+            {avatar.src ? <AvatarImage src={avatar.src} alt={avatar.fallback} /> : null}
+            <AvatarFallback className="bg-primary-foreground/10 text-2xl font-semibold text-primary-foreground">
+                {avatar.fallback}
+            </AvatarFallback>
+        </Avatar>
+    );
+
+    if (!avatar.popover) return avatarEl;
+
+    return (
+        <div
+            className="relative shrink-0"
+            onMouseEnter={() => setHover(true)}
+            onMouseLeave={() => setHover(false)}
+            onFocus={() => setHover(true)}
+            onBlur={() => setHover(false)}
+        >
+            {avatarEl}
+            {hover ? (
+                <AvatarPopoverContent popover={avatar.popover} initials={avatar.fallback} hue={avatar.hue ?? 0} />
             ) : null}
         </div>
     );

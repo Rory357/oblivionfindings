@@ -361,7 +361,24 @@ export function MyDayHero({
         : undefined;
 
     const singleAvatar = !multiResident && singleResident
-        ? { src: singleResident.photo_url ?? null, fallback: singleResident.initials }
+        ? {
+              src: singleResident.photo_url ?? null,
+              fallback: singleResident.initials,
+              hue: singleResident.hue,
+              popover: {
+                  title: singleResident.name,
+                  subtitle: site ? t('resident_at_site', { site: site.name }) : undefined,
+                  note: residentNotes?.get(singleResident.id) ?? singleResident.care_note_preview ?? undefined,
+                  primaryAction: { label: t('res_open_profile'), href: `/clients/${singleResident.id}` },
+                  actions: [
+                      { icon: Pill, label: t('res_give_meds'), href: `/meds/today?client=${singleResident.id}` },
+                      { icon: StickyNote, label: t('res_care_note'), href: `/clients/${singleResident.id}?tab=progress_notes` },
+                      { icon: ShieldCheck, label: t('res_care_plan'), href: `/clients/${singleResident.id}/care` },
+                      { icon: Stethoscope, label: t('res_vitals'), href: `/clients/${singleResident.id}?tab=observations` },
+                      { icon: AlertTriangle, label: t('res_incident'), href: `/incidents/create?client_id=${singleResident.id}` },
+                  ],
+              },
+          }
         : undefined;
 
     const footer = multiResident ? (
