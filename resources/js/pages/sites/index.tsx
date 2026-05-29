@@ -139,7 +139,7 @@ type Summary = {
 };
 
 type SavedViewCounts = {
-    high_risk: number;
+    at_risk: number;
     audit_overdue: number;
     open_hazards: number;
     open_maintenance: number;
@@ -183,7 +183,7 @@ type MenuItem = {
 
 type ViewKey =
     | 'all'
-    | 'high_risk'
+    | 'at_risk'
     | 'audit_overdue'
     | 'open_hazards'
     | 'active_incomplete'
@@ -650,13 +650,17 @@ function SiteCard({
                             : ''}
                     </div>
                 </div>
-                <GeoDot status={s.geofence_status} />
+                {/* "Open" reveals on hover to the LEFT of the dot. Using
+                 * hidden → inline-flex (not opacity) means it reserves no space
+                 * when hidden, so the geofence dot stays tucked flush in the
+                 * corner instead of floating with a phantom gap to its right. */}
                 {!selectMode ? (
-                    <span className="inline-flex items-center gap-1 text-xs font-semibold text-primary opacity-0 transition-opacity group-hover:opacity-100">
+                    <span className="hidden items-center gap-1 text-xs font-semibold text-primary group-hover:inline-flex">
                         Open
                         <ArrowRight className="h-3.5 w-3.5" />
                     </span>
                 ) : null}
+                <GeoDot status={s.geofence_status} />
             </div>
         </Card>
     );
@@ -854,39 +858,46 @@ function HeroPill({
 
     return (
         <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-                <button
-                    type="button"
-                    className={cn(
-                        'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors',
-                        active
-                            ? 'border-primary-foreground bg-primary-foreground text-primary'
-                            : 'border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20',
-                    )}
-                >
-                    {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
-                    <span className="max-w-[160px] truncate">
-                        {active ? (current?.label ?? label) : label}
-                    </span>
-                    {active ? (
-                        <span
-                            role="button"
-                            tabIndex={0}
-                            aria-label="Clear"
-                            onPointerDown={(e) => e.stopPropagation()}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                onChange(allValue);
-                            }}
-                            className="ml-0.5 inline-flex h-4 w-4 items-center justify-center rounded-full hover:bg-primary/20"
-                        >
-                            <X className="h-3 w-3" />
+            {/* The pill chrome lives on a non-interactive wrapper so the clear
+             * "✕" can be a real sibling <button> rather than an interactive
+             * element nested inside the trigger <button> (invalid + awkward for
+             * screen readers). Paddings mirror the old single-button spacing. */}
+            <div
+                className={cn(
+                    'inline-flex items-center rounded-full border text-xs font-semibold transition-colors',
+                    active
+                        ? 'border-primary-foreground bg-primary-foreground text-primary'
+                        : 'border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20',
+                )}
+            >
+                <PopoverTrigger asChild>
+                    <button
+                        type="button"
+                        className={cn(
+                            'inline-flex items-center gap-1.5 rounded-full py-1.5 pl-3',
+                            active ? 'pr-2' : 'pr-3',
+                        )}
+                    >
+                        {Icon ? <Icon className="h-3.5 w-3.5" /> : null}
+                        <span className="max-w-[160px] truncate">
+                            {active ? (current?.label ?? label) : label}
                         </span>
-                    ) : (
-                        <ChevronDown className="h-3 w-3 opacity-70" />
-                    )}
-                </button>
-            </PopoverTrigger>
+                        {!active ? (
+                            <ChevronDown className="h-3 w-3 opacity-70" />
+                        ) : null}
+                    </button>
+                </PopoverTrigger>
+                {active ? (
+                    <button
+                        type="button"
+                        aria-label="Clear"
+                        onClick={() => onChange(allValue)}
+                        className="mr-3 inline-flex h-4 w-4 shrink-0 items-center justify-center rounded-full hover:bg-primary/20"
+                    >
+                        <X className="h-3 w-3" />
+                    </button>
+                ) : null}
+            </div>
             <PopoverContent align="end" className="w-52 p-1">
                 {options.map((o) => (
                     <button
@@ -1254,8 +1265,8 @@ export default function SitesIndex() {
         ? 'archived'
         : filters.status === 'inactive'
           ? 'inactive'
-          : filters.risk === 'high_risk'
-            ? 'high_risk'
+          : filters.risk === 'at_risk'
+            ? 'at_risk'
             : filters.audit === 'overdue'
               ? 'audit_overdue'
               : filters.hazards === 'open'
@@ -1271,7 +1282,7 @@ export default function SitesIndex() {
             region: filters.region,
             show_archived: filters.show_archived,
         };
-        if (key === 'high_risk') base.risk = 'high_risk';
+        if (key === 'at_risk') base.risk = 'at_risk';
         else if (key === 'audit_overdue') base.audit = 'overdue';
         else if (key === 'open_hazards') base.hazards = 'open';
         else if (key === 'active_incomplete') base.readiness = 'incomplete';
@@ -1410,10 +1421,10 @@ export default function SitesIndex() {
             count: summary.total,
         },
         {
-            key: 'high_risk',
-            label: 'High risk',
+            key: 'at_risk',
+            label: 'At risk',
             icon: AlertTriangle,
-            count: savedViewCounts.high_risk,
+            count: savedViewCounts.at_risk,
             alert: true,
         },
         {
@@ -1732,7 +1743,6 @@ export default function SitesIndex() {
             <Head title={sitePlural} />
 
             <PageLayout
-                className="mx-auto max-w-[1400px]"
                 hero={
                     <PageHero
                         icon={Building2}

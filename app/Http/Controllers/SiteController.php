@@ -104,6 +104,14 @@ class SiteController extends Controller
                         })->whereIn('city', $this->citiesForRegion($region));
                     });
             }))
+            // The "At risk" saved view rolls up both elevated-attention flags;
+            // its filter must OR them to match the savedViewCounts['at_risk']
+            // badge (which counts high-risk OR high-needs). Keep the grouped
+            // closure so the OR doesn't leak across the surrounding wheres.
+            ->when($risk === 'at_risk', fn ($q) => $q->where(fn ($risky) => $risky
+                ->where('is_high_risk', true)
+                ->orWhere('is_high_needs', true)
+            ))
             ->when($risk === 'high_risk', fn ($q) => $q->where('is_high_risk', true))
             ->when($risk === 'high_needs', fn ($q) => $q->where('is_high_needs', true))
             ->when($risk === 'both', fn ($q) => $q->where('is_high_risk', true)->where('is_high_needs', true))
@@ -1821,7 +1829,10 @@ class SiteController extends Controller
     private function savedViewCounts($visibleSites, SiteReadinessService $readinessService): array
     {
         return [
-            'high_risk' => $visibleSites->filter(fn (Site $site) => $site->is_high_risk || $site->is_high_needs)->count(),
+            // "At risk" = high-risk OR high-needs. The ?risk=at_risk filter in
+            // index() must mirror this exactly, or the badge over/under-counts
+            // what the view actually shows.
+            'at_risk' => $visibleSites->filter(fn (Site $site) => $site->is_high_risk || $site->is_high_needs)->count(),
             'audit_overdue' => $visibleSites->filter(fn (Site $site) => (int) ($site->overdue_checklists_count ?? 0) > 0)->count(),
             'open_hazards' => $visibleSites->filter(fn (Site $site) => (int) ($site->open_hazards_count ?? 0) > 0)->count(),
             'open_maintenance' => $visibleSites->filter(fn (Site $site) => (int) ($site->open_maintenance_count ?? 0) > 0)->count(),
