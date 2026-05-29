@@ -6,6 +6,7 @@
  * PageHeroActions' `[data-slot=button]` colour overrides. They are therefore built as styled
  * native elements rather than design-system components, sourcing every colour from semantic
  * tokens (never hardcoded hex). */
+import { AddDailyNoteDialog } from '@/components/add-daily-note-dialog';
 import { AssignWorkerDialog } from '@/components/assign-worker-dialog';
 import { ClientEditDialog } from '@/components/client-edit-dialog';
 import {
@@ -50,6 +51,7 @@ import {
     LayoutGrid,
     MapPin,
     MoreHorizontal,
+    NotebookPen,
     Pencil,
     Plus,
     Rows3,
@@ -139,6 +141,8 @@ type Can = {
         archive?: boolean;
         assignmentsUpdate?: boolean;
     };
+    progress_notes?: { create?: boolean };
+    timeline?: { create?: boolean };
 };
 
 type PageProps = {
@@ -1076,6 +1080,9 @@ export default function ClientsIndex() {
     const canCreate = !!can.create;
     const canUpdate = !!can.update;
     const canArchive = !!can.archive;
+    const canAddNote = !!(
+        auth?.can?.progress_notes?.create || auth?.can?.timeline?.create
+    );
     // Support workers land on the frontline care view; everyone else opens the
     // full client profile by default (the care view stays one click away in the menu).
     const isSupportWorker = auth?.user?.role === 'support_worker';
@@ -1105,6 +1112,11 @@ export default function ClientsIndex() {
     const [assignClient, setAssignClient] = useState<{
         id: number;
         name: string;
+    } | null>(null);
+    const [noteClient, setNoteClient] = useState<{
+        id: number;
+        name: string;
+        nhi: string | null;
     } | null>(null);
 
     const setFilter = <K extends keyof Filters>(key: K, value: Filters[K]) =>
@@ -1292,6 +1304,16 @@ export default function ClientsIndex() {
                 label: 'View full profile',
                 icon: Eye,
                 onClick: () => router.visit(`/operations/clients/${c.id}`),
+            },
+            canAddNote && {
+                label: 'Add daily note',
+                icon: NotebookPen,
+                onClick: () =>
+                    setNoteClient({
+                        id: c.id,
+                        name: `${c.first_name} ${c.last_name}`,
+                        nhi: c.nhi_number,
+                    }),
             },
             { separator: true },
             can.assignmentsUpdate && {
@@ -1652,6 +1674,14 @@ export default function ClientsIndex() {
                 open={assignClient !== null}
                 onOpenChange={(isOpen) => {
                     if (!isOpen) setAssignClient(null);
+                }}
+            />
+
+            <AddDailyNoteDialog
+                client={noteClient}
+                open={noteClient !== null}
+                onOpenChange={(isOpen) => {
+                    if (!isOpen) setNoteClient(null);
                 }}
             />
         </AppLayout>

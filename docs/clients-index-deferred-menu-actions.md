@@ -37,18 +37,19 @@ To re-add any action, add a `MenuItem` back into `actionsFor()` (gate it on the 
 
 ## Deferred per-client actions
 
-### 1. Add daily note
+### 1. Add daily note — ✅ DONE
 - **Prior (broken) behaviour:** `router.visit('/operations/clients/{id}/care')` — just
   opened the care view; redundant with the existing "Open care view" item and never
   opened a note composer.
-- **Intended:** open the daily-note composer directly for that client.
-- **Implementation:** the component already exists — `DailyNoteWizard`
-  (`resources/js/pages/operations/clients/dialogs/daily-note-wizard.tsx`), takes
-  `clientId`, posts to `POST /operations/clients/{client}/daily-notes`. Mount it from
-  the index the same way `ClientEditDialog` / `AssignWorkerDialog` are (open-state +
-  `clientId`).
-- **Permission gate:** `progress_notes.create | timeline.create`.
-- **Effort:** small (reuse existing wizard).
+- **Shipped:** new reusable `AddDailyNoteDialog`
+  (`resources/js/components/add-daily-note-dialog.tsx`) — a single-screen popup styled
+  to match `AssignWorkerDialog`, with the client shown prominently at the top
+  (avatar + name + NHI). Captures category (reuses `NOTE_CATEGORIES`), heading, body,
+  when, "needs review" + reason, and family visibility; posts to
+  `POST /operations/clients/{client}/daily-notes` (returns `back()`, so the index
+  refreshes in place). Built self-contained so it can be reused on the profile / care
+  view / anywhere. The heavier 3-step `DailyNoteWizard` was intentionally not reused.
+- **Permission gate:** `progress_notes.create | timeline.create` (`canAddNote` in index).
 
 ### 2. Message family
 - **Prior (broken) behaviour:** `router.visit('/operations/clients/{id}')`.
@@ -117,7 +118,7 @@ was kept.
 ---
 
 ## Suggested priority
-1. **Add daily note** (#1) — quick win, component already exists.
+1. ~~**Add daily note** (#1)~~ — ✅ shipped (`AddDailyNoteDialog`).
 2. **Designate key worker** (#4) — completes the assignment story already shipped.
 3. **Message family** (#2) then **Bulk message** (#5).
 4. **Respite** items (#3, #6) — only after the product decision on what permanent⇄respite means.
