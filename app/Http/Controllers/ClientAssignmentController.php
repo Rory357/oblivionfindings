@@ -9,7 +9,7 @@ use Illuminate\Http\Request;
 
 class ClientAssignmentController extends Controller
 {
-    public function edit(Client $client)
+    public function edit(Request $request, Client $client)
     {
         $this->authorize('update', $client);
 
@@ -19,11 +19,20 @@ class ClientAssignmentController extends Controller
 
         $assignedIds = $client->supportWorkers()->pluck('users.id')->values();
 
-        return inertia('operations/clients/assignments', [
-            'client' => $client->only(['id', 'first_name', 'last_name', 'status']),
+        $payload = [
+            // key_worker_id lets the UI flag the designated key worker with a star.
+            'client' => $client->only(['id', 'first_name', 'last_name', 'status', 'key_worker_id']),
             'workers' => $workers,
             'assignedIds' => $assignedIds,
-        ]);
+        ];
+
+        // The redesigned Clients index manages assignments in a dialog that
+        // fetches this data as JSON. Normal navigations still get the full page.
+        if ($request->wantsJson() || $request->boolean('modal')) {
+            return response()->json($payload);
+        }
+
+        return inertia('operations/clients/assignments', $payload);
     }
 
     public function update(Request $request, Client $client)
@@ -51,10 +60,17 @@ class ClientAssignmentController extends Controller
         app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'client assignments', $client, $client, [
             'title' => "Client assignments updated: {$client->first_name} {$client->last_name}",
             'body' => 'Added worker IDs: ' . (count($added) ? implode(', ', $added) : 'none') . ' | Removed worker IDs: ' . (count($removed) ? implode(', ', $removed) : 'none'),
-            'url' => url("/clients/{$client->id}/assignments"),
+            'url' => url("/operations/clients/{$client->id}/assignments"),
             // Explicitly notify newly assigned workers in addition to managers.
             'target_user_ids' => $added,
         ]);
+
+        // Dialog submissions (from the Clients index popup) stay on the current
+        // page so it can close and reload fresh data; the full page keeps its
+        // own redirect back to the assignments screen.
+        if ($request->boolean('_modal')) {
+            return back()->with('success', 'Assignments updated.');
+        }
 
         return redirect()
             ->route('clients.assignments.edit', $client)

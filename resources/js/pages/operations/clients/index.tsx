@@ -6,6 +6,7 @@
  * PageHeroActions' `[data-slot=button]` colour overrides. They are therefore built as styled
  * native elements rather than design-system components, sourcing every colour from semantic
  * tokens (never hardcoded hex). */
+import { AssignWorkerDialog } from '@/components/assign-worker-dialog';
 import { ClientEditDialog } from '@/components/client-edit-dialog';
 import {
     ClientSafetyBadges,
@@ -47,7 +48,6 @@ import {
     HeartHandshake,
     Home as HomeIcon,
     LayoutGrid,
-    Mail,
     MapPin,
     MoreHorizontal,
     Pencil,
@@ -1022,13 +1022,13 @@ function BulkBar({
     count,
     total,
     onSelectAll,
-    onAct,
+    onExport,
     onClear,
 }: {
     count: number;
     total: number;
     onSelectAll: () => void;
-    onAct: (action: 'message' | 'respite' | 'export' | 'assign') => void;
+    onExport: () => void;
     onClear: () => void;
 }) {
     const btn =
@@ -1049,37 +1049,9 @@ function BulkBar({
                 Select all {total}
             </button>
             <span className="mx-1 h-6 w-px bg-border" />
-            <button
-                type="button"
-                onClick={() => onAct('message')}
-                className={btn}
-            >
-                <Mail className="h-4 w-4" />
-                Message
-            </button>
-            <button
-                type="button"
-                onClick={() => onAct('respite')}
-                className={btn}
-            >
-                <BedDouble className="h-4 w-4" />
-                Set respite
-            </button>
-            <button
-                type="button"
-                onClick={() => onAct('export')}
-                className={btn}
-            >
+            <button type="button" onClick={onExport} className={btn}>
                 <Download className="h-4 w-4" />
                 Export
-            </button>
-            <button
-                type="button"
-                onClick={() => onAct('assign')}
-                className="inline-flex h-8 items-center gap-1.5 rounded-full bg-primary px-3 text-[12.5px] font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
-            >
-                <UserCheck className="h-4 w-4" />
-                Assign staff
             </button>
             <span className="mx-1 h-6 w-px bg-border" />
             <button
@@ -1130,6 +1102,10 @@ export default function ClientsIndex() {
         client: Client;
     } | null>(null);
     const [editingClientId, setEditingClientId] = useState<number | null>(null);
+    const [assignClient, setAssignClient] = useState<{
+        id: number;
+        name: string;
+    } | null>(null);
 
     const setFilter = <K extends keyof Filters>(key: K, value: Filters[K]) =>
         setFilters((f) => ({ ...f, [key]: value }));
@@ -1287,21 +1263,12 @@ export default function ClientsIndex() {
             { preserveScroll: true },
         );
 
-    const onBulkAct = (action: 'message' | 'respite' | 'export' | 'assign') => {
-        const n = selected.size;
-        if (action === 'export') {
-            exportClientsCsv(clients.filter((c) => selected.has(c.id)));
-            toast.success(
-                `Exported ${n} ${n === 1 ? 'client' : 'clients'} to CSV.`,
-            );
-            return;
-        }
-        const messages: Record<typeof action, string> = {
-            message: 'Bulk family messaging is coming soon.',
-            respite: 'Bulk respite changes are coming soon.',
-            assign: 'Bulk staff assignment is coming soon.',
-        };
-        toast.info(messages[action]);
+    const exportSelected = () => {
+        const rows = clients.filter((c) => selected.has(c.id));
+        exportClientsCsv(rows);
+        toast.success(
+            `Exported ${rows.length} ${rows.length === 1 ? 'client' : 'clients'} to CSV.`,
+        );
     };
 
     // Per-client action list, shared by the kebab and the right-click menu.
@@ -1326,35 +1293,16 @@ export default function ClientsIndex() {
                 icon: Eye,
                 onClick: () => router.visit(`/operations/clients/${c.id}`),
             },
-            {
-                label: 'Add daily note',
-                icon: Plus,
-                onClick: () => router.visit(`/operations/clients/${c.id}/care`),
-            },
             { separator: true },
             can.assignmentsUpdate && {
-                label: 'Assign key worker',
+                label: 'Assign workers',
                 icon: UserCheck,
-                onClick: () => router.visit(`/operations/clients/${c.id}`),
+                onClick: () =>
+                    setAssignClient({
+                        id: c.id,
+                        name: `${c.first_name} ${c.last_name}`,
+                    }),
             },
-            {
-                label: 'Message family',
-                icon: Mail,
-                onClick: () => router.visit(`/operations/clients/${c.id}`),
-            },
-            c.has_respite
-                ? {
-                      label: 'Convert to permanent',
-                      icon: HomeIcon,
-                      onClick: () =>
-                          router.visit(`/operations/clients/${c.id}`),
-                  }
-                : {
-                      label: 'Move to respite',
-                      icon: BedDouble,
-                      onClick: () =>
-                          router.visit(`/operations/clients/${c.id}`),
-                  },
             canUpdate && {
                 label: 'Edit details',
                 icon: Pencil,
@@ -1675,7 +1623,7 @@ export default function ClientsIndex() {
                     count={selected.size}
                     total={filtered.length}
                     onSelectAll={selectAllVisible}
-                    onAct={onBulkAct}
+                    onExport={exportSelected}
                     onClear={() => setSelected(new Set())}
                 />
             ) : null}
@@ -1697,6 +1645,14 @@ export default function ClientsIndex() {
                     if (!isOpen) setEditingClientId(null);
                 }}
                 siteSingular={labels?.['site.singular'] ?? 'Site'}
+            />
+
+            <AssignWorkerDialog
+                client={assignClient}
+                open={assignClient !== null}
+                onOpenChange={(isOpen) => {
+                    if (!isOpen) setAssignClient(null);
+                }}
             />
         </AppLayout>
     );
