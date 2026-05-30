@@ -30,6 +30,8 @@ import {
     type MarkEndedEarlyShift,
     ReassignDialog,
     type ReassignShift,
+    RequestReplacementDialog,
+    type RequestReplacementShift,
     ReopenForCorrectionDialog,
     type ReopenForCorrectionShift,
     ResolveConflictDialog,
@@ -524,6 +526,8 @@ export default function RosteringIndex(props: Props) {
     const [reassignShift, setReassignShift] = useState<ReassignShift | null>(
         null,
     );
+    const [requestReplacementShift, setRequestReplacementShift] =
+        useState<RequestReplacementShift | null>(null);
     const [loadingAvailability, setLoadingAvailability] = useState(false);
     const todayBtnRef = useRef<HTMLButtonElement>(null);
 
@@ -1744,6 +1748,24 @@ export default function RosteringIndex(props: Props) {
         );
     };
 
+    const requestReplacement = (
+        shiftId: number,
+        payload: { reason: string; notes: string | null },
+    ) => {
+        router.post(
+            `/operations/shifts/${shiftId}/replacement-request`,
+            {
+                reason: payload.reason,
+                ...(payload.notes ? { notes: payload.notes } : {}),
+                return_to: '/operations/rostering',
+            },
+            {
+                preserveScroll: true,
+                onSuccess: () => setRequestReplacementShift(null),
+            },
+        );
+    };
+
     const reopenShift = (shiftId: number) => {
         if (
             !window.confirm(
@@ -2273,6 +2295,17 @@ export default function RosteringIndex(props: Props) {
                                               })
                                         : undefined
                                 }
+                                onRequestReplacement={
+                                    props.canManageAny
+                                        ? (s) =>
+                                              setRequestReplacementShift({
+                                                  id: s.id,
+                                                  starts_at: s.starts_at,
+                                                  client: s.client,
+                                                  staff: s.staff ?? null,
+                                              })
+                                        : undefined
+                                }
                                 onReopenShift={
                                     props.canManageAny
                                         ? (s) => reopenShift(s.id)
@@ -2383,7 +2416,17 @@ export default function RosteringIndex(props: Props) {
                         setResolveConflictShift(null);
                     }}
                     onReassign={(shift) => {
-                        router.visit(`/operations/shifts/${shift.id}`);
+                        // Resolve the overlap in place: swap the conflict dialog
+                        // for the same-page reassign popup instead of navigating.
+                        setResolveConflictShift(null);
+                        setReassignShift({
+                            id: shift.id,
+                            starts_at: shift.starts_at,
+                            ends_at: shift.ends_at,
+                            client: shift.client,
+                            staff: shift.staff ?? null,
+                            isOpen: false,
+                        });
                     }}
                     onOpenQueue={() => {
                         router.visit('/operations/rostering/conflicts');
@@ -2460,6 +2503,17 @@ export default function RosteringIndex(props: Props) {
                         if (!open) setReassignShift(null);
                     }}
                     onAssign={assignShiftToUser}
+                />
+
+                <RequestReplacementDialog
+                    open={Boolean(requestReplacementShift)}
+                    shift={requestReplacementShift}
+                    onOpenChange={(open) => {
+                        if (!open) setRequestReplacementShift(null);
+                    }}
+                    onConfirm={(shift, payload) =>
+                        requestReplacement(shift.id, payload)
+                    }
                 />
 
                 {props.rosteringFeatures.publish && props.canPublishRoster ? (

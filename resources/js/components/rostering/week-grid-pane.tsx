@@ -102,6 +102,7 @@ export type WeekGridPaneProps = {
     onPublishShift?: (shift: GridShift) => void;
     onMakeRecurring?: (shift: GridShift) => void;
     onBroadcastShift?: (shift: GridShift) => void;
+    onRequestReplacement?: (shift: GridShift) => void;
     onReportIncident?: (shift: GridShift) => void;
     actionEndSlot?: ReactNode;
 };
@@ -191,6 +192,7 @@ function buildShiftActions(
         onPublishShift?: (s: GridShift) => void;
         onMakeRecurring?: (s: GridShift) => void;
         onBroadcastShift?: (s: GridShift) => void;
+        onRequestReplacement?: (s: GridShift) => void;
         onReportIncident?: (s: GridShift) => void;
     },
 ): ShiftCtxItem[] {
@@ -305,9 +307,15 @@ function buildShiftActions(
         items.push({
             icon: <Users className="h-3.5 w-3.5" />,
             label: 'Request replacement…',
-            sub: 'Open shift detail',
+            sub: callbacks.onRequestReplacement
+                ? 'Notify eligible staff to cover'
+                : 'Open shift detail',
             onClick: () => {
-                window.location.href = detailHref;
+                if (callbacks.onRequestReplacement) {
+                    callbacks.onRequestReplacement(shift);
+                } else {
+                    window.location.href = detailHref;
+                }
             },
         });
         if (callbacks.onMarkEndedEarly) {
@@ -437,9 +445,15 @@ function buildShiftActions(
         items.push({
             icon: <Users className="h-3.5 w-3.5" />,
             label: 'Request replacement…',
-            sub: 'Open shift detail',
+            sub: callbacks.onRequestReplacement
+                ? 'Notify eligible staff to cover'
+                : 'Open shift detail',
             onClick: () => {
-                window.location.href = detailHref;
+                if (callbacks.onRequestReplacement) {
+                    callbacks.onRequestReplacement(shift);
+                } else {
+                    window.location.href = detailHref;
+                }
             },
         });
         items.push({ sep: true });
@@ -512,6 +526,7 @@ export function WeekGridPane({
     onPublishShift,
     onMakeRecurring,
     onBroadcastShift,
+    onRequestReplacement,
     onReportIncident,
     actionEndSlot,
 }: WeekGridPaneProps) {
@@ -606,6 +621,7 @@ export function WeekGridPane({
                 onPublishShift,
                 onMakeRecurring,
                 onBroadcastShift,
+                onRequestReplacement,
                 onReportIncident,
             }),
         });

@@ -98,6 +98,7 @@ export function ReassignDialog({
     const [query, setQuery] = useState('');
     const [pendingWarn, setPendingWarn] = useState<Candidate | null>(null);
     const [reason, setReason] = useState('');
+    const [locked, setLocked] = useState(false);
 
     const shiftId = shift?.id ?? null;
 
@@ -110,6 +111,7 @@ export function ReassignDialog({
         setQuery('');
         setPendingWarn(null);
         setReason('');
+        setLocked(false);
         fetch(`/operations/shifts/${shiftId}/candidates`, {
             headers: {
                 Accept: 'application/json',
@@ -127,6 +129,7 @@ export function ReassignDialog({
                     Array.isArray(data.candidates) ? data.candidates : [],
                 );
                 setCurrentUserId(data.current_user_id ?? null);
+                setLocked(Boolean(data.locked));
             })
             .catch(() => {
                 if (!cancelled) {
@@ -221,6 +224,11 @@ export function ReassignDialog({
                                 </p>
                             ) : null}
                         </div>
+                    </div>
+                ) : locked ? (
+                    <div className="py-8 text-center text-sm text-muted-foreground">
+                        This shift is completed or cancelled, so it can no longer
+                        be reassigned.
                     </div>
                 ) : (
                     <div className="min-w-0 space-y-2 py-1">

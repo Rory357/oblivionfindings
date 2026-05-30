@@ -63,6 +63,11 @@ export {
     type ReassignShift,
 } from './reassign-dialog';
 export {
+    RequestReplacementDialog,
+    type RequestReplacementDialogProps,
+    type RequestReplacementShift,
+} from './request-replacement-dialog';
+export {
     ReopenForCorrectionDialog,
     type ReopenForCorrectionDialogProps,
     type ReopenForCorrectionShift,

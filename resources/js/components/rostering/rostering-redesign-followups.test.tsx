@@ -8,6 +8,7 @@ import CapacityHeatmapPane from './capacity-heatmap-pane';
 import CoveragePane from './coverage-pane';
 import OpenShiftsPane from './open-shifts-pane';
 import ReassignDialog from './reassign-dialog';
+import RequestReplacementDialog from './request-replacement-dialog';
 import ResolveConflictDialog from './resolve-conflict-dialog';
 import TabStrip from './tab-strip';
 import TimeOffPane from './time-off-pane';
@@ -727,6 +728,10 @@ describe('rostering redesign follow-up wiring', () => {
         );
 
         expect(screen.getByText('Resolve overlap')).toBeVisible();
+        // The explanation names the double-booked staff member, not generic copy.
+        expect(
+            screen.getByText(/Aroha King is double-booked/i),
+        ).toBeVisible();
         expect(screen.getByText('Ari Kauri')).toBeVisible();
         expect(screen.getByText('Mere Rata')).toBeVisible();
 
@@ -927,5 +932,77 @@ describe('rostering redesign follow-up wiring', () => {
         } finally {
             global.fetch = originalFetch;
         }
+    });
+
+    it('shows a locked message in the reassign popup for completed shifts', async () => {
+        const originalFetch = global.fetch;
+        global.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({
+                candidates: [],
+                current_user_id: null,
+                locked: true,
+            }),
+        }) as unknown as typeof fetch;
+
+        try {
+            render(
+                <ReassignDialog
+                    open
+                    shift={{
+                        id: 99,
+                        starts_at: '2026-05-04T09:00:00',
+                        ends_at: '2026-05-04T13:00:00',
+                        client: 'Ari Kauri',
+                        staff: 'Aroha King',
+                    }}
+                    onOpenChange={vi.fn()}
+                    onAssign={vi.fn()}
+                />,
+            );
+
+            expect(
+                await screen.findByText(
+                    /completed or cancelled, so it can no longer be reassigned/i,
+                ),
+            ).toBeVisible();
+        } finally {
+            global.fetch = originalFetch;
+        }
+    });
+
+    it('requests a replacement inline, requiring a reason', () => {
+        const onConfirm = vi.fn();
+
+        render(
+            <RequestReplacementDialog
+                open
+                shift={{
+                    id: 44,
+                    starts_at: '2026-05-04T09:00:00',
+                    client: 'Ari Kauri',
+                    staff: 'Aroha King',
+                }}
+                onOpenChange={vi.fn()}
+                onConfirm={onConfirm}
+            />,
+        );
+
+        // The confirm button is disabled until a reason is entered.
+        const confirm = screen.getByRole('button', {
+            name: /Request replacement/i,
+        });
+        expect(confirm).toBeDisabled();
+
+        fireEvent.change(screen.getByLabelText(/Reason/i), {
+            target: { value: 'Called in sick' },
+        });
+        expect(confirm).not.toBeDisabled();
+
+        fireEvent.click(confirm);
+        expect(onConfirm).toHaveBeenCalledWith(
+            expect.objectContaining({ id: 44 }),
+            { reason: 'Called in sick', notes: null },
+        );
     });
 });
