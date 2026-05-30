@@ -176,16 +176,18 @@ describe('QueclinkHub page chrome', () => {
                     staff: [],
                     clients: [{ id: 9012, label: 'Amelia Wilson' }],
                 }}
+                presets={[]}
                 can={{ manage: true }}
             />,
         );
 
         expect(screen.getByTestId('queclink-page-shell')).toHaveClass('w-full');
-        expect(screen.getByTestId('queclink-hero')).toHaveClass(
-            'bg-gradient-to-br',
-        );
-        expect(screen.getByText('Direct TCP listener')).toBeVisible();
-        expect(screen.getByText('Paired')).toBeVisible();
+        // Unified compact PageHero (post hero-unification): back link + title,
+        // not the former bespoke gradient banner.
+        expect(
+            screen.getByText('Back to APIs & Integrations'),
+        ).toBeVisible();
+        expect(screen.getByText('Paired devices')).toBeVisible();
         expect(screen.getByTestId('queclink-tab-list')).toHaveClass('border-b');
     });
 });
@@ -197,6 +199,7 @@ describe('QueclinkHub device settings', () => {
         render(
             <DeviceSettingsTab
                 can={{ manage: true }}
+                presets={[]}
                 listener={{
                     port: 8090,
                     public_hostname: 'oblivionfindings.com',

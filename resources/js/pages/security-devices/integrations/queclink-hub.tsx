@@ -49,6 +49,7 @@ import {
     AlertTriangle,
     ArrowDownLeft,
     ArrowUpRight,
+    BookMarked,
     CheckCircle,
     Clock,
     Copy,
@@ -60,6 +61,7 @@ import {
     Play,
     RefreshCw,
     Satellite,
+    Save,
     Send,
     Server,
     Settings2,
@@ -157,6 +159,18 @@ type RecentCommand = {
     ack_response?: string | null;
 };
 
+type Preset = {
+    id: number;
+    name: string;
+    slug: string;
+    description: string | null;
+    target_category: string;
+    is_system: boolean;
+    sections: string[];
+    payload: Record<string, Record<string, unknown>>;
+    created_at: string | null;
+};
+
 type Props = {
     listener: {
         port: number;
@@ -184,6 +198,7 @@ type Props = {
         staff: Target[];
         clients: Target[];
     };
+    presets: Preset[];
     can: { manage: boolean };
 };
 
@@ -273,6 +288,7 @@ export default function QueclinkHub({
     statistics,
     imsCloud,
     targets,
+    presets,
     can,
 }: Props) {
     const [activeTab, setActiveTab] = useState<string>(
@@ -382,7 +398,11 @@ export default function QueclinkHub({
                         </TabsContent>
 
                         <TabsContent value="devices" className="space-y-6 pt-6">
-                            <DevicesTab paired={devices.paired} can={can} />
+                            <DevicesTab
+                                paired={devices.paired}
+                                presets={presets}
+                                can={can}
+                            />
                         </TabsContent>
 
                         <TabsContent
@@ -392,6 +412,7 @@ export default function QueclinkHub({
                             <DeviceSettingsTab
                                 devices={devices.paired}
                                 listener={listener}
+                                presets={presets}
                                 can={can}
                             />
                         </TabsContent>
@@ -1096,7 +1117,15 @@ function ClaimDialog({
 
 // ── Devices tab ───────────────────────────────────────────────────
 
-function DevicesTab({ paired, can }: { paired: Device[]; can: Props['can'] }) {
+function DevicesTab({
+    paired,
+    presets,
+    can,
+}: {
+    paired: Device[];
+    presets: Preset[];
+    can: Props['can'];
+}) {
     const [selectedIds, setSelectedIds] = useState<number[]>([]);
     const [bulkOpen, setBulkOpen] = useState(false);
     const allSelected =
@@ -1255,6 +1284,7 @@ function DevicesTab({ paired, can }: { paired: Device[]; can: Props['can'] }) {
             {bulkOpen && (
                 <BulkActionDialog
                     devices={selectedDevices}
+                    presets={presets}
                     onClose={() => setBulkOpen(false)}
                 />
             )}
@@ -1264,15 +1294,23 @@ function DevicesTab({ paired, can }: { paired: Device[]; can: Props['can'] }) {
 
 function BulkActionDialog({
     devices,
+    presets,
     onClose,
 }: {
     devices: Device[];
+    presets: Preset[];
     onClose: () => void;
 }) {
     const [action, setAction] = useState<
-        'read_configuration' | 'reboot' | 'resident_safety_profile'
+        | 'read_configuration'
+        | 'reboot'
+        | 'resident_safety_profile'
+        | 'apply_preset'
     >('read_configuration');
     const [section, setSection] = useState('all');
+    const [presetId, setPresetId] = useState<string>(
+        presets[0] ? String(presets[0].id) : '',
+    );
 
     return (
         <Dialog open onOpenChange={onClose}>
@@ -1280,7 +1318,7 @@ function BulkActionDialog({
                 <DialogHeader>
                     <DialogTitle>Bulk apply</DialogTitle>
                     <DialogDescription>
-                        Queue one command per selected paired device. Commands
+                        Queue commands for every selected paired device. Commands
                         still send through the normal pending-command queue.
                     </DialogDescription>
                 </DialogHeader>
@@ -1312,7 +1350,8 @@ function BulkActionDialog({
                                     value as
                                         | 'read_configuration'
                                         | 'reboot'
-                                        | 'resident_safety_profile',
+                                        | 'resident_safety_profile'
+                                        | 'apply_preset',
                                 )
                             }
                         >
@@ -1322,6 +1361,9 @@ function BulkActionDialog({
                             <SelectContent>
                                 <SelectItem value="read_configuration">
                                     Read full configuration
+                                </SelectItem>
+                                <SelectItem value="apply_preset">
+                                    Apply a preset
                                 </SelectItem>
                                 <SelectItem value="resident_safety_profile">
                                     Apply resident safety profile
@@ -1354,6 +1396,40 @@ function BulkActionDialog({
                             </Select>
                         </div>
                     )}
+
+                    {action === 'apply_preset' && (
+                        <div className="space-y-2">
+                            <Label>Preset</Label>
+                            {presets.length === 0 ? (
+                                <p className="text-xs text-muted-foreground">
+                                    No presets available yet. Save one from the
+                                    Device settings tab first.
+                                </p>
+                            ) : (
+                                <Select
+                                    value={presetId}
+                                    onValueChange={setPresetId}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        {presets.map((preset) => (
+                                            <SelectItem
+                                                key={preset.id}
+                                                value={String(preset.id)}
+                                            >
+                                                {preset.name}
+                                                {preset.is_system
+                                                    ? ' (built-in)'
+                                                    : ''}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            )}
+                        </div>
+                    )}
                 </div>
 
                 <DialogFooter>
@@ -1362,7 +1438,10 @@ function BulkActionDialog({
                     </Button>
                     <Button
                         type="button"
-                        disabled={devices.length === 0}
+                        disabled={
+                            devices.length === 0 ||
+                            (action === 'apply_preset' && !presetId)
+                        }
                         onClick={() => {
                             router.post(
                                 '/security-devices/integrations/queclink/bulk',
@@ -1375,6 +1454,10 @@ function BulkActionDialog({
                                         action === 'read_configuration'
                                             ? section
                                             : undefined,
+                                    preset_id:
+                                        action === 'apply_preset'
+                                            ? Number(presetId)
+                                            : undefined,
                                 },
                                 {
                                     preserveScroll: true,
@@ -1383,8 +1466,334 @@ function BulkActionDialog({
                             );
                         }}
                     >
-                        Queue {devices.length} command
-                        {devices.length === 1 ? '' : 's'}
+                        {action === 'apply_preset'
+                            ? `Apply to ${devices.length} device${devices.length === 1 ? '' : 's'}`
+                            : `Queue ${devices.length} command${devices.length === 1 ? '' : 's'}`}
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+// ── Configuration presets ──────────────────────────────────────────
+
+function PresetsCard({
+    presets,
+    target,
+    can,
+    serverForm,
+    globalForm,
+}: {
+    presets: Preset[];
+    target: Device | null;
+    can: Props['can'];
+    serverForm: ServerSettingsForm;
+    globalForm: GlobalSettingsForm;
+}) {
+    const [saveOpen, setSaveOpen] = useState(false);
+    const [confirm, setConfirm] = useState<Preset | null>(null);
+
+    const applyPreset = (preset: Preset) => {
+        if (!target) return;
+        router.post(
+            `/security-devices/integrations/queclink/devices/${target.id}/presets/${preset.id}/apply`,
+            {},
+            { preserveScroll: true, onSuccess: () => setConfirm(null) },
+        );
+    };
+
+    const deletePreset = (preset: Preset) => {
+        router.delete(
+            `/security-devices/integrations/queclink/presets/${preset.id}`,
+            { preserveScroll: true },
+        );
+    };
+
+    return (
+        <Card className="shadow-sm">
+            <CardHeader>
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="flex items-start gap-3">
+                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-md bg-primary/10 text-primary">
+                            <BookMarked className="h-4 w-4" />
+                        </div>
+                        <div>
+                            <CardTitle>Configuration presets</CardTitle>
+                            <CardDescription>
+                                Apply a saved bundle of settings to{' '}
+                                {target ? target.imei : 'the selected device'} in
+                                one click. Each section queues its own command.
+                            </CardDescription>
+                        </div>
+                    </div>
+                    <Button
+                        type="button"
+                        variant="outline"
+                        size="sm"
+                        disabled={!can.manage}
+                        onClick={() => setSaveOpen(true)}
+                    >
+                        <Save className="mr-2 h-3 w-3" />
+                        Save current as preset
+                    </Button>
+                </div>
+            </CardHeader>
+            <CardContent>
+                {presets.length === 0 ? (
+                    <p className="text-sm text-muted-foreground">
+                        No presets yet. Set up the Server and Global cards below,
+                        then save them as a reusable preset.
+                    </p>
+                ) : (
+                    <div className="grid gap-3 md:grid-cols-2">
+                        {presets.map((preset) => (
+                            <div
+                                key={preset.id}
+                                className="flex flex-col gap-3 rounded-lg border bg-muted/10 p-4"
+                            >
+                                <div className="flex items-start justify-between gap-2">
+                                    <div>
+                                        <div className="flex items-center gap-2">
+                                            <p className="text-sm font-semibold">
+                                                {preset.name}
+                                            </p>
+                                            <Badge
+                                                variant={
+                                                    preset.is_system
+                                                        ? 'secondary'
+                                                        : 'outline'
+                                                }
+                                                className="text-[10px]"
+                                            >
+                                                {preset.is_system
+                                                    ? 'Built-in'
+                                                    : 'Custom'}
+                                            </Badge>
+                                        </div>
+                                        {preset.description && (
+                                            <p className="mt-1 text-xs text-muted-foreground">
+                                                {preset.description}
+                                            </p>
+                                        )}
+                                    </div>
+                                    {!preset.is_system && (
+                                        <Button
+                                            type="button"
+                                            variant="ghost"
+                                            size="icon"
+                                            className="h-7 w-7 text-muted-foreground hover:text-destructive"
+                                            disabled={!can.manage}
+                                            onClick={() => deletePreset(preset)}
+                                            aria-label={`Delete ${preset.name}`}
+                                        >
+                                            <Trash2 className="h-3.5 w-3.5" />
+                                        </Button>
+                                    )}
+                                </div>
+                                <div className="flex flex-wrap gap-1">
+                                    {preset.sections.map((sectionName) => (
+                                        <Badge
+                                            key={sectionName}
+                                            variant="outline"
+                                            className="font-mono text-[10px] uppercase"
+                                        >
+                                            {sectionName}
+                                        </Badge>
+                                    ))}
+                                </div>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant="outline"
+                                    className="self-start"
+                                    disabled={!can.manage || !target}
+                                    onClick={() => setConfirm(preset)}
+                                >
+                                    <Play className="mr-2 h-3 w-3" />
+                                    Apply
+                                </Button>
+                            </div>
+                        ))}
+                    </div>
+                )}
+            </CardContent>
+
+            {confirm && (
+                <Dialog open onOpenChange={() => setConfirm(null)}>
+                    <DialogContent className="sm:max-w-md">
+                        <DialogHeader>
+                            <DialogTitle>Apply “{confirm.name}”?</DialogTitle>
+                            <DialogDescription>
+                                Queues {confirm.sections.length} command
+                                {confirm.sections.length === 1 ? '' : 's'} to{' '}
+                                <span className="font-mono">
+                                    {target?.imei}
+                                </span>
+                                . The tracker applies them on its next check-in.
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="max-h-72 space-y-3 overflow-y-auto">
+                            {Object.entries(confirm.payload).map(
+                                ([sectionName, fields]) => (
+                                    <div
+                                        key={sectionName}
+                                        className="rounded-md border bg-muted/20 p-3"
+                                    >
+                                        <p className="text-xs font-semibold uppercase text-muted-foreground">
+                                            {sectionName}
+                                        </p>
+                                        <div className="mt-1 grid gap-0.5">
+                                            {Object.entries(fields).map(
+                                                ([field, value]) => (
+                                                    <div
+                                                        key={field}
+                                                        className="flex justify-between gap-4 text-xs"
+                                                    >
+                                                        <span className="text-muted-foreground">
+                                                            {field}
+                                                        </span>
+                                                        <span className="font-mono">
+                                                            {String(value)}
+                                                        </span>
+                                                    </div>
+                                                ),
+                                            )}
+                                        </div>
+                                    </div>
+                                ),
+                            )}
+                        </div>
+                        <DialogFooter>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={() => setConfirm(null)}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="button"
+                                onClick={() => applyPreset(confirm)}
+                            >
+                                <Play className="mr-2 h-3 w-3" />
+                                Queue {confirm.sections.length} command
+                                {confirm.sections.length === 1 ? '' : 's'}
+                            </Button>
+                        </DialogFooter>
+                    </DialogContent>
+                </Dialog>
+            )}
+
+            {saveOpen && (
+                <SavePresetDialog
+                    serverForm={serverForm}
+                    globalForm={globalForm}
+                    onClose={() => setSaveOpen(false)}
+                />
+            )}
+        </Card>
+    );
+}
+
+function SavePresetDialog({
+    serverForm,
+    globalForm,
+    onClose,
+}: {
+    serverForm: ServerSettingsForm;
+    globalForm: GlobalSettingsForm;
+    onClose: () => void;
+}) {
+    const [name, setName] = useState('');
+    const [description, setDescription] = useState('');
+    const [includeServer, setIncludeServer] = useState(false);
+    const [includeTracking, setIncludeTracking] = useState(true);
+
+    const canSubmit =
+        name.trim().length > 0 && (includeServer || includeTracking);
+
+    const submit = () => {
+        const sections: Record<string, Record<string, string>> = {};
+        if (includeTracking)
+            sections.tracking = { ...globalForm } as Record<string, string>;
+        if (includeServer)
+            sections.server = { ...serverForm } as Record<string, string>;
+
+        router.post(
+            '/security-devices/integrations/queclink/presets',
+            { name, description, sections },
+            { preserveScroll: true, onSuccess: onClose },
+        );
+    };
+
+    return (
+        <Dialog open onOpenChange={onClose}>
+            <DialogContent className="sm:max-w-md">
+                <DialogHeader>
+                    <DialogTitle>Save configuration preset</DialogTitle>
+                    <DialogDescription>
+                        Capture the current Server and Global form values as a
+                        reusable preset for your team.
+                    </DialogDescription>
+                </DialogHeader>
+                <div className="space-y-4">
+                    <div className="space-y-2">
+                        <Label>Name</Label>
+                        <Input
+                            value={name}
+                            onChange={(event) => setName(event.target.value)}
+                            placeholder="e.g. Night shift"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Description</Label>
+                        <Textarea
+                            value={description}
+                            onChange={(event) =>
+                                setDescription(event.target.value)
+                            }
+                            rows={2}
+                            placeholder="Optional — what is this preset for?"
+                        />
+                    </div>
+                    <div className="space-y-2">
+                        <Label>Sections to include</Label>
+                        <label className="flex items-center gap-2 text-sm">
+                            <input
+                                type="checkbox"
+                                className="h-4 w-4 rounded border-input"
+                                checked={includeTracking}
+                                onChange={(event) =>
+                                    setIncludeTracking(event.target.checked)
+                                }
+                            />
+                            Global tracking (cadence, GNSS, panic button, battery)
+                        </label>
+                        <label className="flex items-center gap-2 text-sm">
+                            <input
+                                type="checkbox"
+                                className="h-4 w-4 rounded border-input"
+                                checked={includeServer}
+                                onChange={(event) =>
+                                    setIncludeServer(event.target.checked)
+                                }
+                            />
+                            Server connection (hosts, ports, heartbeat)
+                        </label>
+                    </div>
+                </div>
+                <DialogFooter>
+                    <Button type="button" variant="ghost" onClick={onClose}>
+                        Cancel
+                    </Button>
+                    <Button
+                        type="button"
+                        disabled={!canSubmit}
+                        onClick={submit}
+                    >
+                        <Save className="mr-2 h-3 w-3" />
+                        Save preset
                     </Button>
                 </DialogFooter>
             </DialogContent>
@@ -2051,10 +2460,12 @@ function commandStatusBadge(status: RecentCommand['status']) {
 export function DeviceSettingsTab({
     devices,
     listener,
+    presets,
     can,
 }: {
     devices: Device[];
     listener: Props['listener'];
+    presets: Preset[];
     can: Props['can'];
 }) {
     const [targetId, setTargetId] = useState<string>(
@@ -2239,6 +2650,14 @@ export function DeviceSettingsTab({
                     </div>
                 </CardContent>
             </Card>
+
+            <PresetsCard
+                presets={presets}
+                target={target}
+                can={can}
+                serverForm={serverForm}
+                globalForm={globalForm}
+            />
 
             <div className="grid gap-6 xl:grid-cols-[minmax(0,1fr)_380px]">
                 <div className="space-y-6">
