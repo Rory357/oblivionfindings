@@ -1,6 +1,7 @@
 # Shift Edit Consolidation Plan
 
-**Status:** Local verification passed; dev-server verification pending
+**Status:** Implemented, pushed to `main`, and verified locally and on the dev
+server
 **Recovered from:** `main` commit `19d00cef59d772d670132750a71baa9ccb8a6c2c`
 **Current branch:** `codex/ShiftConsildation`
 
@@ -67,3 +68,17 @@ rostering and from the shift detail page without leaving the current workflow.
   warnings only.
 - `git diff --check` passed.
 - Exact route/string sweep for the removed shift edit route passed.
+- Dev server `https://oblivionfindings.com` verified with a clean Chromium
+  browser session:
+  - logged in as a demo admin and opened `/operations/rostering`;
+  - opened shift `#9413` from the rostering context menu and confirmed
+    `/operations/shifts/9413/editable` returned `200`;
+  - confirmed the shared edit dialog opened on the rostering page without
+    navigating to `/edit`;
+  - confirmed the dialog rendered current staff eligibility blockers for the
+    selected shift;
+  - opened `/operations/shifts/9413`, clicked the detail-page `Edit` button,
+    and confirmed the shared edit dialog opened without navigating away;
+  - confirmed authenticated `GET /operations/shifts/9413/edit` returned `404`;
+  - confirmed the duplicate-as-draft action from rostering did not navigate to
+    the retired edit URL and stayed on the originating rostering workflow.
