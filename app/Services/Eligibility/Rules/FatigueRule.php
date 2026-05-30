@@ -22,6 +22,24 @@ use Carbon\CarbonInterface;
 class FatigueRule implements EligibilityRuleInterface
 {
     /**
+     * Request-scoped memo of each user's non-cancelled shifts (id, starts_at,
+     * ends_at only), keyed by user_id. The fatigue sub-checks previously fired
+     * ~15-20 Shift queries per (shift, user) pair via sumShiftHoursInWindow()
+     * and hasShiftOnDate(); they now filter this in-memory set so each user is
+     * fetched at most once for the whole batch.
+     *
+     * FatigueRule is constructor-injected into ShiftStaffEligibilityService and
+     * resolved per request (never a singleton), so this cache lives for one
+     * eligibility-service instance and clears naturally per request. The set
+     * mirrors the original query filter exactly (status NOT IN ['cancelled'] —
+     * completed shifts ARE counted for fatigue), and the per-call window /
+     * ignore-id predicates are applied in PHP, so verdicts are identical.
+     *
+     * @var array<int, \Illuminate\Support\Collection<int, Shift>>
+     */
+    protected array $userShiftsMemo = [];
+
+    /**
      * Single entry point required by interface — returns the first failing sub-check.
      */
     public function evaluate(Shift $shift, User $user): array
@@ -243,19 +261,25 @@ class FatigueRule implements EligibilityRuleInterface
 
     /**
      * Sum actual shift hours for a user within a time window.
+     *
+     * Filters the memoized per-user shift set (loaded once) using the same
+     * predicate the original query used: status NOT IN ['cancelled'],
+     * starts_at < windowEnd, ends_at > windowStart, id != ignoreShiftId.
      */
     protected function sumShiftHoursInWindow(int $userId, CarbonInterface $windowStart, CarbonInterface $windowEnd, ?int $ignoreShiftId): float
     {
-        $shifts = Shift::query()
-            ->where('user_id', $userId)
-            ->whereNotIn('status', ['cancelled'])
-            ->where('starts_at', '<', $windowEnd)
-            ->where('ends_at', '>', $windowStart)
-            ->when($ignoreShiftId, fn ($q) => $q->where('id', '!=', $ignoreShiftId))
-            ->get(['starts_at', 'ends_at']);
-
         $total = 0.0;
-        foreach ($shifts as $shift) {
+        foreach ($this->userShiftsForFatigue($userId) as $shift) {
+            if ($ignoreShiftId && (int) $shift->id === (int) $ignoreShiftId) {
+                continue;
+            }
+            if (! $shift->starts_at || ! $shift->ends_at) {
+                continue;
+            }
+            if (! ($shift->starts_at->lt($windowEnd) && $shift->ends_at->gt($windowStart))) {
+                continue;
+            }
+
             $start = Carbon::parse($shift->starts_at)->max($windowStart);
             $end = Carbon::parse($shift->ends_at)->min($windowEnd);
             $total += $start->floatDiffInHours($end);
@@ -266,19 +290,47 @@ class FatigueRule implements EligibilityRuleInterface
 
     /**
      * Check if the user has at least one non-cancelled shift on a given calendar date.
+     *
+     * Mirrors the original existence query against the memoized per-user set:
+     * status NOT IN ['cancelled'], starts_at < dayEnd, ends_at > dayStart,
+     * id != ignoreShiftId.
      */
     protected function hasShiftOnDate(int $userId, CarbonInterface $date, ?int $ignoreShiftId): bool
     {
         $dayStart = $date->copy()->startOfDay();
         $dayEnd = $date->copy()->endOfDay();
 
-        return Shift::query()
+        return $this->userShiftsForFatigue($userId)
+            ->contains(function (Shift $shift) use ($dayStart, $dayEnd, $ignoreShiftId) {
+                if ($ignoreShiftId && (int) $shift->id === (int) $ignoreShiftId) {
+                    return false;
+                }
+
+                return $shift->starts_at
+                    && $shift->ends_at
+                    && $shift->starts_at->lt($dayEnd)
+                    && $shift->ends_at->gt($dayStart);
+            });
+    }
+
+    /**
+     * Load (once per request) and memoize the user's non-cancelled shifts used by
+     * the fatigue calculations. Only id/starts_at/ends_at are needed; rows are
+     * tiny so the full set is safe to hold in memory for the batch.
+     *
+     * @return \Illuminate\Support\Collection<int, Shift>
+     */
+    protected function userShiftsForFatigue(int $userId): \Illuminate\Support\Collection
+    {
+        if (array_key_exists($userId, $this->userShiftsMemo)) {
+            return $this->userShiftsMemo[$userId];
+        }
+
+        return $this->userShiftsMemo[$userId] = Shift::query()
             ->where('user_id', $userId)
             ->whereNotIn('status', ['cancelled'])
-            ->where('starts_at', '<', $dayEnd)
-            ->where('ends_at', '>', $dayStart)
-            ->when($ignoreShiftId, fn ($q) => $q->where('id', '!=', $ignoreShiftId))
-            ->exists();
+            ->orderBy('starts_at')
+            ->get(['id', 'starts_at', 'ends_at']);
     }
 
     /**

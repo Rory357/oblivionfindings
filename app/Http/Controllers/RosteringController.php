@@ -47,6 +47,15 @@ class RosteringController extends Controller
         $canApproveLeave = $auth->canDo('hr.leave.approve') || $auth->canDo('hr.leave.manage');
         $organizationId = $auth->organization_id;
 
+        // /availability redirects here with ?tab=availability. On that landing the
+        // availability pane is the only tab body rendered, so heavy manager-only
+        // blocks that pane never consumes can be skipped. We only skip work whose
+        // output no always-visible chrome reads: the open-shift eligibility map and
+        // the 4-week historical trend. eligibilityAlerts is intentionally NOT skipped
+        // — its counts feed the always-visible "Open shifts" header donut, the hero
+        // "blocked candidates" badge and the signal rail.
+        $isAvailabilityTab = $request->query('tab') === 'availability';
+
         $data = $request->validated();
 
         $week = !empty($data['week'])
@@ -62,8 +71,18 @@ class RosteringController extends Controller
         $sites = [];
 
         if ($canManageAny) {
-            $staff = User::staff()->orderBy('name')->get(['id', 'name', 'email']);
-            $clients = Client::query()->orderBy('first_name')->get(['id', 'first_name', 'last_name']);
+            // Org-scope the filter dropdowns so managers only see their own
+            // organization's staff/clients. Sites are not organization-scoped
+            // in the schema (the table carries tenant_id, not organization_id),
+            // so the site list is left unscoped here.
+            $staff = User::staff()
+                ->when($organizationId, fn ($q) => $q->where('organization_id', $organizationId))
+                ->orderBy('name')
+                ->get(['id', 'name', 'email']);
+            $clients = Client::query()
+                ->when($organizationId, fn ($q) => $q->where('organization_id', $organizationId))
+                ->orderBy('first_name')
+                ->get(['id', 'first_name', 'last_name']);
             $sites = Site::query()->orderBy('name')->get(['id', 'name', 'type']);
         }
 
@@ -286,23 +305,41 @@ class RosteringController extends Controller
                 ->count();
         }
 
-        // 4-week historical trend (shifts completed vs cancelled per week)
+        // 4-week historical trend (shifts completed vs cancelled per week).
+        // Collapsed into a single GROUP BY week-bucket query and organization
+        // scoped to match the sibling analytics above (Shift carries an
+        // organization_id column). The bucket index is the number of whole
+        // 7-day windows from the trend start (weekStart - 3 weeks); because all
+        // window boundaries land on startOfDay, DATEDIFF (date-only) reproduces
+        // the original half-open [wStart, wEnd) buckets exactly.
+        // Skipped on the availability-tab landing: only the analytics pane reads
+        // analytics.historicalTrend, and that tab body is not rendered there.
         $historicalTrend = [];
-        if ($canManageAny) {
+        if ($canManageAny && ! $isAvailabilityTab) {
+            $trendStart = (clone $weekStart)->subWeeks(3);
+            $trendEnd = (clone $weekStart)->addDays(7);
+
+            $bucketRows = Shift::query()
+                ->when($organizationId, fn ($q) => $q->where('organization_id', $organizationId))
+                ->where('starts_at', '>=', $trendStart)
+                ->where('starts_at', '<', $trendEnd)
+                ->selectRaw('FLOOR(DATEDIFF(starts_at, ?) / 7) as week_bucket', [$trendStart->toDateString()])
+                ->selectRaw("SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed")
+                ->selectRaw("SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled")
+                ->selectRaw('COUNT(*) as total')
+                ->groupBy('week_bucket')
+                ->get()
+                ->keyBy(fn ($row) => (int) $row->week_bucket);
+
             for ($w = 3; $w >= 0; $w--) {
                 $wStart = (clone $weekStart)->subWeeks($w);
-                $wEnd = (clone $wStart)->addDays(7);
-                $weekShifts = Shift::where('starts_at', '>=', $wStart)
-                    ->where('starts_at', '<', $wEnd)
-                    ->selectRaw("SUM(CASE WHEN status = 'completed' THEN 1 ELSE 0 END) as completed")
-                    ->selectRaw("SUM(CASE WHEN status = 'cancelled' THEN 1 ELSE 0 END) as cancelled")
-                    ->selectRaw('COUNT(*) as total')
-                    ->first();
+                $bucketIndex = 3 - $w;
+                $row = $bucketRows->get($bucketIndex);
                 $historicalTrend[] = [
                     'week' => $wStart->format('d M'),
-                    'completed' => (int) ($weekShifts->completed ?? 0),
-                    'cancelled' => (int) ($weekShifts->cancelled ?? 0),
-                    'total' => (int) ($weekShifts->total ?? 0),
+                    'completed' => (int) ($row?->completed ?? 0),
+                    'cancelled' => (int) ($row?->cancelled ?? 0),
+                    'total' => (int) ($row?->total ?? 0),
                 ];
             }
         }
@@ -423,10 +460,15 @@ class RosteringController extends Controller
         $openShiftEligibility = [];
         if ($canManageAny) {
             $eligibilityAlerts = $this->buildEligibilityAlerts();
-            $openShiftEligibility = $this->buildOpenShiftEligibility(
-                $shifts->whereNull('user_id'),
-                $staff,
-            );
+
+            // Per-candidate open-shift eligibility is only read by the open-shifts
+            // pane; skip it on the availability-tab landing.
+            if (! $isAvailabilityTab) {
+                $openShiftEligibility = $this->buildOpenShiftEligibility(
+                    $shifts->whereNull('user_id'),
+                    $staff,
+                );
+            }
         }
 
         $publishEnabled = $this->featureFlags->publishEnabled($auth->organization_id);
@@ -1139,13 +1181,77 @@ class RosteringController extends Controller
             ->whereNotNull('user_id')
             ->where('starts_at', '>', now())
             ->where('starts_at', '<', now()->addDays(14))
-            ->with(['staff:id,name', 'site:id,name'])
+            // client/serviceContext are read inside evaluate() (overfill coverage +
+            // coverage-role checks); eager-load them here so the per-shift evaluate()
+            // calls below don't lazy-load and re-introduce an N+1 (parity with
+            // ShiftStaffEligibilityService::evaluateMany()'s shift-side preload).
+            ->with(['staff:id,name', 'site:id,name', 'client:id,site_id', 'serviceContext:id,name,type'])
             ->orderBy('starts_at')
             ->get();
-        $eligibilityResults = $eligibility->evaluateMany(
-            $futureShifts,
-            $futureShifts->pluck('staff')->filter(),
-        );
+
+        // Each future shift only needs evaluating against its OWN assignee — the
+        // dashboard reads the diagonal [$shift->id][$shift->staff->id] only.
+        // Evaluating the full cartesian product (every shift × every assignee)
+        // was wasted work, so build per-shift assignee pairs instead.
+        //
+        // Eager-load the rule stack's relations onto the distinct assignees and
+        // batch-load their active shifts grouped by user_id (the same relations
+        // and preloaded-shift set evaluateMany() would have prepared), so the
+        // per-pair evaluate() calls stay eager-loaded and reuse one query per
+        // user for the conflict/turnaround checks.
+        $assignees = $futureShifts
+            ->pluck('staff')
+            ->filter()
+            ->unique('id')
+            ->values();
+
+        $eligibilityResults = [];
+
+        if ($assignees->isNotEmpty()) {
+            (new \Illuminate\Database\Eloquent\Collection($assignees->all()))
+                ->loadMissing([
+                    'staffAvailability',
+                    'staffTimeOff',
+                    'hrLeaveRequests' => fn ($query) => $query->where('status', 'approved'),
+                    'hrEmployeeProfile',
+                    'hrComplianceStatuses.requirement:id,code,name,hard_stop,is_active',
+                    'hrDriverEligibility',
+                ]);
+
+            // Reuse the eager-loaded User instances for every shift sharing the
+            // same assignee (pluck() yields distinct instances per shift row).
+            $usersById = $assignees->keyBy('id');
+
+            $shiftsByUser = Shift::query()
+                ->whereIn('user_id', $assignees->pluck('id')->all())
+                ->whereNotIn('status', ['cancelled', 'completed'])
+                ->with(['client:id,first_name,last_name'])
+                ->orderBy('starts_at')
+                ->get()
+                ->groupBy('user_id');
+
+            foreach ($futureShifts as $shift) {
+                if (! $shift->staff) {
+                    continue;
+                }
+
+                $assignee = $usersById->get($shift->staff->id, $shift->staff);
+
+                try {
+                    $eligibilityResults[$shift->id][$assignee->id] = $eligibility->evaluate(
+                        $shift,
+                        $assignee,
+                        $shiftsByUser->get($assignee->id, collect()),
+                    );
+                } catch (\Throwable $e) {
+                    Log::warning('Eligibility alert evaluate failed', [
+                        'shift_id' => $shift->id,
+                        'user_id' => $assignee->id,
+                        'error' => $e->getMessage(),
+                    ]);
+                }
+            }
+        }
 
         $blocked = [];
         $warnings = [];

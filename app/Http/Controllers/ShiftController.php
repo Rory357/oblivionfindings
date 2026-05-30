@@ -415,6 +415,11 @@ class ShiftController extends Controller
                 ->get(['id', 'name']);
         }
 
+        // Resolve coverage once and reuse it for the recommendation scoring
+        // below; the heavy range build is request-memoized, but this also
+        // avoids repeating the lightweight status post-processing.
+        $coverage = app(ShiftCoverageService::class)->coverageStatusForShift($shift);
+
         $assignmentCandidates = [];
         if ($auth->canDo('shifts.manageAny') && in_array($shift->status, ['draft', 'scheduled', 'in_progress'], true)) {
             try {
@@ -423,12 +428,14 @@ class ShiftController extends Controller
                     $auth,
                     8,
                     $this->shiftStaffBypassPermissions(),
+                    null,
+                    null,
+                    $coverage,
                 );
             } catch (\Throwable $exception) {
                 report($exception);
             }
         }
-        $coverage = app(ShiftCoverageService::class)->coverageStatusForShift($shift);
 
         return inertia('operations/shifts/show', [
             'shift' => $shift,

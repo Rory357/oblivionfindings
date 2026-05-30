@@ -138,9 +138,28 @@ class ComplianceMatrixService
 
     /**
      * Get hard-stop compliance failures for a user.
+     *
+     * When the caller has eager-loaded hrComplianceStatuses.requirement (as the
+     * batch eligibility loader does), the same filter is applied in PHP to avoid
+     * a per-user query. The WHERE and output shape mirror the query path exactly.
      */
     public function getHardStopFailures(User $user): Collection
     {
+        if ($user->relationLoaded('hrComplianceStatuses')) {
+            return $user->hrComplianceStatuses
+                ->filter(fn ($s) => in_array($s->status, ['expired', 'not_started'], true)
+                    && $s->requirement
+                    && $s->requirement->hard_stop
+                    && $s->requirement->is_active)
+                ->map(fn ($s) => [
+                    'requirement' => $s->requirement->name,
+                    'code' => $s->requirement->code,
+                    'status' => $s->status,
+                    'expires_at' => $s->expires_at?->toDateString(),
+                ])
+                ->values();
+        }
+
         return HrStaffComplianceStatus::where('user_id', $user->id)
             ->whereIn('status', ['expired', 'not_started'])
             ->whereHas('requirement', fn($q) => $q->where('hard_stop', true)->where('is_active', true))
@@ -156,9 +175,34 @@ class ComplianceMatrixService
 
     /**
      * Get soft warnings for a user (non-blocking).
+     *
+     * Consumes the eager-loaded hrComplianceStatuses.requirement relation when
+     * present (batch path), otherwise queries. The PHP predicate mirrors the
+     * query's WHERE: status = 'expiring_soon' OR (status in [expired,not_started]
+     * AND requirement.hard_stop = false).
      */
     public function getSoftWarnings(User $user): Collection
     {
+        if ($user->relationLoaded('hrComplianceStatuses')) {
+            return $user->hrComplianceStatuses
+                ->filter(function ($s) {
+                    if ($s->status === 'expiring_soon') {
+                        return true;
+                    }
+
+                    return in_array($s->status, ['expired', 'not_started'], true)
+                        && $s->requirement
+                        && ! $s->requirement->hard_stop;
+                })
+                ->map(fn ($s) => [
+                    'requirement' => $s->requirement->name,
+                    'code' => $s->requirement->code,
+                    'status' => $s->status,
+                    'expires_at' => $s->expires_at?->toDateString(),
+                ])
+                ->values();
+        }
+
         return HrStaffComplianceStatus::where('user_id', $user->id)
             ->where(function ($q) {
                 $q->where('status', 'expiring_soon')

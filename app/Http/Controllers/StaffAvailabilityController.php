@@ -20,6 +20,17 @@ class StaffAvailabilityController extends Controller
         // Only staff users have availability
         abort_unless(User::staff()->whereKey($user->id)->exists(), 404);
 
+        // Availability now lives inside Rostering as the single scheduler surface,
+        // so schedulers/managers are sent to that consolidated tab (AvailabilityPane
+        // + EditAvailabilityDialog post to this controller's store/destroy).
+        //
+        // Frontline staff (staff.availability.updateSelf but NOT rostering.viewAny)
+        // would be bounced straight back to /my-day by RoleScope on that route, so
+        // they keep this standalone self-service editor — their only way in.
+        if ($auth->canDo('rostering.viewAny')) {
+            return redirect()->route('operations.rostering.index', ['tab' => 'availability']);
+        }
+
         $availability = StaffAvailability::query()
             ->where('user_id', $user->id)
             ->orderBy('day_of_week')

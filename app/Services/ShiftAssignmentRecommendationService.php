@@ -19,6 +19,11 @@ class ShiftAssignmentRecommendationService
      * @param  array<int, string>  $bypassPermissions
      * @param  Collection<int, User>|null  $candidatePool
      * @param  (Closure(User, Closure): mixed)|null  $eligibilityResolver
+     * @param  array<string, mixed>|null  $coverageStatus  Pre-computed
+     *   coverageStatusForShift() result. When the caller already resolved the
+     *   shift's coverage (e.g. ShiftController::show() needs it for its own
+     *   prop), passing it here avoids recomputing the same status. Null (the
+     *   default) resolves it internally as before.
      */
     public function forShift(
         Shift $shift,
@@ -27,10 +32,11 @@ class ShiftAssignmentRecommendationService
         array $bypassPermissions = [],
         ?Collection $candidatePool = null,
         ?Closure $eligibilityResolver = null,
+        ?array $coverageStatus = null,
     ): array
     {
         $shift->loadMissing(['client:id,first_name,last_name,site_id']);
-        $coverage = $this->coverage->coverageStatusForShift($shift);
+        $coverage = $coverageStatus ?? $this->coverage->coverageStatusForShift($shift);
         $coveragePriority = $coverage && ($coverage['coverage_state'] ?? null) === 'under'
             ? (int) (($coverage['missing_staff'] ?? 0) * 10) + (int) (($coverage['unfilled_after_open_shifts'] ?? 0) * 15)
             : 0;
@@ -51,42 +57,74 @@ class ShiftAssignmentRecommendationService
             $candidatePool = $staffQuery->get(['id', 'name', 'email']);
         }
 
-        $results = $candidatePool->map(function (User $user) use ($shift, $coveragePriority, $roleGapPriority, $eligibilityResolver) {
-            $siteId = $shift->site_id ?: $shift->client?->site_id;
-            $weeklyMinutes = Shift::query()
-                ->where('user_id', $user->id)
+        $siteId = $shift->site_id ?: $shift->client?->site_id;
+        $anchor = $shift->starts_at ?? now();
+        $weekStart = $anchor->copy()->startOfWeek();
+        $weekEnd = $anchor->copy()->endOfWeek();
+        $familiarityFloor = $anchor->copy()->subDays(60);
+        $userIds = $candidatePool->pluck('id')->filter()->values();
+
+        // Batch the three per-staff aggregates into grouped queries keyed by
+        // user_id instead of issuing one query per candidate. Each map below is
+        // keyed by user_id so the scoring loop can read the same values it used
+        // to compute per-user, leaving the result shape and scores identical.
+        $weeklyMinutesByUser = $userIds->isEmpty()
+            ? collect()
+            : Shift::query()
+                ->whereIn('user_id', $userIds)
                 ->where('status', '!=', 'cancelled')
-                ->whereBetween('starts_at', [
-                    ($shift->starts_at ?? now())->copy()->startOfWeek(),
-                    ($shift->starts_at ?? now())->copy()->endOfWeek(),
-                ])
-                ->get()
-                ->sum(function (Shift $existingShift) {
+                ->whereBetween('starts_at', [$weekStart, $weekEnd])
+                ->get(['user_id', 'starts_at', 'ends_at'])
+                ->groupBy('user_id')
+                ->map(fn (Collection $shifts) => $shifts->sum(function (Shift $existingShift) {
                     if (! $existingShift->starts_at || ! $existingShift->ends_at) {
                         return 0;
                     }
 
                     return max(0, $existingShift->ends_at->diffInMinutes($existingShift->starts_at));
-                });
+                }));
+
+        $siteFamiliarityByUser = ($siteId && $userIds->isNotEmpty())
+            ? Shift::query()
+                ->whereIn('user_id', $userIds)
+                ->where('site_id', $siteId)
+                ->where('starts_at', '>=', $familiarityFloor)
+                ->selectRaw('user_id, COUNT(*) as aggregate')
+                ->groupBy('user_id')
+                ->pluck('aggregate', 'user_id')
+            : collect();
+
+        $clientConsistencyByUser = $userIds->isEmpty()
+            ? collect()
+            : Shift::query()
+                ->whereIn('user_id', $userIds)
+                ->where('client_id', $shift->client_id)
+                ->where('starts_at', '>=', $familiarityFloor)
+                ->selectRaw('user_id, COUNT(*) as aggregate')
+                ->groupBy('user_id')
+                ->pluck('aggregate', 'user_id');
+
+        // Run eligibility for the whole shortlist in one batch (relation-aware
+        // after Phase 1) on the controller path. When a custom resolver is
+        // supplied (auto-schedule strategy) keep deferring to it per candidate
+        // so its own memoization/caching is preserved.
+        $batchEligibility = $eligibilityResolver
+            ? []
+            : $this->eligibility->evaluateMany([$shift], $candidatePool->all());
+
+        $results = $candidatePool->map(function (User $user) use ($shift, $coveragePriority, $roleGapPriority, $eligibilityResolver, $siteId, $weeklyMinutesByUser, $siteFamiliarityByUser, $clientConsistencyByUser, $batchEligibility) {
+            $weeklyMinutes = $weeklyMinutesByUser[$user->id] ?? 0;
 
             $eligibilityResult = $eligibilityResolver
                 ? $eligibilityResolver($user, fn () => $this->eligibility->evaluate($shift, $user))
-                : $this->eligibility->evaluate($shift, $user);
+                : ($batchEligibility[$shift->id][$user->id] ?? $this->eligibility->evaluate($shift, $user));
             $eligibility = $eligibilityResult->toArray();
             $roleCoverageBonus = collect($eligibility['matched_roles'] ?? [])
                 ->sum(fn (array $role) => (int) ($role['minimum'] ?? 1) * ($roleGapPriority > 0 ? 12 : 6));
             $siteFamiliarity = $siteId
-                ? Shift::query()
-                    ->where('user_id', $user->id)
-                    ->where('site_id', $siteId)
-                    ->where('starts_at', '>=', ($shift->starts_at ?? now())->copy()->subDays(60))
-                    ->count()
+                ? (int) ($siteFamiliarityByUser[$user->id] ?? 0)
                 : 0;
-            $clientConsistency = Shift::query()
-                ->where('user_id', $user->id)
-                ->where('client_id', $shift->client_id)
-                ->where('starts_at', '>=', ($shift->starts_at ?? now())->copy()->subDays(60))
-                ->count();
+            $clientConsistency = (int) ($clientConsistencyByUser[$user->id] ?? 0);
             $coverageFitBonus = $coveragePriority > 0
                 ? ($siteFamiliarity * 3) + ($clientConsistency * 4)
                 : 0;

@@ -97,6 +97,16 @@ class Timesheet extends Model
         'reconciliation_findings' => 'array',
     ];
 
+    /**
+     * Request-scoped memo for {@see self::effectiveClientAllocations()}. The
+     * index serialises each row twice (directly + via
+     * {@see self::dominantAllocationMethod()}), so caching the materialised
+     * collection avoids a repeat query/synthesis per row.
+     *
+     * @var \Illuminate\Support\Collection<int, array<string, mixed>>|null
+     */
+    private ?\Illuminate\Support\Collection $effectiveClientAllocationsMemo = null;
+
     protected static function booted(): void
     {
         static::saving(function (self $timesheet): void {
@@ -257,22 +267,23 @@ class Timesheet extends Model
      */
     public function effectiveClientAllocations(): \Illuminate\Support\Collection
     {
-        if ($this->relationLoaded('clientAllocations') && $this->clientAllocations->isNotEmpty()) {
-            return $this->clientAllocations->map(fn (TimesheetClientAllocation $a) => [
-                'id' => $a->id,
-                'client_id' => $a->client_id,
-                'hours' => (float) $a->hours,
-                'allocation_method' => $a->allocation_method,
-                'starts_at' => $a->starts_at?->toIso8601String(),
-                'ends_at' => $a->ends_at?->toIso8601String(),
-                'notes' => $a->notes,
-                'sort_order' => $a->sort_order,
-            ])->values();
+        if ($this->effectiveClientAllocationsMemo !== null) {
+            return $this->effectiveClientAllocationsMemo;
         }
 
-        $rows = $this->clientAllocations()->get();
+        // Prefer the eager-loaded relation. When it was loaded (the common
+        // index case writes no allocation rows, so it can be loaded-but-empty)
+        // we trust it and NEVER re-query — an empty loaded relation falls
+        // through to the synthesised single-row below. Only hit the database
+        // when the relation was never loaded at all.
+        if ($this->relationLoaded('clientAllocations')) {
+            $rows = $this->clientAllocations;
+        } else {
+            $rows = $this->clientAllocations()->get();
+        }
+
         if ($rows->isNotEmpty()) {
-            return $rows->map(fn (TimesheetClientAllocation $a) => [
+            return $this->effectiveClientAllocationsMemo = $rows->map(fn (TimesheetClientAllocation $a) => [
                 'id' => $a->id,
                 'client_id' => $a->client_id,
                 'hours' => (float) $a->hours,
@@ -291,7 +302,7 @@ class Timesheet extends Model
         //
         // The total comes from the `total_hours` accessor (starts_at - ends_at
         // - break_minutes); there's no raw `hours` column.
-        return collect([
+        return $this->effectiveClientAllocationsMemo = collect([
             [
                 'id' => null,
                 'client_id' => (int) $this->client_id,

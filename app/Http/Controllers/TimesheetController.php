@@ -231,6 +231,7 @@ class TimesheetController extends Controller
                 'staff:id,name,email',
                 'shift:id,client_id,service_context_id,starts_at,ends_at,location,shift_type,is_sleepover,is_on_call,expected_break_minutes,status',
                 'shift.serviceContext:id,name',
+                'shift.tasks:id,shift_id,is_completed',
                 'site:id,name',
                 'clientAllocations.client:id,first_name,last_name',
             ])
@@ -279,11 +280,16 @@ class TimesheetController extends Controller
         $timesheets = $q->paginate(50)->withQueryString();
         $timesheets = $timesheets->through(fn (Timesheet $ts) => $this->serializeTimesheetRow($ts));
 
-        // Tab counts — query the underlying (scoped) base query once per status.
-        $tabCounts = $this->computeTabCounts($auth);
+        // Single scoped status histogram shared by the tab strip and the hero
+        // summary — replaces the ~18 per-status COUNT queries these two used to
+        // fire independently.
+        $statusCounts = $this->scopedStatusCounts($auth);
+
+        // Tab counts — derived from the shared histogram (+ one archived count).
+        $tabCounts = $this->computeTabCounts($auth, $statusCounts);
 
         // Hero summary
-        $heroSummary = $this->computeHeroSummary($auth);
+        $heroSummary = $this->computeHeroSummary($auth, $statusCounts);
 
         // Clients / sites / shifts for the Create dialog and filters.
         $clientScope = $this->siteAccess()->applyClientScope(Client::query(), $auth, $this->timesheetBypassPermissions());
@@ -295,7 +301,8 @@ class TimesheetController extends Controller
                 ->get(['id', 'name', 'email'])
             : [];
 
-        $sites = \App\Models\Site::query()
+        $sites = $this->siteAccess()
+            ->applySiteScope(\App\Models\Site::query(), $auth, $this->timesheetBypassPermissions())
             ->orderBy('name')
             ->get(['id', 'name']);
 
@@ -349,7 +356,7 @@ class TimesheetController extends Controller
         if ($ts->shift_id && $ts->shift && method_exists($ts->shift, 'tasks')) {
             $shiftTasks = $ts->shift->relationLoaded('tasks') ? $ts->shift->tasks : collect();
             $tasksTotal = $shiftTasks->count();
-            $tasksCompleted = $shiftTasks->where('completed', true)->count();
+            $tasksCompleted = $shiftTasks->where('is_completed', true)->count();
         } elseif (is_array($ts->activity_items)) {
             $tasksTotal = count($ts->activity_items);
             $tasksCompleted = $tasksTotal;
@@ -361,11 +368,12 @@ class TimesheetController extends Controller
     }
 
     /**
-     * Counts per tab for the tab strip.
+     * Scoped, non-archived status histogram (status => count) used by both the
+     * tab strip and the hero summary. One grouped query per request.
      *
      * @return array<string, int>
      */
-    protected function computeTabCounts(User $auth): array
+    protected function scopedStatusCounts(User $auth): array
     {
         $base = Timesheet::query();
         $this->siteAccess()->applyTimesheetScope($base, $auth, $this->timesheetBypassPermissions());
@@ -374,13 +382,38 @@ class TimesheetController extends Controller
             $base->where('user_id', $auth->id);
         }
 
+        return $base->whereNull('archived_at')
+            ->selectRaw('status, count(*) as c')
+            ->groupBy('status')
+            ->pluck('c', 'status')
+            ->map(fn ($c) => (int) $c)
+            ->all();
+    }
+
+    /**
+     * Counts per tab for the tab strip. Reads the per-status numbers from the
+     * shared histogram; only the archived bucket needs its own count.
+     *
+     * @param  array<string, int>  $statusCounts  non-archived status histogram
+     * @return array<string, int>
+     */
+    protected function computeTabCounts(User $auth, array $statusCounts): array
+    {
         $statuses = ['draft', 'submitted', 'returned', 'approved', 'rejected', 'paid'];
+
+        $archivedBase = Timesheet::query();
+        $this->siteAccess()->applyTimesheetScope($archivedBase, $auth, $this->timesheetBypassPermissions());
+
+        if (! $auth->canDo('timesheets.manageAny')) {
+            $archivedBase->where('user_id', $auth->id);
+        }
+
         $counts = [
-            'all' => (clone $base)->whereNull('archived_at')->count(),
-            'archived' => (clone $base)->whereNotNull('archived_at')->count(),
+            'all' => array_sum($statusCounts),
+            'archived' => $archivedBase->whereNotNull('archived_at')->count(),
         ];
         foreach ($statuses as $s) {
-            $counts[$s] = (clone $base)->whereNull('archived_at')->where('status', $s)->count();
+            $counts[$s] = $statusCounts[$s] ?? 0;
         }
 
         return $counts;
@@ -389,9 +422,10 @@ class TimesheetController extends Controller
     /**
      * Hero summary block — pending/returned/approved counts plus hours-vs-rostered.
      *
+     * @param  array<string, int>  $statusCounts  non-archived status histogram
      * @return array<string, mixed>
      */
-    protected function computeHeroSummary(User $auth): array
+    protected function computeHeroSummary(User $auth, array $statusCounts): array
     {
         $base = Timesheet::query();
         $this->siteAccess()->applyTimesheetScope($base, $auth, $this->timesheetBypassPermissions());
@@ -429,15 +463,15 @@ class TimesheetController extends Controller
             'week_start' => $weekStart->toDateString(),
             'week_end' => $weekEnd->toDateString(),
             'week_number' => (int) $weekStart->format('W'),
-            'timesheets_total' => (clone $base)->whereNull('archived_at')->count(),
-            'timesheets_submitted' => (clone $base)->whereNull('archived_at')->where('status', 'submitted')->count(),
-            'timesheets_approved' => (clone $base)->whereNull('archived_at')->where('status', 'approved')->count(),
-            'timesheets_returned' => (clone $base)->whereNull('archived_at')->where('status', 'returned')->count(),
-            'unapproved' => (clone $base)->whereNull('archived_at')->where('status', 'submitted')->count(),
+            'timesheets_total' => array_sum($statusCounts),
+            'timesheets_submitted' => $statusCounts['submitted'] ?? 0,
+            'timesheets_approved' => $statusCounts['approved'] ?? 0,
+            'timesheets_returned' => $statusCounts['returned'] ?? 0,
+            'unapproved' => $statusCounts['submitted'] ?? 0,
             'hours_this_week' => $hoursThisWeek,
             'hours_target' => max($hoursTarget, 0.1),
             'next_payroll_date' => now()->next(\Carbon\Carbon::FRIDAY)->format('d M'),
-            'sites_count' => \App\Models\Site::query()->count(),
+            'sites_count' => $this->siteAccess()->applySiteScope(\App\Models\Site::query(), $auth, $this->timesheetBypassPermissions())->count(),
             'regions_count' => 1,
             'rostered_today' => \App\Models\Shift::query()->whereDate('starts_at', today())->count(),
             'staff_on_shift' => \App\Models\Shift::query()->whereDate('starts_at', today())->where('status', 'in_progress')->count(),

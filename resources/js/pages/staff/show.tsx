@@ -156,9 +156,6 @@ export default function StaffShow({
                         <Link href={`/staff/${user.id}/credentials`}>
                             <Button variant="outline">Credentials</Button>
                         </Link>
-                        <Link href={`/staff/${user.id}/availability`}>
-                            <Button variant="outline">Availability</Button>
-                        </Link>
                         {can?.staff?.assignmentsUpdate ? (
                             <Link href={`/staff/${user.id}/assignments`}>
                                 <Button variant="outline">Assignments</Button>

@@ -35,16 +35,23 @@ class ShiftStaffEligibilityService
      *
      * Returns an EligibilityResult value object. For backwards compatibility,
      * callers using the old array shape can call ->toArray() on the result.
+     *
+     * @param  Collection<int, Shift>|null  $preloadedUserShifts  Optional
+     *   batch-loaded set of the user's active shifts (non-cancelled/
+     *   non-completed, with client) supplied by evaluateMany() so the
+     *   conflict/turnaround checks reuse one query per user instead of
+     *   querying per pair. When null (the default, single-call path) the
+     *   original per-pair queries run unchanged.
      */
-    public function evaluate(Shift $shift, User $user): EligibilityResult
+    public function evaluate(Shift $shift, User $user, ?Collection $preloadedUserShifts = null): EligibilityResult
     {
         $checks = [];
 
         // ── Existing checks (converted to rule-result format) ──────────
 
-        $checks[] = $this->checkConflicts($shift, $user);
+        $checks[] = $this->checkConflicts($shift, $user, $preloadedUserShifts);
         $checks[] = $this->checkTimeOff($shift, $user);
-        $checks[] = $this->checkTurnaround($shift, $user);
+        $checks[] = $this->checkTurnaround($shift, $user, $preloadedUserShifts);
 
         $complianceCheck = $this->checkCompliance($shift, $user);
         $checks[] = $complianceCheck;
@@ -102,11 +109,30 @@ class ShiftStaffEligibilityService
                 'hrDriverEligibility',
             ]);
 
+        // Batch-load each candidate's active shifts (non-cancelled/non-completed,
+        // with client) in ONE query, grouped by user_id. The conflict and
+        // turnaround checks consume this per-user set in PHP instead of running
+        // two Shift queries per (shift, user) pair. This is a superset of every
+        // window those checks inspect, so the filtered results are identical to
+        // the per-pair query path.
+        $userIds = $userModels->pluck('id')->all();
+        $shiftsByUser = Shift::query()
+            ->whereIn('user_id', $userIds)
+            ->whereNotIn('status', ['cancelled', 'completed'])
+            ->with(['client:id,first_name,last_name'])
+            ->orderBy('starts_at')
+            ->get()
+            ->groupBy('user_id');
+
         $results = [];
         foreach ($shiftModels as $shift) {
             foreach ($userModels as $user) {
                 try {
-                    $results[$shift->id][$user->id] = $this->evaluate($shift, $user);
+                    $results[$shift->id][$user->id] = $this->evaluate(
+                        $shift,
+                        $user,
+                        $shiftsByUser->get($user->id, collect()),
+                    );
                 } catch (\Throwable $e) {
                     Log::warning('Batch eligibility evaluate failed', [
                         'shift_id' => $shift->id,
@@ -159,13 +185,14 @@ class ShiftStaffEligibilityService
 
     // ── Private rule methods (existing logic, reformatted as rule results) ──
 
-    protected function checkConflicts(Shift $shift, User $user): array
+    protected function checkConflicts(Shift $shift, User $user, ?Collection $preloadedUserShifts = null): array
     {
         $blockingConflicts = $this->conflicts->findBlockingStaffConflicts(
             $user->id,
             $shift->starts_at ?? now(),
             $shift->ends_at ?? now(),
             $shift->id,
+            $preloadedUserShifts,
         );
 
         if ($blockingConflicts->isNotEmpty()) {
@@ -183,12 +210,24 @@ class ShiftStaffEligibilityService
 
     protected function checkTimeOff(Shift $shift, User $user): array
     {
-        $timeOff = StaffTimeOff::query()
-            ->where('user_id', $user->id)
-            ->where('starts_at', '<', $shift->ends_at)
-            ->where('ends_at', '>', $shift->starts_at)
-            ->orderBy('starts_at')
-            ->first();
+        // Consume the eager-loaded collection when evaluateMany() preloaded it,
+        // filtering in PHP with the same overlap predicate as the query path
+        // (starts_at < shift.ends_at AND ends_at > shift.starts_at). Falls back
+        // to a fresh query for single evaluate() calls that didn't preload.
+        if ($user->relationLoaded('staffTimeOff')) {
+            $timeOff = $user->staffTimeOff
+                ->first(fn (StaffTimeOff $row) => $row->starts_at
+                    && $row->ends_at
+                    && $row->starts_at->lt($shift->ends_at)
+                    && $row->ends_at->gt($shift->starts_at));
+        } else {
+            $timeOff = StaffTimeOff::query()
+                ->where('user_id', $user->id)
+                ->where('starts_at', '<', $shift->ends_at)
+                ->where('ends_at', '>', $shift->starts_at)
+                ->orderBy('starts_at')
+                ->first();
+        }
 
         if ($timeOff) {
             return [
@@ -203,13 +242,15 @@ class ShiftStaffEligibilityService
         return self::pass('time_off');
     }
 
-    protected function checkTurnaround(Shift $shift, User $user): array
+    protected function checkTurnaround(Shift $shift, User $user, ?Collection $preloadedUserShifts = null): array
     {
         $turnaroundWarnings = $this->conflicts->findTightTurnaroundWarnings(
             $user->id,
             $shift->starts_at ?? now(),
             $shift->ends_at ?? now(),
             $shift->id,
+            ShiftConflictService::TIGHT_TURNAROUND_MINUTES, // keep default buffer; preloaded set passed next
+            $preloadedUserShifts,
         );
 
         if ($turnaroundWarnings->isNotEmpty()) {

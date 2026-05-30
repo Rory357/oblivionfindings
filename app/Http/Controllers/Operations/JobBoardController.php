@@ -13,6 +13,7 @@ use App\Services\ShiftStaffEligibilityService;
 use Illuminate\Database\QueryException;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -130,12 +131,25 @@ class JobBoardController extends Controller
         $viewerEligibilityResults = $this->batchViewerEligibility($positionItems, $auth);
         $positionEligibilityResults = $this->batchClaimedPositionEligibility($positionItems);
 
+        // Sensitive-detail visibility depends on three viewer capabilities that
+        // are identical across every card. Resolve them once instead of firing
+        // permissionOverrides queries per card.
+        $viewerCanSeeSensitive = $auth->canDo('job_board.approve')
+            || $auth->canDo('shifts.manageAny')
+            || $auth->canDo('shifts.viewAny');
+
+        // One grouped COUNT for "past shifts here" across the whole page instead
+        // of one query per rendered card.
+        $pastShiftCounts = $this->batchPastShiftsHere($positionItems, $auth);
+
         $formattedJobs = $positions->through(
             fn (ShiftOpenPosition $position) => $this->formatPositionForViewer(
                 $position,
                 $auth,
                 $viewerEligibilityResults[$position->id] ?? null,
                 $positionEligibilityResults[$position->id] ?? null,
+                $viewerCanSeeSensitive,
+                $pastShiftCounts[$position->shift?->client_id] ?? 0,
             ),
         );
 
@@ -305,6 +319,10 @@ class JobBoardController extends Controller
                 'shift_id' => 'This shift already has an active open position.',
             ]);
         }
+
+        // Surface the new position's skills in the filter chips immediately
+        // rather than waiting out the short cache TTL.
+        Cache::forget($this->availableSkillsCacheKey($auth->organization_id));
 
         return redirect()->back()->with('success', 'Open position published.');
     }
@@ -546,9 +564,11 @@ class JobBoardController extends Controller
         User $viewer,
         ?EligibilityResult $viewerEligibilityResult = null,
         ?EligibilityResult $positionEligibilityResult = null,
+        ?bool $viewerCanSeeSensitive = null,
+        ?int $pastShiftsHere = null,
     ): array
     {
-        $canViewSensitiveDetails = $this->canViewSensitivePositionDetails($position, $viewer);
+        $canViewSensitiveDetails = $this->canViewSensitivePositionDetails($position, $viewer, $viewerCanSeeSensitive);
         $viewerEligibilityResult ??= $this->evaluateViewerEligibility($position, $viewer);
         $viewerEligibility = $viewerEligibilityResult
             ? $this->formatEligibilityResult($viewerEligibilityResult)
@@ -557,7 +577,7 @@ class JobBoardController extends Controller
         $coverageRoles = $position->coverage_roles ?? [];
         $tasksTotal = $position->shift?->tasks?->count() ?? 0;
         $taskList = $this->buildTaskList($position, $canViewSensitiveDetails);
-        $pastShiftsHere = $this->countPastShiftsHere($position, $viewer);
+        $pastShiftsHere ??= $this->countPastShiftsHere($position, $viewer);
 
         return [
             'id' => $position->id,
@@ -768,6 +788,38 @@ class JobBoardController extends Controller
             ->count();
     }
 
+    /**
+     * Count the viewer's recent completed shifts per client for the rendered
+     * page in ONE grouped query, keyed by client_id. Mirrors the predicate of
+     * countPastShiftsHere(); clients with no history are simply absent (the
+     * caller defaults to 0).
+     *
+     * @return array<int, int>
+     */
+    protected function batchPastShiftsHere(iterable $positions, User $viewer): array
+    {
+        $clientIds = collect($positions)
+            ->map(fn ($position) => $position instanceof ShiftOpenPosition ? $position->shift?->client_id : null)
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($clientIds->isEmpty()) {
+            return [];
+        }
+
+        return Shift::query()
+            ->where('user_id', $viewer->id)
+            ->whereIn('client_id', $clientIds->all())
+            ->where('status', 'completed')
+            ->where('starts_at', '>=', now()->subWeeks(self::RECENT_WEEKS_LOOKBACK))
+            ->groupBy('client_id')
+            ->selectRaw('client_id, count(*) as aggregate')
+            ->pluck('aggregate', 'client_id')
+            ->map(fn ($count) => (int) $count)
+            ->all();
+    }
+
     protected function viewerFirstName(User $viewer): string
     {
         $name = trim((string) $viewer->name);
@@ -831,13 +883,16 @@ class JobBoardController extends Controller
         ];
     }
 
-    protected function canViewSensitivePositionDetails(ShiftOpenPosition $position, User $viewer): bool
+    protected function canViewSensitivePositionDetails(ShiftOpenPosition $position, User $viewer, ?bool $viewerCanSeeSensitive = null): bool
     {
-        if (
-            $viewer->canDo('job_board.approve')
+        // The three viewer-wide capability checks are identical for every card,
+        // so the caller may resolve them once and pass the result in. Fall back
+        // to evaluating them here when not supplied.
+        $viewerCanSeeSensitive ??= $viewer->canDo('job_board.approve')
             || $viewer->canDo('shifts.manageAny')
-            || $viewer->canDo('shifts.viewAny')
-        ) {
+            || $viewer->canDo('shifts.viewAny');
+
+        if ($viewerCanSeeSensitive) {
             return true;
         }
 
@@ -895,21 +950,32 @@ class JobBoardController extends Controller
 
     protected function availableSkills(User $viewer): array
     {
-        return ShiftOpenPosition::query()
-            ->when($viewer->organization_id, fn ($q) => $q->where('organization_id', $viewer->organization_id))
-            ->where('status', 'open')
-            ->where(function ($query) {
-                $query->whereNull('expires_at')
-                    ->orWhere('expires_at', '>', now());
-            })
-            ->pluck('required_skills')
-            ->flatten()
-            ->filter(fn ($skill) => is_string($skill) && trim($skill) !== '')
-            ->map(fn ($skill) => trim($skill))
-            ->unique()
-            ->sort()
-            ->values()
-            ->all();
+        // The chip list plucks + JSON-decodes required_skills for every open
+        // position on each load. Cache the derived list per organization for a
+        // short TTL so the decode does not run on every request; the brief
+        // staleness window avoids needing explicit cross-writer invalidation.
+        return Cache::remember($this->availableSkillsCacheKey($viewer->organization_id), 60, function () use ($viewer) {
+            return ShiftOpenPosition::query()
+                ->when($viewer->organization_id, fn ($q) => $q->where('organization_id', $viewer->organization_id))
+                ->where('status', 'open')
+                ->where(function ($query) {
+                    $query->whereNull('expires_at')
+                        ->orWhere('expires_at', '>', now());
+                })
+                ->pluck('required_skills')
+                ->flatten()
+                ->filter(fn ($skill) => is_string($skill) && trim($skill) !== '')
+                ->map(fn ($skill) => trim($skill))
+                ->unique()
+                ->sort()
+                ->values()
+                ->all();
+        });
+    }
+
+    protected function availableSkillsCacheKey(?int $organizationId): string
+    {
+        return sprintf('job_board:available_skills:org:%s', $organizationId ?? 'none');
     }
 
     /**

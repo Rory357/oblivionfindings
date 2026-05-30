@@ -10,14 +10,33 @@ class ShiftConflictService
 {
     public const TIGHT_TURNAROUND_MINUTES = 30;
 
+    /**
+     * @param  Collection<int, Shift>|null  $preloadedShifts  Optional batch-loaded
+     *   set of the user's active shifts (non-cancelled/non-completed, with client).
+     *   When provided, the overlap predicate is applied in PHP instead of issuing
+     *   a fresh query — used by the eligibility batch loader to avoid a per-pair
+     *   query. When null, the original query path is used unchanged.
+     */
     public function findBlockingStaffConflicts(
         ?int $userId,
         CarbonInterface $startsAt,
         CarbonInterface $endsAt,
         ?int $ignoreShiftId = null,
+        ?Collection $preloadedShifts = null,
     ): Collection {
         if (! $userId) {
             return collect();
+        }
+
+        if ($preloadedShifts !== null) {
+            return $preloadedShifts
+                ->filter(fn (Shift $shift) => (! $ignoreShiftId || (int) $shift->id !== (int) $ignoreShiftId)
+                    && $shift->starts_at
+                    && $shift->ends_at
+                    && $shift->starts_at->lt($endsAt)
+                    && $shift->ends_at->gt($startsAt))
+                ->sortBy('starts_at')
+                ->values();
         }
 
         return Shift::query()
@@ -31,12 +50,18 @@ class ShiftConflictService
             ->get();
     }
 
+    /**
+     * @param  Collection<int, Shift>|null  $preloadedShifts  See
+     *   findBlockingStaffConflicts(); same opt-in batch path. When null the
+     *   original query path is used unchanged.
+     */
     public function findTightTurnaroundWarnings(
         ?int $userId,
         CarbonInterface $startsAt,
         CarbonInterface $endsAt,
         ?int $ignoreShiftId = null,
         int $bufferMinutes = self::TIGHT_TURNAROUND_MINUTES,
+        ?Collection $preloadedShifts = null,
     ): Collection {
         if (! $userId) {
             return collect();
@@ -44,6 +69,28 @@ class ShiftConflictService
 
         $bufferStart = $startsAt->copy()->subMinutes($bufferMinutes);
         $bufferEnd = $endsAt->copy()->addMinutes($bufferMinutes);
+
+        if ($preloadedShifts !== null) {
+            return $preloadedShifts
+                ->filter(function (Shift $shift) use ($ignoreShiftId, $bufferStart, $startsAt, $endsAt, $bufferEnd) {
+                    if ($ignoreShiftId && (int) $shift->id === (int) $ignoreShiftId) {
+                        return false;
+                    }
+
+                    // Mirror the SQL: ends_at BETWEEN bufferStart AND startsAt
+                    // OR starts_at BETWEEN endsAt AND bufferEnd (inclusive bounds).
+                    $endsInBefore = $shift->ends_at
+                        && $shift->ends_at->gte($bufferStart)
+                        && $shift->ends_at->lte($startsAt);
+                    $startsInAfter = $shift->starts_at
+                        && $shift->starts_at->gte($endsAt)
+                        && $shift->starts_at->lte($bufferEnd);
+
+                    return $endsInBefore || $startsInAfter;
+                })
+                ->sortBy('starts_at')
+                ->values();
+        }
 
         return Shift::query()
             ->when($ignoreShiftId, fn ($query) => $query->where('id', '!=', $ignoreShiftId))

@@ -16,6 +16,26 @@ class ShiftCoverageService
 {
     public const DEFAULT_SLICE_MINUTES = 30;
 
+    /**
+     * Request-scoped memo for the heavy part of buildRangeCoverage() — the
+     * SiteCoverageRequirement / CoverageReservation / ShiftSeries / Shift
+     * queries plus the per-slice summarisation. The service is resolved
+     * per-request (not bound as a singleton), so this instance cache is
+     * cleared naturally at the end of each request and cannot leak stale data
+     * across requests. Keyed by (siteId, rangeStart ISO, rangeEnd ISO,
+     * sliceMinutes) — the full set of inputs that determine the result.
+     *
+     * NOTE: only the pre-lifecycle windows are cached. The acknowledgement
+     * lookup (attachCoverageLifecycleMetadata) is re-run on every call so a
+     * CoverageGapAcknowledgement created earlier in the same request is still
+     * reflected. That lookup is a single light query over the window keys,
+     * while the memoised compute is the dominant per-(shift,user) cost the
+     * eligibility batch repeats.
+     *
+     * @var array<string, array<int, array<string, mixed>>>
+     */
+    protected array $rangeCoverageMemo = [];
+
     public function __construct(
         protected CoverageRoleService $coverageRoles,
     ) {
@@ -25,6 +45,38 @@ class ShiftCoverageService
      * @return array<int, array<string, mixed>>
      */
     public function buildRangeCoverage(
+        CarbonInterface $rangeStart,
+        CarbonInterface $rangeEnd,
+        ?int $siteId = null,
+        int $sliceMinutes = self::DEFAULT_SLICE_MINUTES,
+    ): array {
+        $memoKey = implode('|', [
+            $siteId ?? 'all',
+            $rangeStart->toIso8601String(),
+            $rangeEnd->toIso8601String(),
+            $sliceMinutes,
+        ]);
+
+        if (array_key_exists($memoKey, $this->rangeCoverageMemo)) {
+            $windows = $this->rangeCoverageMemo[$memoKey];
+        } else {
+            $windows = $this->rangeCoverageMemo[$memoKey] = $this->computeRangeCoverage(
+                $rangeStart,
+                $rangeEnd,
+                $siteId,
+                $sliceMinutes,
+            );
+        }
+
+        return $this->attachCoverageLifecycleMetadata($windows);
+    }
+
+    /**
+     * Build the coverage windows for the range (without lifecycle metadata).
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    protected function computeRangeCoverage(
         CarbonInterface $rangeStart,
         CarbonInterface $rangeEnd,
         ?int $siteId = null,
@@ -143,7 +195,7 @@ class ShiftCoverageService
             }
         }
 
-        $windows = collect($results)
+        return collect($results)
             ->sortBy([
                 ['starts_at', 'asc'],
                 ['site_name', 'asc'],
@@ -151,8 +203,6 @@ class ShiftCoverageService
             ])
             ->values()
             ->all();
-
-        return $this->attachCoverageLifecycleMetadata($windows);
     }
 
     /**

@@ -682,20 +682,47 @@ class JobBoardControllerTest extends TestCase
     {
         $this->mock(ShiftStaffEligibilityService::class, function (MockInterface $mock) {
             $mock->shouldReceive('evaluate')->andReturn($this->eligibleResult());
+            // JobBoardController batches eligibility via evaluateMany(); return the
+            // same [shiftId][userId] => result map shape the real service produces.
+            $mock->shouldReceive('evaluateMany')->andReturnUsing(
+                fn ($shifts, $users) => $this->eligibilityMatrix($shifts, $users, $this->eligibleResult())
+            );
         });
     }
 
     private function blockEligibility(string $reason): void
     {
-        $this->mock(ShiftStaffEligibilityService::class, function (MockInterface $mock) use ($reason) {
-            $mock->shouldReceive('evaluate')->andReturn(new EligibilityResult(
-                is_allowed: false,
-                blocking_reasons: [$reason],
-                warnings: [],
-                checked_rules: [],
-                overrideable_warnings: [],
-            ));
+        $blocked = new EligibilityResult(
+            is_allowed: false,
+            blocking_reasons: [$reason],
+            warnings: [],
+            checked_rules: [],
+            overrideable_warnings: [],
+        );
+
+        $this->mock(ShiftStaffEligibilityService::class, function (MockInterface $mock) use ($blocked) {
+            $mock->shouldReceive('evaluate')->andReturn($blocked);
+            $mock->shouldReceive('evaluateMany')->andReturnUsing(
+                fn ($shifts, $users) => $this->eligibilityMatrix($shifts, $users, $blocked)
+            );
         });
+    }
+
+    /**
+     * Build the [shiftId][userId] => EligibilityResult map that
+     * ShiftStaffEligibilityService::evaluateMany() returns, so mocked eligibility
+     * satisfies the controller's batched path.
+     */
+    private function eligibilityMatrix(iterable $shifts, iterable $users, EligibilityResult $result): array
+    {
+        $matrix = [];
+        foreach ($shifts as $shift) {
+            foreach ($users as $user) {
+                $matrix[$shift->id][$user->id] = $result;
+            }
+        }
+
+        return $matrix;
     }
 
     private function eligibleResult(): EligibilityResult
