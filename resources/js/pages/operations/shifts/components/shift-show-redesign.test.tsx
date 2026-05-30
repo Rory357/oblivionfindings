@@ -4,10 +4,29 @@ import { describe, expect, it, vi } from 'vitest';
 import {
     ShiftSignalRail,
     ShiftTabStrip,
+    buildShiftHeroInitials,
+    buildShiftHeroWorkflowNote,
     buildShiftShowSignals,
     buildShiftShowTabs,
     canMarkShiftTasks,
 } from './shift-show-redesign';
+
+describe('shift show hero helpers', () => {
+    it('uses resident initials in the hero avatar', () => {
+        expect(buildShiftHeroInitials('Margaret Whitfield')).toBe('MW');
+        expect(buildShiftHeroInitials('Aroha')).toBe('A');
+        expect(buildShiftHeroInitials('')).toBe('SH');
+    });
+
+    it('puts linked timesheet workflow copy in the hero footer', () => {
+        expect(buildShiftHeroWorkflowNote('in_progress', 4821)).toBe(
+            'Shift is in progress - draft timesheet #4821 will finalise automatically when you complete it.',
+        );
+        expect(buildShiftHeroWorkflowNote('in_progress', null)).toBe(
+            'Shift is in progress - complete the shift to create the draft timesheet.',
+        );
+    });
+});
 
 describe('shift show redesign navigation', () => {
     it('builds icon tabs with redesign badges and preserves operational tab order', () => {

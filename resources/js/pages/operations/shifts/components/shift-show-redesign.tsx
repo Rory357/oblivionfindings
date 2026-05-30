@@ -90,6 +90,39 @@ export function canMarkShiftTasks(
     );
 }
 
+export function buildShiftHeroInitials(name: string) {
+    const initials = name
+        .trim()
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0]?.toUpperCase() ?? '')
+        .join('');
+
+    return initials || 'SH';
+}
+
+export function buildShiftHeroWorkflowNote(
+    status: string,
+    linkedTimesheetId: number | null | undefined,
+) {
+    if (status === 'in_progress') {
+        return linkedTimesheetId
+            ? `Shift is in progress - draft timesheet #${linkedTimesheetId} will finalise automatically when you complete it.`
+            : 'Shift is in progress - complete the shift to create the draft timesheet.';
+    }
+
+    if (status === 'scheduled') {
+        return 'Shift is scheduled - workers should use My Day to clock in and follow the same shift tasks.';
+    }
+
+    if (status === 'cancelled') {
+        return 'Shift is cancelled - check downstream records before reusing this occurrence.';
+    }
+
+    return 'Shift record is locked for audit history and linked workflow review.';
+}
+
 const tabToneClasses: Record<ShiftShowTabTone, string> = {
     primary:
         'bg-primary/10 text-primary [&_.shift-tab-chip]:bg-primary [&_.shift-tab-chip]:text-primary-foreground [&_.shift-tab-bar]:bg-primary',

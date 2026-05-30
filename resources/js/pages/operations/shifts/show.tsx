@@ -44,10 +44,8 @@ import {
     ArrowRight,
     CalendarDays,
     CheckCircle2,
-    ClipboardCheck,
     Clock,
     FileText,
-    Handshake,
     MapPin,
     Pencil,
     Shield,
@@ -66,6 +64,8 @@ import {
 import {
     ShiftSignalRail,
     ShiftTabStrip,
+    buildShiftHeroInitials,
+    buildShiftHeroWorkflowNote,
     buildShiftShowSignals,
     buildShiftShowTabs,
     canMarkShiftTasks,
@@ -589,16 +589,6 @@ export default function ShiftShow({
     );
     const taskCount = tasks.length;
     const incompleteCount = taskCount - tasksDone;
-    const scheduledDurationLabel = useMemo(() => {
-        const start = new Date(shift.starts_at).getTime();
-        const end = new Date(shift.ends_at).getTime();
-
-        if (Number.isNaN(start) || Number.isNaN(end) || end <= start) {
-            return '--';
-        }
-
-        return `${((end - start) / 3600000).toFixed(1)}h`;
-    }, [shift.ends_at, shift.starts_at]);
     const hasProgressOrShiftNotes = useMemo(
         () =>
             (notes ?? []).some(
@@ -885,27 +875,9 @@ export default function ShiftShow({
                 <PageHero
                     title={name}
                     description={formatDate(shift.starts_at)}
-                    icon={<CalendarDays className="h-7 w-7 text-white" />}
+                    avatar={{ fallback: buildShiftHeroInitials(name) }}
                     backHref="/operations/shifts"
                     backLabel="All shifts"
-                    stats={[
-                        {
-                            label: 'Duration',
-                            value: scheduledDurationLabel,
-                        },
-                        {
-                            label: 'Tasks',
-                            value: `${tasksDone}/${taskCount}`,
-                        },
-                        {
-                            label: 'Meds due',
-                            value: outstandingMedicationCount,
-                        },
-                        {
-                            label: 'Notes',
-                            value: notes.length + handover.length,
-                        },
-                    ]}
                     actions={
                         <div className="flex flex-wrap items-center justify-end gap-2">
                             <ShiftStatusBadge
@@ -920,7 +892,24 @@ export default function ShiftShow({
                                         className="gap-1.5"
                                     >
                                         <FileText className="h-4 w-4" />
-                                        Timesheet #{linkedTimesheet.id}
+                                        <span>
+                                            Timesheet #{linkedTimesheet.id}
+                                        </span>
+                                        <TimesheetStatusBadge
+                                            status={linkedTimesheet.status}
+                                            className="ml-1 border-white/30 bg-white/15 text-[10px] text-white uppercase"
+                                        />
+                                    </Link>
+                                </Button>
+                            ) : null}
+                            {shift.respite_booking ? (
+                                <Button asChild size="sm" variant="secondary">
+                                    <Link
+                                        href={`/respite/bookings/${shift.respite_booking.id}`}
+                                        className="gap-1.5"
+                                    >
+                                        <CalendarDays className="h-4 w-4" />
+                                        Booking #{shift.respite_booking.id}
                                     </Link>
                                 </Button>
                             ) : null}
@@ -942,7 +931,7 @@ export default function ShiftShow({
                                         className="gap-1.5"
                                     >
                                         <Shield className="h-4 w-4" />
-                                        Open client care view
+                                        Client care view
                                     </Link>
                                 </Button>
                             ) : null}
@@ -952,35 +941,9 @@ export default function ShiftShow({
                         <div className="flex flex-col items-stretch gap-2.5 py-3 md:flex-row md:items-center md:justify-between">
                             <span className="inline-flex items-center gap-2 text-xs font-medium text-white/85">
                                 <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
-                                {shift.status === 'in_progress' ? (
-                                    linkedTimesheet ? (
-                                        <>
-                                            Shift is in progress - draft
-                                            timesheet #{linkedTimesheet.id} is
-                                            ready when the shift is completed.
-                                        </>
-                                    ) : (
-                                        <>
-                                            Shift is in progress - complete the
-                                            shift to create the draft timesheet.
-                                        </>
-                                    )
-                                ) : shift.status === 'scheduled' ? (
-                                    <>
-                                        Shift is scheduled - workers should use
-                                        My Day to clock in and follow the same
-                                        shift tasks.
-                                    </>
-                                ) : shift.status === 'cancelled' ? (
-                                    <>
-                                        Shift is cancelled - check downstream
-                                        records before reusing this occurrence.
-                                    </>
-                                ) : (
-                                    <>
-                                        Shift record is locked for audit history
-                                        and linked workflow review.
-                                    </>
+                                {buildShiftHeroWorkflowNote(
+                                    shift.status,
+                                    linkedTimesheet?.id,
                                 )}
                             </span>
 
@@ -1160,242 +1123,6 @@ export default function ShiftShow({
                         ) : null}
                     </div>
                 </PageHero>
-
-                {/* Integration cards */}
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    <Card className="transition-shadow hover:shadow-md">
-                        <CardHeader className="pb-2">
-                            <CardTitle className="flex items-center gap-2 text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
-                                <FileText className="h-3.5 w-3.5" />
-                                Linked Timesheet
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            {linkedTimesheet ? (
-                                <div className="space-y-1">
-                                    <div className="flex items-center gap-2">
-                                        <Link
-                                            href={`/operations/timesheets/${linkedTimesheet.id}/edit`}
-                                            className="text-sm font-medium underline"
-                                        >
-                                            Timesheet #{linkedTimesheet.id}
-                                        </Link>
-                                        <TimesheetStatusBadge
-                                            status={linkedTimesheet.status}
-                                        />
-                                    </div>
-                                    <p className="text-xs text-muted-foreground">
-                                        {formatTime(linkedTimesheet.starts_at)}
-                                        {' – '}
-                                        {formatTime(linkedTimesheet.ends_at)}
-                                    </p>
-                                    {linkedTimesheet.exported_to_payroll_at ? (
-                                        <Badge
-                                            variant="outline"
-                                            className="border-status-success/30 bg-status-success-bg text-[10px] text-status-success"
-                                        >
-                                            Exported to payroll
-                                        </Badge>
-                                    ) : null}
-                                </div>
-                            ) : (
-                                <p className="text-sm text-muted-foreground">
-                                    No timesheet linked yet.
-                                </p>
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    {shift.respite_booking ? (
-                        <Card className="transition-shadow hover:shadow-md">
-                            <CardHeader className="pb-2">
-                                <CardTitle className="flex items-center gap-2 text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
-                                    <CalendarDays className="h-3.5 w-3.5" />
-                                    Linked Respite Booking
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="space-y-1">
-                                    <div className="flex items-center gap-2">
-                                        <Link
-                                            href={`/respite/bookings/${shift.respite_booking.id}`}
-                                            className="text-sm font-medium underline"
-                                        >
-                                            Booking #{shift.respite_booking.id}
-                                        </Link>
-                                        <Badge
-                                            variant="outline"
-                                            className="capitalize"
-                                        >
-                                            {shift.respite_booking.status.replace(
-                                                '_',
-                                                ' ',
-                                            )}
-                                        </Badge>
-                                    </div>
-                                    {shift.respite_booking.start_at &&
-                                    shift.respite_booking.end_at ? (
-                                        <p className="text-xs text-muted-foreground">
-                                            {formatDateTime(
-                                                shift.respite_booking.start_at,
-                                            )}
-                                            {' – '}
-                                            {formatTime(
-                                                shift.respite_booking.end_at,
-                                            )}
-                                        </p>
-                                    ) : null}
-                                    {shift.respite_booking
-                                        .cancellation_reason ? (
-                                        <p className="text-xs text-muted-foreground">
-                                            {
-                                                shift.respite_booking
-                                                    .cancellation_reason
-                                            }
-                                        </p>
-                                    ) : null}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ) : null}
-
-                    <Card className="transition-shadow hover:shadow-md">
-                        <CardHeader className="pb-2">
-                            <CardTitle className="flex items-center gap-2 text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
-                                <Handshake className="h-3.5 w-3.5" />
-                                Handover
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            {handoverSummary ? (
-                                <div className="space-y-1">
-                                    <Badge
-                                        variant="outline"
-                                        className={
-                                            handoverSummary.status ===
-                                            'acknowledged'
-                                                ? 'border-status-success/30 bg-status-success-bg text-status-success'
-                                                : handoverSummary.status ===
-                                                    'submitted'
-                                                  ? 'border-status-warning/30 bg-status-warning-bg text-status-warning'
-                                                  : 'bg-muted-foreground/80/10 border-border/30 text-muted-foreground'
-                                        }
-                                    >
-                                        {(handoverSummary.status ?? 'submitted')
-                                            .charAt(0)
-                                            .toUpperCase() +
-                                            (
-                                                handoverSummary.status ??
-                                                'submitted'
-                                            ).slice(1)}
-                                    </Badge>
-                                    {handoverSummary.incoming_staff_name ? (
-                                        <p className="text-xs text-muted-foreground">
-                                            Incoming:{' '}
-                                            {
-                                                handoverSummary.incoming_staff_name
-                                            }
-                                        </p>
-                                    ) : null}
-                                    {(handoverSummary.observations_summary
-                                        ?.length ?? 0) > 0 && (
-                                        <div className="mt-1.5 space-y-0.5 border-t pt-1.5">
-                                            <p className="text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
-                                                Observations
-                                            </p>
-                                            {handoverSummary.observations_summary?.map(
-                                                (obs, i) => (
-                                                    <p
-                                                        key={i}
-                                                        className="text-xs text-muted-foreground"
-                                                    >
-                                                        <span className="font-medium text-foreground">
-                                                            {obs.type_label}
-                                                        </span>
-                                                        {obs.summary
-                                                            ? ` \u2014 ${obs.summary}`
-                                                            : ''}
-                                                        {obs.recorder
-                                                            ? ` (${obs.recorder})`
-                                                            : ''}
-                                                    </p>
-                                                ),
-                                            )}
-                                        </div>
-                                    )}
-                                </div>
-                            ) : (
-                                <p className="text-sm text-muted-foreground">
-                                    No handover required.
-                                </p>
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    <Card className="transition-shadow hover:shadow-md">
-                        <CardHeader className="pb-2">
-                            <CardTitle className="flex items-center gap-2 text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
-                                <ClipboardCheck className="h-3.5 w-3.5" />
-                                Task Progress
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            {tasks.length > 0 ? (
-                                <div className="space-y-2">
-                                    <div className="flex items-baseline gap-2">
-                                        <span className="text-2xl font-bold tabular-nums">
-                                            {tasksDone}
-                                        </span>
-                                        <span className="text-sm text-muted-foreground">
-                                            / {taskCount} completed
-                                        </span>
-                                    </div>
-                                    <div className="h-1.5 w-full rounded-full bg-muted">
-                                        <div
-                                            className="h-full rounded-full bg-primary transition-all duration-300"
-                                            style={{
-                                                width: `${(tasksDone / taskCount) * 100}%`,
-                                            }}
-                                        />
-                                    </div>
-                                </div>
-                            ) : (
-                                <p className="text-sm text-muted-foreground">
-                                    No tasks assigned.
-                                </p>
-                            )}
-                        </CardContent>
-                    </Card>
-
-                    <Card className="transition-shadow hover:shadow-md">
-                        <CardHeader className="pb-2">
-                            <CardTitle className="flex items-center gap-2 text-[10px] font-medium tracking-wider text-muted-foreground uppercase">
-                                <AlertTriangle className="h-3.5 w-3.5" />
-                                Workflow readiness
-                            </CardTitle>
-                        </CardHeader>
-                        <CardContent>
-                            <div className="space-y-1">
-                                <div className="flex items-baseline gap-2">
-                                    <span className="text-2xl font-bold tabular-nums">
-                                        {outstandingMedicationCount}
-                                    </span>
-                                    <span className="text-sm text-muted-foreground">
-                                        medication alert
-                                        {outstandingMedicationCount === 1
-                                            ? ''
-                                            : 's'}
-                                    </span>
-                                </div>
-                                <p className="text-xs text-muted-foreground">
-                                    {availableFormCount > 0
-                                        ? `${submittedFormCount}/${availableFormCount} shift form(s) submitted`
-                                        : 'No active shift forms'}
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
 
                 <div className="grid gap-3 lg:grid-cols-3">
                     <DonutCard
