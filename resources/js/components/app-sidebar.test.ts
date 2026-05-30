@@ -1,6 +1,6 @@
 import { describe, expect, it } from 'vitest';
 
-import { buildNavSearchCatalog } from './app-sidebar';
+import { buildNavSearchCatalog, isIconActive } from './app-sidebar';
 
 describe('app sidebar workforce navigation', () => {
     it('groups roster and time navigation under Workforce instead of Operations', () => {
@@ -71,5 +71,61 @@ describe('app sidebar workforce navigation', () => {
 
         expect(catalog.map((item) => item.section)).toContain('Workforce');
         expect(catalog.map((item) => item.section)).not.toContain('Operations');
+    });
+
+    it('marks workforce routes active under Workforce instead of the generic Operations dashboard', () => {
+        const operationsItem = {
+            id: 'operations',
+            subPanel: true,
+        } as any;
+        const workforceItem = {
+            id: 'workforce',
+            subPanel: true,
+        } as any;
+
+        const operationsGroups = [
+            {
+                label: 'Overview',
+                items: [
+                    {
+                        title: 'Dashboard',
+                        href: '/operations',
+                    },
+                ],
+            },
+        ] as any;
+        const workforceGroups = [
+            {
+                label: 'Workforce',
+                items: [
+                    {
+                        title: 'Conflict Queue',
+                        href: '/operations/rostering/conflicts',
+                    },
+                ],
+            },
+        ] as any;
+
+        expect(
+            isIconActive(
+                '/operations/rostering/conflicts',
+                operationsItem,
+                operationsGroups,
+            ),
+        ).toBe(false);
+        expect(
+            isIconActive(
+                '/operations/rostering/conflicts',
+                workforceItem,
+                workforceGroups,
+            ),
+        ).toBe(true);
+        expect(
+            isIconActive(
+                '/operations/clients',
+                operationsItem,
+                operationsGroups,
+            ),
+        ).toBe(true);
     });
 });

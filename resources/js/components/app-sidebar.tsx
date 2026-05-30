@@ -202,13 +202,32 @@ function matchScore(currentUrl: string, itemHref: NavItem['href']): number {
     return -1;
 }
 
-function isIconActive(
+const WORKFORCE_ROUTE_PREFIXES = [
+    '/operations/shifts',
+    '/operations/job-board',
+    '/operations/rostering',
+    '/operations/timesheets',
+];
+
+function isWorkforceUrl(url: string): boolean {
+    const currentPath = normalizePath(resolveUrl(url));
+
+    return WORKFORCE_ROUTE_PREFIXES.some(
+        (prefix) =>
+            currentPath === prefix || currentPath.startsWith(`${prefix}/`),
+    );
+}
+
+export function isIconActive(
     currentUrl: string,
     item: IconNavItem,
     subPanelGroups?: SubPanelGroup[],
 ): boolean {
     if (item.href) {
         return matchScore(currentUrl, item.href) > 0;
+    }
+    if (item.id === 'operations' && isWorkforceUrl(currentUrl)) {
+        return false;
     }
     // For sub-panel items, check if any child is active
     if (item.subPanel && subPanelGroups) {
