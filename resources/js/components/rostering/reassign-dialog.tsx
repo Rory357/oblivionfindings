@@ -313,7 +313,7 @@ function CandidateRow({
             disabled={disabled}
             onClick={onPick}
             className={cn(
-                'flex w-full items-center gap-3 rounded-md border border-transparent px-2.5 py-2 text-left transition-colors',
+                'flex w-full items-center gap-3 overflow-hidden rounded-md border border-transparent px-2.5 py-2 text-left transition-colors',
                 disabled
                     ? 'cursor-not-allowed opacity-60'
                     : 'hover:border-border hover:bg-muted/60',
@@ -323,12 +323,12 @@ function CandidateRow({
                 {initials(candidate.name)}
             </div>
             <div className="min-w-0 flex-1">
-                <div className="flex items-center gap-1.5">
+                <div className="flex min-w-0 items-center gap-1.5">
                     <span className="truncate text-sm font-medium">
                         {candidate.name}
                     </span>
                     {isCurrent ? (
-                        <span className="inline-flex items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
+                        <span className="inline-flex shrink-0 items-center gap-1 rounded-full bg-primary/10 px-1.5 py-0.5 text-[10px] font-semibold text-primary">
                             <UserCheck className="h-3 w-3" /> Current
                         </span>
                     ) : null}
@@ -338,7 +338,11 @@ function CandidateRow({
                     {detail ? ` · ${detail}` : ''}
                 </div>
             </div>
-            <EligibilityStatusBadge status={status} warningCount={warningCount} />
+            <EligibilityStatusBadge
+                status={status}
+                warningCount={warningCount}
+                className="shrink-0"
+            />
         </button>
     );
 }
