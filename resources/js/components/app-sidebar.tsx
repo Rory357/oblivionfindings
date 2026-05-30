@@ -390,25 +390,63 @@ function buildIconNavItems({
         });
     }
 
-    // Operations (Clients, Shifts, Timesheets, Rostering) — any capability in
-    // the Operations domain grants the icon. Role-only fallbacks were removed
-    // so permissions strictly control visibility; support workers still see
-    // the icon via `shifts.viewAssigned` / `timesheets.viewAssigned`.
+    // Operations holds client, funding, communication, and admin tools. Core
+    // roster/time surfaces live in Workforce so schedulers have one focused
+    // place for shift navigation.
     const hasOps =
+        !!can?.operations?.dashboard ||
         !!can?.clients?.viewAny ||
         !!can?.clients?.viewAssigned ||
-        !!can?.shifts?.viewAny ||
-        !!can?.shifts?.viewAssigned ||
-        !!can?.timesheets?.viewAny ||
-        !!can?.timesheets?.viewAssigned ||
-        !!can?.rostering?.viewAny ||
+        !!can?.onboarding?.viewAny ||
+        !!can?.onboarding?.view ||
         !!can?.progress_notes?.viewAny ||
-        !!can?.care_plans?.viewAny;
+        !!can?.progress_notes?.create ||
+        !!can?.progress_notes?.review ||
+        !!can?.care_plans?.viewAny ||
+        !!can?.service_agreements?.viewAny ||
+        !!can?.client_funds?.manage ||
+        !!can?.billing?.viewAny ||
+        !!can?.invoices?.viewAny ||
+        !!can?.funding?.viewAny ||
+        !!can?.price_books?.viewAny ||
+        !!can?.quotes?.viewAny ||
+        !!can?.recurring_charges?.viewAny ||
+        !!can?.mileage?.viewAny ||
+        !!can?.mileage?.viewOwn ||
+        !!can?.messages?.viewAny ||
+        !!can?.handovers?.viewAny ||
+        !!can?.custom_forms?.viewAny ||
+        !!can?.care_note_templates?.viewAny ||
+        !!can?.evv?.viewAny ||
+        !!can?.family_portal?.viewAny ||
+        !!can?.family_portal?.manage ||
+        !!can?.qualifications?.viewAny ||
+        !!can?.operations?.reports?.view ||
+        !!can?.reports?.viewAny ||
+        !!can?.timeline?.viewAny ||
+        !!can?.summaries?.viewAny ||
+        !!can?.summaries?.generate;
     if (hasOps) {
         items.push({
             id: 'operations',
             icon: Users,
             label: 'Operations',
+            subPanel: true,
+        });
+    }
+
+    const hasWorkforce =
+        !!can?.shifts?.viewAny ||
+        !!can?.job_board?.viewAny ||
+        !!can?.job_board?.claim ||
+        !!can?.rostering?.viewAny ||
+        !!can?.timesheets?.viewAny ||
+        !!can?.timesheets?.viewAssigned;
+    if (hasWorkforce) {
+        items.push({
+            id: 'workforce',
+            icon: Briefcase,
+            label: 'Workforce',
             subPanel: true,
         });
     }
@@ -807,47 +845,8 @@ function buildOperationsSubPanelGroups({
     if (clientMgmt.length > 0)
         groups.push({ label: `${clientLabel} Management`, items: clientMgmt });
 
-    // Scheduling
-    // PR 18 — the `/operations/shifts` table is the scheduler view of the
-    // roster. Frontline workers see their own shifts on `/my-day`, so hide
-    // this entry for them. Managers with `shifts.viewAny` still see it.
-    const scheduling: NavItem[] = [];
-    if (can?.shifts?.viewAny)
-        scheduling.push({
-            title: 'Shifts',
-            href: '/operations/shifts',
-            icon: CalendarDays,
-        });
-    if (can?.job_board?.viewAny || can?.job_board?.claim)
-        scheduling.push({
-            title: 'Job Board',
-            href: '/operations/job-board',
-            icon: ClipboardList,
-            badge: can?.job_board?.open_count,
-        });
-    if (can?.rostering?.viewAny)
-        scheduling.push({
-            title: 'Rostering',
-            href: '/operations/rostering',
-            icon: CalendarDays,
-        });
-    if (can?.rostering?.viewAny)
-        scheduling.push({
-            title: 'Availability',
-            href: '/operations/rostering?tab=availability',
-            icon: Clock,
-        });
-    if (scheduling.length > 0)
-        groups.push({ label: 'Scheduling', items: scheduling });
-
     // Time & Billing
     const timeBilling: NavItem[] = [];
-    if (can?.timesheets?.viewAny || can?.timesheets?.viewAssigned)
-        timeBilling.push({
-            title: 'Timesheets',
-            href: '/operations/timesheets',
-            icon: Clock,
-        });
     if (can?.billing?.viewAny)
         timeBilling.push({
             title: 'Billing',
@@ -967,6 +966,54 @@ function buildOperationsSubPanelGroups({
     }
 
     return groups;
+}
+
+function buildWorkforceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
+    const workforce: NavItem[] = [];
+
+    // The Shifts table is the scheduler view. Frontline staff still use
+    // `/my-day` for their assigned shifts rather than this manager surface.
+    if (can?.shifts?.viewAny)
+        workforce.push({
+            title: 'Shifts',
+            href: '/operations/shifts',
+            icon: CalendarDays,
+        });
+    if (can?.job_board?.viewAny || can?.job_board?.claim)
+        workforce.push({
+            title: 'Job Board',
+            href: '/operations/job-board',
+            icon: ClipboardList,
+            badge: can?.job_board?.open_count,
+        });
+    if (can?.rostering?.viewAny)
+        workforce.push({
+            title: 'Rostering',
+            href: '/operations/rostering',
+            icon: CalendarDays,
+        });
+    if (can?.rostering?.viewAny)
+        workforce.push({
+            title: 'Availability',
+            href: '/operations/rostering?tab=availability',
+            icon: Clock,
+        });
+    if (can?.timesheets?.viewAny || can?.timesheets?.viewAssigned)
+        workforce.push({
+            title: 'Timesheets',
+            href: '/operations/timesheets',
+            icon: Clock,
+        });
+    if (can?.rostering?.viewAny)
+        workforce.push({
+            title: 'Conflict Queue',
+            href: '/operations/rostering/conflicts',
+            icon: AlertTriangle,
+        });
+
+    return workforce.length > 0
+        ? [{ label: 'Workforce', items: workforce }]
+        : [];
 }
 
 function buildEmarSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
@@ -2652,6 +2699,7 @@ export function AppSidebar({
                 role,
                 labels: labels as any,
             }),
+            workforce: buildWorkforceSubPanelGroups({ can }),
             emar: buildEmarSubPanelGroups({ can }),
             safety: buildSafetySubPanelGroups({ can }),
             'fleet-assets': buildFleetAssetsSubPanelGroups({ can }),
@@ -3063,6 +3111,7 @@ export function AppSidebarMobile({
                 role,
                 labels: labels as any,
             }),
+            workforce: buildWorkforceSubPanelGroups({ can }),
             emar: buildEmarSubPanelGroups({ can }),
             safety: buildSafetySubPanelGroups({ can }),
             'fleet-assets': buildFleetAssetsSubPanelGroups({ can }),
@@ -3278,6 +3327,7 @@ export function buildNavSearchCatalog(ctx: {
             role,
             labels: labels as any,
         }),
+        workforce: buildWorkforceSubPanelGroups({ can }),
         emar: buildEmarSubPanelGroups({ can }),
         safety: buildSafetySubPanelGroups({ can }),
         'fleet-assets': buildFleetAssetsSubPanelGroups({ can }),
