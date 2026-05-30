@@ -102,8 +102,11 @@ class JobBoardControllerTest extends TestCase
 
         $this->allowEligibility();
 
+        // The default "for-you" scope intentionally lists only open positions, so the
+        // drop-expired-open-but-keep-claimed/filled behaviour is exercised via the
+        // replacements scope, where open, claimed and filled positions coexist.
         $this->actingAs($this->manager)
-            ->get(route('operations.job_board.index'))
+            ->get(route('operations.job_board.index', ['scope' => 'replacements']))
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('jobs.data', function ($jobs) use ($freshOpen, $expiredOpen, $expiredClaimed, $expiredFilled) {
@@ -113,6 +116,47 @@ class JobBoardControllerTest extends TestCase
                         && $ids->contains($expiredClaimed->id)
                         && $ids->contains($expiredFilled->id)
                         && ! $ids->contains($expiredOpen->id);
+                }));
+    }
+
+    public function test_index_default_scope_lists_only_fresh_open_positions(): void
+    {
+        // The default "for-you"/"all" board is a claimable-work feed: it shows only
+        // open, unexpired positions. Claimed and filled positions live under the
+        // "mine"/"approvals" scopes and must not leak onto the default board.
+        $freshOpen = $this->positionForShift($this->shiftForOrg(), [
+            'status' => 'open',
+            'expires_at' => now()->addHour(),
+        ]);
+        $expiredOpen = $this->positionForShift($this->shiftForOrg(), [
+            'status' => 'open',
+            'expires_at' => now()->subMinute(),
+        ]);
+        $claimed = $this->positionForShift($this->shiftForOrg(), [
+            'status' => 'claimed',
+            'claimed_by' => $this->worker->id,
+            'claimed_at' => now()->subHour(),
+        ]);
+        $filled = $this->positionForShift($this->shiftForOrg(), [
+            'status' => 'filled',
+            'claimed_by' => $this->worker->id,
+            'claimed_at' => now()->subHours(2),
+            'approved_at' => now()->subHour(),
+        ]);
+
+        $this->allowEligibility();
+
+        $this->actingAs($this->manager)
+            ->get(route('operations.job_board.index'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->where('jobs.data', function ($jobs) use ($freshOpen, $expiredOpen, $claimed, $filled) {
+                    $ids = collect($jobs)->pluck('id');
+
+                    return $ids->contains($freshOpen->id)
+                        && ! $ids->contains($expiredOpen->id)
+                        && ! $ids->contains($claimed->id)
+                        && ! $ids->contains($filled->id);
                 }));
     }
 
