@@ -22,8 +22,10 @@ class BulkActionRequest extends FormRequest
                 'read_configuration',
                 'reboot',
                 'resident_safety_profile',
+                'apply_preset',
             ])],
             'section' => ['nullable', 'string', 'in:all,BSI,SRI,CFG,PIN,DOG,TMA,NMD,PDS,GEO,BTS,WFI,BID,UPC,WLT,FVR'],
+            'preset_id' => ['nullable', 'required_if:action,apply_preset', 'integer', 'exists:queclink_presets,id'],
         ];
     }
 }

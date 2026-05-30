@@ -46,6 +46,7 @@ class DatabaseSeeder extends Seeder
         $this->call(ControlRoomSeeder::class);
         $this->call(GovernancePermissionsSeeder::class);
         $this->call(SecurityDevicesPermissionsSeeder::class);
+        $this->call(QueclinkPresetSeeder::class);
         $this->call(RoadmapPermissionsSeeder::class);
         $this->call(RoadmapSeeder::class);
         $this->call(BoardMemberSeeder::class);

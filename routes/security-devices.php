@@ -7,11 +7,11 @@ use App\Domain\SecurityDevices\Http\Controllers\DeviceAssignmentController;
 use App\Domain\SecurityDevices\Http\Controllers\DeviceController;
 use App\Domain\SecurityDevices\Http\Controllers\DeviceDocumentController;
 use App\Domain\SecurityDevices\Http\Controllers\DeviceGroupController;
-use App\Domain\SecurityDevices\Http\Controllers\IntegrationsHubController;
 use App\Domain\SecurityDevices\Http\Controllers\Integrations\MilesightController;
 use App\Domain\SecurityDevices\Http\Controllers\Integrations\QueclinkController;
 use App\Domain\SecurityDevices\Http\Controllers\Integrations\QueclinkHubController;
 use App\Domain\SecurityDevices\Http\Controllers\Integrations\UnifiController;
+use App\Domain\SecurityDevices\Http\Controllers\IntegrationsHubController;
 use App\Domain\SecurityDevices\Http\Controllers\MaintenanceHealthController;
 use App\Domain\SecurityDevices\Http\Controllers\ReportsController;
 use Illuminate\Support\Facades\Route;
@@ -284,6 +284,14 @@ Route::middleware([
                 ->name('security-devices.integrations.queclink.commands.retry');
             Route::post('/bulk', [QueclinkHubController::class, 'bulkAction'])
                 ->name('security-devices.integrations.queclink.bulk');
+
+            // Configuration presets — saved bundles applied with one click.
+            Route::post('/devices/{queclinkDevice}/presets/{preset}/apply', [QueclinkHubController::class, 'applyPreset'])
+                ->name('security-devices.integrations.queclink.presets.apply');
+            Route::post('/presets', [QueclinkHubController::class, 'storePreset'])
+                ->name('security-devices.integrations.queclink.presets.store');
+            Route::delete('/presets/{preset}', [QueclinkHubController::class, 'destroyPreset'])
+                ->name('security-devices.integrations.queclink.presets.destroy');
 
             // IMS cloud credential management (legacy scaffold endpoints).
             Route::post('/key', [QueclinkController::class, 'saveKey'])

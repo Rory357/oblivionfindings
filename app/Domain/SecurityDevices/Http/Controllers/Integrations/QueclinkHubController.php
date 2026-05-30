@@ -17,6 +17,7 @@ use App\Models\Integration\IntegrationTenantSecret;
 use App\Models\Queclink\QueclinkAuditEvent;
 use App\Models\Queclink\QueclinkDevice;
 use App\Models\Queclink\QueclinkPendingCommand;
+use App\Models\Queclink\QueclinkPreset;
 use App\Models\Queclink\QueclinkRawFrame;
 use App\Models\User;
 use App\Services\ConsentValidationService;
@@ -26,6 +27,8 @@ use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Artisan;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
+use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\StreamedResponse;
@@ -40,6 +43,13 @@ use Symfony\Component\HttpFoundation\StreamedResponse;
  */
 class QueclinkHubController extends Controller
 {
+    /** Canonical section keys a preset payload may contain. */
+    private const PRESET_SECTIONS = [
+        'server', 'tracking', 'pin', 'dog', 'time', 'non_movement',
+        'power', 'wifi', 'geo', 'bluetooth', 'beacons', 'allowlist',
+        'firmware_update', 'firmware_version',
+    ];
+
     public function index(Request $request, ConfigurationSnapshotService $configurations)
     {
         abort_unless($this->userCanManage($request->user()), 403);
@@ -119,6 +129,13 @@ class QueclinkHubController extends Controller
                         'label' => trim(($c->first_name ?? '').' '.($c->last_name ?? '')),
                     ])->values(),
             ],
+            'presets' => QueclinkPreset::query()
+                ->availableTo($tenantId)
+                ->orderByDesc('is_system')
+                ->orderBy('name')
+                ->get()
+                ->map(fn (QueclinkPreset $preset) => $this->serialisePreset($preset))
+                ->values(),
             'can' => [
                 'manage' => true,
             ],
@@ -473,6 +490,123 @@ class QueclinkHubController extends Controller
         return back()->with('success', 'Resident safety profile queued.');
     }
 
+    /**
+     * Apply every section in a saved preset to one paired GL30 device, queuing
+     * one command per section in a single transaction.
+     */
+    public function applyPreset(Request $request, QueclinkDevice $queclinkDevice, QueclinkPreset $preset, CommandBuilder $builder)
+    {
+        abort_unless($this->userCanManage($request->user()), 403);
+        abort_unless($queclinkDevice->isPaired(), 422, 'Configuration can only be changed for paired devices.');
+        abort_unless($this->guessFamily($queclinkDevice) === CommandBuilder::FAMILY_GL30M, 422, 'Only GL30 settings are supported in this first version.');
+        abort_unless($this->presetVisibleTo($preset, $request->user()), 404);
+
+        if ($preset->target_category === 'vehicle_tracker') {
+            throw ValidationException::withMessages([
+                'preset' => 'Vehicle-tracker presets cannot be applied to a GL30 pendant.',
+            ]);
+        }
+
+        $sections = $preset->sectionPayloads();
+        if ($sections === []) {
+            throw ValidationException::withMessages([
+                'preset' => 'This preset has no configuration sections to apply.',
+            ]);
+        }
+
+        $queued = 0;
+
+        DB::transaction(function () use ($sections, $request, $queclinkDevice, $builder, $preset, &$queued) {
+            foreach ($sections as $sectionKey => $fields) {
+                try {
+                    $built = $this->buildSectionCommand($builder, (string) $sectionKey, is_array($fields) ? $fields : []);
+                } catch (\InvalidArgumentException $e) {
+                    throw ValidationException::withMessages(['preset' => $e->getMessage()]);
+                }
+
+                $command = $this->queueCommand($request, $queclinkDevice, $built);
+                $this->logAudit($request, $queclinkDevice, 'preset_apply', (string) $sectionKey, null, [
+                    'preset_id' => $preset->id,
+                    'preset_slug' => $preset->slug,
+                    'fields' => $fields,
+                ], $command->raw_command);
+
+                $queued++;
+            }
+        });
+
+        return back()->with('success', "Preset \"{$preset->name}\" queued ({$queued} command".($queued === 1 ? '' : 's').').');
+    }
+
+    /**
+     * Save a reusable preset for the operator's tenant. Each section is built
+     * once up front so a preset that would fail to apply is never persisted.
+     */
+    public function storePreset(Request $request, CommandBuilder $builder)
+    {
+        abort_unless($this->userCanManage($request->user()), 403);
+
+        $validated = $request->validate([
+            'name' => ['required', 'string', 'max:80'],
+            'description' => ['nullable', 'string', 'max:500'],
+            'target_category' => ['nullable', 'string', Rule::in(['personal_tracker', 'all'])],
+            'sections' => ['required', 'array', 'min:1'],
+            'sections.*' => ['array'],
+        ]);
+
+        $sections = [];
+        foreach ($validated['sections'] as $key => $fields) {
+            $sectionKey = strtolower((string) $key);
+
+            if (! in_array($sectionKey, self::PRESET_SECTIONS, true)) {
+                throw ValidationException::withMessages([
+                    'sections' => "Unknown configuration section [{$key}].",
+                ]);
+            }
+
+            try {
+                $this->buildSectionCommand($builder, $sectionKey, is_array($fields) ? $fields : []);
+            } catch (\InvalidArgumentException $e) {
+                throw ValidationException::withMessages(['sections' => $e->getMessage()]);
+            }
+
+            $sections[$sectionKey] = array_filter(
+                (array) $fields,
+                fn ($value) => $value !== null && $value !== '',
+            );
+        }
+
+        $tenantId = $this->resolveTenantId($request->user());
+
+        $preset = QueclinkPreset::create([
+            'tenant_id' => $tenantId,
+            'name' => $validated['name'],
+            'slug' => $this->uniquePresetSlug($validated['name'], $tenantId),
+            'description' => $validated['description'] ?? null,
+            'target_category' => $validated['target_category'] ?? 'personal_tracker',
+            'payload' => $sections,
+            'is_system' => false,
+            'created_by_user_id' => $request->user()->id,
+        ]);
+
+        return back()->with('success', "Preset \"{$preset->name}\" saved.");
+    }
+
+    public function destroyPreset(Request $request, QueclinkPreset $preset)
+    {
+        abort_unless($this->userCanManage($request->user()), 403);
+        abort_if($preset->is_system, 422, 'Built-in presets cannot be deleted.');
+        abort_unless(
+            $preset->tenant_id !== null && (int) $preset->tenant_id === $this->resolveTenantId($request->user()),
+            404,
+        );
+
+        $name = $preset->name;
+        $preset->delete();
+
+        return back()->with('success', "Preset \"{$name}\" deleted.");
+    }
+
     public function updateSectionConfiguration(UpdateSectionRequest $request, QueclinkDevice $queclinkDevice, string $section, CommandBuilder $builder)
     {
         abort_unless($queclinkDevice->isPaired(), 422, 'Configuration can only be changed for paired devices.');
@@ -560,19 +694,48 @@ class QueclinkHubController extends Controller
             ]);
         }
 
-        if ($action === 'resident_safety_profile') {
+        $preset = null;
+        if ($action === 'apply_preset') {
+            $preset = QueclinkPreset::query()
+                ->availableTo($this->resolveTenantId($request->user()))
+                ->find((int) ($validated['preset_id'] ?? 0));
+
+            if (! $preset || $preset->sectionPayloads() === [] || $preset->target_category === 'vehicle_tracker') {
+                throw ValidationException::withMessages([
+                    'preset_id' => 'The selected preset cannot be applied to these devices.',
+                ]);
+            }
+        }
+
+        if (in_array($action, ['resident_safety_profile', 'apply_preset'], true)) {
             $nonGl30 = $devices->first(fn (QueclinkDevice $device) => $this->guessFamily($device) !== CommandBuilder::FAMILY_GL30M);
             if ($nonGl30) {
                 throw ValidationException::withMessages([
-                    'action' => 'The resident safety preset can only be applied to GL30 devices.',
+                    'action' => 'This action can only be applied to GL30 devices.',
                 ]);
             }
         }
 
         $queued = 0;
 
-        DB::transaction(function () use ($devices, $request, $builder, $action, $section, &$queued) {
+        DB::transaction(function () use ($devices, $request, $builder, $action, $section, $preset, &$queued) {
             foreach ($devices as $device) {
+                if ($action === 'apply_preset') {
+                    foreach ($preset->sectionPayloads() as $sectionKey => $fields) {
+                        $built = $this->buildSectionCommand($builder, (string) $sectionKey, is_array($fields) ? $fields : []);
+                        $command = $this->queueCommand($request, $device, $built);
+                        $this->logAudit($request, $device, 'bulk_apply', (string) $sectionKey, null, [
+                            'action' => $action,
+                            'preset_id' => $preset->id,
+                            'command_id' => $command->id,
+                        ], $command->raw_command);
+                    }
+
+                    $queued++;
+
+                    continue;
+                }
+
                 $family = $this->guessFamily($device);
                 $built = match ($action) {
                     'read_configuration' => $builder->readConfiguration($family, $section),
@@ -826,6 +989,49 @@ class QueclinkHubController extends Controller
         ];
     }
 
+    /** @return array<string, mixed> */
+    private function serialisePreset(QueclinkPreset $preset): array
+    {
+        return [
+            'id' => $preset->id,
+            'name' => $preset->name,
+            'slug' => $preset->slug,
+            'description' => $preset->description,
+            'target_category' => $preset->target_category,
+            'is_system' => $preset->is_system,
+            'sections' => array_keys($preset->sectionPayloads()),
+            'payload' => $preset->sectionPayloads(),
+            'created_at' => $preset->created_at?->toIso8601String(),
+        ];
+    }
+
+    private function presetVisibleTo(QueclinkPreset $preset, ?User $user): bool
+    {
+        if ($preset->is_system) {
+            return true;
+        }
+
+        return $preset->tenant_id !== null
+            && (int) $preset->tenant_id === $this->resolveTenantId($user);
+    }
+
+    private function uniquePresetSlug(string $name, ?int $tenantId): string
+    {
+        $base = Str::slug($name) ?: 'preset';
+        $slug = $base;
+        $suffix = 2;
+
+        while (QueclinkPreset::query()
+            ->where('slug', $slug)
+            ->where(fn ($q) => $q->where('tenant_id', $tenantId)->orWhere('is_system', true))
+            ->exists()) {
+            $slug = $base.'-'.$suffix;
+            $suffix++;
+        }
+
+        return $slug;
+    }
+
     private function queueCommand(Request $request, QueclinkDevice $queclinkDevice, array $built, ?Carbon $expiresAt = null): QueclinkPendingCommand
     {
         return QueclinkPendingCommand::create([
@@ -847,23 +1053,7 @@ class QueclinkHubController extends Controller
         $commandKey = strtolower((string) ($payload['command'] ?? $section));
 
         try {
-            $built = match ($commandKey) {
-                'server', 'sri' => $builder->gl30ServerRegistration($payload),
-                'tracking', 'global', 'cfg', 'cfg_alarm' => $builder->gl30GlobalConfiguration($payload),
-                'pin' => $builder->gl30Pin($payload),
-                'dog' => $builder->gl30Dog($payload),
-                'time', 'tma' => $builder->gl30Tma($payload),
-                'non_movement', 'nmd' => $builder->gl30Nmd($payload),
-                'power', 'pds' => $builder->gl30Pds($payload),
-                'wifi', 'wfi' => $builder->gl30Wifi($payload),
-                'geo' => $builder->gl30Geo((int) ($payload['slot'] ?? 0), $payload),
-                'bluetooth', 'bt', 'bts' => $builder->gl30Bts($payload),
-                'beacons', 'bid' => $builder->gl30Bid($payload),
-                'allowlist', 'wlt' => $builder->gl30Wlt($payload),
-                'firmware_update', 'upc' => $builder->gl30Upc($payload),
-                'firmware_version', 'fvr' => $builder->gl30Fvr($payload),
-                default => throw new \InvalidArgumentException("Unsupported Queclink configuration command [{$commandKey}]."),
-            };
+            $built = $this->buildSectionCommand($builder, $commandKey, $payload);
         } catch (\InvalidArgumentException $e) {
             return back()->withErrors(['command' => $e->getMessage()]);
         }
@@ -872,6 +1062,34 @@ class QueclinkHubController extends Controller
         $this->logAudit($request, $queclinkDevice, 'config_write', $section, null, $payload, $command->raw_command);
 
         return back()->with('success', "{$built['command_word']} configuration update queued.");
+    }
+
+    /**
+     * Resolve a section key (or alias) + payload into a built AT command.
+     * Shared by single-section writes and preset application.
+     *
+     * @param  array<string, mixed>  $payload
+     * @return array{command_word: string, raw: string, serial: string}
+     */
+    private function buildSectionCommand(CommandBuilder $builder, string $commandKey, array $payload): array
+    {
+        return match (strtolower($commandKey)) {
+            'server', 'sri' => $builder->gl30ServerRegistration($payload),
+            'tracking', 'global', 'cfg', 'cfg_alarm' => $builder->gl30GlobalConfiguration($payload),
+            'pin' => $builder->gl30Pin($payload),
+            'dog' => $builder->gl30Dog($payload),
+            'time', 'tma' => $builder->gl30Tma($payload),
+            'non_movement', 'nmd' => $builder->gl30Nmd($payload),
+            'power', 'pds' => $builder->gl30Pds($payload),
+            'wifi', 'wfi' => $builder->gl30Wifi($payload),
+            'geo' => $builder->gl30Geo((int) ($payload['slot'] ?? 0), $payload),
+            'bluetooth', 'bt', 'bts' => $builder->gl30Bts($payload),
+            'beacons', 'bid' => $builder->gl30Bid($payload),
+            'allowlist', 'wlt' => $builder->gl30Wlt($payload),
+            'firmware_update', 'upc' => $builder->gl30Upc($payload),
+            'firmware_version', 'fvr' => $builder->gl30Fvr($payload),
+            default => throw new \InvalidArgumentException("Unsupported Queclink configuration command [{$commandKey}]."),
+        };
     }
 
     private function resolveReadSectionCode(string $section, ?string $command = null): string
