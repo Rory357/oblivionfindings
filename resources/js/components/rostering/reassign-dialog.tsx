@@ -186,7 +186,7 @@ export function ReassignDialog({
                 </DialogHeader>
 
                 {pendingWarn ? (
-                    <div className="space-y-3 py-1">
+                    <div className="min-w-0 space-y-3 py-1">
                         <div className="rounded-lg border border-status-warning/30 bg-status-warning-bg/40 p-3">
                             <div className="flex items-center gap-2 text-sm font-semibold text-status-warning">
                                 <AlertTriangle className="h-4 w-4" />
@@ -223,7 +223,7 @@ export function ReassignDialog({
                         </div>
                     </div>
                 ) : (
-                    <div className="space-y-2 py-1">
+                    <div className="min-w-0 space-y-2 py-1">
                         <div className="relative">
                             <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
                             <input
@@ -233,7 +233,7 @@ export function ReassignDialog({
                                 className="w-full rounded-md border border-input bg-background py-2 pl-9 pr-3 text-sm focus:border-primary focus:outline-none"
                             />
                         </div>
-                        <div className="max-h-[340px] space-y-1 overflow-y-auto">
+                        <div className="max-h-[340px] min-w-0 space-y-1 overflow-y-auto">
                             {loading ? (
                                 <div className="flex items-center justify-center gap-2 py-10 text-sm text-muted-foreground">
                                     <Loader2 className="h-4 w-4 animate-spin" />
