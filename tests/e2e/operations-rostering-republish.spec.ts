@@ -29,15 +29,18 @@ test.describe('operations rostering — republish flow', () => {
         await loginAsStaff(page);
         await publishCurrentWeek(page, ROSTERING_DEMO_PUBLISH_TARGET);
 
-        await page.goto('/operations/shifts/9101/edit');
-        await expect(page.getByText(/Edit .*shift/i).first()).toBeVisible();
+        await page.goto('/operations/shifts/9101');
+        await page.getByRole('button', { name: /^Edit$/ }).click();
+        await expect(
+            page.getByRole('heading', { name: 'Edit shift' }),
+        ).toBeVisible();
 
         const datetimeInputs = page.locator('input[type="datetime-local"]');
         await datetimeInputs.first().fill('2026-05-04T09:30');
         await datetimeInputs.nth(1).fill('2026-05-04T12:30');
-        await page.getByRole('button', { name: /^Save$/ }).click();
+        await page.getByRole('button', { name: /^Save changes$/ }).click();
 
-        await expect(page).toHaveURL(/\/operations\/shifts(?:\?|$)/);
+        await expect(page).toHaveURL(/\/operations\/shifts\/9101(?:\?|$)/);
         await page.goto(
             `/operations/rostering?week=${ROSTERING_DEMO_PUBLISH_TARGET.week}&site_id=${ROSTERING_DEMO_PUBLISH_TARGET.siteId}`,
         );
@@ -55,9 +58,7 @@ test.describe('operations rostering — republish flow', () => {
         await page.getByRole('button', { name: /Re-publish/i }).click();
         await expect(page).toHaveURL(/\/operations\/rostering(?:\?|$)/);
         await expect(publishPanel).toContainText(/published/i);
-        await expect(publishPanel).not.toContainText(
-            /changed after publish/i,
-        );
+        await expect(publishPanel).not.toContainText(/changed after publish/i);
 
         expectNoConsoleErrors(consoleErrors);
     });

@@ -31,7 +31,6 @@ class ShiftLegacyRedirectTest extends TestCase
             ['/shifts?status=scheduled', '/operations/shifts?status=scheduled'],
             ['/shifts/create', '/operations/shifts/create'],
             ['/shifts/123', '/operations/shifts/123'],
-            ['/shifts/123/edit', '/operations/shifts/123/edit'],
             ['/timesheets', '/operations/timesheets'],
             ['/timesheets/approvals', '/operations/timesheets/approvals'],
             ['/timesheets/create', '/operations/timesheets/create'],

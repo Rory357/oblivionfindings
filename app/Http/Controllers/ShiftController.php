@@ -14,6 +14,7 @@ use App\Models\FleetResidentTransport;
 use App\Models\IncidentTemplate;
 use App\Models\ServiceContext;
 use App\Models\Shift;
+use App\Models\ShiftEligibilityOverride;
 use App\Models\ShiftHandover;
 use App\Models\ShiftReplacementRequest;
 use App\Models\ShiftSeries;
@@ -455,8 +456,47 @@ class ShiftController extends Controller
             'actor' => $event->actor ? ['id' => $event->actor->id, 'name' => $event->actor->name] : null,
         ];
 
+        $canEditShift = $auth->canDo('shifts.update');
+        $clients = $canEditShift
+            ? $this->siteAccess()->applyClientScope(
+                Client::query(),
+                $auth,
+                $this->shiftBypassPermissions(),
+            )
+                ->orderBy('first_name')
+                ->get(['id', 'first_name', 'last_name', 'service_context_id', 'site_id'])
+            : collect();
+        $staff = $canEditShift
+            ? $this->siteAccess()->applyStaffScope(
+                User::staff(),
+                $auth,
+                $this->shiftStaffBypassPermissions(),
+            )
+                ->orderBy('name')
+                ->get(['id', 'name', 'email'])
+            : collect();
+        $sites = $canEditShift
+            ? $this->siteAccess()->applySiteScope(
+                \App\Models\Site::query(),
+                $auth,
+                $this->shiftBypassPermissions(),
+            )
+                ->orderBy('name')
+                ->get(['id', 'name', 'type'])
+            : collect();
+        $serviceContexts = $canEditShift
+            ? ServiceContext::query()
+                ->orderBy('name')
+                ->get(['id', 'name', 'type', 'is_active'])
+            : collect();
+
         return inertia('operations/shifts/show', [
             'shift' => $shift,
+            'clients' => $clients,
+            'staff' => $staff,
+            'sites' => $sites,
+            'serviceContexts' => $serviceContexts,
+            'defaultServiceContextId' => ServiceContext::defaultId(),
             'handover' => $handover->map(fn ($entry) => [
                 'id' => $entry->id,
                 'type' => 'handover',
@@ -1049,12 +1089,14 @@ class ShiftController extends Controller
         $requestedReturnTo = (string) ($data['return_to'] ?? '');
         $returnTo = str_starts_with($requestedReturnTo, '/') && ! str_starts_with($requestedReturnTo, '//')
             ? $requestedReturnTo
-            : route('operations.shifts.edit', $copy);
+            : route('operations.shifts.show', $copy);
 
-        return redirect($returnTo)->with('success', 'Shift duplicated as draft.');
+        return redirect($returnTo)
+            ->with('success', 'Shift duplicated as draft.')
+            ->with('duplicated_shift_id', $copy->id);
     }
 
-    public function edit(Request $request, Shift $shift)
+    public function editable(Request $request, Shift $shift)
     {
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('shifts.update'), 403);
@@ -1066,32 +1108,58 @@ class ShiftController extends Controller
 
         $this->assertCanAccessShift($auth, $shift);
 
-        $shift->load(['client:id,first_name,last_name,service_context_id', 'staff:id,name,email', 'tasks', 'serviceContext:id,name,type,is_active']);
-        $clients = $this->siteAccess()->applyClientScope(
-            Client::query(),
-            $auth,
-            $this->shiftBypassPermissions(),
-        )
-            ->with('site:id,name')
-            ->orderBy('first_name')
-            ->get(['id', 'first_name', 'last_name', 'service_context_id', 'site_id']);
-        $staff = $this->siteAccess()->applyStaffScope(
-            User::staff(),
-            $auth,
-            $this->shiftStaffBypassPermissions(),
-        )->orderBy('name')->get(['id', 'name', 'email']);
-
-        $serviceContexts = ServiceContext::query()
-            ->orderBy('name')
-            ->get(['id', 'name', 'type', 'is_active']);
-
-        return inertia('operations/shifts/edit', [
-            'shift' => $shift,
-            'clients' => $clients,
-            'staff' => $staff,
-            'serviceContexts' => $serviceContexts,
-            'defaultServiceContextId' => ServiceContext::defaultId(),
+        $shift->loadMissing([
+            'client:id,first_name,last_name,service_context_id',
+            'staff:id,name,email',
+            'site:id,name,type',
+            'tasks:id,shift_id,label,sort_order',
+            'serviceContext:id,name,type,is_active',
         ]);
+
+        return response()->json($this->editableShiftPayload($shift));
+    }
+
+    protected function editableShiftPayload(Shift $shift): array
+    {
+        $shift->loadMissing([
+            'client:id,first_name,last_name,service_context_id',
+            'staff:id,name,email',
+            'site:id,name,type',
+            'tasks:id,shift_id,label,sort_order',
+            'serviceContext:id,name,type,is_active',
+        ]);
+
+        return [
+            'id' => $shift->id,
+            'starts_at' => $shift->starts_at?->toIso8601String(),
+            'ends_at' => $shift->ends_at?->toIso8601String(),
+            'status' => $shift->status,
+            'shift_type' => $shift->shift_type,
+            'location' => $shift->location,
+            'is_sleepover' => (bool) $shift->is_sleepover,
+            'is_on_call' => (bool) $shift->is_on_call,
+            'expected_break_minutes' => $shift->expected_break_minutes,
+            'notes' => $shift->notes,
+            'service_context_id' => $shift->service_context_id,
+            'coverage_roles' => array_values($shift->coverage_roles ?? []),
+            'client' => $shift->client ? [
+                'id' => $shift->client->id,
+            ] : null,
+            'staff' => $shift->staff ? [
+                'id' => $shift->staff->id,
+            ] : null,
+            'site' => $shift->site ? [
+                'id' => $shift->site->id,
+                'name' => $shift->site->name,
+            ] : null,
+            'tasks' => $shift->tasks
+                ->sortBy('sort_order')
+                ->map(fn (ShiftTask $task) => [
+                    'id' => $task->id,
+                    'label' => $task->label,
+                ])
+                ->values(),
+        ];
     }
 
     public function update(Request $request, Shift $shift)
@@ -1143,7 +1211,13 @@ class ShiftController extends Controller
             'tasks.*.label' => ['required_with:tasks', 'string', 'max:255'],
             'tasks.*.is_completed' => ['sometimes', 'boolean'],
             'return_to' => ['nullable', 'string', 'max:2048'],
+            'override_acknowledged' => ['nullable', 'boolean'],
+            'override_reason' => ['nullable', 'string', 'max:2000'],
         ]);
+
+        $overrideAcknowledged = ! empty($data['override_acknowledged']);
+        $overrideReason = trim((string) ($data['override_reason'] ?? ''));
+        unset($data['override_acknowledged'], $data['override_reason']);
 
         $data = $this->normalizeShiftData($data);
         if (array_key_exists('client_id', $data) || empty($shift->site_id)) {
@@ -1273,6 +1347,7 @@ class ShiftController extends Controller
             $timesChanged = (array_key_exists('starts_at', $data) && $startsAt->ne($shift->starts_at))
                          || (array_key_exists('ends_at', $data) && $endsAt->ne($shift->ends_at));
 
+            $overrideData = null;
             if ($resolvedUserId && ($userChanged || $timesChanged)) {
                 $this->assertCanAssignShiftToUser($auth, (int) $resolvedUserId);
                 try {
@@ -1288,7 +1363,34 @@ class ShiftController extends Controller
                     }
 
                     if ($eligibility->hasWarnings()) {
-                        session()->flash('assignment_warnings', $eligibility->warnings);
+                        if (! $overrideAcknowledged) {
+                            return back()
+                                ->with('eligibility_result', $eligibility->toArray())
+                                ->with('assignment_warnings', $eligibility->warnings)
+                                ->withInput();
+                        }
+
+                        if (! empty($eligibility->overrideable_warnings)) {
+                            abort_unless(
+                                $auth->canDo('shifts.overrideEligibility'),
+                                403,
+                                'You do not have permission to override eligibility warnings.',
+                            );
+
+                            if ($overrideReason === '') {
+                                return back()->withErrors([
+                                    'override_reason' => 'A reason is required when overriding eligibility warnings.',
+                                ])->with('eligibility_result', $eligibility->toArray())->withInput();
+                            }
+
+                            $overrideData = [
+                                'user_id' => (int) $resolvedUserId,
+                                'overridden_by' => $auth->id,
+                                'override_reason' => $overrideReason,
+                                'rules_overridden' => collect($eligibility->overrideable_warnings)->pluck('rule')->values()->all(),
+                                'acknowledged_warnings' => $eligibility->overrideable_warnings,
+                            ];
+                        }
                     }
                 } catch (\Throwable $e) {
                     Log::warning('Eligibility check failed during shift update', ['error' => $e->getMessage()]);
@@ -1304,12 +1406,19 @@ class ShiftController extends Controller
             }
 
             try {
-                DB::transaction(function () use ($shift, $data, $reservation) {
+                DB::transaction(function () use ($shift, $data, $reservation, $overrideData) {
                     $lockedShift = Shift::query()->lockForUpdate()->findOrFail($shift->id);
                     $lockedShift->update(Arr::except($data, ['tasks', 'series_scope', 'coverage_reservation_token', 'coverage_rule_id']));
 
                     if (array_key_exists('tasks', $data)) {
                         $this->syncShiftTasks($lockedShift, $data['tasks'] ?? []);
+                    }
+
+                    if ($overrideData) {
+                        ShiftEligibilityOverride::create([
+                            'shift_id' => $lockedShift->id,
+                            ...$overrideData,
+                        ]);
                     }
 
                     app(CoverageReservationService::class)->fulfill($reservation, $lockedShift);

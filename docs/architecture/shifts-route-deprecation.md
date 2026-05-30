@@ -24,7 +24,6 @@ A blanket deletion would 404 any external integration, mobile app, or automated 
 | `GET /shifts` | `operations.shifts.index` |
 | `GET /shifts/create` | `operations.shifts.create` |
 | `GET /shifts/{shift}` | `operations.shifts.show` |
-| `GET /shifts/{shift}/edit` | `operations.shifts.edit` |
 | `GET /timesheets` | `operations.timesheets.index` |
 | `GET /timesheets/approvals` | `operations.timesheets.approvals` |
 | `GET /timesheets/create` | `operations.timesheets.create` |

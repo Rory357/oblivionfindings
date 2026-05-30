@@ -36,6 +36,12 @@ class ShiftStateGuardService
 
     public function assertEditableFromPlanning(Shift $shift, ?string $requestedStatus): void
     {
+        if ($shift->approvedTimesheets()->exists()) {
+            throw ValidationException::withMessages([
+                'shift' => 'This shift has an approved timesheet and can no longer be edited from planning.',
+            ]);
+        }
+
         if (! in_array($shift->status, $this->planningStatuses(), true)) {
             throw ValidationException::withMessages([
                 'status' => 'This shift is already in a live or locked lifecycle state. Use the dedicated lifecycle actions instead of a planning edit.',

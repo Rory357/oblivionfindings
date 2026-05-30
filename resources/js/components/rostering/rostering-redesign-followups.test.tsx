@@ -588,6 +588,50 @@ describe('rostering redesign follow-up wiring', () => {
         );
     });
 
+    it('opens the inline edit dialog from week grid edit actions instead of navigating', () => {
+        const onEditShift = vi.fn();
+        const originalHref = window.location.href;
+
+        render(
+            <WeekGridPane
+                days={weekDays}
+                rows={[
+                    {
+                        id: 7,
+                        name: 'Aroha King',
+                        role: null,
+                        initials: 'AK',
+                        hue: 120,
+                        shifts: {
+                            '2026-05-04': [
+                                {
+                                    id: 44,
+                                    status: 'scheduled',
+                                    starts_at: '2026-05-04T09:00:00+12:00',
+                                    ends_at: '2026-05-04T13:00:00+12:00',
+                                    client: 'Ari Kauri',
+                                    href: '/operations/shifts/44',
+                                },
+                            ],
+                        },
+                    },
+                ]}
+                todayKey={null}
+                canManage
+                onEditShift={onEditShift}
+            />,
+        );
+
+        fireEvent.contextMenu(screen.getByText('Ari Kauri'));
+
+        fireEvent.click(screen.getByRole('menuitem', { name: /^Edit shift/i }));
+
+        expect(onEditShift).toHaveBeenCalledWith(
+            expect.objectContaining({ id: 44, status: 'scheduled' }),
+        );
+        expect(window.location.href).toBe(originalHref);
+    });
+
     it('warns before unassigning and allows submitting without a reason', () => {
         const onConfirm = vi.fn();
 

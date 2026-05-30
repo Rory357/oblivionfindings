@@ -170,7 +170,7 @@ class LegacyShiftNamesRemovedTest extends TestCase
             ['operations.shifts.index'],
             ['operations.shifts.show'],
             ['operations.shifts.create'],
-            ['operations.shifts.edit'],
+            ['operations.shifts.editable'],
             ['operations.shifts.store'],
             ['operations.shifts.series.store'],
             ['operations.shifts.update'],

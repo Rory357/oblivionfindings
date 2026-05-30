@@ -1,10 +1,8 @@
-import { useEffect } from 'react';
 import { Link } from '@inertiajs/react';
 import {
     ArrowUpRight,
     Briefcase,
     CalendarClock,
-    Check,
     CheckCircle2,
     Clock,
     Coffee,
@@ -18,19 +16,19 @@ import {
     X,
     type LucideIcon,
 } from 'lucide-react';
+import { useEffect } from 'react';
 
+import { ShiftStatusBadge } from '@/components/shift-status-badge';
 import {
     Dialog,
     DialogContent,
     DialogDescription,
     DialogTitle,
 } from '@/components/ui/dialog';
-import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
-import { ShiftStatusBadge } from '@/components/shift-status-badge';
 import { shiftTypeMeta } from '@/lib/shift-types';
-import { show as showShift, edit as editShift } from '@/routes/operations/shifts';
+import { show as showShift } from '@/routes/operations/shifts';
+import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 
-import { StaffAvatar } from './staff-avatar';
 import {
     clientFullName,
     effectiveStatus,
@@ -40,6 +38,7 @@ import {
     shiftStartTime,
     type ShiftRow,
 } from './shift-row-types';
+import { StaffAvatar } from './staff-avatar';
 
 type Props = {
     open: boolean;
@@ -49,7 +48,13 @@ type Props = {
     onEdit?: () => void;
 };
 
-export function ShiftDetailDialog({ open, shift, onClose, onAct, onEdit }: Props) {
+export function ShiftDetailDialog({
+    open,
+    shift,
+    onClose,
+    onAct,
+    onEdit,
+}: Props) {
     useEffect(() => {
         if (!open) return;
         const handler = (e: KeyboardEvent) => {
@@ -112,7 +117,7 @@ export function ShiftDetailDialog({ open, shift, onClose, onAct, onEdit }: Props
     return (
         <Dialog open={open} onOpenChange={(o) => (!o ? onClose() : null)}>
             <DialogContent
-                className="!max-w-[min(94vw,820px)] !w-full max-h-[90vh] overflow-hidden !rounded-2xl !p-0 [&>button:last-child]:hidden"
+                className="max-h-[90vh] !w-full !max-w-[min(94vw,820px)] overflow-hidden !rounded-2xl !p-0 [&>button:last-child]:hidden"
                 onInteractOutside={(e) => e.preventDefault()}
             >
                 <VisuallyHidden.Root>
@@ -120,19 +125,20 @@ export function ShiftDetailDialog({ open, shift, onClose, onAct, onEdit }: Props
                         Shift detail for {clientFullName(shift.client)}
                     </DialogTitle>
                     <DialogDescription>
-                        Quick view of shift {shift.id}. Open the full view for tasks, notes, and timeline.
+                        Quick view of shift {shift.id}. Open the full view for
+                        tasks, notes, and timeline.
                     </DialogDescription>
                 </VisuallyHidden.Root>
                 <div className="flex h-full max-h-[90vh] flex-col">
                     {/* Header */}
                     <div className="relative overflow-hidden rounded-t-2xl">
-                        <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-primary/10 blur-2xl" />
-                        <div className="relative flex items-start gap-4 border-b border-border px-6 pb-4 pt-5">
+                        <div className="absolute -top-12 -right-12 h-40 w-40 rounded-full bg-primary/10 blur-2xl" />
+                        <div className="relative flex items-start gap-4 border-b border-border px-6 pt-5 pb-4">
                             <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/20">
                                 <CalendarClock className="h-5 w-5 text-primary" />
                             </span>
                             <div className="min-w-0 flex-1">
-                                <div className="text-[10.5px] font-semibold uppercase tracking-wider text-primary">
+                                <div className="text-[10.5px] font-semibold tracking-wider text-primary uppercase">
                                     Shift · #{shift.id}
                                 </div>
                                 <h2 className="mt-0.5 text-xl font-bold tracking-tight text-foreground">
@@ -146,7 +152,9 @@ export function ShiftDetailDialog({ open, shift, onClose, onAct, onEdit }: Props
                                 </p>
                             </div>
                             <div className="flex shrink-0 items-center gap-2">
-                                <ShiftStatusBadge status={effectiveStatus(shift)} />
+                                <ShiftStatusBadge
+                                    status={effectiveStatus(shift)}
+                                />
                                 <button
                                     type="button"
                                     onClick={onClose}
@@ -221,7 +229,9 @@ export function ShiftDetailDialog({ open, shift, onClose, onAct, onEdit }: Props
                                 </span>
                                 <span className="text-muted-foreground">
                                     {' '}
-                                    · {hours > 0 ? `${hours.toFixed(1)}h` : '—'}{' '}
+                                    · {hours > 0
+                                        ? `${hours.toFixed(1)}h`
+                                        : '—'}{' '}
                                     total
                                 </span>
                             </SDRow>
@@ -245,14 +255,15 @@ export function ShiftDetailDialog({ open, shift, onClose, onAct, onEdit }: Props
 
                         <SDSection icon={Pencil} title="More detail">
                             <p className="rounded-lg bg-muted/40 p-3 text-sm leading-relaxed text-foreground">
-                                Tasks, handover notes, MAR records and timeline live in the full view.
-                                Open it to drill in.
+                                Tasks, handover notes, MAR records and timeline
+                                live in the full view. Open it to drill in.
                             </p>
                             <Link
                                 href={showShift.url(shift.id)}
                                 className="mt-3 inline-flex items-center gap-1 text-sm font-medium text-primary hover:underline"
                             >
-                                Open full view <ArrowUpRight className="h-3.5 w-3.5" />
+                                Open full view{' '}
+                                <ArrowUpRight className="h-3.5 w-3.5" />
                             </Link>
                         </SDSection>
                     </div>
@@ -281,7 +292,7 @@ export function ShiftDetailDialog({ open, shift, onClose, onAct, onEdit }: Props
                                 </button>
                             ) : (
                                 <Link
-                                    href={editShift.url(shift.id)}
+                                    href={showShift.url(shift.id)}
                                     className="inline-flex items-center gap-1.5 rounded-md border border-border bg-transparent px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted"
                                 >
                                     <Pencil className="h-4 w-4" /> Edit

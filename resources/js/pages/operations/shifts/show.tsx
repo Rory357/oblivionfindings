@@ -54,6 +54,10 @@ import {
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import {
+    CreateShiftDialog,
+    type EditableShift,
+} from './components/create-shift-dialog';
+import {
     ShiftAuditTimeline,
     type ShiftAuditTimelineEntry,
 } from './components/shift-audit-timeline';
@@ -98,10 +102,12 @@ type Props = {
         is_sleepover?: boolean;
         is_on_call?: boolean;
         expected_break_minutes?: number | null;
+        coverage_roles?: string[] | null;
         location?: string | null;
         notes?: string | null;
         client: { id: number; first_name: string; last_name: string };
         staff: { id: number; name: string; email?: string } | null;
+        site?: { id: number; name: string; type?: string | null } | null;
         service_context?: {
             id: number;
             name: string;
@@ -172,6 +178,22 @@ type Props = {
         }>;
     } | null;
     medicationWitnesses: Array<{ id: number; name: string }>;
+    clients?: Array<{
+        id: number;
+        first_name: string;
+        last_name: string;
+        service_context_id?: number | null;
+        site_id?: number | null;
+    }>;
+    staff?: Array<{ id: number; name: string; email?: string }>;
+    sites?: Array<{ id: number; name: string; type?: string | null }>;
+    serviceContexts?: Array<{
+        id: number;
+        name: string;
+        type: string;
+        is_active: boolean;
+    }>;
+    defaultServiceContextId?: number | null;
     replacementRequest?: {
         id: number;
         status: string;
@@ -449,6 +471,11 @@ export default function ShiftShow({
     forms,
     medications,
     medicationWitnesses,
+    clients = [],
+    staff = [],
+    sites = [],
+    serviceContexts = [],
+    defaultServiceContextId = null,
     linkedTimesheet,
     handoverSummary,
     transports,
@@ -495,6 +522,7 @@ export default function ShiftShow({
         pageProps.flash?.assignment_warnings ?? [];
 
     const [incidentOpen, setIncidentOpen] = useState(false);
+    const [editOpen, setEditOpen] = useState(false);
     const incidentForm = useForm({
         template_id: '',
         type: 'injury',
@@ -519,6 +547,33 @@ export default function ShiftShow({
     };
 
     const name = `${shift.client.first_name} ${shift.client.last_name}`.trim();
+    const editableShift = useMemo<EditableShift>(
+        () => ({
+            id: shift.id,
+            starts_at: shift.starts_at,
+            ends_at: shift.ends_at,
+            status: shift.status,
+            shift_type: shift.shift_type ?? null,
+            location: shift.location ?? null,
+            is_sleepover: !!shift.is_sleepover,
+            is_on_call: !!shift.is_on_call,
+            expected_break_minutes: shift.expected_break_minutes ?? null,
+            notes: shift.notes ?? null,
+            service_context_id:
+                shift.service_context_id ?? shift.service_context?.id ?? null,
+            coverage_roles: shift.coverage_roles ?? [],
+            tasks: tasks.map((task) => ({
+                id: task.id,
+                label: task.label,
+            })),
+            client: { id: shift.client.id },
+            staff: shift.staff ? { id: shift.staff.id } : null,
+            site: shift.site
+                ? { id: shift.site.id, name: shift.site.name }
+                : null,
+        }),
+        [shift, tasks],
+    );
 
     const incompleteCount = useMemo(
         () => tasks.filter((t) => !t.is_completed).length,
@@ -924,10 +979,12 @@ export default function ShiftShow({
                         </Button>
                     ) : null}
                     {auth?.can?.shifts?.update ? (
-                        <Button variant="ghost" asChild>
-                            <Link href={`/operations/shifts/${shift.id}/edit`}>
-                                Edit
-                            </Link>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            onClick={() => setEditOpen(true)}
+                        >
+                            Edit
                         </Button>
                     ) : null}
                     {auth?.can?.shifts?.manageAny &&
@@ -2853,6 +2910,18 @@ export default function ShiftShow({
                 </div>
 
                 {/* ── Modals (outside tab structure) ── */}
+                <CreateShiftDialog
+                    key={`show-edit-${shift.id}`}
+                    open={editOpen}
+                    onClose={() => setEditOpen(false)}
+                    clients={clients}
+                    staff={staff}
+                    sites={sites}
+                    serviceContexts={serviceContexts}
+                    defaultServiceContextId={defaultServiceContextId}
+                    initialShift={editableShift}
+                />
+
                 <Dialog open={completeOpen} onOpenChange={setCompleteOpen}>
                     <DialogContent className="sm:max-w-2xl">
                         <DialogHeader>

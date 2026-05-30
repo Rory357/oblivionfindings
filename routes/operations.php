@@ -673,9 +673,9 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         ->name('operations.shifts.series.cancel_future');
 
     // Shift updates
-    Route::get('/shifts/{shift}/edit', [ShiftController::class, 'edit'])
+    Route::get('/shifts/{shift}/editable', [ShiftController::class, 'editable'])
         ->middleware('permission:shifts.update')
-        ->name('operations.shifts.edit');
+        ->name('operations.shifts.editable');
     Route::put('/shifts/{shift}', [ShiftController::class, 'update'])
         ->middleware('permission:shifts.update')
         ->name('operations.shifts.update');

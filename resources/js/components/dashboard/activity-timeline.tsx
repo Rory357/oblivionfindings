@@ -1,5 +1,5 @@
 import { Button } from '@/components/ui/button';
-import { edit as editShift } from '@/routes/operations/shifts';
+import { show as showShift } from '@/routes/operations/shifts';
 import { create as createTimesheet } from '@/routes/operations/timesheets';
 import { Link } from '@inertiajs/react';
 import * as React from 'react';
@@ -183,7 +183,7 @@ export function ActivityTimeline({
                                                             variant="outline"
                                                         >
                                                             <Link
-                                                                href={editShift.url(
+                                                                href={showShift.url(
                                                                     shiftId,
                                                                 )}
                                                             >

@@ -33,8 +33,6 @@ Route::middleware(['auth'])->group(function () {
     $legacyRedirect('/shifts/create', 'operations.shifts.create');
     $legacyRedirect('/shifts/{shift}', 'operations.shifts.show')
         ->whereNumber('shift');
-    $legacyRedirect('/shifts/{shift}/edit', 'operations.shifts.edit')
-        ->whereNumber('shift');
 
     // Legacy Shift write URLs redirect (308 preserves method+body) so any
     // straggling external POSTer keeps working. No controller logic here —

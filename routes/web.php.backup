@@ -596,9 +596,6 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/shifts/series', [ShiftSeriesController::class, 'store'])
         ->middleware('permission:shifts.create')
         ->name('shifts.series.store');
-    Route::get('/shifts/{shift}/edit', [ShiftController::class, 'edit'])
-        ->middleware('permission:shifts.update')
-        ->name('shifts.edit');
     Route::put('/shifts/{shift}', [ShiftController::class, 'update'])
         ->middleware('permission:shifts.update')
         ->name('shifts.update');

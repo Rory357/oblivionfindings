@@ -1,5 +1,4 @@
-import { useEffect, useMemo, useRef } from 'react';
-import { useForm, router } from '@inertiajs/react';
+import { router, useForm } from '@inertiajs/react';
 import {
     CalendarClock,
     Check,
@@ -17,24 +16,35 @@ import {
     X,
     type LucideIcon,
 } from 'lucide-react';
+import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { EligibilityAlertBanner } from '@/components/eligibility/eligibility-alert-banner';
+import {
+    EligibilityStatusBadge,
+    deriveEligibilityStatus,
+} from '@/components/eligibility/eligibility-status-badge';
+import {
+    OverrideConfirmationDialog,
+    type OverrideableWarning,
+} from '@/components/eligibility/override-confirmation-dialog';
 import {
     Dialog,
     DialogContent,
     DialogDescription,
     DialogTitle,
 } from '@/components/ui/dialog';
-import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 import {
     SHIFT_TYPES,
     SHIFT_TYPE_ACCENT_CLASSES,
     type ShiftTypeKey,
 } from '@/lib/shift-types';
 import {
+    eligibility_preview as eligibilityPreview,
     store as storeShift,
     update as updateShift,
 } from '@/routes/operations/shifts';
 import { store as storeShiftSeries } from '@/routes/operations/shifts/series';
+import * as VisuallyHidden from '@radix-ui/react-visually-hidden';
 
 type Client = {
     id: number;
@@ -89,6 +99,14 @@ export type EditableShift = {
     tasks?: Array<{ id: number; label: string }>;
 };
 
+type EligibilityPreview = {
+    is_eligible?: boolean;
+    is_allowed?: boolean;
+    blocked_reasons?: string[];
+    warning_reasons?: string[];
+    overrideable_warnings?: OverrideableWarning[];
+};
+
 type Props = {
     open: boolean;
     onClose: () => void;
@@ -126,9 +144,7 @@ function toLocalDatetimeInput(value: string | null | undefined): string {
     // Fast path only for "naive" local datetime strings (no timezone suffix) —
     // anything with a Z or ±HH:MM offset must go through Date so we render the
     // user's local wall time, not the UTC time-of-day.
-    if (
-        /^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(value)
-    ) {
+    if (/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}(:\d{2}(\.\d+)?)?$/.test(value)) {
         return value.slice(0, 16);
     }
     const parsed = new Date(value);
@@ -145,7 +161,9 @@ function toLocalDatetimeInput(value: string | null | undefined): string {
 // "2026-05-30T09:00". The server's Carbon::parse() reads that as UTC, so
 // we convert through a Date (which interprets naive strings as local) and
 // emit an ISO string with the offset Carbon can normalise correctly.
-function localDatetimeInputToIso(value: string | null | undefined): string | null {
+function localDatetimeInputToIso(
+    value: string | null | undefined,
+): string | null {
     if (!value || !/^\d{4}-\d{2}-\d{2}T\d{2}:\d{2}/.test(value)) return null;
     const d = new Date(value);
     if (Number.isNaN(d.getTime())) return null;
@@ -181,9 +199,7 @@ export function CreateShiftDialog({
     const isEdit = !!initialShift;
     const initialClient = useMemo(() => {
         if (initialShift?.client?.id) {
-            const found = clients.find(
-                (c) => c.id === initialShift.client?.id,
-            );
+            const found = clients.find((c) => c.id === initialShift.client?.id);
             if (found) return found;
         }
         if (defaultClientId) {
@@ -202,18 +218,17 @@ export function CreateShiftDialog({
     }, [clients, defaultClientId, defaultSiteId]);
 
     const form = useForm({
-        client_id: (initialShift?.client?.id ??
-            initialClient?.id ??
-            '') as number | '',
+        client_id: (initialShift?.client?.id ?? initialClient?.id ?? '') as
+            | number
+            | '',
         service_context_id: (initialShift?.service_context_id ??
             initialClient?.service_context_id ??
             defaultServiceContextId ??
             '') as number | '',
         user_id: (initialShift?.staff?.id ?? '') as number | '',
         starts_at:
-            toLocalDatetimeInput(
-                initialShift?.starts_at ?? defaultStartsAt,
-            ) || defaultStartForToday(),
+            toLocalDatetimeInput(initialShift?.starts_at ?? defaultStartsAt) ||
+            defaultStartForToday(),
         ends_at:
             toLocalDatetimeInput(initialShift?.ends_at ?? defaultEndsAt) ||
             defaultEndForToday(),
@@ -243,11 +258,11 @@ export function CreateShiftDialog({
         repeat_weekly: false,
         repeat_end_date: '' as string,
         repeat_by_weekday: [
-            weekdayFromDatetime(
-                initialShift?.starts_at ?? defaultStartsAt,
-            ),
+            weekdayFromDatetime(initialShift?.starts_at ?? defaultStartsAt),
         ] as Weekday[],
         return_to: '' as string,
+        override_acknowledged: false,
+        override_reason: '' as string,
     });
 
     // Reset form when dialog opens with new defaults. Run only on the open→true
@@ -334,8 +349,7 @@ export function CreateShiftDialog({
         try {
             const a = new Date(form.data.starts_at).getTime();
             const b = new Date(form.data.ends_at).getTime();
-            if (a && b && b > a)
-                return `${((b - a) / 3_600_000).toFixed(1)}h`;
+            if (a && b && b > a) return `${((b - a) / 3_600_000).toFixed(1)}h`;
         } catch {
             // fallthrough
         }
@@ -370,7 +384,10 @@ export function CreateShiftDialog({
         if (form.data.repeat_weekly && form.data.repeat_end_date) {
             const startDate = new Date(form.data.starts_at);
             const endDate = new Date(form.data.repeat_end_date);
-            if (!Number.isNaN(startDate.getTime()) && !Number.isNaN(endDate.getTime())) {
+            if (
+                !Number.isNaN(startDate.getTime()) &&
+                !Number.isNaN(endDate.getTime())
+            ) {
                 const weeks = Math.max(
                     1,
                     Math.round(
@@ -388,9 +405,106 @@ export function CreateShiftDialog({
     const selectedClient = clients.find(
         (c) => c.id === Number(form.data.client_id),
     );
+    const selectedStaff = staff.find((s) => s.id === Number(form.data.user_id));
 
-    function handleSubmit(e: React.FormEvent) {
-        e.preventDefault();
+    const [eligPreview, setEligPreview] = useState<EligibilityPreview | null>(
+        null,
+    );
+    const [eligLoading, setEligLoading] = useState(false);
+    const [overrideOpen, setOverrideOpen] = useState(false);
+    const eligAbort = useRef<AbortController | null>(null);
+    const eligTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const eligibilityStatus = useMemo(
+        () => (eligPreview ? deriveEligibilityStatus(eligPreview) : null),
+        [eligPreview],
+    );
+    const eligibilityWarnings = eligPreview?.warning_reasons ?? [];
+    const eligibilityBlocks = eligPreview?.blocked_reasons ?? [];
+    const overrideWarnings = eligPreview?.overrideable_warnings?.length
+        ? eligPreview.overrideable_warnings
+        : eligibilityWarnings.map((message) => ({
+              rule: 'unknown',
+              message,
+              overrideable: true,
+          }));
+
+    const fetchEligibility = useCallback(() => {
+        const userId = form.data.user_id;
+        const startsAt = form.data.starts_at;
+        const endsAt = form.data.ends_at;
+
+        if (!userId || !startsAt || !endsAt) {
+            setEligPreview(null);
+            setEligLoading(false);
+            return;
+        }
+
+        if (eligTimer.current) clearTimeout(eligTimer.current);
+        eligTimer.current = setTimeout(async () => {
+            eligAbort.current?.abort();
+            const controller = new AbortController();
+            eligAbort.current = controller;
+            setEligLoading(true);
+
+            try {
+                const query: Record<string, string | string[]> = {
+                    user_id: String(userId),
+                    starts_at: localDatetimeInputToIso(startsAt) ?? startsAt,
+                    ends_at: localDatetimeInputToIso(endsAt) ?? endsAt,
+                };
+
+                const siteId =
+                    selectedClient?.site_id ??
+                    initialShift?.site?.id ??
+                    defaultSiteId;
+                if (siteId) query.site_id = String(siteId);
+                if (initialShift?.id) query.shift_id = String(initialShift.id);
+                if (form.data.shift_type)
+                    query.shift_type = form.data.shift_type;
+                if (form.data.coverage_roles?.length) {
+                    query.coverage_roles = form.data.coverage_roles;
+                }
+
+                const res = await fetch(eligibilityPreview.url({ query }), {
+                    signal: controller.signal,
+                    headers: {
+                        Accept: 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    credentials: 'same-origin',
+                });
+                if (!res.ok) throw new Error('preview failed');
+                const data = (await res.json()) as EligibilityPreview;
+                if (!controller.signal.aborted) setEligPreview(data);
+            } catch {
+                if (!controller.signal.aborted) setEligPreview(null);
+            } finally {
+                if (!controller.signal.aborted) setEligLoading(false);
+            }
+        }, 500);
+    }, [
+        form.data.user_id,
+        form.data.starts_at,
+        form.data.ends_at,
+        form.data.shift_type,
+        form.data.coverage_roles,
+        selectedClient?.site_id,
+        initialShift?.id,
+        initialShift?.site?.id,
+        defaultSiteId,
+    ]);
+
+    useEffect(() => {
+        if (!open) return;
+        fetchEligibility();
+        return () => {
+            eligAbort.current?.abort();
+            if (eligTimer.current) clearTimeout(eligTimer.current);
+        };
+    }, [fetchEligibility, open]);
+
+    function submitForm(overrideReason?: string) {
         // Round-trip the current URL so the server's redirect after save
         // lands the user back on the same week / filter combo instead of
         // resetting to the default index. Also convert the local
@@ -401,12 +515,15 @@ export function CreateShiftDialog({
         // offset (e.g. NZST shifts get pushed 12 hours into the future).
         form.transform((data) => ({
             ...data,
-            starts_at: localDatetimeInputToIso(data.starts_at) ?? data.starts_at,
+            starts_at:
+                localDatetimeInputToIso(data.starts_at) ?? data.starts_at,
             ends_at: localDatetimeInputToIso(data.ends_at) ?? data.ends_at,
             return_to:
                 typeof window !== 'undefined'
                     ? window.location.pathname + window.location.search
                     : data.return_to,
+            override_acknowledged: Boolean(overrideReason),
+            override_reason: overrideReason ?? '',
         }));
         if (isEdit && initialShift) {
             // Edit mode: PUT to update; recurring options don't apply.
@@ -429,464 +546,588 @@ export function CreateShiftDialog({
         const startDate = starts?.slice(0, 10);
         const startsTime = starts?.slice(11, 16);
         const endsTime = ends?.slice(11, 16);
-        router.post(storeShiftSeries.url(), {
-            client_id: form.data.client_id,
-            service_context_id: form.data.service_context_id,
-            user_id: form.data.user_id || null,
-            start_date: startDate,
-            end_date: form.data.repeat_end_date || startDate,
-            by_weekday: form.data.repeat_by_weekday,
-            starts_time: startsTime,
-            ends_time: endsTime,
-            location: form.data.location,
-            notes: form.data.notes,
-            status: form.data.status,
-            shift_type: form.data.shift_type,
-            is_sleepover: form.data.is_sleepover,
-            is_on_call: form.data.is_on_call,
-            expected_break_minutes:
-                form.data.expected_break_minutes || null,
-            tasks: form.data.tasks.filter((t) => t.label.trim() !== ''),
-        }, {
-            preserveScroll: true,
-            onSuccess: () => onClose(),
-        });
+        router.post(
+            storeShiftSeries.url(),
+            {
+                client_id: form.data.client_id,
+                service_context_id: form.data.service_context_id,
+                user_id: form.data.user_id || null,
+                start_date: startDate,
+                end_date: form.data.repeat_end_date || startDate,
+                by_weekday: form.data.repeat_by_weekday,
+                starts_time: startsTime,
+                ends_time: endsTime,
+                location: form.data.location,
+                notes: form.data.notes,
+                status: form.data.status,
+                shift_type: form.data.shift_type,
+                is_sleepover: form.data.is_sleepover,
+                is_on_call: form.data.is_on_call,
+                expected_break_minutes:
+                    form.data.expected_break_minutes || null,
+                tasks: form.data.tasks.filter((t) => t.label.trim() !== ''),
+            },
+            {
+                preserveScroll: true,
+                onSuccess: () => onClose(),
+            },
+        );
+    }
+
+    function handleSubmit(e: React.FormEvent) {
+        e.preventDefault();
+        if (isEdit && eligibilityStatus?.status === 'blocked') {
+            return;
+        }
+        if (
+            isEdit &&
+            eligibilityStatus?.status === 'warnings' &&
+            eligibilityWarnings.length > 0
+        ) {
+            setOverrideOpen(true);
+            return;
+        }
+        submitForm();
     }
 
     return (
-        <Dialog open={open} onOpenChange={(o) => (!o ? onClose() : null)}>
-            <DialogContent
-                className="!max-w-[min(94vw,1080px)] !w-full max-h-[90vh] overflow-hidden !rounded-2xl !p-0 [&>button:last-child]:hidden"
-                onInteractOutside={(e) => e.preventDefault()}
-            >
-                <VisuallyHidden.Root>
-                    <DialogTitle>
-                        {isEdit ? `Edit shift #${initialShift?.id}` : 'Create shift'}
-                    </DialogTitle>
-                    <DialogDescription>
-                        {isEdit
-                            ? 'Update the schedule, staff, tasks or notes for this shift.'
-                            : 'Schedule an appointment or rostered shift. Add tasks and optionally repeat weekly.'}
-                    </DialogDescription>
-                </VisuallyHidden.Root>
-                <form
-                    data-shifts-create
-                    onSubmit={handleSubmit}
-                    className="flex h-full max-h-[90vh] flex-col"
+        <>
+            <Dialog open={open} onOpenChange={(o) => (!o ? onClose() : null)}>
+                <DialogContent
+                    className="max-h-[90vh] !w-full !max-w-[min(94vw,1080px)] overflow-hidden !rounded-2xl !p-0 [&>button:last-child]:hidden"
+                    onInteractOutside={(e) => e.preventDefault()}
                 >
-                    {/* Header */}
-                    <div className="relative overflow-hidden rounded-t-2xl">
-                        <div className="absolute -right-12 -top-12 h-40 w-40 rounded-full bg-primary/10 blur-2xl" />
-                        <div className="relative flex items-start gap-4 border-b border-border px-6 pb-4 pt-5">
-                            <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/20">
-                                <CalendarClock className="h-5 w-5 text-primary" />
-                            </span>
-                            <div className="min-w-0 flex-1">
-                                <div className="text-[10.5px] font-semibold uppercase tracking-wider text-primary">
-                                    {isEdit
-                                        ? `Edit · Shift #${initialShift?.id}`
-                                        : 'New shift'}
-                                </div>
-                                <h2 className="mt-0.5 text-xl font-bold tracking-tight text-foreground">
-                                    {isEdit ? 'Edit shift' : 'Create shift'}
-                                </h2>
-                                <p className="mt-0.5 text-sm text-muted-foreground">
-                                    {isEdit
-                                        ? 'Update the schedule, staff, tasks or notes. Changes are saved on submit.'
-                                        : 'Schedule an appointment or rostered shift. Add tasks and optionally repeat weekly.'}
-                                </p>
-                            </div>
-                            <div className="flex shrink-0 items-center gap-2">
-                                <span className="hidden items-center gap-1 rounded-md border border-border px-1.5 py-1 text-[10.5px] text-muted-foreground sm:inline-flex">
-                                    <kbd className="font-sans font-semibold">⌘</kbd>
-                                    <kbd className="font-sans font-semibold">↵</kbd>
-                                    <span>to save</span>
+                    <VisuallyHidden.Root>
+                        <DialogTitle>
+                            {isEdit
+                                ? `Edit shift #${initialShift?.id}`
+                                : 'Create shift'}
+                        </DialogTitle>
+                        <DialogDescription>
+                            {isEdit
+                                ? 'Update the schedule, staff, tasks or notes for this shift.'
+                                : 'Schedule an appointment or rostered shift. Add tasks and optionally repeat weekly.'}
+                        </DialogDescription>
+                    </VisuallyHidden.Root>
+                    <form
+                        data-shifts-create
+                        onSubmit={handleSubmit}
+                        className="flex h-full max-h-[90vh] flex-col"
+                    >
+                        {/* Header */}
+                        <div className="relative overflow-hidden rounded-t-2xl">
+                            <div className="absolute -top-12 -right-12 h-40 w-40 rounded-full bg-primary/10 blur-2xl" />
+                            <div className="relative flex items-start gap-4 border-b border-border px-6 pt-5 pb-4">
+                                <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/20">
+                                    <CalendarClock className="h-5 w-5 text-primary" />
                                 </span>
-                                <button
-                                    type="button"
-                                    onClick={onClose}
-                                    aria-label="Close dialog"
-                                    className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-                                >
-                                    <X className="h-4 w-4" />
-                                </button>
+                                <div className="min-w-0 flex-1">
+                                    <div className="text-[10.5px] font-semibold tracking-wider text-primary uppercase">
+                                        {isEdit
+                                            ? `Edit · Shift #${initialShift?.id}`
+                                            : 'New shift'}
+                                    </div>
+                                    <h2 className="mt-0.5 text-xl font-bold tracking-tight text-foreground">
+                                        {isEdit ? 'Edit shift' : 'Create shift'}
+                                    </h2>
+                                    <p className="mt-0.5 text-sm text-muted-foreground">
+                                        {isEdit
+                                            ? 'Update the schedule, staff, tasks or notes. Changes are saved on submit.'
+                                            : 'Schedule an appointment or rostered shift. Add tasks and optionally repeat weekly.'}
+                                    </p>
+                                </div>
+                                <div className="flex shrink-0 items-center gap-2">
+                                    <span className="hidden items-center gap-1 rounded-md border border-border px-1.5 py-1 text-[10.5px] text-muted-foreground sm:inline-flex">
+                                        <kbd className="font-sans font-semibold">
+                                            ⌘
+                                        </kbd>
+                                        <kbd className="font-sans font-semibold">
+                                            ↵
+                                        </kbd>
+                                        <span>to save</span>
+                                    </span>
+                                    <button
+                                        type="button"
+                                        onClick={onClose}
+                                        aria-label="Close dialog"
+                                        className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                                    >
+                                        <X className="h-4 w-4" />
+                                    </button>
+                                </div>
                             </div>
                         </div>
-                    </div>
 
-                    {/* Body */}
-                    <div className="flex-1 overflow-y-auto px-6 py-4">
-                        {lockedContext ? (
-                            <LockedContextCard context={lockedContext} />
-                        ) : null}
+                        {/* Body */}
+                        <div className="flex-1 overflow-y-auto px-6 py-4">
+                            {lockedContext ? (
+                                <LockedContextCard context={lockedContext} />
+                            ) : null}
 
-                        <Section
-                            first
-                            icon={LayoutGrid}
-                            title="Shift type"
-                            hint="What kind of shift is this?"
-                        >
-                            <ShiftTypePicker
-                                value={form.data.shift_type}
-                                onChange={setShiftType}
-                            />
-                            <FieldError message={form.errors.shift_type} />
-                        </Section>
-
-                        <Section icon={Users} title="Who & where">
-                            <div className="grid gap-3 sm:grid-cols-2">
-                                <div>
-                                    <Label htmlFor="csd-client" required>
-                                        Client
-                                    </Label>
-                                    <select
-                                        id="csd-client"
-                                        className="select"
-                                        value={form.data.client_id}
-                                        onChange={(e) =>
-                                            selectClient(e.target.value)
-                                        }
-                                    >
-                                        {clients.map((c) => (
-                                            <option key={c.id} value={c.id}>
-                                                {c.first_name} {c.last_name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    {selectedClient ? (
-                                        <ServiceContextHint
-                                            client={selectedClient}
-                                            serviceContexts={serviceContexts}
-                                        />
-                                    ) : null}
-                                    <FieldError
-                                        message={form.errors.client_id}
-                                    />
-                                </div>
-
-                                <div>
-                                    <Label htmlFor="csd-location">
-                                        Location
-                                    </Label>
-                                    <input
-                                        id="csd-location"
-                                        className="input"
-                                        value={form.data.location}
-                                        onChange={(e) =>
-                                            form.setData(
-                                                'location',
-                                                e.target.value,
-                                            )
-                                        }
-                                        placeholder={
-                                            sites.length
-                                                ? sites[0].name
-                                                : "e.g. Client's home"
-                                        }
-                                        list="csd-locations"
-                                    />
-                                    <datalist id="csd-locations">
-                                        {sites.map((s) => (
-                                            <option
-                                                key={s.id}
-                                                value={s.name}
-                                            />
-                                        ))}
-                                    </datalist>
-                                    <FieldError message={form.errors.location} />
-                                </div>
-
-                                <div className="sm:col-span-2">
-                                    <Label htmlFor="csd-staff">Staff</Label>
-                                    <select
-                                        id="csd-staff"
-                                        className="select"
-                                        value={form.data.user_id}
-                                        onChange={(e) =>
-                                            form.setData(
-                                                'user_id',
-                                                e.target.value === ''
-                                                    ? ''
-                                                    : (Number(e.target.value) as number),
-                                            )
-                                        }
-                                    >
-                                        <option value="">
-                                            Unassigned (create an open shift)
-                                        </option>
-                                        {staff.map((s) => (
-                                            <option key={s.id} value={s.id}>
-                                                {s.name}
-                                            </option>
-                                        ))}
-                                    </select>
-                                    {!form.data.user_id ? (
-                                        <p className="mt-1 text-xs text-muted-foreground">
-                                            Leave blank to publish as an open shift — staff can be assigned later from Rostering.
-                                        </p>
-                                    ) : null}
-                                    <FieldError message={form.errors.user_id} />
-                                </div>
-                            </div>
-                        </Section>
-
-                        <Section
-                            icon={Clock}
-                            title="Schedule"
-                            hint={
-                                durationLabel === '—'
-                                    ? undefined
-                                    : `${durationLabel} including any breaks`
-                            }
-                        >
-                            <ScheduleStrip
-                                startsAt={form.data.starts_at}
-                                endsAt={form.data.ends_at}
-                                breakMinutes={form.data.expected_break_minutes}
-                                onStartsAtChange={(v) =>
-                                    form.setData('starts_at', v)
-                                }
-                                onEndsAtChange={(v) =>
-                                    form.setData('ends_at', v)
-                                }
-                                onBreakChange={(v) =>
-                                    form.setData('expected_break_minutes', v)
-                                }
-                                duration={durationLabel}
-                            />
-                            <div className="mt-3">
-                                <Label required>Publish as</Label>
-                                <StatusPicker
-                                    value={form.data.status}
-                                    onChange={(v) => form.setData('status', v)}
-                                />
-                            </div>
-                            <FieldError message={form.errors.starts_at} />
-                            <FieldError message={form.errors.ends_at} />
-                        </Section>
-
-                        {isEdit ? null : (
-                        <Section
-                            icon={Repeat}
-                            title="Repeat weekly"
-                            hint={
-                                form.data.repeat_weekly
-                                    ? 'Creates a recurring series'
-                                    : 'One-off shift'
-                            }
-                            action={
-                                <Toggle
-                                    value={form.data.repeat_weekly}
-                                    onChange={(v) =>
-                                        form.setData('repeat_weekly', v)
-                                    }
-                                    ariaLabel="Toggle repeat weekly"
-                                />
-                            }
-                        >
-                            {form.data.repeat_weekly ? (
-                                <div className="space-y-3">
-                                    <div>
-                                        <Label>Repeat on</Label>
-                                        <div className="flex flex-wrap gap-1.5">
-                                            {WEEKDAYS.map((d) => {
-                                                const active =
-                                                    form.data.repeat_by_weekday.includes(
-                                                        d,
-                                                    );
-                                                return (
-                                                    <button
-                                                        key={d}
-                                                        type="button"
-                                                        onClick={() =>
-                                                            toggleWeekday(d)
-                                                        }
-                                                        className={[
-                                                            'h-8 min-w-[44px] rounded-md px-3 text-xs font-semibold tabular-nums transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
-                                                            active
-                                                                ? 'bg-primary text-primary-foreground shadow-sm'
-                                                                : 'border border-border bg-card text-foreground hover:border-primary/40 hover:bg-primary/5',
-                                                        ].join(' ')}
-                                                    >
-                                                        {WEEKDAY_LABEL[d]}
-                                                    </button>
-                                                );
-                                            })}
-                                        </div>
-                                    </div>
-                                    <div className="grid items-end gap-3 sm:grid-cols-[1fr_auto]">
+                            {form.data.user_id ? (
+                                <div className="mb-4 space-y-2 rounded-xl border border-border bg-card p-3">
+                                    <div className="flex flex-wrap items-center justify-between gap-2">
                                         <div>
-                                            <Label htmlFor="csd-rep-end">
-                                                Repeat end date
-                                            </Label>
-                                            <input
-                                                id="csd-rep-end"
-                                                type="date"
-                                                className="input"
-                                                value={form.data.repeat_end_date}
-                                                onChange={(e) =>
-                                                    form.setData(
-                                                        'repeat_end_date',
-                                                        e.target.value,
-                                                    )
+                                            <div className="text-sm font-semibold text-foreground">
+                                                Staff eligibility
+                                            </div>
+                                            <div className="text-xs text-muted-foreground">
+                                                {selectedStaff?.name ??
+                                                    'Selected staff'}
+                                            </div>
+                                        </div>
+                                        {eligLoading ? (
+                                            <span className="inline-flex items-center gap-1.5 rounded-md border border-border px-2 py-1 text-xs text-muted-foreground">
+                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                Checking
+                                            </span>
+                                        ) : eligibilityStatus ? (
+                                            <EligibilityStatusBadge
+                                                status={
+                                                    eligibilityStatus.status
+                                                }
+                                                warningCount={
+                                                    eligibilityStatus.warningCount
                                                 }
                                             />
-                                        </div>
-                                        <div className="inline-flex h-9 items-center gap-2 self-end rounded-lg border border-primary/20 bg-primary/10 px-3 py-2 text-xs text-foreground">
-                                            <Sparkles className="h-3.5 w-3.5 text-primary" />
-                                            <span>
-                                                Multiple shifts will be created across the date range
-                                            </span>
-                                        </div>
-                                    </div>
-                                </div>
-                            ) : null}
-                        </Section>
-                        )}
-
-                        <Section
-                            icon={Pencil}
-                            title="Tasks & notes"
-                            hint="What the worker needs to know"
-                        >
-                            <div className="grid gap-4 md:grid-cols-2">
-                                <div>
-                                    <div className="mb-2 flex items-center justify-between">
-                                        <label className="text-xs font-semibold text-foreground">
-                                            Shift tasks{' '}
-                                            <span className="font-normal text-muted-foreground">
-                                                ·{' '}
-                                                {form.data.tasks.length
-                                                    ? `${form.data.tasks.length} task${form.data.tasks.length === 1 ? '' : 's'}`
-                                                    : 'checklist for the worker'}
-                                            </span>
-                                        </label>
-                                        {form.data.tasks.length > 0 ? (
-                                            <button
-                                                type="button"
-                                                onClick={addTask}
-                                                className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary hover:bg-primary/5"
-                                            >
-                                                <Plus className="h-3.5 w-3.5" />{' '}
-                                                Add
-                                            </button>
                                         ) : null}
                                     </div>
-                                    {form.data.tasks.length === 0 ? (
-                                        <button
-                                            type="button"
-                                            onClick={addTask}
-                                            className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/30 px-4 py-3 text-xs text-muted-foreground transition hover:border-primary/40 hover:bg-primary/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                                    {!eligLoading &&
+                                    eligibilityBlocks.length > 0 ? (
+                                        <EligibilityAlertBanner
+                                            type="blocked"
+                                            reasons={eligibilityBlocks}
+                                            title="This staff member cannot be assigned"
+                                        />
+                                    ) : null}
+                                    {!eligLoading &&
+                                    eligibilityBlocks.length === 0 &&
+                                    eligibilityWarnings.length > 0 ? (
+                                        <EligibilityAlertBanner
+                                            type="warnings"
+                                            reasons={eligibilityWarnings}
+                                            title="Staff eligibility warnings"
+                                        />
+                                    ) : null}
+                                </div>
+                            ) : null}
+
+                            <Section
+                                first
+                                icon={LayoutGrid}
+                                title="Shift type"
+                                hint="What kind of shift is this?"
+                            >
+                                <ShiftTypePicker
+                                    value={form.data.shift_type}
+                                    onChange={setShiftType}
+                                />
+                                <FieldError message={form.errors.shift_type} />
+                            </Section>
+
+                            <Section icon={Users} title="Who & where">
+                                <div className="grid gap-3 sm:grid-cols-2">
+                                    <div>
+                                        <Label htmlFor="csd-client" required>
+                                            Client
+                                        </Label>
+                                        <select
+                                            id="csd-client"
+                                            className="select"
+                                            value={form.data.client_id}
+                                            onChange={(e) =>
+                                                selectClient(e.target.value)
+                                            }
                                         >
-                                            <Plus className="h-3.5 w-3.5" />
-                                            Add the first task — e.g. “Morning medication round”
-                                        </button>
-                                    ) : (
-                                        <ul className="space-y-1.5">
-                                            {form.data.tasks.map((t, i) => (
-                                                <li
-                                                    key={i}
-                                                    className="flex items-center gap-2"
-                                                >
-                                                    <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-semibold text-muted-foreground tabular-nums">
-                                                        {i + 1}
-                                                    </span>
+                                            {clients.map((c) => (
+                                                <option key={c.id} value={c.id}>
+                                                    {c.first_name} {c.last_name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        {selectedClient ? (
+                                            <ServiceContextHint
+                                                client={selectedClient}
+                                                serviceContexts={
+                                                    serviceContexts
+                                                }
+                                            />
+                                        ) : null}
+                                        <FieldError
+                                            message={form.errors.client_id}
+                                        />
+                                    </div>
+
+                                    <div>
+                                        <Label htmlFor="csd-location">
+                                            Location
+                                        </Label>
+                                        <input
+                                            id="csd-location"
+                                            className="input"
+                                            value={form.data.location}
+                                            onChange={(e) =>
+                                                form.setData(
+                                                    'location',
+                                                    e.target.value,
+                                                )
+                                            }
+                                            placeholder={
+                                                sites.length
+                                                    ? sites[0].name
+                                                    : "e.g. Client's home"
+                                            }
+                                            list="csd-locations"
+                                        />
+                                        <datalist id="csd-locations">
+                                            {sites.map((s) => (
+                                                <option
+                                                    key={s.id}
+                                                    value={s.name}
+                                                />
+                                            ))}
+                                        </datalist>
+                                        <FieldError
+                                            message={form.errors.location}
+                                        />
+                                    </div>
+
+                                    <div className="sm:col-span-2">
+                                        <Label htmlFor="csd-staff">Staff</Label>
+                                        <select
+                                            id="csd-staff"
+                                            className="select"
+                                            value={form.data.user_id}
+                                            onChange={(e) =>
+                                                form.setData(
+                                                    'user_id',
+                                                    e.target.value === ''
+                                                        ? ''
+                                                        : (Number(
+                                                              e.target.value,
+                                                          ) as number),
+                                                )
+                                            }
+                                        >
+                                            <option value="">
+                                                Unassigned (create an open
+                                                shift)
+                                            </option>
+                                            {staff.map((s) => (
+                                                <option key={s.id} value={s.id}>
+                                                    {s.name}
+                                                </option>
+                                            ))}
+                                        </select>
+                                        {!form.data.user_id ? (
+                                            <p className="mt-1 text-xs text-muted-foreground">
+                                                Leave blank to publish as an
+                                                open shift — staff can be
+                                                assigned later from Rostering.
+                                            </p>
+                                        ) : null}
+                                        <FieldError
+                                            message={form.errors.user_id}
+                                        />
+                                    </div>
+                                </div>
+                            </Section>
+
+                            <Section
+                                icon={Clock}
+                                title="Schedule"
+                                hint={
+                                    durationLabel === '—'
+                                        ? undefined
+                                        : `${durationLabel} including any breaks`
+                                }
+                            >
+                                <ScheduleStrip
+                                    startsAt={form.data.starts_at}
+                                    endsAt={form.data.ends_at}
+                                    breakMinutes={
+                                        form.data.expected_break_minutes
+                                    }
+                                    onStartsAtChange={(v) =>
+                                        form.setData('starts_at', v)
+                                    }
+                                    onEndsAtChange={(v) =>
+                                        form.setData('ends_at', v)
+                                    }
+                                    onBreakChange={(v) =>
+                                        form.setData(
+                                            'expected_break_minutes',
+                                            v,
+                                        )
+                                    }
+                                    duration={durationLabel}
+                                />
+                                <div className="mt-3">
+                                    <Label required>Publish as</Label>
+                                    <StatusPicker
+                                        value={form.data.status}
+                                        onChange={(v) =>
+                                            form.setData('status', v)
+                                        }
+                                    />
+                                </div>
+                                <FieldError message={form.errors.starts_at} />
+                                <FieldError message={form.errors.ends_at} />
+                            </Section>
+
+                            {isEdit ? null : (
+                                <Section
+                                    icon={Repeat}
+                                    title="Repeat weekly"
+                                    hint={
+                                        form.data.repeat_weekly
+                                            ? 'Creates a recurring series'
+                                            : 'One-off shift'
+                                    }
+                                    action={
+                                        <Toggle
+                                            value={form.data.repeat_weekly}
+                                            onChange={(v) =>
+                                                form.setData('repeat_weekly', v)
+                                            }
+                                            ariaLabel="Toggle repeat weekly"
+                                        />
+                                    }
+                                >
+                                    {form.data.repeat_weekly ? (
+                                        <div className="space-y-3">
+                                            <div>
+                                                <Label>Repeat on</Label>
+                                                <div className="flex flex-wrap gap-1.5">
+                                                    {WEEKDAYS.map((d) => {
+                                                        const active =
+                                                            form.data.repeat_by_weekday.includes(
+                                                                d,
+                                                            );
+                                                        return (
+                                                            <button
+                                                                key={d}
+                                                                type="button"
+                                                                onClick={() =>
+                                                                    toggleWeekday(
+                                                                        d,
+                                                                    )
+                                                                }
+                                                                className={[
+                                                                    'h-8 min-w-[44px] rounded-md px-3 text-xs font-semibold tabular-nums transition focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                                                                    active
+                                                                        ? 'bg-primary text-primary-foreground shadow-sm'
+                                                                        : 'border border-border bg-card text-foreground hover:border-primary/40 hover:bg-primary/5',
+                                                                ].join(' ')}
+                                                            >
+                                                                {
+                                                                    WEEKDAY_LABEL[
+                                                                        d
+                                                                    ]
+                                                                }
+                                                            </button>
+                                                        );
+                                                    })}
+                                                </div>
+                                            </div>
+                                            <div className="grid items-end gap-3 sm:grid-cols-[1fr_auto]">
+                                                <div>
+                                                    <Label htmlFor="csd-rep-end">
+                                                        Repeat end date
+                                                    </Label>
                                                     <input
-                                                        className="input flex-1"
-                                                        placeholder={`Task ${i + 1}`}
-                                                        value={t.label}
+                                                        id="csd-rep-end"
+                                                        type="date"
+                                                        className="input"
+                                                        value={
+                                                            form.data
+                                                                .repeat_end_date
+                                                        }
                                                         onChange={(e) =>
-                                                            setTask(
-                                                                i,
+                                                            form.setData(
+                                                                'repeat_end_date',
                                                                 e.target.value,
                                                             )
                                                         }
                                                     />
-                                                    <button
-                                                        type="button"
-                                                        onClick={() =>
-                                                            removeTask(i)
-                                                        }
-                                                        className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-                                                        aria-label={`Remove task ${i + 1}`}
-                                                    >
-                                                        <Trash className="h-4 w-4" />
-                                                    </button>
-                                                </li>
-                                            ))}
-                                        </ul>
-                                    )}
-                                </div>
-                                <div>
-                                    <label
-                                        className="mb-2 block text-xs font-semibold text-foreground"
-                                        htmlFor="csd-notes"
-                                    >
-                                        Handover notes{' '}
-                                        <span className="font-normal text-muted-foreground">
-                                            · anything the worker should know
-                                        </span>
-                                    </label>
-                                    <textarea
-                                        id="csd-notes"
-                                        rows={4}
-                                        className="textarea"
-                                        placeholder="e.g. Prefers a quieter handover; check fridge for new medication."
-                                        value={form.data.notes}
-                                        onChange={(e) =>
-                                            form.setData('notes', e.target.value)
-                                        }
-                                    />
-                                </div>
-                            </div>
-                        </Section>
-                    </div>
+                                                </div>
+                                                <div className="inline-flex h-9 items-center gap-2 self-end rounded-lg border border-primary/20 bg-primary/10 px-3 py-2 text-xs text-foreground">
+                                                    <Sparkles className="h-3.5 w-3.5 text-primary" />
+                                                    <span>
+                                                        Multiple shifts will be
+                                                        created across the date
+                                                        range
+                                                    </span>
+                                                </div>
+                                            </div>
+                                        </div>
+                                    ) : null}
+                                </Section>
+                            )}
 
-                    {/* Footer */}
-                    <div className="flex flex-col gap-3 border-t border-border bg-card px-6 py-3.5 sm:flex-row sm:items-center sm:justify-between">
-                        <div className="flex min-w-0 items-center gap-2">
-                            <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                                <CalendarClock className="h-3.5 w-3.5" />
-                            </span>
-                            <div className="min-w-0">
-                                <div className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
-                                    {isEdit ? 'Will update' : 'Will create'}
+                            <Section
+                                icon={Pencil}
+                                title="Tasks & notes"
+                                hint="What the worker needs to know"
+                            >
+                                <div className="grid gap-4 md:grid-cols-2">
+                                    <div>
+                                        <div className="mb-2 flex items-center justify-between">
+                                            <label className="text-xs font-semibold text-foreground">
+                                                Shift tasks{' '}
+                                                <span className="font-normal text-muted-foreground">
+                                                    ·{' '}
+                                                    {form.data.tasks.length
+                                                        ? `${form.data.tasks.length} task${form.data.tasks.length === 1 ? '' : 's'}`
+                                                        : 'checklist for the worker'}
+                                                </span>
+                                            </label>
+                                            {form.data.tasks.length > 0 ? (
+                                                <button
+                                                    type="button"
+                                                    onClick={addTask}
+                                                    className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-medium text-primary hover:bg-primary/5"
+                                                >
+                                                    <Plus className="h-3.5 w-3.5" />{' '}
+                                                    Add
+                                                </button>
+                                            ) : null}
+                                        </div>
+                                        {form.data.tasks.length === 0 ? (
+                                            <button
+                                                type="button"
+                                                onClick={addTask}
+                                                className="flex w-full items-center justify-center gap-2 rounded-lg border border-dashed border-border bg-muted/30 px-4 py-3 text-xs text-muted-foreground transition hover:border-primary/40 hover:bg-primary/5 focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring"
+                                            >
+                                                <Plus className="h-3.5 w-3.5" />
+                                                Add the first task — e.g.
+                                                “Morning medication round”
+                                            </button>
+                                        ) : (
+                                            <ul className="space-y-1.5">
+                                                {form.data.tasks.map((t, i) => (
+                                                    <li
+                                                        key={i}
+                                                        className="flex items-center gap-2"
+                                                    >
+                                                        <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-semibold text-muted-foreground tabular-nums">
+                                                            {i + 1}
+                                                        </span>
+                                                        <input
+                                                            className="input flex-1"
+                                                            placeholder={`Task ${i + 1}`}
+                                                            value={t.label}
+                                                            onChange={(e) =>
+                                                                setTask(
+                                                                    i,
+                                                                    e.target
+                                                                        .value,
+                                                                )
+                                                            }
+                                                        />
+                                                        <button
+                                                            type="button"
+                                                            onClick={() =>
+                                                                removeTask(i)
+                                                            }
+                                                            className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
+                                                            aria-label={`Remove task ${i + 1}`}
+                                                        >
+                                                            <Trash className="h-4 w-4" />
+                                                        </button>
+                                                    </li>
+                                                ))}
+                                            </ul>
+                                        )}
+                                    </div>
+                                    <div>
+                                        <label
+                                            className="mb-2 block text-xs font-semibold text-foreground"
+                                            htmlFor="csd-notes"
+                                        >
+                                            Handover notes{' '}
+                                            <span className="font-normal text-muted-foreground">
+                                                · anything the worker should
+                                                know
+                                            </span>
+                                        </label>
+                                        <textarea
+                                            id="csd-notes"
+                                            rows={4}
+                                            className="textarea"
+                                            placeholder="e.g. Prefers a quieter handover; check fridge for new medication."
+                                            value={form.data.notes}
+                                            onChange={(e) =>
+                                                form.setData(
+                                                    'notes',
+                                                    e.target.value,
+                                                )
+                                            }
+                                        />
+                                    </div>
                                 </div>
-                                <div className="truncate text-xs text-foreground">
-                                    {summary}
+                            </Section>
+                        </div>
+
+                        {/* Footer */}
+                        <div className="flex flex-col gap-3 border-t border-border bg-card px-6 py-3.5 sm:flex-row sm:items-center sm:justify-between">
+                            <div className="flex min-w-0 items-center gap-2">
+                                <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                                    <CalendarClock className="h-3.5 w-3.5" />
+                                </span>
+                                <div className="min-w-0">
+                                    <div className="text-[10.5px] font-semibold tracking-wider text-muted-foreground uppercase">
+                                        {isEdit ? 'Will update' : 'Will create'}
+                                    </div>
+                                    <div className="truncate text-xs text-foreground">
+                                        {summary}
+                                    </div>
                                 </div>
                             </div>
+                            <div className="flex shrink-0 items-center gap-2">
+                                <button
+                                    type="button"
+                                    onClick={onClose}
+                                    className="inline-flex items-center gap-1.5 rounded-md border border-border bg-transparent px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted"
+                                >
+                                    Cancel
+                                </button>
+                                <button
+                                    type="submit"
+                                    disabled={form.processing}
+                                    className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-70"
+                                >
+                                    {form.processing ? (
+                                        <>
+                                            <Loader2 className="h-4 w-4 animate-spin" />
+                                            Saving…
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Check className="h-4 w-4" />
+                                            {isEdit
+                                                ? 'Save changes'
+                                                : 'Create shift'}
+                                        </>
+                                    )}
+                                </button>
+                            </div>
                         </div>
-                        <div className="flex shrink-0 items-center gap-2">
-                            <button
-                                type="button"
-                                onClick={onClose}
-                                className="inline-flex items-center gap-1.5 rounded-md border border-border bg-transparent px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted"
-                            >
-                                Cancel
-                            </button>
-                            <button
-                                type="submit"
-                                disabled={form.processing}
-                                className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-70"
-                            >
-                                {form.processing ? (
-                                    <>
-                                        <Loader2 className="h-4 w-4 animate-spin" />
-                                        Saving…
-                                    </>
-                                ) : (
-                                    <>
-                                        <Check className="h-4 w-4" />
-                                        {isEdit ? 'Save changes' : 'Create shift'}
-                                    </>
-                                )}
-                            </button>
-                        </div>
-                    </div>
-                </form>
-            </DialogContent>
-        </Dialog>
+                    </form>
+                </DialogContent>
+            </Dialog>
+            <OverrideConfirmationDialog
+                open={overrideOpen}
+                onOpenChange={setOverrideOpen}
+                warnings={overrideWarnings}
+                staffName={selectedStaff?.name}
+                processing={form.processing}
+                onConfirm={(reason) => {
+                    setOverrideOpen(false);
+                    submitForm(reason);
+                }}
+            />
+        </>
     );
 }
 
@@ -993,7 +1234,7 @@ function ShiftTypePicker({
                             </span>
                         </span>
                         {active ? (
-                            <span className="absolute right-2 top-2 inline-flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground">
+                            <span className="absolute top-2 right-2 inline-flex h-4 w-4 items-center justify-center rounded-full bg-primary text-primary-foreground">
                                 <Check className="h-3 w-3" strokeWidth={3} />
                             </span>
                         ) : null}
@@ -1036,7 +1277,7 @@ function ScheduleStrip({
                 />
             </div>
             <div className="flex flex-col items-center pb-1">
-                <div className="text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">
+                <div className="text-[10.5px] font-semibold tracking-wider text-muted-foreground uppercase">
                     Duration
                 </div>
                 <div className="mt-1 flex items-center gap-1.5">
@@ -1188,8 +1429,8 @@ function ServiceContextHint({
     if (!ctx) return null;
     return (
         <p className="mt-1 text-xs text-muted-foreground">
-            Service context:{' '}
-            <span className="text-foreground">{ctx.name}</span> (inherited)
+            Service context: <span className="text-foreground">{ctx.name}</span>{' '}
+            (inherited)
         </p>
     );
 }
@@ -1216,7 +1457,8 @@ function LockedContextCard({ context }: { context: LockedContext }) {
                         {context.missing
                             ? ` · missing ${context.missing} staff`
                             : ''}
-                        . Confirm the client and staff so coverage closes safely.
+                        . Confirm the client and staff so coverage closes
+                        safely.
                     </p>
                 ) : null}
             </div>

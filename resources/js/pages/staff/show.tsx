@@ -1,10 +1,10 @@
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { MyDayList, type MyDayItem } from '@/components/workstream/my-day-list';
-import { PageHero } from '@/components/page';
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
 import {
@@ -12,7 +12,7 @@ import {
     formatDistance,
     formatDuration,
 } from '@/lib/fleet-utils';
-import { edit as editShift } from '@/routes/operations/shifts';
+import { show as showShift } from '@/routes/operations/shifts';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -244,7 +244,7 @@ export default function StaffShow({
                                         </div>
                                         <Link
                                             className="text-xs underline"
-                                            href={editShift.url(s.id)}
+                                            href={showShift.url(s.id)}
                                         >
                                             View
                                         </Link>
@@ -302,7 +302,7 @@ export default function StaffShow({
                                         </div>
                                         <Link
                                             className="text-xs underline"
-                                            href={editShift.url(s.id)}
+                                            href={showShift.url(s.id)}
                                         >
                                             View
                                         </Link>

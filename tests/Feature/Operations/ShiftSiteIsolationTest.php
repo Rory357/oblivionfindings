@@ -428,7 +428,7 @@ class ShiftSiteIsolationTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_shift_edit_page_does_not_leak_other_site_clients(): void
+    public function test_shift_editable_payload_does_not_leak_other_site_clients(): void
     {
         $user = $this->makeSiteScopedUser([$this->siteA], ['shifts.update']);
 
@@ -442,13 +442,12 @@ class ShiftSiteIsolationTest extends TestCase
             'status' => 'scheduled',
         ]);
 
-        $response = $this->actingAs($user)->get("/operations/shifts/{$shift->id}/edit");
+        $response = $this->actingAs($user)->getJson("/operations/shifts/{$shift->id}/editable");
 
-        $response->assertOk()->assertInertia(fn (Assert $page) => $page
-            ->component('operations/shifts/edit')
-            ->has('clients', 1)
-            ->where('clients.0.id', $this->clientA->id)
-        );
+        $response->assertOk()
+            ->assertJsonPath('id', $shift->id)
+            ->assertJsonPath('client.id', $this->clientA->id)
+            ->assertJsonMissing(['id' => $this->clientB->id]);
     }
 
     public function test_shift_show_scopes_medication_witnesses_to_accessible_sites(): void

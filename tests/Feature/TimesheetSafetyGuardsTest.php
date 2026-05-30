@@ -233,7 +233,7 @@ class TimesheetSafetyGuardsTest extends TestCase
         $newStart = $shift->starts_at->copy()->addHour();
         $newEnd = $shift->ends_at->copy()->addHour();
 
-        $this->from("/operations/shifts/{$shift->id}/edit")
+        $this->from("/operations/shifts/{$shift->id}")
             ->actingAs($this->admin)
             ->put("/operations/shifts/{$shift->id}", [
                 'client_id' => $this->client->id,
@@ -242,7 +242,7 @@ class TimesheetSafetyGuardsTest extends TestCase
                 'ends_at' => $newEnd->format('Y-m-d H:i:s'),
                 'status' => 'scheduled',
             ])
-            ->assertRedirect("/operations/shifts/{$shift->id}/edit")
+            ->assertRedirect("/operations/shifts/{$shift->id}")
             ->assertSessionHasErrors(['shift']);
 
         $shift->refresh();

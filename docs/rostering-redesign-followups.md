@@ -94,7 +94,7 @@ The follow-up implementation focuses on mapping returned roster data into the re
 - `resources/js/components/rostering/week-grid-pane.tsx`
     - Renders compliance chips beside staff names.
     - Adds a clear empty roster state.
-    - Routes edit actions to `/operations/shifts/{id}/edit`.
+    - Opens edit actions in the shared shift dialog using `/operations/shifts/{id}/editable` data.
     - Routes completed-shift timesheet actions to `/operations/timesheets/{timesheet_id}/edit` when available.
     - Carries overlap peer details into the inline conflict dialog.
     - Removes or hides menu labels that implied unsupported one-click actions.
@@ -151,7 +151,7 @@ The context menu now only exposes actions that map to current routes or existing
 | Menu action                                  | Current behaviour                                                                                                           |
 | -------------------------------------------- | --------------------------------------------------------------------------------------------------------------------------- |
 | View shift                                   | Visits `/operations/shifts/{id}`.                                                                                           |
-| Edit shift / Edit draft                      | Visits `/operations/shifts/{id}/edit`.                                                                                      |
+| Edit shift / Edit draft                      | Opens the shared shift edit dialog from the current roster view.                                                            |
 | Assign / Reassign                            | Opens the shift detail surface where the existing assignment workflow lives.                                                |
 | Unassign                                     | Posts `/operations/shifts/{id}/unassign`.                                                                                   |
 | Cancel                                       | Patches `/operations/shifts/{id}/cancel`.                                                                                   |

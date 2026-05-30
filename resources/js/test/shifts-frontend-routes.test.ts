@@ -12,7 +12,7 @@ import {
 import { index as rosteringIndex } from '@/routes/operations/rostering';
 import {
     create as createShift,
-    edit as editShift,
+    editable as editableShift,
     index as shiftsIndex,
     show as showShift,
 } from '@/routes/operations/shifts';
@@ -28,7 +28,7 @@ describe('shifts frontend canonical routes', () => {
         expect(shiftsIndex.url()).toBe('/operations/shifts');
         expect(createShift.url()).toBe('/operations/shifts/create');
         expect(showShift.url(123)).toBe('/operations/shifts/123');
-        expect(editShift.url(123)).toBe('/operations/shifts/123/edit');
+        expect(editableShift.url(123)).toBe('/operations/shifts/123/editable');
 
         expect(rosteringIndex.url()).toBe('/operations/rostering');
 

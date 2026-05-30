@@ -1,8 +1,8 @@
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 
@@ -194,7 +194,8 @@ export default function ShiftSeriesShow({
                 title={`Recurring series - ${series.client?.name ?? series.id}`}
             />
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero
+                    variant="compact"
                     title={series.client?.name ?? 'Recurring support series'}
                     description="Operational view of this recurring shift pattern, including open occurrences and active replacement workflows."
                     actions={
@@ -221,9 +222,9 @@ export default function ShiftSeriesShow({
                                     {canManageAny ? (
                                         <Button asChild>
                                             <Link
-                                                href={`/operations/shifts/${nextOccurrence.id}/edit`}
+                                                href={`/operations/shifts/${nextOccurrence.id}`}
                                             >
-                                                Edit future
+                                                Open future
                                             </Link>
                                         </Button>
                                     ) : null}
@@ -579,9 +580,9 @@ export default function ShiftSeriesShow({
                                                 {canManageAny ? (
                                                     <Button size="sm" asChild>
                                                         <Link
-                                                            href={`/operations/shifts/${occurrence.id}/edit`}
+                                                            href={`/operations/shifts/${occurrence.id}`}
                                                         >
-                                                            Edit occurrence
+                                                            Open occurrence
                                                         </Link>
                                                     </Button>
                                                 ) : null}

@@ -76,6 +76,10 @@ import {
     Zap,
 } from 'lucide-react';
 import { useMemo, useRef, useState } from 'react';
+import {
+    CreateShiftDialog,
+    type EditableShift,
+} from '../shifts/components/create-shift-dialog';
 
 type Staff = { id: number; name: string; email?: string };
 type Client = {
@@ -83,8 +87,16 @@ type Client = {
     first_name?: string | null;
     last_name?: string | null;
     name?: string | null;
+    service_context_id?: number | null;
+    site_id?: number | null;
 };
 type Site = { id: number; name: string; type?: string | null };
+type ServiceContext = {
+    id: number;
+    name: string;
+    type: string;
+    is_active: boolean;
+};
 type ShiftLite = {
     id: number;
     client_id: number;
@@ -263,6 +275,8 @@ type Props = {
     staff: Staff[];
     clients: Client[];
     sites: Site[];
+    serviceContexts?: ServiceContext[];
+    defaultServiceContextId?: number | null;
     rosterPeriod: RosterPeriodSummary | null;
     stats: {
         total: number;
@@ -533,6 +547,11 @@ export default function RosteringIndex(props: Props) {
         useState<RequestReplacementShift | null>(null);
     const [unassignMakeOpenShift, setUnassignMakeOpenShift] =
         useState<UnassignMakeOpenShift | null>(null);
+    const [editShift, setEditShift] = useState<EditableShift | null>(null);
+    const [editShiftLoadingId, setEditShiftLoadingId] = useState<number | null>(
+        null,
+    );
+    const [editShiftError, setEditShiftError] = useState<string | null>(null);
     const [loadingAvailability, setLoadingAvailability] = useState(false);
     const todayBtnRef = useRef<HTMLButtonElement>(null);
 
@@ -550,6 +569,18 @@ export default function RosteringIndex(props: Props) {
             (props.clients ?? []).map((client) => ({
                 id: client.id,
                 name: clientName(client),
+            })),
+        [props.clients],
+    );
+    const editDialogClients = useMemo(
+        () =>
+            (props.clients ?? []).map((client) => ({
+                id: client.id,
+                first_name:
+                    client.first_name ?? client.name ?? `Client ${client.id}`,
+                last_name: client.last_name ?? '',
+                service_context_id: client.service_context_id ?? null,
+                site_id: client.site_id ?? null,
             })),
         [props.clients],
     );
@@ -1693,6 +1724,29 @@ export default function RosteringIndex(props: Props) {
         );
     };
 
+    const openEditShift = async (shift: GridShift) => {
+        setEditShiftError(null);
+        setEditShiftLoadingId(shift.id);
+
+        try {
+            const res = await fetch(`/operations/shifts/${shift.id}/editable`, {
+                headers: {
+                    Accept: 'application/json',
+                    'X-Requested-With': 'XMLHttpRequest',
+                },
+                credentials: 'same-origin',
+            });
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            setEditShift((await res.json()) as EditableShift);
+        } catch {
+            setEditShiftError(
+                'Could not load the shift editor. Open the shift detail and try again.',
+            );
+        } finally {
+            setEditShiftLoadingId(null);
+        }
+    };
+
     const copyShiftToDay = (shiftId: number, date: string) => {
         router.post(
             `/operations/shifts/${shiftId}/duplicate`,
@@ -2250,6 +2304,11 @@ export default function RosteringIndex(props: Props) {
                                         ? (s) => duplicateShift(s.id)
                                         : undefined
                                 }
+                                onEditShift={
+                                    props.canManageAny
+                                        ? openEditShift
+                                        : undefined
+                                }
                                 onCopyShiftToDay={
                                     props.canManageAny
                                         ? (s) =>
@@ -2449,6 +2508,42 @@ export default function RosteringIndex(props: Props) {
                     onOpenQueue={() => {
                         router.visit('/operations/rostering/conflicts');
                     }}
+                />
+
+                {editShiftLoadingId ? (
+                    <div
+                        role="status"
+                        className="fixed bottom-6 left-1/2 z-50 inline-flex -translate-x-1/2 items-center gap-2 rounded-lg bg-foreground px-3 py-2 text-xs text-background shadow-lg"
+                    >
+                        <CalendarDays className="h-4 w-4" />
+                        Loading shift editor...
+                    </div>
+                ) : null}
+                {editShiftError ? (
+                    <div
+                        role="status"
+                        className="fixed bottom-6 left-1/2 z-50 inline-flex max-w-sm -translate-x-1/2 items-center gap-2 rounded-lg bg-status-critical px-3 py-2 text-xs text-white shadow-lg"
+                    >
+                        <AlertTriangle className="h-4 w-4" />
+                        {editShiftError}
+                    </div>
+                ) : null}
+                <CreateShiftDialog
+                    key={
+                        editShift
+                            ? `rostering-edit-${editShift.id}`
+                            : 'rostering-edit-none'
+                    }
+                    open={Boolean(editShift)}
+                    onClose={() => setEditShift(null)}
+                    clients={editDialogClients}
+                    staff={props.staff}
+                    sites={props.sites}
+                    serviceContexts={props.serviceContexts ?? []}
+                    defaultServiceContextId={
+                        props.defaultServiceContextId ?? null
+                    }
+                    initialShift={editShift}
                 />
 
                 <CopyToDayDialog

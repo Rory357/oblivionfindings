@@ -14,6 +14,7 @@ use App\Http\Requests\Operations\Rostering\RosteringIndexRequest;
 use App\Models\Client;
 use App\Models\RosterPeriod;
 use App\Models\RosterSuggestionRun;
+use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\ShiftEligibilityOverride;
 use App\Models\Site;
@@ -69,6 +70,7 @@ class RosteringController extends Controller
         $staff = [];
         $clients = [];
         $sites = [];
+        $serviceContexts = [];
 
         if ($canManageAny) {
             // Org-scope the filter dropdowns so managers only see their own
@@ -81,9 +83,13 @@ class RosteringController extends Controller
                 ->get(['id', 'name', 'email']);
             $clients = Client::query()
                 ->when($organizationId, fn ($q) => $q->where('organization_id', $organizationId))
+                ->with('site:id,name')
                 ->orderBy('first_name')
-                ->get(['id', 'first_name', 'last_name']);
+                ->get(['id', 'first_name', 'last_name', 'service_context_id', 'site_id']);
             $sites = Site::query()->orderBy('name')->get(['id', 'name', 'type']);
+            $serviceContexts = ServiceContext::query()
+                ->orderBy('name')
+                ->get(['id', 'name', 'type', 'is_active']);
         }
 
         $query = Shift::query()
@@ -538,6 +544,8 @@ class RosteringController extends Controller
             'staff' => $staff,
             'clients' => $clients,
             'sites' => $sites,
+            'serviceContexts' => $serviceContexts,
+            'defaultServiceContextId' => ServiceContext::defaultId(),
             'rosterPeriod' => $selectedRosterPeriod ? [
                 'id' => $selectedRosterPeriod->id,
                 'site_id' => $selectedRosterPeriod->site_id,

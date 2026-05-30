@@ -103,6 +103,7 @@ export type WeekGridPaneProps = {
     onMakeRecurring?: (shift: GridShift) => void;
     onBroadcastShift?: (shift: GridShift) => void;
     onRequestReplacement?: (shift: GridShift) => void;
+    onEditShift?: (shift: GridShift) => void;
     onReportIncident?: (shift: GridShift) => void;
     actionEndSlot?: ReactNode;
 };
@@ -193,12 +194,12 @@ function buildShiftActions(
         onMakeRecurring?: (s: GridShift) => void;
         onBroadcastShift?: (s: GridShift) => void;
         onRequestReplacement?: (s: GridShift) => void;
+        onEditShift?: (s: GridShift) => void;
         onReportIncident?: (s: GridShift) => void;
     },
 ): ShiftCtxItem[] {
     const items: ShiftCtxItem[] = [];
     const detailHref = shift.href ?? `/operations/shifts/${shift.id}`;
-    const editHref = `/operations/shifts/${shift.id}/edit`;
     const navAction = (
         label: string,
         icon: ReactNode,
@@ -210,6 +211,19 @@ function buildShiftActions(
         kbd: '↵',
         onClick: () => {
             window.location.href = href;
+        },
+    });
+    const editAction = (label: string): ShiftCtxItem => ({
+        icon: <Edit3 className="h-3.5 w-3.5" />,
+        label,
+        tone: 'primary',
+        kbd: '↵',
+        onClick: () => {
+            if (callbacks.onEditShift) {
+                callbacks.onEditShift(shift);
+            } else {
+                window.location.href = detailHref;
+            }
         },
     });
     const pushDuplicateAction = () => {
@@ -268,13 +282,7 @@ function buildShiftActions(
             });
         }
         items.push({ sep: true });
-        items.push({
-            icon: <Edit3 className="h-3.5 w-3.5" />,
-            label: 'Edit shift',
-            onClick: () => {
-                window.location.href = editHref;
-            },
-        });
+        items.push(editAction('Edit shift'));
         pushDuplicateAction();
         items.push({ sep: true });
         items.push({
@@ -382,13 +390,7 @@ function buildShiftActions(
             });
         }
     } else if (shift.status === 'draft') {
-        items.push(
-            navAction(
-                'Edit draft',
-                <Edit3 className="h-3.5 w-3.5" />,
-                editHref,
-            ),
-        );
+        items.push(editAction('Edit draft'));
         if (callbacks.onPublishShift) {
             items.push({
                 icon: <Send className="h-3.5 w-3.5" />,
@@ -415,13 +417,7 @@ function buildShiftActions(
             onClick: () => callbacks.onCancelShift?.(shift),
         });
     } else {
-        items.push(
-            navAction(
-                'Edit shift',
-                <Edit3 className="h-3.5 w-3.5" />,
-                editHref,
-            ),
-        );
+        items.push(editAction('Edit shift'));
         pushDuplicateAction();
         if (callbacks.onMakeRecurring) {
             items.push({
@@ -527,6 +523,7 @@ export function WeekGridPane({
     onMakeRecurring,
     onBroadcastShift,
     onRequestReplacement,
+    onEditShift,
     onReportIncident,
     actionEndSlot,
 }: WeekGridPaneProps) {
@@ -622,6 +619,7 @@ export function WeekGridPane({
                 onMakeRecurring,
                 onBroadcastShift,
                 onRequestReplacement,
+                onEditShift,
                 onReportIncident,
             }),
         });

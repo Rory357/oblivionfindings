@@ -173,6 +173,65 @@ class ShiftControllerTest extends TestCase
         // If SQL injection worked, we'd get all shifts. With parameterized query, we get none.
     }
 
+    public function test_editable_shift_endpoint_returns_dialog_payload_shape(): void
+    {
+        $shift = Shift::factory()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'service_context_id' => $this->serviceContext->id,
+            'user_id' => $this->staff->id,
+            'starts_at' => Carbon::parse('2026-05-04 09:00:00', 'Pacific/Auckland')->utc(),
+            'ends_at' => Carbon::parse('2026-05-04 13:00:00', 'Pacific/Auckland')->utc(),
+            'location' => 'Kowhai House',
+            'notes' => 'Bring medication folder.',
+            'status' => 'scheduled',
+            'shift_type' => 'standard',
+            'is_sleepover' => false,
+            'is_on_call' => false,
+            'expected_break_minutes' => 30,
+            'coverage_roles' => ['caregiver', 'driver'],
+        ]);
+        ShiftTask::create([
+            'shift_id' => $shift->id,
+            'label' => 'Check overnight notes',
+            'sort_order' => 1,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->getJson(route('operations.shifts.editable', $shift))
+            ->assertOk()
+            ->assertJsonPath('id', $shift->id)
+            ->assertJsonPath('client.id', $this->client->id)
+            ->assertJsonPath('staff.id', $this->staff->id)
+            ->assertJsonPath('site.id', $this->site->id)
+            ->assertJsonPath('service_context_id', $this->serviceContext->id)
+            ->assertJsonPath('coverage_roles.0', 'caregiver')
+            ->assertJsonPath('coverage_roles.1', 'driver')
+            ->assertJsonPath('tasks.0.id', ShiftTask::query()->where('shift_id', $shift->id)->value('id'))
+            ->assertJsonPath('tasks.0.label', 'Check overnight notes');
+    }
+
+    public function test_editable_shift_endpoint_requires_shift_update_permission(): void
+    {
+        $viewer = User::factory()->create([
+            'role' => 'support_worker',
+            'approved_at' => now(),
+        ]);
+        $shift = Shift::factory()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'service_context_id' => $this->serviceContext->id,
+            'user_id' => $this->staff->id,
+            'starts_at' => Carbon::parse('2026-05-04 09:00:00', 'Pacific/Auckland')->utc(),
+            'ends_at' => Carbon::parse('2026-05-04 13:00:00', 'Pacific/Auckland')->utc(),
+            'status' => 'scheduled',
+        ]);
+
+        $this->actingAs($viewer)
+            ->getJson(route('operations.shifts.editable', $shift))
+            ->assertForbidden();
+    }
+
     // ==========================================
     // STORE TESTS
     // ==========================================

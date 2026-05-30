@@ -83,7 +83,7 @@ These routes are canonical. They should not be redirected to operations routes.
 | GET | `/operations/shifts/series/{series}` | `operations.shifts.series.show` | `ShiftSeriesController@show` | `role_scope:my-day`, `rostering.viewAny|shifts.viewAny|shifts.manageAny` |
 | POST | `/operations/shifts/series` | `operations.shifts.series.store` | `ShiftSeriesController@store` | `shifts.create` |
 | PATCH | `/operations/shifts/series/{series}/cancel-future` | `operations.shifts.series.cancel_future` | `ShiftSeriesController@cancelFuture` | `rostering.viewAny|shifts.manageAny` |
-| GET | `/operations/shifts/{shift}/edit` | `operations.shifts.edit` | `ShiftController@edit` | `shifts.update` |
+| GET | `/operations/shifts/{shift}/editable` | `operations.shifts.editable` | `ShiftController@editable` | `shifts.update` |
 | PUT | `/operations/shifts/{shift}` | `operations.shifts.update` | `ShiftController@update` | `shifts.update` |
 | POST | `/operations/shifts/{shift}/assign` | `operations.shifts.assign` | `ShiftController@assign` | `shifts.manageAny` |
 | POST | `/operations/shifts/{shift}/unassign` | `operations.shifts.unassign` | `ShiftController@unassign` | `shifts.manageAny` |
@@ -107,7 +107,6 @@ Legacy Shift route names have been removed. The GET URLs remain only as unnamed 
 | removed | `GET /shifts/create` | `operations.shifts.create` | Unnamed 301 redirect. |
 | removed | `POST /shifts` | `operations.shifts.store` | Removed; use canonical route. |
 | removed | `POST /shifts/series` | `operations.shifts.series.store` | Removed; use canonical route. |
-| removed | `GET /shifts/{shift}/edit` | `operations.shifts.edit` | Unnamed 301 redirect. |
 | removed | `PUT /shifts/{shift}` | `operations.shifts.update` | Removed; use canonical route. |
 | removed | `POST /shifts/{shift}/assign` | `operations.shifts.assign` | Removed; use canonical route. |
 | removed | `POST /shifts/{shift}/unassign` | `operations.shifts.unassign` | Removed; use canonical route. |
@@ -235,7 +234,6 @@ The primary duplicate pairs were true controller duplicates, not role separation
 | `shifts.show` | `operations.shifts.show` | `ShiftController@show` |
 | `shifts.create` | `operations.shifts.create` | `ShiftController@create` |
 | `shifts.store` | `operations.shifts.store` | `ShiftController@store` |
-| `shifts.edit` | `operations.shifts.edit` | `ShiftController@edit` |
 | `shifts.update` | `operations.shifts.update` | `ShiftController@update` |
 | `shifts.start` | `operations.shifts.start` | `ShiftController@start` |
 | `shifts.complete` | `operations.shifts.complete` | `ShiftController@complete` |
