@@ -7,6 +7,7 @@ import {
     type AvailabilityStaffMember,
     CapacityHeatmapPane,
     type CoverageCellState,
+    CoverageOverlapPane,
     CoveragePane,
     type CoverageRow,
     DonutCard,
@@ -87,6 +88,8 @@ type ShiftLite = {
     starts_at: string;
     ends_at: string;
     location: string | null;
+    site_id?: number | null;
+    site?: string | null;
     status: string;
     roster_period_id?: number | null;
     published_at?: string | null;
@@ -787,6 +790,23 @@ export default function RosteringIndex(props: Props) {
 
     const openShifts = useMemo(
         () => props.shifts.filter((s) => s.user_id === null),
+        [props.shifts],
+    );
+
+    // Coverage-overlap grid source — normalises optional site fields to null so
+    // the pane can group by site or staff without undefined leaking in.
+    const overlapShifts = useMemo(
+        () =>
+            props.shifts.map((s) => ({
+                id: s.id,
+                starts_at: s.starts_at,
+                ends_at: s.ends_at,
+                status: s.status,
+                user_id: s.user_id,
+                staff: s.staff,
+                site_id: s.site_id ?? null,
+                site: s.site ?? null,
+            })),
         [props.shifts],
     );
 
@@ -2193,6 +2213,15 @@ export default function RosteringIndex(props: Props) {
                                     )
                                 }
                             />
+                        ) : null}
+                        {tab === 'shifts' ? (
+                            <div className="mt-4">
+                                <CoverageOverlapPane
+                                    shifts={overlapShifts}
+                                    days={days}
+                                    todayKey={todayKey}
+                                />
+                            </div>
                         ) : null}
                         {tab === 'open' ? (
                             <OpenShiftsPane
