@@ -11,6 +11,11 @@ class HrComplianceRequirement extends Model
 {
     use HasFactory, AuditableChanges;
 
+    protected static function newFactory()
+    {
+        return \Database\Factories\HrComplianceRequirementFactory::new();
+    }
+
     protected $fillable = [
         'tenant_id',
         'code',

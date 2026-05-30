@@ -12,6 +12,7 @@ class HrComplianceRequirementFactory extends Factory
     public function definition(): array
     {
         return [
+            'tenant_id' => 1,
             'code' => 'HR_' . strtoupper(fake()->unique()->lexify('????')),
             'name' => fake()->words(3, true) . ' Certification',
             'category' => fake()->randomElement(['safety', 'clinical', 'operational']),

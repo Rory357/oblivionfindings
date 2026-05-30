@@ -12,6 +12,11 @@ class HrStaffComplianceStatus extends Model
 {
     use HasFactory, AuditableChanges;
 
+    protected static function newFactory()
+    {
+        return \Database\Factories\HrStaffComplianceStatusFactory::new();
+    }
+
     protected $table = 'hr_staff_compliance_status';
 
     protected $fillable = [

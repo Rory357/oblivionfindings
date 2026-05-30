@@ -14,6 +14,7 @@ class HrStaffComplianceStatusFactory extends Factory
     public function definition(): array
     {
         return [
+            'tenant_id' => 1,
             'user_id' => User::factory(),
             'requirement_id' => HrComplianceRequirement::factory(),
             'status' => 'compliant',

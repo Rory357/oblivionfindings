@@ -51,7 +51,10 @@ class HsTrainingComplianceService
                 'regulatory_reference' => $requirement->regulatory_reference,
             ];
 
-            if ($requirement->isBlocking()) {
+            // A status within its grace window ('expiring_soon') is treated as a
+            // soft warning even for blocking requirements: the grace period exists
+            // to prevent sudden hard blocks the moment training expires.
+            if ($requirement->isBlocking() && $status !== 'expiring_soon') {
                 $failures[] = $entry;
             } else {
                 $warnings[] = $entry;
