@@ -58,6 +58,11 @@ export {
     type MarkEndedEarlyShift,
 } from './mark-ended-early-dialog';
 export {
+    ReassignDialog,
+    type ReassignDialogProps,
+    type ReassignShift,
+} from './reassign-dialog';
+export {
     ReopenForCorrectionDialog,
     type ReopenForCorrectionDialogProps,
     type ReopenForCorrectionShift,

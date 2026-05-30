@@ -681,6 +681,9 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         ->name('operations.shifts.update');
 
     // Roster planning (assign/unassign)
+    Route::get('/shifts/{shift}/candidates', [ShiftController::class, 'candidates'])
+        ->middleware('permission:shifts.manageAny')
+        ->name('operations.shifts.candidates');
     Route::post('/shifts/{shift}/assign', [ShiftController::class, 'assign'])
         ->middleware('permission:shifts.manageAny')
         ->name('operations.shifts.assign');

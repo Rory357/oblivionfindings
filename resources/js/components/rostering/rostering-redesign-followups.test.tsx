@@ -7,6 +7,7 @@ import AvailabilityPane from './availability-pane';
 import CapacityHeatmapPane from './capacity-heatmap-pane';
 import CoveragePane from './coverage-pane';
 import OpenShiftsPane from './open-shifts-pane';
+import ReassignDialog from './reassign-dialog';
 import ResolveConflictDialog from './resolve-conflict-dialog';
 import TabStrip from './tab-strip';
 import TimeOffPane from './time-off-pane';
@@ -841,5 +842,90 @@ describe('rostering redesign follow-up wiring', () => {
         fireEvent.click(screen.getByRole('tab', { name: 'Site' }));
         expect(screen.getByText(/Sites ·/i)).toBeVisible();
         expect(screen.getByText('Matai House')).toBeVisible();
+    });
+
+    it('reassigns from a popup of eligibility-ranked candidates, with an override step for warnings', async () => {
+        const onAssign = vi.fn();
+        const originalFetch = global.fetch;
+        global.fetch = vi.fn().mockResolvedValue({
+            ok: true,
+            json: async () => ({
+                candidates: [
+                    {
+                        id: 7,
+                        name: 'Aroha King',
+                        weekly_hours: 32,
+                        is_eligible: true,
+                        blocked_reasons: [],
+                        warning_reasons: [],
+                    },
+                    {
+                        id: 8,
+                        name: 'Tama Rangi',
+                        weekly_hours: 12,
+                        is_eligible: true,
+                        blocked_reasons: [],
+                        warning_reasons: ['Tight turnaround under 8h'],
+                    },
+                    {
+                        id: 9,
+                        name: 'Mere Ana',
+                        weekly_hours: 40,
+                        is_eligible: false,
+                        blocked_reasons: ['Expired first aid certification'],
+                        warning_reasons: [],
+                    },
+                ],
+                current_user_id: null,
+            }),
+        }) as unknown as typeof fetch;
+
+        try {
+            render(
+                <ReassignDialog
+                    open
+                    shift={{
+                        id: 44,
+                        starts_at: '2026-05-04T09:00:00',
+                        ends_at: '2026-05-04T13:00:00',
+                        client: 'Ari Kauri',
+                        staff: null,
+                        isOpen: true,
+                    }}
+                    onOpenChange={vi.fn()}
+                    onAssign={onAssign}
+                />,
+            );
+
+            // Eligible candidate assigns directly.
+            const aroha = await screen.findByRole('button', {
+                name: /Aroha King/i,
+            });
+            fireEvent.click(aroha);
+            expect(onAssign).toHaveBeenCalledWith(44, 7);
+
+            // Blocked candidate cannot be picked.
+            expect(
+                screen.getByRole('button', { name: /Mere Ana/i }),
+            ).toBeDisabled();
+
+            // Warning candidate requires an override reason before assigning.
+            fireEvent.click(screen.getByRole('button', { name: /Tama Rangi/i }));
+            expect(
+                screen.getByText(/has eligibility warnings/i),
+            ).toBeVisible();
+            fireEvent.change(
+                screen.getByLabelText(/Reason for overriding/i),
+                { target: { value: 'Covered by senior on site' } },
+            );
+            fireEvent.click(
+                screen.getByRole('button', { name: /Assign anyway/i }),
+            );
+            expect(onAssign).toHaveBeenCalledWith(44, 8, {
+                reason: 'Covered by senior on site',
+            });
+        } finally {
+            global.fetch = originalFetch;
+        }
     });
 });

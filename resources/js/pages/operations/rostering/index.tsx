@@ -28,6 +28,8 @@ import {
     type MakeRecurringShift,
     MarkEndedEarlyDialog,
     type MarkEndedEarlyShift,
+    ReassignDialog,
+    type ReassignShift,
     ReopenForCorrectionDialog,
     type ReopenForCorrectionShift,
     ResolveConflictDialog,
@@ -519,6 +521,9 @@ export default function RosteringIndex(props: Props) {
         useState<MakeRecurringShift | null>(null);
     const [broadcastShift, setBroadcastShift] =
         useState<BroadcastShift | null>(null);
+    const [reassignShift, setReassignShift] = useState<ReassignShift | null>(
+        null,
+    );
     const [loadingAvailability, setLoadingAvailability] = useState(false);
     const todayBtnRef = useRef<HTMLButtonElement>(null);
 
@@ -1613,6 +1618,31 @@ export default function RosteringIndex(props: Props) {
             { preserveScroll: true },
         );
     };
+    // Reassign/assign from the grid popup; carries an override reason when the
+    // chosen staff member has acknowledged soft eligibility warnings.
+    const assignShiftToUser = (
+        shiftId: number,
+        userId: number,
+        override?: { reason: string },
+    ) => {
+        router.post(
+            `/operations/shifts/${shiftId}/assign`,
+            {
+                user_id: userId,
+                return_to: '/operations/rostering',
+                ...(override
+                    ? {
+                          override_acknowledged: true,
+                          override_reason: override.reason,
+                      }
+                    : {}),
+            },
+            {
+                preserveScroll: true,
+                onSuccess: () => setReassignShift(null),
+            },
+        );
+    };
     const unassignShift = (shiftId: number) => {
         router.post(
             `/operations/shifts/${shiftId}/unassign`,
@@ -2153,10 +2183,24 @@ export default function RosteringIndex(props: Props) {
                                     router.visit('/operations/shifts/create')
                                 }
                                 onAssignOpen={(s) =>
-                                    router.visit(`/operations/shifts/${s.id}`)
+                                    setReassignShift({
+                                        id: s.id,
+                                        starts_at: s.starts_at,
+                                        ends_at: s.ends_at,
+                                        client: s.client,
+                                        staff: s.staff ?? null,
+                                        isOpen: true,
+                                    })
                                 }
                                 onReassign={(s) =>
-                                    router.visit(`/operations/shifts/${s.id}`)
+                                    setReassignShift({
+                                        id: s.id,
+                                        starts_at: s.starts_at,
+                                        ends_at: s.ends_at,
+                                        client: s.client,
+                                        staff: s.staff ?? null,
+                                        isOpen: false,
+                                    })
                                 }
                                 onResolveConflict={(s) =>
                                     setResolveConflictShift(s)
@@ -2404,6 +2448,18 @@ export default function RosteringIndex(props: Props) {
                         broadcastNeedsCover(shift.id, message);
                         setBroadcastShift(null);
                     }}
+                />
+
+                <ReassignDialog
+                    open={Boolean(reassignShift)}
+                    shift={reassignShift}
+                    canOverride={Boolean(
+                        auth?.can?.shifts?.overrideEligibility ?? true,
+                    )}
+                    onOpenChange={(open) => {
+                        if (!open) setReassignShift(null);
+                    }}
+                    onAssign={assignShiftToUser}
                 />
 
                 {props.rosteringFeatures.publish && props.canPublishRoster ? (

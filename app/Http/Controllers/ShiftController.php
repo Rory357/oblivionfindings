@@ -1719,6 +1719,38 @@ class ShiftController extends Controller
         return $data;
     }
 
+    /**
+     * Eligibility-ranked staff candidates for a shift, for the rostering
+     * reassign/assign popup. Returns the same shape the shift detail page uses.
+     */
+    public function candidates(Request $request, Shift $shift)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('shifts.manageAny'), 403);
+        $this->assertCanAccessShift($auth, $shift);
+
+        if (in_array($shift->status, ['completed', 'cancelled'], true)) {
+            return response()->json([
+                'candidates' => [],
+                'current_user_id' => $shift->user_id,
+                'locked' => true,
+            ]);
+        }
+
+        $candidates = app(ShiftAssignmentRecommendationService::class)->forShift(
+            $shift,
+            $auth,
+            100,
+            $this->shiftStaffBypassPermissions(),
+        );
+
+        return response()->json([
+            'candidates' => $candidates,
+            'current_user_id' => $shift->user_id,
+            'locked' => false,
+        ]);
+    }
+
     public function assign(Request $request, Shift $shift)
     {
         $auth = $request->user();
