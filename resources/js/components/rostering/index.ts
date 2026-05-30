@@ -16,11 +16,6 @@ export {
     type CapacityRow as CapacityHeatmapRow,
 } from './capacity-heatmap-pane';
 export {
-    CoverageOverlapPane,
-    type CoverageOverlapPaneProps,
-    type OverlapShift,
-} from './coverage-overlap-pane';
-export {
     CoveragePane,
     type CoverageAlertSummary,
     type CoverageCell,

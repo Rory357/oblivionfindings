@@ -5,7 +5,6 @@ import { describe, expect, it, vi } from 'vitest';
 import AnalyticsPane from './analytics-pane';
 import AvailabilityPane from './availability-pane';
 import CapacityHeatmapPane from './capacity-heatmap-pane';
-import CoverageOverlapPane from './coverage-overlap-pane';
 import CoveragePane from './coverage-pane';
 import OpenShiftsPane from './open-shifts-pane';
 import ResolveConflictDialog from './resolve-conflict-dialog';
@@ -791,44 +790,56 @@ describe('rostering redesign follow-up wiring', () => {
         expect(screen.getByRole('button', { name: /Next day/i })).toBeVisible();
     });
 
-    it('groups shift coverage by site or staff and flags time overlaps', () => {
+    it('regroups the week grid between staff and site rows', () => {
+        const cell = [
+            {
+                id: 44,
+                status: 'scheduled' as const,
+                starts_at: '2026-05-04T09:00:00',
+                ends_at: '2026-05-04T13:00:00',
+                client: 'Ari Kauri',
+                staff: 'Aroha King',
+                href: '/operations/shifts/44',
+            },
+        ];
+        const staffRows = [
+            {
+                id: 7,
+                name: 'Aroha King',
+                role: null,
+                initials: 'AK',
+                hue: 120,
+                shifts: { '2026-05-04': cell },
+            },
+        ];
+        const siteRows = [
+            {
+                id: 3,
+                name: 'Matai House',
+                role: null,
+                initials: 'MH',
+                hue: 200,
+                shifts: { '2026-05-04': cell },
+            },
+        ];
+
         render(
-            <CoverageOverlapPane
+            <WeekGridPane
                 days={weekDays}
+                rows={staffRows}
+                siteRows={siteRows}
                 todayKey={null}
-                shifts={[
-                    {
-                        id: 1,
-                        starts_at: '2026-05-04T09:00:00',
-                        ends_at: '2026-05-04T17:00:00',
-                        status: 'scheduled',
-                        user_id: 7,
-                        staff: 'Aroha King',
-                        site_id: 3,
-                        site: 'Matai House',
-                    },
-                    {
-                        id: 2,
-                        starts_at: '2026-05-04T12:00:00',
-                        ends_at: '2026-05-04T20:00:00',
-                        status: 'scheduled',
-                        user_id: 8,
-                        staff: 'Tama Rangi',
-                        site_id: 3,
-                        site: 'Matai House',
-                    },
-                ]}
+                canManage
             />,
         );
 
-        // Defaults to grouping by site, and the two same-site shifts overlap.
-        expect(screen.getByText('Coverage overlap')).toBeVisible();
-        expect(screen.getByText('Matai House')).toBeVisible();
-        expect(screen.getByText(/overlapping cell/i)).toBeVisible();
-
-        // Switching to staff splits the same shifts across two staff rows.
-        fireEvent.click(screen.getByRole('tab', { name: 'Staff' }));
+        // Defaults to grouping by staff.
+        expect(screen.getByText(/Staff ·/i)).toBeVisible();
         expect(screen.getByText('Aroha King')).toBeVisible();
-        expect(screen.getByText('Tama Rangi')).toBeVisible();
+
+        // Switching to Site regroups the same grid into site rows.
+        fireEvent.click(screen.getByRole('tab', { name: 'Site' }));
+        expect(screen.getByText(/Sites ·/i)).toBeVisible();
+        expect(screen.getByText('Matai House')).toBeVisible();
     });
 });

@@ -83,6 +83,8 @@ export type GridStaffRow = {
 export type WeekGridPaneProps = {
     days: Date[];
     rows: GridStaffRow[];
+    /** Same shifts grouped by site. When provided, a Staff/Site toggle appears. */
+    siteRows?: GridStaffRow[];
     todayKey: string | null;
     canManage: boolean;
     onAssignOpen?: (shift: GridShift) => void;
@@ -465,6 +467,13 @@ const GRID_VIEWS: { value: GridView; label: string }[] = [
     { value: 'list', label: 'List' },
 ];
 
+type GroupBy = 'staff' | 'site';
+
+const GROUP_VIEWS: { value: GroupBy; label: string }[] = [
+    { value: 'staff', label: 'Staff' },
+    { value: 'site', label: 'Site' },
+];
+
 function buildEmptyCellActions(
     staffName: string,
     dayLabel: string,
@@ -485,6 +494,7 @@ function buildEmptyCellActions(
 export function WeekGridPane({
     days,
     rows,
+    siteRows,
     todayKey,
     canManage,
     onAssignOpen,
@@ -507,7 +517,14 @@ export function WeekGridPane({
 }: WeekGridPaneProps) {
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
     const [view, setView] = useState<GridView>('week');
+    const [groupBy, setGroupBy] = useState<GroupBy>('staff');
     const [dayCursor, setDayCursor] = useState<string | null>(null);
+
+    // When grouping by site, render the site-grouped rows instead of staff rows.
+    // The toggle only appears when siteRows is supplied, so this safely falls
+    // back to staff rows otherwise.
+    const activeRows = groupBy === 'site' && siteRows ? siteRows : rows;
+    const groupedBySite = groupBy === 'site' && !!siteRows;
 
     // Resolve which day the single-day view focuses on. Falls back to today (when
     // it is inside the current week) and otherwise the first day, so the cursor
@@ -535,10 +552,10 @@ export function WeekGridPane({
     // the List view.
     const listGroups = useMemo(() => {
         const items: Array<{ shift: GridShift; staffName: string }> = [];
-        for (const row of rows) {
+        for (const row of activeRows) {
             for (const dayShifts of Object.values(row.shifts)) {
                 for (const s of dayShifts) {
-                    items.push({ shift: s, staffName: row.name });
+                    items.push({ shift: s, staffName: s.staff ?? row.name });
                 }
             }
         }
@@ -557,7 +574,7 @@ export function WeekGridPane({
             map.get(k)!.push(it);
         }
         return Array.from(map.entries());
-    }, [rows]);
+    }, [activeRows]);
 
     const onShiftCtx = (
         e: React.MouseEvent,
@@ -613,33 +630,65 @@ export function WeekGridPane({
     return (
         <div className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-[14px] border border-border bg-card px-4 py-2.5">
-                {/* eslint-disable-next-line no-restricted-syntax -- segmented Week/Day/List selector container, not a Card. */}
-                <div
-                    role="tablist"
-                    aria-label="Roster layout"
-                    className="inline-flex rounded-md border border-border bg-background p-0.5"
-                >
-                    {GRID_VIEWS.map((opt) => {
-                        const active = view === opt.value;
-                        return (
-                            // eslint-disable-next-line no-restricted-syntax -- segmented Week/Day/List selector; not a shadcn Button.
-                            <button
-                                key={opt.value}
-                                type="button"
-                                role="tab"
-                                aria-selected={active}
-                                onClick={() => setView(opt.value)}
-                                className={cn(
-                                    'rounded-sm px-3 py-1 text-xs font-semibold transition-colors',
-                                    active
-                                        ? 'bg-primary text-primary-foreground'
-                                        : 'text-muted-foreground hover:bg-accent',
-                                )}
-                            >
-                                {opt.label}
-                            </button>
-                        );
-                    })}
+                <div className="flex flex-wrap items-center gap-2">
+                    {/* eslint-disable-next-line no-restricted-syntax -- segmented Week/Day/List selector container, not a Card. */}
+                    <div
+                        role="tablist"
+                        aria-label="Roster layout"
+                        className="inline-flex rounded-md border border-border bg-background p-0.5"
+                    >
+                        {GRID_VIEWS.map((opt) => {
+                            const active = view === opt.value;
+                            return (
+                                // eslint-disable-next-line no-restricted-syntax -- segmented Week/Day/List selector; not a shadcn Button.
+                                <button
+                                    key={opt.value}
+                                    type="button"
+                                    role="tab"
+                                    aria-selected={active}
+                                    onClick={() => setView(opt.value)}
+                                    className={cn(
+                                        'rounded-sm px-3 py-1 text-xs font-semibold transition-colors',
+                                        active
+                                            ? 'bg-primary text-primary-foreground'
+                                            : 'text-muted-foreground hover:bg-accent',
+                                    )}
+                                >
+                                    {opt.label}
+                                </button>
+                            );
+                        })}
+                    </div>
+                    {siteRows ? (
+                        // eslint-disable-next-line no-restricted-syntax -- segmented Staff/Site selector container, not a Card.
+                        <div
+                            role="tablist"
+                            aria-label="Group roster by"
+                            className="inline-flex rounded-md border border-border bg-background p-0.5"
+                        >
+                            {GROUP_VIEWS.map((opt) => {
+                                const active = groupBy === opt.value;
+                                return (
+                                    // eslint-disable-next-line no-restricted-syntax -- segmented Staff/Site selector; not a shadcn Button.
+                                    <button
+                                        key={opt.value}
+                                        type="button"
+                                        role="tab"
+                                        aria-selected={active}
+                                        onClick={() => setGroupBy(opt.value)}
+                                        className={cn(
+                                            'rounded-sm px-3 py-1 text-xs font-semibold transition-colors',
+                                            active
+                                                ? 'bg-primary text-primary-foreground'
+                                                : 'text-muted-foreground hover:bg-accent',
+                                        )}
+                                    >
+                                        {opt.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    ) : null}
                 </div>
                 <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
                     <LegendDot color="var(--primary)" label="Scheduled" />
@@ -698,7 +747,7 @@ export function WeekGridPane({
 
             {view === 'list' ? (
                 <div className="overflow-hidden rounded-[14px] border border-border bg-card">
-                    {rows.length === 0 ? (
+                    {activeRows.length === 0 ? (
                         <EmptyRoster />
                     ) : (
                         <div className="divide-y divide-border">
@@ -741,8 +790,9 @@ export function WeekGridPane({
                         style={{ gridTemplateColumns: gridCols }}
                     >
                         <div className="px-3 py-2 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-                            Staff · {rows.filter((r) => !r.open).length}{' '}
-                            rostered
+                            {groupedBySite
+                                ? `Sites · ${activeRows.length}`
+                                : `Staff · ${activeRows.filter((r) => !r.open).length} rostered`}
                         </div>
                         {visibleDays.map((d, i) => {
                             const key = ymdKey(d);
@@ -773,8 +823,8 @@ export function WeekGridPane({
                         })}
                     </div>
                     <div className="divide-y divide-border">
-                        {rows.length === 0 ? <EmptyRoster /> : null}
-                        {rows.map((row) => (
+                        {activeRows.length === 0 ? <EmptyRoster /> : null}
+                        {activeRows.map((row) => (
                             <div
                                 key={row.id}
                                 className={cn(

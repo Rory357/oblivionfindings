@@ -7,7 +7,6 @@ import {
     type AvailabilityStaffMember,
     CapacityHeatmapPane,
     type CoverageCellState,
-    CoverageOverlapPane,
     CoveragePane,
     type CoverageRow,
     DonutCard,
@@ -650,8 +649,10 @@ export default function RosteringIndex(props: Props) {
         });
     };
 
-    // Build per-staff shift map keyed by user id and day
-    const rosterRows: GridStaffRow[] = useMemo(() => {
+    // Build the week grid two ways from the same shift set: grouped by staff
+    // (the default) and grouped by site. The Site/Staff toggle in the grid
+    // header swaps between them so overlaps stay editable in one place.
+    const { staffRows, siteRows } = useMemo(() => {
         const userShifts = new Map<number, ShiftLite[]>();
         const openByDay = new Map<string, ShiftLite[]>();
 
@@ -667,6 +668,8 @@ export default function RosteringIndex(props: Props) {
         }
 
         const staffById = new Map(props.staff.map((s) => [s.id, s]));
+        const staffNameFor = (uid: number | null) =>
+            uid == null ? null : (staffById.get(uid)?.name ?? null);
         const toConflictPeer = (
             shift: ShiftLite,
             staffName: string | null,
@@ -681,7 +684,9 @@ export default function RosteringIndex(props: Props) {
             href: `/operations/shifts/${shift.id}`,
         });
 
-        // Compute staff-level conflicts (overlapping shifts for same user)
+        // Compute staff-level conflicts (overlapping shifts for same user).
+        // These flags travel with each shift, so a double-booking stays flagged
+        // in both the staff and site groupings.
         const conflictIds = new Set<number>();
         const conflictPeersByShiftId = new Map<number, GridConflictPeer[]>();
         const addConflictPeer = (
@@ -721,32 +726,40 @@ export default function RosteringIndex(props: Props) {
             }
         }
 
-        // Convert per-staff shifts into GridStaffRow
-        const rosteredUserIds = Array.from(userShifts.keys());
-        const rows: GridStaffRow[] = [];
-        for (const id of rosteredUserIds) {
-            const u = staffById.get(id);
-            const list = userShifts.get(id) ?? [];
-            if (!u) continue;
-            const shiftsByDay: Record<string, GridShift[]> = {};
-            for (const s of list) {
+        // Shared: turn a raw shift into the interactive GridShift the grid
+        // renders, carrying its conflict flags regardless of how it's grouped.
+        const toGridShift = (s: ShiftLite): GridShift => ({
+            id: s.id,
+            status: s.user_id == null ? 'open' : statusToGridStatus(s.status),
+            starts_at: s.starts_at,
+            ends_at: s.ends_at,
+            client: s.client,
+            staff: staffNameFor(s.user_id),
+            conflict: conflictIds.has(s.id),
+            conflictPeers: conflictPeersByShiftId.get(s.id) ?? [],
+            incident: (s.incidents_count ?? 0) > 0,
+            timesheet_id: s.timesheet_id,
+            href: `/operations/shifts/${s.id}`,
+        });
+
+        const groupByDay = (shifts: ShiftLite[]) => {
+            const byDay: Record<string, GridShift[]> = {};
+            for (const s of shifts) {
                 const k = ymd(new Date(s.starts_at));
-                if (!shiftsByDay[k]) shiftsByDay[k] = [];
-                shiftsByDay[k].push({
-                    id: s.id,
-                    status: statusToGridStatus(s.status),
-                    starts_at: s.starts_at,
-                    ends_at: s.ends_at,
-                    client: s.client,
-                    staff: u.name,
-                    conflict: conflictIds.has(s.id),
-                    conflictPeers: conflictPeersByShiftId.get(s.id) ?? [],
-                    incident: (s.incidents_count ?? 0) > 0,
-                    timesheet_id: s.timesheet_id,
-                    href: `/operations/shifts/${s.id}`,
-                });
+                (byDay[k] ??= []).push(toGridShift(s));
             }
-            rows.push({
+            for (const cell of Object.values(byDay)) {
+                cell.sort((a, b) => a.starts_at.localeCompare(b.starts_at));
+            }
+            return byDay;
+        };
+
+        // ---- Staff rows (one per rostered staff member + an open-shifts row) ----
+        const staffRows: GridStaffRow[] = [];
+        for (const id of userShifts.keys()) {
+            const u = staffById.get(id);
+            if (!u) continue;
+            staffRows.push({
                 id: u.id,
                 name: u.name,
                 role: null,
@@ -754,27 +767,17 @@ export default function RosteringIndex(props: Props) {
                 hue: hashHue(u.name),
                 complianceBadge: complianceByUserId.get(u.id),
                 open: false,
-                shifts: shiftsByDay,
+                shifts: groupByDay(userShifts.get(id) ?? []),
             });
         }
+        staffRows.sort((a, b) => a.name.localeCompare(b.name));
 
-        rows.sort((a, b) => a.name.localeCompare(b.name));
-
-        // Add the open shifts row at the bottom
         const openShiftsByDay: Record<string, GridShift[]> = {};
         for (const [day, list] of openByDay.entries()) {
-            openShiftsByDay[day] = list.map((s) => ({
-                id: s.id,
-                status: 'open',
-                starts_at: s.starts_at,
-                ends_at: s.ends_at,
-                client: s.client,
-                timesheet_id: s.timesheet_id,
-                href: `/operations/shifts/${s.id}`,
-            }));
+            openShiftsByDay[day] = list.map(toGridShift);
         }
         if (Object.keys(openShiftsByDay).length > 0) {
-            rows.push({
+            staffRows.push({
                 id: 0,
                 name: 'Open shifts',
                 role: 'Need cover',
@@ -785,28 +788,51 @@ export default function RosteringIndex(props: Props) {
             });
         }
 
-        return rows;
+        // ---- Site rows (one per site, including assigned + open shifts) ----
+        const NO_SITE = -1;
+        const siteGroups = new Map<
+            number,
+            { name: string; shifts: ShiftLite[] }
+        >();
+        for (const s of props.shifts) {
+            const key = s.site_id ?? NO_SITE;
+            let bucket = siteGroups.get(key);
+            if (!bucket) {
+                bucket = {
+                    name:
+                        key === NO_SITE
+                            ? 'No site'
+                            : (s.site ?? `Site ${key}`),
+                    shifts: [],
+                };
+                siteGroups.set(key, bucket);
+            }
+            bucket.shifts.push(s);
+        }
+        const siteRows: GridStaffRow[] = [];
+        for (const [key, bucket] of siteGroups) {
+            siteRows.push({
+                id: key,
+                name: bucket.name,
+                role: key === NO_SITE ? 'No location set' : null,
+                initials: initials(bucket.name),
+                hue: hashHue(bucket.name),
+                open: false,
+                shifts: groupByDay(bucket.shifts),
+            });
+        }
+        siteRows.sort((a, b) => {
+            // Keep the catch-all "No site" bucket pinned to the bottom.
+            if (a.id === NO_SITE) return 1;
+            if (b.id === NO_SITE) return -1;
+            return a.name.localeCompare(b.name);
+        });
+
+        return { staffRows, siteRows };
     }, [props.shifts, props.staff, complianceByUserId]);
 
     const openShifts = useMemo(
         () => props.shifts.filter((s) => s.user_id === null),
-        [props.shifts],
-    );
-
-    // Coverage-overlap grid source — normalises optional site fields to null so
-    // the pane can group by site or staff without undefined leaking in.
-    const overlapShifts = useMemo(
-        () =>
-            props.shifts.map((s) => ({
-                id: s.id,
-                starts_at: s.starts_at,
-                ends_at: s.ends_at,
-                status: s.status,
-                user_id: s.user_id,
-                staff: s.staff,
-                site_id: s.site_id ?? null,
-                site: s.site ?? null,
-            })),
         [props.shifts],
     );
 
@@ -2117,7 +2143,8 @@ export default function RosteringIndex(props: Props) {
                         {tab === 'shifts' ? (
                             <WeekGridPane
                                 days={days}
-                                rows={rosterRows}
+                                rows={staffRows}
+                                siteRows={siteRows}
                                 todayKey={todayKey}
                                 canManage={props.canManageAny}
                                 onUnassign={(s) => unassignShift(s.id)}
@@ -2213,15 +2240,6 @@ export default function RosteringIndex(props: Props) {
                                     )
                                 }
                             />
-                        ) : null}
-                        {tab === 'shifts' ? (
-                            <div className="mt-4">
-                                <CoverageOverlapPane
-                                    shifts={overlapShifts}
-                                    days={days}
-                                    todayKey={todayKey}
-                                />
-                            </div>
                         ) : null}
                         {tab === 'open' ? (
                             <OpenShiftsPane
