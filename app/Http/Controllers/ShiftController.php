@@ -7,6 +7,7 @@ use App\Domain\Shifts\Lifecycle\ShiftLifecycleService;
 use App\Domain\Shifts\Lifecycle\ShiftLifecycleSource;
 use App\Models\Client;
 use App\Models\ClientIncident;
+use App\Models\ClientNote;
 use App\Models\CustomForm;
 use App\Models\CustomFormSubmission;
 use App\Models\FleetResidentTransport;
@@ -17,6 +18,7 @@ use App\Models\ShiftHandover;
 use App\Models\ShiftReplacementRequest;
 use App\Models\ShiftSeries;
 use App\Models\ShiftTask;
+use App\Models\TimelineEvent;
 use App\Models\Timesheet;
 use App\Models\User;
 use App\Services\CoverageReservationService;
@@ -327,13 +329,18 @@ class ShiftController extends Controller
             ->limit(5)
             ->get();
 
-        // Notes linked to this shift
-        $notes = \App\Models\TimelineEvent::query()
+        // Timeline events linked to this shift. Notes are split out for the
+        // notes tab; the complete event stream powers the audit timeline.
+        $timelineEvents = TimelineEvent::query()
             ->where('shift_id', $shift->id)
             ->orderByDesc('occurred_at')
             ->with(['actor:id,name'])
             ->limit(100)
             ->get();
+        $noteEvents = $timelineEvents
+            ->filter(fn (TimelineEvent $event) => $event->source_type === ClientNote::class
+                || in_array($event->type, ['note', 'shift_note', 'progress_note', 'handover', 'daily_note', 'quick'], true))
+            ->values();
 
         $incidents = ClientIncident::query()
             ->where('shift_id', $shift->id)
@@ -437,6 +444,17 @@ class ShiftController extends Controller
             }
         }
 
+        $timelinePayload = fn (TimelineEvent $event) => [
+            'id' => $event->id,
+            'type' => $event->type,
+            'occurred_at' => optional($event->occurred_at)->toISOString(),
+            'subject' => $event->subject,
+            'body' => $event->body,
+            'visibility' => $event->visibility,
+            'meta' => $event->meta ?? [],
+            'actor' => $event->actor ? ['id' => $event->actor->id, 'name' => $event->actor->name] : null,
+        ];
+
         return inertia('operations/shifts/show', [
             'shift' => $shift,
             'handover' => $handover->map(fn ($entry) => [
@@ -449,15 +467,8 @@ class ShiftController extends Controller
                 'body' => $entry->handover_notes,
                 'actor' => $entry->outgoingStaff ? ['id' => $entry->outgoingStaff->id, 'name' => $entry->outgoingStaff->name] : null,
             ])->values(),
-            'notes' => $notes->map(fn ($e) => [
-                'id' => $e->id,
-                'type' => $e->type,
-                'occurred_at' => optional($e->occurred_at)->toISOString(),
-                'subject' => $e->subject,
-                'body' => $e->body,
-                'meta' => $e->meta ?? [],
-                'actor' => $e->actor ? ['id' => $e->actor->id, 'name' => $e->actor->name] : null,
-            ])->values(),
+            'notes' => $noteEvents->map($timelinePayload)->values(),
+            'auditTimeline' => $timelineEvents->map($timelinePayload)->values(),
             'incidents' => $incidents,
             'incidentTemplates' => $incidentTemplates,
             'forms' => [
@@ -1936,8 +1947,18 @@ class ShiftController extends Controller
             return back()->with('error', 'In-progress shifts cannot be unassigned. Use the replacement workflow instead.');
         }
 
-        $returnTo = $request->input('return_to') ?: url('/operations/rostering');
-        app(ShiftLifecycleService::class)->unassign($shift, $auth);
+        $data = $request->validate([
+            'reason' => ['nullable', 'string', 'max:2000'],
+            'return_to' => ['nullable', 'string'],
+        ]);
+
+        $reason = trim((string) ($data['reason'] ?? ''));
+        $returnTo = $data['return_to'] ?? url('/operations/rostering');
+        app(ShiftLifecycleService::class)->unassign(
+            $shift,
+            $auth,
+            $reason === '' ? null : $reason,
+        );
 
         return redirect($returnTo)->with('success', 'Shift unassigned.');
     }

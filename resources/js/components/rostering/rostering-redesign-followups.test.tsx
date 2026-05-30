@@ -12,6 +12,7 @@ import RequestReplacementDialog from './request-replacement-dialog';
 import ResolveConflictDialog from './resolve-conflict-dialog';
 import TabStrip from './tab-strip';
 import TimeOffPane from './time-off-pane';
+import UnassignMakeOpenDialog from './unassign-make-open-dialog';
 import WeekGridPane from './week-grid-pane';
 
 vi.mock('@inertiajs/react', () => ({
@@ -587,6 +588,71 @@ describe('rostering redesign follow-up wiring', () => {
         );
     });
 
+    it('warns before unassigning and allows submitting without a reason', () => {
+        const onConfirm = vi.fn();
+
+        render(
+            <UnassignMakeOpenDialog
+                open
+                shift={{
+                    id: 44,
+                    starts_at: '2026-05-04T09:00:00+12:00',
+                    client: 'Ari Kauri',
+                    staff: 'Aroha King',
+                }}
+                onOpenChange={vi.fn()}
+                onConfirm={onConfirm}
+            />,
+        );
+
+        expect(
+            screen.getByText('You are about to unassign this shift.'),
+        ).toBeVisible();
+        expect(screen.getByLabelText('Reason (optional)')).toBeVisible();
+        expect(
+            screen.getByText(/Not mandatory, but useful for audit/i),
+        ).toBeVisible();
+
+        fireEvent.click(
+            screen.getByRole('button', { name: /Unassign and make open/i }),
+        );
+
+        expect(onConfirm).toHaveBeenCalledWith(
+            expect.objectContaining({ id: 44 }),
+            null,
+        );
+    });
+
+    it('passes the optional unassign reason when one is entered', () => {
+        const onConfirm = vi.fn();
+
+        render(
+            <UnassignMakeOpenDialog
+                open
+                shift={{
+                    id: 45,
+                    starts_at: '2026-05-05T13:00:00+12:00',
+                    client: 'Mere Rata',
+                    staff: 'Wiremu Tait',
+                }}
+                onOpenChange={vi.fn()}
+                onConfirm={onConfirm}
+            />,
+        );
+
+        fireEvent.change(screen.getByLabelText('Reason (optional)'), {
+            target: { value: '  Staff called in sick  ' },
+        });
+        fireEvent.click(
+            screen.getByRole('button', { name: /Unassign and make open/i }),
+        );
+
+        expect(onConfirm).toHaveBeenCalledWith(
+            expect.objectContaining({ id: 45 }),
+            'Staff called in sick',
+        );
+    });
+
     it('shows compliance state on the capacity heatmap staff rows', () => {
         render(
             <CapacityHeatmapPane
@@ -729,9 +795,7 @@ describe('rostering redesign follow-up wiring', () => {
 
         expect(screen.getByText('Resolve overlap')).toBeVisible();
         // The explanation names the double-booked staff member, not generic copy.
-        expect(
-            screen.getByText(/Aroha King is double-booked/i),
-        ).toBeVisible();
+        expect(screen.getByText(/Aroha King is double-booked/i)).toBeVisible();
         expect(screen.getByText('Ari Kauri')).toBeVisible();
         expect(screen.getByText('Mere Rata')).toBeVisible();
 
@@ -915,14 +979,13 @@ describe('rostering redesign follow-up wiring', () => {
             ).toBeDisabled();
 
             // Warning candidate requires an override reason before assigning.
-            fireEvent.click(screen.getByRole('button', { name: /Tama Rangi/i }));
-            expect(
-                screen.getByText(/has eligibility warnings/i),
-            ).toBeVisible();
-            fireEvent.change(
-                screen.getByLabelText(/Reason for overriding/i),
-                { target: { value: 'Covered by senior on site' } },
+            fireEvent.click(
+                screen.getByRole('button', { name: /Tama Rangi/i }),
             );
+            expect(screen.getByText(/has eligibility warnings/i)).toBeVisible();
+            fireEvent.change(screen.getByLabelText(/Reason for overriding/i), {
+                target: { value: 'Covered by senior on site' },
+            });
             fireEvent.click(
                 screen.getByRole('button', { name: /Assign anyway/i }),
             );

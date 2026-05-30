@@ -2,10 +2,14 @@ import { PageHero } from '@/components/page';
 import {
     AnalyticsPane,
     type AnalyticsTrendPoint,
-    AvailabilityPane,
     type AvailabilityLeaveRequest,
+    AvailabilityPane,
     type AvailabilityStaffMember,
+    BroadcastDialog,
+    type BroadcastShift,
     CapacityHeatmapPane,
+    CopyToDayDialog,
+    type CopyToDayShift,
     type CoverageCellState,
     CoveragePane,
     type CoverageRow,
@@ -17,23 +21,19 @@ import {
     type GridShift,
     type GridShiftStatus,
     type GridStaffRow,
-    type MicroStat,
-    type OpenShiftCard,
-    OpenShiftsPane,
-    CopyToDayDialog,
-    type CopyToDayShift,
-    BroadcastDialog,
-    type BroadcastShift,
     MakeRecurringDialog,
     type MakeRecurringShift,
     MarkEndedEarlyDialog,
     type MarkEndedEarlyShift,
+    type MicroStat,
+    type OpenShiftCard,
+    OpenShiftsPane,
     ReassignDialog,
     type ReassignShift,
-    RequestReplacementDialog,
-    type RequestReplacementShift,
     ReopenForCorrectionDialog,
     type ReopenForCorrectionShift,
+    RequestReplacementDialog,
+    type RequestReplacementShift,
     ResolveConflictDialog,
     type ShiftTypeSlice,
     type Signal,
@@ -42,6 +42,8 @@ import {
     TabStrip,
     TimeOffPane,
     type TimeOffRequest,
+    UnassignMakeOpenDialog,
+    type UnassignMakeOpenShift,
     WeekGridPane,
     WeekPicker,
     addDaysWP,
@@ -357,10 +359,7 @@ type Props = {
     };
     openShiftEligibility?: Record<
         number,
-        Record<
-            number,
-            { status: 'warning' | 'blocked'; reasons: string[] }
-        >
+        Record<number, { status: 'warning' | 'blocked'; reasons: string[] }>
     >;
 };
 
@@ -384,7 +383,9 @@ const ROSTER_TABS: RosterTab[] = [
 ];
 
 function isRosterTab(value: unknown): value is RosterTab {
-    return typeof value === 'string' && ROSTER_TABS.includes(value as RosterTab);
+    return (
+        typeof value === 'string' && ROSTER_TABS.includes(value as RosterTab)
+    );
 }
 
 function initialRosterTab(): RosterTab {
@@ -513,21 +514,25 @@ export default function RosteringIndex(props: Props) {
     const [pickerOpen, setPickerOpen] = useState(false);
     const [resolveConflictShift, setResolveConflictShift] =
         useState<GridShift | null>(null);
-    const [copyToDayShift, setCopyToDayShift] =
-        useState<CopyToDayShift | null>(null);
+    const [copyToDayShift, setCopyToDayShift] = useState<CopyToDayShift | null>(
+        null,
+    );
     const [markEndedEarlyShift, setMarkEndedEarlyShift] =
         useState<MarkEndedEarlyShift | null>(null);
     const [reopenForCorrectionShift, setReopenForCorrectionShift] =
         useState<ReopenForCorrectionShift | null>(null);
     const [makeRecurringShift, setMakeRecurringShift] =
         useState<MakeRecurringShift | null>(null);
-    const [broadcastShift, setBroadcastShift] =
-        useState<BroadcastShift | null>(null);
+    const [broadcastShift, setBroadcastShift] = useState<BroadcastShift | null>(
+        null,
+    );
     const [reassignShift, setReassignShift] = useState<ReassignShift | null>(
         null,
     );
     const [requestReplacementShift, setRequestReplacementShift] =
         useState<RequestReplacementShift | null>(null);
+    const [unassignMakeOpenShift, setUnassignMakeOpenShift] =
+        useState<UnassignMakeOpenShift | null>(null);
     const [loadingAvailability, setLoadingAvailability] = useState(false);
     const todayBtnRef = useRef<HTMLButtonElement>(null);
 
@@ -809,9 +814,7 @@ export default function RosteringIndex(props: Props) {
             if (!bucket) {
                 bucket = {
                     name:
-                        key === NO_SITE
-                            ? 'No site'
-                            : (s.site ?? `Site ${key}`),
+                        key === NO_SITE ? 'No site' : (s.site ?? `Site ${key}`),
                     shifts: [],
                 };
                 siteGroups.set(key, bucket);
@@ -1647,11 +1650,26 @@ export default function RosteringIndex(props: Props) {
             },
         );
     };
-    const unassignShift = (shiftId: number) => {
+    const openUnassignMakeOpenDialog = (shift: UnassignMakeOpenShift) => {
+        setUnassignMakeOpenShift({
+            id: shift.id,
+            starts_at: shift.starts_at ?? null,
+            client: shift.client ?? null,
+            staff: shift.staff ?? null,
+        });
+    };
+
+    const unassignShift = (shiftId: number, reason: string | null = null) => {
         router.post(
             `/operations/shifts/${shiftId}/unassign`,
-            { return_to: '/operations/rostering' },
-            { preserveScroll: true },
+            {
+                return_to: '/operations/rostering',
+                ...(reason ? { reason } : {}),
+            },
+            {
+                preserveScroll: true,
+                onSuccess: () => setUnassignMakeOpenShift(null),
+            },
         );
     };
 
@@ -2199,7 +2217,7 @@ export default function RosteringIndex(props: Props) {
                                 siteRows={siteRows}
                                 todayKey={todayKey}
                                 canManage={props.canManageAny}
-                                onUnassign={(s) => unassignShift(s.id)}
+                                onUnassign={openUnassignMakeOpenDialog}
                                 onCancelShift={(s) => cancelShift(s.id)}
                                 onCreateShift={() =>
                                     router.visit('/operations/shifts/create')
@@ -2412,8 +2430,8 @@ export default function RosteringIndex(props: Props) {
                         if (!open) setResolveConflictShift(null);
                     }}
                     onUnassign={(shift) => {
-                        unassignShift(shift.id);
                         setResolveConflictShift(null);
+                        openUnassignMakeOpenDialog(shift);
                     }}
                     onReassign={(shift) => {
                         // Resolve the overlap in place: swap the conflict dialog
@@ -2513,6 +2531,17 @@ export default function RosteringIndex(props: Props) {
                     }}
                     onConfirm={(shift, payload) =>
                         requestReplacement(shift.id, payload)
+                    }
+                />
+
+                <UnassignMakeOpenDialog
+                    open={Boolean(unassignMakeOpenShift)}
+                    shift={unassignMakeOpenShift}
+                    onOpenChange={(open) => {
+                        if (!open) setUnassignMakeOpenShift(null);
+                    }}
+                    onConfirm={(shift, reason) =>
+                        unassignShift(shift.id, reason)
                     }
                 />
 

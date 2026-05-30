@@ -109,6 +109,36 @@ class ShiftLifecycleServiceTest extends TestCase
         $this->assertSame($assignee->id, $event->meta['assigned_user_id']);
     }
 
+    public function test_unassign_records_internal_timeline_event_with_optional_reason(): void
+    {
+        $actor = User::factory()->create();
+        $staff = User::factory()->create(['name' => 'Aroha King']);
+        $shift = $this->shiftFor($staff, ['status' => 'scheduled']);
+
+        $unassigned = app(ShiftLifecycleService::class)->unassign(
+            $shift,
+            $actor,
+            'Staff called in sick',
+        );
+
+        $this->assertSame('draft', $unassigned->status);
+        $this->assertNull($unassigned->user_id);
+
+        $event = TimelineEvent::query()
+            ->where('type', ShiftTimelineService::UNASSIGNED_EVENT_TYPE)
+            ->where('source_type', Shift::class)
+            ->where('source_id', $shift->id)
+            ->first();
+
+        $this->assertNotNull($event);
+        $this->assertSame('Shift unassigned', $event->subject);
+        $this->assertStringContainsString('Aroha King', $event->body);
+        $this->assertStringContainsString('Staff called in sick', $event->body);
+        $this->assertSame($actor->id, $event->actor_user_id);
+        $this->assertSame($staff->id, $event->meta['previous_user_id']);
+        $this->assertSame('Staff called in sick', $event->meta['reason']);
+    }
+
     /**
      * @param  array<string, mixed>  $overrides
      */

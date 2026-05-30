@@ -10,9 +10,9 @@ import {
 } from '@/components/eligibility/eligibility-status-badge';
 import type { OverrideableWarning } from '@/components/eligibility/override-confirmation-dialog';
 import { OverrideConfirmationDialog } from '@/components/eligibility/override-confirmation-dialog';
-import { PageHero } from '@/components/page';
 import ShiftFormsCard from '@/components/operations/shift-forms-card';
 import ShiftMedicationCard from '@/components/operations/shift-medication-card';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { ShiftStatusBadge } from '@/components/shift-status-badge';
 import { TimesheetStatusBadge } from '@/components/timesheet-status-badge';
@@ -53,6 +53,10 @@ import {
     User,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import {
+    ShiftAuditTimeline,
+    type ShiftAuditTimelineEntry,
+} from './components/shift-audit-timeline';
 
 type Task = {
     id: number;
@@ -66,6 +70,7 @@ type Note = {
     occurred_at?: string | null;
     subject?: string | null;
     body?: string | null;
+    visibility?: string | null;
     meta?: any;
     actor?: { id: number; name: string } | null;
 };
@@ -114,6 +119,7 @@ type Props = {
     };
     handover: Note[];
     notes: Note[];
+    auditTimeline?: ShiftAuditTimelineEntry[];
     incidents: any[];
     incidentTemplates: any[];
     forms: {
@@ -437,6 +443,7 @@ export default function ShiftShow({
     shift,
     handover,
     notes,
+    auditTimeline = [],
     incidents,
     incidentTemplates,
     forms,
@@ -555,6 +562,10 @@ export default function ShiftShow({
             label: `Notes${notes.length + handover.length ? ` (${notes.length + handover.length})` : ''}`,
         });
         tabs.push({
+            key: 'audit',
+            label: `Audit timeline${auditTimeline.length ? ` (${auditTimeline.length})` : ''}`,
+        });
+        tabs.push({
             key: 'incidents',
             label: `Incidents${incidents.length ? ` (${incidents.length})` : ''}`,
         });
@@ -574,6 +585,7 @@ export default function ShiftShow({
         tasks.length,
         notes.length,
         handover.length,
+        auditTimeline.length,
         incidents.length,
         showCoverage,
         showAssignment,
@@ -1030,8 +1042,7 @@ export default function ShiftShow({
                                             href={`/respite/bookings/${shift.respite_booking.id}`}
                                             className="text-sm font-medium underline"
                                         >
-                                            Booking #
-                                            {shift.respite_booking.id}
+                                            Booking #{shift.respite_booking.id}
                                         </Link>
                                         <Badge
                                             variant="outline"
@@ -1065,7 +1076,8 @@ export default function ShiftShow({
                                             })}
                                         </p>
                                     ) : null}
-                                    {shift.respite_booking.cancellation_reason ? (
+                                    {shift.respite_booking
+                                        .cancellation_reason ? (
                                         <p className="text-xs text-muted-foreground">
                                             {
                                                 shift.respite_booking
@@ -2790,6 +2802,11 @@ export default function ShiftShow({
                             ) : null}
                         </CardContent>
                     </Card>
+                </div>
+
+                {/* Audit timeline tab */}
+                <div className={resolvedActiveTab !== 'audit' ? 'hidden' : ''}>
+                    <ShiftAuditTimeline entries={auditTimeline} />
                 </div>
 
                 {/* Incidents tab */}

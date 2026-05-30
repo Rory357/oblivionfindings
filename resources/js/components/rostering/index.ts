@@ -12,9 +12,19 @@ export {
     type AvailabilityStaffMember,
 } from './availability-pane';
 export {
+    BroadcastDialog,
+    type BroadcastDialogProps,
+    type BroadcastShift,
+} from './broadcast-dialog';
+export {
     CapacityHeatmapPane,
     type CapacityRow as CapacityHeatmapRow,
 } from './capacity-heatmap-pane';
+export {
+    CopyToDayDialog,
+    type CopyToDayDialogProps,
+    type CopyToDayShift,
+} from './copy-to-day-dialog';
 export {
     CoveragePane,
     type CoverageAlertSummary,
@@ -24,29 +34,12 @@ export {
 } from './coverage-pane';
 export { Donut, DonutLegend, type DonutSegment } from './donut';
 export { DonutCard, type DonutCardTone } from './donut-card';
-export { EntityFilter, type EntityFilterOption } from './entity-filter';
-export { MicroStats, type MicroStat, type MicroStatTone } from './micro-stats';
-export {
-    OpenShiftsPane,
-    type EligibilityAlertItem,
-    type OpenShiftCard,
-    type ReplacementRequestCard,
-} from './open-shifts-pane';
-export {
-    BroadcastDialog,
-    type BroadcastDialogProps,
-    type BroadcastShift,
-} from './broadcast-dialog';
-export {
-    CopyToDayDialog,
-    type CopyToDayDialogProps,
-    type CopyToDayShift,
-} from './copy-to-day-dialog';
 export {
     EditAvailabilityDialog,
     type EditAvailabilityBlock,
     type EditAvailabilityDialogProps,
 } from './edit-availability-dialog';
+export { EntityFilter, type EntityFilterOption } from './entity-filter';
 export {
     MakeRecurringDialog,
     type MakeRecurringDialogProps,
@@ -57,21 +50,28 @@ export {
     type MarkEndedEarlyDialogProps,
     type MarkEndedEarlyShift,
 } from './mark-ended-early-dialog';
+export { MicroStats, type MicroStat, type MicroStatTone } from './micro-stats';
+export {
+    OpenShiftsPane,
+    type EligibilityAlertItem,
+    type OpenShiftCard,
+    type ReplacementRequestCard,
+} from './open-shifts-pane';
 export {
     ReassignDialog,
     type ReassignDialogProps,
     type ReassignShift,
 } from './reassign-dialog';
 export {
-    RequestReplacementDialog,
-    type RequestReplacementDialogProps,
-    type RequestReplacementShift,
-} from './request-replacement-dialog';
-export {
     ReopenForCorrectionDialog,
     type ReopenForCorrectionDialogProps,
     type ReopenForCorrectionShift,
 } from './reopen-for-correction-dialog';
+export {
+    RequestReplacementDialog,
+    type RequestReplacementDialogProps,
+    type RequestReplacementShift,
+} from './request-replacement-dialog';
 export {
     ResolveConflictDialog,
     type ResolveConflictDialogProps,
@@ -91,6 +91,11 @@ export {
 export { SiteFilter, type SiteOption } from './site-filter';
 export { TabStrip, type RosterTabItem, type RosterTabTone } from './tab-strip';
 export { TimeOffPane, type TimeOffRequest } from './time-off-pane';
+export {
+    UnassignMakeOpenDialog,
+    type UnassignMakeOpenDialogProps,
+    type UnassignMakeOpenShift,
+} from './unassign-make-open-dialog';
 export {
     WeekGridPane,
     type GridConflictPeer,

@@ -500,11 +500,12 @@ class ShiftLifecycleService
         return $assigned->fresh() ?? $assigned;
     }
 
-    public function unassign(Shift $shift, User $actor): Shift
+    public function unassign(Shift $shift, User $actor, ?string $reason = null): Shift
     {
         $this->coverageReservationService->releaseForShift($shift);
+        $previousStaff = null;
 
-        return DB::transaction(function () use ($shift) {
+        $unassigned = DB::transaction(function () use ($shift, &$previousStaff) {
             $locked = Shift::query()->lockForUpdate()->findOrFail($shift->id);
 
             if (in_array($locked->status, ['completed', 'cancelled'], true)) {
@@ -519,6 +520,9 @@ class ShiftLifecycleService
                 ]);
             }
 
+            $locked->loadMissing(['staff:id,name']);
+            $previousStaff = $locked->staff;
+
             $locked->update([
                 'user_id' => null,
                 'status' => 'draft',
@@ -526,6 +530,15 @@ class ShiftLifecycleService
 
             return $locked->fresh() ?? $locked;
         });
+
+        $this->timelineService->recordUnassigned(
+            $unassigned,
+            $previousStaff,
+            $actor,
+            $reason,
+        );
+
+        return $unassigned->fresh() ?? $unassigned;
     }
 
     private function normalizeSource(ShiftLifecycleSource|string|null $source): ShiftLifecycleSource

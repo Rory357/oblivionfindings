@@ -16,6 +16,8 @@ class ShiftTimelineService
 
     public const ASSIGNED_EVENT_TYPE = 'shift_assigned';
 
+    public const UNASSIGNED_EVENT_TYPE = 'shift_unassigned';
+
     public const STARTED_EVENT_TYPE = 'shift_started';
 
     public const COMPLETED_EVENT_TYPE = 'shift_completed';
@@ -40,6 +42,7 @@ class ShiftTimelineService
         return [
             self::SNAPSHOT_EVENT_TYPE,
             self::ASSIGNED_EVENT_TYPE,
+            self::UNASSIGNED_EVENT_TYPE,
             self::STARTED_EVENT_TYPE,
             self::COMPLETED_EVENT_TYPE,
             self::CANCELLED_EVENT_TYPE,
@@ -218,6 +221,63 @@ class ShiftTimelineService
                     'assigned_user_id' => $assignee->id,
                     'assigned_user_name' => $assignee->name,
                     'previous_user_id' => $previousUserId,
+                ], fn ($value) => $value !== null && $value !== '')),
+                'visibility' => 'internal',
+                'created_by' => $actor?->id ?? $shift->created_by,
+            ]
+        );
+    }
+
+    public function recordUnassigned(
+        Shift $shift,
+        ?User $previousStaff = null,
+        ?User $actor = null,
+        ?string $reason = null,
+        ?CarbonInterface $occurredAt = null
+    ): TimelineEvent {
+        $shift = $this->loadShiftContext($shift);
+        $occurredAt = $occurredAt ?? now();
+        $reason = trim((string) $reason);
+        $bodyParts = [
+            $previousStaff
+                ? $previousStaff->name.' unassigned from '.$this->shiftTypeLabel($shift)
+                : $this->shiftTypeLabel($shift).' made open',
+        ];
+        $clientName = $this->clientName($shift);
+
+        if ($clientName !== '') {
+            $bodyParts[] = 'Client: '.$clientName;
+        }
+
+        if ($shift->starts_at && $shift->ends_at) {
+            $bodyParts[] = 'Scheduled '.$this->formatWindow($shift->starts_at, $shift->ends_at);
+        }
+
+        if ($reason !== '') {
+            $bodyParts[] = 'Reason: '.$reason;
+        }
+
+        return TimelineEvent::query()->updateOrCreate(
+            [
+                'type' => self::UNASSIGNED_EVENT_TYPE,
+                'source_type' => Shift::class,
+                'source_id' => $shift->id,
+            ],
+            [
+                'occurred_at' => $occurredAt,
+                'source_type' => Shift::class,
+                'source_id' => $shift->id,
+                'actor_user_id' => $actor?->id,
+                'client_id' => $shift->client_id,
+                'shift_id' => $shift->id,
+                'site_id' => $shift->site_id ?: $shift->client?->site_id,
+                'subject' => 'Shift unassigned',
+                'body' => implode(' · ', $bodyParts),
+                'meta' => array_merge($this->baseMeta($shift), array_filter([
+                    'event' => 'unassigned',
+                    'previous_user_id' => $previousStaff?->id,
+                    'previous_user_name' => $previousStaff?->name,
+                    'reason' => $reason !== '' ? $reason : null,
                 ], fn ($value) => $value !== null && $value !== '')),
                 'visibility' => 'internal',
                 'created_by' => $actor?->id ?? $shift->created_by,
