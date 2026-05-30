@@ -568,6 +568,8 @@ class RosteringController extends Controller
                     'starts_at' => optional($shift->starts_at)->toIso8601String(),
                     'ends_at' => optional($shift->ends_at)->toIso8601String(),
                     'location' => $shift->location,
+                    'site_id' => $shift->site_id,
+                    'site' => $shift->site?->name,
                     'status' => $shift->status,
                     'roster_period_id' => $shift->roster_period_id,
                     'published_at' => optional($shift->published_at)->toIso8601String(),

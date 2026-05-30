@@ -1,6 +1,8 @@
 import { Link } from '@inertiajs/react';
 import {
     AlertTriangle,
+    ChevronLeft,
+    ChevronRight,
     Copy,
     Edit3,
     FileText,
@@ -15,7 +17,7 @@ import {
     X,
 } from 'lucide-react';
 import type { ReactNode } from 'react';
-import { useState } from 'react';
+import { useMemo, useState } from 'react';
 
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
@@ -455,6 +457,14 @@ function buildShiftActions(
     return items;
 }
 
+type GridView = 'week' | 'day' | 'list';
+
+const GRID_VIEWS: { value: GridView; label: string }[] = [
+    { value: 'week', label: 'Week' },
+    { value: 'day', label: 'Day' },
+    { value: 'list', label: 'List' },
+];
+
 function buildEmptyCellActions(
     staffName: string,
     dayLabel: string,
@@ -496,6 +506,58 @@ export function WeekGridPane({
     actionEndSlot,
 }: WeekGridPaneProps) {
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
+    const [view, setView] = useState<GridView>('week');
+    const [dayCursor, setDayCursor] = useState<string | null>(null);
+
+    // Resolve which day the single-day view focuses on. Falls back to today (when
+    // it is inside the current week) and otherwise the first day, so the cursor
+    // stays valid even after navigating to a different week.
+    const todayIdx = todayKey
+        ? days.findIndex((d) => ymdKey(d) === todayKey)
+        : -1;
+    const cursorIdx = (() => {
+        if (dayCursor) {
+            const i = days.findIndex((d) => ymdKey(d) === dayCursor);
+            if (i >= 0) return i;
+        }
+        return todayIdx >= 0 ? todayIdx : 0;
+    })();
+    const visibleDays =
+        view === 'day' && days.length > 0 ? [days[cursorIdx]] : days;
+    const gridCols = `220px repeat(${visibleDays.length}, minmax(0, 1fr))`;
+    const goDay = (delta: number) => {
+        if (days.length === 0) return;
+        const next = Math.min(days.length - 1, Math.max(0, cursorIdx + delta));
+        setDayCursor(ymdKey(days[next]));
+    };
+
+    // Flatten every shift into a single chronological stream grouped by day for
+    // the List view.
+    const listGroups = useMemo(() => {
+        const items: Array<{ shift: GridShift; staffName: string }> = [];
+        for (const row of rows) {
+            for (const dayShifts of Object.values(row.shifts)) {
+                for (const s of dayShifts) {
+                    items.push({ shift: s, staffName: row.name });
+                }
+            }
+        }
+        items.sort(
+            (a, b) =>
+                new Date(a.shift.starts_at).getTime() -
+                new Date(b.shift.starts_at).getTime(),
+        );
+        const map = new Map<
+            string,
+            Array<{ shift: GridShift; staffName: string }>
+        >();
+        for (const it of items) {
+            const k = ymdKey(new Date(it.shift.starts_at));
+            if (!map.has(k)) map.set(k, []);
+            map.get(k)!.push(it);
+        }
+        return Array.from(map.entries());
+    }, [rows]);
 
     const onShiftCtx = (
         e: React.MouseEvent,
@@ -551,25 +613,33 @@ export function WeekGridPane({
     return (
         <div className="space-y-3">
             <div className="flex flex-wrap items-center justify-between gap-2 rounded-[14px] border border-border bg-card px-4 py-2.5">
-                <div className="inline-flex rounded-md border border-border bg-background p-0.5">
-                    <button
-                        type="button"
-                        className="rounded-sm bg-primary px-3 py-1 text-xs font-semibold text-primary-foreground"
-                    >
-                        Week
-                    </button>
-                    <button
-                        type="button"
-                        className="rounded-sm px-3 py-1 text-xs font-semibold text-muted-foreground hover:bg-accent"
-                    >
-                        Day
-                    </button>
-                    <button
-                        type="button"
-                        className="rounded-sm px-3 py-1 text-xs font-semibold text-muted-foreground hover:bg-accent"
-                    >
-                        List
-                    </button>
+                {/* eslint-disable-next-line no-restricted-syntax -- segmented Week/Day/List selector container, not a Card. */}
+                <div
+                    role="tablist"
+                    aria-label="Roster layout"
+                    className="inline-flex rounded-md border border-border bg-background p-0.5"
+                >
+                    {GRID_VIEWS.map((opt) => {
+                        const active = view === opt.value;
+                        return (
+                            // eslint-disable-next-line no-restricted-syntax -- segmented Week/Day/List selector; not a shadcn Button.
+                            <button
+                                key={opt.value}
+                                type="button"
+                                role="tab"
+                                aria-selected={active}
+                                onClick={() => setView(opt.value)}
+                                className={cn(
+                                    'rounded-sm px-3 py-1 text-xs font-semibold transition-colors',
+                                    active
+                                        ? 'bg-primary text-primary-foreground'
+                                        : 'text-muted-foreground hover:bg-accent',
+                                )}
+                            >
+                                {opt.label}
+                            </button>
+                        );
+                    })}
                 </div>
                 <div className="flex flex-wrap items-center gap-3 text-[11px] text-muted-foreground">
                     <LegendDot color="var(--primary)" label="Scheduled" />
@@ -596,137 +666,198 @@ export function WeekGridPane({
                 </div>
             </div>
 
-            <div className="overflow-hidden rounded-[14px] border border-border bg-card">
-                <div
-                    className="sticky top-0 z-10 grid border-b border-border bg-muted/50"
-                    style={{
-                        gridTemplateColumns: '220px repeat(7, minmax(0, 1fr))',
-                    }}
-                >
-                    <div className="px-3 py-2 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
-                        Staff · {rows.filter((r) => !r.open).length} rostered
+            {view === 'day' ? (
+                <div className="flex items-center justify-between rounded-[14px] border border-border bg-card px-3 py-2">
+                    {/* eslint-disable-next-line no-restricted-syntax -- compact inline day-stepper, not a shadcn Button. */}
+                    <button
+                        type="button"
+                        onClick={() => goDay(-1)}
+                        disabled={cursorIdx <= 0}
+                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:bg-accent disabled:opacity-40"
+                    >
+                        <ChevronLeft className="h-3.5 w-3.5" /> Prev day
+                    </button>
+                    <div className="text-sm font-semibold">
+                        {visibleDays[0]?.toLocaleDateString(undefined, {
+                            weekday: 'long',
+                            day: 'numeric',
+                            month: 'long',
+                        })}
                     </div>
-                    {days.map((d, i) => {
-                        const key = ymdKey(d);
-                        const isToday = todayKey === key;
-                        return (
-                            <div
-                                key={i}
-                                className={cn(
-                                    'px-2 py-2 text-center text-[11px]',
-                                    isToday && 'bg-primary/10 text-primary',
-                                )}
-                            >
-                                <div className="font-semibold tracking-wider uppercase">
-                                    {d
-                                        .toLocaleDateString(undefined, {
-                                            weekday: 'short',
-                                        })
-                                        .toUpperCase()}
-                                </div>
-                                <div className="mt-0.5 text-xs font-bold tabular-nums">
-                                    {d.toLocaleDateString(undefined, {
-                                        day: '2-digit',
-                                        month: 'short',
-                                    })}
-                                </div>
-                            </div>
-                        );
-                    })}
+                    {/* eslint-disable-next-line no-restricted-syntax -- compact inline day-stepper, not a shadcn Button. */}
+                    <button
+                        type="button"
+                        onClick={() => goDay(1)}
+                        disabled={cursorIdx >= days.length - 1}
+                        className="inline-flex items-center gap-1 rounded-md px-2 py-1 text-xs font-semibold text-muted-foreground transition-colors hover:bg-accent disabled:opacity-40"
+                    >
+                        Next day <ChevronRight className="h-3.5 w-3.5" />
+                    </button>
                 </div>
-                <div className="divide-y divide-border">
+            ) : null}
+
+            {view === 'list' ? (
+                <div className="overflow-hidden rounded-[14px] border border-border bg-card">
                     {rows.length === 0 ? (
-                        <div className="p-6 text-center">
-                            <div className="text-sm font-semibold">
-                                No shifts this week
-                            </div>
-                            <div className="mt-1 text-xs text-muted-foreground">
-                                Auto-schedule, paste from last week, or add a
-                                shift to start building this roster.
-                            </div>
-                        </div>
-                    ) : null}
-                    {rows.map((row) => (
-                        <div
-                            key={row.id}
-                            className={cn(
-                                'grid min-h-[68px]',
-                                row.open &&
-                                    'border-t-2 border-dashed border-status-warning/40 bg-status-warning-bg/40',
-                            )}
-                            style={{
-                                gridTemplateColumns:
-                                    '220px repeat(7, minmax(0, 1fr))',
-                            }}
-                        >
-                            <div className="flex items-center gap-2 px-3 py-2">
-                                <div
-                                    className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold uppercase"
-                                    style={{
-                                        background: `hsl(${row.hue} 55% 90%)`,
-                                        color: `hsl(${row.hue} 50% 35%)`,
-                                    }}
-                                >
-                                    {row.initials}
-                                </div>
-                                <div className="min-w-0">
-                                    <div className="flex min-w-0 flex-wrap items-center gap-1.5">
-                                        <div className="truncate text-sm font-semibold">
-                                            {row.name}
-                                        </div>
-                                        <ComplianceChip
-                                            badge={row.complianceBadge}
-                                        />
+                        <EmptyRoster />
+                    ) : (
+                        <div className="divide-y divide-border">
+                            {listGroups.map(([dayKey, items]) => (
+                                <div key={dayKey}>
+                                    <div className="flex items-center justify-between bg-muted/50 px-4 py-2">
+                                        <span className="text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+                                            {fmtListDay(dayKey)}
+                                        </span>
+                                        <span className="text-[11px] text-muted-foreground tabular-nums">
+                                            {items.length} shift
+                                            {items.length === 1 ? '' : 's'}
+                                        </span>
                                     </div>
-                                    {row.role ? (
-                                        <div className="truncate text-[11px] text-muted-foreground">
-                                            {row.role}
-                                        </div>
-                                    ) : null}
+                                    <ul className="divide-y divide-border">
+                                        {items.map(({ shift, staffName }) => (
+                                            <ShiftListRow
+                                                key={shift.id}
+                                                s={shift}
+                                                staffName={staffName}
+                                                onContextMenu={(e) =>
+                                                    onShiftCtx(
+                                                        e,
+                                                        shift,
+                                                        staffName,
+                                                    )
+                                                }
+                                            />
+                                        ))}
+                                    </ul>
                                 </div>
-                            </div>
-                            {days.map((d, di) => {
-                                const key = ymdKey(d);
-                                const isToday = todayKey === key;
-                                const cellShifts = row.shifts[key] ?? [];
-                                return (
-                                    <div
-                                        key={di}
-                                        className={cn(
-                                            'space-y-1 border-l border-border p-1.5',
-                                            isToday && 'bg-primary/5',
-                                        )}
-                                        onContextMenu={
-                                            cellShifts.length === 0 && canManage
-                                                ? (e) =>
-                                                      onCellCtx(e, row.name, d)
-                                                : undefined
-                                        }
-                                    >
-                                        {cellShifts.length === 0 ? (
-                                            <div className="h-full min-h-[44px] rounded-md" />
-                                        ) : (
-                                            cellShifts.map((s) => (
-                                                <ShiftBlock
-                                                    key={s.id}
-                                                    s={s}
-                                                    onContextMenu={(e) =>
-                                                        onShiftCtx(
-                                                            e,
-                                                            s,
-                                                            row.name,
-                                                        )
-                                                    }
-                                                />
-                                            ))
-                                        )}
-                                    </div>
-                                );
-                            })}
+                            ))}
                         </div>
-                    ))}
+                    )}
                 </div>
-            </div>
+            ) : (
+                <div className="overflow-hidden rounded-[14px] border border-border bg-card">
+                    <div
+                        className="sticky top-0 z-10 grid border-b border-border bg-muted/50"
+                        style={{ gridTemplateColumns: gridCols }}
+                    >
+                        <div className="px-3 py-2 text-[11px] font-semibold tracking-wider text-muted-foreground uppercase">
+                            Staff · {rows.filter((r) => !r.open).length}{' '}
+                            rostered
+                        </div>
+                        {visibleDays.map((d, i) => {
+                            const key = ymdKey(d);
+                            const isToday = todayKey === key;
+                            return (
+                                <div
+                                    key={i}
+                                    className={cn(
+                                        'px-2 py-2 text-center text-[11px]',
+                                        isToday && 'bg-primary/10 text-primary',
+                                    )}
+                                >
+                                    <div className="font-semibold tracking-wider uppercase">
+                                        {d
+                                            .toLocaleDateString(undefined, {
+                                                weekday: 'short',
+                                            })
+                                            .toUpperCase()}
+                                    </div>
+                                    <div className="mt-0.5 text-xs font-bold tabular-nums">
+                                        {d.toLocaleDateString(undefined, {
+                                            day: '2-digit',
+                                            month: 'short',
+                                        })}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </div>
+                    <div className="divide-y divide-border">
+                        {rows.length === 0 ? <EmptyRoster /> : null}
+                        {rows.map((row) => (
+                            <div
+                                key={row.id}
+                                className={cn(
+                                    'grid min-h-[68px]',
+                                    row.open &&
+                                        'border-t-2 border-dashed border-status-warning/40 bg-status-warning-bg/40',
+                                )}
+                                style={{ gridTemplateColumns: gridCols }}
+                            >
+                                <div className="flex items-center gap-2 px-3 py-2">
+                                    <div
+                                        className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold uppercase"
+                                        style={{
+                                            background: `hsl(${row.hue} 55% 90%)`,
+                                            color: `hsl(${row.hue} 50% 35%)`,
+                                        }}
+                                    >
+                                        {row.initials}
+                                    </div>
+                                    <div className="min-w-0">
+                                        <div className="flex min-w-0 flex-wrap items-center gap-1.5">
+                                            <div className="truncate text-sm font-semibold">
+                                                {row.name}
+                                            </div>
+                                            <ComplianceChip
+                                                badge={row.complianceBadge}
+                                            />
+                                        </div>
+                                        {row.role ? (
+                                            <div className="truncate text-[11px] text-muted-foreground">
+                                                {row.role}
+                                            </div>
+                                        ) : null}
+                                    </div>
+                                </div>
+                                {visibleDays.map((d, di) => {
+                                    const key = ymdKey(d);
+                                    const isToday = todayKey === key;
+                                    const cellShifts = row.shifts[key] ?? [];
+                                    return (
+                                        <div
+                                            key={di}
+                                            className={cn(
+                                                'space-y-1 border-l border-border p-1.5',
+                                                isToday && 'bg-primary/5',
+                                            )}
+                                            onContextMenu={
+                                                cellShifts.length === 0 &&
+                                                canManage
+                                                    ? (e) =>
+                                                          onCellCtx(
+                                                              e,
+                                                              row.name,
+                                                              d,
+                                                          )
+                                                    : undefined
+                                            }
+                                        >
+                                            {cellShifts.length === 0 ? (
+                                                <div className="h-full min-h-[44px] rounded-md" />
+                                            ) : (
+                                                cellShifts.map((s) => (
+                                                    <ShiftBlock
+                                                        key={s.id}
+                                                        s={s}
+                                                        onContextMenu={(e) =>
+                                                            onShiftCtx(
+                                                                e,
+                                                                s,
+                                                                row.name,
+                                                            )
+                                                        }
+                                                    />
+                                                ))
+                                            )}
+                                        </div>
+                                    );
+                                })}
+                            </div>
+                        ))}
+                    </div>
+                </div>
+            )}
 
             {ctx ? (
                 <ShiftContextMenu ctx={ctx} onClose={() => setCtx(null)} />
@@ -831,6 +962,90 @@ function LegendDot({ color, label }: { color: string; label: string }) {
             />
             <span>{label}</span>
         </span>
+    );
+}
+
+function EmptyRoster() {
+    return (
+        <div className="p-6 text-center">
+            <div className="text-sm font-semibold">No shifts this week</div>
+            <div className="mt-1 text-xs text-muted-foreground">
+                Auto-schedule, paste from last week, or add a shift to start
+                building this roster.
+            </div>
+        </div>
+    );
+}
+
+function fmtListDay(key: string): string {
+    const d = new Date(key + 'T00:00:00');
+    return d.toLocaleDateString(undefined, {
+        weekday: 'long',
+        day: 'numeric',
+        month: 'long',
+    });
+}
+
+function ShiftListRow({
+    s,
+    staffName,
+    onContextMenu,
+}: {
+    s: GridShift;
+    staffName: string;
+    onContextMenu: (e: React.MouseEvent) => void;
+}) {
+    const tone = STATUS_CTX_TONE[s.status];
+    const inner = (
+        <div
+            onContextMenu={onContextMenu}
+            className="group flex cursor-pointer items-center gap-3 px-4 py-2.5 transition-colors hover:bg-muted/40"
+        >
+            <div className="w-[108px] shrink-0 text-sm font-semibold tabular-nums">
+                {fmtTime(s.starts_at)}
+                <span className="font-normal text-muted-foreground">–</span>
+                {fmtTime(s.ends_at)}
+            </div>
+            <span
+                className="h-8 w-[3px] shrink-0 rounded-full"
+                style={{ background: tone.color }}
+                aria-hidden="true"
+            />
+            <div className="min-w-0 flex-1">
+                <div className="truncate text-sm font-medium">
+                    {s.client ?? 'Shift'}
+                </div>
+                <div className="truncate text-[11px] text-muted-foreground">
+                    {staffName}
+                </div>
+            </div>
+            {s.conflict ? (
+                <span
+                    className="inline-flex h-4 min-w-4 items-center justify-center rounded bg-status-critical text-[9px] font-bold text-white"
+                    title="Overlap conflict"
+                >
+                    !
+                </span>
+            ) : null}
+            <span
+                className="inline-flex shrink-0 items-center rounded-full px-2 py-0.5 text-[11px] font-semibold"
+                style={{ background: tone.bg, color: tone.color }}
+            >
+                {STATUS_LABELS[s.status]}
+            </span>
+        </div>
+    );
+
+    return (
+        <li>
+            {s.href ? (
+                <Link href={s.href} className="block">
+                    {inner}
+                </Link>
+            ) : (
+                inner
+            )}
+        </li>
     );
 }
 
