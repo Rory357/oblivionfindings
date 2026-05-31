@@ -54,6 +54,9 @@ import {
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import ViewTimesheetDialog, {
+    type ViewTimesheetRow,
+} from '@/components/timesheets/view-timesheet-dialog';
 import AppLayout from '@/layouts/app-layout';
 import { index as rosteringIndex } from '@/routes/operations/rostering';
 import { Head, Link, router, usePage } from '@inertiajs/react';
@@ -535,6 +538,10 @@ export default function RosteringIndex(props: Props) {
         useState<MarkEndedEarlyShift | null>(null);
     const [reopenForCorrectionShift, setReopenForCorrectionShift] =
         useState<ReopenForCorrectionShift | null>(null);
+    // Read-only timesheet popup opened from the grid's "View timesheet" action.
+    const [viewingTimesheet, setViewingTimesheet] =
+        useState<ViewTimesheetRow | null>(null);
+    const [canApproveTimesheet, setCanApproveTimesheet] = useState(false);
     const [makeRecurringShift, setMakeRecurringShift] =
         useState<MakeRecurringShift | null>(null);
     const [broadcastShift, setBroadcastShift] = useState<BroadcastShift | null>(
@@ -924,12 +931,16 @@ export default function RosteringIndex(props: Props) {
         },
     ].filter((s) => s.value > 0);
 
-    const eligibleCounts = props.eligibilityAlerts?.counts ?? {
-        eligible: 0,
-        warnings: 0,
-        blocked: 0,
-        overrides: 0,
-    };
+    const eligibleCounts = useMemo(
+        () =>
+            props.eligibilityAlerts?.counts ?? {
+                eligible: 0,
+                warnings: 0,
+                blocked: 0,
+                overrides: 0,
+            },
+        [props.eligibilityAlerts?.counts],
+    );
     const openBreakdown = [
         {
             key: 'filled',
@@ -1747,6 +1758,35 @@ export default function RosteringIndex(props: Props) {
         }
     };
 
+    // "View timesheet" from the grid popup. Fetches the same row payload the
+    // Timesheets index feeds ViewTimesheetDialog (the ?modal=1 JSON branch) and
+    // opens it inline; falls back to the full timesheet page if the fetch fails.
+    const openTimesheet = async (shift: GridShift) => {
+        if (!shift.timesheet_id) {
+            window.location.href =
+                shift.href ?? `/operations/shifts/${shift.id}`;
+            return;
+        }
+        try {
+            const res = await fetch(
+                `/operations/timesheets/${shift.timesheet_id}?modal=1`,
+                {
+                    headers: {
+                        Accept: 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                    },
+                    credentials: 'same-origin',
+                },
+            );
+            if (!res.ok) throw new Error(`HTTP ${res.status}`);
+            const json = await res.json();
+            setCanApproveTimesheet(Boolean(json.can_approve));
+            setViewingTimesheet(json.timesheet as ViewTimesheetRow);
+        } catch {
+            window.location.href = `/operations/timesheets/${shift.timesheet_id}/edit`;
+        }
+    };
+
     const copyShiftToDay = (shiftId: number, date: string) => {
         router.post(
             `/operations/shifts/${shiftId}/duplicate`,
@@ -1988,8 +2028,8 @@ export default function RosteringIndex(props: Props) {
                                     aria-hidden="true"
                                     className="relative inline-flex h-2 w-2"
                                 >
-                                    <span className="absolute inset-0 inline-flex h-full w-full animate-ping rounded-full bg-emerald-300/70" />
-                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-300 ring-2 ring-emerald-300/30" />
+                                    <span className="absolute inset-0 inline-flex h-full w-full animate-ping rounded-full bg-status-success/70" />
+                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success ring-2 ring-status-success/30" />
                                 </span>
                                 Live roster · refreshed just now
                             </span>
@@ -2118,6 +2158,7 @@ export default function RosteringIndex(props: Props) {
                     footer={
                         <div className="flex flex-col items-stretch gap-2 py-3 md:flex-row md:items-center md:justify-between">
                             <div className="flex flex-wrap items-center gap-1.5">
+                                {/* eslint-disable-next-line no-restricted-syntax -- segmented week-stepper on dark hero; not a shadcn Button. */}
                                 <button
                                     type="button"
                                     className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-foreground/20"
@@ -2126,6 +2167,7 @@ export default function RosteringIndex(props: Props) {
                                     <ChevronLeft className="h-3.5 w-3.5" />
                                     {prevLab}
                                 </button>
+                                {/* eslint-disable-next-line no-restricted-syntax -- segmented week-stepper on dark hero; not a shadcn Button. */}
                                 <button
                                     ref={todayBtnRef}
                                     type="button"
@@ -2138,6 +2180,7 @@ export default function RosteringIndex(props: Props) {
                                     {curLab} · {curCompactRange} · pick week
                                     <ChevronDown className="h-3 w-3" />
                                 </button>
+                                {/* eslint-disable-next-line no-restricted-syntax -- segmented week-stepper on dark hero; not a shadcn Button. */}
                                 <button
                                     type="button"
                                     className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-foreground/20"
@@ -2393,6 +2436,7 @@ export default function RosteringIndex(props: Props) {
                                         `/incidents/create?shift_id=${s.id}`,
                                     )
                                 }
+                                onViewTimesheet={openTimesheet}
                             />
                         ) : null}
                         {tab === 'open' ? (
@@ -2638,6 +2682,15 @@ export default function RosteringIndex(props: Props) {
                     onConfirm={(shift, reason) =>
                         unassignShift(shift.id, reason)
                     }
+                />
+
+                <ViewTimesheetDialog
+                    open={Boolean(viewingTimesheet)}
+                    timesheet={viewingTimesheet}
+                    canApprove={canApproveTimesheet}
+                    onOpenChange={(open) => {
+                        if (!open) setViewingTimesheet(null);
+                    }}
                 />
 
                 {props.rosteringFeatures.publish && props.canPublishRoster ? (

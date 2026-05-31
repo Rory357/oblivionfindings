@@ -105,6 +105,8 @@ export type WeekGridPaneProps = {
     onRequestReplacement?: (shift: GridShift) => void;
     onEditShift?: (shift: GridShift) => void;
     onReportIncident?: (shift: GridShift) => void;
+    /** Open the read-only timesheet popup for a completed shift's timesheet. */
+    onViewTimesheet?: (shift: GridShift) => void;
     actionEndSlot?: ReactNode;
 };
 
@@ -196,6 +198,7 @@ function buildShiftActions(
         onRequestReplacement?: (s: GridShift) => void;
         onEditShift?: (s: GridShift) => void;
         onReportIncident?: (s: GridShift) => void;
+        onViewTimesheet?: (s: GridShift) => void;
     },
 ): ShiftCtxItem[] {
     const items: ShiftCtxItem[] = [];
@@ -353,9 +356,13 @@ function buildShiftActions(
             icon: <FileText className="h-3.5 w-3.5" />,
             label: 'View timesheet',
             onClick: () => {
-                window.location.href = shift.timesheet_id
-                    ? `/operations/timesheets/${shift.timesheet_id}/edit`
-                    : detailHref;
+                // Open the read-only popup inline when there's a linked
+                // timesheet; otherwise fall back to the shift detail page.
+                if (shift.timesheet_id && callbacks.onViewTimesheet) {
+                    callbacks.onViewTimesheet(shift);
+                } else {
+                    window.location.href = detailHref;
+                }
             },
         });
         if (callbacks.onReopenCompletedForCorrection) {
@@ -525,6 +532,7 @@ export function WeekGridPane({
     onRequestReplacement,
     onEditShift,
     onReportIncident,
+    onViewTimesheet,
     actionEndSlot,
 }: WeekGridPaneProps) {
     const [ctx, setCtx] = useState<ShiftCtxState | null>(null);
@@ -621,6 +629,7 @@ export function WeekGridPane({
                 onRequestReplacement,
                 onEditShift,
                 onReportIncident,
+                onViewTimesheet,
             }),
         });
     };

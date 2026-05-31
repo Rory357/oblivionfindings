@@ -547,7 +547,49 @@ class TimesheetController extends Controller
 
     public function show(Request $request, Timesheet $timesheet)
     {
+        // The roster grid (and any other surface) opens the read-only
+        // ViewTimesheetDialog inline. It fetches the same row payload the index
+        // table feeds that modal, so serve JSON for those requests and keep the
+        // full edit page for normal navigation.
+        if ($request->wantsJson() || $request->boolean('modal')) {
+            return $this->showTimesheetCard($request, $timesheet);
+        }
+
         return $this->edit($request, $timesheet);
+    }
+
+    /**
+     * JSON payload for the inline ViewTimesheetDialog ("View timesheet" from the
+     * roster grid). Mirrors the relations index() eager-loads so the row is
+     * identical to what the index table hands the modal, applies the same access
+     * guard as edit(), and returns can_approve so the modal knows whether to
+     * surface the approve / return / reject controls.
+     */
+    protected function showTimesheetCard(Request $request, Timesheet $timesheet)
+    {
+        $auth = $request->user();
+        abort_unless($auth && ($auth->canDo('timesheets.viewAny') || $auth->canDo('timesheets.viewAssigned')), 403);
+
+        if (! $auth->canDo('timesheets.manageAny') && ! $this->canReviewTimesheets($auth) && $timesheet->user_id !== $auth->id) {
+            abort(403);
+        }
+
+        $this->assertCanAccessTimesheet($auth, $timesheet);
+
+        $timesheet->load([
+            'client:id,first_name,last_name',
+            'staff:id,name,email',
+            'shift:id,client_id,service_context_id,starts_at,ends_at,location,shift_type,is_sleepover,is_on_call,expected_break_minutes,status',
+            'shift.serviceContext:id,name',
+            'shift.tasks:id,shift_id,is_completed',
+            'site:id,name',
+            'clientAllocations.client:id,first_name,last_name',
+        ]);
+
+        return response()->json([
+            'timesheet' => $this->serializeTimesheetRow($timesheet),
+            'can_approve' => $this->canReviewTimesheets($auth),
+        ]);
     }
 
     /**

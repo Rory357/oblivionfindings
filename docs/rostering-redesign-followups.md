@@ -158,7 +158,7 @@ The context menu now only exposes actions that map to current routes or existing
 | Request replacement / Cover with replacement | Visits shift detail for the existing replacement workflow.                                                                  |
 | Report incident                              | Visits `/incidents/create?shift_id={id}`.                                                                                   |
 | Resolve overlap                              | Opens the inline Resolve overlap dialog with reassign/unassign actions and a link to the conflict queue.                    |
-| View timesheet                               | Visits `/operations/timesheets/{timesheet_id}/edit` when `timesheet_id` is available; otherwise falls back to shift detail. |
+| View timesheet                               | Opens the read-only `ViewTimesheetDialog` inline, fetched from `/operations/timesheets/{timesheet_id}?modal=1` (the same payload the Timesheets index feeds the modal). Falls back to shift detail when there's no `timesheet_id`, or to `/operations/timesheets/{timesheet_id}/edit` if the fetch fails. |
 | Duplicate as draft                           | Posts `/operations/shifts/{id}/duplicate` with a confirm prompt. Available on scheduled, draft, and in-progress rows for users with `shifts.create`. |
 | Reopen cancelled shift                       | Patches `/operations/shifts/{id}/reopen` with a confirm prompt. Only surfaced on cancelled rows for users with `shifts.manageAny` and site access.   |
 

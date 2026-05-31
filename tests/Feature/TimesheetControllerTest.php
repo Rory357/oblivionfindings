@@ -553,6 +553,65 @@ class TimesheetControllerTest extends TestCase
         ]);
     }
 
+    public function test_show_serves_timesheet_card_json_for_reviewers(): void
+    {
+        // The roster grid's "View timesheet" fetches /timesheets/{id}?modal=1
+        // and renders ViewTimesheetDialog from this payload (the same shape the
+        // index table feeds the modal). Reviewers see can_approve = true.
+        $timesheet = $this->makeSubmittedTimesheet($this->staff);
+
+        $this->actingAs($this->finance)
+            ->getJson(route('operations.timesheets.show', ['timesheet' => $timesheet->id, 'modal' => 1]))
+            ->assertOk()
+            ->assertJsonPath('timesheet.id', $timesheet->id)
+            ->assertJsonPath('timesheet.status', 'submitted')
+            ->assertJsonPath('can_approve', true)
+            ->assertJsonStructure([
+                'timesheet' => [
+                    'id', 'status', 'total_hours', 'client_allocations',
+                    'tasks_total', 'tasks_completed', 'staff' => ['id', 'name'],
+                ],
+                'can_approve',
+            ]);
+    }
+
+    public function test_show_card_json_for_owner_cannot_approve(): void
+    {
+        $timesheet = $this->makeDraftTimesheet($this->staff);
+
+        $this->actingAs($this->staff)
+            ->getJson(route('operations.timesheets.show', ['timesheet' => $timesheet->id, 'modal' => 1]))
+            ->assertOk()
+            ->assertJsonPath('timesheet.id', $timesheet->id)
+            ->assertJsonPath('can_approve', false);
+    }
+
+    public function test_show_card_json_forbidden_for_unrelated_staff(): void
+    {
+        // A worker who can view their own assigned timesheets but neither owns
+        // this one nor reviews timesheets must not pull it into the popup.
+        $this->grantPermissions($this->otherStaff, ['timesheets.viewAssigned']);
+        $timesheet = $this->makeSubmittedTimesheet($this->staff);
+
+        $this->actingAs($this->otherStaff)
+            ->getJson(route('operations.timesheets.show', ['timesheet' => $timesheet->id, 'modal' => 1]))
+            ->assertForbidden();
+    }
+
+    public function test_show_without_modal_still_renders_edit_page(): void
+    {
+        // Regression: normal navigation to the show route keeps the full edit
+        // page; the JSON branch only triggers for modal/JSON requests.
+        $timesheet = $this->makeDraftTimesheet($this->staff);
+
+        $this->actingAs($this->staff)
+            ->get(route('operations.timesheets.show', $timesheet))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('operations/timesheets/edit')
+            );
+    }
+
     protected function makeRoleUser(string $roleName): User
     {
         $user = User::factory()->create([
