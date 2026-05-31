@@ -1,4 +1,5 @@
-import { ArrowRight, ChevronRight } from 'lucide-react';
+import { cn } from '@/lib/utils';
+import { useState } from 'react';
 
 export type DonutSegment = {
     key: string;
@@ -7,23 +8,174 @@ export type DonutSegment = {
     color: string;
 };
 
+type DonutTone = 'primary' | 'warning' | 'success' | 'critical';
+
 type Props = {
-    tone: 'primary' | 'warning' | 'success';
+    tone: DonutTone;
     title: string;
     subtitle: string;
     segments: DonutSegment[];
     centerValue: number | string;
     centerLabel: string;
+    /** Legend keys to emphasise (bold + foreground) — draws the eye to at-risk segments. */
+    accentKeys?: string[];
     cta?: string;
     active?: boolean;
     onClick?: () => void;
 };
 
-const TONE_COLOR: Record<Props['tone'], string> = {
-    primary: 'var(--primary)',
-    warning: 'var(--status-warning)',
-    success: 'var(--status-success)',
+const DONUT_TONE: Record<
+    DonutTone,
+    { bar: string; border: string; ring: string }
+> = {
+    primary: {
+        bar: 'bg-primary/60 group-hover:bg-primary',
+        border: 'border-primary/60',
+        ring: 'ring-primary/15',
+    },
+    warning: {
+        bar: 'bg-status-warning/60 group-hover:bg-status-warning',
+        border: 'border-status-warning/60',
+        ring: 'ring-status-warning/15',
+    },
+    success: {
+        bar: 'bg-status-success/60 group-hover:bg-status-success',
+        border: 'border-status-success/60',
+        ring: 'ring-status-success/15',
+    },
+    critical: {
+        bar: 'bg-status-critical/60 group-hover:bg-status-critical',
+        border: 'border-status-critical/60',
+        ring: 'ring-status-critical/15',
+    },
 };
+
+function Donut({
+    segments,
+    size = 124,
+    thickness = 14,
+    centerValue,
+    centerLabel,
+}: {
+    segments: DonutSegment[];
+    size?: number;
+    thickness?: number;
+    centerValue: number | string;
+    centerLabel: string;
+}) {
+    const [hover, setHover] = useState<number | null>(null);
+    const total = segments.reduce((sum, s) => sum + s.value, 0) || 1;
+    const radius = (size - thickness) / 2;
+    const circumference = 2 * Math.PI * radius;
+    const center = size / 2;
+    const gap = 1.5;
+    const usable = Math.max(circumference - segments.length * gap, 0);
+
+    let cursor = 0;
+    const arcs = segments.map((seg, i) => {
+        const len = (seg.value / total) * usable;
+        const arc = {
+            ...seg,
+            idx: i,
+            dash: `${len} ${circumference - len}`,
+            offset: -cursor,
+        };
+        cursor += len + gap;
+        return arc;
+    });
+
+    return (
+        <div className="relative inline-block">
+            <svg
+                width={size}
+                height={size}
+                viewBox={`0 0 ${size} ${size}`}
+                role="img"
+                aria-label={centerLabel}
+            >
+                <circle
+                    cx={center}
+                    cy={center}
+                    r={radius}
+                    fill="none"
+                    stroke="color-mix(in oklch, var(--border) 60%, transparent)"
+                    strokeWidth={thickness}
+                />
+                <g transform={`rotate(-90 ${center} ${center})`}>
+                    {arcs.map((a) => (
+                        <circle
+                            key={a.key}
+                            cx={center}
+                            cy={center}
+                            r={radius}
+                            fill="none"
+                            stroke={a.color}
+                            strokeWidth={
+                                hover === a.idx ? thickness + 3 : thickness
+                            }
+                            strokeDasharray={a.dash}
+                            strokeDashoffset={a.offset}
+                            strokeLinecap="butt"
+                            onMouseEnter={() => setHover(a.idx)}
+                            onMouseLeave={() => setHover(null)}
+                            style={{
+                                transition:
+                                    'stroke-width 160ms ease, opacity 160ms ease',
+                                opacity:
+                                    hover !== null && hover !== a.idx ? 0.5 : 1,
+                                cursor: 'pointer',
+                            }}
+                        />
+                    ))}
+                </g>
+                <foreignObject x={0} y={0} width={size} height={size}>
+                    <div className="flex h-full w-full flex-col items-center justify-center text-center leading-none">
+                        <div className="text-[26px] font-extrabold tracking-tight text-foreground tabular-nums">
+                            {centerValue}
+                        </div>
+                        <div className="mt-1 text-[10px] font-semibold tracking-wider text-muted-foreground uppercase">
+                            {centerLabel}
+                        </div>
+                    </div>
+                </foreignObject>
+            </svg>
+        </div>
+    );
+}
+
+function DonutLegend({
+    segments,
+    accentKeys,
+}: {
+    segments: DonutSegment[];
+    accentKeys?: string[];
+}) {
+    return (
+        <ul className="mt-1 space-y-1.5">
+            {segments.map((s) => {
+                const accent = accentKeys?.includes(s.key);
+                return (
+                    <li
+                        key={s.key}
+                        className={cn(
+                            'flex items-center gap-2 text-xs',
+                            accent
+                                ? 'font-semibold text-foreground'
+                                : 'text-muted-foreground',
+                        )}
+                    >
+                        <span
+                            className="inline-block h-2.5 w-2.5 shrink-0 rounded-sm"
+                            style={{ background: s.color }}
+                        />
+                        <span className="flex-1 truncate">{s.label}</span>
+                        <span className="tabular-nums">{s.value}</span>
+                    </li>
+                );
+            })}
+        </ul>
+    );
+}
 
 export function DonutCard({
     tone,
@@ -32,127 +184,58 @@ export function DonutCard({
     segments,
     centerValue,
     centerLabel,
+    accentKeys,
     cta,
     active = false,
     onClick,
 }: Props) {
-    const total = segments.reduce((a, s) => a + s.value, 0) || 1;
-    const radius = 38;
-    const circumference = 2 * Math.PI * radius;
-    let offset = 0;
-    const accent = TONE_COLOR[tone];
+    const t = DONUT_TONE[tone];
 
     return (
+        // eslint-disable-next-line no-restricted-syntax -- The whole donut card is a single clickable selector surface (matches the redesign).
         <button
             type="button"
             onClick={onClick}
-            className={[
-                'relative overflow-hidden rounded-xl border bg-card p-4 text-left transition-all focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
-                active
-                    ? 'border-primary shadow-sm ring-1 ring-primary/30'
-                    : 'border-border hover:border-primary/40',
-            ].join(' ')}
+            data-active={active}
+            className={cn(
+                'group relative cursor-pointer overflow-hidden rounded-[14px] border border-border bg-card p-4 pl-5 text-left transition hover:-translate-y-px hover:shadow-md focus-visible:outline-2 focus-visible:outline-offset-2 focus-visible:outline-ring',
+                active && `ring-4 ${t.border} ${t.ring}`,
+            )}
         >
-            <div className="flex items-start justify-between gap-3">
+            <span
+                aria-hidden
+                className={cn(
+                    'absolute inset-y-0 left-0 w-1 rounded-l-[14px] transition-colors',
+                    t.bar,
+                )}
+            />
+            <div className="grid grid-cols-[124px_1fr] items-center gap-4">
+                <Donut
+                    segments={segments}
+                    centerValue={centerValue}
+                    centerLabel={centerLabel}
+                />
                 <div className="min-w-0">
-                    <div className="flex items-center gap-2">
-                        <span
-                            className="h-2 w-2 rounded-full"
-                            style={{ background: accent }}
-                        />
-                        <div className="text-sm font-semibold text-foreground">
-                            {title}
-                        </div>
+                    <div className="text-sm font-bold tracking-tight text-foreground">
+                        {title}
                     </div>
-                    <div className="mt-0.5 text-xs text-muted-foreground">
+                    <div className="mb-2 text-xs text-muted-foreground">
                         {subtitle}
                     </div>
-                </div>
-                <ChevronRight className="h-4 w-4 text-muted-foreground" />
-            </div>
-
-            <div className="mt-3 flex items-center gap-4">
-                <div className="relative shrink-0">
-                    <svg
-                        width="100"
-                        height="100"
-                        viewBox="0 0 100 100"
-                        style={{ transform: 'rotate(-90deg)' }}
-                    >
-                        <circle
-                            cx="50"
-                            cy="50"
-                            r={radius}
-                            fill="none"
-                            stroke="var(--muted)"
-                            strokeWidth="12"
-                        />
-                        {segments.map((s, i) => {
-                            const len = (s.value / total) * circumference;
-                            const el = (
-                                <circle
-                                    key={s.key + i}
-                                    cx="50"
-                                    cy="50"
-                                    r={radius}
-                                    fill="none"
-                                    stroke={s.color}
-                                    strokeWidth="12"
-                                    strokeDasharray={`${len} ${circumference - len}`}
-                                    strokeDashoffset={-offset}
-                                    strokeLinecap="butt"
-                                />
-                            );
-                            offset += len;
-                            return el;
-                        })}
-                    </svg>
-                    <div className="absolute inset-0 flex flex-col items-center justify-center">
-                        <div className="text-xl font-bold tracking-tight text-foreground tabular-nums">
-                            {centerValue}
-                        </div>
-                        <div className="-mt-0.5 text-[10px] text-muted-foreground">
-                            {centerLabel}
-                        </div>
-                    </div>
-                </div>
-                <ul className="min-w-0 flex-1 space-y-1.5">
-                    {segments.length === 0 ? (
-                        <li className="text-xs text-muted-foreground">
-                            Nothing here yet
-                        </li>
-                    ) : (
-                        segments.map((s) => (
-                            <li
-                                key={s.key}
-                                className="flex items-center justify-between gap-2 text-xs"
+                    <DonutLegend segments={segments} accentKeys={accentKeys} />
+                    {cta ? (
+                        <div className="mt-3 flex items-center gap-1 text-xs font-semibold text-muted-foreground transition-colors group-hover:text-foreground">
+                            <span>{cta}</span>
+                            <span
+                                aria-hidden
+                                className="transition-transform group-hover:translate-x-1"
                             >
-                                <span className="flex min-w-0 items-center gap-1.5">
-                                    <span
-                                        className="h-2 w-2 shrink-0 rounded-full"
-                                        style={{ background: s.color }}
-                                    />
-                                    <span className="truncate text-foreground">
-                                        {s.label}
-                                    </span>
-                                </span>
-                                <span className="shrink-0 font-medium text-foreground tabular-nums">
-                                    {s.value}
-                                </span>
-                            </li>
-                        ))
-                    )}
-                </ul>
-            </div>
-
-            {cta ? (
-                <div className="mt-3 flex items-center justify-between border-t border-border pt-3 text-xs">
-                    <span className="text-muted-foreground">{cta}</span>
-                    <span className="inline-flex items-center gap-1 font-medium text-primary">
-                        View <ArrowRight className="h-3 w-3" />
-                    </span>
+                                →
+                            </span>
+                        </div>
+                    ) : null}
                 </div>
-            ) : null}
+            </div>
         </button>
     );
 }

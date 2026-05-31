@@ -14,6 +14,7 @@ import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { ShiftStatusBadge } from '@/components/shift-status-badge';
 import { TimesheetStatusBadge } from '@/components/timesheet-status-badge';
+import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -26,6 +27,12 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import {
@@ -38,18 +45,28 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { formatDate, formatDateTime, formatTime } from '@/lib/datetime';
+import { cn } from '@/lib/utils';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     ArrowRight,
+    Building2,
     CalendarDays,
+    Car,
+    Check,
     CheckCircle2,
     Clock,
     FileText,
+    Handshake,
+    ListChecks,
     MapPin,
+    MoreHorizontal,
     Pencil,
+    Plus,
+    Repeat,
     Shield,
     User,
+    UserPlus,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import {
@@ -627,6 +644,8 @@ export default function ShiftShow({
                 auditCount: auditTimeline.length,
                 incidentCount: incidents.length,
                 medicationOutstandingCount: outstandingMedicationCount,
+                formsSubmittedCount: submittedFormCount,
+                formsAvailableCount: availableFormCount,
                 showCoverage,
                 showAssignment,
                 showMedications,
@@ -643,6 +662,8 @@ export default function ShiftShow({
             auditTimeline.length,
             incidents.length,
             outstandingMedicationCount,
+            submittedFormCount,
+            availableFormCount,
             showCoverage,
             showAssignment,
             showMedications,
@@ -678,9 +699,9 @@ export default function ShiftShow({
         () => [
             {
                 key: 'done',
-                label: 'Done',
+                label: 'Completed',
                 value: tasksDone,
-                color: 'var(--status-success)',
+                color: 'var(--primary)',
             },
             {
                 key: 'outstanding',
@@ -747,6 +768,15 @@ export default function ShiftShow({
             },
         ];
     }, [coverage]);
+
+    // The design's coverage donut centres on a covered % rather than a raw
+    // assigned/required ratio. Backend has no rate field, so derive it.
+    const coverageRate = coverage
+        ? Math.round(
+              (coverage.assigned_staff / Math.max(1, coverage.required_staff)) *
+                  100,
+          )
+        : 0;
 
     const completeForm = useForm<{
         final_note_subject: string;
@@ -858,6 +888,25 @@ export default function ShiftShow({
         }
     }
 
+    // Hero footer button treatments — mirrors the redesign's heroPrimary (solid
+    // white) vs heroGhost (transparent, white outline) variants on the gradient.
+    const heroPrimaryButton =
+        'border border-transparent bg-white text-primary shadow-sm hover:bg-white/90 hover:text-primary';
+    const heroGhostButton =
+        'border border-white/30 bg-transparent text-white shadow-none hover:bg-white/10 hover:text-white';
+
+    // Lower-priority manage actions collapse into the footer overflow menu.
+    const canManageOccurrence = Boolean(auth?.can?.shifts?.manageAny);
+    const showCancelOccurrence =
+        canManageOccurrence &&
+        shift.status !== 'completed' &&
+        shift.status !== 'cancelled';
+    const showReopenOccurrence =
+        canManageOccurrence && shift.status === 'cancelled';
+    const showRecurringSeries = Boolean(shift.shift_series_id);
+    const showOverflowMenu =
+        showCancelOccurrence || showReopenOccurrence || showRecurringSeries;
+
     return (
         <AppLayout
             breadcrumbs={[
@@ -878,6 +927,46 @@ export default function ShiftShow({
                     avatar={{ fallback: buildShiftHeroInitials(name) }}
                     backHref="/operations/shifts"
                     backLabel="All shifts"
+                    meta={[
+                        {
+                            icon: Clock,
+                            label: `${formatTime(shift.starts_at)} – ${formatTime(shift.ends_at)}`,
+                        },
+                        ...(shift.location
+                            ? [{ icon: MapPin, label: shift.location }]
+                            : []),
+                        {
+                            icon: User,
+                            label: shift.staff?.name ?? 'Unassigned',
+                        },
+                        ...(shift.actual_starts_at
+                            ? [
+                                  {
+                                      label: `Actual in: ${formatTime(shift.actual_starts_at)}${
+                                          shift.actual_ends_at
+                                              ? ` – ${formatTime(shift.actual_ends_at)}`
+                                              : ''
+                                      }`,
+                                  },
+                              ]
+                            : []),
+                    ]}
+                    badges={[
+                        ...(shift.site
+                            ? [{ icon: Building2, label: shift.site.name }]
+                            : []),
+                        ...(shift.service_context
+                            ? [{ label: shift.service_context.name }]
+                            : []),
+                        ...(shift.is_sleepover ? [{ label: 'Sleepover' }] : []),
+                        ...(shift.is_on_call ? [{ label: 'On-call' }] : []),
+                        ...(shift.shift_type
+                            ? [{ label: shift.shift_type.split('_').join(' ') }]
+                            : []),
+                        ...(shift.coverage_roles ?? []).map((role) => ({
+                            label: role.split('_').join(' '),
+                        })),
+                    ]}
                     actions={
                         <div className="flex flex-wrap items-center justify-end gap-2">
                             <ShiftStatusBadge
@@ -952,6 +1041,7 @@ export default function ShiftShow({
                                     <Button
                                         size="sm"
                                         variant="secondary"
+                                        className={heroGhostButton}
                                         onClick={() =>
                                             router.patch(
                                                 `/operations/shifts/${shift.id}/start`,
@@ -968,6 +1058,7 @@ export default function ShiftShow({
                                     <Button
                                         size="sm"
                                         variant="secondary"
+                                        className={heroPrimaryButton}
                                         onClick={() => setCompleteOpen(true)}
                                     >
                                         <CheckCircle2 className="h-4 w-4" />
@@ -978,6 +1069,7 @@ export default function ShiftShow({
                                     <Button
                                         size="sm"
                                         variant="secondary"
+                                        className={heroGhostButton}
                                         onClick={() => setIncidentOpen(true)}
                                     >
                                         <AlertTriangle className="h-4 w-4" />
@@ -989,6 +1081,7 @@ export default function ShiftShow({
                                         asChild
                                         size="sm"
                                         variant="secondary"
+                                        className={heroGhostButton}
                                     >
                                         <Link
                                             href={`/operations/timesheets/${linkedTimesheet.id}/edit`}
@@ -1004,6 +1097,7 @@ export default function ShiftShow({
                                         asChild
                                         size="sm"
                                         variant="secondary"
+                                        className={heroGhostButton}
                                     >
                                         <Link
                                             href={`/operations/timesheets/create?shift_id=${shift.id}`}
@@ -1014,115 +1108,65 @@ export default function ShiftShow({
                                         </Link>
                                     </Button>
                                 ) : null}
-                                {auth?.can?.shifts?.manageAny &&
-                                shift.status !== 'completed' &&
-                                shift.status !== 'cancelled' ? (
-                                    <Button
-                                        size="sm"
-                                        variant="secondary"
-                                        onClick={() =>
-                                            router.patch(
-                                                `/operations/shifts/${shift.id}/cancel`,
-                                                {},
-                                                { preserveScroll: true },
-                                            )
-                                        }
-                                    >
-                                        Cancel occurrence
-                                    </Button>
-                                ) : null}
-                                {auth?.can?.shifts?.manageAny &&
-                                shift.status === 'cancelled' ? (
-                                    <Button
-                                        size="sm"
-                                        variant="secondary"
-                                        onClick={() =>
-                                            router.patch(
-                                                `/operations/shifts/${shift.id}/reopen`,
-                                                {},
-                                                { preserveScroll: true },
-                                            )
-                                        }
-                                    >
-                                        Reopen occurrence
-                                    </Button>
-                                ) : null}
-                                {shift.shift_series_id ? (
-                                    <Button
-                                        asChild
-                                        size="sm"
-                                        variant="secondary"
-                                    >
-                                        <Link
-                                            href={`/operations/shifts/series/${shift.shift_series_id}`}
-                                        >
-                                            Recurring series
-                                        </Link>
-                                    </Button>
+                                {showOverflowMenu ? (
+                                    <DropdownMenu>
+                                        <DropdownMenuTrigger asChild>
+                                            <Button
+                                                size="icon"
+                                                variant="secondary"
+                                                aria-label="More shift actions"
+                                                className={heroGhostButton}
+                                            >
+                                                <MoreHorizontal className="h-4 w-4" />
+                                            </Button>
+                                        </DropdownMenuTrigger>
+                                        <DropdownMenuContent align="end">
+                                            {showCancelOccurrence ? (
+                                                <DropdownMenuItem
+                                                    onSelect={() =>
+                                                        router.patch(
+                                                            `/operations/shifts/${shift.id}/cancel`,
+                                                            {},
+                                                            {
+                                                                preserveScroll: true,
+                                                            },
+                                                        )
+                                                    }
+                                                >
+                                                    Cancel occurrence
+                                                </DropdownMenuItem>
+                                            ) : null}
+                                            {showReopenOccurrence ? (
+                                                <DropdownMenuItem
+                                                    onSelect={() =>
+                                                        router.patch(
+                                                            `/operations/shifts/${shift.id}/reopen`,
+                                                            {},
+                                                            {
+                                                                preserveScroll: true,
+                                                            },
+                                                        )
+                                                    }
+                                                >
+                                                    Reopen occurrence
+                                                </DropdownMenuItem>
+                                            ) : null}
+                                            {showRecurringSeries ? (
+                                                <DropdownMenuItem asChild>
+                                                    <Link
+                                                        href={`/operations/shifts/series/${shift.shift_series_id}`}
+                                                    >
+                                                        Recurring series
+                                                    </Link>
+                                                </DropdownMenuItem>
+                                            ) : null}
+                                        </DropdownMenuContent>
+                                    </DropdownMenu>
                                 ) : null}
                             </div>
                         </div>
                     }
-                >
-                    <div className="mt-4 flex flex-wrap items-center gap-x-4 gap-y-1 text-sm text-white/70">
-                        <span className="inline-flex items-center gap-1">
-                            <Clock className="h-3.5 w-3.5" />
-                            {formatTime(shift.starts_at)}
-                            {' – '}
-                            {formatTime(shift.ends_at)}
-                        </span>
-                        {shift.location ? (
-                            <span className="inline-flex items-center gap-1">
-                                <MapPin className="h-3.5 w-3.5" />
-                                {shift.location}
-                            </span>
-                        ) : null}
-                        <span className="inline-flex items-center gap-1">
-                            <User className="h-3.5 w-3.5" />
-                            {shift.staff?.name ?? 'Unassigned'}
-                        </span>
-                        {shift.service_context ? (
-                            <Badge
-                                variant="outline"
-                                className="border-white/20 bg-white/10 text-[10px] text-white"
-                            >
-                                {shift.service_context.name}
-                            </Badge>
-                        ) : null}
-                        {shift.is_sleepover ? (
-                            <Badge
-                                variant="outline"
-                                className="border-white/20 bg-white/10 text-[10px] text-white"
-                            >
-                                Sleepover
-                            </Badge>
-                        ) : null}
-                        {shift.is_on_call ? (
-                            <Badge
-                                variant="outline"
-                                className="border-white/20 bg-white/10 text-[10px] text-white"
-                            >
-                                On-call
-                            </Badge>
-                        ) : null}
-                        {shift.shift_type ? (
-                            <Badge
-                                variant="outline"
-                                className="border-white/20 bg-white/10 text-[10px] text-white"
-                            >
-                                {shift.shift_type}
-                            </Badge>
-                        ) : null}
-                        {shift.actual_starts_at ? (
-                            <span className="text-white/50">
-                                Actual: {formatTime(shift.actual_starts_at)}
-                                {shift.actual_ends_at
-                                    ? ` - ${formatTime(shift.actual_ends_at)}`
-                                    : ''}
-                            </span>
-                        ) : null}
-                    </div>
-                </PageHero>
+                />
 
                 <div className="grid gap-3 lg:grid-cols-3">
                     <DonutCard
@@ -1132,6 +1176,7 @@ export default function ShiftShow({
                         segments={taskSegments}
                         centerValue={`${tasksDone}/${taskCount}`}
                         centerLabel="done"
+                        accentKeys={['done']}
                         cta="View tasks"
                         active={resolvedActiveTab === 'tasks'}
                         onClick={() => setActiveTab('tasks')}
@@ -1148,6 +1193,7 @@ export default function ShiftShow({
                             segments={medicationSegments}
                             centerValue={outstandingMedicationCount}
                             centerLabel="outstanding"
+                            accentKeys={['due', 'late']}
                             cta="View medications"
                             active={resolvedActiveTab === 'medications'}
                             onClick={() => setActiveTab('medications')}
@@ -1157,14 +1203,15 @@ export default function ShiftShow({
                         <DonutCard
                             tone={
                                 coverage.has_actionable_gap
-                                    ? 'warning'
+                                    ? 'critical'
                                     : 'success'
                             }
-                            title="Coverage"
+                            title="Site coverage"
                             subtitle={coverage.window_label}
                             segments={coverageSegments}
-                            centerValue={`${coverage.assigned_staff}/${coverage.required_staff}`}
-                            centerLabel="assigned"
+                            centerValue={`${coverageRate}%`}
+                            centerLabel="covered"
+                            accentKeys={['gap', 'open']}
                             cta="View coverage"
                             active={resolvedActiveTab === 'coverage'}
                             onClick={() => setActiveTab('coverage')}
@@ -1191,30 +1238,58 @@ export default function ShiftShow({
                             }
                         >
                             <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-base">
-                                        Tasks
-                                    </CardTitle>
+                                <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 border-b">
+                                    <div className="min-w-0">
+                                        <div className="mb-0.5 text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
+                                            Care plan
+                                        </div>
+                                        <CardTitle className="flex items-center gap-2 text-base font-bold tracking-tight">
+                                            <ListChecks className="h-4 w-4 text-primary" />
+                                            Shift tasks
+                                        </CardTitle>
+                                    </div>
+                                    <span className="shrink-0 text-xs font-semibold text-muted-foreground">
+                                        {tasksDone}/{taskCount} complete
+                                    </span>
                                 </CardHeader>
                                 <CardContent className="space-y-2">
                                     {tasks.map((t) => (
-                                        <div
+                                        // eslint-disable-next-line no-restricted-syntax -- Task rows are clickable checklist selector surfaces.
+                                        <button
                                             key={t.id}
-                                            className="flex items-center gap-3 rounded-md border p-3"
+                                            type="button"
+                                            disabled={!canMarkTasks}
+                                            onClick={() =>
+                                                toggleTask(t, !t.is_completed)
+                                            }
+                                            className="flex w-full items-center gap-3 rounded-lg border p-3 text-left transition-colors hover:bg-accent disabled:cursor-not-allowed disabled:opacity-60"
                                         >
-                                            <Checkbox
-                                                checked={t.is_completed}
-                                                disabled={!canMarkTasks}
-                                                onCheckedChange={(v) =>
-                                                    toggleTask(t, Boolean(v))
-                                                }
-                                            />
-                                            <div
-                                                className={`text-sm ${t.is_completed ? 'text-muted-foreground line-through' : ''}`}
+                                            <span
+                                                className={cn(
+                                                    'flex h-5 w-5 shrink-0 items-center justify-center rounded-md border-2 transition-colors',
+                                                    t.is_completed
+                                                        ? 'border-primary bg-primary text-primary-foreground'
+                                                        : 'border-input bg-background',
+                                                )}
+                                            >
+                                                {t.is_completed ? (
+                                                    <Check
+                                                        className="h-3.5 w-3.5"
+                                                        strokeWidth={3}
+                                                    />
+                                                ) : null}
+                                            </span>
+                                            <span
+                                                className={cn(
+                                                    'text-sm',
+                                                    t.is_completed
+                                                        ? 'text-muted-foreground line-through'
+                                                        : 'text-foreground',
+                                                )}
                                             >
                                                 {t.label}
-                                            </div>
-                                        </div>
+                                            </span>
+                                        </button>
                                     ))}
                                     {!tasks.length ? (
                                         <div className="text-sm text-muted-foreground">
@@ -1233,64 +1308,85 @@ export default function ShiftShow({
                         >
                             {coverage ? (
                                 <Card>
-                                    <CardHeader>
-                                        <CardTitle className="text-base">
-                                            Site coverage
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="space-y-3">
-                                        <div className="flex flex-wrap items-center justify-between gap-3">
-                                            <div>
-                                                <div className="text-sm font-medium">
-                                                    {coverage.site_name}
-                                                </div>
-                                                <div className="text-xs text-muted-foreground">
-                                                    {coverage.window_label}
-                                                </div>
+                                    <CardHeader className="flex flex-row items-start justify-between gap-3 space-y-0 border-b">
+                                        <div className="min-w-0">
+                                            <div className="mb-0.5 text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
+                                                {coverage.site_name} ·{' '}
+                                                {coverage.window_label}
                                             </div>
-                                            <Badge
-                                                variant={
-                                                    coverage.has_actionable_gap
-                                                        ? 'destructive'
-                                                        : coverage.coverage_state ===
-                                                            'over'
-                                                          ? 'outline'
-                                                          : 'secondary'
-                                                }
-                                            >
-                                                {coverage.has_actionable_gap
-                                                    ? gapKindLabel(
-                                                          coverage.gap_kind,
-                                                      )
+                                            <CardTitle className="flex items-center gap-2 text-base font-bold tracking-tight">
+                                                <Shield className="h-4 w-4 text-primary" />
+                                                Site coverage
+                                            </CardTitle>
+                                        </div>
+                                        <Badge
+                                            variant={
+                                                coverage.has_actionable_gap
+                                                    ? 'destructive'
                                                     : coverage.coverage_state ===
                                                         'over'
-                                                      ? 'Over-covered'
-                                                      : 'Exact coverage'}
-                                            </Badge>
-                                        </div>
+                                                      ? 'outline'
+                                                      : 'secondary'
+                                            }
+                                        >
+                                            {coverage.has_actionable_gap
+                                                ? gapKindLabel(
+                                                      coverage.gap_kind,
+                                                  )
+                                                : coverage.coverage_state ===
+                                                    'over'
+                                                  ? 'Over-covered'
+                                                  : 'Exact coverage'}
+                                        </Badge>
+                                    </CardHeader>
+                                    <CardContent className="space-y-3">
+                                        {coverage.has_actionable_gap ? (
+                                            <div className="rounded-lg border border-status-critical/30 bg-status-critical-bg p-3 text-sm text-status-critical">
+                                                <span className="font-semibold">
+                                                    {coverage.window_label}
+                                                </span>{' '}
+                                                — needs{' '}
+                                                {coverage.required_staff},{' '}
+                                                {coverage.assigned_staff}{' '}
+                                                assigned
+                                                {coverage.open_shifts > 0
+                                                    ? `, ${coverage.open_shifts} open shift${coverage.open_shifts === 1 ? '' : 's'} carrying no role demand`
+                                                    : ''}
+                                                .
+                                            </div>
+                                        ) : null}
 
                                         <div className="grid gap-3 sm:grid-cols-3">
-                                            <div className="rounded-md border p-3">
-                                                <div className="text-xs text-muted-foreground uppercase">
+                                            <div className="rounded-lg border p-3">
+                                                <div className="text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
                                                     Required
                                                 </div>
-                                                <div className="mt-1 text-sm font-medium">
+                                                <div className="mt-1 text-lg font-bold tabular-nums">
                                                     {coverage.required_staff}
                                                 </div>
                                             </div>
-                                            <div className="rounded-md border p-3">
-                                                <div className="text-xs text-muted-foreground uppercase">
+                                            <div className="rounded-lg border p-3">
+                                                <div className="text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
                                                     Assigned
                                                 </div>
-                                                <div className="mt-1 text-sm font-medium">
+                                                <div className="mt-1 text-lg font-bold tabular-nums">
                                                     {coverage.assigned_staff}
                                                 </div>
                                             </div>
-                                            <div className="rounded-md border p-3">
-                                                <div className="text-xs text-muted-foreground uppercase">
+                                            <div className="rounded-lg border p-3">
+                                                <div className="text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
                                                     Open shifts
                                                 </div>
-                                                <div className="mt-1 text-sm font-medium">
+                                                <div
+                                                    className={cn(
+                                                        'mt-1 text-lg font-bold tabular-nums',
+                                                        coverage.open_shifts >
+                                                            0 &&
+                                                            coverage.has_actionable_gap
+                                                            ? 'text-status-critical'
+                                                            : '',
+                                                    )}
+                                                >
                                                     {coverage.open_shifts}
                                                 </div>
                                             </div>
@@ -1639,9 +1735,13 @@ export default function ShiftShow({
                         >
                             {can.assign_shift ? (
                                 <Card>
-                                    <CardHeader>
-                                        <CardTitle className="text-base">
-                                            Assignment coverage
+                                    <CardHeader className="border-b">
+                                        <div className="mb-0.5 text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
+                                            Ranked by fit &amp; eligibility
+                                        </div>
+                                        <CardTitle className="flex items-center gap-2 text-base font-bold tracking-tight">
+                                            <UserPlus className="h-4 w-4 text-primary" />
+                                            Suggested cover
                                         </CardTitle>
                                     </CardHeader>
                                     <CardContent className="space-y-3">
@@ -1708,37 +1808,51 @@ export default function ShiftShow({
                                                     return (
                                                         <div
                                                             key={candidate.id}
-                                                            className="rounded-md border p-3"
+                                                            className="rounded-lg border border-border p-3"
                                                         >
                                                             <div className="flex flex-wrap items-start justify-between gap-3">
-                                                                <div>
-                                                                    <div className="text-sm font-medium">
-                                                                        {
-                                                                            candidate.name
-                                                                        }
-                                                                    </div>
-                                                                    <div className="text-xs text-muted-foreground">
-                                                                        {candidate.email ??
-                                                                            'No email'}
-                                                                        {' · '}
-                                                                        {candidate.weekly_hours.toFixed(
-                                                                            1,
-                                                                        )}{' '}
-                                                                        hrs this
-                                                                        week
-                                                                    </div>
-                                                                    <div className="mt-1 text-xs text-muted-foreground">
-                                                                        {candidate.site_familiarity ??
-                                                                            0}{' '}
-                                                                        recent
-                                                                        site
-                                                                        shift(s)
-                                                                        {' · '}
-                                                                        {candidate.client_consistency ??
-                                                                            0}{' '}
-                                                                        recent
-                                                                        client
-                                                                        shift(s)
+                                                                <div className="flex items-center gap-3">
+                                                                    <Avatar className="size-10">
+                                                                        <AvatarFallback className="bg-primary/10 text-xs font-bold text-primary uppercase">
+                                                                            {buildShiftHeroInitials(
+                                                                                candidate.name,
+                                                                            )}
+                                                                        </AvatarFallback>
+                                                                    </Avatar>
+                                                                    <div>
+                                                                        <div className="text-sm font-semibold text-foreground">
+                                                                            {
+                                                                                candidate.name
+                                                                            }
+                                                                        </div>
+                                                                        <div className="text-xs text-muted-foreground">
+                                                                            {candidate.email ??
+                                                                                'No email'}
+                                                                            {
+                                                                                ' · '
+                                                                            }
+                                                                            {candidate.weekly_hours.toFixed(
+                                                                                1,
+                                                                            )}{' '}
+                                                                            hrs
+                                                                            this
+                                                                            week
+                                                                        </div>
+                                                                        <div className="mt-1 text-xs text-muted-foreground">
+                                                                            {candidate.site_familiarity ??
+                                                                                0}{' '}
+                                                                            recent
+                                                                            site
+                                                                            shift(s)
+                                                                            {
+                                                                                ' · '
+                                                                            }
+                                                                            {candidate.client_consistency ??
+                                                                                0}{' '}
+                                                                            recent
+                                                                            client
+                                                                            shift(s)
+                                                                        </div>
                                                                     </div>
                                                                 </div>
 
@@ -2014,8 +2128,9 @@ export default function ShiftShow({
                         >
                             {transports.length > 0 || can.view_transport ? (
                                 <Card>
-                                    <CardHeader className="flex flex-row items-center justify-between gap-3">
-                                        <CardTitle className="text-base">
+                                    <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0 border-b">
+                                        <CardTitle className="flex items-center gap-2 text-base font-bold tracking-tight">
+                                            <Car className="h-4 w-4 text-primary" />
                                             Transport activity
                                         </CardTitle>
                                         {can.view_transport ? (
@@ -2026,7 +2141,9 @@ export default function ShiftShow({
                                             >
                                                 <Link
                                                     href={`/fleet-assets/transports/create?shift_id=${shift.id}`}
+                                                    className="gap-1.5"
                                                 >
+                                                    <Plus className="h-4 w-4" />
                                                     Log transport
                                                 </Link>
                                             </Button>
@@ -2137,8 +2254,14 @@ export default function ShiftShow({
                             {replacementRequest ||
                             (can.request_replacement && shift.user_id) ? (
                                 <Card>
-                                    <CardHeader>
-                                        <CardTitle className="text-base">
+                                    <CardHeader className="border-b">
+                                        <div className="mb-0.5 text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
+                                            {replacementRequest?.is_active
+                                                ? 'Active request'
+                                                : 'No active request'}
+                                        </div>
+                                        <CardTitle className="flex items-center gap-2 text-base font-bold tracking-tight">
+                                            <Repeat className="h-4 w-4 text-primary" />
                                             Replacement workflow
                                         </CardTitle>
                                     </CardHeader>
@@ -2543,8 +2666,12 @@ export default function ShiftShow({
                         >
                             {handover.length ? (
                                 <Card>
-                                    <CardHeader>
-                                        <CardTitle className="text-base">
+                                    <CardHeader className="border-b">
+                                        <div className="mb-0.5 text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
+                                            Continuity of care
+                                        </div>
+                                        <CardTitle className="flex items-center gap-2 text-base font-bold tracking-tight">
+                                            <Handshake className="h-4 w-4 text-primary" />
                                             Recent handover
                                         </CardTitle>
                                     </CardHeader>
@@ -2552,10 +2679,10 @@ export default function ShiftShow({
                                         {handover.map((h) => (
                                             <div
                                                 key={h.id}
-                                                className="rounded-md border p-3"
+                                                className="rounded-lg border border-l-[3px] border-border border-l-status-info bg-muted/40 p-3"
                                             >
                                                 <div className="flex items-center justify-between gap-2">
-                                                    <div className="text-sm font-medium">
+                                                    <div className="text-sm font-semibold text-foreground">
                                                         {h.subject ||
                                                             'Handover'}
                                                     </div>
@@ -2568,7 +2695,7 @@ export default function ShiftShow({
                                                     </div>
                                                 </div>
                                                 {h.body ? (
-                                                    <div className="mt-2 text-sm whitespace-pre-wrap">
+                                                    <div className="mt-1.5 text-sm whitespace-pre-wrap text-foreground/90">
                                                         {h.body}
                                                     </div>
                                                 ) : null}
@@ -2584,8 +2711,9 @@ export default function ShiftShow({
                             ) : null}
 
                             <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-base">
+                                <CardHeader className="border-b">
+                                    <CardTitle className="flex items-center gap-2 text-base font-bold tracking-tight">
+                                        <FileText className="h-4 w-4 text-primary" />
                                         Shift notes
                                     </CardTitle>
                                 </CardHeader>
@@ -2809,13 +2937,32 @@ export default function ShiftShow({
                                     {notes.map((n) => (
                                         <div
                                             key={n.id}
-                                            className="rounded-md border p-3"
+                                            className="rounded-lg border p-3"
                                         >
                                             <div className="flex items-center justify-between gap-2">
-                                                <div className="text-sm font-medium">
-                                                    {n.subject || n.type}
+                                                <div className="flex min-w-0 items-center gap-2">
+                                                    <Badge
+                                                        variant="outline"
+                                                        className={cn(
+                                                            'capitalize',
+                                                            n.type ===
+                                                                'progress_note'
+                                                                ? 'border-status-success/30 bg-status-success-bg text-status-success'
+                                                                : 'border-status-info/30 bg-status-info-bg text-status-info',
+                                                        )}
+                                                    >
+                                                        {n.type
+                                                            .split('_')
+                                                            .join(' ')}
+                                                    </Badge>
+                                                    <span className="truncate text-sm font-semibold text-foreground">
+                                                        {n.subject ||
+                                                            n.type
+                                                                .split('_')
+                                                                .join(' ')}
+                                                    </span>
                                                 </div>
-                                                <div className="text-xs text-muted-foreground">
+                                                <div className="shrink-0 text-xs text-muted-foreground">
                                                     {n.occurred_at
                                                         ? formatDateTime(
                                                               n.occurred_at,
@@ -2829,7 +2976,7 @@ export default function ShiftShow({
                                                 </div>
                                             ) : null}
                                             {n.body ? (
-                                                <div className="mt-2 text-sm whitespace-pre-wrap">
+                                                <div className="mt-1.5 text-sm whitespace-pre-wrap text-foreground/90">
                                                     {n.body}
                                                 </div>
                                             ) : null}
@@ -2867,36 +3014,77 @@ export default function ShiftShow({
                             }
                         >
                             <Card>
-                                <CardHeader>
-                                    <CardTitle className="text-base">
-                                        Shift incidents
+                                <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0 border-b">
+                                    <CardTitle className="flex items-center gap-2 text-base font-bold tracking-tight">
+                                        <AlertTriangle className="h-4 w-4 text-primary" />
+                                        Incidents
                                     </CardTitle>
+                                    {can.create_incident ? (
+                                        <Button
+                                            variant="outline"
+                                            size="sm"
+                                            onClick={() =>
+                                                setIncidentOpen(true)
+                                            }
+                                        >
+                                            <Plus className="h-4 w-4" />
+                                            Report incident
+                                        </Button>
+                                    ) : null}
                                 </CardHeader>
                                 <CardContent className="space-y-2">
                                     {(incidents || []).map((i: any) => (
                                         <div
                                             key={i.id}
-                                            className="flex items-center justify-between rounded-md border p-3"
+                                            className="rounded-lg border border-l-[3px] border-border border-l-status-warning p-3"
                                         >
-                                            <div>
-                                                <div className="text-sm font-medium">
-                                                    {i.type} &bull; {i.severity}
+                                            <div className="flex flex-wrap items-center justify-between gap-2">
+                                                <div className="text-sm font-semibold text-foreground capitalize">
+                                                    {(
+                                                        i.title ||
+                                                        i.type ||
+                                                        'Incident'
+                                                    )
+                                                        .toString()
+                                                        .replace(/_/g, ' ')}
                                                 </div>
-                                                <div className="mt-1 text-xs text-muted-foreground">
-                                                    {i.status} &bull;{' '}
-                                                    {i.occurred_at
-                                                        ? formatDateTime(
-                                                              i.occurred_at,
-                                                          )
-                                                        : 'Time not recorded'}
+                                                <div className="flex items-center gap-2">
+                                                    <Badge
+                                                        variant="outline"
+                                                        className="border-status-warning/40 bg-status-warning-bg text-status-warning capitalize"
+                                                    >
+                                                        {i.severity} severity
+                                                    </Badge>
+                                                    <span className="text-xs text-muted-foreground">
+                                                        {i.occurred_at
+                                                            ? formatDateTime(
+                                                                  i.occurred_at,
+                                                              )
+                                                            : 'Time not recorded'}
+                                                    </span>
                                                 </div>
                                             </div>
-                                            <Link
-                                                href={`/incidents/${i.id}`}
-                                                className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
-                                            >
-                                                Open
-                                            </Link>
+                                            {i.description ? (
+                                                <p className="mt-1.5 text-sm text-foreground/90">
+                                                    {i.description}
+                                                </p>
+                                            ) : null}
+                                            <div className="mt-2 flex items-center justify-between gap-2">
+                                                <span className="text-xs text-muted-foreground">
+                                                    {i.reporter?.name
+                                                        ? `Reported by ${i.reporter.name}`
+                                                        : 'Reporter unknown'}
+                                                    {i.requires_followup
+                                                        ? ' · follow-up required'
+                                                        : ' · no follow-up'}
+                                                </span>
+                                                <Link
+                                                    href={`/incidents/${i.id}`}
+                                                    className="rounded-md border px-2.5 py-1 text-xs hover:bg-muted"
+                                                >
+                                                    Open
+                                                </Link>
+                                            </div>
                                         </div>
                                     ))}
                                     {!(incidents || []).length && (

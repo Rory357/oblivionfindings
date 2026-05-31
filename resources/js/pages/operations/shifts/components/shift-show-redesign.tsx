@@ -6,6 +6,7 @@ import {
     Activity,
     AlertTriangle,
     Car,
+    CheckCircle2,
     ClipboardList,
     FileText,
     History,
@@ -55,6 +56,8 @@ type BuildShiftShowTabsInput = {
     auditCount: number;
     incidentCount: number;
     medicationOutstandingCount: number;
+    formsSubmittedCount: number;
+    formsAvailableCount: number;
     showCoverage: boolean;
     showAssignment: boolean;
     showMedications: boolean;
@@ -145,6 +148,8 @@ export function buildShiftShowTabs({
     auditCount,
     incidentCount,
     medicationOutstandingCount,
+    formsSubmittedCount,
+    formsAvailableCount,
     showCoverage,
     showAssignment,
     showMedications,
@@ -153,6 +158,9 @@ export function buildShiftShowTabs({
     showTransport,
     showReplacement,
 }: BuildShiftShowTabsInput): ShiftShowTab[] {
+    // Order mirrors the redesign: Tasks, Notes, Audit history, Incidents, then
+    // the conditional operational sections. Audit history and Incidents always
+    // render; the rest are gated on the page's show* flags.
     const tabs: ShiftShowTab[] = [
         {
             key: 'tasks',
@@ -171,6 +179,20 @@ export function buildShiftShowTabs({
                     ? notesCount + handoverCount
                     : undefined,
         },
+        {
+            key: 'audit',
+            label: 'Audit history',
+            icon: History,
+            tone: 'neutral',
+            badge: auditCount > 0 ? auditCount : undefined,
+        },
+        {
+            key: 'incidents',
+            label: 'Incidents',
+            icon: AlertTriangle,
+            tone: 'critical',
+            badge: incidentCount > 0 ? incidentCount : undefined,
+        },
     ];
 
     if (showMedications) {
@@ -178,7 +200,7 @@ export function buildShiftShowTabs({
             key: 'medications',
             label: 'Medications',
             icon: Pill,
-            tone: medicationOutstandingCount > 0 ? 'warning' : 'success',
+            tone: 'warning',
             badge:
                 medicationOutstandingCount > 0
                     ? medicationOutstandingCount
@@ -191,7 +213,7 @@ export function buildShiftShowTabs({
             key: 'coverage',
             label: 'Coverage',
             icon: ShieldAlert,
-            tone: 'warning',
+            tone: 'critical',
         });
     }
 
@@ -200,17 +222,9 @@ export function buildShiftShowTabs({
             key: 'assignment',
             label: 'Assignment',
             icon: UserPlus,
-            tone: 'neutral',
+            tone: 'info',
         });
     }
-
-    tabs.push({
-        key: 'incidents',
-        label: 'Incidents',
-        icon: AlertTriangle,
-        tone: incidentCount > 0 ? 'critical' : 'neutral',
-        badge: incidentCount > 0 ? incidentCount : undefined,
-    });
 
     if (showObservations) {
         tabs.push({
@@ -226,7 +240,11 @@ export function buildShiftShowTabs({
             key: 'forms',
             label: 'Forms',
             icon: ClipboardList,
-            tone: 'neutral',
+            tone: 'primary',
+            badge:
+                formsAvailableCount > 0
+                    ? `${formsSubmittedCount}/${formsAvailableCount}`
+                    : undefined,
         });
     }
 
@@ -235,7 +253,7 @@ export function buildShiftShowTabs({
             key: 'transport',
             label: 'Transport',
             icon: Car,
-            tone: 'neutral',
+            tone: 'info',
         });
     }
 
@@ -247,14 +265,6 @@ export function buildShiftShowTabs({
             tone: 'warning',
         });
     }
-
-    tabs.push({
-        key: 'audit',
-        label: 'Audit',
-        icon: History,
-        tone: 'neutral',
-        badge: auditCount > 0 ? auditCount : undefined,
-    });
 
     return tabs;
 }
@@ -279,6 +289,7 @@ export function ShiftTabStrip({
                 const Icon = tab.icon;
 
                 return (
+                    // eslint-disable-next-line no-restricted-syntax -- Tab buttons need the custom chip + underline layout, not the shared Button.
                     <button
                         key={tab.key}
                         type="button"
@@ -307,7 +318,7 @@ export function ShiftTabStrip({
                         </span>
                         <span>{tab.label}</span>
                         {tab.badge !== undefined ? (
-                            <span className="ml-0.5 inline-flex items-center rounded-full bg-background/70 px-1.5 py-0.5 text-[10px] font-bold tabular-nums">
+                            <span className="ml-0.5 inline-flex items-center rounded-full bg-background/60 px-1.5 py-0.5 text-[10px] font-bold tabular-nums">
                                 {tab.badge}
                             </span>
                         ) : null}
@@ -459,7 +470,7 @@ const signalIcon: Record<ShiftShowSignal['tone'], LucideIcon> = {
     critical: AlertTriangle,
     warning: AlertTriangle,
     info: Info,
-    success: Activity,
+    success: CheckCircle2,
 };
 
 export function ShiftSignalRail({
@@ -472,7 +483,7 @@ export function ShiftSignalRail({
     onSelectTab: (key: ShiftShowTabKey) => void;
 }) {
     return (
-        <aside className="flex flex-col gap-4 rounded-[14px] border border-border bg-card p-4 shadow-sm">
+        <aside className="flex flex-col gap-6 rounded-[14px] border border-border bg-card p-4 shadow-sm">
             <section>
                 <header className="mb-3 flex items-center justify-between gap-3">
                     <h2 className="text-sm font-bold tracking-tight text-foreground">
@@ -494,6 +505,7 @@ export function ShiftSignalRail({
 
                             return (
                                 <li key={signal.id}>
+                                    {/* eslint-disable-next-line no-restricted-syntax -- Signal cards are bespoke interactive alert surfaces. */}
                                     <button
                                         type="button"
                                         onClick={() =>
@@ -525,7 +537,7 @@ export function ShiftSignalRail({
                                                 <span className="mt-1 inline-flex items-center gap-1 text-[11px] font-semibold text-primary">
                                                     {signal.cta}
                                                     <span aria-hidden="true">
-                                                        -&gt;
+                                                        →
                                                     </span>
                                                 </span>
                                             </span>

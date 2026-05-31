@@ -1,6 +1,8 @@
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader } from '@/components/ui/card';
 import { formatDateTime } from '@/lib/datetime';
+import { cn } from '@/lib/utils';
+import { History } from 'lucide-react';
 
 export type ShiftAuditTimelineEntry = {
     id: number;
@@ -65,6 +67,35 @@ function auditDetails(entry: ShiftAuditTimelineEntry) {
         .filter((row): row is readonly [string, string] => row[1] !== null);
 }
 
+const AUDIT_DOT = {
+    success: 'bg-status-success',
+    info: 'bg-status-info',
+    warning: 'bg-status-warning',
+    critical: 'bg-status-critical',
+} as const;
+
+// Map the real event type onto a timeline-dot tone (no mock tone field).
+function auditTone(type: string): keyof typeof AUDIT_DOT {
+    if (
+        type === 'shift_started' ||
+        type === 'shift_completed' ||
+        type === 'shift_handover_acknowledged'
+    ) {
+        return 'success';
+    }
+    if (
+        type === 'shift_cancelled' ||
+        type === 'shift_cancellation_cascade' ||
+        type === 'shift_unassigned'
+    ) {
+        return 'critical';
+    }
+    if (type === 'shift_handover_waived') {
+        return 'warning';
+    }
+    return 'info';
+}
+
 export function ShiftAuditTimeline({
     entries,
 }: {
@@ -74,9 +105,17 @@ export function ShiftAuditTimeline({
 
     return (
         <Card>
-            <CardHeader>
-                <div className="flex flex-wrap items-center justify-between gap-3">
-                    <h2 className="text-base font-semibold">Audit timeline</h2>
+            <CardHeader className="border-b">
+                <div className="flex flex-wrap items-start justify-between gap-3">
+                    <div className="min-w-0">
+                        <div className="mb-0.5 text-[10px] font-bold tracking-wider text-muted-foreground uppercase">
+                            Everything that happened on this shift
+                        </div>
+                        <h2 className="flex items-center gap-2 text-base font-bold tracking-tight">
+                            <History className="h-4 w-4 text-primary" />
+                            Audit timeline
+                        </h2>
+                    </div>
                     <Badge variant="secondary">
                         {count} event{count === 1 ? '' : 's'}
                     </Badge>
@@ -84,19 +123,22 @@ export function ShiftAuditTimeline({
             </CardHeader>
             <CardContent>
                 {count ? (
-                    <ol className="space-y-3">
+                    <ol className="relative space-y-5 border-l border-border pl-6">
                         {entries.map((entry) => {
                             const details = auditDetails(entry);
 
                             return (
-                                <li
-                                    key={entry.id}
-                                    className="rounded-md border p-3"
-                                >
+                                <li key={entry.id} className="relative">
+                                    <span
+                                        className={cn(
+                                            'absolute top-1 -left-[26px] h-3 w-3 rounded-full ring-4 ring-card',
+                                            AUDIT_DOT[auditTone(entry.type)],
+                                        )}
+                                    />
                                     <div className="flex flex-wrap items-start justify-between gap-3">
                                         <div className="min-w-0 space-y-1">
                                             <div className="flex flex-wrap items-center gap-2">
-                                                <div className="text-sm font-medium">
+                                                <div className="text-sm font-semibold text-foreground">
                                                     {entry.subject ||
                                                         eventLabel(entry.type)}
                                                 </div>

@@ -29,7 +29,7 @@ describe('shift show hero helpers', () => {
 });
 
 describe('shift show redesign navigation', () => {
-    it('builds icon tabs with redesign badges and preserves operational tab order', () => {
+    it('builds icon tabs with redesign badges and follows the redesign tab order', () => {
         const tabs = buildShiftShowTabs({
             tasksDone: 5,
             tasksTotal: 8,
@@ -38,6 +38,8 @@ describe('shift show redesign navigation', () => {
             auditCount: 4,
             incidentCount: 1,
             medicationOutstandingCount: 3,
+            formsSubmittedCount: 1,
+            formsAvailableCount: 2,
             showCoverage: true,
             showAssignment: true,
             showMedications: true,
@@ -50,15 +52,15 @@ describe('shift show redesign navigation', () => {
         expect(tabs.map((tab) => tab.key)).toEqual([
             'tasks',
             'notes',
+            'audit',
+            'incidents',
             'medications',
             'coverage',
             'assignment',
-            'incidents',
             'observations',
             'forms',
             'transport',
             'replacement',
-            'audit',
         ]);
         expect(tabs[0]).toMatchObject({
             key: 'tasks',
@@ -67,7 +69,22 @@ describe('shift show redesign navigation', () => {
             tone: 'primary',
         });
         expect(tabs[2]).toMatchObject({
-            key: 'medications',
+            key: 'audit',
+            label: 'Audit history',
+            badge: 4,
+            tone: 'neutral',
+        });
+        expect(tabs[3]).toMatchObject({
+            key: 'incidents',
+            badge: 1,
+            tone: 'critical',
+        });
+        expect(tabs.find((tab) => tab.key === 'forms')).toMatchObject({
+            label: 'Forms',
+            badge: '1/2',
+            tone: 'primary',
+        });
+        expect(tabs.find((tab) => tab.key === 'medications')).toMatchObject({
             badge: 3,
             tone: 'warning',
         });
@@ -83,6 +100,8 @@ describe('shift show redesign navigation', () => {
             auditCount: 0,
             incidentCount: 0,
             medicationOutstandingCount: 2,
+            formsSubmittedCount: 0,
+            formsAvailableCount: 0,
             showCoverage: false,
             showAssignment: false,
             showMedications: true,
