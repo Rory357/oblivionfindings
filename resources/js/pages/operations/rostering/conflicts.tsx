@@ -148,15 +148,9 @@ export default function RosteringConflicts(props: ConflictsProps) {
         [weekStartDate],
     );
     // End label without the year, to match the design ("Mon 25 May → Sun 31 May").
-    const rangeEndLabel = useMemo(
-        () =>
-            range.end.toLocaleDateString('en-NZ', {
-                weekday: 'short',
-                day: '2-digit',
-                month: 'short',
-            }),
-        [range.end],
-    );
+    // Strip the trailing year off the shared label so it stays consistent with
+    // startLabel's format (no stray comma).
+    const rangeEndLabel = range.endLabel.replace(/[ ,]+\d{4}$/, '');
     const curLab = weekLabel(weekStartDate);
     const returnTo = `/operations/rostering/conflicts?week=${encodeURIComponent(props.weekStart)}`;
 
@@ -731,7 +725,7 @@ export default function RosteringConflicts(props: ConflictsProps) {
                                     Kia ora {firstName},{' '}
                                     {pluralise(blocking, 'conflict')} need you —
                                 </span>{' '}
-                                <span className="border-b-2 border-primary-foreground/40 pb-0.5">
+                                <span className="border-b-2 border-primary-foreground/40 pb-0.5 whitespace-nowrap">
                                     {range.startLabel} → {rangeEndLabel}
                                 </span>
                             </span>
