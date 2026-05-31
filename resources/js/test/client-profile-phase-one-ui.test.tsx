@@ -1,6 +1,6 @@
 import { render, screen } from '@testing-library/react';
 import type React from 'react';
-import { beforeEach, describe, expect, it, vi } from 'vitest';
+import { afterEach, beforeEach, describe, expect, it, vi } from 'vitest';
 
 import { ActionsReviewsTab } from '@/pages/operations/clients/tabs/actions-reviews';
 import {
@@ -71,6 +71,10 @@ describe('client profile phase-one tabs', () => {
         );
     });
 
+    afterEach(() => {
+        vi.useRealTimers();
+    });
+
     it('opens daily notes filtered to the review queue from query params and still surfaces drafts', () => {
         render(
             <DailyNotesTab
@@ -91,6 +95,15 @@ describe('client profile phase-one tabs', () => {
     });
 
     it('groups actions by due bucket before severity', () => {
+        // The "due this week" / "upcoming" buckets are computed relative to the
+        // current date, so pin the clock to keep the fixed due_at dates below in
+        // their intended buckets (2026-05-25 = due this week, 2026-06-20 = upcoming).
+        // Fake only Date so React/RTL timers stay real.
+        vi.useFakeTimers({
+            toFake: ['Date'],
+            now: new Date('2026-05-22T12:00:00Z'),
+        });
+
         render(
             <ActionsReviewsTab
                 summary={{ open: 3, critical: 1, warning: 1 }}
