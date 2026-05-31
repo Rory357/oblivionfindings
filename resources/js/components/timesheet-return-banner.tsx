@@ -1,11 +1,7 @@
 import { Link } from '@inertiajs/react';
 import { ArrowRight } from 'lucide-react';
-import { useState } from 'react';
 
 import StaffStatus from '@/components/staff-status';
-import TimesheetEditSheet, {
-    type InlineTimesheet,
-} from '@/components/timesheet-edit-sheet';
 import { Button } from '@/components/ui/button';
 import { useMyDayLabels } from '@/hooks/use-my-day-labels';
 import { cn } from '@/lib/utils';
@@ -37,7 +33,7 @@ export type TimesheetReturnBannerProps = {
     returnNote?: string | null;
     /**
      * Override the edit-page URL. Defaults to the canonical operations edit
-     * URL. My Day callers should pass `timesheet` for inline editing.
+     * URL.
      */
     editHref?: string;
     /** Hide the primary action — useful on the edit page itself. */
@@ -46,8 +42,6 @@ export type TimesheetReturnBannerProps = {
     className?: string;
     /** Optional size override for the status pill. Defaults to `sm`. */
     size?: 'sm' | 'md';
-    /** Optional inline-edit payload for My Day. Falls back to edit link when omitted. */
-    timesheet?: InlineTimesheet;
 };
 
 export function TimesheetReturnBanner({
@@ -57,10 +51,8 @@ export function TimesheetReturnBanner({
     hideAction = false,
     className,
     size = 'sm',
-    timesheet,
 }: TimesheetReturnBannerProps) {
     const t = useMyDayLabels();
-    const [editOpen, setEditOpen] = useState(false);
     const href = editHref ?? editTimesheet.url(timesheetId);
     const trimmedNote = returnNote?.trim() ?? '';
 
@@ -98,41 +90,16 @@ export function TimesheetReturnBanner({
 
             {!hideAction ? (
                 <div className="shrink-0">
-                    {timesheet ? (
-                        <>
-                            <Button
-                                type="button"
-                                size="sm"
-                                className="w-full bg-status-warning text-white hover:bg-status-warning focus-visible:ring-status-warning sm:w-auto dark:hover:bg-status-warning"
-                                onClick={() => setEditOpen(true)}
-                                disabled={!timesheet.can_edit_inline}
-                                title={
-                                    timesheet.can_edit_inline
-                                        ? undefined
-                                        : 'This timesheet is locked or no longer editable.'
-                                }
-                            >
-                                {t('update_and_resubmit')}
-                                <ArrowRight className="ml-1.5 h-4 w-4" />
-                            </Button>
-                            <TimesheetEditSheet
-                                timesheet={timesheet}
-                                open={editOpen}
-                                onOpenChange={setEditOpen}
-                            />
-                        </>
-                    ) : (
-                        <Button
-                            asChild
-                            size="sm"
-                            className="w-full bg-status-warning text-white hover:bg-status-warning focus-visible:ring-status-warning sm:w-auto dark:hover:bg-status-warning"
-                        >
-                            <Link href={href}>
-                                Fix and resend
-                                <ArrowRight className="ml-1.5 h-4 w-4" />
-                            </Link>
-                        </Button>
-                    )}
+                    <Button
+                        asChild
+                        size="sm"
+                        className="w-full bg-status-warning text-white hover:bg-status-warning focus-visible:ring-status-warning sm:w-auto dark:hover:bg-status-warning"
+                    >
+                        <Link href={href}>
+                            Fix and resend
+                            <ArrowRight className="ml-1.5 h-4 w-4" />
+                        </Link>
+                    </Button>
                 </div>
             ) : null}
         </div>
