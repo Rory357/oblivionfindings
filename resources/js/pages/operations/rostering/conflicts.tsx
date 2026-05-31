@@ -38,6 +38,7 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import AppLayout from '@/layouts/app-layout';
+import { useCreateShiftLauncher } from '@/pages/operations/shifts/components/use-create-shift-launcher';
 import { Head, router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -157,45 +158,42 @@ export default function RosteringConflicts(props: ConflictsProps) {
     const subFor = (item: QueueItem) =>
         `${TYPE_META[item.type].label} · ${item.who}`;
 
+    const createShiftLauncher = useCreateShiftLauncher();
+
     /* ----------------------------- coverage create ----------------------------- */
 
-    const buildCoverageCreateHref = (
+    // Build the inline-dialog params (was a /operations/shifts/create deep link).
+    // return_to is omitted — the in-place dialog returns to this page on save.
+    const buildCoverageCreateParams = (
         gap: CoverageGap,
         options?: { openShift?: boolean; repeatWeekly?: boolean },
         reservationToken?: string | null,
     ) => {
-        const params = new URLSearchParams();
-        params.set('site_id', String(gap.site_id));
-        if (gap.rule_id) params.set('coverage_rule_id', String(gap.rule_id));
-        if (gap.starts_at) params.set('starts_at', gap.starts_at);
-        if (gap.ends_at) params.set('ends_at', gap.ends_at);
-        if (gap.preferred_client_id) {
-            params.set('client_id', String(gap.preferred_client_id));
-        }
-        params.set('coverage_rule_name', gap.rule_name);
-        params.set('coverage_required_staff', String(gap.required_staff));
-        params.set('coverage_missing_staff', String(gap.missing_staff));
         const actionRoles = coverageRolesForAction(gap);
-        if (actionRoles.length > 0) {
-            params.set('coverage_role_shortages', JSON.stringify(actionRoles));
+        let repeatEndDate: string | undefined;
+        if (options?.repeatWeekly && gap.starts_at) {
+            const repeatEnd = new Date(gap.starts_at);
+            repeatEnd.setDate(repeatEnd.getDate() + 28);
+            repeatEndDate = repeatEnd.toISOString().slice(0, 10);
         }
-        params.set('return_to', returnTo);
-        if (reservationToken) {
-            params.set('coverage_reservation_token', reservationToken);
-        }
-        if (options?.openShift) params.set('open_shift', '1');
-        if (options?.repeatWeekly) {
-            params.set('repeat_weekly', '1');
-            if (gap.starts_at) {
-                const repeatEnd = new Date(gap.starts_at);
-                repeatEnd.setDate(repeatEnd.getDate() + 28);
-                params.set(
-                    'repeat_end_date',
-                    repeatEnd.toISOString().slice(0, 10),
-                );
-            }
-        }
-        return `/operations/shifts/create?${params.toString()}`;
+        return {
+            site_id: gap.site_id,
+            coverage_rule_id: gap.rule_id ?? undefined,
+            client_id: gap.preferred_client_id ?? undefined,
+            starts_at: gap.starts_at ?? undefined,
+            ends_at: gap.ends_at ?? undefined,
+            coverage_rule_name: gap.rule_name,
+            coverage_required_staff: gap.required_staff,
+            coverage_missing_staff: gap.missing_staff,
+            coverage_role_shortages:
+                actionRoles.length > 0
+                    ? JSON.stringify(actionRoles)
+                    : undefined,
+            coverage_reservation_token: reservationToken ?? undefined,
+            open_shift: options?.openShift,
+            repeat_weekly: options?.repeatWeekly,
+            repeat_end_date: repeatEndDate,
+        };
     };
 
     const openCoverageCreate = async (
@@ -203,7 +201,7 @@ export default function RosteringConflicts(props: ConflictsProps) {
         options?: { openShift?: boolean; repeatWeekly?: boolean },
     ) => {
         if (!gap.starts_at || !gap.ends_at) {
-            router.visit(buildCoverageCreateHref(gap, options));
+            createShiftLauncher.openWith(buildCoverageCreateParams(gap, options));
             return;
         }
         try {
@@ -232,7 +230,9 @@ export default function RosteringConflicts(props: ConflictsProps) {
             const payload = (await response.json()) as {
                 token?: string | null;
             };
-            router.visit(buildCoverageCreateHref(gap, options, payload.token));
+            createShiftLauncher.openWith(
+                buildCoverageCreateParams(gap, options, payload.token),
+            );
         } catch {
             router.reload({ only: ['coverageGaps'], preserveScroll: true });
         }
@@ -959,6 +959,7 @@ export default function RosteringConflicts(props: ConflictsProps) {
                     );
                 }}
             />
+            {createShiftLauncher.dialog}
         </AppLayout>
     );
 }

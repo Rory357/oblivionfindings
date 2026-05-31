@@ -90,7 +90,11 @@ export type WeekGridPaneProps = {
     onAssignOpen?: (shift: GridShift) => void;
     onUnassign?: (shift: GridShift) => void;
     onCancelShift?: (shift: GridShift) => void;
-    onCreateShift?: (staffName: string, day: Date) => void;
+    onCreateShift?: (ctx?: {
+        day?: Date;
+        staffId?: number;
+        siteId?: number;
+    }) => void;
     onResolveConflict?: (shift: GridShift) => void;
     onReassign?: (shift: GridShift) => void;
     onDuplicateShift?: (shift: GridShift) => void;
@@ -634,7 +638,7 @@ export function WeekGridPane({
         });
     };
 
-    const onCellCtx = (e: React.MouseEvent, staffName: string, day: Date) => {
+    const onCellCtx = (e: React.MouseEvent, row: GridStaffRow, day: Date) => {
         e.preventDefault();
         e.stopPropagation();
         setCtx({
@@ -643,9 +647,15 @@ export function WeekGridPane({
             tag: 'Empty',
             tagBg: 'var(--muted)',
             tagColor: 'var(--muted-foreground)',
-            meta: `${staffName} · ${fmtDay(day)}`,
-            items: buildEmptyCellActions(staffName, fmtDay(day), () =>
-                onCreateShift?.(staffName, day),
+            meta: `${row.name} · ${fmtDay(day)}`,
+            items: buildEmptyCellActions(row.name, fmtDay(day), () =>
+                onCreateShift?.(
+                    groupedBySite
+                        ? { day, siteId: row.id > 0 ? row.id : undefined }
+                        : row.open
+                          ? { day }
+                          : { day, staffId: row.id },
+                ),
             ),
         });
     };
@@ -727,12 +737,14 @@ export function WeekGridPane({
                     <span className="hidden text-[11px] text-muted-foreground/80 italic md:inline">
                         Right-click any shift for quick actions
                     </span>
-                    {canManage ? (
-                        <Link href="/operations/shifts/create">
-                            <Button variant="outline" size="sm">
-                                <Plus className="mr-1 h-3.5 w-3.5" /> Add shift
-                            </Button>
-                        </Link>
+                    {canManage && onCreateShift ? (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            onClick={() => onCreateShift()}
+                        >
+                            <Plus className="mr-1 h-3.5 w-3.5" /> Add shift
+                        </Button>
                     ) : null}
                     {actionEndSlot}
                 </div>
@@ -898,11 +910,7 @@ export function WeekGridPane({
                                                 cellShifts.length === 0 &&
                                                 canManage
                                                     ? (e) =>
-                                                          onCellCtx(
-                                                              e,
-                                                              row.name,
-                                                              d,
-                                                          )
+                                                          onCellCtx(e, row, d)
                                                     : undefined
                                             }
                                         >

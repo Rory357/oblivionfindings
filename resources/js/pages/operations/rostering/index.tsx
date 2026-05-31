@@ -559,6 +559,13 @@ export default function RosteringIndex(props: Props) {
         null,
     );
     const [editShiftError, setEditShiftError] = useState<string | null>(null);
+    const [createOpen, setCreateOpen] = useState(false);
+    const [createDefaults, setCreateDefaults] = useState<{
+        starts_at?: string;
+        ends_at?: string;
+        user_id?: number | null;
+        site_id?: number | null;
+    }>({});
     const [loadingAvailability, setLoadingAvailability] = useState(false);
     const todayBtnRef = useRef<HTMLButtonElement>(null);
 
@@ -1758,6 +1765,31 @@ export default function RosteringIndex(props: Props) {
         }
     };
 
+    // Open the shared create dialog inline (instead of navigating to the
+    // full-page /operations/shifts/create form). Pre-fills the clicked day and,
+    // when a specific staff/site row was right-clicked, that assignee/site.
+    const openCreateShift = (ctx?: {
+        day?: Date;
+        staffId?: number;
+        siteId?: number;
+    }) => {
+        const defaults: {
+            starts_at?: string;
+            ends_at?: string;
+            user_id?: number | null;
+            site_id?: number | null;
+        } = {};
+        if (ctx?.day) {
+            const key = ymd(ctx.day);
+            defaults.starts_at = `${key}T09:00`;
+            defaults.ends_at = `${key}T17:00`;
+        }
+        if (ctx?.staffId) defaults.user_id = ctx.staffId;
+        if (ctx?.siteId) defaults.site_id = ctx.siteId;
+        setCreateDefaults(defaults);
+        setCreateOpen(true);
+    };
+
     // "View timesheet" from the grid popup. Fetches the same row payload the
     // Timesheets index feeds ViewTimesheetDialog (the ?modal=1 JSON branch) and
     // opens it inline; falls back to the full timesheet page if the fetch fails.
@@ -2316,9 +2348,7 @@ export default function RosteringIndex(props: Props) {
                                 canManage={props.canManageAny}
                                 onUnassign={openUnassignMakeOpenDialog}
                                 onCancelShift={(s) => cancelShift(s.id)}
-                                onCreateShift={() =>
-                                    router.visit('/operations/shifts/create')
-                                }
+                                onCreateShift={openCreateShift}
                                 onAssignOpen={(s) =>
                                     setReassignShift({
                                         id: s.id,
@@ -2572,6 +2602,20 @@ export default function RosteringIndex(props: Props) {
                         {editShiftError}
                     </div>
                 ) : null}
+                <CreateShiftDialog
+                    open={createOpen}
+                    onClose={() => setCreateOpen(false)}
+                    clients={editDialogClients}
+                    staff={props.staff}
+                    sites={props.sites}
+                    serviceContexts={props.serviceContexts ?? []}
+                    defaultServiceContextId={props.defaultServiceContextId ?? null}
+                    defaultStartsAt={createDefaults.starts_at ?? null}
+                    defaultEndsAt={createDefaults.ends_at ?? null}
+                    defaultUserId={createDefaults.user_id ?? null}
+                    defaultSiteId={createDefaults.site_id ?? null}
+                />
+
                 <CreateShiftDialog
                     key={
                         editShift

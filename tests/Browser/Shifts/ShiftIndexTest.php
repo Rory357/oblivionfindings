@@ -17,14 +17,16 @@ test('shifts index page loads', function () {
     });
 });
 
-test('shifts create page loads', function () {
+test('legacy shifts create redirects to the shifts index', function () {
+    // /shifts/create → /operations/shifts/create → /operations/shifts (the
+    // standalone create page was retired in favour of the inline dialog).
     $user = User::where('email', 'admin@test.com')->first();
 
     $this->browse(function (Browser $browser) use ($user) {
         $browser->loginAs($user)
             ->visit('/shifts/create')
             ->waitForText('Shift', 10)
-            ->assertPathIs('/operations/shifts/create');
+            ->assertPathIs('/operations/shifts');
     });
 });
 

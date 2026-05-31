@@ -66,6 +66,11 @@ type LockedContext = {
     site_name?: string | null;
     window_label?: string | null;
     missing?: number | string | null;
+    role_shortages?: Array<{
+        key: string;
+        label?: string | null;
+        missing?: number | string | null;
+    }>;
 } | null;
 
 type Weekday = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
@@ -119,7 +124,17 @@ type Props = {
     defaultEndsAt?: string | null;
     defaultClientId?: number | null;
     defaultSiteId?: number | null;
+    defaultUserId?: number | null;
     lockedContext?: LockedContext;
+    /** Coverage-gap reservation token; forwarded on save so the gap closes. */
+    coverageReservationToken?: string | null;
+    /** Coverage requirement id this shift fills; forwarded on save. */
+    coverageRuleId?: number | string | null;
+    /** Coverage role-shortage keys to pre-tag on the new shift. */
+    defaultCoverageRoles?: string[];
+    /** Pre-enable the recurring-weekly series (coverage "recurring cover"). */
+    defaultRepeatWeekly?: boolean;
+    defaultRepeatEndDate?: string | null;
     /** When set, the dialog flips into edit mode and pre-fills from this shift. */
     initialShift?: EditableShift | null;
 };
@@ -193,7 +208,13 @@ export function CreateShiftDialog({
     defaultEndsAt = null,
     defaultClientId = null,
     defaultSiteId = null,
+    defaultUserId = null,
     lockedContext = null,
+    coverageReservationToken = null,
+    coverageRuleId = null,
+    defaultCoverageRoles,
+    defaultRepeatWeekly = false,
+    defaultRepeatEndDate = null,
     initialShift = null,
 }: Props) {
     const isEdit = !!initialShift;
@@ -225,7 +246,9 @@ export function CreateShiftDialog({
             initialClient?.service_context_id ??
             defaultServiceContextId ??
             '') as number | '',
-        user_id: (initialShift?.staff?.id ?? '') as number | '',
+        user_id: (initialShift?.staff?.id ?? defaultUserId ?? '') as
+            | number
+            | '',
         starts_at:
             toLocalDatetimeInput(initialShift?.starts_at ?? defaultStartsAt) ||
             defaultStartForToday(),
@@ -250,13 +273,17 @@ export function CreateShiftDialog({
         // existing coverage roles / tasks on the server. We keep the task id
         // for existing rows so syncShiftTasks updates them in place instead of
         // recreating them.
-        coverage_roles: (initialShift?.coverage_roles ?? []) as string[],
+        coverage_roles: (initialShift?.coverage_roles ??
+            defaultCoverageRoles ??
+            []) as string[],
+        coverage_rule_id: (coverageRuleId ?? '') as number | string,
+        coverage_reservation_token: (coverageReservationToken ?? '') as string,
         tasks: (initialShift?.tasks?.map((t) => ({
             id: t.id,
             label: t.label,
         })) ?? []) as Array<{ id?: number; label: string }>,
-        repeat_weekly: false,
-        repeat_end_date: '' as string,
+        repeat_weekly: defaultRepeatWeekly,
+        repeat_end_date: (defaultRepeatEndDate ?? '') as string,
         repeat_by_weekday: [
             weekdayFromDatetime(initialShift?.starts_at ?? defaultStartsAt),
         ] as Weekday[],
@@ -286,10 +313,17 @@ export function CreateShiftDialog({
                 initialClient?.service_context_id ??
                 defaultServiceContextId ??
                 '',
+            user_id: defaultUserId ?? '',
+            coverage_roles: defaultCoverageRoles ?? [],
+            coverage_rule_id: coverageRuleId ?? '',
+            coverage_reservation_token: coverageReservationToken ?? '',
             starts_at:
                 toLocalDatetimeInput(defaultStartsAt) || defaultStartForToday(),
             ends_at:
                 toLocalDatetimeInput(defaultEndsAt) || defaultEndForToday(),
+            repeat_weekly: defaultRepeatWeekly,
+            repeat_end_date: defaultRepeatEndDate ?? '',
+            repeat_by_weekday: [weekdayFromDatetime(defaultStartsAt)],
         } as typeof form.data);
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [open]);
@@ -566,6 +600,14 @@ export function CreateShiftDialog({
                 expected_break_minutes:
                     form.data.expected_break_minutes || null,
                 tasks: form.data.tasks.filter((t) => t.label.trim() !== ''),
+                coverage_rule_id: form.data.coverage_rule_id || undefined,
+                coverage_roles: form.data.coverage_roles,
+                coverage_reservation_token:
+                    form.data.coverage_reservation_token || undefined,
+                return_to:
+                    typeof window !== 'undefined'
+                        ? window.location.pathname + window.location.search
+                        : undefined,
             },
             {
                 preserveScroll: true,
@@ -1460,6 +1502,19 @@ function LockedContextCard({ context }: { context: LockedContext }) {
                         . Confirm the client and staff so coverage closes
                         safely.
                     </p>
+                ) : null}
+                {context.role_shortages && context.role_shortages.length ? (
+                    <div className="mt-1.5 flex flex-wrap gap-1">
+                        {context.role_shortages.map((role) => (
+                            <span
+                                key={role.key}
+                                className="inline-flex items-center rounded-full bg-status-warning-bg px-2 py-0.5 text-[11px] font-medium text-status-warning"
+                            >
+                                {role.label ?? role.key}
+                                {role.missing ? ` · ${role.missing} short` : ''}
+                            </span>
+                        ))}
+                    </div>
                 ) : null}
             </div>
         </div>

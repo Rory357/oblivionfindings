@@ -91,7 +91,7 @@ export default function ShiftSeriesIndex({ series, canManageAny }: Props) {
                             </Button>
                             {canManageAny ? (
                                 <Button asChild>
-                                    <Link href="/operations/shifts/create">
+                                    <Link href="/operations/shifts?create=1&repeat_weekly=1">
                                         New recurring shift
                                     </Link>
                                 </Button>

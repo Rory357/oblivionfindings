@@ -43,12 +43,15 @@ test('operations shifts page loads', function () {
     });
 });
 
-test('operations shifts create page loads', function () {
+test('operations shifts create redirects to the shifts index', function () {
+    // The standalone create page was retired; the inline CreateShiftDialog now
+    // opens on the shifts index instead.
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/operations/shifts/create')
             ->waitForText('Shift', 10)
+            ->assertPathIs('/operations/shifts')
             ->assertSee('Shift');
     });
 });

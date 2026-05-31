@@ -753,7 +753,7 @@ class ShiftController extends Controller
                 ->value('id');
         }
 
-        return inertia('operations/shifts/create', [
+        $props = [
             'clients' => $clients,
             'staff' => $staff,
             'serviceContexts' => $serviceContexts,
@@ -779,7 +779,22 @@ class ShiftController extends Controller
                 'preferred_client_id' => $defaultClientId,
                 'role_shortages' => collect(json_decode((string) $request->query('coverage_role_shortages', '[]'), true) ?: [])->values()->all(),
             ],
-        ]);
+        ];
+
+        // The standalone create page has been retired in favour of the shared
+        // inline CreateShiftDialog. The launcher fetches this data as JSON to
+        // hydrate the dialog (incl. coverage context + reservation token).
+        if ($request->wantsJson()) {
+            return response()->json($props);
+        }
+
+        // Direct browser hits (bookmarks, the legacy /shifts/create redirect)
+        // land on the shifts index, which opens the inline create dialog from
+        // these same query params.
+        return redirect()->route('operations.shifts.index', array_merge(
+            $request->query(),
+            ['create' => 1],
+        ));
     }
 
     /**

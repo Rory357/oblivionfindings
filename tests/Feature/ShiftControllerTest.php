@@ -236,20 +236,29 @@ class ShiftControllerTest extends TestCase
     // STORE TESTS
     // ==========================================
 
-    public function test_create_includes_client_site_for_location_prefill(): void
+    public function test_create_json_includes_client_site_for_location_prefill(): void
     {
         $site = Site::factory()->create(['name' => 'Kauri House']);
         $this->client->update(['site_id' => $site->id]);
 
-        $response = $this->actingAs($this->admin)->get('/operations/shifts/create');
+        // The standalone create page was retired in favour of the inline
+        // CreateShiftDialog, which hydrates from this JSON endpoint.
+        $response = $this->actingAs($this->admin)
+            ->getJson('/operations/shifts/create');
 
         $response->assertOk();
-        $response->assertInertia(fn ($page) => $page
-            ->component('operations/shifts/create')
-            ->where('clients.0.id', $this->client->id)
-            ->where('clients.0.site.id', $site->id)
-            ->where('clients.0.site.name', 'Kauri House')
-        );
+        $response->assertJsonPath('clients.0.id', $this->client->id);
+        $response->assertJsonPath('clients.0.site.id', $site->id);
+        $response->assertJsonPath('clients.0.site.name', 'Kauri House');
+    }
+
+    public function test_create_get_redirects_browser_to_shifts_index(): void
+    {
+        // A non-JSON browser hit (bookmark / legacy redirect) lands on the
+        // shifts index, which opens the inline create dialog.
+        $this->actingAs($this->admin)
+            ->get('/operations/shifts/create')
+            ->assertRedirect(route('operations.shifts.index', ['create' => 1]));
     }
 
     public function test_coverage_reservation_post_is_idempotent_and_shift_create_get_only_validates_token(): void
@@ -290,7 +299,7 @@ class ShiftControllerTest extends TestCase
         $this->assertSame(1, CoverageReservation::query()->count());
 
         $this->actingAs($this->admin)
-            ->get(route('operations.shifts.create', array_merge($payload, [
+            ->getJson(route('operations.shifts.create', array_merge($payload, [
                 'coverage_reservation_token' => $first['token'],
             ])))
             ->assertOk();

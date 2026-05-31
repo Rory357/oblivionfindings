@@ -76,7 +76,7 @@ These routes are canonical. They should not be redirected to operations routes.
 | --- | --- | --- | --- | --- |
 | GET | `/operations/shifts` | `operations.shifts.index` | `ShiftController@index` | `shifts.viewAny|shifts.viewAssigned`, `role_scope:my-day` |
 | GET | `/operations/shifts/{shift}` | `operations.shifts.show` | `ShiftController@show` | `shifts.viewAny|shifts.viewAssigned` |
-| GET | `/operations/shifts/create` | `operations.shifts.create` | `ShiftController@create` | `shifts.create` |
+| GET | `/operations/shifts/create` | `operations.shifts.create` | `ShiftController@create` (JSON data for the inline `CreateShiftDialog`; HTML redirects to `/operations/shifts?create=1`) | `shifts.create` |
 | POST | `/operations/shifts` | `operations.shifts.store` | `ShiftController@store` | `shifts.create` |
 | GET | `/operations/shifts/eligibility-preview` | `operations.shifts.eligibility_preview` | `ShiftController@eligibilityPreview` | `shifts.create|shifts.update` |
 | GET | `/operations/shifts/series` | `operations.shifts.series.index` | `ShiftSeriesController@index` | `role_scope:my-day`, `rostering.viewAny|shifts.viewAny|shifts.manageAny` |

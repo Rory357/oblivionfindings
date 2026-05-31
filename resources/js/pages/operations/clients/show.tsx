@@ -42,6 +42,7 @@ import { formatDateTime } from '@/lib/date-format';
 import { formatDateTime as formatDT } from '@/lib/fleet-utils';
 import { DailyNoteWizard } from '@/pages/operations/clients/dialogs/daily-note-wizard';
 import { QuickNoteDialog } from '@/pages/operations/clients/dialogs/quick-note-dialog';
+import { useCreateShiftLauncher } from '@/pages/operations/shifts/components/use-create-shift-launcher';
 import {
     CLIENT_TAB_GROUPS,
     groupForTab,
@@ -662,6 +663,7 @@ export default function ClientShow({
     const pageProps = usePage().props as any;
     const { auth, labels } = pageProps;
     const safety = pageProps.safety as ClientSafety | null | undefined;
+    const createShiftLauncher = useCreateShiftLauncher();
     const nextShiftSummary = shifts_summary?.next ?? null;
     const recurringShiftSeries = shifts_summary?.recurring ?? [];
     const siteCoverageSummary = site_coverage ?? null;
@@ -2151,17 +2153,21 @@ export default function ClientShow({
                                                                     alert.ends_at ? (
                                                                         <div className="mt-3">
                                                                             <Button
-                                                                                asChild
                                                                                 size="sm"
                                                                                 variant="outline"
+                                                                                onClick={() =>
+                                                                                    createShiftLauncher.openWith(
+                                                                                        {
+                                                                                            site_id: siteCoverageSummary.site_id,
+                                                                                            starts_at: alert.starts_at,
+                                                                                            ends_at: alert.ends_at,
+                                                                                        },
+                                                                                    )
+                                                                                }
                                                                             >
-                                                                                <Link
-                                                                                    href={`/operations/shifts/create?site_id=${siteCoverageSummary.site_id}&starts_at=${encodeURIComponent(alert.starts_at)}&ends_at=${encodeURIComponent(alert.ends_at)}`}
-                                                                                >
-                                                                                    Create
-                                                                                    cover
-                                                                                    shift
-                                                                                </Link>
+                                                                                Create
+                                                                                cover
+                                                                                shift
                                                                             </Button>
                                                                         </div>
                                                                     ) : null}
@@ -7243,6 +7249,8 @@ export default function ClientShow({
                 open={editDialogOpen}
                 onOpenChange={setEditDialogOpen}
             />
+
+            {createShiftLauncher.dialog}
         </AppLayout>
     );
 }

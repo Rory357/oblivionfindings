@@ -73,6 +73,7 @@ import {
     CreateShiftDialog,
     type EditableShift,
 } from './components/create-shift-dialog';
+import { useCreateShiftLauncher } from './components/use-create-shift-launcher';
 import { DonutCard } from './components/donut-card';
 import {
     ShiftAuditTimeline,
@@ -548,6 +549,7 @@ export default function ShiftShow({
 
     const [incidentOpen, setIncidentOpen] = useState(false);
     const [editOpen, setEditOpen] = useState(false);
+    const createShiftLauncher = useCreateShiftLauncher();
     const incidentForm = useForm({
         template_id: '',
         type: 'injury',
@@ -1685,37 +1687,121 @@ export default function ShiftShow({
                                             coverage.starts_at &&
                                             coverage.ends_at ? (
                                                 <>
-                                                    <Button size="sm" asChild>
-                                                        <Link
-                                                            href={`/operations/shifts/create?site_id=${coverage.site_id}&coverage_rule_id=${encodeURIComponent(String(coverage.rule_id ?? ''))}&client_id=${encodeURIComponent(String(coverage.preferred_client_id ?? ''))}&starts_at=${encodeURIComponent(coverage.starts_at)}&ends_at=${encodeURIComponent(coverage.ends_at)}&coverage_rule_name=${encodeURIComponent(coverage.window_label)}&coverage_required_staff=${coverage.required_staff}&coverage_missing_staff=${coverage.missing_staff}&coverage_role_shortages=${encodeURIComponent(JSON.stringify(coverageRolesForAction(coverage)))}&return_to=${encodeURIComponent(coverageReturnTo)}`}
-                                                        >
-                                                            {fillActionLabel(
-                                                                coverage.recommended_fill_action,
-                                                            )}
-                                                        </Link>
+                                                    <Button
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            createShiftLauncher.openWith(
+                                                                {
+                                                                    site_id: coverage.site_id,
+                                                                    coverage_rule_id:
+                                                                        coverage.rule_id,
+                                                                    client_id:
+                                                                        coverage.preferred_client_id,
+                                                                    starts_at:
+                                                                        coverage.starts_at,
+                                                                    ends_at: coverage.ends_at,
+                                                                    coverage_rule_name:
+                                                                        coverage.window_label,
+                                                                    coverage_required_staff:
+                                                                        coverage.required_staff,
+                                                                    coverage_missing_staff:
+                                                                        coverage.missing_staff,
+                                                                    coverage_role_shortages:
+                                                                        JSON.stringify(
+                                                                            coverageRolesForAction(
+                                                                                coverage,
+                                                                            ),
+                                                                        ),
+                                                                },
+                                                            )
+                                                        }
+                                                    >
+                                                        {fillActionLabel(
+                                                            coverage.recommended_fill_action,
+                                                        )}
                                                     </Button>
                                                     <Button
                                                         size="sm"
                                                         variant="outline"
-                                                        asChild
+                                                        onClick={() =>
+                                                            createShiftLauncher.openWith(
+                                                                {
+                                                                    site_id: coverage.site_id,
+                                                                    coverage_rule_id:
+                                                                        coverage.rule_id,
+                                                                    client_id:
+                                                                        coverage.preferred_client_id,
+                                                                    starts_at:
+                                                                        coverage.starts_at,
+                                                                    ends_at: coverage.ends_at,
+                                                                    open_shift: true,
+                                                                    coverage_rule_name:
+                                                                        coverage.window_label,
+                                                                    coverage_required_staff:
+                                                                        coverage.required_staff,
+                                                                    coverage_missing_staff:
+                                                                        coverage.missing_staff,
+                                                                    coverage_role_shortages:
+                                                                        JSON.stringify(
+                                                                            coverageRolesForAction(
+                                                                                coverage,
+                                                                            ),
+                                                                        ),
+                                                                },
+                                                            )
+                                                        }
                                                     >
-                                                        <Link
-                                                            href={`/operations/shifts/create?site_id=${coverage.site_id}&coverage_rule_id=${encodeURIComponent(String(coverage.rule_id ?? ''))}&client_id=${encodeURIComponent(String(coverage.preferred_client_id ?? ''))}&starts_at=${encodeURIComponent(coverage.starts_at)}&ends_at=${encodeURIComponent(coverage.ends_at)}&open_shift=1&coverage_rule_name=${encodeURIComponent(coverage.window_label)}&coverage_required_staff=${coverage.required_staff}&coverage_missing_staff=${coverage.missing_staff}&coverage_role_shortages=${encodeURIComponent(JSON.stringify(coverageRolesForAction(coverage)))}&return_to=${encodeURIComponent(coverageReturnTo)}`}
-                                                        >
-                                                            Create open shift
-                                                        </Link>
+                                                        Create open shift
                                                     </Button>
                                                     <Button
                                                         size="sm"
                                                         variant="outline"
-                                                        asChild
+                                                        onClick={() =>
+                                                            createShiftLauncher.openWith(
+                                                                {
+                                                                    site_id: coverage.site_id,
+                                                                    coverage_rule_id:
+                                                                        coverage.rule_id,
+                                                                    client_id:
+                                                                        coverage.preferred_client_id,
+                                                                    starts_at:
+                                                                        coverage.starts_at,
+                                                                    ends_at: coverage.ends_at,
+                                                                    repeat_weekly: true,
+                                                                    repeat_end_date:
+                                                                        new Date(
+                                                                            new Date(
+                                                                                coverage.starts_at!,
+                                                                            ).getTime() +
+                                                                                1000 *
+                                                                                    60 *
+                                                                                    60 *
+                                                                                    24 *
+                                                                                    28,
+                                                                        )
+                                                                            .toISOString()
+                                                                            .slice(
+                                                                                0,
+                                                                                10,
+                                                                            ),
+                                                                    open_shift: true,
+                                                                    coverage_rule_name:
+                                                                        coverage.window_label,
+                                                                    coverage_required_staff:
+                                                                        coverage.required_staff,
+                                                                    coverage_missing_staff:
+                                                                        coverage.missing_staff,
+                                                                    coverage_role_shortages:
+                                                                        JSON.stringify(
+                                                                            coverageRolesForAction(
+                                                                                coverage,
+                                                                            ),
+                                                                        ),
+                                                                },
+                                                            )
+                                                        }
                                                     >
-                                                        <Link
-                                                            href={`/operations/shifts/create?site_id=${coverage.site_id}&coverage_rule_id=${encodeURIComponent(String(coverage.rule_id ?? ''))}&client_id=${encodeURIComponent(String(coverage.preferred_client_id ?? ''))}&starts_at=${encodeURIComponent(coverage.starts_at)}&ends_at=${encodeURIComponent(coverage.ends_at)}&repeat_weekly=1&repeat_end_date=${encodeURIComponent(new Date(new Date(coverage.starts_at).getTime() + 1000 * 60 * 60 * 24 * 28).toISOString().slice(0, 10))}&open_shift=1&coverage_rule_name=${encodeURIComponent(coverage.window_label)}&coverage_required_staff=${coverage.required_staff}&coverage_missing_staff=${coverage.missing_staff}&coverage_role_shortages=${encodeURIComponent(JSON.stringify(coverageRolesForAction(coverage)))}&return_to=${encodeURIComponent(coverageReturnTo)}`}
-                                                        >
-                                                            Create recurring
-                                                            cover
-                                                        </Link>
+                                                        Create recurring cover
                                                     </Button>
                                                 </>
                                             ) : null}
@@ -3115,6 +3201,7 @@ export default function ShiftShow({
                     defaultServiceContextId={defaultServiceContextId}
                     initialShift={editableShift}
                 />
+                {createShiftLauncher.dialog}
 
                 <Dialog open={completeOpen} onOpenChange={setCompleteOpen}>
                     <DialogContent className="sm:max-w-2xl">

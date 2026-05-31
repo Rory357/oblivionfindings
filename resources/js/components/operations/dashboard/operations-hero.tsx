@@ -124,7 +124,7 @@ export function OperationsHero({
                         size="sm"
                         className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
                     >
-                        <Link href="/operations/shifts/create">
+                        <Link href="/operations/shifts?create=1">
                             <CalendarPlus className="mr-1 h-3.5 w-3.5" /> Create shift
                         </Link>
                     </Button>

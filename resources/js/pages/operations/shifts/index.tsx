@@ -1,4 +1,4 @@
-import { useMemo, useState, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     AlertCircle,
@@ -28,6 +28,7 @@ import {
 import { ConfirmDialog } from '@/components/confirm-dialog';
 
 import { CreateShiftDialog } from './components/create-shift-dialog';
+import { useCreateShiftLauncher } from './components/use-create-shift-launcher';
 import { DonutCard } from './components/donut-card';
 import {
     ShiftContextMenu,
@@ -203,6 +204,7 @@ export default function ShiftsIndex({
         () => new Set(),
     );
     const [toast, setToast] = useState<string | null>(null);
+    const createLauncher = useCreateShiftLauncher();
 
     function openEdit(shift: ShiftRow) {
         setViewShift(null);
@@ -218,6 +220,41 @@ export default function ShiftsIndex({
         setCreateDefaults(defaults);
         setCreateOpen(true);
     }
+
+    // The standalone create page was retired; deep links (?create=1 plus any
+    // coverage-gap params) now open the shared inline dialog here, hydrated via
+    // the launcher fetch so coverage context + reservation token come through.
+    useEffect(() => {
+        if (typeof window === 'undefined') return;
+        const sp = new URLSearchParams(window.location.search);
+        if (!sp.has('create')) return;
+        createLauncher.openWith({
+            site_id: sp.get('site_id'),
+            coverage_rule_id: sp.get('coverage_rule_id'),
+            client_id: sp.get('client_id'),
+            starts_at: sp.get('starts_at'),
+            ends_at: sp.get('ends_at'),
+            coverage_rule_name: sp.get('coverage_rule_name'),
+            coverage_required_staff: sp.get('coverage_required_staff'),
+            coverage_missing_staff: sp.get('coverage_missing_staff'),
+            coverage_role_shortages: sp.get('coverage_role_shortages'),
+            coverage_reservation_token: sp.get('coverage_reservation_token'),
+            open_shift: sp.get('open_shift') === '1',
+            repeat_weekly: sp.get('repeat_weekly') === '1',
+            repeat_end_date: sp.get('repeat_end_date'),
+            shift_type: sp.get('shift_type'),
+            return_to: sp.get('return_to'),
+        });
+        // Drop the trigger so a refresh / back-button doesn't reopen it.
+        sp.delete('create');
+        const qs = sp.toString();
+        window.history.replaceState(
+            {},
+            '',
+            window.location.pathname + (qs ? `?${qs}` : ''),
+        );
+        // eslint-disable-next-line react-hooks/exhaustive-deps
+    }, []);
 
     function gotoWeek(iso: string) {
         const start = weekStartFor(iso);
@@ -809,6 +846,8 @@ export default function ShiftsIndex({
                     defaultClientId={createDefaults.client_id ?? null}
                     defaultSiteId={createDefaults.site_id ?? null}
                 />
+
+                {createLauncher.dialog}
 
                 <CreateShiftDialog
                     key={editShiftRow ? `edit-${editShiftRow.id}` : 'edit-none'}

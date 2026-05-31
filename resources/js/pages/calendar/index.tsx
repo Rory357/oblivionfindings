@@ -17,6 +17,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
+import { useCreateShiftLauncher } from '@/pages/operations/shifts/components/use-create-shift-launcher';
 import { Head, usePage } from '@inertiajs/react';
 
 import type {
@@ -429,10 +430,7 @@ export default function CalendarIndex(props: Props) {
     const [modalMode, setModalMode] = useState<'create' | 'edit'>('create');
     const [saving, setSaving] = useState(false);
     const [error, setError] = useState<string | null>(null);
-    const coverageReturnTo =
-        typeof window === 'undefined'
-            ? '/calendar'
-            : `${window.location.pathname}${window.location.search}`;
+    const createShiftLauncher = useCreateShiftLauncher();
     const [viewInfo, setViewInfo] = useState<ShiftViewInfo | null>(null);
     const [form, setForm] = useState<ShiftForm>({
         client_id: '',
@@ -1695,36 +1693,111 @@ export default function CalendarIndex(props: Props) {
                                     viewInfo.coverageRecommendedFillAction,
                                 ) ? (
                                     <>
-                                        <Button type="button" asChild>
-                                            <a
-                                                href={`/operations/shifts/create?site_id=${encodeURIComponent(String(viewInfo.siteId ?? ''))}&coverage_rule_id=${encodeURIComponent(String(viewInfo.coverageRuleId ?? ''))}&client_id=${encodeURIComponent(String(viewInfo.coveragePreferredClientId ?? ''))}&starts_at=${encodeURIComponent(form.starts_at)}&ends_at=${encodeURIComponent(form.ends_at)}&coverage_rule_name=${encodeURIComponent(String(viewInfo.coverageRuleName ?? 'Coverage gap'))}&coverage_required_staff=${encodeURIComponent(String(viewInfo.coverageRequiredStaff ?? ''))}&coverage_missing_staff=${encodeURIComponent(String(viewInfo.coverageMissingStaff ?? ''))}&coverage_role_shortages=${encodeURIComponent(JSON.stringify(coverageRolesForAction(viewInfo)))}&return_to=${encodeURIComponent(coverageReturnTo)}`}
-                                            >
-                                                {fillActionLabel(
-                                                    viewInfo.coverageRecommendedFillAction,
-                                                )}
-                                            </a>
+                                        <Button
+                                            type="button"
+                                            onClick={() =>
+                                                createShiftLauncher.openWith({
+                                                    site_id: viewInfo.siteId,
+                                                    coverage_rule_id:
+                                                        viewInfo.coverageRuleId,
+                                                    client_id:
+                                                        viewInfo.coveragePreferredClientId,
+                                                    starts_at: form.starts_at,
+                                                    ends_at: form.ends_at,
+                                                    coverage_rule_name:
+                                                        viewInfo.coverageRuleName ??
+                                                        'Coverage gap',
+                                                    coverage_required_staff:
+                                                        viewInfo.coverageRequiredStaff,
+                                                    coverage_missing_staff:
+                                                        viewInfo.coverageMissingStaff,
+                                                    coverage_role_shortages:
+                                                        JSON.stringify(
+                                                            coverageRolesForAction(
+                                                                viewInfo,
+                                                            ),
+                                                        ),
+                                                })
+                                            }
+                                        >
+                                            {fillActionLabel(
+                                                viewInfo.coverageRecommendedFillAction,
+                                            )}
                                         </Button>
                                         <Button
                                             type="button"
                                             variant="outline"
-                                            asChild
+                                            onClick={() =>
+                                                createShiftLauncher.openWith({
+                                                    site_id: viewInfo.siteId,
+                                                    coverage_rule_id:
+                                                        viewInfo.coverageRuleId,
+                                                    client_id:
+                                                        viewInfo.coveragePreferredClientId,
+                                                    starts_at: form.starts_at,
+                                                    ends_at: form.ends_at,
+                                                    open_shift: true,
+                                                    coverage_rule_name:
+                                                        viewInfo.coverageRuleName ??
+                                                        'Coverage gap',
+                                                    coverage_required_staff:
+                                                        viewInfo.coverageRequiredStaff,
+                                                    coverage_missing_staff:
+                                                        viewInfo.coverageMissingStaff,
+                                                    coverage_role_shortages:
+                                                        JSON.stringify(
+                                                            coverageRolesForAction(
+                                                                viewInfo,
+                                                            ),
+                                                        ),
+                                                })
+                                            }
                                         >
-                                            <a
-                                                href={`/operations/shifts/create?site_id=${encodeURIComponent(String(viewInfo.siteId ?? ''))}&coverage_rule_id=${encodeURIComponent(String(viewInfo.coverageRuleId ?? ''))}&client_id=${encodeURIComponent(String(viewInfo.coveragePreferredClientId ?? ''))}&starts_at=${encodeURIComponent(form.starts_at)}&ends_at=${encodeURIComponent(form.ends_at)}&open_shift=1&coverage_rule_name=${encodeURIComponent(String(viewInfo.coverageRuleName ?? 'Coverage gap'))}&coverage_required_staff=${encodeURIComponent(String(viewInfo.coverageRequiredStaff ?? ''))}&coverage_missing_staff=${encodeURIComponent(String(viewInfo.coverageMissingStaff ?? ''))}&coverage_role_shortages=${encodeURIComponent(JSON.stringify(coverageRolesForAction(viewInfo)))}&return_to=${encodeURIComponent(coverageReturnTo)}`}
-                                            >
-                                                Create open shift
-                                            </a>
+                                            Create open shift
                                         </Button>
                                         <Button
                                             type="button"
                                             variant="outline"
-                                            asChild
+                                            onClick={() =>
+                                                createShiftLauncher.openWith({
+                                                    site_id: viewInfo.siteId,
+                                                    coverage_rule_id:
+                                                        viewInfo.coverageRuleId,
+                                                    client_id:
+                                                        viewInfo.coveragePreferredClientId,
+                                                    starts_at: form.starts_at,
+                                                    ends_at: form.ends_at,
+                                                    open_shift: true,
+                                                    repeat_weekly: true,
+                                                    repeat_end_date: new Date(
+                                                        new Date(
+                                                            form.starts_at,
+                                                        ).getTime() +
+                                                            1000 *
+                                                                60 *
+                                                                60 *
+                                                                24 *
+                                                                28,
+                                                    )
+                                                        .toISOString()
+                                                        .slice(0, 10),
+                                                    coverage_rule_name:
+                                                        viewInfo.coverageRuleName ??
+                                                        'Coverage gap',
+                                                    coverage_required_staff:
+                                                        viewInfo.coverageRequiredStaff,
+                                                    coverage_missing_staff:
+                                                        viewInfo.coverageMissingStaff,
+                                                    coverage_role_shortages:
+                                                        JSON.stringify(
+                                                            coverageRolesForAction(
+                                                                viewInfo,
+                                                            ),
+                                                        ),
+                                                })
+                                            }
                                         >
-                                            <a
-                                                href={`/operations/shifts/create?site_id=${encodeURIComponent(String(viewInfo.siteId ?? ''))}&coverage_rule_id=${encodeURIComponent(String(viewInfo.coverageRuleId ?? ''))}&client_id=${encodeURIComponent(String(viewInfo.coveragePreferredClientId ?? ''))}&starts_at=${encodeURIComponent(form.starts_at)}&ends_at=${encodeURIComponent(form.ends_at)}&open_shift=1&repeat_weekly=1&repeat_end_date=${encodeURIComponent(new Date(new Date(form.starts_at).getTime() + 1000 * 60 * 60 * 24 * 28).toISOString().slice(0, 10))}&coverage_rule_name=${encodeURIComponent(String(viewInfo.coverageRuleName ?? 'Coverage gap'))}&coverage_required_staff=${encodeURIComponent(String(viewInfo.coverageRequiredStaff ?? ''))}&coverage_missing_staff=${encodeURIComponent(String(viewInfo.coverageMissingStaff ?? ''))}&coverage_role_shortages=${encodeURIComponent(JSON.stringify(coverageRolesForAction(viewInfo)))}&return_to=${encodeURIComponent(coverageReturnTo)}`}
-                                            >
-                                                Recurring cover
-                                            </a>
+                                            Recurring cover
                                         </Button>
                                     </>
                                 ) : null}
@@ -1750,6 +1823,8 @@ export default function CalendarIndex(props: Props) {
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {createShiftLauncher.dialog}
         </AppLayout>
     );
 }
