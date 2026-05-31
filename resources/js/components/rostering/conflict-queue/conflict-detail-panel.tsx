@@ -49,16 +49,36 @@ function DetailEmpty() {
     );
 }
 
+// Action keys that hit shifts.manageAny-gated endpoints. Disabled for viewers
+// without manage rights so they never trigger a hard 403 on click.
+const MANAGE_GATED = new Set([
+    'reassign',
+    'assign',
+    'open',
+    'broadcast',
+    'fill',
+    'create',
+    'approve',
+]);
+
 function ActionButton({
     action,
+    disabled,
     onClick,
 }: {
     action: QueueAction;
+    disabled?: boolean;
     onClick: () => void;
 }) {
+    const title = disabled ? 'Requires shift management permission' : undefined;
     if (action.tone === 'primary') {
         return (
-            <Button size="sm" onClick={onClick}>
+            <Button
+                size="sm"
+                disabled={disabled}
+                title={title}
+                onClick={onClick}
+            >
                 <Check className="mr-1.5 h-4 w-4" />
                 {action.label}
             </Button>
@@ -68,6 +88,8 @@ function ActionButton({
         <Button
             size="sm"
             variant={action.tone === 'subtle' ? 'ghost' : 'outline'}
+            disabled={disabled}
+            title={title}
             onClick={onClick}
         >
             {action.label}
@@ -78,18 +100,25 @@ function ActionButton({
 export interface ConflictDetailPanelProps {
     item: QueueItem | null;
     onAction: (item: QueueItem, action: QueueAction) => void;
+    /** When false, shifts.manageAny-gated actions render disabled. Default true. */
+    canManage?: boolean;
 }
 
 export function ConflictDetailPanel({
     item,
     onAction,
+    canManage = true,
 }: ConflictDetailPanelProps) {
     return (
         <div className="rounded-2xl border bg-card p-[18px] lg:sticky lg:top-5">
             {!item ? (
                 <DetailEmpty />
             ) : (
-                <DetailBody item={item} onAction={onAction} />
+                <DetailBody
+                    item={item}
+                    onAction={onAction}
+                    canManage={canManage}
+                />
             )}
         </div>
     );
@@ -98,9 +127,11 @@ export function ConflictDetailPanel({
 function DetailBody({
     item,
     onAction,
+    canManage,
 }: {
     item: QueueItem;
     onAction: (item: QueueItem, action: QueueAction) => void;
+    canManage: boolean;
 }) {
     const meta = TYPE_META[item.type];
     const Icon = meta.icon;
@@ -190,6 +221,7 @@ function DetailBody({
                     <ActionButton
                         key={action.key}
                         action={action}
+                        disabled={!canManage && MANAGE_GATED.has(action.key)}
                         onClick={() => onAction(item, action)}
                     />
                 ))}

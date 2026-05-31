@@ -60,10 +60,14 @@ type UnassignState = { shift: UnassignMakeOpenShift; item: QueueItem };
 type BroadcastState = { shift: BroadcastShift; item: QueueItem };
 type ConfirmState = { kind: ConflictConfirmKind; item: QueueItem };
 
+// Hero stat-tile value tints. The hero sits on the purple ops gradient, so the
+// dark on-light --status-* tokens read as muddy (and --status-info IS --primary,
+// i.e. purple-on-purple). Use the light on-gradient tints the design specifies
+// (prototype --on-critical/warning/info) so every value is legible.
 const HERO_TILE_TONE: Record<string, string> = {
-    critical: 'text-status-critical',
-    warning: 'text-status-warning',
-    info: 'text-status-info',
+    critical: 'text-[oklch(83%_0.13_22)]',
+    warning: 'text-[oklch(89%_0.11_90)]',
+    info: 'text-[oklch(87%_0.07_250)]',
     neutral: 'text-primary-foreground',
 };
 
@@ -71,15 +75,23 @@ function pluralise(count: number, word: string, plural?: string) {
     return `${count} ${count === 1 ? word : (plural ?? `${word}s`)}`;
 }
 
+/**
+ * Laravel business-rule rejections come back as `back()->with('error', …)`, which
+ * lands in `flash.error` (a 2xx visit) rather than `props.errors`, so Inertia
+ * fires `onSuccess`. Guard server-action success on the absence of a flash error
+ * so a rejected action never toasts success or drops a still-live conflict.
+ */
+function hasFlashError(page: unknown): boolean {
+    const flash = (page as { props?: { flash?: { error?: unknown } } } | null)
+        ?.props?.flash;
+    return Boolean(flash?.error);
+}
+
 function csrfToken() {
     return (
         document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')
             ?.content ?? ''
     );
-}
-
-function primaryShiftId(item: QueueItem): number | null {
-    return item.shifts[0]?.id ?? null;
 }
 
 /** The shift a "reassign"/"unassign" should act on — the second of an overlap pair. */
@@ -90,16 +102,23 @@ function shiftToMove(item: QueueItem): QueueShift | null {
 
 export default function RosteringConflicts(props: ConflictsProps) {
     const { auth } = usePage().props as {
-        auth?: { user?: { name?: string }; can?: Record<string, unknown> };
+        auth?: {
+            user?: { name?: string };
+            can?: { shifts?: { manageAny?: boolean } };
+        };
     };
     const firstName = auth?.user?.name?.split(' ')?.[0] ?? 'team';
+    // Write actions hit endpoints gated on shifts.manageAny; the page itself is
+    // only gated on rostering.viewAny. Disable management actions for viewers
+    // without manage rights (matches the rostering index) so they never 403.
+    const canManage = Boolean(auth?.can?.shifts?.manageAny);
 
     const items = useMemo(() => buildQueue(props), [props]);
-    const queue = useConflictQueue(items);
+    const queue = useConflictQueue(items, props.weekStart);
     const {
         counts,
         blocking,
-        total,
+        seedTotal,
         resolvedToday,
         open,
         visible,
@@ -235,8 +254,15 @@ export default function RosteringConflicts(props: ConflictsProps) {
             {
                 preserveScroll: true,
                 preserveState: true,
-                onSuccess: () =>
-                    queue.resolveLocally(item.id, 'Acknowledged', subFor(item)),
+                onSuccess: (page) => {
+                    if (!hasFlashError(page)) {
+                        queue.resolveLocally(
+                            item.id,
+                            'Acknowledged',
+                            subFor(item),
+                        );
+                    }
+                },
             },
         );
     };
@@ -253,12 +279,15 @@ export default function RosteringConflicts(props: ConflictsProps) {
             {
                 preserveScroll: true,
                 preserveState: true,
-                onSuccess: () =>
-                    queue.resolveLocally(
-                        item.id,
-                        'Gap dismissed',
-                        subFor(item),
-                    ),
+                onSuccess: (page) => {
+                    if (!hasFlashError(page)) {
+                        queue.resolveLocally(
+                            item.id,
+                            'Gap dismissed',
+                            subFor(item),
+                        );
+                    }
+                },
             },
         );
     };
@@ -380,8 +409,14 @@ export default function RosteringConflicts(props: ConflictsProps) {
                     {
                         preserveScroll: true,
                         preserveState: true,
-                        onSuccess: () =>
-                            queue.resolveLocally(item.id, action.done, sub),
+                        // The approved replacement leaves activeReplacements on
+                        // the prop reload — just tally + toast on real success.
+                        onSuccess: (page) => {
+                            if (!hasFlashError(page)) {
+                                queue.pushToast(action.done, sub);
+                                queue.recordResolved();
+                            }
+                        },
                     },
                 );
                 return;
@@ -392,8 +427,14 @@ export default function RosteringConflicts(props: ConflictsProps) {
             case 'edit':
             case 'retime': {
                 // No conflict-page editor (Props are intentionally minimal); hand off
-                // to the shift detail page where the full editor lives.
-                const id = primaryShiftId(item);
+                // to the shift detail page where the full editor lives. For a tight
+                // turnaround the recommendation targets the SECOND shift, so open
+                // that one; otherwise the first shift.
+                const target =
+                    item.type === 'tight_turnaround'
+                        ? shiftToMove(item)
+                        : item.shifts[0];
+                const id = target?.id ?? null;
                 if (id) router.visit(`/operations/shifts/${id}`);
                 return;
             }
@@ -421,12 +462,30 @@ export default function RosteringConflicts(props: ConflictsProps) {
                 sub,
             );
         } else if (kind === 'cancel') {
-            // TODO: wire to the leave-cancellation endpoint when available.
-            queue.resolveLocally(
-                item.id,
-                'Leave cancelled · shift retained',
-                sub,
-            );
+            const timeOffId = item.payload.time_off_id as number | undefined;
+            if (timeOffId) {
+                router.delete(`/operations/rostering/time-off/${timeOffId}`, {
+                    data: { return_to: returnTo, reason: result.reason ?? '' },
+                    preserveScroll: true,
+                    preserveState: true,
+                    // The deleted leave block clears the clash on reload.
+                    onSuccess: (page) => {
+                        if (!hasFlashError(page)) {
+                            queue.pushToast(
+                                'Leave cancelled · shift retained',
+                                sub,
+                            );
+                            queue.recordResolved();
+                        }
+                    },
+                });
+            } else {
+                queue.resolveLocally(
+                    item.id,
+                    'Leave cancelled · shift retained',
+                    sub,
+                );
+            }
         } else if (kind === 'ratio') {
             queue.resolveLocally(
                 item.id,
@@ -465,10 +524,17 @@ export default function RosteringConflicts(props: ConflictsProps) {
             {
                 preserveScroll: true,
                 preserveState: true,
-                onSuccess: () => {
-                    queue.resolveLocally(item.id, done, subFor(item));
-                    setReassignState(null);
+                // Don't optimistically hide the conflict: a rejected assign comes
+                // back as flash.error (still onSuccess), and a coverage "fill"
+                // may only partially close the gap. Toast + tally on real success
+                // and let the prop reload decide whether the item leaves.
+                onSuccess: (page) => {
+                    if (!hasFlashError(page)) {
+                        queue.pushToast(done, subFor(item));
+                        queue.recordResolved();
+                    }
                 },
+                onFinish: () => setReassignState(null),
             },
         );
     };
@@ -485,14 +551,16 @@ export default function RosteringConflicts(props: ConflictsProps) {
             {
                 preserveScroll: true,
                 preserveState: true,
-                onSuccess: () => {
-                    queue.resolveLocally(
-                        item.id,
-                        'Shift unassigned & opened',
-                        subFor(item),
-                    );
-                    setUnassignState(null);
+                onSuccess: (page) => {
+                    if (!hasFlashError(page)) {
+                        queue.pushToast(
+                            'Shift unassigned & opened',
+                            subFor(item),
+                        );
+                        queue.recordResolved();
+                    }
                 },
+                onFinish: () => setUnassignState(null),
             },
         );
     };
@@ -506,12 +574,15 @@ export default function RosteringConflicts(props: ConflictsProps) {
             {
                 preserveScroll: true,
                 preserveState: true,
-                onSuccess: () => {
-                    // The shift is still open after broadcasting — don't clear it,
-                    // just confirm the broadcast went out.
-                    queue.pushToast('Broadcast sent', subFor(item));
-                    setBroadcastState(null);
+                // The shift is still open after broadcasting — don't clear it,
+                // just confirm the broadcast went out (and only on real success;
+                // server guards reject via flash.error, which still hits onSuccess).
+                onSuccess: (page) => {
+                    if (!hasFlashError(page)) {
+                        queue.pushToast('Broadcast sent', subFor(item));
+                    }
                 },
+                onFinish: () => setBroadcastState(null),
             },
         );
     };
@@ -610,7 +681,9 @@ export default function RosteringConflicts(props: ConflictsProps) {
         },
     ];
 
-    const progressPct = total ? Math.round((resolvedToday / total) * 100) : 0;
+    const progressPct = seedTotal
+        ? Math.round((resolvedToday / seedTotal) * 100)
+        : 0;
 
     return (
         <AppLayout
@@ -785,7 +858,7 @@ export default function RosteringConflicts(props: ConflictsProps) {
                             </div>
                             <div className="flex items-center justify-end gap-2.5">
                                 <span className="text-[11px] font-medium text-primary-foreground/70 tabular-nums">
-                                    {resolvedToday} of {total} resolved
+                                    {resolvedToday} of {seedTotal} resolved
                                 </span>
                                 <span className="h-1.5 w-[168px] overflow-hidden rounded-full bg-primary-foreground/20">
                                     {/* eslint-disable no-restricted-syntax -- light-green progress fill reads on the purple hero gradient, matching the emerald hero accent. */}
@@ -819,7 +892,7 @@ export default function RosteringConflicts(props: ConflictsProps) {
                     counts={counts}
                     total={open.length}
                     resolvedToday={resolvedToday}
-                    seedTotal={total}
+                    seedTotal={seedTotal}
                 />
 
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,400px)]">
@@ -833,6 +906,7 @@ export default function RosteringConflicts(props: ConflictsProps) {
                     <ConflictDetailPanel
                         item={selected}
                         onAction={dispatchAction}
+                        canManage={canManage}
                     />
                 </div>
             </div>

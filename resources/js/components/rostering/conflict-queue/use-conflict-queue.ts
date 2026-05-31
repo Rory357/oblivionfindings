@@ -60,8 +60,10 @@ export interface UseConflictQueue {
     open: QueueItem[];
     counts: Record<ConflictType, number>;
     blocking: number;
-    total: number;
+    /** Resolutions this week-session (client acks + confirmed server resolutions). */
     resolvedToday: number;
+    /** Stable progress denominator: resolved + still-open this session. */
+    seedTotal: number;
     visible: QueueItem[];
     selected: QueueItem | null;
 
@@ -77,10 +79,16 @@ export interface UseConflictQueue {
     pushToast: (title: string, sub: string) => void;
 
     markLocallyResolved: (id: string) => void;
-    /** Resolve an item entirely client-side: advance, hide it, toast. */
+    /** Resolve an item entirely client-side: advance, hide it, toast, tally. */
     resolveLocally: (id: string, title: string, sub: string) => void;
     /** Resolve a bulk set of ids client-side (e.g. acknowledge all turnarounds). */
     resolveManyLocally: (ids: string[]) => void;
+    /**
+     * Tally a server-backed resolution. The item itself leaves the queue on the
+     * next Inertia prop reload (or stays if the server still reports it, e.g. a
+     * partially-filled coverage gap) — this only advances the progress counter.
+     */
+    recordResolved: (count?: number) => void;
     resolveNext: () => void;
 }
 
@@ -90,7 +98,10 @@ const sortQueue = (a: QueueItem, b: QueueItem) => {
     return TYPE_ORDER.indexOf(a.type) - TYPE_ORDER.indexOf(b.type);
 };
 
-export function useConflictQueue(items: QueueItem[]): UseConflictQueue {
+export function useConflictQueue(
+    items: QueueItem[],
+    weekStart: string,
+): UseConflictQueue {
     const [filter, setFilter] = useState<QueueFilter>('all');
     const [selectedId, setSelectedId] = useState<string | null>(null);
     const [staffFilter, setStaffFilter] = useState<string | null>(null);
@@ -101,14 +112,25 @@ export function useConflictQueue(items: QueueItem[]): UseConflictQueue {
     const [toasts, setToasts] = useState<QueueToast[]>([]);
     const toastId = useRef(0);
 
-    const total = items.length;
+    // Cumulative resolutions this week-session. Tracked as a counter (NOT derived
+    // from items.length) because a server-backed resolution removes the conflict
+    // from the reloaded props, so `items.length - open.length` would net to zero
+    // for the most common triage actions.
+    const [seedWeek, setSeedWeek] = useState(weekStart);
+    const [resolvedCount, setResolvedCount] = useState(0);
+    if (seedWeek !== weekStart) {
+        // Week changed via the footer picker — reset the tally for the new week.
+        setSeedWeek(weekStart);
+        setResolvedCount(0);
+    }
 
     const open = useMemo(
         () => items.filter((item) => !locallyResolved.has(item.id)),
         [items, locallyResolved],
     );
 
-    const resolvedToday = total - open.length;
+    const resolvedToday = resolvedCount;
+    const seedTotal = resolvedCount + open.length;
 
     const counts = useMemo(() => {
         const next = Object.fromEntries(
@@ -167,6 +189,20 @@ export function useConflictQueue(items: QueueItem[]): UseConflictQueue {
         }
     }, [visible, selectedId]);
 
+    // Repair the staff/site filter when its entity drops out of the queue (its
+    // last conflict resolved). Without this the EntityFilter pill resets to "All
+    // staff" while the name filter keeps hiding every remaining item.
+    useEffect(() => {
+        if (staffFilter && !staffOptions.some((o) => o.name === staffFilter)) {
+            setStaffFilter(null);
+        }
+    }, [staffOptions, staffFilter]);
+    useEffect(() => {
+        if (siteFilter && !siteOptions.some((o) => o.name === siteFilter)) {
+            setSiteFilter(null);
+        }
+    }, [siteOptions, siteFilter]);
+
     const pushToast = useCallback((title: string, sub: string) => {
         const id = (toastId.current += 1);
         setToasts((current) => [...current, { id, title, sub }]);
@@ -183,12 +219,17 @@ export function useConflictQueue(items: QueueItem[]): UseConflictQueue {
         });
     }, []);
 
+    const recordResolved = useCallback((count = 1) => {
+        setResolvedCount((current) => current + count);
+    }, []);
+
     const resolveLocally = useCallback(
         (id: string, title: string, sub: string) => {
             const idx = visible.findIndex((item) => item.id === id);
             const next = visible[idx + 1] ?? visible[idx - 1] ?? null;
             markLocallyResolved(id);
             setSelectedId(next ? next.id : null);
+            setResolvedCount((current) => current + 1);
             pushToast(title, sub);
         },
         [visible, markLocallyResolved, pushToast],
@@ -201,6 +242,7 @@ export function useConflictQueue(items: QueueItem[]): UseConflictQueue {
             for (const id of ids) next.add(id);
             return next;
         });
+        setResolvedCount((current) => current + ids.length);
         setSelectedId((current) =>
             current && ids.includes(current) ? null : current,
         );
@@ -247,8 +289,8 @@ export function useConflictQueue(items: QueueItem[]): UseConflictQueue {
         open,
         counts,
         blocking,
-        total,
         resolvedToday,
+        seedTotal,
         visible,
         selected,
         staffOptions,
@@ -262,6 +304,7 @@ export function useConflictQueue(items: QueueItem[]): UseConflictQueue {
         markLocallyResolved,
         resolveLocally,
         resolveManyLocally,
+        recordResolved,
         resolveNext,
     };
 }
