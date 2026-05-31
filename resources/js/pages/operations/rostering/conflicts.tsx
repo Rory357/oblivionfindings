@@ -897,7 +897,7 @@ export default function RosteringConflicts(props: ConflictsProps) {
                     total={open.length}
                 />
 
-                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,400px)]">
+                <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,540px)]">
                     <ConflictQueueList
                         filter={filter}
                         visible={visible}
