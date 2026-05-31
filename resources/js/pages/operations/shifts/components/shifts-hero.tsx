@@ -29,6 +29,7 @@ import {
 } from '@/components/ui/command';
 import {
     Popover,
+    PopoverAnchor,
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
@@ -447,11 +448,11 @@ function StatusChip({
 
     return (
         <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-                <button
-                    type="button"
-                    aria-haspopup="listbox"
-                    aria-expanded={open}
+            <PopoverAnchor asChild>
+                {/* The pill is a wrapper, not a button, so the clear action can
+                    sit as a sibling of the trigger rather than nested inside it
+                    (nested <button>s are invalid HTML and break hydration). */}
+                <div
                     className={cn(
                         'inline-flex items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-semibold transition-colors',
                         allSelected
@@ -459,27 +460,34 @@ function StatusChip({
                             : 'border-primary-foreground bg-primary-foreground text-primary',
                     )}
                 >
-                    <Filter className="h-3.5 w-3.5" aria-hidden="true" />
-                    <span className="max-w-[200px] truncate">
-                        {triggerLabel}
-                    </span>
+                    <PopoverTrigger asChild>
+                        <button
+                            type="button"
+                            aria-haspopup="listbox"
+                            aria-expanded={open}
+                            className="inline-flex items-center gap-1.5 rounded-full focus-visible:outline-none"
+                        >
+                            <Filter className="h-3.5 w-3.5" aria-hidden="true" />
+                            <span className="max-w-[200px] truncate">
+                                {triggerLabel}
+                            </span>
+                            {allSelected ? (
+                                <ChevronDown className="h-3 w-3 opacity-70" />
+                            ) : null}
+                        </button>
+                    </PopoverTrigger>
                     {!allSelected ? (
                         <button
                             type="button"
                             aria-label="Clear status filter"
-                            className="ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full hover:bg-primary/30"
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                clearAll();
-                            }}
+                            className="inline-flex h-4 w-4 items-center justify-center rounded-full hover:bg-primary/30"
+                            onClick={clearAll}
                         >
                             <X className="h-3 w-3" />
                         </button>
-                    ) : (
-                        <ChevronDown className="h-3 w-3 opacity-70" />
-                    )}
-                </button>
-            </PopoverTrigger>
+                    ) : null}
+                </div>
+            </PopoverAnchor>
             <PopoverContent
                 align="end"
                 className="w-[240px] p-0"

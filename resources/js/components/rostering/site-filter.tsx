@@ -12,6 +12,7 @@ import {
 } from '@/components/ui/command';
 import {
     Popover,
+    PopoverAnchor,
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
@@ -78,37 +79,44 @@ export function SiteFilter({
 
     return (
         <Popover open={open} onOpenChange={setOpen}>
-            <PopoverTrigger asChild>
-                <button
-                    type="button"
-                    aria-haspopup="listbox"
-                    aria-expanded={open}
-                    className={cn(triggerClass, className)}
-                >
-                    <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
-                    <span className="max-w-[200px] truncate">{triggerLabel}</span>
+            <PopoverAnchor asChild>
+                {/* The pill is a wrapper, not a button, so the clear action can
+                    sit as a sibling of the trigger rather than nested inside it
+                    (nested <button>s are invalid HTML and break hydration). */}
+                <div className={cn(triggerClass, className)}>
+                    <PopoverTrigger asChild>
+                        <button
+                            type="button"
+                            aria-haspopup="listbox"
+                            aria-expanded={open}
+                            className="inline-flex items-center gap-1.5 rounded-full focus-visible:outline-none"
+                        >
+                            <MapPin className="h-3.5 w-3.5" aria-hidden="true" />
+                            <span className="max-w-[200px] truncate">
+                                {triggerLabel}
+                            </span>
+                            {allSelected ? (
+                                <ChevronDown className="h-3 w-3 opacity-70" />
+                            ) : null}
+                        </button>
+                    </PopoverTrigger>
                     {!allSelected ? (
                         <button
                             type="button"
                             aria-label="Clear site filter"
                             className={cn(
-                                'ml-1 inline-flex h-4 w-4 items-center justify-center rounded-full',
+                                'inline-flex h-4 w-4 items-center justify-center rounded-full',
                                 onDark
                                     ? 'hover:bg-primary/30'
                                     : 'hover:bg-primary-foreground/20',
                             )}
-                            onClick={(e) => {
-                                e.stopPropagation();
-                                clearAll();
-                            }}
+                            onClick={clearAll}
                         >
                             <X className="h-3 w-3" />
                         </button>
-                    ) : (
-                        <ChevronDown className="h-3 w-3 opacity-70" />
-                    )}
-                </button>
-            </PopoverTrigger>
+                    ) : null}
+                </div>
+            </PopoverAnchor>
             <PopoverContent
                 align="end"
                 className="w-[300px] p-0"
