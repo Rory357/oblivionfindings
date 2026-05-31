@@ -108,7 +108,7 @@ export function MultiEntityFilter({
                             aria-haspopup="listbox"
                             aria-expanded={open}
                             aria-label={`${label} filter: ${triggerLabel}`}
-                            className="inline-flex items-center gap-1.5 rounded-full focus-visible:outline-none"
+                            className="inline-flex items-center gap-1.5 rounded-full"
                         >
                             <Search className="h-3.5 w-3.5" aria-hidden="true" />
                             <span className="max-w-[200px] truncate">

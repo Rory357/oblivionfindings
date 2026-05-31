@@ -465,7 +465,7 @@ function StatusChip({
                             type="button"
                             aria-haspopup="listbox"
                             aria-expanded={open}
-                            className="inline-flex items-center gap-1.5 rounded-full focus-visible:outline-none"
+                            className="inline-flex items-center gap-1.5 rounded-full"
                         >
                             <Filter className="h-3.5 w-3.5" aria-hidden="true" />
                             <span className="max-w-[200px] truncate">
