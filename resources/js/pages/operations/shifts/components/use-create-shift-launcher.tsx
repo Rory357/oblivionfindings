@@ -119,7 +119,18 @@ export function useCreateShiftLauncher() {
     }, []);
 
     const coverage = data?.coverageContext ?? null;
-    const lockedContext = coverage
+    // The create endpoint always returns a coverageContext object (falling back
+    // to nulls when there's no gap), so only surface the locked "Coverage gap"
+    // card when it carries real coverage intent — otherwise a plain create shows
+    // an empty gap card.
+    const hasCoverageContext =
+        !!coverage &&
+        (coverage.rule_id != null ||
+            !!coverage.rule_name ||
+            coverage.site_id != null ||
+            coverage.missing_staff != null ||
+            (coverage.role_shortages?.length ?? 0) > 0);
+    const lockedContext = hasCoverageContext
         ? {
               site_name: coverage.site_name ?? null,
               window_label: coverage.rule_name ?? null,
