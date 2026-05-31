@@ -25,22 +25,18 @@ export interface ConflictFilterStripProps {
     onFilter: (next: QueueFilter) => void;
     counts: Record<ConflictType, number>;
     total: number;
-    resolvedToday: number;
-    seedTotal: number;
 }
 
 /**
- * Severity filter strip — the app's real `TabStrip` (one tab per view, tone-matched
- * to each type's severity, live count badges) with a resolved-progress track on the
- * right. Replaces the old wall of seven count-cards.
+ * Severity filter strip — the app's real `TabStrip`, one tab per view, tone-matched
+ * to each type's severity with live count badges. Replaces the old wall of seven
+ * count-cards. (Resolved progress lives in the hero, not here.)
  */
 export function ConflictFilterStrip({
     filter,
     onFilter,
     counts,
     total,
-    resolvedToday,
-    seedTotal,
 }: ConflictFilterStripProps) {
     const items: RosterTabItem[] = [
         {
@@ -59,28 +55,13 @@ export function ConflictFilterStrip({
         })),
     ];
 
-    const pct = seedTotal ? Math.round((resolvedToday / seedTotal) * 100) : 0;
-
     return (
-        <div className="flex flex-wrap items-center gap-3">
-            <TabStrip
-                value={filter}
-                onChange={(next) => onFilter(next as QueueFilter)}
-                items={items}
-                className="min-w-0 flex-1"
-            />
-            <div className="flex items-center gap-2.5 px-1">
-                <span className="text-[11px] font-medium text-muted-foreground tabular-nums">
-                    {resolvedToday} of {seedTotal} resolved
-                </span>
-                <span className="h-1.5 w-[168px] overflow-hidden rounded-full bg-muted">
-                    <span
-                        className="block h-full rounded-full bg-status-success transition-[width] duration-300"
-                        style={{ width: `${pct}%` }}
-                    />
-                </span>
-            </div>
-        </div>
+        <TabStrip
+            value={filter}
+            onChange={(next) => onFilter(next as QueueFilter)}
+            items={items}
+            className="w-full"
+        />
     );
 }
 

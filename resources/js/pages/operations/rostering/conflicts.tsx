@@ -147,6 +147,16 @@ export default function RosteringConflicts(props: ConflictsProps) {
         () => formatWeekRange(weekStartDate),
         [weekStartDate],
     );
+    // End label without the year, to match the design ("Mon 25 May → Sun 31 May").
+    const rangeEndLabel = useMemo(
+        () =>
+            range.end.toLocaleDateString('en-NZ', {
+                weekday: 'short',
+                day: '2-digit',
+                month: 'short',
+            }),
+        [range.end],
+    );
     const curLab = weekLabel(weekStartDate);
     const returnTo = `/operations/rostering/conflicts?week=${encodeURIComponent(props.weekStart)}`;
 
@@ -703,7 +713,7 @@ export default function RosteringConflicts(props: ConflictsProps) {
                     backHref="/operations/rostering"
                     backLabel="Back to rostering"
                     title={
-                        <span>
+                        <span className="block max-w-[34rem]">
                             <span className="mb-2 flex items-center gap-2 text-[10.5px] font-semibold tracking-wider text-primary-foreground/80 uppercase">
                                 <span
                                     aria-hidden="true"
@@ -722,13 +732,13 @@ export default function RosteringConflicts(props: ConflictsProps) {
                                     {pluralise(blocking, 'conflict')} need you —
                                 </span>{' '}
                                 <span className="border-b-2 border-primary-foreground/40 pb-0.5">
-                                    {range.startLabel} → {range.endLabel}
+                                    {range.startLabel} → {rangeEndLabel}
                                 </span>
                             </span>
                         </span>
                     }
                     description={
-                        <span>
+                        <span className="block max-w-[34rem]">
                             {pluralise(
                                 counts.staff_overlap,
                                 'staff double-booking',
@@ -781,7 +791,7 @@ export default function RosteringConflicts(props: ConflictsProps) {
                         },
                     ]}
                     actions={
-                        <div className="flex w-full flex-col items-stretch gap-3 md:w-[300px]">
+                        <div className="flex w-full flex-col items-stretch gap-3 md:w-auto">
                             <div className="flex justify-end">
                                 <DropdownMenu>
                                     <DropdownMenuTrigger
@@ -828,7 +838,7 @@ export default function RosteringConflicts(props: ConflictsProps) {
                                     </DropdownMenuContent>
                                 </DropdownMenu>
                             </div>
-                            <div className="grid grid-cols-2 gap-2">
+                            <div className="flex flex-wrap justify-end gap-2">
                                 {heroTiles.map((tile) => {
                                     const TileIcon = tile.icon;
                                     return (
@@ -839,7 +849,7 @@ export default function RosteringConflicts(props: ConflictsProps) {
                                             onClick={() =>
                                                 queue.setFilter(tile.filter)
                                             }
-                                            className="rounded-xl border border-primary-foreground/15 bg-primary-foreground/10 px-3 py-2 text-left backdrop-blur-sm transition-colors hover:bg-primary-foreground/20"
+                                            className="min-w-[96px] rounded-xl border border-primary-foreground/15 bg-primary-foreground/10 px-3 py-2 text-left backdrop-blur-sm transition-colors hover:bg-primary-foreground/20"
                                         >
                                             <span className="flex items-center gap-2">
                                                 <TileIcon className="h-4 w-4 text-primary-foreground/70" />
@@ -891,8 +901,6 @@ export default function RosteringConflicts(props: ConflictsProps) {
                     onFilter={queue.setFilter}
                     counts={counts}
                     total={open.length}
-                    resolvedToday={resolvedToday}
-                    seedTotal={seedTotal}
                 />
 
                 <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_minmax(0,400px)]">
