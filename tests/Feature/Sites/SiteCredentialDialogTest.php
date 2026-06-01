@@ -171,6 +171,46 @@ test('credential store accepts new fields, encrypts password, and writes a creat
     )->toBeTrue();
 });
 
+test('credential store rejects unsafe url schemes', function () {
+    $this->actingAs($this->admin)
+        ->from("/sites/{$this->site->id}")
+        ->post("/sites/{$this->site->id}/credentials", [
+            'label' => 'Bad Link',
+            'username' => 'root@example.test',
+            'url' => 'javascript:alert(1)',
+            'credential_type' => 'password',
+            'value' => 'Sup3rS3cretPw!',
+        ])
+        ->assertRedirect("/sites/{$this->site->id}")
+        ->assertSessionHasErrors(['url']);
+
+    expect(SiteCredential::query()->where('label', 'Bad Link')->exists())->toBeFalse();
+});
+
+test('credential update rejects unsafe url schemes', function () {
+    $credential = SiteCredential::create([
+        'site_id' => $this->site->id,
+        'tenant_id' => $this->site->tenant_id,
+        'label' => 'old name',
+        'credential_type' => 'password',
+        'url' => 'https://safe.example.test',
+        'encrypted_value' => \Illuminate\Support\Facades\Crypt::encryptString('keep-me'),
+    ]);
+
+    $this->actingAs($this->admin)
+        ->from("/sites/{$this->site->id}")
+        ->put("/sites/{$this->site->id}/credentials/{$credential->id}", [
+            'label' => 'new name',
+            'credential_type' => 'password',
+            'url' => 'data:text/html,<script>alert(1)</script>',
+            'value' => '',
+        ])
+        ->assertRedirect("/sites/{$this->site->id}")
+        ->assertSessionHasErrors(['url']);
+
+    expect($credential->fresh()->url)->toBe('https://safe.example.test');
+});
+
 test('credential update can change metadata without rotating password', function () {
     $credential = SiteCredential::create([
         'site_id' => $this->site->id,

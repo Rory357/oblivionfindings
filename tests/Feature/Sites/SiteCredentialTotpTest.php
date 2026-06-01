@@ -138,6 +138,52 @@ test('totp code endpoint returns a valid 6-digit code for a pasted secret + audi
     )->toBeTrue();
 });
 
+test('totp code endpoint requires re-auth when the credential requires reauth', function () {
+    $google2fa = new Google2FA();
+    $secret = $google2fa->generateSecretKey();
+
+    $credential = SiteCredential::create([
+        'site_id' => $this->site->id,
+        'tenant_id' => $this->site->tenant_id,
+        'label' => 'Protected admin',
+        'credential_type' => 'password',
+        'encrypted_value' => Crypt::encryptString('pw'),
+        'requires_reauth' => true,
+        'totp_secret_encrypted' => Crypt::encryptString($secret),
+    ]);
+
+    $this->actingAs($this->admin)
+        ->postJson("/sites/{$this->site->id}/credentials/{$credential->id}/totp/code")
+        ->assertUnprocessable()
+        ->assertJsonValidationErrors(['password']);
+
+    $this->actingAs($this->admin)
+        ->postJson("/sites/{$this->site->id}/credentials/{$credential->id}/totp/code", [
+            'password' => 'definitely-wrong',
+        ])
+        ->assertStatus(403);
+
+    expect(
+        SiteCredentialAuditLog::query()
+            ->where('credential_id', $credential->id)
+            ->where('action', 'reauth_failed')
+            ->exists(),
+    )->toBeTrue();
+
+    $response = $this->actingAs($this->admin)
+        ->postJson("/sites/{$this->site->id}/credentials/{$credential->id}/totp/code", [
+            'password' => 'password',
+        ])
+        ->assertOk();
+
+    expect($google2fa->verifyKey($secret, $response->json('code'), 1))->toBeTrue();
+
+    $this->actingAs($this->admin)
+        ->postJson("/sites/{$this->site->id}/credentials/{$credential->id}/totp/code")
+        ->assertOk()
+        ->assertJsonStructure(['code', 'seconds_remaining', 'period']);
+});
+
 test('totp code endpoint returns 404 when no secret is stored', function () {
     $credential = SiteCredential::create([
         'site_id' => $this->site->id,

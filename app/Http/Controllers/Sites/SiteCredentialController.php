@@ -95,7 +95,7 @@ class SiteCredentialController extends Controller
             'credential_type' => 'required|string|max:30',
             'value' => 'required|string',
             'username' => 'nullable|string|max:255',
-            'url' => 'nullable|string|max:2048',
+            'url' => ['nullable', 'string', 'max:2048', $this->credentialHttpUrlRule()],
             'vendor_id' => [
                 'nullable',
                 Rule::exists('site_vendors', 'id')->where(fn ($query) => $query->where('site_id', $site->id)),
@@ -157,34 +157,8 @@ class SiteCredentialController extends Controller
         $request->user()->canDo('credentials.reveal') || abort(403);
         $this->assertCredentialBelongsToSite($site, $credential);
 
-        // Check if re-authentication is required
-        if ($credential->requires_reauth) {
-            $request->validate([
-                'password' => 'required|string',
-            ]);
-
-            // Verify user's password
-            if (!Auth::validate(['email' => $request->user()->email, 'password' => $request->input('password')])) {
-                // Record the denied step-up attempt so failed unlocks leave a
-                // forensic trail (and surface in the Reveal & audit log's
-                // "Denied" view). Best-effort: never let a logging issue turn a
-                // clean 403 into a 500.
-                try {
-                    SiteCredentialAuditLog::create([
-                        'credential_id' => $credential->id,
-                        'tenant_id' => $site->tenant_id,
-                        'user_id' => $request->user()->id,
-                        'action' => 'reauth_failed',
-                        'ip_address' => $request->ip(),
-                        'user_agent' => $request->userAgent(),
-                        'created_at' => now(),
-                    ]);
-                } catch (\Throwable $e) {
-                    report($e);
-                }
-
-                return response()->json(['error' => 'Invalid password'], 403);
-            }
+        if ($reauthResponse = $this->ensureCredentialReauth($request, $site, $credential)) {
+            return $reauthResponse;
         }
 
         // Audit log
@@ -216,7 +190,7 @@ class SiteCredentialController extends Controller
             'credential_type' => 'required|string|max:30',
             'value' => 'nullable|string',
             'username' => 'nullable|string|max:255',
-            'url' => 'nullable|string|max:2048',
+            'url' => ['nullable', 'string', 'max:2048', $this->credentialHttpUrlRule()],
             'vendor_id' => [
                 'nullable',
                 Rule::exists('site_vendors', 'id')->where(fn ($query) => $query->where('site_id', $site->id)),
@@ -384,6 +358,10 @@ class SiteCredentialController extends Controller
             abort(404, 'No authenticator configured for this credential.');
         }
 
+        if ($reauthResponse = $this->ensureCredentialReauth($request, $site, $credential)) {
+            return $reauthResponse;
+        }
+
         $secret = Crypt::decryptString($credential->totp_secret_encrypted);
         $google2fa = new Google2FA();
         $code = $google2fa->getCurrentOtp($secret);
@@ -445,6 +423,79 @@ class SiteCredentialController extends Controller
 
         $clean = strtoupper(preg_replace('/\s+/', '', $raw));
         return $clean === '' ? null : $clean;
+    }
+
+    private function credentialHttpUrlRule(): \Closure
+    {
+        return function (string $attribute, mixed $value, \Closure $fail): void {
+            if ($value === null || $value === '') {
+                return;
+            }
+
+            $scheme = is_string($value) ? parse_url($value, PHP_URL_SCHEME) : null;
+            if (
+                ! is_string($value)
+                || ! filter_var($value, FILTER_VALIDATE_URL)
+                || ! in_array(strtolower((string) $scheme), ['http', 'https'], true)
+            ) {
+                $fail('The :attribute must be a valid http or https URL.');
+            }
+        };
+    }
+
+    private function ensureCredentialReauth(Request $request, Site $site, SiteCredential $credential)
+    {
+        if (! $credential->requires_reauth) {
+            return null;
+        }
+
+        if ($this->hasFreshCredentialReauth($request, $credential)) {
+            return null;
+        }
+
+        $request->validate([
+            'password' => 'required|string',
+        ]);
+
+        if (! Auth::validate(['email' => $request->user()->email, 'password' => $request->input('password')])) {
+            $this->recordCredentialAuditSafely($request, $site, $credential, 'reauth_failed');
+
+            return response()->json(['error' => 'Invalid password'], 403);
+        }
+
+        $request->session()->put($this->credentialReauthSessionKey($request, $credential), now()->timestamp);
+        $this->recordCredentialAuditSafely($request, $site, $credential, 'reauth_passed');
+
+        return null;
+    }
+
+    private function hasFreshCredentialReauth(Request $request, SiteCredential $credential): bool
+    {
+        $unlockedAt = (int) $request->session()->get($this->credentialReauthSessionKey($request, $credential), 0);
+
+        return $unlockedAt >= now()->subMinutes(5)->timestamp;
+    }
+
+    private function credentialReauthSessionKey(Request $request, SiteCredential $credential): string
+    {
+        return "site_credential_reauth.{$request->user()->id}.{$credential->id}";
+    }
+
+    private function recordCredentialAuditSafely(Request $request, Site $site, SiteCredential $credential, string $action): void
+    {
+        try {
+            SiteCredentialAuditLog::create([
+                'credential_id' => $credential->id,
+                'tenant_id' => $site->tenant_id,
+                'user_id' => $request->user()->id,
+                'action' => $action,
+                'ip_address' => $request->ip(),
+                'user_agent' => $request->userAgent(),
+                'created_at' => now(),
+            ]);
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 
     public function auditLog(Request $request, Site $site, SiteCredential $credential)

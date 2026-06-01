@@ -80,6 +80,68 @@ test('global index exposes enriched vendor/credential fields and manage flags', 
         );
 });
 
+test('vendor compliance fields persist and are exposed in global and site profile surfaces', function () {
+    $this->actingAs($this->admin)
+        ->from('/vendors')
+        ->post("/sites/{$this->site->id}/vendors", [
+            'service_type' => 'contractor',
+            'company_name' => 'SafeWorks NZ',
+            'contact_name' => 'Jordan Safe',
+            'phone' => '+64 21 555 0101',
+            'email' => 'jobs@safeworks.example',
+            'account_number' => 'SW-100',
+            'preferred_contact_method' => 'email',
+            'is_preferred' => true,
+            'hs_induction_completed' => true,
+            'hs_induction_date' => '2026-05-20',
+            'qualifications_verified' => true,
+            'qualifications_notes' => 'Electrical practising licence sighted.',
+            'insurance_verified' => true,
+            'insurance_expiry' => '2026-12-31',
+            'insurance_provider' => 'Southern Cover',
+            'insurance_policy_number' => 'POL-9988',
+            'site_specific_hs_plan' => 'Use lockout process before panel work.',
+            'hs_performance_rating' => 'good',
+            'hs_last_reviewed_at' => '2026-05-22',
+            'notes' => 'Use after-hours entrance.',
+        ])
+        ->assertRedirect('/vendors');
+
+    $vendor = SiteVendor::query()->where('company_name', 'SafeWorks NZ')->firstOrFail();
+    expect($vendor->hs_induction_completed)->toBeTrue();
+    expect($vendor->hs_induction_completed_by)->toBe($this->admin->id);
+    expect($vendor->qualifications_verified)->toBeTrue();
+    expect($vendor->insurance_verified)->toBeTrue();
+
+    $this->actingAs($this->admin)
+        ->get('/vendors')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('vendors.0.company_name', 'SafeWorks NZ')
+            ->where('vendors.0.hs_induction_completed', true)
+            ->where('vendors.0.hs_induction_date', '2026-05-20')
+            ->where('vendors.0.qualifications_verified', true)
+            ->where('vendors.0.qualifications_notes', 'Electrical practising licence sighted.')
+            ->where('vendors.0.insurance_verified', true)
+            ->where('vendors.0.insurance_expiry', '2026-12-31')
+            ->where('vendors.0.insurance_provider', 'Southern Cover')
+            ->where('vendors.0.insurance_policy_number', 'POL-9988')
+            ->where('vendors.0.site_specific_hs_plan', 'Use lockout process before panel work.')
+            ->where('vendors.0.hs_performance_rating', 'good')
+            ->where('vendors.0.hs_last_reviewed_at', '2026-05-22')
+        );
+
+    $this->actingAs($this->admin)
+        ->get("/sites/{$this->site->id}")
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->where('vendors.0.company_name', 'SafeWorks NZ')
+            ->where('vendors.0.hs_induction_completed', true)
+            ->where('vendors.0.insurance_expiry', '2026-12-31')
+            ->where('vendors.0.hs_performance_rating', 'good')
+        );
+});
+
 test('vendor flags endpoint toggles preferred and active', function () {
     $vendor = gvcVendor($this->site, ['is_preferred' => false, 'is_active' => true]);
 
@@ -126,7 +188,7 @@ test('credential reauth endpoint toggles the flag and audits an edit row', funct
         ->exists())->toBeTrue();
 });
 
-test('global audit feed returns scoped JSON for credential viewers', function () {
+test('global audit feed returns scoped JSON for credential revealers', function () {
     $credential = gvcCredential($this->site, ['label' => 'Server Room PIN']);
     SiteCredentialAuditLog::create([
         'credential_id' => $credential->id,
@@ -157,6 +219,18 @@ test('vendor-only user is forbidden from the credential audit feed', function ()
     expect($vendorOnly->canDo('credentials.view'))->toBeFalse();
 
     $this->actingAs($vendorOnly)
+        ->getJson('/vendors/audit')
+        ->assertForbidden();
+});
+
+test('credential metadata viewers without reveal rights are forbidden from the global audit feed', function () {
+    $viewer = User::factory()->create(['role' => 'team_lead', 'approved_at' => now()]);
+    $viewer->roles()->syncWithoutDetaching([Role::query()->where('name', 'team_lead')->firstOrFail()->id]);
+
+    expect($viewer->canDo('credentials.view'))->toBeTrue();
+    expect($viewer->canDo('credentials.reveal'))->toBeFalse();
+
+    $this->actingAs($viewer)
         ->getJson('/vendors/audit')
         ->assertForbidden();
 });

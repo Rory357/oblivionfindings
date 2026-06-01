@@ -38,25 +38,33 @@ import {
 import { useEffect, useState } from 'react';
 import {
     CREDENTIAL_TYPE_META,
-    type CredentialPickerOption,
     credentialTypeIcon,
     credentialTypeLabel,
     DetailIconHeader,
     FilterSelect,
-    type FilterOption,
     formatDate,
     LockedSiteCard,
     resolveCredentialIcon,
     RotationBadge,
     rotationStatus,
     SitePickerField,
-    type SiteOption,
     TilePicker,
+    type CredentialPickerOption,
+    type FilterOption,
+    type SiteOption,
     type TileOption,
 } from '../_dialog-shared';
 
 const CRED_TILES: TileOption[] = (
-    ['password', 'pin', 'api_key', 'oauth', 'ssh_key', 'certificate', 'other'] as const
+    [
+        'password',
+        'pin',
+        'api_key',
+        'oauth',
+        'ssh_key',
+        'certificate',
+        'other',
+    ] as const
 ).map((key) => ({
     key,
     label: CREDENTIAL_TYPE_META[key].label,
@@ -168,8 +176,11 @@ function AddCredentialBody({
     onClose: () => void;
 }) {
     const [pickedSiteId, setPickedSiteId] = useState<number | ''>('');
-    const targetSiteId = siteId ?? (pickedSiteId === '' ? undefined : pickedSiteId);
-    const siteVendors = (vendors ?? []).filter((v) => v.site_id === targetSiteId);
+    const targetSiteId =
+        siteId ?? (pickedSiteId === '' ? undefined : pickedSiteId);
+    const siteVendors = (vendors ?? []).filter(
+        (v) => v.site_id === targetSiteId,
+    );
 
     const form = useForm<CredentialFormValues>({
         label: '',
@@ -185,7 +196,9 @@ function AddCredentialBody({
         totp_secret: '',
     });
 
-    const [strength, setStrength] = useState<StrengthResult>(emptyPasswordStrength);
+    const [strength, setStrength] = useState<StrengthResult>(
+        emptyPasswordStrength,
+    );
 
     useEffect(() => {
         let cancelled = false;
@@ -219,15 +232,18 @@ function AddCredentialBody({
                     Create credential
                 </DialogTitle>
                 <DialogDescription>
-                    Credentials are encrypted at rest and every reveal is recorded in the audit
-                    log.
+                    Credentials are encrypted at rest and every reveal is
+                    recorded in the audit log.
                 </DialogDescription>
             </DialogHeader>
 
             <div className="mt-3 space-y-3">
                 {siteId ? (
                     lockedSite ? (
-                        <LockedSiteCard site={lockedSite} note="Locked to the site you opened this from." />
+                        <LockedSiteCard
+                            site={lockedSite}
+                            note="Locked to the site you opened this from."
+                        />
                     ) : null
                 ) : (
                     <SitePickerField
@@ -261,7 +277,9 @@ function AddCredentialBody({
                         !form.data.value.trim()
                     }
                 >
-                    {form.processing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {form.processing && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
                     Save credential
                 </Button>
             </DialogFooter>
@@ -336,7 +354,9 @@ function EditCredentialBody({
         totp_secret: '',
     });
 
-    const [strength, setStrength] = useState<StrengthResult>(emptyPasswordStrength);
+    const [strength, setStrength] = useState<StrengthResult>(
+        emptyPasswordStrength,
+    );
 
     useEffect(() => {
         let cancelled = false;
@@ -351,14 +371,20 @@ function EditCredentialBody({
     const effectiveLockedSite =
         lockedSite ??
         (credential.site_name
-            ? { id: credential.site_id ?? siteId, name: credential.site_name, type: credential.site_type ?? '' }
+            ? {
+                  id: credential.site_id ?? siteId,
+                  name: credential.site_name,
+                  type: credential.site_type ?? '',
+              }
             : null);
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         form.transform((data) => ({
             ...data,
-            password_strength: data.value ? strength.score : data.password_strength,
+            password_strength: data.value
+                ? strength.score
+                : data.password_strength,
         }));
         form.put(`/sites/${siteId}/credentials/${credential.id}`, {
             preserveScroll: true,
@@ -375,8 +401,8 @@ function EditCredentialBody({
                     Edit credential
                 </DialogTitle>
                 <DialogDescription>
-                    Leave the {secretWord(form.data.credential_type)} blank to keep the existing
-                    value. Every reveal is audited.
+                    Leave the {secretWord(form.data.credential_type)} blank to
+                    keep the existing value. Every reveal is audited.
                 </DialogDescription>
             </DialogHeader>
 
@@ -400,8 +426,13 @@ function EditCredentialBody({
                 <Button type="button" variant="outline" onClick={onClose}>
                     Cancel
                 </Button>
-                <Button type="submit" disabled={form.processing || !form.data.label.trim()}>
-                    {form.processing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                <Button
+                    type="submit"
+                    disabled={form.processing || !form.data.label.trim()}
+                >
+                    {form.processing && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
                     Save changes
                 </Button>
             </DialogFooter>
@@ -459,17 +490,22 @@ export function ShowCredentialDialog({
             const xsrf = decodeURIComponent(
                 document.cookie.match(/XSRF-TOKEN=([^;]+)/)?.[1] ?? '',
             );
-            const res = await fetch(`/sites/${siteId}/credentials/${credential.id}/reveal`, {
-                method: 'POST',
-                credentials: 'include',
-                headers: {
-                    'Content-Type': 'application/json',
-                    Accept: 'application/json',
-                    'X-Requested-With': 'XMLHttpRequest',
-                    'X-XSRF-TOKEN': xsrf,
+            const res = await fetch(
+                `/sites/${siteId}/credentials/${credential.id}/reveal`,
+                {
+                    method: 'POST',
+                    credentials: 'include',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        Accept: 'application/json',
+                        'X-Requested-With': 'XMLHttpRequest',
+                        'X-XSRF-TOKEN': xsrf,
+                    },
+                    body: suppliedPassword
+                        ? JSON.stringify({ password: suppliedPassword })
+                        : undefined,
                 },
-                body: suppliedPassword ? JSON.stringify({ password: suppliedPassword }) : undefined,
-            });
+            );
             if (!res.ok) {
                 let message = `HTTP ${res.status}`;
                 try {
@@ -486,7 +522,9 @@ export function ShowCredentialDialog({
             setPassword('');
             window.setTimeout(() => setRevealedValue(null), 30000);
         } catch (e) {
-            setRevealError(e instanceof Error ? e.message : 'Could not reveal credential.');
+            setRevealError(
+                e instanceof Error ? e.message : 'Could not reveal credential.',
+            );
         } finally {
             setRevealing(false);
         }
@@ -545,16 +583,23 @@ export function ShowCredentialDialog({
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
             <DialogContent style={{ maxWidth: 'min(92vw, 600px)' }}>
                 <DialogHeader>
-                    <DialogTitle className="sr-only">{credential.label}</DialogTitle>
+                    <DialogTitle className="sr-only">
+                        {credential.label}
+                    </DialogTitle>
                     <DialogDescription className="sr-only">
-                        Stored {credentialTypeLabel(credential.credential_type)} credential details.
+                        Stored {credentialTypeLabel(credential.credential_type)}{' '}
+                        credential details.
                     </DialogDescription>
                     <DetailIconHeader
                         icon={TypeIcon}
                         title={credential.label}
                         subtitle={
                             <>
-                                <span>{credentialTypeLabel(credential.credential_type)}</span>
+                                <span>
+                                    {credentialTypeLabel(
+                                        credential.credential_type,
+                                    )}
+                                </span>
                                 {credential.site_name ? (
                                     <>
                                         <span>·</span>
@@ -596,7 +641,12 @@ export function ShowCredentialDialog({
                         <>
                             <dt className="text-muted-foreground">Strength</dt>
                             <dd className="col-span-2">
-                                <Badge variant="outline" className={strengthBadgeClasses(strengthLabel.level)}>
+                                <Badge
+                                    variant="outline"
+                                    className={strengthBadgeClasses(
+                                        strengthLabel.level,
+                                    )}
+                                >
                                     {strengthLabel.label}
                                 </Badge>
                             </dd>
@@ -606,7 +656,9 @@ export function ShowCredentialDialog({
                         <>
                             <dt className="text-muted-foreground">Username</dt>
                             <dd className="col-span-2 flex items-center gap-2">
-                                <span className="font-mono">{credential.username}</span>
+                                <span className="font-mono">
+                                    {credential.username}
+                                </span>
                                 <CopyButton text={credential.username} />
                             </dd>
                         </>
@@ -615,7 +667,9 @@ export function ShowCredentialDialog({
                     <dd className="col-span-2" aria-live="polite">
                         {revealedValue ? (
                             <div className="flex items-center gap-2">
-                                <span className="font-mono">{revealedValue}</span>
+                                <span className="font-mono">
+                                    {revealedValue}
+                                </span>
                                 <Button
                                     type="button"
                                     variant="ghost"
@@ -633,7 +687,11 @@ export function ShowCredentialDialog({
                                     aria-label={`Copy ${word}`}
                                 >
                                     <Copy className="h-4 w-4" />
-                                    {copied && <span className="ml-1 text-xs">Copied</span>}
+                                    {copied && (
+                                        <span className="ml-1 text-xs">
+                                            Copied
+                                        </span>
+                                    )}
                                 </Button>
                             </div>
                         ) : reauthOpen ? (
@@ -646,11 +704,14 @@ export function ShowCredentialDialog({
                                         type="password"
                                         autoFocus
                                         value={password}
-                                        onChange={(e) => setPassword(e.target.value)}
+                                        onChange={(e) =>
+                                            setPassword(e.target.value)
+                                        }
                                         onKeyDown={(e) => {
                                             if (e.key === 'Enter') {
                                                 e.preventDefault();
-                                                if (password) void doReveal(password);
+                                                if (password)
+                                                    void doReveal(password);
                                             }
                                         }}
                                         placeholder="Your account password"
@@ -701,19 +762,49 @@ export function ShowCredentialDialog({
                             </Button>
                         )}
                         {revealError && (
-                            <p className="mt-1 text-xs text-status-critical" role="alert">
+                            <p
+                                className="mt-1 text-xs text-status-critical"
+                                role="alert"
+                            >
                                 {revealError}
                             </p>
                         )}
+                        {!canReveal && (
+                            <p className="mt-1 text-xs text-muted-foreground">
+                                You can view details, but need reveal permission
+                                to show this {word}.
+                            </p>
+                        )}
                     </dd>
-                    {credential.has_totp && canReveal && (
-                        <>
-                            <dt className="text-muted-foreground">One-time code</dt>
-                            <dd className="col-span-2">
-                                <CredentialTotpDisplay siteId={siteId} credentialId={credential.id} />
-                            </dd>
-                        </>
-                    )}
+                    {credential.has_totp &&
+                        canReveal &&
+                        (!credential.requires_reauth || revealedValue) && (
+                            <>
+                                <dt className="text-muted-foreground">
+                                    One-time code
+                                </dt>
+                                <dd className="col-span-2">
+                                    <CredentialTotpDisplay
+                                        siteId={siteId}
+                                        credentialId={credential.id}
+                                    />
+                                </dd>
+                            </>
+                        )}
+                    {credential.has_totp &&
+                        canReveal &&
+                        credential.requires_reauth &&
+                        !revealedValue && (
+                            <>
+                                <dt className="text-muted-foreground">
+                                    One-time code
+                                </dt>
+                                <dd className="col-span-2 text-xs text-muted-foreground">
+                                    Reveal this credential first to unlock the
+                                    live code.
+                                </dd>
+                            </>
+                        )}
                     {credential.url && (
                         <>
                             <dt className="text-muted-foreground">URL</dt>
@@ -732,28 +823,41 @@ export function ShowCredentialDialog({
                     )}
                     {credential.vendor_name && (
                         <>
-                            <dt className="text-muted-foreground">Linked vendor</dt>
-                            <dd className="col-span-2">{credential.vendor_name}</dd>
+                            <dt className="text-muted-foreground">
+                                Linked vendor
+                            </dt>
+                            <dd className="col-span-2">
+                                {credential.vendor_name}
+                            </dd>
                         </>
                     )}
                     <dt className="text-muted-foreground">Last rotated</dt>
                     <dd className="col-span-2">
                         {formatDate(credential.last_rotated_at)}
                         {rot.days != null && (
-                            <span className="ml-1 text-xs text-muted-foreground">· {rot.days}d</span>
+                            <span className="ml-1 text-xs text-muted-foreground">
+                                · {rot.days}d
+                            </span>
                         )}
                     </dd>
                     {credential.notes && (
                         <>
                             <dt className="text-muted-foreground">Notes</dt>
-                            <dd className="col-span-2 whitespace-pre-wrap">{credential.notes}</dd>
+                            <dd className="col-span-2 whitespace-pre-wrap">
+                                {credential.notes}
+                            </dd>
                         </>
                     )}
                 </dl>
 
                 <DialogFooter className="mt-4 flex-wrap gap-2 sm:justify-between">
                     {onHistory ? (
-                        <Button type="button" variant="ghost" size="sm" onClick={onHistory}>
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={onHistory}
+                        >
                             <History className="mr-2 h-4 w-4" />
                             Reveal history
                         </Button>
@@ -762,7 +866,11 @@ export function ShowCredentialDialog({
                     )}
                     <div className="flex flex-wrap items-center gap-2">
                         {canManage && credential.has_totp && (
-                            <Button type="button" variant="outline" onClick={onRemoveTotp}>
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={onRemoveTotp}
+                            >
                                 <ShieldCheck className="mr-2 h-4 w-4" />
                                 Remove authenticator
                             </Button>
@@ -778,7 +886,11 @@ export function ShowCredentialDialog({
                                 Delete
                             </Button>
                         )}
-                        <Button type="button" variant="outline" onClick={onClose}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={onClose}
+                        >
                             Close
                         </Button>
                         {canManage && onEdit && (
@@ -796,7 +908,13 @@ export function ShowCredentialDialog({
 
 function strengthLabelFromScore(score?: number | null) {
     if (score === null || score === undefined) return null;
-    const labels = ['Very weak', 'Weak', 'Fair', 'Good', 'Very strong'] as const;
+    const labels = [
+        'Very weak',
+        'Weak',
+        'Fair',
+        'Good',
+        'Very strong',
+    ] as const;
     const levels = ['very-weak', 'weak', 'fair', 'good', 'strong'] as const;
     const idx = Math.max(0, Math.min(4, score)) as 0 | 1 | 2 | 3 | 4;
     return { label: labels[idx], level: levels[idx] };
@@ -811,7 +929,13 @@ function CopyButton({ text }: { text: string }) {
         }
     };
     return (
-        <Button type="button" variant="ghost" size="sm" onClick={handleCopy} aria-label="Copy">
+        <Button
+            type="button"
+            variant="ghost"
+            size="sm"
+            onClick={handleCopy}
+            aria-label="Copy"
+        >
             <Copy className="h-4 w-4" />
         </Button>
     );
@@ -851,9 +975,13 @@ export function DeleteCredentialDialog({
                     <DialogDescription>
                         {credential && (
                             <>
-                                <span className="font-medium">{credential.label}</span> will be
-                                removed and anyone relying on this {secretWord(credential.credential_type)} will
-                                lose access. Audit history is retained. This cannot be undone.
+                                <span className="font-medium">
+                                    {credential.label}
+                                </span>{' '}
+                                will be removed and anyone relying on this{' '}
+                                {secretWord(credential.credential_type)} will
+                                lose access. Audit history is retained. This
+                                cannot be undone.
                             </>
                         )}
                     </DialogDescription>
@@ -862,8 +990,14 @@ export function DeleteCredentialDialog({
                     <Button variant="outline" onClick={onClose}>
                         Cancel
                     </Button>
-                    <Button variant="destructive" onClick={handleDelete} disabled={submitting}>
-                        {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    <Button
+                        variant="destructive"
+                        onClick={handleDelete}
+                        disabled={submitting}
+                    >
+                        {submitting && (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        )}
                         Delete credential
                     </Button>
                 </DialogFooter>
@@ -904,16 +1038,23 @@ export function RemoveTotpDialog({
                 <DialogHeader>
                     <DialogTitle>Remove authenticator?</DialogTitle>
                     <DialogDescription>
-                        The TOTP secret will be permanently deleted. Anyone with access to this
-                        credential will no longer see a one-time code.
+                        The TOTP secret will be permanently deleted. Anyone with
+                        access to this credential will no longer see a one-time
+                        code.
                     </DialogDescription>
                 </DialogHeader>
                 <DialogFooter>
                     <Button variant="outline" onClick={onClose}>
                         Cancel
                     </Button>
-                    <Button variant="destructive" onClick={handleRemove} disabled={submitting}>
-                        {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    <Button
+                        variant="destructive"
+                        onClick={handleRemove}
+                        disabled={submitting}
+                    >
+                        {submitting && (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        )}
                         Remove authenticator
                     </Button>
                 </DialogFooter>
@@ -980,7 +1121,9 @@ function CredentialFormFields({
         { value: '', label: 'No linked vendor' },
         ...vendors.map((v) => ({
             value: String(v.id),
-            label: v.service_type ? `${v.company_name} · ${v.service_type}` : v.company_name,
+            label: v.service_type
+                ? `${v.company_name} · ${v.service_type}`
+                : v.company_name,
         })),
     ];
 
@@ -1023,7 +1166,9 @@ function CredentialFormFields({
                     <Input
                         id="c-user"
                         value={form.data.username}
-                        onChange={(e) => form.setData('username', e.target.value)}
+                        onChange={(e) =>
+                            form.setData('username', e.target.value)
+                        }
                         autoComplete="off"
                         placeholder="optional"
                     />
@@ -1046,8 +1191,17 @@ function CredentialFormFields({
                     <Label>Linked vendor</Label>
                     <div className="mt-1">
                         <FilterSelect
-                            value={form.data.vendor_id == null ? '' : String(form.data.vendor_id)}
-                            onChange={(v) => form.setData('vendor_id', v === '' ? null : Number(v))}
+                            value={
+                                form.data.vendor_id == null
+                                    ? ''
+                                    : String(form.data.vendor_id)
+                            }
+                            onChange={(v) =>
+                                form.setData(
+                                    'vendor_id',
+                                    v === '' ? null : Number(v),
+                                )
+                            }
                             options={vendorOptions}
                             widthClass="w-full"
                             aria-label="Linked vendor"
@@ -1060,9 +1214,17 @@ function CredentialFormFields({
             <div>
                 <div className="flex items-center justify-between">
                     <Label htmlFor="c-value" className="capitalize">
-                        {word} {!edit && <span className="text-status-critical">*</span>}
+                        {word}{' '}
+                        {!edit && (
+                            <span className="text-status-critical">*</span>
+                        )}
                     </Label>
-                    <Button type="button" variant="ghost" size="sm" onClick={handleGenerate}>
+                    <Button
+                        type="button"
+                        variant="ghost"
+                        size="sm"
+                        onClick={handleGenerate}
+                    >
                         <RefreshCcw className="mr-1 h-3 w-3" />
                         Generate
                     </Button>
@@ -1080,11 +1242,15 @@ function CredentialFormFields({
                     {/* eslint-disable-next-line no-restricted-syntax -- inline input affordance, not a Button */}
                     <button
                         type="button"
-                        className="absolute right-2 top-1/2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
+                        className="absolute top-1/2 right-2 -translate-y-1/2 text-muted-foreground hover:text-foreground"
                         onClick={() => setShowPassword((v) => !v)}
                         aria-label={showPassword ? 'Hide' : 'Show'}
                     >
-                        {showPassword ? <EyeOff className="h-4 w-4" /> : <Eye className="h-4 w-4" />}
+                        {showPassword ? (
+                            <EyeOff className="h-4 w-4" />
+                        ) : (
+                            <Eye className="h-4 w-4" />
+                        )}
                     </button>
                 </div>
                 {form.data.value && (
@@ -1092,15 +1258,22 @@ function CredentialFormFields({
                         <div className="h-1.5 overflow-hidden rounded-full bg-muted">
                             <div
                                 className={`h-full rounded-full transition-all ${STRENGTH_FILL[strength.level] ?? 'bg-muted-foreground'}`}
-                                style={{ width: `${((strength.score + 1) / 5) * 100}%` }}
+                                style={{
+                                    width: `${((strength.score + 1) / 5) * 100}%`,
+                                }}
                             />
                         </div>
                         <div className="flex items-center gap-2 text-xs">
-                            <Badge variant="outline" className={strengthBadgeClasses(strength.level)}>
+                            <Badge
+                                variant="outline"
+                                className={strengthBadgeClasses(strength.level)}
+                            >
                                 {strength.label}
                             </Badge>
                             {strength.feedback && (
-                                <span className="text-muted-foreground">{strength.feedback}</span>
+                                <span className="text-muted-foreground">
+                                    {strength.feedback}
+                                </span>
                             )}
                         </div>
                     </div>
@@ -1125,7 +1298,10 @@ function CredentialFormFields({
                     id="c-totp"
                     value={form.data.totp_secret}
                     onChange={(e) =>
-                        form.setData('totp_secret', e.target.value.replace(/\s+/g, '').toUpperCase())
+                        form.setData(
+                            'totp_secret',
+                            e.target.value.replace(/\s+/g, '').toUpperCase(),
+                        )
                     }
                     placeholder={
                         edit
@@ -1137,8 +1313,8 @@ function CredentialFormFields({
                     className="font-mono tracking-wide"
                 />
                 <p className="mt-1 text-xs text-muted-foreground">
-                    Paste the Base32 secret from the external service. Oblivion becomes the
-                    authenticator and shows the live 6-digit code.
+                    Paste the Base32 secret from the external service. Oblivion
+                    becomes the authenticator and shows the live 6-digit code.
                 </p>
                 <FieldError message={form.errors.totp_secret} />
             </div>
@@ -1148,7 +1324,9 @@ function CredentialFormFields({
                     <Checkbox
                         id="c-reauth"
                         checked={form.data.requires_reauth}
-                        onCheckedChange={(v) => form.setData('requires_reauth', !!v)}
+                        onCheckedChange={(v) =>
+                            form.setData('requires_reauth', !!v)
+                        }
                     />
                     <Label htmlFor="c-reauth" className="text-sm font-normal">
                         Require re-auth to reveal
@@ -1158,13 +1336,22 @@ function CredentialFormFields({
                     <Checkbox
                         id="c-shareable"
                         checked={form.data.is_shareable}
-                        onCheckedChange={(v) => form.setData('is_shareable', !!v)}
+                        onCheckedChange={(v) =>
+                            form.setData('is_shareable', !!v)
+                        }
                     />
-                    <Label htmlFor="c-shareable" className="text-sm font-normal">
-                        Allow sharing outside this site
+                    <Label
+                        htmlFor="c-shareable"
+                        className="text-sm font-normal"
+                    >
+                        Mark as shareable outside this site
                     </Label>
                 </div>
             </div>
+            <p className="-mt-1 text-xs text-muted-foreground">
+                Shareable is a review marker only; it does not grant access or
+                bypass reveal permissions.
+            </p>
 
             <div>
                 <Label htmlFor="c-notes">Notes</Label>

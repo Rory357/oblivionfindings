@@ -580,6 +580,17 @@ class SiteController extends Controller
                         'preferred_contact_method' => $v->preferred_contact_method,
                         'is_preferred' => (bool) $v->is_preferred,
                         'is_active' => (bool) $v->is_active,
+                        'hs_induction_completed' => (bool) $v->hs_induction_completed,
+                        'hs_induction_date' => $v->hs_induction_date?->toDateString(),
+                        'qualifications_verified' => (bool) $v->qualifications_verified,
+                        'qualifications_notes' => $v->qualifications_notes,
+                        'insurance_verified' => (bool) $v->insurance_verified,
+                        'insurance_expiry' => $v->insurance_expiry?->toDateString(),
+                        'insurance_provider' => $v->insurance_provider,
+                        'insurance_policy_number' => $v->insurance_policy_number,
+                        'site_specific_hs_plan' => $v->site_specific_hs_plan,
+                        'hs_performance_rating' => $v->hs_performance_rating,
+                        'hs_last_reviewed_at' => $v->hs_last_reviewed_at?->toDateString(),
                     ])
                     ->values()
                     ->all()

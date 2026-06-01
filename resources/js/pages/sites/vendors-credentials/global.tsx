@@ -41,7 +41,6 @@ import {
 import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import {
-    CREDENTIAL_TYPE_META,
     type CredentialPickerOption,
     credentialTypeIcon,
     credentialTypeLabel,
@@ -50,8 +49,8 @@ import {
     RotationBadge,
     rotationStatus,
     SITE_TYPE_META,
-    SiteTypeBadge,
     type SiteOption,
+    SiteTypeBadge,
 } from '../_dialog-shared';
 import {
     AddCredentialDialog,
@@ -69,7 +68,11 @@ import {
     type VendorRecord,
 } from '../vendors/_dialogs';
 import { AuditLogDialog } from './_audit-dialog';
-import { type ContextMenuItem, type ContextMenuState, RowContextMenu } from './_context-menu';
+import {
+    type ContextMenuItem,
+    type ContextMenuState,
+    RowContextMenu,
+} from './_context-menu';
 import { ManageCredentialTypesDialog } from './_manage-types-dialog';
 
 type VendorRow = VendorRecord & {
@@ -111,7 +114,10 @@ type Props = {
     };
 };
 
-type VendorDialog = { mode: 'add' | 'edit' | 'show' | 'delete' | null; target: VendorRow | null };
+type VendorDialog = {
+    mode: 'add' | 'edit' | 'show' | 'delete' | null;
+    target: VendorRow | null;
+};
 type CredentialDialog = {
     mode: 'add' | 'edit' | 'show' | 'delete' | 'remove-totp' | null;
     target: CredentialRow | null;
@@ -121,8 +127,15 @@ function csvEscape(cell: unknown) {
     return `"${String(cell ?? '').replace(/"/g, '""')}"`;
 }
 
-function downloadCsv(filename: string, head: string[], rows: (string | number | null | undefined)[][]) {
-    const csv = [head.map(csvEscape).join(','), ...rows.map((r) => r.map(csvEscape).join(','))].join('\n');
+function downloadCsv(
+    filename: string,
+    head: string[],
+    rows: (string | number | null | undefined)[][],
+) {
+    const csv = [
+        head.map(csvEscape).join(','),
+        ...rows.map((r) => r.map(csvEscape).join(',')),
+    ].join('\n');
     try {
         const blob = new Blob([csv], { type: 'text/csv;charset=utf-8;' });
         const url = URL.createObjectURL(blob);
@@ -156,20 +169,42 @@ export default function GlobalVendorsCredentials({
     const page = usePage<{ auth?: { user?: { name?: string } } }>();
     const firstName = firstNameFromPage(page.props.auth?.user?.name);
 
-    const [tab, setTab] = useState<'vendors' | 'credentials'>(can.vendors ? 'vendors' : 'credentials');
+    const [tab, setTab] = useState<'vendors' | 'credentials'>(
+        can.vendors ? 'vendors' : 'credentials',
+    );
     const [search, setSearch] = useState('');
-    const [siteFilter, setSiteFilter] = useState<string>(filters.site_id ? String(filters.site_id) : 'all');
-    const [serviceTypeFilter, setServiceTypeFilter] = useState<string>(filters.service_type ?? 'all');
-    const [vendorStatusFilter, setVendorStatusFilter] = useState<string>(filters.vendor_status ?? 'all');
-    const [preferredFilter, setPreferredFilter] = useState<string>(filters.preferred ?? 'all');
-    const [credentialTypeFilter, setCredentialTypeFilter] = useState<string>(filters.credential_type ?? 'all');
-    const [reauthFilter, setReauthFilter] = useState<string>(filters.requires_reauth ?? 'all');
+    const [siteFilter, setSiteFilter] = useState<string>(
+        filters.site_id ? String(filters.site_id) : 'all',
+    );
+    const [serviceTypeFilter, setServiceTypeFilter] = useState<string>(
+        filters.service_type ?? 'all',
+    );
+    const [vendorStatusFilter, setVendorStatusFilter] = useState<string>(
+        filters.vendor_status ?? 'all',
+    );
+    const [preferredFilter, setPreferredFilter] = useState<string>(
+        filters.preferred ?? 'all',
+    );
+    const [credentialTypeFilter, setCredentialTypeFilter] = useState<string>(
+        filters.credential_type ?? 'all',
+    );
+    const [reauthFilter, setReauthFilter] = useState<string>(
+        filters.requires_reauth ?? 'all',
+    );
     const [rotFilter, setRotFilter] = useState<string>('all');
 
     // Dialog + menu state
-    const [vendorDialog, setVendorDialog] = useState<VendorDialog>({ mode: null, target: null });
-    const [credentialDialog, setCredentialDialog] = useState<CredentialDialog>({ mode: null, target: null });
-    const [auditOpen, setAuditOpen] = useState<{ focusLabel?: string } | null>(null);
+    const [vendorDialog, setVendorDialog] = useState<VendorDialog>({
+        mode: null,
+        target: null,
+    });
+    const [credentialDialog, setCredentialDialog] = useState<CredentialDialog>({
+        mode: null,
+        target: null,
+    });
+    const [auditOpen, setAuditOpen] = useState<{ focusLabel?: string } | null>(
+        null,
+    );
     const [typesOpen, setTypesOpen] = useState(false);
     const [ctxMenu, setCtxMenu] = useState<ContextMenuState | null>(null);
 
@@ -185,41 +220,88 @@ export default function GlobalVendorsCredentials({
     const filteredVendors = useMemo(
         () =>
             vendors.filter((v) => {
-                if (siteFilter !== 'all' && String(v.site_id) !== siteFilter) return false;
-                if (serviceTypeFilter !== 'all' && v.service_type !== serviceTypeFilter) return false;
-                if (vendorStatusFilter === 'active' && !v.is_active) return false;
-                if (vendorStatusFilter === 'inactive' && v.is_active) return false;
+                if (siteFilter !== 'all' && String(v.site_id) !== siteFilter)
+                    return false;
+                if (
+                    serviceTypeFilter !== 'all' &&
+                    v.service_type !== serviceTypeFilter
+                )
+                    return false;
+                if (vendorStatusFilter === 'active' && !v.is_active)
+                    return false;
+                if (vendorStatusFilter === 'inactive' && v.is_active)
+                    return false;
                 if (preferredFilter === 'yes' && !v.is_preferred) return false;
-                return matchSearch([v.company_name, v.service_type, v.site_name, v.contact_name]);
+                return matchSearch([
+                    v.company_name,
+                    v.service_type,
+                    v.site_name,
+                    v.contact_name,
+                ]);
             }),
-        [vendors, siteFilter, serviceTypeFilter, vendorStatusFilter, preferredFilter, matchSearch],
+        [
+            vendors,
+            siteFilter,
+            serviceTypeFilter,
+            vendorStatusFilter,
+            preferredFilter,
+            matchSearch,
+        ],
     );
 
     const filteredCredentials = useMemo(
         () =>
             credentials.filter((c) => {
-                if (siteFilter !== 'all' && String(c.site_id) !== siteFilter) return false;
-                if (credentialTypeFilter !== 'all' && c.credential_type !== credentialTypeFilter) return false;
+                if (siteFilter !== 'all' && String(c.site_id) !== siteFilter)
+                    return false;
+                if (
+                    credentialTypeFilter !== 'all' &&
+                    c.credential_type !== credentialTypeFilter
+                )
+                    return false;
                 if (reauthFilter === 'yes' && !c.requires_reauth) return false;
                 if (reauthFilter === 'no' && c.requires_reauth) return false;
                 if (rotFilter !== 'all') {
                     const key = rotationStatus(c.last_rotated_at).key;
                     if (rotFilter === 'ok' && key !== 'ok') return false;
                     if (rotFilter === 'due' && key !== 'due') return false;
-                    if (rotFilter === 'overdue' && key !== 'overdue' && key !== 'unknown') return false;
+                    if (
+                        rotFilter === 'overdue' &&
+                        key !== 'overdue' &&
+                        key !== 'unknown'
+                    )
+                        return false;
                 }
-                return matchSearch([c.label, c.credential_type, c.site_name, c.vendor_name]);
+                return matchSearch([
+                    c.label,
+                    c.credential_type,
+                    c.site_name,
+                    c.vendor_name,
+                ]);
             }),
-        [credentials, siteFilter, credentialTypeFilter, reauthFilter, rotFilter, matchSearch],
+        [
+            credentials,
+            siteFilter,
+            credentialTypeFilter,
+            reauthFilter,
+            rotFilter,
+            matchSearch,
+        ],
     );
 
     // Counts respect the site filter only (matching how the hero already scopes).
     const scopedVendors = useMemo(
-        () => vendors.filter((v) => siteFilter === 'all' || String(v.site_id) === siteFilter),
+        () =>
+            vendors.filter(
+                (v) => siteFilter === 'all' || String(v.site_id) === siteFilter,
+            ),
         [vendors, siteFilter],
     );
     const scopedCredentials = useMemo(
-        () => credentials.filter((c) => siteFilter === 'all' || String(c.site_id) === siteFilter),
+        () =>
+            credentials.filter(
+                (c) => siteFilter === 'all' || String(c.site_id) === siteFilter,
+            ),
         [credentials, siteFilter],
     );
 
@@ -241,7 +323,9 @@ export default function GlobalVendorsCredentials({
         credentials: scopedCredentials.length,
         reauth: scopedCredentials.filter((c) => c.requires_reauth).length,
         rotationDue: scopedCredentials.filter((c) =>
-            ['due', 'overdue', 'unknown'].includes(rotationStatus(c.last_rotated_at).key),
+            ['due', 'overdue', 'unknown'].includes(
+                rotationStatus(c.last_rotated_at).key,
+            ),
         ).length,
     };
 
@@ -267,7 +351,11 @@ export default function GlobalVendorsCredentials({
     };
 
     const siteById = (id?: number | null) => sites.find((s) => s.id === id);
-    const lockedSiteFor = (row: { site_id: number; site_name?: string | null; site_type?: string | null }) => ({
+    const lockedSiteFor = (row: {
+        site_id: number;
+        site_name?: string | null;
+        site_type?: string | null;
+    }) => ({
         id: row.site_id,
         name: row.site_name ?? siteById(row.site_id)?.name ?? 'This site',
         type: row.site_type ?? siteById(row.site_id)?.type ?? '',
@@ -297,7 +385,11 @@ export default function GlobalVendorsCredentials({
     ];
     const credTypeOptions: FilterOption[] = [
         { value: 'all', label: 'Any type' },
-        ...credentialTypes.map((t) => ({ value: t, label: credentialTypeLabel(t), icon: credentialTypeIcon(t) })),
+        ...credentialTypes.map((t) => ({
+            value: t,
+            label: credentialTypeLabel(t),
+            icon: credentialTypeIcon(t),
+        })),
     ];
     const reauthOptions: FilterOption[] = [
         { value: 'all', label: 'Any reveal rule' },
@@ -315,11 +407,18 @@ export default function GlobalVendorsCredentials({
         toast.success(`${label} copied`);
     };
 
-    const toggleVendorFlag = (vendor: VendorRow, patch: { is_preferred?: boolean; is_active?: boolean }) => {
-        router.patch(`/sites/${vendor.site_id}/vendors/${vendor.id}/flags`, patch, {
-            preserveScroll: true,
-            preserveState: true,
-        });
+    const toggleVendorFlag = (
+        vendor: VendorRow,
+        patch: { is_preferred?: boolean; is_active?: boolean },
+    ) => {
+        router.patch(
+            `/sites/${vendor.site_id}/vendors/${vendor.id}/flags`,
+            patch,
+            {
+                preserveScroll: true,
+                preserveState: true,
+            },
+        );
     };
     const markRotated = (credential: CredentialRow) => {
         router.post(
@@ -336,107 +435,195 @@ export default function GlobalVendorsCredentials({
         );
     };
 
+    const vendorMenuItems = (v: VendorRow): ContextMenuItem[] => [
+        {
+            icon: Eye,
+            label: 'View details',
+            onClick: () => setVendorDialog({ mode: 'show', target: v }),
+        },
+        ...(can.vendorsManage
+            ? [
+                  {
+                      icon: Pencil,
+                      label: 'Edit vendor',
+                      onClick: () =>
+                          setVendorDialog({ mode: 'edit', target: v }),
+                  },
+              ]
+            : []),
+        ...(v.phone
+            ? [
+                  {
+                      icon: Phone,
+                      label: 'Call main line',
+                      onClick: () => (window.location.href = `tel:${v.phone}`),
+                  },
+              ]
+            : []),
+        ...(v.after_hours_phone
+            ? [
+                  {
+                      icon: Clock,
+                      label: 'Call after-hours',
+                      onClick: () =>
+                          (window.location.href = `tel:${v.after_hours_phone}`),
+                  },
+              ]
+            : []),
+        ...(v.email
+            ? [
+                  {
+                      icon: Mail,
+                      label: 'Email vendor',
+                      onClick: () =>
+                          (window.location.href = `mailto:${v.email}`),
+                  },
+              ]
+            : []),
+        ...(v.phone
+            ? [
+                  {
+                      icon: FileText,
+                      label: 'Copy phone number',
+                      onClick: () => copyText(v.phone!, 'Phone'),
+                  },
+              ]
+            : []),
+        { sep: true } as ContextMenuItem,
+        ...(can.vendorsManage
+            ? [
+                  {
+                      icon: Star,
+                      label: v.is_preferred
+                          ? 'Remove preferred'
+                          : 'Mark as preferred',
+                      onClick: () =>
+                          toggleVendorFlag(v, {
+                              is_preferred: !v.is_preferred,
+                          }),
+                  },
+              ]
+            : []),
+        {
+            icon: Lock,
+            label: 'View linked credentials',
+            onClick: () => {
+                setTab('credentials');
+                setCredentialTypeFilter('all');
+                setReauthFilter('all');
+                setRotFilter('all');
+                setSearch(v.company_name);
+            },
+        },
+        ...(can.vendorsManage
+            ? [
+                  {
+                      icon: v.is_active ? X : CheckCircle2,
+                      label: v.is_active
+                          ? 'Deactivate vendor'
+                          : 'Activate vendor',
+                      onClick: () =>
+                          toggleVendorFlag(v, { is_active: !v.is_active }),
+                  },
+              ]
+            : []),
+        ...(can.vendorsManage
+            ? [
+                  { sep: true } as ContextMenuItem,
+                  {
+                      icon: Trash2,
+                      label: 'Delete vendor',
+                      danger: true,
+                      onClick: () =>
+                          setVendorDialog({ mode: 'delete', target: v }),
+                  },
+              ]
+            : []),
+    ];
+
     const openVendorMenu = (e: React.MouseEvent, v: VendorRow) => {
         e.preventDefault();
-        const items: ContextMenuItem[] = [
-            { icon: Eye, label: 'View details', onClick: () => setVendorDialog({ mode: 'show', target: v }) },
-            ...(can.vendorsManage
-                ? [{ icon: Pencil, label: 'Edit vendor', onClick: () => setVendorDialog({ mode: 'edit', target: v }) }]
-                : []),
-            ...(v.phone
-                ? [{ icon: Phone, label: 'Call main line', onClick: () => (window.location.href = `tel:${v.phone}`) }]
-                : []),
-            ...(v.after_hours_phone
-                ? [
-                      {
-                          icon: Clock,
-                          label: 'Call after-hours',
-                          onClick: () => (window.location.href = `tel:${v.after_hours_phone}`),
-                      },
-                  ]
-                : []),
-            ...(v.email
-                ? [{ icon: Mail, label: 'Email vendor', onClick: () => (window.location.href = `mailto:${v.email}`) }]
-                : []),
-            ...(v.phone ? [{ icon: FileText, label: 'Copy phone number', onClick: () => copyText(v.phone!, 'Phone') }] : []),
-            { sep: true } as ContextMenuItem,
-            ...(can.vendorsManage
-                ? [
-                      {
-                          icon: Star,
-                          label: v.is_preferred ? 'Remove preferred' : 'Mark as preferred',
-                          onClick: () => toggleVendorFlag(v, { is_preferred: !v.is_preferred }),
-                      },
-                  ]
-                : []),
-            {
-                icon: Lock,
-                label: 'View linked credentials',
-                onClick: () => {
-                    setTab('credentials');
-                    setCredentialTypeFilter('all');
-                    setReauthFilter('all');
-                    setRotFilter('all');
-                    setSearch(v.company_name);
-                },
-            },
-            ...(can.vendorsManage
-                ? [
-                      {
-                          icon: v.is_active ? X : CheckCircle2,
-                          label: v.is_active ? 'Deactivate vendor' : 'Activate vendor',
-                          onClick: () => toggleVendorFlag(v, { is_active: !v.is_active }),
-                      },
-                  ]
-                : []),
-            ...(can.vendorsManage
-                ? [
-                      { sep: true } as ContextMenuItem,
-                      {
-                          icon: Trash2,
-                          label: 'Delete vendor',
-                          danger: true,
-                          onClick: () => setVendorDialog({ mode: 'delete', target: v }),
-                      },
-                  ]
-                : []),
-        ];
-        setCtxMenu({ x: e.clientX, y: e.clientY, header: { icon: Truck, title: v.company_name, sub: v.service_type }, items });
+        const items = vendorMenuItems(v);
+        setCtxMenu({
+            x: e.clientX,
+            y: e.clientY,
+            header: { icon: Truck, title: v.company_name, sub: v.service_type },
+            items,
+        });
     };
 
-    const openCredentialMenu = (e: React.MouseEvent, c: CredentialRow) => {
-        e.preventDefault();
+    const credentialMenuItems = (c: CredentialRow): ContextMenuItem[] => {
         const word = c.credential_type === 'pin' ? 'code' : 'password';
-        const items: ContextMenuItem[] = [
+        return [
             ...(can.credentialsReveal
                 ? [
                       {
                           icon: Eye,
-                          label: c.requires_reauth ? 'Re-authenticate & reveal' : `Reveal ${word}`,
-                          onClick: () => setCredentialDialog({ mode: 'show', target: c }),
+                          label: c.requires_reauth
+                              ? 'Re-authenticate & reveal'
+                              : `Reveal ${word}`,
+                          onClick: () =>
+                              setCredentialDialog({ mode: 'show', target: c }),
                       },
                   ]
-                : [{ icon: Eye, label: 'View details', onClick: () => setCredentialDialog({ mode: 'show', target: c }) }]),
+                : [
+                      {
+                          icon: Eye,
+                          label: 'View details',
+                          onClick: () =>
+                              setCredentialDialog({ mode: 'show', target: c }),
+                      },
+                  ]),
             ...(c.username
-                ? [{ icon: FileText, label: 'Copy username', onClick: () => copyText(c.username!, 'Username') }]
+                ? [
+                      {
+                          icon: FileText,
+                          label: 'Copy username',
+                          onClick: () => copyText(c.username!, 'Username'),
+                      },
+                  ]
                 : []),
             ...(c.url
-                ? [{ icon: Globe, label: 'Open URL', onClick: () => window.open(c.url!, '_blank', 'noopener') }]
+                ? [
+                      {
+                          icon: Globe,
+                          label: 'Open URL',
+                          onClick: () =>
+                              window.open(c.url!, '_blank', 'noopener'),
+                      },
+                  ]
                 : []),
             { sep: true } as ContextMenuItem,
             ...(can.credentialsManage
                 ? [
-                      { icon: Pencil, label: 'Edit credential', onClick: () => setCredentialDialog({ mode: 'edit', target: c }) },
-                      { icon: RefreshCcw, label: 'Mark rotated now', onClick: () => markRotated(c) },
+                      {
+                          icon: Pencil,
+                          label: 'Edit credential',
+                          onClick: () =>
+                              setCredentialDialog({ mode: 'edit', target: c }),
+                      },
+                      {
+                          icon: RefreshCcw,
+                          label: 'Mark rotated now',
+                          onClick: () => markRotated(c),
+                      },
                       {
                           icon: ShieldCheck,
-                          label: c.requires_reauth ? 'Drop re-auth requirement' : 'Require re-auth to reveal',
+                          label: c.requires_reauth
+                              ? 'Drop re-auth requirement'
+                              : 'Require re-auth to reveal',
                           onClick: () => toggleReauth(c),
                       },
                   ]
                 : []),
             ...(can.credentials
-                ? [{ icon: History, label: 'Reveal history', onClick: () => setAuditOpen({ focusLabel: c.label }) }]
+                ? [
+                      {
+                          icon: History,
+                          label: 'Reveal history',
+                          onClick: () => setAuditOpen({ focusLabel: c.label }),
+                      },
+                  ]
                 : []),
             ...(can.credentialsManage
                 ? [
@@ -445,15 +632,28 @@ export default function GlobalVendorsCredentials({
                           icon: Trash2,
                           label: 'Delete credential',
                           danger: true,
-                          onClick: () => setCredentialDialog({ mode: 'delete', target: c }),
+                          onClick: () =>
+                              setCredentialDialog({
+                                  mode: 'delete',
+                                  target: c,
+                              }),
                       },
                   ]
                 : []),
         ];
+    };
+
+    const openCredentialMenu = (e: React.MouseEvent, c: CredentialRow) => {
+        e.preventDefault();
+        const items = credentialMenuItems(c);
         setCtxMenu({
             x: e.clientX,
             y: e.clientY,
-            header: { icon: credentialTypeIcon(c.credential_type), title: c.label, sub: credentialTypeLabel(c.credential_type) },
+            header: {
+                icon: credentialTypeIcon(c.credential_type),
+                title: c.label,
+                sub: credentialTypeLabel(c.credential_type),
+            },
             items,
         });
     };
@@ -462,7 +662,25 @@ export default function GlobalVendorsCredentials({
     const exportVendors = () => {
         downloadCsv(
             `vendors-${new Date().toISOString().slice(0, 10)}.csv`,
-            ['Company', 'Service', 'Site', 'Contact', 'Phone', 'After-hours', 'Email', 'Preferred', 'Active'],
+            [
+                'Company',
+                'Service',
+                'Site',
+                'Contact',
+                'Phone',
+                'After-hours',
+                'Email',
+                'Preferred',
+                'Active',
+                'H&S induction',
+                'Induction date',
+                'Qualifications verified',
+                'Insurance verified',
+                'Insurance expiry',
+                'Insurance provider',
+                'H&S rating',
+                'Last H&S review',
+            ],
             filteredVendors.map((v) => [
                 v.company_name,
                 v.service_type,
@@ -473,6 +691,14 @@ export default function GlobalVendorsCredentials({
                 v.email,
                 v.is_preferred ? 'Yes' : 'No',
                 v.is_active ? 'Yes' : 'No',
+                v.hs_induction_completed ? 'Yes' : 'No',
+                v.hs_induction_date,
+                v.qualifications_verified ? 'Yes' : 'No',
+                v.insurance_verified ? 'Yes' : 'No',
+                v.insurance_expiry,
+                v.insurance_provider,
+                v.hs_performance_rating,
+                v.hs_last_reviewed_at,
             ]),
         );
         toast.success('Vendors exported to CSV');
@@ -480,7 +706,18 @@ export default function GlobalVendorsCredentials({
     const exportCredentials = () => {
         downloadCsv(
             `credentials-${new Date().toISOString().slice(0, 10)}.csv`,
-            ['Label', 'Type', 'Site', 'Vendor', 'Username', 'URL', 'Re-auth', 'Authenticator', 'Last rotated', 'Health'],
+            [
+                'Label',
+                'Type',
+                'Site',
+                'Vendor',
+                'Username',
+                'URL',
+                'Re-auth',
+                'Authenticator',
+                'Last rotated',
+                'Health',
+            ],
             filteredCredentials.map((c) => [
                 c.label,
                 credentialTypeLabel(c.credential_type),
@@ -501,27 +738,59 @@ export default function GlobalVendorsCredentials({
     const scopeLabel =
         siteFilter === 'all'
             ? `${sites.length} ${sites.length === 1 ? 'site' : 'sites'}`
-            : siteById(Number(siteFilter))?.name ?? '1 site';
+            : (siteById(Number(siteFilter))?.name ?? '1 site');
 
     const heroBadges = [
         ...(can.vendors
-            ? [{ icon: Star, label: `${counts.preferredVendors} preferred`, tone: 'default' as const }]
+            ? [
+                  {
+                      icon: Star,
+                      label: `${counts.preferredVendors} preferred`,
+                      tone: 'default' as const,
+                  },
+              ]
             : []),
         ...(can.credentials && counts.reauth > 0
-            ? [{ icon: ShieldCheck, label: `${counts.reauth} re-auth`, tone: 'warning' as const }]
+            ? [
+                  {
+                      icon: ShieldCheck,
+                      label: `${counts.reauth} re-auth`,
+                      tone: 'warning' as const,
+                  },
+              ]
             : []),
         ...(can.credentials && counts.rotationDue > 0
-            ? [{ icon: Clock, label: `${counts.rotationDue} rotation due`, tone: 'warning' as const }]
+            ? [
+                  {
+                      icon: Clock,
+                      label: `${counts.rotationDue} rotation due`,
+                      tone: 'warning' as const,
+                  },
+              ]
             : []),
     ];
 
     const heroStats = [
         ...(can.vendors ? [{ label: 'Vendors', value: counts.vendors }] : []),
-        ...(can.credentials ? [{ label: 'Credentials', value: counts.credentials }] : []),
         ...(can.credentials
-            ? [{ label: 'Re-auth', value: counts.reauth, tone: counts.reauth > 0 ? ('warning' as const) : undefined }]
+            ? [{ label: 'Credentials', value: counts.credentials }]
+            : []),
+        ...(can.credentials
+            ? [
+                  {
+                      label: 'Re-auth',
+                      value: counts.reauth,
+                      tone:
+                          counts.reauth > 0 ? ('warning' as const) : undefined,
+                  },
+              ]
             : []),
     ];
+    const hasMoreActions =
+        can.vendorsManage ||
+        can.credentialsManage ||
+        can.credentialsReveal ||
+        can.manageCredentialTypes;
 
     return (
         <AppLayout
@@ -537,7 +806,7 @@ export default function GlobalVendorsCredentials({
                     icon={Package}
                     title={
                         <span className="block space-y-1.5">
-                            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wider text-primary-foreground/80">
+                            <span className="inline-flex items-center gap-1.5 text-[11px] font-semibold tracking-wider text-primary-foreground/80 uppercase">
                                 <span className="relative flex h-2 w-2">
                                     <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-primary-foreground/70 opacity-75" />
                                     <span className="relative inline-flex h-2 w-2 rounded-full bg-primary-foreground" />
@@ -545,7 +814,8 @@ export default function GlobalVendorsCredentials({
                                 Live · vendor directory &amp; access vault
                             </span>
                             <span className="block">
-                                Kia ora {firstName}, here's who keeps the lights on across{' '}
+                                Kia ora {firstName}, here's who keeps the lights
+                                on across{' '}
                                 <span className="underline decoration-primary-foreground/40 underline-offset-4">
                                     {scopeLabel}
                                 </span>
@@ -556,8 +826,13 @@ export default function GlobalVendorsCredentials({
                         <>
                             {can.vendors && (
                                 <>
-                                    <strong className="font-semibold text-primary-foreground">{counts.vendors}</strong>{' '}
-                                    service {counts.vendors === 1 ? 'provider' : 'providers'}
+                                    <strong className="font-semibold text-primary-foreground">
+                                        {counts.vendors}
+                                    </strong>{' '}
+                                    service{' '}
+                                    {counts.vendors === 1
+                                        ? 'provider'
+                                        : 'providers'}
                                 </>
                             )}
                             {can.vendors && can.credentials ? ' and ' : ''}
@@ -566,15 +841,21 @@ export default function GlobalVendorsCredentials({
                                     <strong className="font-semibold text-primary-foreground">
                                         {counts.credentials}
                                     </strong>{' '}
-                                    stored {counts.credentials === 1 ? 'credential' : 'credentials'}
+                                    stored{' '}
+                                    {counts.credentials === 1
+                                        ? 'credential'
+                                        : 'credentials'}
                                 </>
                             )}{' '}
                             in view.
                             {can.credentials && counts.reauth > 0 ? (
                                 <>
                                     {' '}
-                                    {counts.reauth} {counts.reauth === 1 ? 'credential needs' : 'credentials need'} re-auth
-                                    to reveal.
+                                    {counts.reauth}{' '}
+                                    {counts.reauth === 1
+                                        ? 'credential needs'
+                                        : 'credentials need'}{' '}
+                                    re-auth to reveal.
                                 </>
                             ) : null}
                             {can.vendors ? (
@@ -583,84 +864,137 @@ export default function GlobalVendorsCredentials({
                                     <strong className="font-semibold text-primary-foreground">
                                         {counts.preferredVendors}
                                     </strong>{' '}
-                                    preferred {counts.preferredVendors === 1 ? 'vendor' : 'vendors'} on call.
+                                    preferred{' '}
+                                    {counts.preferredVendors === 1
+                                        ? 'vendor'
+                                        : 'vendors'}{' '}
+                                    on call.
                                 </>
                             ) : null}
                         </>
                     }
                     meta={[
-                        { icon: Building2, label: `${sites.length} ${sites.length === 1 ? 'site' : 'sites'}` },
-                        ...(can.vendors ? [{ icon: Truck, label: `${counts.activeVendors} active vendors` }] : []),
-                        { icon: ShieldCheck, label: 'Encrypted at rest · every reveal audited' },
+                        {
+                            icon: Building2,
+                            label: `${sites.length} ${sites.length === 1 ? 'site' : 'sites'}`,
+                        },
+                        ...(can.vendors
+                            ? [
+                                  {
+                                      icon: Truck,
+                                      label: `${counts.activeVendors} active vendors`,
+                                  },
+                              ]
+                            : []),
+                        {
+                            icon: ShieldCheck,
+                            label: 'Encrypted at rest · every reveal audited',
+                        },
                     ]}
                     badges={heroBadges}
                     stats={heroStats}
                     actions={
                         <>
                             {can.credentialsManage && (
-                                <Button size="sm" onClick={() => setCredentialDialog({ mode: 'add', target: null })}>
+                                <Button
+                                    size="sm"
+                                    onClick={() =>
+                                        setCredentialDialog({
+                                            mode: 'add',
+                                            target: null,
+                                        })
+                                    }
+                                >
                                     <Plus className="mr-1.5 h-4 w-4" />
                                     Add credential
                                 </Button>
                             )}
                             {can.vendorsManage && (
-                                <Button size="sm" variant="outline" onClick={() => setVendorDialog({ mode: 'add', target: null })}>
+                                <Button
+                                    size="sm"
+                                    variant="outline"
+                                    onClick={() =>
+                                        setVendorDialog({
+                                            mode: 'add',
+                                            target: null,
+                                        })
+                                    }
+                                >
                                     <Truck className="mr-1.5 h-4 w-4" />
                                     Add vendor
                                 </Button>
                             )}
-                            <DropdownMenu>
-                                <DropdownMenuTrigger asChild>
-                                    {/* Explicit on-dark styling: as a Radix trigger this Button
-                                        loses its data-slot, so PageHeroActions can't reach it. */}
-                                    <Button
-                                        size="icon"
-                                        variant="outline"
-                                        aria-label="More actions"
-                                        className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground shadow-none hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                            {hasMoreActions && (
+                                <DropdownMenu>
+                                    <DropdownMenuTrigger asChild>
+                                        {/* Explicit on-dark styling: as a Radix trigger this Button
+                                            loses its data-slot, so PageHeroActions can't reach it. */}
+                                        <Button
+                                            size="icon"
+                                            variant="outline"
+                                            aria-label="More actions"
+                                            className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground shadow-none hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                        >
+                                            <MoreHorizontal className="h-4 w-4" />
+                                        </Button>
+                                    </DropdownMenuTrigger>
+                                    <DropdownMenuContent
+                                        align="end"
+                                        className="w-56"
                                     >
-                                        <MoreHorizontal className="h-4 w-4" />
-                                    </Button>
-                                </DropdownMenuTrigger>
-                                <DropdownMenuContent align="end" className="w-56">
-                                    {can.vendors && (
-                                        <DropdownMenuItem onClick={exportVendors}>
-                                            <Truck className="mr-2 h-4 w-4" />
-                                            Export vendors (CSV)
-                                        </DropdownMenuItem>
-                                    )}
-                                    {can.credentials && (
-                                        <DropdownMenuItem onClick={exportCredentials}>
-                                            <Lock className="mr-2 h-4 w-4" />
-                                            Export credentials (CSV)
-                                        </DropdownMenuItem>
-                                    )}
-                                    {can.credentials && (
-                                        <>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem onClick={() => setAuditOpen({ focusLabel: '' })}>
-                                                <History className="mr-2 h-4 w-4" />
-                                                View reveal &amp; audit log
+                                        {can.vendorsManage && (
+                                            <DropdownMenuItem
+                                                onClick={exportVendors}
+                                            >
+                                                <Truck className="mr-2 h-4 w-4" />
+                                                Export vendors (CSV)
                                             </DropdownMenuItem>
-                                        </>
-                                    )}
-                                    {can.manageCredentialTypes && (
-                                        <>
-                                            <DropdownMenuSeparator />
-                                            <DropdownMenuItem onClick={() => setTypesOpen(true)}>
-                                                <Settings className="mr-2 h-4 w-4" />
-                                                Manage credential types
+                                        )}
+                                        {can.credentialsManage && (
+                                            <DropdownMenuItem
+                                                onClick={exportCredentials}
+                                            >
+                                                <Lock className="mr-2 h-4 w-4" />
+                                                Export credentials (CSV)
                                             </DropdownMenuItem>
-                                        </>
-                                    )}
-                                </DropdownMenuContent>
-                            </DropdownMenu>
+                                        )}
+                                        {can.credentialsReveal && (
+                                            <>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem
+                                                    onClick={() =>
+                                                        setAuditOpen({
+                                                            focusLabel: '',
+                                                        })
+                                                    }
+                                                >
+                                                    <History className="mr-2 h-4 w-4" />
+                                                    View reveal &amp; audit log
+                                                </DropdownMenuItem>
+                                            </>
+                                        )}
+                                        {can.manageCredentialTypes && (
+                                            <>
+                                                <DropdownMenuSeparator />
+                                                <DropdownMenuItem
+                                                    onClick={() =>
+                                                        setTypesOpen(true)
+                                                    }
+                                                >
+                                                    <Settings className="mr-2 h-4 w-4" />
+                                                    Manage credential types
+                                                </DropdownMenuItem>
+                                            </>
+                                        )}
+                                    </DropdownMenuContent>
+                                </DropdownMenu>
+                            )}
                         </>
                     }
                     footer={
                         <div className="flex flex-wrap items-center gap-2 py-3">
                             <div className="relative min-w-[220px] flex-1">
-                                <Search className="absolute left-3 top-1/2 h-4 w-4 -translate-y-1/2 text-primary-foreground/60" />
+                                <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-primary-foreground/60" />
                                 <Input
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
@@ -761,8 +1095,12 @@ export default function GlobalVendorsCredentials({
                     onVendorFilter={(which) => {
                         setTab('vendors');
                         setServiceTypeFilter('all');
-                        setVendorStatusFilter(which === 'active' ? 'active' : 'all');
-                        setPreferredFilter(which === 'preferred' ? 'yes' : 'all');
+                        setVendorStatusFilter(
+                            which === 'active' ? 'active' : 'all',
+                        );
+                        setPreferredFilter(
+                            which === 'preferred' ? 'yes' : 'all',
+                        );
                     }}
                 />
 
@@ -793,16 +1131,23 @@ export default function GlobalVendorsCredentials({
                     <VendorTable
                         rows={filteredVendors}
                         hasFilters={hasFilters}
-                        onOpen={(v) => setVendorDialog({ mode: 'show', target: v })}
+                        onOpen={(v) =>
+                            setVendorDialog({ mode: 'show', target: v })
+                        }
                         onContext={openVendorMenu}
+                        menuItems={vendorMenuItems}
                     />
                 ) : null}
                 {tab === 'credentials' && can.credentials ? (
                     <CredentialTable
                         rows={filteredCredentials}
                         hasFilters={hasFilters}
-                        onOpen={(c) => setCredentialDialog({ mode: 'show', target: c })}
+                        onOpen={(c) =>
+                            setCredentialDialog({ mode: 'show', target: c })
+                        }
                         onContext={openCredentialMenu}
+                        menuItems={credentialMenuItems}
+                        canReveal={can.credentialsReveal}
                     />
                 ) : null}
             </div>
@@ -820,21 +1165,31 @@ export default function GlobalVendorsCredentials({
                         siteId={vendorDialog.target.site_id}
                         vendor={vendorDialog.target}
                         lockedSite={lockedSiteFor(vendorDialog.target)}
-                        onClose={() => setVendorDialog({ mode: null, target: null })}
+                        onClose={() =>
+                            setVendorDialog({ mode: null, target: null })
+                        }
                     />
                     <ShowVendorDialog
                         isOpen={vendorDialog.mode === 'show'}
                         vendor={vendorDialog.target}
                         canManage={can.vendorsManage}
-                        onClose={() => setVendorDialog({ mode: null, target: null })}
-                        onEdit={() => setVendorDialog((p) => ({ ...p, mode: 'edit' }))}
-                        onDelete={() => setVendorDialog((p) => ({ ...p, mode: 'delete' }))}
+                        onClose={() =>
+                            setVendorDialog({ mode: null, target: null })
+                        }
+                        onEdit={() =>
+                            setVendorDialog((p) => ({ ...p, mode: 'edit' }))
+                        }
+                        onDelete={() =>
+                            setVendorDialog((p) => ({ ...p, mode: 'delete' }))
+                        }
                     />
                     <DeleteVendorDialog
                         isOpen={vendorDialog.mode === 'delete'}
                         siteId={vendorDialog.target.site_id}
                         vendor={vendorDialog.target}
-                        onClose={() => setVendorDialog({ mode: null, target: null })}
+                        onClose={() =>
+                            setVendorDialog({ mode: null, target: null })
+                        }
                     />
                 </>
             )}
@@ -844,7 +1199,9 @@ export default function GlobalVendorsCredentials({
                 sites={sites}
                 vendors={vendors}
                 typeOptions={credentialTypeOptions}
-                onClose={() => setCredentialDialog({ mode: null, target: null })}
+                onClose={() =>
+                    setCredentialDialog({ mode: null, target: null })
+                }
             />
             {credentialDialog.target && (
                 <>
@@ -855,7 +1212,9 @@ export default function GlobalVendorsCredentials({
                         lockedSite={lockedSiteFor(credentialDialog.target)}
                         vendors={vendors}
                         typeOptions={credentialTypeOptions}
-                        onClose={() => setCredentialDialog({ mode: null, target: null })}
+                        onClose={() =>
+                            setCredentialDialog({ mode: null, target: null })
+                        }
                     />
                     <ShowCredentialDialog
                         isOpen={credentialDialog.mode === 'show'}
@@ -863,10 +1222,24 @@ export default function GlobalVendorsCredentials({
                         credential={credentialDialog.target}
                         canManage={can.credentialsManage}
                         canReveal={can.credentialsReveal}
-                        onClose={() => setCredentialDialog({ mode: null, target: null })}
-                        onEdit={() => setCredentialDialog((p) => ({ ...p, mode: 'edit' }))}
-                        onDelete={() => setCredentialDialog((p) => ({ ...p, mode: 'delete' }))}
-                        onRemoveTotp={() => setCredentialDialog((p) => ({ ...p, mode: 'remove-totp' }))}
+                        onClose={() =>
+                            setCredentialDialog({ mode: null, target: null })
+                        }
+                        onEdit={() =>
+                            setCredentialDialog((p) => ({ ...p, mode: 'edit' }))
+                        }
+                        onDelete={() =>
+                            setCredentialDialog((p) => ({
+                                ...p,
+                                mode: 'delete',
+                            }))
+                        }
+                        onRemoveTotp={() =>
+                            setCredentialDialog((p) => ({
+                                ...p,
+                                mode: 'remove-totp',
+                            }))
+                        }
                         onHistory={() => {
                             const label = credentialDialog.target?.label;
                             setCredentialDialog({ mode: null, target: null });
@@ -877,13 +1250,17 @@ export default function GlobalVendorsCredentials({
                         isOpen={credentialDialog.mode === 'delete'}
                         siteId={credentialDialog.target.site_id}
                         credential={credentialDialog.target}
-                        onClose={() => setCredentialDialog({ mode: null, target: null })}
+                        onClose={() =>
+                            setCredentialDialog({ mode: null, target: null })
+                        }
                     />
                     <RemoveTotpDialog
                         isOpen={credentialDialog.mode === 'remove-totp'}
                         siteId={credentialDialog.target.site_id}
                         credential={credentialDialog.target}
-                        onClose={() => setCredentialDialog({ mode: null, target: null })}
+                        onClose={() =>
+                            setCredentialDialog({ mode: null, target: null })
+                        }
                     />
                 </>
             )}
@@ -895,7 +1272,10 @@ export default function GlobalVendorsCredentials({
                 onClose={() => setAuditOpen(null)}
             />
 
-            <ManageCredentialTypesDialog isOpen={typesOpen} onClose={() => setTypesOpen(false)} />
+            <ManageCredentialTypesDialog
+                isOpen={typesOpen}
+                onClose={() => setTypesOpen(false)}
+            />
 
             <RowContextMenu menu={ctxMenu} onClose={() => setCtxMenu(null)} />
         </AppLayout>
@@ -924,7 +1304,9 @@ function TabPill({
             onClick={onClick}
             className={cn(
                 'inline-flex items-center gap-2 rounded-lg px-3.5 py-1.5 text-sm font-medium transition-colors',
-                active ? 'bg-accent text-foreground shadow-sm' : 'text-muted-foreground hover:text-foreground',
+                active
+                    ? 'bg-accent text-foreground shadow-sm'
+                    : 'text-muted-foreground hover:text-foreground',
             )}
         >
             <Icon className="h-4 w-4" />
@@ -932,7 +1314,9 @@ function TabPill({
             <span
                 className={cn(
                     'rounded-full px-1.5 py-0.5 text-xs tabular-nums',
-                    active ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground',
+                    active
+                        ? 'bg-primary text-primary-foreground'
+                        : 'bg-muted text-muted-foreground',
                 )}
             >
                 {count}
@@ -964,7 +1348,10 @@ function HealthStrip({
     onReauth: () => void;
     onVendorFilter: (which: 'active' | 'preferred') => void;
 }) {
-    const total = Math.max(1, credHealth.ok + credHealth.due + credHealth.overdue);
+    const total = Math.max(
+        1,
+        credHealth.ok + credHealth.due + credHealth.overdue,
+    );
     const pct = (n: number) => `${(n / total) * 100}%`;
 
     return (
@@ -975,21 +1362,41 @@ function HealthStrip({
                     <div className="flex items-center gap-2 text-sm font-medium">
                         <Lock className="h-4 w-4 text-muted-foreground" />
                         Credential health
-                        <span className="text-xs font-normal text-muted-foreground">· {credentials} stored</span>
+                        <span className="text-xs font-normal text-muted-foreground">
+                            · {credentials} stored
+                        </span>
                     </div>
                     <div
                         className="mt-3 flex h-2 overflow-hidden rounded-full bg-muted"
                         role="img"
                         aria-label={`Rotation health: ${credHealth.ok} healthy, ${credHealth.due} due, ${credHealth.overdue} overdue`}
                     >
-                        {credHealth.ok > 0 && <div className="bg-status-success" style={{ width: pct(credHealth.ok) }} />}
-                        {credHealth.due > 0 && <div className="bg-status-warning" style={{ width: pct(credHealth.due) }} />}
+                        {credHealth.ok > 0 && (
+                            <div
+                                className="bg-status-success"
+                                style={{ width: pct(credHealth.ok) }}
+                            />
+                        )}
+                        {credHealth.due > 0 && (
+                            <div
+                                className="bg-status-warning"
+                                style={{ width: pct(credHealth.due) }}
+                            />
+                        )}
                         {credHealth.overdue > 0 && (
-                            <div className="bg-status-critical" style={{ width: pct(credHealth.overdue) }} />
+                            <div
+                                className="bg-status-critical"
+                                style={{ width: pct(credHealth.overdue) }}
+                            />
                         )}
                     </div>
                     <div className="mt-3 flex flex-wrap gap-2">
-                        <HealthChip label="Healthy" n={credHealth.ok} dotClass="bg-status-success" onClick={() => onCredFilter('ok')} />
+                        <HealthChip
+                            label="Healthy"
+                            n={credHealth.ok}
+                            dotClass="bg-status-success"
+                            onClick={() => onCredFilter('ok')}
+                        />
                         <HealthChip
                             label="Rotation due"
                             n={credHealth.due}
@@ -1016,7 +1423,9 @@ function HealthStrip({
                 </div>
             )}
 
-            {can.credentials && can.vendors && <div className="hidden w-px bg-border lg:block" />}
+            {can.credentials && can.vendors && (
+                <div className="hidden w-px bg-border lg:block" />
+            )}
 
             {can.vendors && (
                 <div className="lg:w-64">
@@ -1031,8 +1440,12 @@ function HealthStrip({
                             onClick={() => onVendorFilter('active')}
                             className="rounded-xl border border-border bg-background/40 p-3 text-left transition-colors hover:border-primary/50"
                         >
-                            <div className="text-xl font-bold tabular-nums">{activeVendors}</div>
-                            <div className="text-xs text-muted-foreground">Active</div>
+                            <div className="text-xl font-bold tabular-nums">
+                                {activeVendors}
+                            </div>
+                            <div className="text-xs text-muted-foreground">
+                                Active
+                            </div>
                         </button>
                         {/* eslint-disable-next-line no-restricted-syntax -- clickable stat tile (filters the table) */}
                         <button
@@ -1044,7 +1457,9 @@ function HealthStrip({
                                 {preferredVendors}
                                 <Star className="h-4 w-4 fill-status-warning text-status-warning" />
                             </div>
-                            <div className="text-xs text-muted-foreground">Preferred</div>
+                            <div className="text-xs text-muted-foreground">
+                                Preferred
+                            </div>
                         </button>
                     </div>
                 </div>
@@ -1113,7 +1528,9 @@ function TableShell({
                         <Icon className="h-4 w-4 text-primary" />
                         {title}
                     </h3>
-                    <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                        {subtitle}
+                    </p>
                 </div>
                 {badge}
             </div>
@@ -1122,7 +1539,17 @@ function TableShell({
     );
 }
 
-function EmptyRow({ icon: Icon, title, sub, colSpan }: { icon: typeof Truck; title: string; sub: string; colSpan: number }) {
+function EmptyRow({
+    icon: Icon,
+    title,
+    sub,
+    colSpan,
+}: {
+    icon: typeof Truck;
+    title: string;
+    sub: string;
+    colSpan: number;
+}) {
     return (
         <tr>
             <td colSpan={colSpan} className="px-4 py-16 text-center">
@@ -1134,32 +1561,81 @@ function EmptyRow({ icon: Icon, title, sub, colSpan }: { icon: typeof Truck; tit
     );
 }
 
-const TH = 'px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground';
+function RowActionDropdown({
+    items,
+    label,
+}: {
+    items: ContextMenuItem[];
+    label: string;
+}) {
+    return (
+        <DropdownMenu>
+            <DropdownMenuTrigger asChild>
+                <Button variant="ghost" size="sm" aria-label={label}>
+                    <MoreHorizontal className="h-4 w-4" />
+                </Button>
+            </DropdownMenuTrigger>
+            <DropdownMenuContent align="end" className="w-56">
+                {items.map((item, index) => {
+                    if (item.sep) {
+                        return <DropdownMenuSeparator key={`sep-${index}`} />;
+                    }
+
+                    const Icon = item.icon;
+                    return (
+                        <DropdownMenuItem
+                            key={`${item.label}-${index}`}
+                            disabled={item.disabled}
+                            className={
+                                item.danger
+                                    ? 'text-status-critical focus:text-status-critical'
+                                    : undefined
+                            }
+                            onClick={item.onClick}
+                        >
+                            <Icon className="mr-2 h-4 w-4" />
+                            {item.label}
+                        </DropdownMenuItem>
+                    );
+                })}
+            </DropdownMenuContent>
+        </DropdownMenu>
+    );
+}
+
+const TH =
+    'px-4 py-3 text-left text-xs font-semibold uppercase tracking-wider text-muted-foreground';
 
 function VendorTable({
     rows,
     hasFilters,
     onOpen,
     onContext,
+    menuItems,
 }: {
     rows: VendorRow[];
     hasFilters: boolean;
     onOpen: (v: VendorRow) => void;
     onContext: (e: React.MouseEvent, v: VendorRow) => void;
+    menuItems: (v: VendorRow) => ContextMenuItem[];
 }) {
     return (
         <TableShell
             title="Service providers"
             icon={Truck}
-            subtitle={`Click a vendor to view · right-click for quick actions · ${rows.length} shown`}
+            subtitle={`Click a vendor to view · use row actions for quick changes · ${rows.length} shown`}
         >
             <table className="w-full text-sm">
                 <thead className="border-b bg-muted/50">
                     <tr>
                         <th className={TH}>Company</th>
                         <th className={cn(TH, 'hidden md:table-cell')}>Site</th>
-                        <th className={cn(TH, 'hidden sm:table-cell')}>Service</th>
-                        <th className={cn(TH, 'hidden lg:table-cell')}>Contact</th>
+                        <th className={cn(TH, 'hidden sm:table-cell')}>
+                            Service
+                        </th>
+                        <th className={cn(TH, 'hidden lg:table-cell')}>
+                            Contact
+                        </th>
                         <th className={TH}>Status</th>
                         <th className={cn(TH, 'text-right')}>Actions</th>
                     </tr>
@@ -1169,7 +1645,11 @@ function VendorTable({
                         <EmptyRow
                             icon={Truck}
                             title="No vendors found"
-                            sub={hasFilters ? 'Try adjusting your filters' : 'Add a vendor to get started'}
+                            sub={
+                                hasFilters
+                                    ? 'Try adjusting your filters'
+                                    : 'Add a vendor to get started'
+                            }
                             colSpan={6}
                         />
                     ) : (
@@ -1182,12 +1662,18 @@ function VendorTable({
                             >
                                 <td className="px-4 py-3">
                                     <div className="flex items-center gap-2">
-                                        <span className="font-medium group-hover:text-primary">{v.company_name}</span>
+                                        <span className="font-medium group-hover:text-primary">
+                                            {v.company_name}
+                                        </span>
                                         {v.is_preferred && (
                                             <Star className="h-3.5 w-3.5 fill-status-warning text-status-warning" />
                                         )}
                                     </div>
-                                    {v.contact_name && <div className="text-xs text-muted-foreground">{v.contact_name}</div>}
+                                    {v.contact_name && (
+                                        <div className="text-xs text-muted-foreground">
+                                            {v.contact_name}
+                                        </div>
+                                    )}
                                 </td>
                                 <td className="hidden px-4 py-3 md:table-cell">
                                     <span className="inline-flex items-center gap-1 text-sm">
@@ -1199,44 +1685,89 @@ function VendorTable({
                                     </div>
                                 </td>
                                 <td className="hidden px-4 py-3 sm:table-cell">
-                                    <Badge variant="outline" className="border-border bg-muted text-muted-foreground">
+                                    <Badge
+                                        variant="outline"
+                                        className="border-border bg-muted text-muted-foreground"
+                                    >
                                         {v.service_type}
                                     </Badge>
                                 </td>
-                                <td className="hidden px-4 py-3 lg:table-cell" onClick={(e) => e.stopPropagation()}>
+                                <td
+                                    className="hidden px-4 py-3 lg:table-cell"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
                                     <div className="flex flex-col gap-0.5 text-xs">
                                         {v.phone && (
-                                            <a href={`tel:${v.phone}`} className="inline-flex items-center gap-1 text-primary hover:underline">
+                                            <a
+                                                href={`tel:${v.phone}`}
+                                                className="inline-flex items-center gap-1 text-primary hover:underline"
+                                            >
                                                 <Phone className="h-3 w-3" />
                                                 {v.phone}
                                             </a>
                                         )}
                                         {v.email && (
-                                            <a href={`mailto:${v.email}`} className="inline-flex items-center gap-1 text-primary hover:underline">
+                                            <a
+                                                href={`mailto:${v.email}`}
+                                                className="inline-flex items-center gap-1 text-primary hover:underline"
+                                            >
                                                 <Mail className="h-3 w-3" />
-                                                <span className="max-w-[160px] truncate">{v.email}</span>
+                                                <span className="max-w-[160px] truncate">
+                                                    {v.email}
+                                                </span>
                                             </a>
                                         )}
-                                        {!v.phone && !v.email && <span className="text-muted-foreground">—</span>}
+                                        {!v.phone && !v.email && (
+                                            <span className="text-muted-foreground">
+                                                —
+                                            </span>
+                                        )}
                                     </div>
                                 </td>
                                 <td className="px-4 py-3">
-                                    <Badge
-                                        variant="outline"
-                                        className={
-                                            v.is_active
-                                                ? 'border-status-success/30 bg-status-success-bg text-status-success'
-                                                : 'border-border bg-muted text-muted-foreground'
-                                        }
-                                    >
-                                        {v.is_active ? 'Active' : 'Inactive'}
-                                    </Badge>
+                                    <div className="flex flex-wrap gap-1.5">
+                                        <Badge
+                                            variant="outline"
+                                            className={
+                                                v.is_active
+                                                    ? 'border-status-success/30 bg-status-success-bg text-status-success'
+                                                    : 'border-border bg-muted text-muted-foreground'
+                                            }
+                                        >
+                                            {v.is_active
+                                                ? 'Active'
+                                                : 'Inactive'}
+                                        </Badge>
+                                        {(v.hs_induction_completed ||
+                                            v.insurance_verified ||
+                                            v.qualifications_verified) && (
+                                            <Badge
+                                                variant="outline"
+                                                className="border-status-info/30 bg-status-info-bg text-status-info"
+                                            >
+                                                H&S
+                                            </Badge>
+                                        )}
+                                    </div>
                                 </td>
-                                <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                                    <Button variant="ghost" size="sm" onClick={() => onOpen(v)}>
-                                        <Eye className="mr-1 h-3.5 w-3.5" />
-                                        View
-                                    </Button>
+                                <td
+                                    className="px-4 py-3 text-right"
+                                    onClick={(e) => e.stopPropagation()}
+                                >
+                                    <div className="inline-flex items-center justify-end gap-1">
+                                        <Button
+                                            variant="ghost"
+                                            size="sm"
+                                            onClick={() => onOpen(v)}
+                                        >
+                                            <Eye className="mr-1 h-3.5 w-3.5" />
+                                            View
+                                        </Button>
+                                        <RowActionDropdown
+                                            items={menuItems(v)}
+                                            label={`Actions for ${v.company_name}`}
+                                        />
+                                    </div>
                                 </td>
                             </tr>
                         ))
@@ -1252,21 +1783,32 @@ function CredentialTable({
     hasFilters,
     onOpen,
     onContext,
+    menuItems,
+    canReveal,
 }: {
     rows: CredentialRow[];
     hasFilters: boolean;
     onOpen: (c: CredentialRow) => void;
     onContext: (e: React.MouseEvent, c: CredentialRow) => void;
+    menuItems: (c: CredentialRow) => ContextMenuItem[];
+    canReveal: boolean;
 }) {
     return (
         <TableShell
             title="Access vault"
             icon={Lock}
-            subtitle={`Encrypted at rest · click to reveal (audited) · right-click for quick actions · ${rows.length} shown`}
+            subtitle={
+                canReveal
+                    ? `Encrypted at rest · reveal is audited · use row actions for quick changes · ${rows.length} shown`
+                    : `Encrypted at rest · open to view metadata · reveal permission required for secrets · ${rows.length} shown`
+            }
             badge={
-                <Badge variant="outline" className="gap-1 border-status-info/30 bg-status-info-bg text-status-info">
+                <Badge
+                    variant="outline"
+                    className="gap-1 border-status-info/30 bg-status-info-bg text-status-info"
+                >
                     <ShieldCheck className="h-3 w-3" />
-                    Zero-knowledge storage
+                    Encrypted vault
                 </Badge>
             }
         >
@@ -1276,7 +1818,9 @@ function CredentialTable({
                         <th className={TH}>Credential</th>
                         <th className={cn(TH, 'hidden md:table-cell')}>Site</th>
                         <th className={cn(TH, 'hidden sm:table-cell')}>Type</th>
-                        <th className={cn(TH, 'hidden lg:table-cell')}>Health</th>
+                        <th className={cn(TH, 'hidden lg:table-cell')}>
+                            Health
+                        </th>
                         <th className={TH}>Status</th>
                         <th className={cn(TH, 'text-right')}>Actions</th>
                     </tr>
@@ -1286,12 +1830,18 @@ function CredentialTable({
                         <EmptyRow
                             icon={Lock}
                             title="No credentials found"
-                            sub={hasFilters ? 'Try adjusting your filters' : 'Add a credential to get started'}
+                            sub={
+                                hasFilters
+                                    ? 'Try adjusting your filters'
+                                    : 'Add a credential to get started'
+                            }
                             colSpan={6}
                         />
                     ) : (
                         rows.map((c) => {
-                            const TypeIcon = credentialTypeIcon(c.credential_type);
+                            const TypeIcon = credentialTypeIcon(
+                                c.credential_type,
+                            );
                             return (
                                 <tr
                                     key={c.id}
@@ -1302,7 +1852,9 @@ function CredentialTable({
                                     <td className="px-4 py-3">
                                         <div className="flex items-center gap-2">
                                             <TypeIcon className="h-4 w-4 text-muted-foreground" />
-                                            <span className="font-medium group-hover:text-primary">{c.label}</span>
+                                            <span className="font-medium group-hover:text-primary">
+                                                {c.label}
+                                            </span>
                                             {c.has_totp && (
                                                 <Badge
                                                     variant="outline"
@@ -1313,7 +1865,11 @@ function CredentialTable({
                                                 </Badge>
                                             )}
                                         </div>
-                                        {c.vendor_name && <div className="ml-6 text-xs text-muted-foreground">{c.vendor_name}</div>}
+                                        {c.vendor_name && (
+                                            <div className="ml-6 text-xs text-muted-foreground">
+                                                {c.vendor_name}
+                                            </div>
+                                        )}
                                     </td>
                                     <td className="hidden px-4 py-3 md:table-cell">
                                         <span className="inline-flex items-center gap-1 text-sm">
@@ -1325,12 +1881,19 @@ function CredentialTable({
                                         </div>
                                     </td>
                                     <td className="hidden px-4 py-3 sm:table-cell">
-                                        <Badge variant="outline" className="border-border bg-muted text-muted-foreground">
-                                            {credentialTypeLabel(c.credential_type)}
+                                        <Badge
+                                            variant="outline"
+                                            className="border-border bg-muted text-muted-foreground"
+                                        >
+                                            {credentialTypeLabel(
+                                                c.credential_type,
+                                            )}
                                         </Badge>
                                     </td>
                                     <td className="hidden px-4 py-3 lg:table-cell">
-                                        <RotationBadge lastRotatedAt={c.last_rotated_at} />
+                                        <RotationBadge
+                                            lastRotatedAt={c.last_rotated_at}
+                                        />
                                     </td>
                                     <td className="px-4 py-3">
                                         {c.requires_reauth ? (
@@ -1342,17 +1905,33 @@ function CredentialTable({
                                                 Re-auth
                                             </Badge>
                                         ) : (
-                                            <Badge variant="outline" className="gap-1 border-border bg-muted text-muted-foreground">
+                                            <Badge
+                                                variant="outline"
+                                                className="gap-1 border-border bg-muted text-muted-foreground"
+                                            >
                                                 <Lock className="h-3 w-3" />
                                                 Stored
                                             </Badge>
                                         )}
                                     </td>
-                                    <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
-                                        <Button variant="ghost" size="sm" onClick={() => onOpen(c)}>
-                                            <Eye className="mr-1 h-3.5 w-3.5" />
-                                            Reveal
-                                        </Button>
+                                    <td
+                                        className="px-4 py-3 text-right"
+                                        onClick={(e) => e.stopPropagation()}
+                                    >
+                                        <div className="inline-flex items-center justify-end gap-1">
+                                            <Button
+                                                variant="ghost"
+                                                size="sm"
+                                                onClick={() => onOpen(c)}
+                                            >
+                                                <Eye className="mr-1 h-3.5 w-3.5" />
+                                                {canReveal ? 'Reveal' : 'View'}
+                                            </Button>
+                                            <RowActionDropdown
+                                                items={menuItems(c)}
+                                                label={`Actions for ${c.label}`}
+                                            />
+                                        </div>
                                     </td>
                                 </tr>
                             );

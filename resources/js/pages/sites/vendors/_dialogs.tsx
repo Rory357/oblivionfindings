@@ -14,12 +14,15 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { router, useForm } from '@inertiajs/react';
 import {
+    ClipboardCheck,
     Clock,
     Copy,
+    FileCheck2,
     Loader2,
     Mail,
     Pencil,
     Phone,
+    ShieldCheck,
     Star,
     Trash2,
     Truck,
@@ -27,15 +30,18 @@ import {
 import { useState } from 'react';
 import {
     DetailIconHeader,
+    FilterSelect,
+    formatDate,
     LockedSiteCard,
-    SiteTypeBadge,
     SitePickerField,
-    type SiteOption,
+    SiteTypeBadge,
     TilePicker,
+    type FilterOption,
+    type SiteOption,
     type TileOption,
 } from '../_dialog-shared';
 
-export type VendorFormValues = {
+type VendorBaseValues = {
     service_type: string;
     company_name: string;
     contact_name: string;
@@ -48,17 +54,39 @@ export type VendorFormValues = {
     is_preferred: boolean;
 };
 
-export type VendorRecord = VendorFormValues & {
-    id: number;
-    is_active?: boolean;
-    site_id?: number;
-    site_name?: string | null;
-    site_type?: string | null;
+type VendorComplianceValues = {
+    hs_induction_completed: boolean;
+    hs_induction_date: string;
+    qualifications_verified: boolean;
+    qualifications_notes: string;
+    insurance_verified: boolean;
+    insurance_expiry: string;
+    insurance_provider: string;
+    insurance_policy_number: string;
+    site_specific_hs_plan: string;
+    hs_performance_rating: string;
+    hs_last_reviewed_at: string;
 };
+
+export type VendorFormValues = VendorBaseValues & VendorComplianceValues;
+
+export type VendorRecord = VendorBaseValues &
+    Partial<VendorComplianceValues> & {
+        id: number;
+        is_active?: boolean;
+        site_id?: number;
+        site_name?: string | null;
+        site_type?: string | null;
+    };
 
 const CONTACT_TILES: TileOption[] = [
     { key: 'phone', label: 'Phone', description: 'Daytime line', icon: Phone },
-    { key: 'after_hours', label: 'After hours', description: 'Urgent / on-call', icon: Clock },
+    {
+        key: 'after_hours',
+        label: 'After hours',
+        description: 'Urgent / on-call',
+        icon: Clock,
+    },
     { key: 'email', label: 'Email', description: 'Non-urgent', icon: Mail },
 ];
 
@@ -66,6 +94,21 @@ const CONTACT_METHOD_LABEL: Record<string, string> = {
     phone: 'Phone (daytime)',
     after_hours: 'After-hours line',
     email: 'Email',
+};
+
+const HS_RATING_OPTIONS: FilterOption[] = [
+    { value: '', label: 'No rating' },
+    { value: 'excellent', label: 'Excellent' },
+    { value: 'good', label: 'Good' },
+    { value: 'watch', label: 'Watch' },
+    { value: 'concern', label: 'Concern' },
+];
+
+const HS_RATING_LABEL: Record<string, string> = {
+    excellent: 'Excellent',
+    good: 'Good',
+    watch: 'Watch',
+    concern: 'Concern',
 };
 
 function FieldError({ message }: { message?: string }) {
@@ -119,7 +162,8 @@ function AddVendorBody({
     onClose: () => void;
 }) {
     const [pickedSiteId, setPickedSiteId] = useState<number | ''>('');
-    const targetSiteId = siteId ?? (pickedSiteId === '' ? undefined : pickedSiteId);
+    const targetSiteId =
+        siteId ?? (pickedSiteId === '' ? undefined : pickedSiteId);
 
     const form = useForm<VendorFormValues>({
         service_type: '',
@@ -132,6 +176,17 @@ function AddVendorBody({
         notes: '',
         preferred_contact_method: 'phone',
         is_preferred: false,
+        hs_induction_completed: false,
+        hs_induction_date: '',
+        qualifications_verified: false,
+        qualifications_notes: '',
+        insurance_verified: false,
+        insurance_expiry: '',
+        insurance_provider: '',
+        insurance_policy_number: '',
+        site_specific_hs_plan: '',
+        hs_performance_rating: '',
+        hs_last_reviewed_at: '',
     });
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -160,7 +215,10 @@ function AddVendorBody({
                 <div className="sm:col-span-2">
                     {siteId ? (
                         lockedSite ? (
-                            <LockedSiteCard site={lockedSite} note="Vendor is scoped to this site." />
+                            <LockedSiteCard
+                                site={lockedSite}
+                                note="Vendor is scoped to this site."
+                            />
                         ) : null
                     ) : (
                         <SitePickerField
@@ -177,8 +235,13 @@ function AddVendorBody({
                 <Button type="button" variant="outline" onClick={onClose}>
                     Cancel
                 </Button>
-                <Button type="submit" disabled={form.processing || !targetSiteId}>
-                    {form.processing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                <Button
+                    type="submit"
+                    disabled={form.processing || !targetSiteId}
+                >
+                    {form.processing && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
                     Save vendor
                 </Button>
             </DialogFooter>
@@ -239,12 +302,27 @@ function EditVendorBody({
         notes: vendor.notes ?? '',
         preferred_contact_method: vendor.preferred_contact_method ?? 'phone',
         is_preferred: !!vendor.is_preferred,
+        hs_induction_completed: !!vendor.hs_induction_completed,
+        hs_induction_date: vendor.hs_induction_date ?? '',
+        qualifications_verified: !!vendor.qualifications_verified,
+        qualifications_notes: vendor.qualifications_notes ?? '',
+        insurance_verified: !!vendor.insurance_verified,
+        insurance_expiry: vendor.insurance_expiry ?? '',
+        insurance_provider: vendor.insurance_provider ?? '',
+        insurance_policy_number: vendor.insurance_policy_number ?? '',
+        site_specific_hs_plan: vendor.site_specific_hs_plan ?? '',
+        hs_performance_rating: vendor.hs_performance_rating ?? '',
+        hs_last_reviewed_at: vendor.hs_last_reviewed_at ?? '',
     });
 
     const effectiveLockedSite =
         lockedSite ??
         (vendor.site_name
-            ? { id: vendor.site_id ?? siteId, name: vendor.site_name, type: vendor.site_type ?? '' }
+            ? {
+                  id: vendor.site_id ?? siteId,
+                  name: vendor.site_name,
+                  type: vendor.site_type ?? '',
+              }
             : null);
 
     const handleSubmit = (e: React.FormEvent) => {
@@ -285,7 +363,9 @@ function EditVendorBody({
                     Cancel
                 </Button>
                 <Button type="submit" disabled={form.processing}>
-                    {form.processing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    {form.processing && (
+                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                    )}
                     Save changes
                 </Button>
             </DialogFooter>
@@ -318,6 +398,15 @@ export function ShowVendorDialog({
             // clipboard may be blocked
         }
     };
+    const hasComplianceNotes = Boolean(
+        vendor?.hs_induction_completed ||
+        vendor?.qualifications_verified ||
+        vendor?.insurance_verified ||
+        vendor?.insurance_expiry ||
+        vendor?.insurance_policy_number ||
+        vendor?.hs_performance_rating ||
+        vendor?.site_specific_hs_plan,
+    );
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
@@ -325,9 +414,12 @@ export function ShowVendorDialog({
                 {isOpen && vendor && (
                     <>
                         <DialogHeader>
-                            <DialogTitle className="sr-only">{vendor.company_name}</DialogTitle>
+                            <DialogTitle className="sr-only">
+                                {vendor.company_name}
+                            </DialogTitle>
                             <DialogDescription className="sr-only">
-                                Vendor contact details for {vendor.company_name}.
+                                Vendor contact details for {vendor.company_name}
+                                .
                             </DialogDescription>
                             <DetailIconHeader
                                 icon={Truck}
@@ -373,7 +465,36 @@ export function ShowVendorDialog({
                                     Preferred vendor
                                 </Badge>
                             )}
-                            {vendor.site_type ? <SiteTypeBadge type={vendor.site_type} /> : null}
+                            {vendor.site_type ? (
+                                <SiteTypeBadge type={vendor.site_type} />
+                            ) : null}
+                            {vendor.hs_induction_completed && (
+                                <Badge
+                                    variant="outline"
+                                    className="gap-1 border-status-success/30 bg-status-success-bg text-status-success"
+                                >
+                                    <ClipboardCheck className="h-3 w-3" />
+                                    Inducted
+                                </Badge>
+                            )}
+                            {vendor.qualifications_verified && (
+                                <Badge
+                                    variant="outline"
+                                    className="gap-1 border-status-success/30 bg-status-success-bg text-status-success"
+                                >
+                                    <FileCheck2 className="h-3 w-3" />
+                                    Qualifications checked
+                                </Badge>
+                            )}
+                            {vendor.insurance_verified && (
+                                <Badge
+                                    variant="outline"
+                                    className="gap-1 border-status-success/30 bg-status-success-bg text-status-success"
+                                >
+                                    <ShieldCheck className="h-3 w-3" />
+                                    Insurance checked
+                                </Badge>
+                            )}
                         </div>
 
                         <dl className="mt-4 grid grid-cols-3 gap-x-4 gap-y-3 text-sm">
@@ -398,7 +519,9 @@ export function ShowVendorDialog({
                                         href={`tel:${vendor.after_hours_phone}`}
                                         icon={Clock}
                                         text={vendor.after_hours_phone}
-                                        onCopy={() => copy(vendor.after_hours_phone)}
+                                        onCopy={() =>
+                                            copy(vendor.after_hours_phone)
+                                        }
                                     />
                                 </DetailRow>
                             ) : null}
@@ -415,14 +538,88 @@ export function ShowVendorDialog({
                                 )}
                             </DetailRow>
                             {vendor.account_number ? (
-                                <DetailRow label="Account #">{vendor.account_number}</DetailRow>
+                                <DetailRow label="Account #">
+                                    {vendor.account_number}
+                                </DetailRow>
                             ) : null}
                             <DetailRow label="Preferred method">
-                                {CONTACT_METHOD_LABEL[vendor.preferred_contact_method] || 'Phone'}
+                                {CONTACT_METHOD_LABEL[
+                                    vendor.preferred_contact_method
+                                ] || 'Phone'}
                             </DetailRow>
+                            <DetailRow label="H&S induction">
+                                {vendor.hs_induction_completed ? (
+                                    `Completed${vendor.hs_induction_date ? ` · ${formatDate(vendor.hs_induction_date)}` : ''}`
+                                ) : (
+                                    <Muted />
+                                )}
+                            </DetailRow>
+                            <DetailRow label="Insurance">
+                                {vendor.insurance_verified ||
+                                vendor.insurance_expiry ? (
+                                    [
+                                        vendor.insurance_verified
+                                            ? 'Verified'
+                                            : 'Not verified',
+                                        vendor.insurance_expiry
+                                            ? `expires ${formatDate(vendor.insurance_expiry)}`
+                                            : null,
+                                        vendor.insurance_provider || null,
+                                    ]
+                                        .filter(Boolean)
+                                        .join(' · ')
+                                ) : (
+                                    <Muted />
+                                )}
+                            </DetailRow>
+                            <DetailRow label="Qualifications">
+                                {vendor.qualifications_verified ? (
+                                    'Verified'
+                                ) : (
+                                    <Muted />
+                                )}
+                            </DetailRow>
+                            {vendor.hs_performance_rating ? (
+                                <DetailRow label="H&S rating">
+                                    {HS_RATING_LABEL[
+                                        vendor.hs_performance_rating
+                                    ] ?? vendor.hs_performance_rating}
+                                    {vendor.hs_last_reviewed_at ? (
+                                        <span className="text-muted-foreground">
+                                            {' '}
+                                            · reviewed{' '}
+                                            {formatDate(
+                                                vendor.hs_last_reviewed_at,
+                                            )}
+                                        </span>
+                                    ) : null}
+                                </DetailRow>
+                            ) : null}
+                            {hasComplianceNotes &&
+                            vendor.insurance_policy_number ? (
+                                <DetailRow label="Policy #">
+                                    {vendor.insurance_policy_number}
+                                </DetailRow>
+                            ) : null}
+                            {vendor.site_specific_hs_plan ? (
+                                <DetailRow label="Site H&S plan" full>
+                                    <span className="whitespace-pre-wrap">
+                                        {vendor.site_specific_hs_plan}
+                                    </span>
+                                </DetailRow>
+                            ) : null}
+                            {vendor.qualifications_notes ? (
+                                <DetailRow label="Qualification notes" full>
+                                    <span className="whitespace-pre-wrap">
+                                        {vendor.qualifications_notes}
+                                    </span>
+                                </DetailRow>
+                            ) : null}
                             {vendor.notes ? (
                                 <DetailRow label="Notes" full>
-                                    <span className="whitespace-pre-wrap">{vendor.notes}</span>
+                                    <span className="whitespace-pre-wrap">
+                                        {vendor.notes}
+                                    </span>
                                 </DetailRow>
                             ) : null}
                         </dl>
@@ -433,7 +630,10 @@ export function ShowVendorDialog({
                                 variant="ghost"
                                 size="sm"
                                 disabled={!vendor.phone}
-                                onClick={() => vendor.phone && (window.location.href = `tel:${vendor.phone}`)}
+                                onClick={() =>
+                                    vendor.phone &&
+                                    (window.location.href = `tel:${vendor.phone}`)
+                                }
                             >
                                 <Phone className="mr-2 h-4 w-4" />
                                 Call now
@@ -450,7 +650,11 @@ export function ShowVendorDialog({
                                         Delete
                                     </Button>
                                 )}
-                                <Button type="button" variant="outline" onClick={onClose}>
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={onClose}
+                                >
                                     Close
                                 </Button>
                                 {canManage && onEdit && (
@@ -566,10 +770,22 @@ export function DeleteVendorDialog({
                     <DialogDescription>
                         {vendor && (
                             <>
-                                <span className="font-medium">{vendor.company_name}</span> will be
-                                removed{vendor.site_name ? <> from <span className="font-medium">{vendor.site_name}</span></> : null}.
-                                A vendor with linked credentials can't be deleted until those
-                                credentials are removed. This cannot be undone.
+                                <span className="font-medium">
+                                    {vendor.company_name}
+                                </span>{' '}
+                                will be removed
+                                {vendor.site_name ? (
+                                    <>
+                                        {' '}
+                                        from{' '}
+                                        <span className="font-medium">
+                                            {vendor.site_name}
+                                        </span>
+                                    </>
+                                ) : null}
+                                . A vendor with linked credentials can't be
+                                deleted until those credentials are removed.
+                                This cannot be undone.
                             </>
                         )}
                     </DialogDescription>
@@ -578,8 +794,14 @@ export function DeleteVendorDialog({
                     <Button variant="outline" onClick={onClose}>
                         Cancel
                     </Button>
-                    <Button variant="destructive" onClick={handleDelete} disabled={submitting}>
-                        {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                    <Button
+                        variant="destructive"
+                        onClick={handleDelete}
+                        disabled={submitting}
+                    >
+                        {submitting && (
+                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
+                        )}
                         Delete vendor
                     </Button>
                 </DialogFooter>
@@ -590,7 +812,11 @@ export function DeleteVendorDialog({
 
 // ── Shared field group ────────────────────────────────────────────────────
 
-function VendorFields({ form }: { form: ReturnType<typeof useForm<VendorFormValues>> }) {
+function VendorFields({
+    form,
+}: {
+    form: ReturnType<typeof useForm<VendorFormValues>>;
+}) {
     return (
         <>
             <div className="sm:col-span-2">
@@ -600,7 +826,9 @@ function VendorFields({ form }: { form: ReturnType<typeof useForm<VendorFormValu
                 <Input
                     id="v-company"
                     value={form.data.company_name}
-                    onChange={(e) => form.setData('company_name', e.target.value)}
+                    onChange={(e) =>
+                        form.setData('company_name', e.target.value)
+                    }
                     placeholder="e.g. Capital Plumbing & Gas"
                     required
                 />
@@ -608,12 +836,15 @@ function VendorFields({ form }: { form: ReturnType<typeof useForm<VendorFormValu
             </div>
             <div>
                 <Label htmlFor="v-service">
-                    Category / Service type <span className="text-status-critical">*</span>
+                    Category / Service type{' '}
+                    <span className="text-status-critical">*</span>
                 </Label>
                 <Input
                     id="v-service"
                     value={form.data.service_type}
-                    onChange={(e) => form.setData('service_type', e.target.value)}
+                    onChange={(e) =>
+                        form.setData('service_type', e.target.value)
+                    }
                     placeholder="e.g. Plumbing"
                     required
                 />
@@ -624,7 +855,9 @@ function VendorFields({ form }: { form: ReturnType<typeof useForm<VendorFormValu
                 <Input
                     id="v-contact"
                     value={form.data.contact_name}
-                    onChange={(e) => form.setData('contact_name', e.target.value)}
+                    onChange={(e) =>
+                        form.setData('contact_name', e.target.value)
+                    }
                     placeholder="Primary contact"
                 />
                 <FieldError message={form.errors.contact_name} />
@@ -644,7 +877,9 @@ function VendorFields({ form }: { form: ReturnType<typeof useForm<VendorFormValu
                 <Input
                     id="v-after"
                     value={form.data.after_hours_phone}
-                    onChange={(e) => form.setData('after_hours_phone', e.target.value)}
+                    onChange={(e) =>
+                        form.setData('after_hours_phone', e.target.value)
+                    }
                     placeholder="+64 27 …"
                 />
                 <FieldError message={form.errors.after_hours_phone} />
@@ -665,7 +900,9 @@ function VendorFields({ form }: { form: ReturnType<typeof useForm<VendorFormValu
                 <Input
                     id="v-acct"
                     value={form.data.account_number}
-                    onChange={(e) => form.setData('account_number', e.target.value)}
+                    onChange={(e) =>
+                        form.setData('account_number', e.target.value)
+                    }
                 />
                 <FieldError message={form.errors.account_number} />
             </div>
@@ -689,11 +926,162 @@ function VendorFields({ form }: { form: ReturnType<typeof useForm<VendorFormValu
                 <Checkbox
                     id="v-preferred-flag"
                     checked={form.data.is_preferred}
-                    onCheckedChange={(checked) => form.setData('is_preferred', !!checked)}
+                    onCheckedChange={(checked) =>
+                        form.setData('is_preferred', !!checked)
+                    }
                 />
-                <Label htmlFor="v-preferred-flag" className="text-sm font-normal">
+                <Label
+                    htmlFor="v-preferred-flag"
+                    className="text-sm font-normal"
+                >
                     Mark as preferred vendor for this service
                 </Label>
+            </div>
+            <div className="mt-1 border-t border-border pt-3 sm:col-span-2">
+                <div className="flex items-center gap-2 text-sm font-medium">
+                    <ShieldCheck className="h-4 w-4 text-primary" />
+                    Compliance
+                </div>
+            </div>
+            <div className="flex items-center gap-2">
+                <Checkbox
+                    id="v-hs-induction"
+                    checked={form.data.hs_induction_completed}
+                    onCheckedChange={(checked) =>
+                        form.setData('hs_induction_completed', !!checked)
+                    }
+                />
+                <Label htmlFor="v-hs-induction" className="text-sm font-normal">
+                    Site induction completed
+                </Label>
+            </div>
+            <div>
+                <Label htmlFor="v-hs-induction-date">Induction date</Label>
+                <Input
+                    id="v-hs-induction-date"
+                    type="date"
+                    value={form.data.hs_induction_date}
+                    onChange={(e) =>
+                        form.setData('hs_induction_date', e.target.value)
+                    }
+                />
+                <FieldError message={form.errors.hs_induction_date} />
+            </div>
+            <div className="flex items-center gap-2">
+                <Checkbox
+                    id="v-qualifications"
+                    checked={form.data.qualifications_verified}
+                    onCheckedChange={(checked) =>
+                        form.setData('qualifications_verified', !!checked)
+                    }
+                />
+                <Label
+                    htmlFor="v-qualifications"
+                    className="text-sm font-normal"
+                >
+                    Qualifications verified
+                </Label>
+            </div>
+            <div className="flex items-center gap-2">
+                <Checkbox
+                    id="v-insurance"
+                    checked={form.data.insurance_verified}
+                    onCheckedChange={(checked) =>
+                        form.setData('insurance_verified', !!checked)
+                    }
+                />
+                <Label htmlFor="v-insurance" className="text-sm font-normal">
+                    Insurance verified
+                </Label>
+            </div>
+            <div>
+                <Label htmlFor="v-insurance-provider">Insurance provider</Label>
+                <Input
+                    id="v-insurance-provider"
+                    value={form.data.insurance_provider}
+                    onChange={(e) =>
+                        form.setData('insurance_provider', e.target.value)
+                    }
+                />
+                <FieldError message={form.errors.insurance_provider} />
+            </div>
+            <div>
+                <Label htmlFor="v-insurance-expiry">Insurance expiry</Label>
+                <Input
+                    id="v-insurance-expiry"
+                    type="date"
+                    value={form.data.insurance_expiry}
+                    onChange={(e) =>
+                        form.setData('insurance_expiry', e.target.value)
+                    }
+                />
+                <FieldError message={form.errors.insurance_expiry} />
+            </div>
+            <div>
+                <Label htmlFor="v-insurance-policy">Policy number</Label>
+                <Input
+                    id="v-insurance-policy"
+                    value={form.data.insurance_policy_number}
+                    onChange={(e) =>
+                        form.setData('insurance_policy_number', e.target.value)
+                    }
+                />
+                <FieldError message={form.errors.insurance_policy_number} />
+            </div>
+            <div>
+                <Label>H&S performance</Label>
+                <div className="mt-1">
+                    <FilterSelect
+                        value={form.data.hs_performance_rating}
+                        onChange={(value) =>
+                            form.setData('hs_performance_rating', value)
+                        }
+                        options={HS_RATING_OPTIONS}
+                        widthClass="w-full"
+                        aria-label="H&S performance rating"
+                    />
+                </div>
+                <FieldError message={form.errors.hs_performance_rating} />
+            </div>
+            <div>
+                <Label htmlFor="v-hs-reviewed">Last H&S review</Label>
+                <Input
+                    id="v-hs-reviewed"
+                    type="date"
+                    value={form.data.hs_last_reviewed_at}
+                    onChange={(e) =>
+                        form.setData('hs_last_reviewed_at', e.target.value)
+                    }
+                />
+                <FieldError message={form.errors.hs_last_reviewed_at} />
+            </div>
+            <div className="sm:col-span-2">
+                <Label htmlFor="v-site-hs-plan">Site-specific H&S plan</Label>
+                <Textarea
+                    id="v-site-hs-plan"
+                    rows={2}
+                    value={form.data.site_specific_hs_plan}
+                    onChange={(e) =>
+                        form.setData('site_specific_hs_plan', e.target.value)
+                    }
+                    placeholder="Access controls, lockout process, site risks..."
+                />
+                <FieldError message={form.errors.site_specific_hs_plan} />
+            </div>
+            <div className="sm:col-span-2">
+                <Label htmlFor="v-qualification-notes">
+                    Qualification notes
+                </Label>
+                <Textarea
+                    id="v-qualification-notes"
+                    rows={2}
+                    value={form.data.qualifications_notes}
+                    onChange={(e) =>
+                        form.setData('qualifications_notes', e.target.value)
+                    }
+                    placeholder="Licences sighted, expiry notes, restrictions..."
+                />
+                <FieldError message={form.errors.qualifications_notes} />
             </div>
             <div className="sm:col-span-2">
                 <Label htmlFor="v-notes">Notes</Label>

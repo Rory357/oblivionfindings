@@ -11,6 +11,7 @@ use App\Models\SiteCredentialAuditLog;
 use App\Models\SiteVendor;
 use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
 
 class SiteVendorController extends Controller
 {
@@ -51,23 +52,7 @@ class SiteVendorController extends Controller
                 ->orderBy('company_name')
                 ->limit(1000)
                 ->get()
-                ->map(fn (SiteVendor $vendor) => [
-                    'id' => $vendor->id,
-                    'site_id' => $vendor->site_id,
-                    'site_name' => $vendor->site?->name,
-                    'site_type' => $vendor->site?->type,
-                    'service_type' => $vendor->service_type,
-                    'company_name' => $vendor->company_name,
-                    'contact_name' => $vendor->contact_name,
-                    'phone' => $vendor->phone,
-                    'after_hours_phone' => $vendor->after_hours_phone,
-                    'email' => $vendor->email,
-                    'account_number' => $vendor->account_number,
-                    'notes' => $vendor->notes,
-                    'preferred_contact_method' => $vendor->preferred_contact_method,
-                    'is_preferred' => (bool) $vendor->is_preferred,
-                    'is_active' => (bool) $vendor->is_active,
-                ])
+                ->map(fn (SiteVendor $vendor) => $this->vendorPayload($vendor, withSite: true))
                 ->values()
             : collect();
 
@@ -187,12 +172,12 @@ class SiteVendorController extends Controller
     /**
      * Cross-site reveal & audit log feed for the Vendors & Credentials page.
      * Scoped to the credentials the viewer is allowed to see; gated on
-     * credentials.view so vendor-only viewers never reach the trail.
+     * credentials.reveal so metadata-only viewers never reach the trail.
      */
     public function globalAudit(Request $request, UserSiteAccessService $siteAccess)
     {
         $user = $request->user();
-        abort_unless((bool) ($user?->canDo('credentials.view') ?? false), 403);
+        abort_unless((bool) ($user?->canDo('credentials.reveal') ?? false), 403);
 
         $allowedSiteTypes = $this->allowedSiteTypes($request);
         $accessibleSiteIds = $siteAccess->accessibleSiteIds($user);
@@ -248,7 +233,9 @@ class SiteVendorController extends Controller
             ->when($request->status === 'inactive', fn($q) => $q->where('is_active', false))
             ->orderBy('service_type')
             ->orderBy('company_name')
-            ->get();
+            ->get()
+            ->map(fn (SiteVendor $vendor) => $this->vendorPayload($vendor))
+            ->values();
 
         $serviceTypes = SiteVendor::where('site_id', $site->id)
             ->distinct()
@@ -284,9 +271,13 @@ class SiteVendorController extends Controller
             'notes' => 'nullable|string',
             'preferred_contact_method' => 'required|in:phone,after_hours,email',
             'is_preferred' => 'boolean',
+            ...$this->vendorComplianceRules(),
         ]);
 
-        $vendor = SiteVendor::create([
+        $validated['is_preferred'] = $validated['is_preferred'] ?? false;
+        $validated = $this->prepareVendorComplianceData($validated, $request);
+
+        SiteVendor::create([
             ...$validated,
             'site_id' => $site->id,
             'tenant_id' => $site->tenant_id,
@@ -314,7 +305,10 @@ class SiteVendorController extends Controller
             'preferred_contact_method' => 'required|in:phone,after_hours,email',
             'is_preferred' => 'boolean',
             'is_active' => 'boolean',
+            ...$this->vendorComplianceRules(),
         ]);
+
+        $validated = $this->prepareVendorComplianceData($validated, $request, $vendor);
 
         $vendor->update($validated);
 
@@ -338,6 +332,80 @@ class SiteVendorController extends Controller
         $vendor->delete();
 
         return back(303)->with('success', 'Vendor deleted successfully.');
+    }
+
+    private function vendorPayload(SiteVendor $vendor, bool $withSite = false): array
+    {
+        return [
+            'id' => $vendor->id,
+            'site_id' => $vendor->site_id,
+            'site_name' => $withSite ? $vendor->site?->name : null,
+            'site_type' => $withSite ? $vendor->site?->type : null,
+            'service_type' => $vendor->service_type,
+            'company_name' => $vendor->company_name,
+            'contact_name' => $vendor->contact_name,
+            'phone' => $vendor->phone,
+            'after_hours_phone' => $vendor->after_hours_phone,
+            'email' => $vendor->email,
+            'account_number' => $vendor->account_number,
+            'notes' => $vendor->notes,
+            'preferred_contact_method' => $vendor->preferred_contact_method,
+            'is_preferred' => (bool) $vendor->is_preferred,
+            'is_active' => (bool) $vendor->is_active,
+            'hs_induction_completed' => (bool) $vendor->hs_induction_completed,
+            'hs_induction_date' => $vendor->hs_induction_date?->toDateString(),
+            'qualifications_verified' => (bool) $vendor->qualifications_verified,
+            'qualifications_notes' => $vendor->qualifications_notes,
+            'insurance_verified' => (bool) $vendor->insurance_verified,
+            'insurance_expiry' => $vendor->insurance_expiry?->toDateString(),
+            'insurance_provider' => $vendor->insurance_provider,
+            'insurance_policy_number' => $vendor->insurance_policy_number,
+            'site_specific_hs_plan' => $vendor->site_specific_hs_plan,
+            'hs_performance_rating' => $vendor->hs_performance_rating,
+            'hs_last_reviewed_at' => $vendor->hs_last_reviewed_at?->toDateString(),
+        ];
+    }
+
+    private function vendorComplianceRules(): array
+    {
+        return [
+            'hs_induction_completed' => 'boolean',
+            'hs_induction_date' => 'nullable|date',
+            'qualifications_verified' => 'boolean',
+            'qualifications_notes' => 'nullable|string',
+            'insurance_verified' => 'boolean',
+            'insurance_expiry' => 'nullable|date',
+            'insurance_provider' => 'nullable|string|max:255',
+            'insurance_policy_number' => 'nullable|string|max:255',
+            'site_specific_hs_plan' => 'nullable|string',
+            'hs_performance_rating' => [
+                'nullable',
+                'string',
+                'max:50',
+                Rule::in(['excellent', 'good', 'watch', 'concern']),
+            ],
+            'hs_last_reviewed_at' => 'nullable|date',
+        ];
+    }
+
+    private function prepareVendorComplianceData(array $validated, Request $request, ?SiteVendor $vendor = null): array
+    {
+        if ($vendor === null) {
+            $validated['hs_induction_completed'] = $validated['hs_induction_completed'] ?? false;
+            $validated['qualifications_verified'] = $validated['qualifications_verified'] ?? false;
+            $validated['insurance_verified'] = $validated['insurance_verified'] ?? false;
+        }
+
+        if (array_key_exists('hs_induction_completed', $validated)) {
+            if ((bool) $validated['hs_induction_completed']) {
+                $validated['hs_induction_completed_by'] = $vendor?->hs_induction_completed_by
+                    ?? $request->user()->id;
+            } else {
+                $validated['hs_induction_completed_by'] = null;
+            }
+        }
+
+        return $validated;
     }
 
 }
