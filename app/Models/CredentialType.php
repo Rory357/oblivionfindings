@@ -4,6 +4,7 @@ namespace App\Models;
 
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Tenant-scoped credential-type registry. The seven built-ins are defined in
@@ -82,7 +83,10 @@ class CredentialType extends Model
      */
     public static function effectiveForTenant(?int $tenantId): Collection
     {
-        $stored = $tenantId
+        // Guard the table-existence check so a not-yet-migrated server (the
+        // deploy window before `migrate` runs) falls back to the built-in
+        // defaults instead of 500-ing every page that reads the registry.
+        $stored = $tenantId && Schema::hasTable('credential_types')
             ? static::query()->where('tenant_id', $tenantId)->get()->keyBy('key')
             : collect();
 
