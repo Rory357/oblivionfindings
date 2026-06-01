@@ -142,6 +142,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::delete('/vendors/{vendor}', [SiteVendorController::class, 'destroy'])
             ->name('sites.vendors.destroy')
             ->middleware('permission:vendors.manage');
+        Route::patch('/vendors/{vendor}/flags', [SiteVendorController::class, 'toggleVendorFlags'])
+            ->name('sites.vendors.flags')
+            ->middleware('permission:vendors.manage');
 
         // Credentials
         Route::get('/credentials', [SiteCredentialController::class, 'index'])
@@ -161,6 +164,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->middleware('permission:credentials.manage');
         Route::delete('/credentials/{credential}', [SiteCredentialController::class, 'destroy'])
             ->name('sites.credentials.destroy')
+            ->middleware('permission:credentials.manage');
+        Route::post('/credentials/{credential}/rotate', [SiteCredentialController::class, 'rotate'])
+            ->name('sites.credentials.rotate')
+            ->middleware('permission:credentials.manage');
+        Route::patch('/credentials/{credential}/reauth', [SiteCredentialController::class, 'toggleReauth'])
+            ->name('sites.credentials.reauth')
             ->middleware('permission:credentials.manage');
         Route::get('/credentials/{credential}/audit', [SiteCredentialController::class, 'auditLog'])
             ->name('sites.credentials.audit')
@@ -420,6 +429,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/vendors', [SiteVendorController::class, 'globalIndex'])
         ->name('sites.vendors.global')
         ->middleware('permission:vendors.view|credentials.view');
+
+    // Cross-site reveal & audit feed (JSON) for the Vendors & Credentials page.
+    // Credential-scoped, so it requires credentials.view specifically.
+    Route::get('/vendors/audit', [SiteVendorController::class, 'globalAudit'])
+        ->name('sites.vendors.audit')
+        ->middleware('permission:credentials.view');
 
     // Legacy URL — /sites/vendors-credentials is the previous canonical location.
     // Permanent redirect preserves bookmarks and historical references.

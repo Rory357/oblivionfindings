@@ -11,17 +11,29 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { router, useForm } from '@inertiajs/react';
-import { Loader2, Pencil, Trash2 } from 'lucide-react';
+import {
+    Clock,
+    Copy,
+    Loader2,
+    Mail,
+    Pencil,
+    Phone,
+    Star,
+    Trash2,
+    Truck,
+} from 'lucide-react';
 import { useState } from 'react';
+import {
+    DetailIconHeader,
+    LockedSiteCard,
+    SiteTypeBadge,
+    SitePickerField,
+    type SiteOption,
+    TilePicker,
+    type TileOption,
+} from '../_dialog-shared';
 
 export type VendorFormValues = {
     service_type: string;
@@ -39,6 +51,21 @@ export type VendorFormValues = {
 export type VendorRecord = VendorFormValues & {
     id: number;
     is_active?: boolean;
+    site_id?: number;
+    site_name?: string | null;
+    site_type?: string | null;
+};
+
+const CONTACT_TILES: TileOption[] = [
+    { key: 'phone', label: 'Phone', description: 'Daytime line', icon: Phone },
+    { key: 'after_hours', label: 'After hours', description: 'Urgent / on-call', icon: Clock },
+    { key: 'email', label: 'Email', description: 'Non-urgent', icon: Mail },
+];
+
+const CONTACT_METHOD_LABEL: Record<string, string> = {
+    phone: 'Phone (daytime)',
+    after_hours: 'After-hours line',
+    email: 'Email',
 };
 
 function FieldError({ message }: { message?: string }) {
@@ -50,17 +77,31 @@ function FieldError({ message }: { message?: string }) {
 
 export function AddVendorDialog({
     siteId,
+    lockedSite,
+    sites,
     isOpen,
     onClose,
 }: {
-    siteId: number;
+    /** When set, the vendor is locked to this site (site-context add). */
+    siteId?: number;
+    /** Optional richer locked-site card (name + type). */
+    lockedSite?: SiteOption | null;
+    /** Required when adding from the global view (no siteId): show a picker. */
+    sites?: SiteOption[];
     isOpen: boolean;
     onClose: () => void;
 }) {
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-w-lg">
-                {isOpen && <AddVendorBody siteId={siteId} onClose={onClose} />}
+            <DialogContent style={{ maxWidth: 'min(92vw, 680px)' }}>
+                {isOpen && (
+                    <AddVendorBody
+                        siteId={siteId}
+                        lockedSite={lockedSite}
+                        sites={sites}
+                        onClose={onClose}
+                    />
+                )}
             </DialogContent>
         </Dialog>
     );
@@ -68,11 +109,18 @@ export function AddVendorDialog({
 
 function AddVendorBody({
     siteId,
+    lockedSite,
+    sites,
     onClose,
 }: {
-    siteId: number;
+    siteId?: number;
+    lockedSite?: SiteOption | null;
+    sites?: SiteOption[];
     onClose: () => void;
 }) {
+    const [pickedSiteId, setPickedSiteId] = useState<number | ''>('');
+    const targetSiteId = siteId ?? (pickedSiteId === '' ? undefined : pickedSiteId);
+
     const form = useForm<VendorFormValues>({
         service_type: '',
         company_name: '',
@@ -88,7 +136,8 @@ function AddVendorBody({
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        form.post(`/sites/${siteId}/vendors`, {
+        if (!targetSiteId) return;
+        form.post(`/sites/${targetSiteId}/vendors`, {
             preserveScroll: true,
             preserveState: true,
             onSuccess: () => onClose(),
@@ -98,22 +147,38 @@ function AddVendorBody({
     return (
         <form onSubmit={handleSubmit}>
             <DialogHeader>
-                <DialogTitle>Add Vendor</DialogTitle>
+                <DialogTitle className="flex items-center gap-2">
+                    <Truck className="h-4 w-4 text-primary" />
+                    Add vendor
+                </DialogTitle>
                 <DialogDescription>
-                    Vendor will be associated with this site only.
+                    Vendor will be associated with the selected site only.
                 </DialogDescription>
             </DialogHeader>
 
-            <VendorFields form={form} />
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                <div className="sm:col-span-2">
+                    {siteId ? (
+                        lockedSite ? (
+                            <LockedSiteCard site={lockedSite} note="Vendor is scoped to this site." />
+                        ) : null
+                    ) : (
+                        <SitePickerField
+                            sites={sites ?? []}
+                            value={pickedSiteId}
+                            onChange={setPickedSiteId}
+                        />
+                    )}
+                </div>
+                <VendorFields form={form} />
+            </div>
 
             <DialogFooter className="mt-4">
                 <Button type="button" variant="outline" onClick={onClose}>
                     Cancel
                 </Button>
-                <Button type="submit" disabled={form.processing}>
-                    {form.processing && (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    )}
+                <Button type="submit" disabled={form.processing || !targetSiteId}>
+                    {form.processing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Save vendor
                 </Button>
             </DialogFooter>
@@ -126,21 +191,24 @@ function AddVendorBody({
 export function EditVendorDialog({
     siteId,
     vendor,
+    lockedSite,
     isOpen,
     onClose,
 }: {
     siteId: number;
     vendor: VendorRecord | null;
+    lockedSite?: SiteOption | null;
     isOpen: boolean;
     onClose: () => void;
 }) {
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-w-lg">
+            <DialogContent style={{ maxWidth: 'min(92vw, 680px)' }}>
                 {isOpen && vendor && (
                     <EditVendorBody
                         siteId={siteId}
                         vendor={vendor}
+                        lockedSite={lockedSite}
                         onClose={onClose}
                     />
                 )}
@@ -152,10 +220,12 @@ export function EditVendorDialog({
 function EditVendorBody({
     siteId,
     vendor,
+    lockedSite,
     onClose,
 }: {
     siteId: number;
     vendor: VendorRecord;
+    lockedSite?: SiteOption | null;
     onClose: () => void;
 }) {
     const form = useForm<VendorFormValues>({
@@ -171,6 +241,12 @@ function EditVendorBody({
         is_preferred: !!vendor.is_preferred,
     });
 
+    const effectiveLockedSite =
+        lockedSite ??
+        (vendor.site_name
+            ? { id: vendor.site_id ?? siteId, name: vendor.site_name, type: vendor.site_type ?? '' }
+            : null);
+
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
         form.put(`/sites/${siteId}/vendors/${vendor.id}`, {
@@ -183,19 +259,33 @@ function EditVendorBody({
     return (
         <form onSubmit={handleSubmit}>
             <DialogHeader>
-                <DialogTitle>Edit Vendor</DialogTitle>
+                <DialogTitle className="flex items-center gap-2">
+                    <Pencil className="h-4 w-4 text-primary" />
+                    Edit vendor
+                </DialogTitle>
+                <DialogDescription>
+                    Update this service provider's contact details.
+                </DialogDescription>
             </DialogHeader>
 
-            <VendorFields form={form} />
+            <div className="mt-3 grid gap-3 sm:grid-cols-2">
+                {effectiveLockedSite ? (
+                    <div className="sm:col-span-2">
+                        <LockedSiteCard
+                            site={effectiveLockedSite}
+                            note="A vendor stays with its site — create a new one to move it."
+                        />
+                    </div>
+                ) : null}
+                <VendorFields form={form} />
+            </div>
 
             <DialogFooter className="mt-4">
                 <Button type="button" variant="outline" onClick={onClose}>
                     Cancel
                 </Button>
                 <Button type="submit" disabled={form.processing}>
-                    {form.processing && (
-                        <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                    )}
+                    {form.processing && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                     Save changes
                 </Button>
             </DialogFooter>
@@ -203,7 +293,7 @@ function EditVendorBody({
     );
 }
 
-// ── Show / Read-only ──────────────────────────────────────────────────────
+// ── Show / Read-only (view-first; Edit is the RBAC-gated elevated action) ──
 
 export function ShowVendorDialog({
     vendor,
@@ -220,79 +310,156 @@ export function ShowVendorDialog({
     onEdit?: () => void;
     onDelete?: () => void;
 }) {
+    const copy = (text?: string | null) => {
+        if (!text) return;
+        try {
+            void navigator.clipboard.writeText(text);
+        } catch {
+            // clipboard may be blocked
+        }
+    };
+
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-w-lg">
+            <DialogContent style={{ maxWidth: 'min(92vw, 560px)' }}>
                 {isOpen && vendor && (
                     <>
                         <DialogHeader>
-                            <DialogTitle>{vendor.company_name}</DialogTitle>
-                            <DialogDescription>
-                                {vendor.service_type}
-                                {vendor.is_preferred && (
-                                    <Badge
-                                        variant="outline"
-                                        className="ml-2 border-status-warning/30 text-status-warning"
-                                    >
-                                        Preferred
-                                    </Badge>
-                                )}
+                            <DialogTitle className="sr-only">{vendor.company_name}</DialogTitle>
+                            <DialogDescription className="sr-only">
+                                Vendor contact details for {vendor.company_name}.
                             </DialogDescription>
+                            <DetailIconHeader
+                                icon={Truck}
+                                title={
+                                    <span className="flex items-center gap-2">
+                                        {vendor.company_name}
+                                        {vendor.is_preferred && (
+                                            <Star className="h-4 w-4 fill-status-warning text-status-warning" />
+                                        )}
+                                    </span>
+                                }
+                                subtitle={
+                                    <>
+                                        <span>{vendor.service_type}</span>
+                                        {vendor.site_name ? (
+                                            <>
+                                                <span>·</span>
+                                                <span>{vendor.site_name}</span>
+                                            </>
+                                        ) : null}
+                                    </>
+                                }
+                            />
                         </DialogHeader>
 
-                        <dl className="grid grid-cols-3 gap-x-4 gap-y-2 text-sm">
-                            <ReadOnlyRow
-                                label="Contact"
-                                value={vendor.contact_name}
-                            />
-                            <ReadOnlyRow label="Phone" value={vendor.phone} />
-                            <ReadOnlyRow
-                                label="After hours"
-                                value={vendor.after_hours_phone}
-                            />
-                            <ReadOnlyRow label="Email" value={vendor.email} />
-                            <ReadOnlyRow
-                                label="Account #"
-                                value={vendor.account_number}
-                            />
-                            <ReadOnlyRow
-                                label="Preferred contact"
-                                value={vendor.preferred_contact_method}
-                            />
-                            {vendor.notes && (
-                                <ReadOnlyRow
-                                    label="Notes"
-                                    value={vendor.notes}
-                                    full
-                                />
+                        <div className="mt-3 flex flex-wrap gap-2">
+                            <Badge
+                                variant="outline"
+                                className={
+                                    vendor.is_active
+                                        ? 'border-status-success/30 bg-status-success-bg text-status-success'
+                                        : 'border-border bg-muted text-muted-foreground'
+                                }
+                            >
+                                {vendor.is_active ? 'Active' : 'Inactive'}
+                            </Badge>
+                            {vendor.is_preferred && (
+                                <Badge
+                                    variant="outline"
+                                    className="gap-1 border-status-warning/30 bg-status-warning-bg text-status-warning"
+                                >
+                                    <Star className="h-3 w-3 fill-current" />
+                                    Preferred vendor
+                                </Badge>
                             )}
+                            {vendor.site_type ? <SiteTypeBadge type={vendor.site_type} /> : null}
+                        </div>
+
+                        <dl className="mt-4 grid grid-cols-3 gap-x-4 gap-y-3 text-sm">
+                            <DetailRow label="Contact">
+                                {vendor.contact_name || <Muted />}
+                            </DetailRow>
+                            <DetailRow label="Phone">
+                                {vendor.phone ? (
+                                    <ContactValue
+                                        href={`tel:${vendor.phone}`}
+                                        icon={Phone}
+                                        text={vendor.phone}
+                                        onCopy={() => copy(vendor.phone)}
+                                    />
+                                ) : (
+                                    <Muted />
+                                )}
+                            </DetailRow>
+                            {vendor.after_hours_phone ? (
+                                <DetailRow label="After-hours">
+                                    <ContactValue
+                                        href={`tel:${vendor.after_hours_phone}`}
+                                        icon={Clock}
+                                        text={vendor.after_hours_phone}
+                                        onCopy={() => copy(vendor.after_hours_phone)}
+                                    />
+                                </DetailRow>
+                            ) : null}
+                            <DetailRow label="Email">
+                                {vendor.email ? (
+                                    <ContactValue
+                                        href={`mailto:${vendor.email}`}
+                                        icon={Mail}
+                                        text={vendor.email}
+                                        onCopy={() => copy(vendor.email)}
+                                    />
+                                ) : (
+                                    <Muted />
+                                )}
+                            </DetailRow>
+                            {vendor.account_number ? (
+                                <DetailRow label="Account #">{vendor.account_number}</DetailRow>
+                            ) : null}
+                            <DetailRow label="Preferred method">
+                                {CONTACT_METHOD_LABEL[vendor.preferred_contact_method] || 'Phone'}
+                            </DetailRow>
+                            {vendor.notes ? (
+                                <DetailRow label="Notes" full>
+                                    <span className="whitespace-pre-wrap">{vendor.notes}</span>
+                                </DetailRow>
+                            ) : null}
                         </dl>
 
-                        <DialogFooter className="mt-2">
-                            {canManage && onDelete && (
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    className="text-status-critical"
-                                    onClick={onDelete}
-                                >
-                                    <Trash2 className="mr-2 h-4 w-4" />
-                                    Delete
-                                </Button>
-                            )}
+                        <DialogFooter className="mt-4 flex-wrap gap-2 sm:justify-between">
                             <Button
                                 type="button"
-                                variant="outline"
-                                onClick={onClose}
+                                variant="ghost"
+                                size="sm"
+                                disabled={!vendor.phone}
+                                onClick={() => vendor.phone && (window.location.href = `tel:${vendor.phone}`)}
                             >
-                                Close
+                                <Phone className="mr-2 h-4 w-4" />
+                                Call now
                             </Button>
-                            {canManage && onEdit && (
-                                <Button type="button" onClick={onEdit}>
-                                    <Pencil className="mr-2 h-4 w-4" />
-                                    Edit
+                            <div className="flex flex-wrap items-center gap-2">
+                                {canManage && onDelete && (
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        className="text-status-critical"
+                                        onClick={onDelete}
+                                    >
+                                        <Trash2 className="mr-2 h-4 w-4" />
+                                        Delete
+                                    </Button>
+                                )}
+                                <Button type="button" variant="outline" onClick={onClose}>
+                                    Close
                                 </Button>
-                            )}
+                                {canManage && onEdit && (
+                                    <Button type="button" onClick={onEdit}>
+                                        <Pencil className="mr-2 h-4 w-4" />
+                                        Edit
+                                    </Button>
+                                )}
+                            </div>
                         </DialogFooter>
                     </>
                 )}
@@ -301,22 +468,58 @@ export function ShowVendorDialog({
     );
 }
 
-function ReadOnlyRow({
+function DetailRow({
     label,
-    value,
+    children,
     full,
 }: {
     label: string;
-    value?: string | null;
+    children: React.ReactNode;
     full?: boolean;
 }) {
     return (
         <>
             <dt className="text-muted-foreground">{label}</dt>
-            <dd className={full ? 'col-span-2 whitespace-pre-wrap' : 'col-span-2'}>
-                {value ? value : <span className="text-muted-foreground">—</span>}
-            </dd>
+            <dd className={full ? 'col-span-2' : 'col-span-2'}>{children}</dd>
         </>
+    );
+}
+
+function Muted() {
+    return <span className="text-muted-foreground">—</span>;
+}
+
+function ContactValue({
+    href,
+    icon: Icon,
+    text,
+    onCopy,
+}: {
+    href: string;
+    icon: typeof Phone;
+    text: string;
+    onCopy: () => void;
+}) {
+    return (
+        <span className="flex items-center gap-2">
+            <a
+                href={href}
+                className="inline-flex items-center gap-1.5 text-primary hover:underline"
+            >
+                <Icon className="h-3.5 w-3.5" />
+                <span className="truncate">{text}</span>
+            </a>
+            <Button
+                type="button"
+                variant="ghost"
+                size="sm"
+                className="h-6 w-6 p-0"
+                aria-label="Copy"
+                onClick={onCopy}
+            >
+                <Copy className="h-3.5 w-3.5" />
+            </Button>
+        </span>
     );
 }
 
@@ -348,17 +551,15 @@ export function DeleteVendorDialog({
 
     return (
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
-            <DialogContent className="max-w-md">
+            <DialogContent style={{ maxWidth: 'min(92vw, 460px)' }}>
                 <DialogHeader>
                     <DialogTitle>Delete vendor?</DialogTitle>
                     <DialogDescription>
                         {vendor && (
                             <>
-                                <span className="font-medium">
-                                    {vendor.company_name}
-                                </span>{' '}
-                                will be removed from this site. This cannot be
-                                undone.
+                                <span className="font-medium">{vendor.company_name}</span> will be
+                                removed{vendor.site_name ? <> from <span className="font-medium">{vendor.site_name}</span></> : null}.
+                                Linked credentials are kept but unlinked. This cannot be undone.
                             </>
                         )}
                     </DialogDescription>
@@ -367,14 +568,8 @@ export function DeleteVendorDialog({
                     <Button variant="outline" onClick={onClose}>
                         Cancel
                     </Button>
-                    <Button
-                        variant="destructive"
-                        onClick={handleDelete}
-                        disabled={submitting}
-                    >
-                        {submitting && (
-                            <Loader2 className="mr-2 h-4 w-4 animate-spin" />
-                        )}
+                    <Button variant="destructive" onClick={handleDelete} disabled={submitting}>
+                        {submitting && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
                         Delete vendor
                     </Button>
                 </DialogFooter>
@@ -387,7 +582,7 @@ export function DeleteVendorDialog({
 
 function VendorFields({ form }: { form: ReturnType<typeof useForm<VendorFormValues>> }) {
     return (
-        <div className="grid gap-3 sm:grid-cols-2">
+        <>
             <div className="sm:col-span-2">
                 <Label htmlFor="v-company">
                     Company name <span className="text-status-critical">*</span>
@@ -396,20 +591,20 @@ function VendorFields({ form }: { form: ReturnType<typeof useForm<VendorFormValu
                     id="v-company"
                     value={form.data.company_name}
                     onChange={(e) => form.setData('company_name', e.target.value)}
+                    placeholder="e.g. Capital Plumbing & Gas"
                     required
                 />
                 <FieldError message={form.errors.company_name} />
             </div>
             <div>
                 <Label htmlFor="v-service">
-                    Category / Service type{' '}
-                    <span className="text-status-critical">*</span>
+                    Category / Service type <span className="text-status-critical">*</span>
                 </Label>
                 <Input
                     id="v-service"
                     value={form.data.service_type}
                     onChange={(e) => form.setData('service_type', e.target.value)}
-                    placeholder="electrician, plumber, ISP…"
+                    placeholder="e.g. Plumbing"
                     required
                 />
                 <FieldError message={form.errors.service_type} />
@@ -420,6 +615,7 @@ function VendorFields({ form }: { form: ReturnType<typeof useForm<VendorFormValu
                     id="v-contact"
                     value={form.data.contact_name}
                     onChange={(e) => form.setData('contact_name', e.target.value)}
+                    placeholder="Primary contact"
                 />
                 <FieldError message={form.errors.contact_name} />
             </div>
@@ -429,6 +625,7 @@ function VendorFields({ form }: { form: ReturnType<typeof useForm<VendorFormValu
                     id="v-phone"
                     value={form.data.phone}
                     onChange={(e) => form.setData('phone', e.target.value)}
+                    placeholder="+64 21 …"
                 />
                 <FieldError message={form.errors.phone} />
             </div>
@@ -437,9 +634,8 @@ function VendorFields({ form }: { form: ReturnType<typeof useForm<VendorFormValu
                 <Input
                     id="v-after"
                     value={form.data.after_hours_phone}
-                    onChange={(e) =>
-                        form.setData('after_hours_phone', e.target.value)
-                    }
+                    onChange={(e) => form.setData('after_hours_phone', e.target.value)}
+                    placeholder="+64 27 …"
                 />
                 <FieldError message={form.errors.after_hours_phone} />
             </div>
@@ -450,6 +646,7 @@ function VendorFields({ form }: { form: ReturnType<typeof useForm<VendorFormValu
                     type="email"
                     value={form.data.email}
                     onChange={(e) => form.setData('email', e.target.value)}
+                    placeholder="jobs@company.co.nz"
                 />
                 <FieldError message={form.errors.email} />
             </div>
@@ -458,59 +655,47 @@ function VendorFields({ form }: { form: ReturnType<typeof useForm<VendorFormValu
                 <Input
                     id="v-acct"
                     value={form.data.account_number}
-                    onChange={(e) =>
-                        form.setData('account_number', e.target.value)
-                    }
+                    onChange={(e) => form.setData('account_number', e.target.value)}
                 />
                 <FieldError message={form.errors.account_number} />
             </div>
-            <div>
-                <Label htmlFor="v-preferred">Preferred contact method</Label>
-                <Select
-                    value={form.data.preferred_contact_method}
-                    onValueChange={(v) =>
-                        form.setData(
-                            'preferred_contact_method',
-                            v as VendorFormValues['preferred_contact_method'],
-                        )
-                    }
-                >
-                    <SelectTrigger id="v-preferred">
-                        <SelectValue />
-                    </SelectTrigger>
-                    <SelectContent>
-                        <SelectItem value="phone">Phone</SelectItem>
-                        <SelectItem value="after_hours">After hours</SelectItem>
-                        <SelectItem value="email">Email</SelectItem>
-                    </SelectContent>
-                </Select>
+            <div className="sm:col-span-2">
+                <Label>Preferred contact method</Label>
+                <div className="mt-1">
+                    <TilePicker
+                        options={CONTACT_TILES}
+                        value={form.data.preferred_contact_method}
+                        onChange={(v) =>
+                            form.setData(
+                                'preferred_contact_method',
+                                v as VendorFormValues['preferred_contact_method'],
+                            )
+                        }
+                    />
+                </div>
                 <FieldError message={form.errors.preferred_contact_method} />
             </div>
             <div className="flex items-center gap-2 sm:col-span-2">
                 <Checkbox
                     id="v-preferred-flag"
                     checked={form.data.is_preferred}
-                    onCheckedChange={(checked) =>
-                        form.setData('is_preferred', !!checked)
-                    }
+                    onCheckedChange={(checked) => form.setData('is_preferred', !!checked)}
                 />
-                <Label
-                    htmlFor="v-preferred-flag"
-                    className="text-sm font-normal"
-                >
-                    Mark as preferred vendor
+                <Label htmlFor="v-preferred-flag" className="text-sm font-normal">
+                    Mark as preferred vendor for this service
                 </Label>
             </div>
             <div className="sm:col-span-2">
                 <Label htmlFor="v-notes">Notes</Label>
                 <Textarea
                     id="v-notes"
-                    rows={3}
+                    rows={2}
                     value={form.data.notes}
                     onChange={(e) => form.setData('notes', e.target.value)}
+                    placeholder="Account number, SLA, access notes…"
                 />
                 <FieldError message={form.errors.notes} />
             </div>
-        </div>
+        </>
     );
 }

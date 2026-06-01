@@ -3099,6 +3099,7 @@ export default function SiteShow({
                                 <LazyDialog>
                                     <AddVendorDialog
                                         siteId={site.id}
+                                        lockedSite={{ id: site.id, name: site.name, type: site.type }}
                                         isOpen
                                         onClose={closeVendorDialog}
                                     />
@@ -3109,6 +3110,7 @@ export default function SiteShow({
                                     <EditVendorDialog
                                         siteId={site.id}
                                         vendor={vendorDialog.target}
+                                        lockedSite={{ id: site.id, name: site.name, type: site.type }}
                                         isOpen
                                         onClose={closeVendorDialog}
                                     />
@@ -3151,6 +3153,7 @@ export default function SiteShow({
                                 <LazyDialog>
                                     <AddCredentialDialog
                                         siteId={site.id}
+                                        lockedSite={{ id: site.id, name: site.name, type: site.type }}
                                         isOpen
                                         onClose={closeCredentialDialog}
                                     />
@@ -3161,6 +3164,7 @@ export default function SiteShow({
                                     <EditCredentialDialog
                                         siteId={site.id}
                                         credential={credentialDialog.target}
+                                        lockedSite={{ id: site.id, name: site.name, type: site.type }}
                                         isOpen
                                         onClose={closeCredentialDialog}
                                     />
@@ -3193,6 +3197,15 @@ export default function SiteShow({
                                                 mode: 'remove-totp',
                                             }))
                                         }
+                                        onHistory={() => {
+                                            const id = credentialDialog.target?.id;
+                                            closeCredentialDialog();
+                                            if (id) {
+                                                router.visit(
+                                                    `/sites/${site.id}/credentials/${id}/audit`,
+                                                );
+                                            }
+                                        }}
                                     />
                                 </LazyDialog>
                             )}

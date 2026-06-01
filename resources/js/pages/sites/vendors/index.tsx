@@ -346,6 +346,7 @@ export default function SiteVendors({ site, vendors, canManage }: Props) {
                     <LazyDialog>
                         <AddVendorDialog
                             siteId={site.id}
+                            lockedSite={{ id: site.id, name: site.name, type: site.type }}
                             isOpen
                             onClose={closeVendorDialog}
                         />
@@ -356,6 +357,7 @@ export default function SiteVendors({ site, vendors, canManage }: Props) {
                         <EditVendorDialog
                             siteId={site.id}
                             vendor={vendorDialog.target}
+                            lockedSite={{ id: site.id, name: site.name, type: site.type }}
                             isOpen
                             onClose={closeVendorDialog}
                         />

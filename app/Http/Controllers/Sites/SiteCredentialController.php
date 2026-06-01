@@ -276,6 +276,67 @@ class SiteCredentialController extends Controller
         return back(303)->with('success', 'Credential deleted successfully.');
     }
 
+    /**
+     * Mark a credential as rotated *now* without changing the stored secret —
+     * the "Mark rotated now" quick action. Records a rotate audit entry so the
+     * rotation-health badge resets. Reuses the credentials.manage gate.
+     */
+    public function rotate(Request $request, Site $site, SiteCredential $credential)
+    {
+        $this->authorize('view', $site);
+        $request->user()->canDo('credentials.manage') || abort(403);
+        $this->assertCredentialBelongsToSite($site, $credential);
+
+        $credential->update([
+            'last_rotated_at' => now(),
+            'last_rotated_by_user_id' => $request->user()->id,
+        ]);
+
+        SiteCredentialAuditLog::create([
+            'credential_id' => $credential->id,
+            'tenant_id' => $site->tenant_id,
+            'user_id' => $request->user()->id,
+            'action' => 'rotate',
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'created_at' => now(),
+        ]);
+
+        return back(303)->with('success', 'Marked as rotated today.');
+    }
+
+    /**
+     * Toggle the "require re-auth to reveal" flag — the quick action from the
+     * row context menu. Records an edit audit entry.
+     */
+    public function toggleReauth(Request $request, Site $site, SiteCredential $credential)
+    {
+        $this->authorize('view', $site);
+        $request->user()->canDo('credentials.manage') || abort(403);
+        $this->assertCredentialBelongsToSite($site, $credential);
+
+        $validated = $request->validate([
+            'requires_reauth' => 'required|boolean',
+        ]);
+
+        $credential->update(['requires_reauth' => $validated['requires_reauth']]);
+
+        SiteCredentialAuditLog::create([
+            'credential_id' => $credential->id,
+            'tenant_id' => $site->tenant_id,
+            'user_id' => $request->user()->id,
+            'action' => 'edit',
+            'ip_address' => $request->ip(),
+            'user_agent' => $request->userAgent(),
+            'created_at' => now(),
+        ]);
+
+        return back(303)->with(
+            'success',
+            $validated['requires_reauth'] ? 'Re-auth now required to reveal.' : 'Re-auth requirement removed.',
+        );
+    }
+
     public function totpCode(Request $request, Site $site, SiteCredential $credential)
     {
         $this->authorize('view', $site);

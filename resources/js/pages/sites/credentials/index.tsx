@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link } from '@inertiajs/react';
+import { Head, Link, router } from '@inertiajs/react';
 import {
     Eye,
     History,
@@ -290,6 +290,7 @@ export default function SiteCredentials({
                 {credentialDialog.mode === 'add' && canManage && (
                     <AddCredentialDialog
                         siteId={site.id}
+                        lockedSite={{ id: site.id, name: site.name, type: site.type }}
                         isOpen
                         onClose={closeCredentialDialog}
                     />
@@ -298,6 +299,7 @@ export default function SiteCredentials({
                     <EditCredentialDialog
                         siteId={site.id}
                         credential={credentialDialog.target}
+                        lockedSite={{ id: site.id, name: site.name, type: site.type }}
                         isOpen
                         onClose={closeCredentialDialog}
                     />
@@ -328,6 +330,13 @@ export default function SiteCredentials({
                                 mode: 'remove-totp',
                             }))
                         }
+                        onHistory={() => {
+                            const id = credentialDialog.target?.id;
+                            closeCredentialDialog();
+                            if (id) {
+                                router.visit(`/sites/${site.id}/credentials/${id}/audit`);
+                            }
+                        }}
                     />
                 )}
                 {credentialDialog.mode === 'delete' && canManage && (
