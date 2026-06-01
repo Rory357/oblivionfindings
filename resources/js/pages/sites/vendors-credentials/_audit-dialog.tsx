@@ -273,6 +273,7 @@ export function AuditLogDialog({
                             value={search}
                             onChange={(e) => setSearch(e.target.value)}
                             placeholder="Search actor, target, or site…"
+                            aria-label="Search audit log"
                             className="pl-9"
                         />
                     </div>
@@ -364,7 +365,8 @@ export function AuditLogDialog({
                                                 <td className="px-3 py-2">
                                                     {row.result === 'ok' ? (
                                                         <span className="inline-flex items-center text-status-success">
-                                                            <Check className="h-4 w-4" />
+                                                            <Check className="h-4 w-4" aria-hidden="true" />
+                                                            <span className="sr-only">Allowed</span>
                                                         </span>
                                                     ) : (
                                                         <Badge variant="outline" className={TONE_BADGE.critical}>

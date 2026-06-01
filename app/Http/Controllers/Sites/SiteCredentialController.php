@@ -6,6 +6,7 @@ use App\Http\Controllers\Controller;
 use App\Models\Site;
 use App\Models\SiteCredential;
 use App\Models\SiteCredentialAuditLog;
+use App\Models\SiteVendor;
 use App\Services\Sites\SiteCredentialEncryptionService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Auth;
@@ -59,6 +60,16 @@ class SiteCredentialController extends Controller
             ]);
         }
 
+        $vendors = SiteVendor::where('site_id', $site->id)
+            ->orderBy('company_name')
+            ->get(['id', 'site_id', 'company_name', 'service_type'])
+            ->map(fn (SiteVendor $vendor) => [
+                'id' => $vendor->id,
+                'site_id' => $vendor->site_id,
+                'company_name' => $vendor->company_name,
+                'service_type' => $vendor->service_type,
+            ]);
+
         return inertia('sites/credentials/index', [
             'site' => [
                 'id' => $site->id,
@@ -66,6 +77,7 @@ class SiteCredentialController extends Controller
                 'type' => $site->type,
             ],
             'credentials' => $credentials,
+            'vendors' => $vendors,
             'canReveal' => $request->user()->canDo('credentials.reveal'),
             'canManage' => $request->user()->canDo('credentials.manage'),
         ]);
@@ -151,6 +163,24 @@ class SiteCredentialController extends Controller
 
             // Verify user's password
             if (!Auth::validate(['email' => $request->user()->email, 'password' => $request->input('password')])) {
+                // Record the denied step-up attempt so failed unlocks leave a
+                // forensic trail (and surface in the Reveal & audit log's
+                // "Denied" view). Best-effort: never let a logging issue turn a
+                // clean 403 into a 500.
+                try {
+                    SiteCredentialAuditLog::create([
+                        'credential_id' => $credential->id,
+                        'tenant_id' => $site->tenant_id,
+                        'user_id' => $request->user()->id,
+                        'action' => 'reauth_failed',
+                        'ip_address' => $request->ip(),
+                        'user_agent' => $request->userAgent(),
+                        'created_at' => now(),
+                    ]);
+                } catch (\Throwable $e) {
+                    report($e);
+                }
+
                 return response()->json(['error' => 'Invalid password'], 403);
             }
         }
@@ -203,11 +233,16 @@ class SiteCredentialController extends Controller
             'credential_type' => $validated['credential_type'],
             'username' => $validated['username'] ?? null,
             'url' => $validated['url'] ?? null,
-            'vendor_id' => $validated['vendor_id'] ?? null,
             'notes' => $validated['notes'] ?? null,
             'requires_reauth' => $validated['requires_reauth'] ?? false,
             'is_shareable' => $validated['is_shareable'] ?? false,
         ];
+
+        // Only touch the vendor link when the form actually sent the key, so a
+        // dialog that omits vendor_id never silently unlinks an existing vendor.
+        if ($request->has('vendor_id')) {
+            $updateData['vendor_id'] = $validated['vendor_id'] ?? null;
+        }
 
         $newTotpSecret = $this->normalizeTotpSecret($validated['totp_secret'] ?? null);
         if ($newTotpSecret !== null) {

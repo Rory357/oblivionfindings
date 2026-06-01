@@ -8,12 +8,13 @@ use App\Models\Site;
 use App\Models\SiteCredential;
 use App\Models\SiteCredentialAuditLog;
 use App\Models\SiteVendor;
+use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 
 class SiteVendorController extends Controller
 {
     use ResolvesAllowedSiteTypes;
-    public function globalIndex(Request $request)
+    public function globalIndex(Request $request, UserSiteAccessService $siteAccess)
     {
         $user = $request->user();
         $canVendors = (bool) ($user?->canDo('vendors.view') ?? false);
@@ -21,13 +22,25 @@ class SiteVendorController extends Controller
 
         abort_unless($canVendors || $canCredentials, 403);
 
+        // Site-scoped writes (reveal/edit/delete/rotate/…) additionally require
+        // sites.viewAny via SitePolicy::view.
+        $canSiteWrite = (bool) ($user?->canDo('sites.viewAny') ?? false);
+
         $allowedSiteTypes = $this->allowedSiteTypes($request);
+        // Per-user site-assignment scoping — mirrors the per-site endpoints'
+        // SitePolicy::view (canAccessAssignedSite) and SiteCalendarController::global.
+        // [] means unrestricted (admins / no assignment), matching the service.
+        $accessibleSiteIds = $siteAccess->accessibleSiteIds($user);
+        $scopeBySite = fn ($q, string $column = 'site_id') => $q->when(
+            $accessibleSiteIds !== [],
+            fn ($q) => $q->whereIn($column, $accessibleSiteIds),
+        );
 
         // Vendor data — only loaded and serialised when the user can see it.
         $vendors = $canVendors
-            ? SiteVendor::query()
+            ? $scopeBySite(SiteVendor::query()
                 ->with('site:id,name,type')
-                ->whereHas('site', fn ($q) => $q->whereIn('type', $allowedSiteTypes))
+                ->whereHas('site', fn ($q) => $q->whereIn('type', $allowedSiteTypes)))
                 ->when($request->site_id, fn ($q) => $q->where('site_id', (int) $request->site_id))
                 ->when($request->service_type, fn ($q) => $q->where('service_type', $request->service_type))
                 ->when($request->vendor_status === 'active', fn ($q) => $q->where('is_active', true))
@@ -61,9 +74,9 @@ class SiteVendorController extends Controller
         // here (the list view never includes the secret), but the metadata
         // itself is still restricted to credentials.view holders.
         $credentials = $canCredentials
-            ? SiteCredential::query()
+            ? $scopeBySite(SiteCredential::query()
                 ->with(['site:id,name,type', 'vendor:id,company_name,service_type'])
-                ->whereHas('site', fn ($q) => $q->whereIn('type', $allowedSiteTypes))
+                ->whereHas('site', fn ($q) => $q->whereIn('type', $allowedSiteTypes)))
                 ->when($request->site_id, fn ($q) => $q->where('site_id', (int) $request->site_id))
                 ->when($request->credential_type, fn ($q) => $q->where('credential_type', $request->credential_type))
                 ->when($request->requires_reauth === 'yes', fn ($q) => $q->where('requires_reauth', true))
@@ -94,16 +107,16 @@ class SiteVendorController extends Controller
                 ->values()
             : collect();
 
-        $sites = Site::query()
+        $sites = $scopeBySite(Site::query()
             ->active()
-            ->whereIn('type', $allowedSiteTypes)
+            ->whereIn('type', $allowedSiteTypes), 'id')
             ->select(['id', 'name', 'type'])
             ->orderBy('name')
             ->get();
 
         $serviceTypes = $canVendors
-            ? SiteVendor::query()
-                ->whereHas('site', fn ($q) => $q->whereIn('type', $allowedSiteTypes))
+            ? $scopeBySite(SiteVendor::query()
+                ->whereHas('site', fn ($q) => $q->whereIn('type', $allowedSiteTypes)))
                 ->select('service_type')
                 ->distinct()
                 ->orderBy('service_type')
@@ -112,8 +125,8 @@ class SiteVendorController extends Controller
             : collect();
 
         $credentialTypes = $canCredentials
-            ? SiteCredential::query()
-                ->whereHas('site', fn ($q) => $q->whereIn('type', $allowedSiteTypes))
+            ? $scopeBySite(SiteCredential::query()
+                ->whereHas('site', fn ($q) => $q->whereIn('type', $allowedSiteTypes)))
                 ->select('credential_type')
                 ->distinct()
                 ->orderBy('credential_type')
@@ -131,9 +144,12 @@ class SiteVendorController extends Controller
             'can' => [
                 'vendors' => $canVendors,
                 'credentials' => $canCredentials,
-                'vendorsManage' => (bool) ($user?->canDo('vendors.manage') ?? false),
-                'credentialsManage' => (bool) ($user?->canDo('credentials.manage') ?? false),
-                'credentialsReveal' => (bool) ($user?->canDo('credentials.reveal') ?? false),
+                // Writes target the site-scoped routes, which also require
+                // sites.viewAny (SitePolicy::view). Fold it in so the manage
+                // affordances hide instead of dead-ending in a 403.
+                'vendorsManage' => $canSiteWrite && (bool) ($user?->canDo('vendors.manage') ?? false),
+                'credentialsManage' => $canSiteWrite && (bool) ($user?->canDo('credentials.manage') ?? false),
+                'credentialsReveal' => $canSiteWrite && (bool) ($user?->canDo('credentials.reveal') ?? false),
             ],
         ]);
     }
@@ -167,17 +183,24 @@ class SiteVendorController extends Controller
      * Scoped to the credentials the viewer is allowed to see; gated on
      * credentials.view so vendor-only viewers never reach the trail.
      */
-    public function globalAudit(Request $request)
+    public function globalAudit(Request $request, UserSiteAccessService $siteAccess)
     {
         $user = $request->user();
         abort_unless((bool) ($user?->canDo('credentials.view') ?? false), 403);
 
         $allowedSiteTypes = $this->allowedSiteTypes($request);
+        $accessibleSiteIds = $siteAccess->accessibleSiteIds($user);
 
         $logs = SiteCredentialAuditLog::query()
             ->with(['user:id,name', 'credential:id,label,credential_type,site_id', 'credential.site:id,name,type'])
             ->whereHas('credential.site', fn ($q) => $q->whereIn('type', $allowedSiteTypes))
+            // Per-user assignment scoping, matching globalIndex / the per-site flow.
+            ->when($accessibleSiteIds !== [], fn ($q) => $q->whereHas('credential', fn ($c) => $c->whereIn('site_id', $accessibleSiteIds)))
             ->when($request->site_id, fn ($q) => $q->whereHas('credential', fn ($c) => $c->where('site_id', (int) $request->site_id)))
+            // Routine page-load views are not a "reveal/copy/rotation/change" —
+            // excluding them keeps high-signal security events from being
+            // evicted from the recent window.
+            ->where('action', '!=', 'view_list')
             ->orderByDesc('created_at')
             ->limit(500)
             ->get()

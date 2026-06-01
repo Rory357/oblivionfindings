@@ -4,25 +4,27 @@ import { vi } from 'vitest';
 // jsdom doesn't implement ResizeObserver / pointer-capture / scrollIntoView,
 // which Radix popovers, dialogs and cmdk rely on. Polyfill them so component
 // tests that open these surfaces don't throw.
-if (!('ResizeObserver' in window)) {
-    window.ResizeObserver = class {
+const win = window as unknown as Record<string, unknown>;
+if (typeof win.ResizeObserver === 'undefined') {
+    win.ResizeObserver = class {
         observe() {}
         unobserve() {}
         disconnect() {}
-    } as unknown as typeof ResizeObserver;
+    };
 }
 
-if (!Element.prototype.scrollIntoView) {
-    Element.prototype.scrollIntoView = vi.fn();
+const elementProto = Element.prototype as unknown as Record<string, unknown>;
+if (!elementProto.scrollIntoView) {
+    elementProto.scrollIntoView = vi.fn();
 }
-if (!Element.prototype.hasPointerCapture) {
-    Element.prototype.hasPointerCapture = vi.fn(() => false) as unknown as (pointerId: number) => boolean;
+if (!elementProto.hasPointerCapture) {
+    elementProto.hasPointerCapture = vi.fn(() => false);
 }
-if (!Element.prototype.setPointerCapture) {
-    Element.prototype.setPointerCapture = vi.fn() as unknown as (pointerId: number) => void;
+if (!elementProto.setPointerCapture) {
+    elementProto.setPointerCapture = vi.fn();
 }
-if (!Element.prototype.releasePointerCapture) {
-    Element.prototype.releasePointerCapture = vi.fn() as unknown as (pointerId: number) => void;
+if (!elementProto.releasePointerCapture) {
+    elementProto.releasePointerCapture = vi.fn();
 }
 
 Object.defineProperty(window, 'matchMedia', {

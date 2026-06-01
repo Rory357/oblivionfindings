@@ -1573,6 +1573,14 @@ export default function SiteShow({
     const closeCredentialDialog = () =>
         setCredentialDialog({ mode: null, target: null });
 
+    // Vendors for this site, shaped for the credential dialog's "Linked vendor" picker.
+    const credentialVendorOptions = vendors.map((v) => ({
+        id: v.id,
+        site_id: site.id,
+        company_name: v.company_name,
+        service_type: v.service_type,
+    }));
+
     const handleDeleteNote = (noteId: number) => {
         router.delete(`/sites/${site.id}/notes/${noteId}`, {
             preserveScroll: true,
@@ -3154,6 +3162,7 @@ export default function SiteShow({
                                     <AddCredentialDialog
                                         siteId={site.id}
                                         lockedSite={{ id: site.id, name: site.name, type: site.type }}
+                                        vendors={credentialVendorOptions}
                                         isOpen
                                         onClose={closeCredentialDialog}
                                     />
@@ -3165,6 +3174,7 @@ export default function SiteShow({
                                         siteId={site.id}
                                         credential={credentialDialog.target}
                                         lockedSite={{ id: site.id, name: site.name, type: site.type }}
+                                        vendors={credentialVendorOptions}
                                         isOpen
                                         onClose={closeCredentialDialog}
                                     />

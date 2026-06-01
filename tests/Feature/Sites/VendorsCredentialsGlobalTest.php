@@ -1,5 +1,6 @@
 <?php
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
@@ -158,6 +159,136 @@ test('vendor-only user is forbidden from the credential audit feed', function ()
     $this->actingAs($vendorOnly)
         ->getJson('/vendors/audit')
         ->assertForbidden();
+});
+
+test('global feeds are scoped to the user\'s assigned sites (no horizontal access)', function () {
+    $siteA = $this->site; // house
+    $siteB = Site::factory()->create(['type' => 'house', 'is_active' => true]);
+
+    gvcVendor($siteA, ['company_name' => 'Site A Plumbing']);
+    gvcVendor($siteB, ['company_name' => 'Site B Plumbing']);
+    $credA = gvcCredential($siteA, ['label' => 'Site A Door']);
+    $credB = gvcCredential($siteB, ['label' => 'Site B Door']);
+    foreach ([$credA, $credB] as $cred) {
+        SiteCredentialAuditLog::create([
+            'credential_id' => $cred->id,
+            'tenant_id' => $cred->tenant_id,
+            'user_id' => $this->admin->id,
+            'action' => 'reveal',
+            'ip_address' => '127.0.0.1',
+            'user_agent' => 'phpunit',
+            'created_at' => now(),
+        ]);
+    }
+
+    // A credential viewer assigned to site A only via their HR profile.
+    $scoped = User::factory()->create(['role' => 'maintenance_coordinator', 'approved_at' => now()]);
+    $scoped->roles()->syncWithoutDetaching([Role::query()->where('name', 'maintenance_coordinator')->firstOrFail()->id]);
+    HrEmployeeProfile::create([
+        'user_id' => $scoped->id,
+        'tenant_id' => $siteA->tenant_id,
+        'employee_number' => 'EMP-' . $scoped->id,
+        'work_email' => 'scoped@example.test',
+        'position_title' => 'Maintenance Coordinator',
+        'position_role' => 'maintenance_coordinator',
+        'employment_type' => 'full_time',
+        'start_date' => now()->subYear()->toDateString(),
+        'primary_site_id' => $siteA->id,
+        'secondary_site_ids' => [],
+    ]);
+
+    expect($scoped->canDo('credentials.view'))->toBeTrue();
+
+    $this->actingAs($scoped)
+        ->get('/vendors')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->has('vendors', 1)
+            ->where('vendors.0.company_name', 'Site A Plumbing')
+            ->has('credentials', 1)
+            ->where('credentials.0.label', 'Site A Door'));
+
+    $logs = collect($this->actingAs($scoped)->getJson('/vendors/audit')->assertOk()->json('logs'));
+    expect($logs->pluck('target'))->toContain('Site A Door');
+    expect($logs->pluck('target'))->not->toContain('Site B Door');
+});
+
+test('credential update without a vendor_id key keeps the existing vendor link', function () {
+    $vendor = gvcVendor($this->site);
+    $credential = gvcCredential($this->site, ['credential_type' => 'password', 'vendor_id' => $vendor->id]);
+
+    $this->actingAs($this->admin)
+        ->from('/vendors')
+        ->put("/sites/{$this->site->id}/credentials/{$credential->id}", [
+            'label' => 'renamed',
+            'credential_type' => 'password',
+            'value' => '',
+            // no vendor_id key sent — must not wipe the link
+        ])
+        ->assertRedirect();
+
+    expect($credential->fresh()->vendor_id)->toBe($vendor->id);
+});
+
+test('credential update can set and clear the vendor link when vendor_id is sent', function () {
+    $vendor = gvcVendor($this->site);
+    $credential = gvcCredential($this->site, ['credential_type' => 'password']);
+
+    $this->actingAs($this->admin)->from('/vendors')
+        ->put("/sites/{$this->site->id}/credentials/{$credential->id}", [
+            'label' => $credential->label, 'credential_type' => 'password', 'value' => '', 'vendor_id' => $vendor->id,
+        ])->assertRedirect();
+    expect($credential->fresh()->vendor_id)->toBe($vendor->id);
+
+    $this->actingAs($this->admin)->from('/vendors')
+        ->put("/sites/{$this->site->id}/credentials/{$credential->id}", [
+            'label' => $credential->label, 'credential_type' => 'password', 'value' => '', 'vendor_id' => null,
+        ])->assertRedirect();
+    expect($credential->fresh()->vendor_id)->toBeNull();
+});
+
+test('a failed re-auth reveal is recorded as reauth_failed', function () {
+    $credential = gvcCredential($this->site, ['credential_type' => 'password', 'requires_reauth' => true]);
+
+    $this->actingAs($this->admin)
+        ->postJson("/sites/{$this->site->id}/credentials/{$credential->id}/reveal", ['password' => 'definitely-wrong'])
+        ->assertStatus(403);
+
+    expect(SiteCredentialAuditLog::query()
+        ->where('credential_id', $credential->id)
+        ->where('action', 'reauth_failed')
+        ->exists())->toBeTrue();
+});
+
+test('global audit feed excludes routine view_list rows', function () {
+    $credential = gvcCredential($this->site);
+    foreach (['view_list', 'reveal'] as $action) {
+        SiteCredentialAuditLog::create([
+            'credential_id' => $credential->id,
+            'tenant_id' => $credential->tenant_id,
+            'user_id' => $this->admin->id,
+            'action' => $action,
+            'ip_address' => '127.0.0.1',
+            'user_agent' => 'phpunit',
+            'created_at' => now(),
+        ]);
+    }
+
+    $logs = collect($this->actingAs($this->admin)->getJson('/vendors/audit')->assertOk()->json('logs'));
+    expect($logs->pluck('action'))->not->toContain('view_list');
+    expect($logs->pluck('action'))->toContain('reveal');
+});
+
+test('per-site credentials page exposes the site vendor list for the linked-vendor picker', function () {
+    gvcVendor($this->site, ['company_name' => 'Hamilton Electrical Ltd']);
+
+    $this->actingAs($this->admin)
+        ->get("/sites/{$this->site->id}/credentials")
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page
+            ->component('sites/credentials/index')
+            ->has('vendors', 1)
+            ->where('vendors.0.company_name', 'Hamilton Electrical Ltd'));
 });
 
 test('manage-less user cannot toggle flags, rotate, or change reauth', function () {

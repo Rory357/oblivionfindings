@@ -477,10 +477,19 @@ function DetailRow({
     children: React.ReactNode;
     full?: boolean;
 }) {
+    if (full) {
+        // Full-width row: label on its own line, value spanning all 3 columns.
+        return (
+            <>
+                <dt className="col-span-3 text-muted-foreground">{label}</dt>
+                <dd className="col-span-3">{children}</dd>
+            </>
+        );
+    }
     return (
         <>
             <dt className="text-muted-foreground">{label}</dt>
-            <dd className={full ? 'col-span-2' : 'col-span-2'}>{children}</dd>
+            <dd className="col-span-2">{children}</dd>
         </>
     );
 }
@@ -559,7 +568,8 @@ export function DeleteVendorDialog({
                             <>
                                 <span className="font-medium">{vendor.company_name}</span> will be
                                 removed{vendor.site_name ? <> from <span className="font-medium">{vendor.site_name}</span></> : null}.
-                                Linked credentials are kept but unlinked. This cannot be undone.
+                                A vendor with linked credentials can't be deleted until those
+                                credentials are removed. This cannot be undone.
                             </>
                         )}
                     </DialogDescription>

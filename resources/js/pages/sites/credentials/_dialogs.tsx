@@ -41,6 +41,8 @@ import {
     credentialTypeIcon,
     credentialTypeLabel,
     DetailIconHeader,
+    FilterSelect,
+    type FilterOption,
     formatDate,
     LockedSiteCard,
     RotationBadge,
@@ -77,10 +79,19 @@ export type CredentialFormValues = {
     credential_type: (typeof CREDENTIAL_TYPES)[number];
     value: string;
     notes: string;
+    vendor_id: number | null;
     requires_reauth: boolean;
     is_shareable: boolean;
     password_strength: number | null;
     totp_secret: string;
+};
+
+/** A vendor the credential can be linked to (scoped to the credential's site). */
+export type CredentialVendorOption = {
+    id: number;
+    site_id: number;
+    company_name: string;
+    service_type?: string | null;
 };
 
 export type CredentialRecord = {
@@ -117,12 +128,14 @@ export function AddCredentialDialog({
     siteId,
     lockedSite,
     sites,
+    vendors,
     isOpen,
     onClose,
 }: {
     siteId?: number;
     lockedSite?: SiteOption | null;
     sites?: SiteOption[];
+    vendors?: CredentialVendorOption[];
     isOpen: boolean;
     onClose: () => void;
 }) {
@@ -134,6 +147,7 @@ export function AddCredentialDialog({
                         siteId={siteId}
                         lockedSite={lockedSite}
                         sites={sites}
+                        vendors={vendors}
                         onClose={onClose}
                     />
                 )}
@@ -146,15 +160,18 @@ function AddCredentialBody({
     siteId,
     lockedSite,
     sites,
+    vendors,
     onClose,
 }: {
     siteId?: number;
     lockedSite?: SiteOption | null;
     sites?: SiteOption[];
+    vendors?: CredentialVendorOption[];
     onClose: () => void;
 }) {
     const [pickedSiteId, setPickedSiteId] = useState<number | ''>('');
     const targetSiteId = siteId ?? (pickedSiteId === '' ? undefined : pickedSiteId);
+    const siteVendors = (vendors ?? []).filter((v) => v.site_id === targetSiteId);
 
     const form = useForm<CredentialFormValues>({
         label: '',
@@ -163,6 +180,7 @@ function AddCredentialBody({
         credential_type: 'password',
         value: '',
         notes: '',
+        vendor_id: null,
         requires_reauth: false,
         is_shareable: false,
         password_strength: null,
@@ -217,10 +235,14 @@ function AddCredentialBody({
                     <SitePickerField
                         sites={sites ?? []}
                         value={pickedSiteId}
-                        onChange={setPickedSiteId}
+                        onChange={(id) => {
+                            setPickedSiteId(id);
+                            // The previously-picked vendor belongs to the old site.
+                            form.setData('vendor_id', null);
+                        }}
                     />
                 )}
-                <CredentialFormFields form={form} strength={strength} />
+                <CredentialFormFields form={form} strength={strength} vendors={siteVendors} />
             </div>
 
             <DialogFooter className="mt-4">
@@ -250,12 +272,14 @@ export function EditCredentialDialog({
     siteId,
     credential,
     lockedSite,
+    vendors,
     isOpen,
     onClose,
 }: {
     siteId: number;
     credential: CredentialRecord | null;
     lockedSite?: SiteOption | null;
+    vendors?: CredentialVendorOption[];
     isOpen: boolean;
     onClose: () => void;
 }) {
@@ -267,6 +291,7 @@ export function EditCredentialDialog({
                         siteId={siteId}
                         credential={credential}
                         lockedSite={lockedSite}
+                        vendors={vendors}
                         onClose={onClose}
                     />
                 )}
@@ -279,13 +304,16 @@ function EditCredentialBody({
     siteId,
     credential,
     lockedSite,
+    vendors,
     onClose,
 }: {
     siteId: number;
     credential: CredentialRecord;
     lockedSite?: SiteOption | null;
+    vendors?: CredentialVendorOption[];
     onClose: () => void;
 }) {
+    const siteVendors = (vendors ?? []).filter((v) => v.site_id === siteId);
     const form = useForm<CredentialFormValues>({
         label: credential.label,
         username: credential.username ?? '',
@@ -295,6 +323,7 @@ function EditCredentialBody({
             : 'password',
         value: '',
         notes: credential.notes ?? '',
+        vendor_id: credential.vendor_id ?? null,
         requires_reauth: credential.requires_reauth,
         is_shareable: credential.is_shareable,
         password_strength: credential.password_strength ?? null,
@@ -352,7 +381,7 @@ function EditCredentialBody({
                         note="A credential stays with its site — create a new one to move it."
                     />
                 ) : null}
-                <CredentialFormFields form={form} strength={strength} edit />
+                <CredentialFormFields form={form} strength={strength} vendors={siteVendors} edit />
             </div>
 
             <DialogFooter className="mt-4">
@@ -571,7 +600,7 @@ export function ShowCredentialDialog({
                         </>
                     )}
                     <dt className="text-muted-foreground capitalize">{word}</dt>
-                    <dd className="col-span-2">
+                    <dd className="col-span-2" aria-live="polite">
                         {revealedValue ? (
                             <div className="flex items-center gap-2">
                                 <span className="font-mono">{revealedValue}</span>
@@ -659,7 +688,11 @@ export function ShowCredentialDialog({
                                 {revealLabel}
                             </Button>
                         )}
-                        {revealError && <p className="mt-1 text-xs text-status-critical">{revealError}</p>}
+                        {revealError && (
+                            <p className="mt-1 text-xs text-status-critical" role="alert">
+                                {revealError}
+                            </p>
+                        )}
                     </dd>
                     {credential.has_totp && canReveal && (
                         <>
@@ -879,9 +912,18 @@ export function RemoveTotpDialog({
 
 // ── Shared field group ────────────────────────────────────────────────────
 
+const STRENGTH_FILL: Record<string, string> = {
+    'very-weak': 'bg-status-critical',
+    weak: 'bg-status-critical',
+    fair: 'bg-status-warning',
+    good: 'bg-status-success',
+    strong: 'bg-status-success',
+};
+
 function CredentialFormFields({
     form,
     strength,
+    vendors = [],
     edit,
 }: {
     // Both Add and Edit reach this component; their form types are structural
@@ -889,11 +931,20 @@ function CredentialFormFields({
     // generic gymnastics.
     form: any;
     strength: StrengthResult;
+    vendors?: CredentialVendorOption[];
     edit?: boolean;
 }) {
     const [showPassword, setShowPassword] = useState(false);
     const type = (form.data as CredentialFormValues).credential_type;
     const word = secretWord(type);
+
+    const vendorOptions: FilterOption[] = [
+        { value: '', label: 'No linked vendor' },
+        ...vendors.map((v) => ({
+            value: String(v.id),
+            label: v.service_type ? `${v.company_name} · ${v.service_type}` : v.company_name,
+        })),
+    ];
 
     const handleGenerate = () => {
         const generated = generatePassword({ length: 20 });
@@ -952,6 +1003,22 @@ function CredentialFormFields({
                 </div>
             </div>
 
+            {vendors.length > 0 && (
+                <div>
+                    <Label>Linked vendor</Label>
+                    <div className="mt-1">
+                        <FilterSelect
+                            value={form.data.vendor_id == null ? '' : String(form.data.vendor_id)}
+                            onChange={(v) => form.setData('vendor_id', v === '' ? null : Number(v))}
+                            options={vendorOptions}
+                            widthClass="w-full"
+                            aria-label="Linked vendor"
+                        />
+                    </div>
+                    <FieldError message={form.errors.vendor_id} />
+                </div>
+            )}
+
             <div>
                 <div className="flex items-center justify-between">
                     <Label htmlFor="c-value" className="capitalize">
@@ -983,13 +1050,21 @@ function CredentialFormFields({
                     </button>
                 </div>
                 {form.data.value && (
-                    <div className="mt-1 flex items-center gap-2 text-xs">
-                        <Badge variant="outline" className={strengthBadgeClasses(strength.level)}>
-                            {strength.label}
-                        </Badge>
-                        {strength.feedback && (
-                            <span className="text-muted-foreground">{strength.feedback}</span>
-                        )}
+                    <div className="mt-2 space-y-1.5">
+                        <div className="h-1.5 overflow-hidden rounded-full bg-muted">
+                            <div
+                                className={`h-full rounded-full transition-all ${STRENGTH_FILL[strength.level] ?? 'bg-muted-foreground'}`}
+                                style={{ width: `${((strength.score + 1) / 5) * 100}%` }}
+                            />
+                        </div>
+                        <div className="flex items-center gap-2 text-xs">
+                            <Badge variant="outline" className={strengthBadgeClasses(strength.level)}>
+                                {strength.label}
+                            </Badge>
+                            {strength.feedback && (
+                                <span className="text-muted-foreground">{strength.feedback}</span>
+                            )}
+                        </div>
                     </div>
                 )}
                 <FieldError message={form.errors.value} />

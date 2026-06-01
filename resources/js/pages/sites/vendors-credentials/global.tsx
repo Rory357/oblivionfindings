@@ -367,6 +367,9 @@ export default function GlobalVendorsCredentials({
                 label: 'View linked credentials',
                 onClick: () => {
                     setTab('credentials');
+                    setCredentialTypeFilter('all');
+                    setReauthFilter('all');
+                    setRotFilter('all');
                     setSearch(v.company_name);
                 },
             },
@@ -640,7 +643,8 @@ export default function GlobalVendorsCredentials({
                                     value={search}
                                     onChange={(e) => setSearch(e.target.value)}
                                     placeholder="Search company, credential, type, or site…"
-                                    className="border-primary-foreground/20 bg-primary-foreground/10 pl-9 text-primary-foreground placeholder:text-primary-foreground/50 focus-visible:ring-primary-foreground/30"
+                                    aria-label="Search vendors and credentials"
+                                    className="border-primary-foreground/20 bg-primary-foreground/15 pl-9 text-primary-foreground placeholder:text-primary-foreground/70 focus-visible:ring-primary-foreground/30"
                                 />
                             </div>
                             <FilterSelect
@@ -720,21 +724,28 @@ export default function GlobalVendorsCredentials({
                     activeVendors={counts.activeVendors}
                     preferredVendors={counts.preferredVendors}
                     onCredFilter={(key) => {
+                        // Land on exactly the intended subset — clear sibling credential filters.
                         setTab('credentials');
+                        setCredentialTypeFilter('all');
+                        setReauthFilter('all');
                         setRotFilter(key);
                     }}
                     onReauth={() => {
                         setTab('credentials');
+                        setCredentialTypeFilter('all');
+                        setRotFilter('all');
                         setReauthFilter('yes');
                     }}
                     onVendorFilter={(which) => {
                         setTab('vendors');
-                        if (which === 'active') setVendorStatusFilter('active');
-                        if (which === 'preferred') setPreferredFilter('yes');
+                        setServiceTypeFilter('all');
+                        setVendorStatusFilter(which === 'active' ? 'active' : 'all');
+                        setPreferredFilter(which === 'preferred' ? 'yes' : 'all');
                     }}
                 />
 
                 {/* Segmented pill tabs */}
+                {/* eslint-disable-next-line no-restricted-syntax -- segmented tab-bar container, not a Card */}
                 <div className="inline-flex self-start rounded-xl border border-border bg-card p-1">
                     {can.vendors && (
                         <TabPill
@@ -809,6 +820,7 @@ export default function GlobalVendorsCredentials({
             <AddCredentialDialog
                 isOpen={credentialDialog.mode === 'add'}
                 sites={sites}
+                vendors={vendors}
                 onClose={() => setCredentialDialog({ mode: null, target: null })}
             />
             {credentialDialog.target && (
@@ -818,6 +830,7 @@ export default function GlobalVendorsCredentials({
                         siteId={credentialDialog.target.site_id}
                         credential={credentialDialog.target}
                         lockedSite={lockedSiteFor(credentialDialog.target)}
+                        vendors={vendors}
                         onClose={() => setCredentialDialog({ mode: null, target: null })}
                     />
                     <ShowCredentialDialog
@@ -938,7 +951,11 @@ function HealthStrip({
                         Credential health
                         <span className="text-xs font-normal text-muted-foreground">· {credentials} stored</span>
                     </div>
-                    <div className="mt-3 flex h-2 overflow-hidden rounded-full bg-muted" role="img" aria-label="Credential rotation health">
+                    <div
+                        className="mt-3 flex h-2 overflow-hidden rounded-full bg-muted"
+                        role="img"
+                        aria-label={`Rotation health: ${credHealth.ok} healthy, ${credHealth.due} due, ${credHealth.overdue} overdue`}
+                    >
                         {credHealth.ok > 0 && <div className="bg-status-success" style={{ width: pct(credHealth.ok) }} />}
                         {credHealth.due > 0 && <div className="bg-status-warning" style={{ width: pct(credHealth.due) }} />}
                         {credHealth.overdue > 0 && (
@@ -1260,7 +1277,15 @@ function CredentialTable({
                                         <div className="flex items-center gap-2">
                                             <TypeIcon className="h-4 w-4 text-muted-foreground" />
                                             <span className="font-medium group-hover:text-primary">{c.label}</span>
-                                            {c.has_totp && <KeyRound className="h-3 w-3 text-status-success" />}
+                                            {c.has_totp && (
+                                                <Badge
+                                                    variant="outline"
+                                                    className="gap-1 border-status-success/30 bg-status-success-bg text-status-success"
+                                                >
+                                                    <KeyRound className="h-3 w-3" />
+                                                    OTP
+                                                </Badge>
+                                            )}
                                         </div>
                                         {c.vendor_name && <div className="ml-6 text-xs text-muted-foreground">{c.vendor_name}</div>}
                                     </td>

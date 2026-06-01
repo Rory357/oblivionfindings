@@ -18,8 +18,10 @@ import {
     Truck,
 } from 'lucide-react';
 import { useState } from 'react';
+import { credentialTypeLabel, formatDate } from '../_dialog-shared';
 import {
     AddCredentialDialog,
+    type CredentialVendorOption,
     DeleteCredentialDialog,
     EditCredentialDialog,
     RemoveTotpDialog,
@@ -36,6 +38,7 @@ type Site = {
 type Props = {
     site: Site;
     credentials: CredentialRecord[];
+    vendors?: CredentialVendorOption[];
     canReveal: boolean;
     canManage: boolean;
 };
@@ -48,15 +51,10 @@ type CredentialDialogMode =
     | 'remove-totp'
     | null;
 
-function formatDate(value?: string | null) {
-    if (!value) return null;
-
-    return new Date(value).toLocaleDateString();
-}
-
 export default function SiteCredentials({
     site,
     credentials,
+    vendors = [],
     canReveal,
     canManage,
 }: Props) {
@@ -189,7 +187,7 @@ export default function SiteCredentials({
                                                     {credential.label}
                                                 </span>
                                                 <Badge variant="outline">
-                                                    {credential.credential_type}
+                                                    {credentialTypeLabel(credential.credential_type)}
                                                 </Badge>
                                                 {credential.has_totp && (
                                                     <Badge
@@ -291,6 +289,7 @@ export default function SiteCredentials({
                     <AddCredentialDialog
                         siteId={site.id}
                         lockedSite={{ id: site.id, name: site.name, type: site.type }}
+                        vendors={vendors}
                         isOpen
                         onClose={closeCredentialDialog}
                     />
@@ -300,6 +299,7 @@ export default function SiteCredentials({
                         siteId={site.id}
                         credential={credentialDialog.target}
                         lockedSite={{ id: site.id, name: site.name, type: site.type }}
+                        vendors={vendors}
                         isOpen
                         onClose={closeCredentialDialog}
                     />
