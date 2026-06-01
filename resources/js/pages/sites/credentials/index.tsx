@@ -18,7 +18,7 @@ import {
     Truck,
 } from 'lucide-react';
 import { useState } from 'react';
-import { credentialTypeLabel, formatDate } from '../_dialog-shared';
+import { type CredentialPickerOption, credentialTypeLabel, formatDate } from '../_dialog-shared';
 import {
     AddCredentialDialog,
     type CredentialVendorOption,
@@ -39,6 +39,7 @@ type Props = {
     site: Site;
     credentials: CredentialRecord[];
     vendors?: CredentialVendorOption[];
+    credentialTypeOptions?: CredentialPickerOption[];
     canReveal: boolean;
     canManage: boolean;
 };
@@ -55,6 +56,7 @@ export default function SiteCredentials({
     site,
     credentials,
     vendors = [],
+    credentialTypeOptions = [],
     canReveal,
     canManage,
 }: Props) {
@@ -290,6 +292,7 @@ export default function SiteCredentials({
                         siteId={site.id}
                         lockedSite={{ id: site.id, name: site.name, type: site.type }}
                         vendors={vendors}
+                        typeOptions={credentialTypeOptions}
                         isOpen
                         onClose={closeCredentialDialog}
                     />
@@ -300,6 +303,7 @@ export default function SiteCredentials({
                         credential={credentialDialog.target}
                         lockedSite={{ id: site.id, name: site.name, type: site.type }}
                         vendors={vendors}
+                        typeOptions={credentialTypeOptions}
                         isOpen
                         onClose={closeCredentialDialog}
                     />

@@ -114,6 +114,7 @@ import { SiteReadinessPanel, type SiteReadiness } from './_readiness-panel';
 import SiteGeofenceDialog, {
     type SiteGeofenceRecord,
 } from './_site-geofence-dialog';
+import type { CredentialPickerOption } from './_dialog-shared';
 import type { VendorRecord } from './vendors/_dialogs';
 import type { CredentialRecord } from './credentials/_dialogs';
 import type { ContactRecord, ContactTypeKey } from './contacts/_dialogs';
@@ -622,6 +623,7 @@ type Props = {
     roomsSummary?: RoomsSummary | null;
     vendors?: VendorLite[];
     credentials?: CredentialLite[];
+    credentialTypeOptions?: CredentialPickerOption[];
     staffRequirements?: StaffRequirement[];
     coverageRequirements?: CoverageRequirement[];
     coveragePreview?: Array<{
@@ -1423,6 +1425,7 @@ export default function SiteShow({
     roomsSummary,
     vendors = [],
     credentials = [],
+    credentialTypeOptions = [],
     staffRequirements = [],
     coverageRequirements = [],
     coveragePreview = [],
@@ -3163,6 +3166,7 @@ export default function SiteShow({
                                         siteId={site.id}
                                         lockedSite={{ id: site.id, name: site.name, type: site.type }}
                                         vendors={credentialVendorOptions}
+                                        typeOptions={credentialTypeOptions}
                                         isOpen
                                         onClose={closeCredentialDialog}
                                     />
@@ -3175,6 +3179,7 @@ export default function SiteShow({
                                         credential={credentialDialog.target}
                                         lockedSite={{ id: site.id, name: site.name, type: site.type }}
                                         vendors={credentialVendorOptions}
+                                        typeOptions={credentialTypeOptions}
                                         isOpen
                                         onClose={closeCredentialDialog}
                                     />

@@ -4,6 +4,7 @@ use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\SiteController;
 use App\Http\Controllers\Sites\{
     ChecklistsDashboardController,
+    CredentialTypeController,
     HouseLedgerController,
     HouseChecklistController,
     SiteCalendarController,
@@ -435,6 +436,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::get('/vendors/audit', [SiteVendorController::class, 'globalAudit'])
         ->name('sites.vendors.audit')
         ->middleware('permission:credentials.view');
+
+    // Tenant credential-type registry (powers the type tile picker). Tenant-
+    // global config, gated on credentials.manage.
+    Route::get('/credential-types', [CredentialTypeController::class, 'index'])
+        ->name('credential-types.index')
+        ->middleware('permission:credentials.manage');
+    Route::put('/credential-types', [CredentialTypeController::class, 'bulkSave'])
+        ->name('credential-types.save')
+        ->middleware('permission:credentials.manage');
 
     // Legacy URL — /sites/vendors-credentials is the previous canonical location.
     // Permanent redirect preserves bookmarks and historical references.

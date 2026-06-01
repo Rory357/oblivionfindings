@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Sites;
 
 use App\Http\Controllers\Controller;
+use App\Models\CredentialType;
 use App\Models\Site;
 use App\Models\SiteCredential;
 use App\Models\SiteCredentialAuditLog;
@@ -78,6 +79,7 @@ class SiteCredentialController extends Controller
             ],
             'credentials' => $credentials,
             'vendors' => $vendors,
+            'credentialTypeOptions' => CredentialType::pickerOptionsForTenant($site->tenant_id),
             'canReveal' => $request->user()->canDo('credentials.reveal'),
             'canManage' => $request->user()->canDo('credentials.manage'),
         ]);

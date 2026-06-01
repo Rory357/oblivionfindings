@@ -38,6 +38,7 @@ import {
 import { useEffect, useState } from 'react';
 import {
     CREDENTIAL_TYPE_META,
+    type CredentialPickerOption,
     credentialTypeIcon,
     credentialTypeLabel,
     DetailIconHeader,
@@ -45,6 +46,7 @@ import {
     type FilterOption,
     formatDate,
     LockedSiteCard,
+    resolveCredentialIcon,
     RotationBadge,
     rotationStatus,
     SitePickerField,
@@ -52,16 +54,6 @@ import {
     TilePicker,
     type TileOption,
 } from '../_dialog-shared';
-
-const CREDENTIAL_TYPES = [
-    'password',
-    'api_key',
-    'ssh_key',
-    'pin',
-    'certificate',
-    'oauth',
-    'other',
-] as const;
 
 const CRED_TILES: TileOption[] = (
     ['password', 'pin', 'api_key', 'oauth', 'ssh_key', 'certificate', 'other'] as const
@@ -76,7 +68,8 @@ export type CredentialFormValues = {
     label: string;
     username: string;
     url: string;
-    credential_type: (typeof CREDENTIAL_TYPES)[number];
+    // Free-form to allow tenant-defined custom types from the registry.
+    credential_type: string;
     value: string;
     notes: string;
     vendor_id: number | null;
@@ -129,6 +122,7 @@ export function AddCredentialDialog({
     lockedSite,
     sites,
     vendors,
+    typeOptions,
     isOpen,
     onClose,
 }: {
@@ -136,6 +130,7 @@ export function AddCredentialDialog({
     lockedSite?: SiteOption | null;
     sites?: SiteOption[];
     vendors?: CredentialVendorOption[];
+    typeOptions?: CredentialPickerOption[];
     isOpen: boolean;
     onClose: () => void;
 }) {
@@ -148,6 +143,7 @@ export function AddCredentialDialog({
                         lockedSite={lockedSite}
                         sites={sites}
                         vendors={vendors}
+                        typeOptions={typeOptions}
                         onClose={onClose}
                     />
                 )}
@@ -161,12 +157,14 @@ function AddCredentialBody({
     lockedSite,
     sites,
     vendors,
+    typeOptions,
     onClose,
 }: {
     siteId?: number;
     lockedSite?: SiteOption | null;
     sites?: SiteOption[];
     vendors?: CredentialVendorOption[];
+    typeOptions?: CredentialPickerOption[];
     onClose: () => void;
 }) {
     const [pickedSiteId, setPickedSiteId] = useState<number | ''>('');
@@ -242,7 +240,12 @@ function AddCredentialBody({
                         }}
                     />
                 )}
-                <CredentialFormFields form={form} strength={strength} vendors={siteVendors} />
+                <CredentialFormFields
+                    form={form}
+                    strength={strength}
+                    vendors={siteVendors}
+                    typeOptions={typeOptions}
+                />
             </div>
 
             <DialogFooter className="mt-4">
@@ -273,6 +276,7 @@ export function EditCredentialDialog({
     credential,
     lockedSite,
     vendors,
+    typeOptions,
     isOpen,
     onClose,
 }: {
@@ -280,6 +284,7 @@ export function EditCredentialDialog({
     credential: CredentialRecord | null;
     lockedSite?: SiteOption | null;
     vendors?: CredentialVendorOption[];
+    typeOptions?: CredentialPickerOption[];
     isOpen: boolean;
     onClose: () => void;
 }) {
@@ -292,6 +297,7 @@ export function EditCredentialDialog({
                         credential={credential}
                         lockedSite={lockedSite}
                         vendors={vendors}
+                        typeOptions={typeOptions}
                         onClose={onClose}
                     />
                 )}
@@ -305,12 +311,14 @@ function EditCredentialBody({
     credential,
     lockedSite,
     vendors,
+    typeOptions,
     onClose,
 }: {
     siteId: number;
     credential: CredentialRecord;
     lockedSite?: SiteOption | null;
     vendors?: CredentialVendorOption[];
+    typeOptions?: CredentialPickerOption[];
     onClose: () => void;
 }) {
     const siteVendors = (vendors ?? []).filter((v) => v.site_id === siteId);
@@ -318,9 +326,7 @@ function EditCredentialBody({
         label: credential.label,
         username: credential.username ?? '',
         url: credential.url ?? '',
-        credential_type: (CREDENTIAL_TYPES as readonly string[]).includes(credential.credential_type)
-            ? (credential.credential_type as CredentialFormValues['credential_type'])
-            : 'password',
+        credential_type: credential.credential_type || 'password',
         value: '',
         notes: credential.notes ?? '',
         vendor_id: credential.vendor_id ?? null,
@@ -381,7 +387,13 @@ function EditCredentialBody({
                         note="A credential stays with its site — create a new one to move it."
                     />
                 ) : null}
-                <CredentialFormFields form={form} strength={strength} vendors={siteVendors} edit />
+                <CredentialFormFields
+                    form={form}
+                    strength={strength}
+                    vendors={siteVendors}
+                    typeOptions={typeOptions}
+                    edit
+                />
             </div>
 
             <DialogFooter className="mt-4">
@@ -924,6 +936,7 @@ function CredentialFormFields({
     form,
     strength,
     vendors = [],
+    typeOptions,
     edit,
 }: {
     // Both Add and Edit reach this component; their form types are structural
@@ -932,11 +945,36 @@ function CredentialFormFields({
     form: any;
     strength: StrengthResult;
     vendors?: CredentialVendorOption[];
+    typeOptions?: CredentialPickerOption[];
     edit?: boolean;
 }) {
     const [showPassword, setShowPassword] = useState(false);
     const type = (form.data as CredentialFormValues).credential_type;
     const word = secretWord(type);
+
+    // Tile set from the tenant registry (active types), falling back to the
+    // built-in defaults. Always include the credential's current type so
+    // editing a now-hidden/custom type still shows it selected.
+    const baseTiles: TileOption[] =
+        typeOptions && typeOptions.length > 0
+            ? typeOptions.map((o) => ({
+                  key: o.key,
+                  label: o.label,
+                  description: o.description ?? undefined,
+                  icon: resolveCredentialIcon(o.icon),
+              }))
+            : CRED_TILES;
+    const tiles: TileOption[] = baseTiles.some((t) => t.key === type)
+        ? baseTiles
+        : [
+              ...baseTiles,
+              {
+                  key: type,
+                  label: credentialTypeLabel(type),
+                  description: 'Current type',
+                  icon: credentialTypeIcon(type),
+              },
+          ];
 
     const vendorOptions: FilterOption[] = [
         { value: '', label: 'No linked vendor' },
@@ -972,7 +1010,7 @@ function CredentialFormFields({
                 <Label>Category</Label>
                 <div className="mt-1">
                     <TilePicker
-                        options={CRED_TILES}
+                        options={tiles}
                         value={type}
                         onChange={(v) => form.setData('credential_type', v)}
                     />

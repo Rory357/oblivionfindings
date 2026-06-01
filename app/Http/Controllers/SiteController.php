@@ -8,6 +8,7 @@ use App\Http\Requests\UpdateSiteRequest;
 use App\Models\Asset;
 use App\Models\AssetGeofence;
 use App\Models\Client;
+use App\Models\CredentialType;
 use App\Models\FleetFuelLog;
 use App\Models\FleetIncident;
 use App\Models\FleetOuting;
@@ -609,6 +610,9 @@ class SiteController extends Controller
             'credentialCount' => ($user?->canDo('credentials.view') ?? false)
                 ? SiteCredential::where('site_id', $site->id)->count()
                 : 0,
+            'credentialTypeOptions' => ($user?->canDo('credentials.view') ?? false)
+                ? CredentialType::pickerOptionsForTenant($site->tenant_id)
+                : collect(),
             'hardwareCount' => (clone $siteDevices)->count(),
             'integrationStatus' => IntegrationSiteConfig::where('site_id', $site->id)
                 ->where('is_active', true)

@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Sites;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Sites\Concerns\ResolvesAllowedSiteTypes;
+use App\Models\CredentialType;
 use App\Models\Site;
 use App\Models\SiteCredential;
 use App\Models\SiteCredentialAuditLog;
@@ -140,6 +141,9 @@ class SiteVendorController extends Controller
             'sites' => $sites,
             'serviceTypes' => $serviceTypes,
             'credentialTypes' => $credentialTypes,
+            'credentialTypeOptions' => $canCredentials
+                ? CredentialType::pickerOptionsForTenant($user?->organization_id)
+                : collect(),
             'filters' => $request->only(['site_id', 'service_type', 'vendor_status', 'preferred', 'credential_type', 'requires_reauth']),
             'can' => [
                 'vendors' => $canVendors,
@@ -150,6 +154,8 @@ class SiteVendorController extends Controller
                 'vendorsManage' => $canSiteWrite && (bool) ($user?->canDo('vendors.manage') ?? false),
                 'credentialsManage' => $canSiteWrite && (bool) ($user?->canDo('credentials.manage') ?? false),
                 'credentialsReveal' => $canSiteWrite && (bool) ($user?->canDo('credentials.reveal') ?? false),
+                // Type registry is tenant-global config, not site-scoped.
+                'manageCredentialTypes' => (bool) ($user?->canDo('credentials.manage') ?? false),
             ],
         ]);
     }

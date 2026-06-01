@@ -26,16 +26,24 @@ import {
     ChevronDown,
     ChevronsUpDown,
     Clock,
+    CreditCard,
+    Database,
     FileBadge,
     FileKey,
     Fingerprint,
+    Globe,
     Home,
     KeyRound,
     Link2,
     Lock,
+    Mail,
     MapPin,
+    Radio,
+    Server,
     Shield,
+    Smartphone,
     Warehouse,
+    Wifi,
     type LucideIcon,
 } from 'lucide-react';
 import { type ReactNode, useState } from 'react';
@@ -97,13 +105,51 @@ export const CREDENTIAL_TYPE_META: Record<
     other: { label: 'Other', icon: Shield, description: 'Anything else' },
 };
 
+/** Icon-key → lucide component registry (mirrors CredentialType::ICONS). */
+export const CREDENTIAL_ICONS: Record<string, LucideIcon> = {
+    lock: Lock,
+    keyRound: KeyRound,
+    fileKey: FileKey,
+    fingerprint: Fingerprint,
+    fileBadge: FileBadge,
+    link2: Link2,
+    shield: Shield,
+    globe: Globe,
+    server: Server,
+    smartphone: Smartphone,
+    wifi: Wifi,
+    creditCard: CreditCard,
+    mail: Mail,
+    radio: Radio,
+    database: Database,
+};
+
+export function resolveCredentialIcon(iconKey?: string | null): LucideIcon {
+    return (iconKey && CREDENTIAL_ICONS[iconKey]) || Lock;
+}
+
+function humanizeKey(key: string): string {
+    return key
+        .replace(/[_-]+/g, ' ')
+        .replace(/\b\w/g, (c) => c.toUpperCase())
+        .trim();
+}
+
 export function credentialTypeLabel(type: string): string {
-    return CREDENTIAL_TYPE_META[type]?.label ?? type;
+    return CREDENTIAL_TYPE_META[type]?.label ?? humanizeKey(type);
 }
 
 export function credentialTypeIcon(type: string): LucideIcon {
     return CREDENTIAL_TYPE_META[type]?.icon ?? Lock;
 }
+
+/** A credential-type option from the tenant registry (icon as a string key). */
+export type CredentialPickerOption = {
+    key: string;
+    label: string;
+    description?: string | null;
+    icon: string;
+};
 
 // ── Rotation health ────────────────────────────────────────────────────────
 // Threshold is a placeholder per the redesign handoff — confirm the real

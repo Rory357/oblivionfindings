@@ -13,7 +13,7 @@ vi.mock('@inertiajs/react', async () => {
         Head: () => null,
         Link: ({ children, ...rest }: { children: React.ReactNode }) => <a {...rest}>{children}</a>,
         usePage: () => ({ props: { auth: { user: { name: 'Rangi Morgan' } } } }),
-        router: { patch: vi.fn(), post: vi.fn(), delete: vi.fn(), visit: vi.fn() },
+        router: { patch: vi.fn(), post: vi.fn(), delete: vi.fn(), visit: vi.fn(), reload: vi.fn() },
         useForm: (initial: Record<string, unknown>) => {
             const [data, setData] = ReactActual.useState(initial);
             const form = {
@@ -85,6 +85,10 @@ const baseProps = {
     sites,
     serviceTypes: ['Plumbing'],
     credentialTypes: ['pin', 'password'],
+    credentialTypeOptions: [
+        { key: 'password', label: 'Password', description: 'Username + secret', icon: 'lock' },
+        { key: 'pin', label: 'PIN / Code', description: 'Door, alarm, panel', icon: 'fingerprint' },
+    ],
     filters: {},
     can: {
         vendors: true,
@@ -92,6 +96,7 @@ const baseProps = {
         vendorsManage: true,
         credentialsManage: true,
         credentialsReveal: true,
+        manageCredentialTypes: true,
     },
 };
 

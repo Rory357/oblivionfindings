@@ -31,6 +31,7 @@ import {
     Plus,
     RefreshCcw,
     Search,
+    Settings,
     ShieldCheck,
     Star,
     Trash2,
@@ -41,6 +42,7 @@ import { useCallback, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import {
     CREDENTIAL_TYPE_META,
+    type CredentialPickerOption,
     credentialTypeIcon,
     credentialTypeLabel,
     type FilterOption,
@@ -68,6 +70,7 @@ import {
 } from '../vendors/_dialogs';
 import { AuditLogDialog } from './_audit-dialog';
 import { type ContextMenuItem, type ContextMenuState, RowContextMenu } from './_context-menu';
+import { ManageCredentialTypesDialog } from './_manage-types-dialog';
 
 type VendorRow = VendorRecord & {
     site_id: number;
@@ -89,6 +92,7 @@ type Props = {
     sites: SiteOption[];
     serviceTypes: string[];
     credentialTypes: string[];
+    credentialTypeOptions: CredentialPickerOption[];
     filters: {
         site_id?: string | number;
         service_type?: string;
@@ -103,6 +107,7 @@ type Props = {
         vendorsManage: boolean;
         credentialsManage: boolean;
         credentialsReveal: boolean;
+        manageCredentialTypes: boolean;
     };
 };
 
@@ -144,6 +149,7 @@ export default function GlobalVendorsCredentials({
     sites,
     serviceTypes,
     credentialTypes,
+    credentialTypeOptions,
     filters,
     can,
 }: Props) {
@@ -164,6 +170,7 @@ export default function GlobalVendorsCredentials({
     const [vendorDialog, setVendorDialog] = useState<VendorDialog>({ mode: null, target: null });
     const [credentialDialog, setCredentialDialog] = useState<CredentialDialog>({ mode: null, target: null });
     const [auditOpen, setAuditOpen] = useState<{ focusLabel?: string } | null>(null);
+    const [typesOpen, setTypesOpen] = useState(false);
     const [ctxMenu, setCtxMenu] = useState<ContextMenuState | null>(null);
 
     const matchSearch = useCallback(
@@ -631,6 +638,15 @@ export default function GlobalVendorsCredentials({
                                             </DropdownMenuItem>
                                         </>
                                     )}
+                                    {can.manageCredentialTypes && (
+                                        <>
+                                            <DropdownMenuSeparator />
+                                            <DropdownMenuItem onClick={() => setTypesOpen(true)}>
+                                                <Settings className="mr-2 h-4 w-4" />
+                                                Manage credential types
+                                            </DropdownMenuItem>
+                                        </>
+                                    )}
                                 </DropdownMenuContent>
                             </DropdownMenu>
                         </>
@@ -821,6 +837,7 @@ export default function GlobalVendorsCredentials({
                 isOpen={credentialDialog.mode === 'add'}
                 sites={sites}
                 vendors={vendors}
+                typeOptions={credentialTypeOptions}
                 onClose={() => setCredentialDialog({ mode: null, target: null })}
             />
             {credentialDialog.target && (
@@ -831,6 +848,7 @@ export default function GlobalVendorsCredentials({
                         credential={credentialDialog.target}
                         lockedSite={lockedSiteFor(credentialDialog.target)}
                         vendors={vendors}
+                        typeOptions={credentialTypeOptions}
                         onClose={() => setCredentialDialog({ mode: null, target: null })}
                     />
                     <ShowCredentialDialog
@@ -870,6 +888,8 @@ export default function GlobalVendorsCredentials({
                 siteId={siteFilter !== 'all' ? Number(siteFilter) : null}
                 onClose={() => setAuditOpen(null)}
             />
+
+            <ManageCredentialTypesDialog isOpen={typesOpen} onClose={() => setTypesOpen(false)} />
 
             <RowContextMenu menu={ctxMenu} onClose={() => setCtxMenu(null)} />
         </AppLayout>
