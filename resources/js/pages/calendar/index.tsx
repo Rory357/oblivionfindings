@@ -73,6 +73,13 @@ type ShiftForm = {
     notes: string;
 };
 
+type TimedShiftTask = {
+    id: number;
+    label: string;
+    scheduled_time: string | null;
+    is_completed?: boolean;
+};
+
 type ShiftViewInfo = {
     id?: number;
     eventType?: string;
@@ -89,6 +96,8 @@ type ShiftViewInfo = {
     hasActiveReplacement?: boolean;
     tasksTotal?: number;
     tasksCompleted?: number;
+    tasks?: TimedShiftTask[];
+    timedTasks?: TimedShiftTask[];
     incidentsCount?: number;
     isOpenShift?: boolean;
     siteId?: number | null;
@@ -121,13 +130,13 @@ function eventTone(
     isOpenShift?: boolean,
     hasActiveReplacement?: boolean,
 ) {
-    if (status === 'cancelled')
-        return 'border-border bg-muted text-foreground';
+    if (status === 'cancelled') return 'border-border bg-muted text-foreground';
     if (status === 'completed')
         return 'border-status-success/30 bg-status-success-bg text-status-success';
     if (hasActiveReplacement)
         return 'border-status-warning/30 bg-status-warning-bg text-status-warning';
-    if (isOpenShift) return 'border-status-critical/30 bg-status-critical-bg text-status-critical';
+    if (isOpenShift)
+        return 'border-status-critical/30 bg-status-critical-bg text-status-critical';
     if (status === 'in_progress')
         return 'border-status-info/30 bg-status-info-bg text-status-info';
     return 'border-border bg-background text-foreground';
@@ -510,6 +519,8 @@ export default function CalendarIndex(props: Props) {
             hasActiveReplacement: !!ext.has_active_replacement,
             tasksTotal: ext.tasks_total ?? 0,
             tasksCompleted: ext.tasks_completed ?? 0,
+            tasks: ext.tasks ?? [],
+            timedTasks: ext.timed_tasks ?? ext.tasks ?? [],
             incidentsCount: ext.incidents_count ?? 0,
             isOpenShift: !!ext.is_open_shift,
             siteId: ext.site_id ?? null,
@@ -846,6 +857,8 @@ export default function CalendarIndex(props: Props) {
                                 eventContent={(arg) => {
                                     const ext = (arg.event.extendedProps ??
                                         {}) as any;
+                                    const timedTasks =
+                                        ext.timed_tasks ?? ext.tasks ?? [];
                                     const client =
                                         ext.client ?? arg.event.title;
                                     const staff = ext.staff;
@@ -899,6 +912,15 @@ export default function CalendarIndex(props: Props) {
                                                         incident
                                                     </span>
                                                 ) : null}
+                                                {timedTasks[0]
+                                                    ?.scheduled_time ? (
+                                                    <span className="rounded-full border px-1 py-0.5 text-[9px] font-medium tracking-wide uppercase">
+                                                        {
+                                                            timedTasks[0]
+                                                                .scheduled_time
+                                                        }
+                                                    </span>
+                                                ) : null}
                                             </div>
                                         </div>
                                     );
@@ -906,6 +928,8 @@ export default function CalendarIndex(props: Props) {
                                 eventDidMount={(info) => {
                                     const ext = (info.event.extendedProps ??
                                         {}) as any;
+                                    const timedTasks =
+                                        ext.timed_tasks ?? ext.tasks ?? [];
                                     const lines = [
                                         ext.client
                                             ? `Client: ${ext.client}`
@@ -930,6 +954,14 @@ export default function CalendarIndex(props: Props) {
                                             : null,
                                         ext.tasks_total != null
                                             ? `Tasks: ${ext.tasks_completed ?? 0}/${ext.tasks_total}`
+                                            : null,
+                                        timedTasks.length
+                                            ? `Timed tasks: ${timedTasks
+                                                  .map(
+                                                      (task: TimedShiftTask) =>
+                                                          `${task.scheduled_time} ${task.label}`,
+                                                  )
+                                                  .join(', ')}`
                                             : null,
                                         ext.incidents_count
                                             ? `Incidents: ${ext.incidents_count}`
@@ -1235,6 +1267,33 @@ export default function CalendarIndex(props: Props) {
                                             </div>
                                         </div>
                                     </div>
+
+                                    {viewInfo.timedTasks?.length ? (
+                                        <div className="rounded-md border p-2">
+                                            <div className="text-xs text-muted-foreground">
+                                                Timed tasks
+                                            </div>
+                                            <div className="mt-2 space-y-1.5">
+                                                {viewInfo.timedTasks.map(
+                                                    (task) => (
+                                                        <div
+                                                            key={task.id}
+                                                            className="flex items-center gap-2 text-xs"
+                                                        >
+                                                            <span className="rounded bg-muted px-1.5 py-0.5 font-medium tabular-nums">
+                                                                {
+                                                                    task.scheduled_time
+                                                                }
+                                                            </span>
+                                                            <span className="min-w-0 truncate text-muted-foreground">
+                                                                {task.label}
+                                                            </span>
+                                                        </div>
+                                                    ),
+                                                )}
+                                            </div>
+                                        </div>
+                                    ) : null}
 
                                     <div className="flex flex-wrap gap-2">
                                         {viewInfo.id ? (

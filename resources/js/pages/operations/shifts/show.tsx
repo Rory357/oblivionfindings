@@ -73,7 +73,6 @@ import {
     CreateShiftDialog,
     type EditableShift,
 } from './components/create-shift-dialog';
-import { useCreateShiftLauncher } from './components/use-create-shift-launcher';
 import { DonutCard } from './components/donut-card';
 import {
     ShiftAuditTimeline,
@@ -89,10 +88,12 @@ import {
     canMarkShiftTasks,
     type ShiftShowTabKey,
 } from './components/shift-show-redesign';
+import { useCreateShiftLauncher } from './components/use-create-shift-launcher';
 
 type Task = {
     id: number;
     label: string;
+    scheduled_time?: string | null;
     is_completed: boolean;
 };
 
@@ -1281,15 +1282,23 @@ export default function ShiftShow({
                                                     />
                                                 ) : null}
                                             </span>
-                                            <span
-                                                className={cn(
-                                                    'text-sm',
-                                                    t.is_completed
-                                                        ? 'text-muted-foreground line-through'
-                                                        : 'text-foreground',
-                                                )}
-                                            >
-                                                {t.label}
+                                            <span className="min-w-0 flex-1">
+                                                <span
+                                                    className={cn(
+                                                        'block text-sm',
+                                                        t.is_completed
+                                                            ? 'text-muted-foreground line-through'
+                                                            : 'text-foreground',
+                                                    )}
+                                                >
+                                                    {t.label}
+                                                </span>
+                                                {t.scheduled_time ? (
+                                                    <span className="mt-1 inline-flex items-center gap-1 rounded-md bg-muted px-1.5 py-0.5 text-xs text-muted-foreground">
+                                                        <Clock className="h-3 w-3" />
+                                                        {t.scheduled_time}
+                                                    </span>
+                                                ) : null}
                                             </span>
                                         </button>
                                     ))}
@@ -1692,14 +1701,16 @@ export default function ShiftShow({
                                                         onClick={() =>
                                                             createShiftLauncher.openWith(
                                                                 {
-                                                                    site_id: coverage.site_id,
+                                                                    site_id:
+                                                                        coverage.site_id,
                                                                     coverage_rule_id:
                                                                         coverage.rule_id,
                                                                     client_id:
                                                                         coverage.preferred_client_id,
                                                                     starts_at:
                                                                         coverage.starts_at,
-                                                                    ends_at: coverage.ends_at,
+                                                                    ends_at:
+                                                                        coverage.ends_at,
                                                                     coverage_rule_name:
                                                                         coverage.window_label,
                                                                     coverage_required_staff:
@@ -1726,14 +1737,16 @@ export default function ShiftShow({
                                                         onClick={() =>
                                                             createShiftLauncher.openWith(
                                                                 {
-                                                                    site_id: coverage.site_id,
+                                                                    site_id:
+                                                                        coverage.site_id,
                                                                     coverage_rule_id:
                                                                         coverage.rule_id,
                                                                     client_id:
                                                                         coverage.preferred_client_id,
                                                                     starts_at:
                                                                         coverage.starts_at,
-                                                                    ends_at: coverage.ends_at,
+                                                                    ends_at:
+                                                                        coverage.ends_at,
                                                                     open_shift: true,
                                                                     coverage_rule_name:
                                                                         coverage.window_label,
@@ -1759,14 +1772,16 @@ export default function ShiftShow({
                                                         onClick={() =>
                                                             createShiftLauncher.openWith(
                                                                 {
-                                                                    site_id: coverage.site_id,
+                                                                    site_id:
+                                                                        coverage.site_id,
                                                                     coverage_rule_id:
                                                                         coverage.rule_id,
                                                                     client_id:
                                                                         coverage.preferred_client_id,
                                                                     starts_at:
                                                                         coverage.starts_at,
-                                                                    ends_at: coverage.ends_at,
+                                                                    ends_at:
+                                                                        coverage.ends_at,
                                                                     repeat_weekly: true,
                                                                     repeat_end_date:
                                                                         new Date(

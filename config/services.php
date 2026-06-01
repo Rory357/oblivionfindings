@@ -1,5 +1,7 @@
 <?php
 
+use SocialiteProviders\Manager\SocialiteWasCalled;
+
 return [
 
     /*
@@ -15,7 +17,7 @@ return [
     */
 
     'listeners' => [
-        \SocialiteProviders\Manager\SocialiteWasCalled::class => [
+        SocialiteWasCalled::class => [
             'SocialiteProviders\\Microsoft\\MicrosoftExtendSocialite@handle',
             'SocialiteProviders\\Google\\GoogleExtendSocialite@handle',
         ],
@@ -98,6 +100,12 @@ return [
             'endpoint' => env('EXPO_PUSH_ENDPOINT', 'https://exp.host/--/api/v2/push/send'),
             'access_token' => env('EXPO_ACCESS_TOKEN'),
         ],
+    ],
+
+    'webpush' => [
+        'public_key' => env('VAPID_PUBLIC_KEY'),
+        'private_key' => env('VAPID_PRIVATE_KEY'),
+        'subject' => env('VAPID_SUBJECT', 'mailto:'.env('MAIL_FROM_ADDRESS', 'hello@example.com')),
     ],
 
 ];

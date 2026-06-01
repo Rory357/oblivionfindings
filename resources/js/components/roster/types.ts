@@ -9,6 +9,8 @@ export interface RosterClient {
 export interface RosterTask {
     id: number;
     label: string;
+    scheduled_time?: string | null;
+    scheduled_for?: string | null;
     is_completed: boolean;
     completed_at: string | null;
 }

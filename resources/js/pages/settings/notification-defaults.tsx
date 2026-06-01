@@ -31,7 +31,6 @@ import {
     ChevronDown,
     ChevronRight,
     ClipboardList,
-    Clock,
     Mail,
     Monitor,
     Search,
@@ -39,6 +38,12 @@ import {
     Smartphone,
 } from 'lucide-react';
 import { useMemo, useState } from 'react';
+import {
+    friendlyNotificationName,
+    groupNotificationKeysByModule,
+    NOTIFICATION_MODULES,
+    type NotificationModuleGroup,
+} from './notification-catalog';
 
 type ChannelPref = {
     enabled: boolean;
@@ -66,66 +71,11 @@ const DEFAULT_PREF: ChannelPref = {
     push: false,
 };
 
-/** Friendly name map */
-const NOTIFICATION_META: Record<string, { name: string }> = {
-    'timesheets.created': { name: 'Timesheet Created' },
-    'timesheets.updated': { name: 'Timesheet Updated' },
-    'timesheets.submitted': { name: 'Timesheet Submitted' },
-    'timesheets.approved': { name: 'Timesheet Approved' },
-    'timesheets.rejected': { name: 'Timesheet Rejected' },
-    'timesheets.returned': { name: 'Timesheet Returned' },
-    'incidents.draft_created': { name: 'Incident Draft Created' },
-    'incidents.submitted': { name: 'Incident Submitted' },
-    'incidents.reviewed': { name: 'Incident Reviewed' },
-    'incidents.high_severity_alert': { name: 'High Severity Alert' },
-    'breakglass.daily_report': { name: 'Break Glass Daily Report' },
-    'incidents.high_unreviewed_reminder': {
-        name: 'High Severity Unreviewed Reminder',
-    },
-    'followups.created': { name: 'Follow-up Created' },
-    'followups.updated': { name: 'Follow-up Updated' },
-    'followups.completed': { name: 'Follow-up Completed' },
-    'followups.overdue_reminder': { name: 'Follow-up Overdue Reminder' },
-};
-
-const MODULE_CONFIG: Record<
-    string,
-    { label: string; icon: typeof Clock; keys: string[] }
-> = {
-    operations: {
-        label: 'Operations',
-        icon: ClipboardList,
-        keys: [
-            'timesheets.created',
-            'timesheets.updated',
-            'timesheets.submitted',
-            'timesheets.approved',
-            'timesheets.rejected',
-            'timesheets.returned',
-        ],
-    },
-    incidents: {
-        label: 'Incidents & Safety',
-        icon: Shield,
-        keys: [
-            'incidents.draft_created',
-            'incidents.submitted',
-            'incidents.reviewed',
-            'incidents.high_severity_alert',
-            'breakglass.daily_report',
-            'incidents.high_unreviewed_reminder',
-        ],
-    },
-    followups: {
-        label: 'Follow-ups',
-        icon: CheckCircle2,
-        keys: [
-            'followups.created',
-            'followups.updated',
-            'followups.completed',
-            'followups.overdue_reminder',
-        ],
-    },
+const MODULE_ICONS: Record<string, typeof Bell> = {
+    operations: ClipboardList,
+    incidents: Shield,
+    followups: CheckCircle2,
+    other: Bell,
 };
 
 const ROLE_COLORS: string[] = [
@@ -139,51 +89,13 @@ const ROLE_COLORS: string[] = [
     'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning',
 ];
 
-function humanize(key: string): string {
-    return (
-        NOTIFICATION_META[key]?.name ??
-        key
-            .replace(/\./g, ' ')
-            .replace(/_/g, ' ')
-            .replace(/\b\w/g, (c) => c.toUpperCase())
-    );
-}
-
 function groupByModule(
     allKeys: string[],
-): { moduleKey: string; label: string; icon: typeof Clock; keys: string[] }[] {
-    const assigned = new Set<string>();
-    const result: {
-        moduleKey: string;
-        label: string;
-        icon: typeof Clock;
-        keys: string[];
-    }[] = [];
-
-    for (const [moduleKey, config] of Object.entries(MODULE_CONFIG)) {
-        const matched = config.keys.filter((k) => allKeys.includes(k));
-        if (matched.length > 0) {
-            result.push({
-                moduleKey,
-                label: config.label,
-                icon: config.icon,
-                keys: matched,
-            });
-            matched.forEach((k) => assigned.add(k));
-        }
-    }
-
-    const remaining = allKeys.filter((k) => !assigned.has(k));
-    if (remaining.length > 0) {
-        result.push({
-            moduleKey: 'other',
-            label: 'Other',
-            icon: Bell,
-            keys: remaining,
-        });
-    }
-
-    return result;
+): Array<NotificationModuleGroup & { icon: typeof Bell }> {
+    return groupNotificationKeysByModule(allKeys).map((group) => ({
+        ...group,
+        icon: MODULE_ICONS[group.moduleKey] ?? Bell,
+    }));
 }
 
 /** Channel dot indicator: green if on, grey if off */
@@ -214,7 +126,9 @@ export default function NotificationDefaults({ groups, roles, matrix }: Props) {
     const [openModules, setOpenModules] = useState<Record<string, boolean>>(
         () => {
             const initial: Record<string, boolean> = {};
-            Object.keys(MODULE_CONFIG).forEach((k) => (initial[k] = true));
+            Object.keys(NOTIFICATION_MODULES).forEach(
+                (key) => (initial[key] = true),
+            );
             initial['other'] = true;
             return initial;
         },
@@ -231,7 +145,7 @@ export default function NotificationDefaults({ groups, roles, matrix }: Props) {
                 keys: mod.keys.filter(
                     (k) =>
                         k.toLowerCase().includes(q) ||
-                        humanize(k).toLowerCase().includes(q) ||
+                        friendlyNotificationName(k).toLowerCase().includes(q) ||
                         mod.label.toLowerCase().includes(q),
                 ),
             }))
@@ -560,7 +474,7 @@ export default function NotificationDefaults({ groups, roles, matrix }: Props) {
                                                             >
                                                                 <td className="py-3 pr-4">
                                                                     <div className="text-sm font-medium">
-                                                                        {humanize(
+                                                                        {friendlyNotificationName(
                                                                             key,
                                                                         )}
                                                                     </div>
@@ -621,7 +535,7 @@ export default function NotificationDefaults({ groups, roles, matrix }: Props) {
                                                                                         <div className="space-y-3">
                                                                                             <div className="flex items-center justify-between">
                                                                                                 <span className="text-xs font-semibold">
-                                                                                                    {humanize(
+                                                                                                    {friendlyNotificationName(
                                                                                                         key,
                                                                                                     )}
                                                                                                 </span>

@@ -38,6 +38,8 @@ export interface MyDayShiftClient {
 export interface MyDayShiftTask {
     id: number;
     label: string;
+    scheduled_time?: string | null;
+    scheduled_for?: string | null;
     is_completed: boolean;
     completed_at: string | null;
     /** Resident this task belongs to (derived from shift.client_id for now). */
@@ -203,6 +205,8 @@ export interface MyDayEndOfShiftBlocker {
 export interface MyDayClockSessionTask {
     id: number;
     label: string;
+    scheduled_time?: string | null;
+    scheduled_for?: string | null;
     is_completed: boolean;
     completed_at?: string | null;
 }
@@ -299,7 +303,14 @@ export interface MyDayPageProps {
     tasks: MyDayTaskFollowup[];
     stats: MyDayStats;
     pending_claims_count: number;
-    leave: { balances: { type: string; remaining_hours: number; total_hours: number }[]; pending_requests: number };
+    leave: {
+        balances: {
+            type: string;
+            remaining_hours: number;
+            total_hours: number;
+        }[];
+        pending_requests: number;
+    };
     is_manager: boolean;
     clock?: MyDayClockState;
     active_shift?: (MyDayShift & { site?: MyDayActiveSite | null }) | null;

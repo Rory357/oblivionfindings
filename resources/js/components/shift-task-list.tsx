@@ -4,10 +4,13 @@ import { useEffect, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { Checkbox } from '@/components/ui/checkbox';
 import { cn } from '@/lib/utils';
+import { Clock3 } from 'lucide-react';
 
 export interface ShiftTaskListItem {
     id: number;
     label: string;
+    scheduled_time?: string | null;
+    scheduled_for?: string | null;
     is_completed: boolean;
     completed_at: string | null;
 }
@@ -101,13 +104,21 @@ export default function ShiftTaskList({
                         onCheckedChange={() => toggleTask(task)}
                         className="mt-0.5"
                     />
-                    <span
-                        className={cn(
-                            'leading-snug',
-                            task.is_completed && 'line-through',
-                        )}
-                    >
-                        {task.label}
+                    <span className="min-w-0 flex-1">
+                        <span
+                            className={cn(
+                                'block leading-snug',
+                                task.is_completed && 'line-through',
+                            )}
+                        >
+                            {task.label}
+                        </span>
+                        {task.scheduled_time ? (
+                            <span className="mt-1 inline-flex items-center gap-1 text-xs text-muted-foreground">
+                                <Clock3 className="h-3 w-3" />
+                                {task.scheduled_time}
+                            </span>
+                        ) : null}
                     </span>
                 </label>
             ))}

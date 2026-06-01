@@ -1,13 +1,13 @@
 import '../css/app.css';
 
 import { createInertiaApp } from '@inertiajs/react';
-import { resolvePageComponent } from 'laravel-vite-plugin/inertia-helpers';
 import { createElement, StrictMode, type CSSProperties } from 'react';
 import { createRoot } from 'react-dom/client';
 import { Toaster } from 'sonner';
 import FlashToaster from './components/flash-toaster';
 import OfflineStatusBanner from './components/offline-status-banner';
 import { initializeAppearance } from './hooks/use-appearance';
+import { resolveInertiaPage } from './inertia-pages';
 import { bootEmarOffline } from './lib/emar-offline';
 import { bootOfflineQueue } from './lib/offline-queue';
 
@@ -32,11 +32,7 @@ function renderInertiaPage(Component: any, pageProps: Record<string, unknown>, k
 
 createInertiaApp({
     title: (title) => (title ? `${title} - ${appName}` : appName),
-    resolve: (name) =>
-        resolvePageComponent(
-            `./pages/${name}.tsx`,
-            import.meta.glob('./pages/**/*.tsx'),
-        ),
+    resolve: resolveInertiaPage,
     setup({ el, App, props }) {
         const initialPageProps = props.initialPage.props as {
             appearance?: Parameters<typeof initializeAppearance>[0];

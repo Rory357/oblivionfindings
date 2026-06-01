@@ -18,11 +18,19 @@ export type StreamMedItem = {
 
 export type StreamItem = StreamTaskItem | StreamMedItem;
 
+const WORKER_TIME_FORMAT = new Intl.DateTimeFormat('en-NZ', {
+    hour: '2-digit',
+    hourCycle: 'h23',
+    minute: '2-digit',
+    timeZone: 'Pacific/Auckland',
+});
+
 /** Convert "HH:MM" → hours-as-decimal for ordering. Returns Infinity on parse failure. */
 export function parseHourMinute(hhmm: string | null | undefined): number {
     if (!hhmm) return Number.POSITIVE_INFINITY;
     const [h, m] = hhmm.split(':').map((part) => Number(part));
-    if (!Number.isFinite(h) || !Number.isFinite(m)) return Number.POSITIVE_INFINITY;
+    if (!Number.isFinite(h) || !Number.isFinite(m))
+        return Number.POSITIVE_INFINITY;
     return h + m / 60;
 }
 
@@ -31,7 +39,7 @@ export function isoToHourMinute(iso: string | null | undefined): string {
     if (!iso) return '';
     const d = new Date(iso);
     if (Number.isNaN(d.getTime())) return '';
-    return `${String(d.getHours()).padStart(2, '0')}:${String(d.getMinutes()).padStart(2, '0')}`;
+    return WORKER_TIME_FORMAT.format(d);
 }
 
 interface BuildStreamArgs {
@@ -43,8 +51,16 @@ interface BuildStreamArgs {
     fallbackClientId?: number | null;
 }
 
-export function buildStream({ tasks, meds, residentFilter, fallbackClientId = null }: BuildStreamArgs): StreamItem[] {
-    const filterId = residentFilter === 'all' || residentFilter == null ? null : Number(residentFilter);
+export function buildStream({
+    tasks,
+    meds,
+    residentFilter,
+    fallbackClientId = null,
+}: BuildStreamArgs): StreamItem[] {
+    const filterId =
+        residentFilter === 'all' || residentFilter == null
+            ? null
+            : Number(residentFilter);
 
     const taskItems: StreamTaskItem[] = tasks
         .map((task) => {
@@ -58,7 +74,9 @@ export function buildStream({ tasks, meds, residentFilter, fallbackClientId = nu
                 data: task,
             };
         })
-        .filter((item) => (filterId == null ? true : item.clientId === filterId));
+        .filter((item) =>
+            filterId == null ? true : item.clientId === filterId,
+        );
 
     const medItems: StreamMedItem[] = meds
         .map((med) => {
@@ -71,13 +89,17 @@ export function buildStream({ tasks, meds, residentFilter, fallbackClientId = nu
                 data: med,
             };
         })
-        .filter((item) => (filterId == null ? true : item.clientId === filterId));
+        .filter((item) =>
+            filterId == null ? true : item.clientId === filterId,
+        );
 
     return [...taskItems, ...medItems].sort((a, b) => a.hr - b.hr);
 }
 
 /** Groups a stream by "HH:MM" preserving the relative order returned by buildStream. */
-export function groupByTime(stream: StreamItem[]): Array<{ time: string; items: StreamItem[] }> {
+export function groupByTime(
+    stream: StreamItem[],
+): Array<{ time: string; items: StreamItem[] }> {
     const map = new Map<string, StreamItem[]>();
     for (const item of stream) {
         const key = item.at || '—';
@@ -90,8 +112,14 @@ export function groupByTime(stream: StreamItem[]): Array<{ time: string; items: 
 
 /** Tasks don't always carry an `at` field in the existing payload; some controllers set it on
  *  custom keys. Resolve through the most common shapes, defaulting to "" when unknown. */
-function inferTaskTime(task: MyDayShiftTask & { at?: string; scheduled_for?: string }): string {
-    if (typeof (task as { at?: string }).at === 'string') return (task as { at: string }).at;
+function inferTaskTime(
+    task: MyDayShiftTask & {
+        at?: string | null;
+        scheduled_for?: string | null;
+    },
+): string {
+    if (typeof (task as { at?: string }).at === 'string')
+        return (task as { at: string }).at;
     const scheduled = (task as { scheduled_for?: string }).scheduled_for;
     if (typeof scheduled === 'string') return isoToHourMinute(scheduled);
     return '';
@@ -101,7 +129,7 @@ function inferTaskTime(task: MyDayShiftTask & { at?: string; scheduled_for?: str
  * "HH:MM" representation of the current wall-clock time, used by the NowRule.
  */
 export function nowHourMinute(now: Date = new Date()): string {
-    return `${String(now.getHours()).padStart(2, '0')}:${String(now.getMinutes()).padStart(2, '0')}`;
+    return WORKER_TIME_FORMAT.format(now);
 }
 
 /**
@@ -109,7 +137,10 @@ export function nowHourMinute(now: Date = new Date()): string {
  * list of time-grouped buckets. Returns -1 when "now" is past the last bucket
  * (the rule sits after everything).
  */
-export function nowRuleIndex(buckets: Array<{ time: string }>, now: string): number {
+export function nowRuleIndex(
+    buckets: Array<{ time: string }>,
+    now: string,
+): number {
     const nowHr = parseHourMinute(now);
     for (let i = 0; i < buckets.length; i++) {
         if (parseHourMinute(buckets[i].time) >= nowHr) return i;

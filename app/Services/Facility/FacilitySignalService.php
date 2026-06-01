@@ -5,7 +5,11 @@ namespace App\Services\Facility;
 use App\Enums\AlertSeverity;
 use App\Models\ControlRoom\Device;
 use App\Models\ControlRoom\SignalSource;
+use App\Models\ControlRoomAlert;
+use App\Models\ShiftTask;
+use App\Models\SiteInspectionRecord;
 use App\Models\SiteInspectionSchedule;
+use App\Models\User;
 use App\Services\ControlRoom\SignalProcessingService;
 use Illuminate\Support\Facades\Log;
 
@@ -21,9 +25,14 @@ use Illuminate\Support\Facades\Log;
 class FacilitySignalService
 {
     public const TYPE_INSPECTION_OVERDUE = 'inspection_overdue';
+
     public const TYPE_INSPECTION_FAILED = 'inspection_failed';
+
     public const TYPE_DEVICE_OFFLINE = 'cr_device_offline';
+
     public const TYPE_DEVICE_LOW_BATTERY = 'cr_device_low_battery';
+
+    public const TYPE_SHIFT_TASK_DUE = 'shift_task_due';
 
     protected ?SignalSource $signalSource = null;
 
@@ -67,7 +76,7 @@ class FacilitySignalService
      */
     public function emitInspectionFailed(
         SiteInspectionSchedule $schedule,
-        \App\Models\SiteInspectionRecord $record,
+        SiteInspectionRecord $record,
     ): void {
         $schedule->loadMissing(['site:id,name', 'assignedTo:id,name']);
 
@@ -134,6 +143,58 @@ class FacilitySignalService
         );
     }
 
+    public function emitShiftTaskDue(ShiftTask $task, User $worker): void
+    {
+        $task->loadMissing(['shift.client:id,first_name,last_name,site_id', 'shift.site:id,name']);
+        $shift = $task->shift;
+
+        $existing = ControlRoomAlert::query()
+            ->where('source', 'shift_task')
+            ->where('alert_type', 'Shift task due')
+            ->where('context->shift_task_id', $task->id)
+            ->unresolved()
+            ->first();
+
+        if ($existing) {
+            return;
+        }
+
+        $scheduledFor = $task->scheduledFor();
+        $clientName = $shift?->client
+            ? trim($shift->client->first_name.' '.$shift->client->last_name)
+            : null;
+        $message = $clientName
+            ? "{$task->label} is due now for {$clientName}."
+            : "{$task->label} is due now.";
+
+        ControlRoomAlert::query()->create([
+            'source' => 'shift_task',
+            'alert_type' => 'Shift task due',
+            'severity' => AlertSeverity::LOW,
+            'status' => ControlRoomAlert::STATUS_OPEN,
+            'site_id' => $shift?->site_id ?? $shift?->client?->site_id,
+            'client_id' => $shift?->client_id,
+            'triggered_at' => now(),
+            'due_at' => $scheduledFor,
+            'assigned_to_user_id' => $worker->id,
+            'assigned_at' => now(),
+            'context' => [
+                'summary' => $message,
+                'message' => $message,
+                'source_module' => 'my_day',
+                'signal_type' => self::TYPE_SHIFT_TASK_DUE,
+                'shift_id' => $task->shift_id,
+                'shift_task_id' => $task->id,
+                'task_label' => $task->label,
+                'scheduled_time' => $task->scheduled_time,
+                'scheduled_for' => $scheduledFor?->toIso8601String(),
+                'worker_id' => $worker->id,
+            ],
+            'priority' => 'low',
+            'category' => 'shift',
+        ]);
+    }
+
     /**
      * Core signal emission method.
      */
@@ -194,8 +255,8 @@ class FacilitySignalService
         // Inspections dedup daily (only need one alert per day per schedule)
         // Devices dedup every 30 minutes (similar to fleet offline pattern)
         $windowMinutes = str_starts_with($signalType, 'inspection') ? 1440 : 30;
-        $window = now()->format('Y-m-d') . ($windowMinutes < 1440
-            ? '_' . (intdiv((int) now()->format('G'), 1) . ':' . (intdiv((int) now()->format('i'), $windowMinutes) * $windowMinutes))
+        $window = now()->format('Y-m-d').($windowMinutes < 1440
+            ? '_'.(intdiv((int) now()->format('G'), 1).':'.(intdiv((int) now()->format('i'), $windowMinutes) * $windowMinutes))
             : '');
 
         $entityKey = match ($signalType) {

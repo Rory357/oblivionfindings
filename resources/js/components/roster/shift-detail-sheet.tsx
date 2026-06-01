@@ -27,6 +27,7 @@ function ShiftDetail({ shift }: { shift: RosterShift }) {
     const completedTasks = shift.tasks.filter(
         (task) => task.is_completed,
     ).length;
+    const timedTasks = shift.tasks.filter((task) => task.scheduled_time);
 
     return (
         <div className="space-y-4">
@@ -84,6 +85,24 @@ function ShiftDetail({ shift }: { shift: RosterShift }) {
                     </span>
                 </div>
                 <Progress value={shift.task_progress} className="mt-2 h-2" />
+                {timedTasks.length ? (
+                    <div className="mt-3 space-y-1.5">
+                        {timedTasks.map((task) => (
+                            <div
+                                key={task.id}
+                                className="flex items-center gap-2 text-xs text-muted-foreground"
+                            >
+                                <Clock className="h-3.5 w-3.5" />
+                                <span className="font-medium text-foreground">
+                                    {task.scheduled_time}
+                                </span>
+                                <span className="min-w-0 truncate">
+                                    {task.label}
+                                </span>
+                            </div>
+                        ))}
+                    </div>
+                ) : null}
             </div>
 
             {shift.timesheet ? (

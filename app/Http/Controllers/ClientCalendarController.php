@@ -9,7 +9,8 @@ use App\Models\ClientMedicationAdministration;
 use App\Models\FamilyNote;
 use App\Models\FamilyVisitRequest;
 use App\Models\Shift;
-use App\Models\TimelineEvent;
+use App\Services\Timeline\TimelineEmitter;
+use App\Support\ShiftTaskSupport;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
@@ -27,15 +28,15 @@ class ClientCalendarController extends Controller
         // 1. Shifts
         $shifts = Shift::where('client_id', $client->id)
             ->whereBetween('starts_at', [$start, $end])
-            ->with('staff:id,name')
+            ->with(['staff:id,name', 'tasks:id,shift_id,label,scheduled_time,is_completed,sort_order'])
             ->get();
 
         foreach ($shifts as $s) {
             $isRespite = (bool) $s->respite_booking_id;
 
             $events->push([
-                'id' => 'shift-' . $s->id,
-                'title' => ($s->staff?->name ?? 'Staff TBC') . ' — Shift',
+                'id' => 'shift-'.$s->id,
+                'title' => ($s->staff?->name ?? 'Staff TBC').' — Shift',
                 'start' => $s->starts_at?->toIso8601String(),
                 'end' => $s->ends_at?->toIso8601String(),
                 'backgroundColor' => $isRespite ? '#7c3aed' : ($s->status === 'completed' ? '#10b981' : ($s->status === 'cancelled' ? '#94a3b8' : '#3b82f6')),
@@ -48,6 +49,8 @@ class ClientCalendarController extends Controller
                     'staff_name' => $s->staff?->name,
                     'notes' => $s->notes,
                     'location' => $s->location,
+                    'tasks' => ShiftTaskSupport::payloadsForShift($s),
+                    'timed_tasks' => ShiftTaskSupport::timedPayloadForShift($s),
                 ],
             ]);
         }
@@ -75,8 +78,8 @@ class ClientCalendarController extends Controller
 
             $visitTypes = ['in_person' => 'In Person', 'video_call' => 'Video Call', 'outing' => 'Outing'];
             $events->push([
-                'id' => 'visit-' . $v->id,
-                'title' => 'Family Visit — ' . ($v->user?->name ?? 'Family'),
+                'id' => 'visit-'.$v->id,
+                'title' => 'Family Visit — '.($v->user?->name ?? 'Family'),
                 'start' => $startTime->toIso8601String(),
                 'end' => $endTime->toIso8601String(),
                 'backgroundColor' => '#22c55e',
@@ -109,11 +112,11 @@ class ClientCalendarController extends Controller
 
         foreach ($appointments as $a) {
             $events->push([
-                'id' => 'appt-' . $a->id,
+                'id' => 'appt-'.$a->id,
                 'title' => $a->title,
                 'start' => $a->starts_at->toIso8601String(),
                 'end' => $a->ends_at?->toIso8601String(),
-                'allDay' => !$a->ends_at,
+                'allDay' => ! $a->ends_at,
                 'backgroundColor' => $typeColors[$a->appointment_type] ?? '#64748b',
                 'borderColor' => 'transparent',
                 'extendedProps' => [
@@ -143,11 +146,11 @@ class ClientCalendarController extends Controller
                 $noteStart->setTime((int) $h, (int) $m);
             }
             $events->push([
-                'id' => 'fnote-' . $fn->id,
-                'title' => '📝 ' . $fn->title,
+                'id' => 'fnote-'.$fn->id,
+                'title' => '📝 '.$fn->title,
                 'start' => $fn->due_time ? $noteStart->toIso8601String() : $fn->due_date->toDateString(),
                 'end' => $fn->due_time ? $noteStart->copy()->addHour()->toIso8601String() : null,
-                'allDay' => !$fn->due_time,
+                'allDay' => ! $fn->due_time,
                 'backgroundColor' => '#a78bfa',
                 'borderColor' => 'transparent',
                 'extendedProps' => [
@@ -183,8 +186,8 @@ class ClientCalendarController extends Controller
                 default => '#ec4899',
             };
             $events->push([
-                'id' => 'med-' . $ma->id,
-                'title' => $medName . ' — ' . $statusLabel,
+                'id' => 'med-'.$ma->id,
+                'title' => $medName.' — '.$statusLabel,
                 'start' => $ma->scheduled_for?->toIso8601String() ?? $ma->administered_at?->toIso8601String(),
                 'end' => null,
                 'allDay' => false,
@@ -213,7 +216,9 @@ class ClientCalendarController extends Controller
 
         foreach ($activeMeds as $med) {
             $times = $this->parseFrequencyTimes($med->frequency);
-            if (empty($times)) continue;
+            if (empty($times)) {
+                continue;
+            }
 
             $current = $medStart->copy();
             while ($current->lte($medEnd)) {
@@ -225,11 +230,11 @@ class ClientCalendarController extends Controller
                             && $ma->scheduled_for
                             && $ma->scheduled_for->format('Y-m-d H:i') === $scheduledAt->format('Y-m-d H:i');
                     });
-                    if (!$alreadyRecorded && $scheduledAt->gte($start) && $scheduledAt->lte($end)) {
+                    if (! $alreadyRecorded && $scheduledAt->gte($start) && $scheduledAt->lte($end)) {
                         $isPast = $scheduledAt->lt(now());
                         $events->push([
-                            'id' => 'medsched-' . $med->id . '-' . $scheduledAt->format('YmdHi'),
-                            'title' => $med->name . ($isPast ? ' — Overdue' : ' — Due'),
+                            'id' => 'medsched-'.$med->id.'-'.$scheduledAt->format('YmdHi'),
+                            'title' => $med->name.($isPast ? ' — Overdue' : ' — Due'),
                             'start' => $scheduledAt->toIso8601String(),
                             'end' => null,
                             'allDay' => false,
@@ -274,7 +279,7 @@ class ClientCalendarController extends Controller
             'created_by' => $request->user()->id,
         ]);
 
-        app(\App\Services\Timeline\TimelineEmitter::class)->record([
+        app(TimelineEmitter::class)->record([
             'source_type' => ClientAppointment::class,
             'source_id' => $appointment->id,
             'occurred_at' => now(),
@@ -282,7 +287,7 @@ class ClientCalendarController extends Controller
             'actor_user_id' => $request->user()->id,
             'client_id' => $client->id,
             'site_id' => $client->site_id,
-            'subject' => 'Appointment scheduled: ' . $data['title'],
+            'subject' => 'Appointment scheduled: '.$data['title'],
             'body' => $data['description'],
             'meta' => array_filter([
                 'appointment_type' => $data['appointment_type'],
@@ -350,7 +355,9 @@ class ClientCalendarController extends Controller
      */
     private function parseFrequencyTimes(?string $frequency): array
     {
-        if (!$frequency) return [];
+        if (! $frequency) {
+            return [];
+        }
 
         $freq = strtolower(trim($frequency));
 

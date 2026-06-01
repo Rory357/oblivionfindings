@@ -7,6 +7,7 @@ use App\Models\AuditLog;
 use App\Models\Client;
 use App\Models\CoverageGapAcknowledgement;
 use App\Models\CoverageReservation;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\RosterPeriod;
 use App\Models\ServiceContext;
@@ -16,6 +17,7 @@ use App\Models\Site;
 use App\Models\SiteCoverageRequirement;
 use App\Models\User;
 use App\Services\ShiftSignalService;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Tests\TestCase;
@@ -39,7 +41,7 @@ class ShiftControllerTest extends TestCase
         parent::setUp();
 
         // Create roles and permissions
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         // Create test users
         $this->admin = User::factory()->create([
@@ -57,7 +59,7 @@ class ShiftControllerTest extends TestCase
         // Grant staff additional permissions needed for tests
         $staffRole = Role::where('name', 'support_worker')->first();
         $staffRole->permissions()->syncWithoutDetaching([
-            \App\Models\Permission::where('key', 'shifts.update')->first()->id,
+            Permission::where('key', 'shifts.update')->first()->id,
         ]);
 
         // Create service context
@@ -194,6 +196,7 @@ class ShiftControllerTest extends TestCase
         ShiftTask::create([
             'shift_id' => $shift->id,
             'label' => 'Check overnight notes',
+            'scheduled_time' => '10:30',
             'sort_order' => 1,
         ]);
 
@@ -208,7 +211,8 @@ class ShiftControllerTest extends TestCase
             ->assertJsonPath('coverage_roles.0', 'caregiver')
             ->assertJsonPath('coverage_roles.1', 'driver')
             ->assertJsonPath('tasks.0.id', ShiftTask::query()->where('shift_id', $shift->id)->value('id'))
-            ->assertJsonPath('tasks.0.label', 'Check overnight notes');
+            ->assertJsonPath('tasks.0.label', 'Check overnight notes')
+            ->assertJsonPath('tasks.0.scheduled_time', '10:30');
     }
 
     public function test_editable_shift_endpoint_requires_shift_update_permission(): void
@@ -431,6 +435,8 @@ class ShiftControllerTest extends TestCase
         ShiftTask::create([
             'shift_id' => $source->id,
             'label' => 'Morning handover',
+            'scheduled_time' => '09:30',
+            'reminder_sent_at' => Carbon::parse('2026-05-05 09:35:00', 'Pacific/Auckland')->utc(),
             'sort_order' => 0,
         ]);
 
@@ -455,6 +461,8 @@ class ShiftControllerTest extends TestCase
         $this->assertDatabaseHas('shift_tasks', [
             'shift_id' => $copy->id,
             'label' => 'Morning handover',
+            'scheduled_time' => '09:30',
+            'reminder_sent_at' => null,
             'sort_order' => 0,
         ]);
     }
@@ -604,7 +612,7 @@ class ShiftControllerTest extends TestCase
             'starts_at' => now()->addDay()->format('Y-m-d H:i:s'),
             'ends_at' => now()->addDay()->addHours(4)->format('Y-m-d H:i:s'),
             'tasks' => [
-                ['label' => 'Task 1'],
+                ['label' => 'Task 1', 'scheduled_time' => '10:15'],
                 ['label' => 'Task 2'],
                 ['label' => 'Task 3'],
             ],
@@ -614,7 +622,11 @@ class ShiftControllerTest extends TestCase
 
         $shift = Shift::latest()->first();
         $this->assertCount(3, $shift->tasks);
-        $this->assertDatabaseHas('shift_tasks', ['label' => 'Task 1', 'shift_id' => $shift->id]);
+        $this->assertDatabaseHas('shift_tasks', [
+            'label' => 'Task 1',
+            'shift_id' => $shift->id,
+            'scheduled_time' => '10:15',
+        ]);
     }
 
     // ==========================================
@@ -670,7 +682,12 @@ class ShiftControllerTest extends TestCase
         ]);
 
         // Add existing task
-        $existingTask = $shift->tasks()->create(['label' => 'Old Task', 'sort_order' => 0]);
+        $existingTask = $shift->tasks()->create([
+            'label' => 'Old Task',
+            'scheduled_time' => '09:00',
+            'reminder_sent_at' => now()->subHour(),
+            'sort_order' => 0,
+        ]);
 
         $response = $this->actingAs($this->admin)
             ->put(route('operations.shifts.update', $shift), [
@@ -679,14 +696,83 @@ class ShiftControllerTest extends TestCase
                 'ends_at' => $shift->ends_at->format('Y-m-d H:i:s'),
                 'status' => 'scheduled',
                 'tasks' => [
-                    ['id' => $existingTask->id, 'label' => 'Updated Task'],
-                    ['label' => 'New Task'],
+                    ['id' => $existingTask->id, 'label' => 'Updated Task', 'scheduled_time' => '10:00'],
+                    ['label' => 'New Task', 'scheduled_time' => '11:30'],
                 ],
             ]);
 
         $response->assertRedirect('/operations/shifts');
-        $this->assertDatabaseHas('shift_tasks', ['id' => $existingTask->id, 'label' => 'Updated Task']);
-        $this->assertDatabaseHas('shift_tasks', ['label' => 'New Task', 'shift_id' => $shift->id]);
+        $this->assertDatabaseHas('shift_tasks', [
+            'id' => $existingTask->id,
+            'label' => 'Updated Task',
+            'scheduled_time' => '10:00',
+            'reminder_sent_at' => null,
+        ]);
+        $this->assertDatabaseHas('shift_tasks', [
+            'label' => 'New Task',
+            'shift_id' => $shift->id,
+            'scheduled_time' => '11:30',
+        ]);
+    }
+
+    public function test_update_clears_sent_task_reminders_when_shift_start_changes(): void
+    {
+        $start = now()->addDay()->setTime(9, 0);
+        $end = $start->copy()->addHours(4);
+        $shift = Shift::factory()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'service_context_id' => $this->serviceContext->id,
+            'user_id' => null,
+            'status' => 'scheduled',
+            'starts_at' => $start,
+            'ends_at' => $end,
+        ]);
+
+        $task = $shift->tasks()->create([
+            'label' => 'Medication prompt',
+            'scheduled_time' => '10:00',
+            'reminder_sent_at' => now()->subHour(),
+            'sort_order' => 0,
+        ]);
+
+        $response = $this->actingAs($this->admin)
+            ->put(route('operations.shifts.update', $shift), [
+                'client_id' => $this->client->id,
+                'service_context_id' => $this->serviceContext->id,
+                'starts_at' => $start->copy()->addHour()->format('Y-m-d H:i:s'),
+                'ends_at' => $end->copy()->addHour()->format('Y-m-d H:i:s'),
+                'status' => 'scheduled',
+            ]);
+
+        $response->assertRedirect('/operations/shifts');
+        expect($task->fresh()->reminder_sent_at)->toBeNull();
+    }
+
+    public function test_series_store_copies_task_scheduled_time_to_each_occurrence(): void
+    {
+        $response = $this->actingAs($this->admin)
+            ->post(route('operations.shifts.series.store'), [
+                'client_id' => $this->client->id,
+                'service_context_id' => $this->serviceContext->id,
+                'user_id' => null,
+                'start_date' => '2026-05-04',
+                'end_date' => '2026-05-04',
+                'timezone' => 'Pacific/Auckland',
+                'by_weekday' => ['mon'],
+                'starts_time' => '09:00',
+                'ends_time' => '13:00',
+                'status' => 'scheduled',
+                'tasks' => [
+                    ['label' => 'Time-specific medication prompt', 'scheduled_time' => '11:15'],
+                ],
+            ]);
+
+        $response->assertSessionHasNoErrors();
+        $this->assertDatabaseHas('shift_tasks', [
+            'label' => 'Time-specific medication prompt',
+            'scheduled_time' => '11:15',
+        ]);
     }
 
     // ==========================================

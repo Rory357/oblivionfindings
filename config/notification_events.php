@@ -24,6 +24,9 @@ return [
             'followups.completed',
             'followups.overdue_reminder',
         ],
+        'Rostering' => [
+            'shift_task_due',
+        ],
         'Audit & Safety' => [
             'breakglass.daily_report',
             'incidents.high_unreviewed_reminder',

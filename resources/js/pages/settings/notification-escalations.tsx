@@ -40,6 +40,7 @@ import {
     X,
 } from 'lucide-react';
 import { useCallback, useMemo, useState } from 'react';
+import { friendlyNotificationName } from './notification-catalog';
 
 type GroupedEvents = Record<string, string[]>;
 
@@ -70,36 +71,6 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Settings', href: '/settings/profile' },
     { title: 'Escalation Rules', href: '/settings/notification-escalations' },
 ];
-
-/** Friendly name map */
-const NOTIFICATION_META: Record<string, string> = {
-    'timesheets.created': 'Timesheet Created',
-    'timesheets.updated': 'Timesheet Updated',
-    'timesheets.submitted': 'Timesheet Submitted',
-    'timesheets.approved': 'Timesheet Approved',
-    'timesheets.rejected': 'Timesheet Rejected',
-    'timesheets.returned': 'Timesheet Returned',
-    'incidents.draft_created': 'Incident Draft Created',
-    'incidents.submitted': 'Incident Submitted',
-    'incidents.reviewed': 'Incident Reviewed',
-    'incidents.high_severity_alert': 'High Severity Alert',
-    'breakglass.daily_report': 'Break Glass Daily Report',
-    'incidents.high_unreviewed_reminder': 'High Severity Unreviewed Reminder',
-    'followups.created': 'Follow-up Created',
-    'followups.updated': 'Follow-up Updated',
-    'followups.completed': 'Follow-up Completed',
-    'followups.overdue_reminder': 'Follow-up Overdue Reminder',
-};
-
-function friendlyName(key: string): string {
-    return (
-        NOTIFICATION_META[key] ??
-        key
-            .replace(/\./g, ' ')
-            .replace(/_/g, ' ')
-            .replace(/\b\w/g, (c) => c.toUpperCase())
-    );
-}
 
 type FilterMode = 'all' | 'active' | 'disabled' | 'ack';
 type SortMode = 'default' | 'urgent';
@@ -496,7 +467,7 @@ export default function NotificationEscalations({
             const q = searchQuery.toLowerCase();
             keys = keys.filter(
                 (k) =>
-                    friendlyName(k).toLowerCase().includes(q) ||
+                    friendlyNotificationName(k).toLowerCase().includes(q) ||
                     k.toLowerCase().includes(q),
             );
         }
@@ -724,7 +695,9 @@ export default function NotificationEscalations({
                                             </div>
                                             <div>
                                                 <CardTitle className="text-base font-bold">
-                                                    {friendlyName(k)}
+                                                    {friendlyNotificationName(
+                                                        k,
+                                                    )}
                                                 </CardTitle>
                                                 <CardDescription className="mt-0.5 font-mono text-[11px]">
                                                     {k}

@@ -4,6 +4,7 @@ namespace App\Http\Resources;
 
 use App\Models\Shift;
 use App\Models\Timesheet;
+use App\Support\ShiftTaskSupport;
 use Illuminate\Http\Request;
 use Illuminate\Http\Resources\Json\JsonResource;
 use Illuminate\Support\Carbon;
@@ -52,6 +53,8 @@ class MyShiftResource extends JsonResource
             'tasks' => $tasks->map(fn ($task) => [
                 'id' => $task->id,
                 'label' => $task->label,
+                'scheduled_time' => ShiftTaskSupport::normalizeTime($task->scheduled_time),
+                'scheduled_for' => $task->setRelation('shift', $shift)->scheduledFor()?->toIso8601String(),
                 'is_completed' => (bool) $task->is_completed,
                 'completed_at' => $task->completed_at?->toIso8601String(),
             ])->values()->all(),

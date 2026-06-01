@@ -20,11 +20,14 @@ use App\Models\ClientAppointment;
 use App\Models\ClientAssessment;
 use App\Models\ClientBowelEntry;
 use App\Models\ClientDocument;
+use App\Models\ClientExcursionRequest;
 use App\Models\ClientFluidEntry;
 use App\Models\ClientFundTransaction;
 use App\Models\ClientIncident;
+use App\Models\ClientLeaveRequest;
 use App\Models\ClientLedgerEntry;
 use App\Models\ClientNote;
+use App\Models\ClientPathPlan;
 use App\Models\ClientRoutine;
 use App\Models\ClientSeizureEntry;
 use App\Models\EmergencyDrill;
@@ -78,6 +81,7 @@ use App\Services\Notifications\FailingSmsProvider;
 use App\Services\Notifications\PushProvider;
 use App\Services\Notifications\SmsProvider;
 use App\Services\Notifications\TwilioSmsProvider;
+use App\Services\Notifications\WebPushProvider;
 use Illuminate\Auth\Events\PasswordReset;
 use Illuminate\Cache\RateLimiting\Limit;
 use Illuminate\Database\Eloquent\Relations\Relation;
@@ -139,14 +143,18 @@ class AppServiceProvider extends ServiceProvider
             $provider = config('services.push.provider');
 
             return match ($provider) {
-                'expo' => new ExpoPushProvider(
-                    config('services.push.expo.endpoint'),
-                    config('services.push.expo.access_token'),
-                ),
+                'expo' => $this->app->make(ExpoPushProvider::class),
                 null, '' => new FailingPushProvider('Push provider is not configured.'),
                 default => new FailingPushProvider('Unsupported push provider: '.$provider),
             };
         });
+
+        $this->app->bind(ExpoPushProvider::class, fn () => new ExpoPushProvider(
+            config('services.push.expo.endpoint'),
+            config('services.push.expo.access_token'),
+        ));
+
+        $this->app->bind(WebPushProvider::class);
 
         $this->app->singleton(DeliveryProviderManager::class);
     }
@@ -171,9 +179,9 @@ class AppServiceProvider extends ServiceProvider
         ClientAppointment::observe(ProjectsToTimelineObserver::class);
         ClientAssessment::observe(ProjectsToTimelineObserver::class);
         ClientDocument::observe(ProjectsToTimelineObserver::class);
-        \App\Models\ClientLeaveRequest::observe(ProjectsToTimelineObserver::class);
-        \App\Models\ClientExcursionRequest::observe(ProjectsToTimelineObserver::class);
-        \App\Models\ClientPathPlan::observe(ProjectsToTimelineObserver::class);
+        ClientLeaveRequest::observe(ProjectsToTimelineObserver::class);
+        ClientExcursionRequest::observe(ProjectsToTimelineObserver::class);
+        ClientPathPlan::observe(ProjectsToTimelineObserver::class);
         Site::observe(SiteObserver::class);
         SiteHazard::observe(SiteHazardObserver::class);
         SiteChecklistRun::observe(SiteChecklistRunObserver::class);

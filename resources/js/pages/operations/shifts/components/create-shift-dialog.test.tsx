@@ -118,7 +118,13 @@ describe('CreateShiftDialog edit mode', () => {
                     expected_break_minutes: 45,
                     service_context_id: 3,
                     coverage_roles: ['caregiver'],
-                    tasks: [{ id: 91, label: 'Check overnight notes' }],
+                    tasks: [
+                        {
+                            id: 91,
+                            label: 'Check overnight notes',
+                            scheduled_time: '10:30',
+                        },
+                    ],
                     client: { id: 10 },
                     staff: { id: 7 },
                     site: { id: 2, name: 'Kowhai House' },
@@ -137,6 +143,12 @@ describe('CreateShiftDialog edit mode', () => {
             'Bring medication folder.',
         );
         expect(screen.getByDisplayValue('Check overnight notes')).toBeVisible();
+        expect(screen.getByLabelText(/Specific time/i)).toBeChecked();
+        expect(screen.getByDisplayValue('10:30')).toBeVisible();
+
+        fireEvent.change(screen.getByDisplayValue('10:30'), {
+            target: { value: '11:15' },
+        });
 
         fireEvent.click(screen.getByRole('button', { name: /Save changes/i }));
 
@@ -146,6 +158,13 @@ describe('CreateShiftDialog edit mode', () => {
                 client_id: 10,
                 user_id: 7,
                 expected_break_minutes: '45',
+                tasks: [
+                    expect.objectContaining({
+                        id: 91,
+                        label: 'Check overnight notes',
+                        scheduled_time: '11:15',
+                    }),
+                ],
             }),
         );
         expect(onClose).toHaveBeenCalled();

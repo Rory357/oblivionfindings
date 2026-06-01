@@ -3,9 +3,9 @@
 namespace App\Http\Controllers;
 
 use App\Models\Client;
-use App\Models\Shift;
-use App\Models\ShiftTask;
 use App\Models\ServiceContext;
+use App\Models\Shift;
+use App\Models\SiteCoverageRequirement;
 use App\Models\User;
 use App\Services\CoverageReservationService;
 use App\Services\NotificationService;
@@ -13,6 +13,7 @@ use App\Services\ShiftConflictService;
 use App\Services\ShiftCoverageService;
 use App\Services\ShiftStateGuardService;
 use App\Services\ShiftTimelineService;
+use App\Support\ShiftTaskSupport;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Carbon;
@@ -23,8 +24,7 @@ class CalendarController extends Controller
     public function __construct(
         protected ShiftConflictService $shiftConflictService,
         protected ShiftCoverageService $shiftCoverageService,
-    ) {
-    }
+    ) {}
 
     public function index(Request $request)
     {
@@ -90,6 +90,7 @@ class CalendarController extends Controller
                 'serviceContext:id,name,type,is_active',
                 'series:id,by_weekday,status',
                 'replacementRequests' => fn ($query) => $query->active(),
+                'tasks:id,shift_id,label,scheduled_time,is_completed,sort_order',
             ])
             ->withCount([
                 'incidents as incidents_count',
@@ -99,15 +100,15 @@ class CalendarController extends Controller
             ->where('starts_at', '<', $data['end'])
             ->where('ends_at', '>', $data['start']);
 
-        if (!$canManageAny) {
+        if (! $canManageAny) {
             $query
                 ->where('user_id', $auth->id)
                 ->visibleToFrontline($auth->organization_id);
         } else {
-            if (!empty($data['staff_id'])) {
+            if (! empty($data['staff_id'])) {
                 $query->where('user_id', $data['staff_id']);
             }
-            if (!empty($data['client_id'])) {
+            if (! empty($data['client_id'])) {
                 $query->where('client_id', $data['client_id']);
             }
         }
@@ -140,64 +141,66 @@ class CalendarController extends Controller
         });
 
         $shiftEvents = $shifts->map(function (Shift $shift) use ($canManageAny, $shiftCoverageById) {
-                $clientName = $shift->client ? ($shift->client->first_name . ' ' . $shift->client->last_name) : 'Client';
-                $staffName = $shift->staff ? $shift->staff->name : 'Staff';
-                $coverage = $shiftCoverageById->get($shift->id);
-                $isRespite = (bool) $shift->respite_booking_id;
+            $clientName = $shift->client ? ($shift->client->first_name.' '.$shift->client->last_name) : 'Client';
+            $staffName = $shift->staff ? $shift->staff->name : 'Staff';
+            $coverage = $shiftCoverageById->get($shift->id);
+            $isRespite = (bool) $shift->respite_booking_id;
 
-                $title = $canManageAny ? ($clientName . ' · ' . $staffName) : $clientName;
+            $title = $canManageAny ? ($clientName.' · '.$staffName) : $clientName;
 
-                return [
-                    'id' => $shift->id,
-                    'title' => $title,
-                    // Send ISO-8601 strings so FullCalendar parses reliably.
-                    'start' => optional($shift->starts_at)->toIso8601String(),
-                    'end' => optional($shift->ends_at)->toIso8601String(),
-                    'backgroundColor' => $isRespite ? '#7c3aed' : null,
-                    'borderColor' => $isRespite ? 'transparent' : null,
-                    'extendedProps' => [
-                        'client_id' => $shift->client_id,
-                        'service_context_id' => $shift->service_context_id,
-                        'service_context' => $shift->serviceContext ? $shift->serviceContext->name : null,
-                        'is_respite' => $isRespite,
-                        'respite_booking_id' => $shift->respite_booking_id,
-                        'user_id' => $shift->user_id,
-                        'location' => $shift->location,
-                        'notes' => $shift->notes,
-                        'status' => $shift->status,
-                        'shift_type' => $shift->shift_type ?? 'standard',
-                        'shift_series_id' => $shift->shift_series_id,
-                        'is_recurring' => (bool) $shift->shift_series_id,
-                        'recurring_weekdays' => $shift->series?->by_weekday ?? [],
-                        'has_active_replacement' => $shift->replacementRequests->isNotEmpty(),
-                        'replacement_status' => $shift->replacementRequests->sortByDesc('requested_at')->first()?->status,
-                        'is_sleepover' => (bool) $shift->is_sleepover,
-                        'is_on_call' => (bool) $shift->is_on_call,
-                        'expected_break_minutes' => $shift->expected_break_minutes,
-                        'coverage_roles' => $shift->coverage_roles ?? [],
-                        'tasks_total' => (int) ($shift->tasks_total ?? 0),
-                        'tasks_completed' => (int) ($shift->tasks_completed ?? 0),
-                        'incidents_count' => (int) ($shift->incidents_count ?? 0),
-                        'is_open_shift' => $shift->user_id === null,
-                        'client' => $clientName,
-                        'staff' => $staffName,
-                        'site_id' => $shift->site_id ?: $shift->client?->site_id,
-                        'site_name' => $shift->site?->name ?? $shift->client?->site?->name ?? null,
-                        'coverage_state' => $coverage['coverage_state'] ?? null,
-                        'coverage_gap_kind' => $coverage['gap_kind'] ?? null,
-                        'coverage_recommended_fill_action' => $coverage['recommended_fill_action'] ?? null,
-                        'coverage_missing_staff' => $coverage['missing_staff'] ?? 0,
-                        'coverage_required_staff' => $coverage['required_staff'] ?? null,
-                        'coverage_assigned_staff' => $coverage['assigned_staff'] ?? null,
-                        'coverage_window_label' => $coverage['window_label'] ?? null,
-                        'coverage_rule_id' => $coverage['rule_id'] ?? null,
-                        'coverage_preferred_client_id' => $coverage['preferred_client_id'] ?? null,
-                        'coverage_role_shortages' => $coverage['role_shortages'] ?? [],
-                        'coverage_planned_role_shortages' => $coverage['planned_role_shortages'] ?? [],
-                        'coverage_contradictions' => $coverage['contradictions'] ?? [],
-                    ],
-                ];
-            })->values();
+            return [
+                'id' => $shift->id,
+                'title' => $title,
+                // Send ISO-8601 strings so FullCalendar parses reliably.
+                'start' => optional($shift->starts_at)->toIso8601String(),
+                'end' => optional($shift->ends_at)->toIso8601String(),
+                'backgroundColor' => $isRespite ? '#7c3aed' : null,
+                'borderColor' => $isRespite ? 'transparent' : null,
+                'extendedProps' => [
+                    'client_id' => $shift->client_id,
+                    'service_context_id' => $shift->service_context_id,
+                    'service_context' => $shift->serviceContext ? $shift->serviceContext->name : null,
+                    'is_respite' => $isRespite,
+                    'respite_booking_id' => $shift->respite_booking_id,
+                    'user_id' => $shift->user_id,
+                    'location' => $shift->location,
+                    'notes' => $shift->notes,
+                    'status' => $shift->status,
+                    'shift_type' => $shift->shift_type ?? 'standard',
+                    'shift_series_id' => $shift->shift_series_id,
+                    'is_recurring' => (bool) $shift->shift_series_id,
+                    'recurring_weekdays' => $shift->series?->by_weekday ?? [],
+                    'has_active_replacement' => $shift->replacementRequests->isNotEmpty(),
+                    'replacement_status' => $shift->replacementRequests->sortByDesc('requested_at')->first()?->status,
+                    'is_sleepover' => (bool) $shift->is_sleepover,
+                    'is_on_call' => (bool) $shift->is_on_call,
+                    'expected_break_minutes' => $shift->expected_break_minutes,
+                    'coverage_roles' => $shift->coverage_roles ?? [],
+                    'tasks_total' => (int) ($shift->tasks_total ?? 0),
+                    'tasks_completed' => (int) ($shift->tasks_completed ?? 0),
+                    'tasks' => ShiftTaskSupport::payloadsForShift($shift),
+                    'timed_tasks' => ShiftTaskSupport::timedPayloadForShift($shift),
+                    'incidents_count' => (int) ($shift->incidents_count ?? 0),
+                    'is_open_shift' => $shift->user_id === null,
+                    'client' => $clientName,
+                    'staff' => $staffName,
+                    'site_id' => $shift->site_id ?: $shift->client?->site_id,
+                    'site_name' => $shift->site?->name ?? $shift->client?->site?->name ?? null,
+                    'coverage_state' => $coverage['coverage_state'] ?? null,
+                    'coverage_gap_kind' => $coverage['gap_kind'] ?? null,
+                    'coverage_recommended_fill_action' => $coverage['recommended_fill_action'] ?? null,
+                    'coverage_missing_staff' => $coverage['missing_staff'] ?? 0,
+                    'coverage_required_staff' => $coverage['required_staff'] ?? null,
+                    'coverage_assigned_staff' => $coverage['assigned_staff'] ?? null,
+                    'coverage_window_label' => $coverage['window_label'] ?? null,
+                    'coverage_rule_id' => $coverage['rule_id'] ?? null,
+                    'coverage_preferred_client_id' => $coverage['preferred_client_id'] ?? null,
+                    'coverage_role_shortages' => $coverage['role_shortages'] ?? [],
+                    'coverage_planned_role_shortages' => $coverage['planned_role_shortages'] ?? [],
+                    'coverage_contradictions' => $coverage['contradictions'] ?? [],
+                ],
+            ];
+        })->values();
 
         $coverageGapEvents = $coverageWindows
             ->filter(fn (array $window) => ! empty($window['has_actionable_gap']))
@@ -263,6 +266,7 @@ class CalendarController extends Controller
             'coverage_reservation_token' => ['nullable', 'string', 'max:120'],
             'tasks' => ['sometimes', 'array'],
             'tasks.*.label' => ['required_with:tasks', 'string', 'max:255'],
+            'tasks.*.scheduled_time' => ['nullable', 'date_format:H:i'],
         ]);
 
         $data = $this->normalizeShiftData($data);
@@ -327,18 +331,7 @@ class CalendarController extends Controller
                     'created_by' => $auth->id,
                 ]);
 
-                $tasks = collect($data['tasks'] ?? [])
-                    ->map(fn ($t, $i) => ['label' => (string) ($t['label'] ?? ''), 'sort_order' => $i])
-                    ->filter(fn ($t) => trim($t['label']) !== '')
-                    ->values();
-
-                foreach ($tasks as $t) {
-                    ShiftTask::create([
-                        'shift_id' => $shift->id,
-                        'label' => $t['label'],
-                        'sort_order' => $t['sort_order'],
-                    ]);
-                }
+                ShiftTaskSupport::createForShift($shift, $data['tasks'] ?? []);
 
                 app(CoverageReservationService::class)->fulfill($reservation, $shift);
 
@@ -373,7 +366,7 @@ class CalendarController extends Controller
         abort_unless($auth && $auth->canDo('shifts.update'), 403);
 
         // Staff can edit only own shifts unless manageAny
-        if (!$auth->canDo('shifts.manageAny') && $shift->user_id !== $auth->id) {
+        if (! $auth->canDo('shifts.manageAny') && $shift->user_id !== $auth->id) {
             abort(403);
         }
 
@@ -402,6 +395,7 @@ class CalendarController extends Controller
             'tasks' => ['sometimes', 'array'],
             'tasks.*.id' => ['sometimes', 'integer', 'exists:shift_tasks,id'],
             'tasks.*.label' => ['required_with:tasks', 'string', 'max:255'],
+            'tasks.*.scheduled_time' => ['nullable', 'date_format:H:i'],
         ]);
 
         $data = $this->normalizeShiftData($data);
@@ -421,7 +415,7 @@ class CalendarController extends Controller
 
         // If the client is changed but service_context_id isn't explicitly set,
         // inherit the new client's service context.
-        if (array_key_exists('client_id', $data) && !array_key_exists('service_context_id', $data)) {
+        if (array_key_exists('client_id', $data) && ! array_key_exists('service_context_id', $data)) {
             $data['service_context_id'] = Client::query()
                 ->whereKey($data['client_id'])
                 ->value('service_context_id');
@@ -459,7 +453,7 @@ class CalendarController extends Controller
 
         // If the client changes and service context is not explicitly set,
         // inherit from the client to keep classification consistent.
-        if (array_key_exists('client_id', $data) && !array_key_exists('service_context_id', $data)) {
+        if (array_key_exists('client_id', $data) && ! array_key_exists('service_context_id', $data)) {
             $data['service_context_id'] = Client::query()
                 ->whereKey($resolvedClientId)
                 ->value('service_context_id');
@@ -518,36 +512,12 @@ class CalendarController extends Controller
         try {
             DB::transaction(function () use ($shift, $data, $reservation) {
                 $shift = Shift::query()->lockForUpdate()->findOrFail($shift->id);
-                $shift->update(\Illuminate\Support\Arr::except($data, ['tasks', 'coverage_reservation_token', 'coverage_rule_id']));
+                $previousStartsAt = $shift->starts_at?->copy();
+                $shift->update(Arr::except($data, ['tasks', 'coverage_reservation_token', 'coverage_rule_id']));
+                ShiftTaskSupport::clearRemindersForShiftStartChange($shift, $previousStartsAt);
 
                 if (array_key_exists('tasks', $data)) {
-                    $existing = $shift->tasks()->get()->keyBy('id');
-                    $incoming = collect($data['tasks'] ?? [])
-                        ->map(fn ($t, $i) => [
-                            'id' => $t['id'] ?? null,
-                            'label' => (string) ($t['label'] ?? ''),
-                            'sort_order' => $i,
-                        ])
-                        ->filter(fn ($t) => trim($t['label']) !== '')
-                        ->values();
-
-                    $keepIds = $incoming->pluck('id')->filter()->all();
-                    $shift->tasks()->whereNotIn('id', $keepIds)->delete();
-
-                    foreach ($incoming as $t) {
-                        if ($t['id'] && $existing->has($t['id'])) {
-                            $existing[$t['id']]->update([
-                                'label' => $t['label'],
-                                'sort_order' => $t['sort_order'],
-                            ]);
-                        } else {
-                            ShiftTask::create([
-                                'shift_id' => $shift->id,
-                                'label' => $t['label'],
-                                'sort_order' => $t['sort_order'],
-                            ]);
-                        }
-                    }
+                    ShiftTaskSupport::syncForShift($shift, $data['tasks'] ?? []);
                 }
 
                 app(CoverageReservationService::class)->fulfill($reservation, $shift);
@@ -624,7 +594,7 @@ class CalendarController extends Controller
         }
 
         if ($coverageRuleId) {
-            $ruleSiteId = \App\Models\SiteCoverageRequirement::query()
+            $ruleSiteId = SiteCoverageRequirement::query()
                 ->whereKey($coverageRuleId)
                 ->value('site_id');
 

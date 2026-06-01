@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers;
 
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Shifts\Lifecycle\Data\CompleteShiftData;
 use App\Domain\Shifts\Lifecycle\ShiftLifecycleService;
 use App\Domain\Shifts\Lifecycle\ShiftLifecycleSource;
@@ -19,9 +20,13 @@ use App\Models\ShiftHandover;
 use App\Models\ShiftReplacementRequest;
 use App\Models\ShiftSeries;
 use App\Models\ShiftTask;
+use App\Models\Site;
+use App\Models\SiteCoverageRequirement;
 use App\Models\TimelineEvent;
 use App\Models\Timesheet;
 use App\Models\User;
+use App\Notifications\ShiftBroadcastNotification;
+use App\Notifications\TimesheetCreationFailedNotification;
 use App\Services\CoverageReservationService;
 use App\Services\EnhancedMarService;
 use App\Services\NotificationService;
@@ -35,6 +40,7 @@ use App\Services\ShiftStateGuardService;
 use App\Services\ShiftTimelineService;
 use App\Services\UserSiteAccessService;
 use App\Support\ClientSafetyPayload;
+use App\Support\ShiftTaskSupport;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -76,7 +82,7 @@ class ShiftController extends Controller
                 'client:id,first_name,last_name,site_id',
                 'staff:id,name,email',
                 'site:id,name,type',
-                'tasks:id,shift_id,label,sort_order,is_completed',
+                'tasks:id,shift_id,label,scheduled_time,sort_order,is_completed',
             ])
             ->withExists([
                 'openPositions as cover_requested' => fn ($openPositions) => $openPositions
@@ -173,7 +179,7 @@ class ShiftController extends Controller
             ->get(['id', 'name', 'email']);
 
         $sitesQuery = $this->siteAccess()->applySiteScope(
-            \App\Models\Site::query(),
+            Site::query(),
             $auth,
             $this->shiftBypassPermissions(),
         );
@@ -201,6 +207,7 @@ class ShiftController extends Controller
             if (! $s->starts_at || ! $s->ends_at) {
                 return 0;
             }
+
             return $s->starts_at->diffInMinutes($s->ends_at);
         });
         $statsSites = $rows->pluck('site_id')->filter()->unique()->count();
@@ -477,7 +484,7 @@ class ShiftController extends Controller
             : collect();
         $sites = $canEditShift
             ? $this->siteAccess()->applySiteScope(
-                \App\Models\Site::query(),
+                Site::query(),
                 $auth,
                 $this->shiftBypassPermissions(),
             )
@@ -674,7 +681,7 @@ class ShiftController extends Controller
         $coverageRuleId = $request->query('coverage_rule_id');
 
         if (! $defaultSiteId && $coverageRuleId) {
-            $defaultSiteId = \App\Models\SiteCoverageRequirement::query()
+            $defaultSiteId = SiteCoverageRequirement::query()
                 ->whereKey($coverageRuleId)
                 ->value('site_id');
         }
@@ -864,6 +871,7 @@ class ShiftController extends Controller
             'return_to' => ['nullable', 'string', 'max:2048'],
             'tasks' => ['sometimes', 'array', 'max:50'],
             'tasks.*.label' => ['required_with:tasks', 'string', 'max:255'],
+            'tasks.*.scheduled_time' => ['nullable', 'date_format:H:i'],
         ]);
 
         $data = $this->normalizeShiftData($data);
@@ -885,8 +893,8 @@ class ShiftController extends Controller
         );
 
         // Additional validation: shift duration cannot exceed 24 hours
-        $startsAt = \Carbon\Carbon::parse($data['starts_at']);
-        $endsAt = \Carbon\Carbon::parse($data['ends_at']);
+        $startsAt = Carbon::parse($data['starts_at']);
+        $endsAt = Carbon::parse($data['ends_at']);
         if ($startsAt->diffInHours($endsAt) > 24) {
             return back()->withErrors([
                 'ends_at' => 'Shift duration cannot exceed 24 hours.',
@@ -941,23 +949,12 @@ class ShiftController extends Controller
         try {
             $shift = DB::transaction(function () use ($auth, $data, $reservation) {
                 $shift = Shift::create([
-                    ...\Illuminate\Support\Arr::except($data, ['tasks', 'coverage_reservation_token', 'coverage_rule_id']),
+                    ...Arr::except($data, ['tasks', 'coverage_reservation_token', 'coverage_rule_id']),
                     'status' => $data['status'],
                     'created_by' => $auth->id,
                 ]);
 
-                $tasks = collect($data['tasks'] ?? [])
-                    ->map(fn ($t, $i) => ['label' => (string) ($t['label'] ?? ''), 'sort_order' => $i])
-                    ->filter(fn ($t) => trim($t['label']) !== '')
-                    ->values();
-
-                foreach ($tasks as $t) {
-                    ShiftTask::create([
-                        'shift_id' => $shift->id,
-                        'label' => $t['label'],
-                        'sort_order' => $t['sort_order'],
-                    ]);
-                }
+                ShiftTaskSupport::createForShift($shift, $data['tasks'] ?? []);
 
                 app(CoverageReservationService::class)->fulfill($reservation, $shift);
 
@@ -1051,7 +1048,7 @@ class ShiftController extends Controller
         }
 
         $copy = DB::transaction(function () use ($auth, $shift, $targetStart, $targetEnd) {
-            $copy = new Shift();
+            $copy = new Shift;
             $copy->forceFill([
                 'organization_id' => $shift->organization_id,
                 'roster_period_id' => $shift->roster_period_id,
@@ -1091,9 +1088,11 @@ class ShiftController extends Controller
                     ShiftTask::create([
                         'shift_id' => $copy->id,
                         'label' => $task->label,
+                        'scheduled_time' => ShiftTaskSupport::normalizeTime($task->scheduled_time),
                         'is_completed' => false,
                         'completed_at' => null,
                         'completed_by' => null,
+                        'reminder_sent_at' => null,
                         'sort_order' => $task->sort_order,
                     ]);
                 });
@@ -1127,7 +1126,7 @@ class ShiftController extends Controller
             'client:id,first_name,last_name,service_context_id',
             'staff:id,name,email',
             'site:id,name,type',
-            'tasks:id,shift_id,label,sort_order',
+            'tasks:id,shift_id,label,scheduled_time,sort_order',
             'serviceContext:id,name,type,is_active',
         ]);
 
@@ -1140,7 +1139,7 @@ class ShiftController extends Controller
             'client:id,first_name,last_name,service_context_id',
             'staff:id,name,email',
             'site:id,name,type',
-            'tasks:id,shift_id,label,sort_order',
+            'tasks:id,shift_id,label,scheduled_time,sort_order',
             'serviceContext:id,name,type,is_active',
         ]);
 
@@ -1172,6 +1171,7 @@ class ShiftController extends Controller
                 ->map(fn (ShiftTask $task) => [
                     'id' => $task->id,
                     'label' => $task->label,
+                    'scheduled_time' => ShiftTaskSupport::normalizeTime($task->scheduled_time),
                 ])
                 ->values(),
         ];
@@ -1224,6 +1224,7 @@ class ShiftController extends Controller
             'tasks' => ['sometimes', 'array', 'max:50'],
             'tasks.*.id' => ['sometimes', 'integer', 'exists:shift_tasks,id'],
             'tasks.*.label' => ['required_with:tasks', 'string', 'max:255'],
+            'tasks.*.scheduled_time' => ['nullable', 'date_format:H:i'],
             'tasks.*.is_completed' => ['sometimes', 'boolean'],
             'return_to' => ['nullable', 'string', 'max:2048'],
             'override_acknowledged' => ['nullable', 'boolean'],
@@ -1423,7 +1424,9 @@ class ShiftController extends Controller
             try {
                 DB::transaction(function () use ($shift, $data, $reservation, $overrideData) {
                     $lockedShift = Shift::query()->lockForUpdate()->findOrFail($shift->id);
+                    $previousStartsAt = $lockedShift->starts_at?->copy();
                     $lockedShift->update(Arr::except($data, ['tasks', 'series_scope', 'coverage_reservation_token', 'coverage_rule_id']));
+                    ShiftTaskSupport::clearRemindersForShiftStartChange($lockedShift, $previousStartsAt);
 
                     if (array_key_exists('tasks', $data)) {
                         $this->syncShiftTasks($lockedShift, $data['tasks'] ?? []);
@@ -1654,7 +1657,7 @@ class ShiftController extends Controller
             }
 
             try {
-                $candidate->notify(new \App\Notifications\ShiftBroadcastNotification(
+                $candidate->notify(new ShiftBroadcastNotification(
                     shiftId: $shift->id,
                     shiftDate: $start->format('D j M Y'),
                     shiftTime: $start->format('H:i').' – '.$end->format('H:i'),
@@ -1706,7 +1709,7 @@ class ShiftController extends Controller
         $timezone = (string) config('app.worker_timezone', 'Pacific/Auckland');
         $sourceStart = $shift->starts_at->copy()->timezone($timezone);
         $sourceEnd = $shift->ends_at->copy()->timezone($timezone);
-        $endDate = \Carbon\Carbon::createFromFormat('Y-m-d', $data['end_date'], $timezone)->endOfDay();
+        $endDate = Carbon::createFromFormat('Y-m-d', $data['end_date'], $timezone)->endOfDay();
 
         $startDate = $sourceStart->copy()->startOfDay();
         if ($endDate->lt($startDate)) {
@@ -1805,16 +1808,16 @@ class ShiftController extends Controller
 
     protected function notifyTimesheetCreationFailure(Shift $shift, string $reason): void
     {
-        $staffProfile = \App\Domain\Hr\Models\HrEmployeeProfile::where('user_id', $shift->user_id)
+        $staffProfile = HrEmployeeProfile::where('user_id', $shift->user_id)
             ->where('is_active', true)
             ->first(['manager_user_id']);
 
         $manager = $staffProfile?->manager_user_id
-            ? \App\Models\User::find($staffProfile->manager_user_id)
+            ? User::find($staffProfile->manager_user_id)
             : null;
 
         if (! $manager) {
-            $manager = \App\Models\User::whereHas('roles', fn ($q) => $q->where('name', 'provider_manager'))
+            $manager = User::whereHas('roles', fn ($q) => $q->where('name', 'provider_manager'))
                 ->first();
         }
 
@@ -1822,7 +1825,7 @@ class ShiftController extends Controller
             return;
         }
 
-        $manager->notify(new \App\Notifications\TimesheetCreationFailedNotification(
+        $manager->notify(new TimesheetCreationFailedNotification(
             shiftId: $shift->id,
             staffName: $shift->staff?->name ?? 'Unknown',
             shiftDate: $shift->starts_at?->format('D j M, g:i A') ?? 'Unknown',
@@ -2203,13 +2206,13 @@ class ShiftController extends Controller
             ->all();
 
         if ($this->hasOverlappingFutureSeriesWindows($futureWindows)) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
+            throw ValidationException::withMessages([
                 'series_scope' => 'Updating future occurrences would make this recurring pattern overlap itself. Adjust the time pattern first.',
             ]);
         }
 
         if ($conflictDates !== []) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
+            throw ValidationException::withMessages([
                 'series_scope' => 'Updating future occurrences would create conflicts on: '.collect($conflictDates)->take(4)->implode(', ').(count($conflictDates) > 4 ? '...' : ''),
             ]);
         }
@@ -2244,6 +2247,7 @@ class ShiftController extends Controller
                     ? [$editedStart->copy(), $editedEnd->copy()]
                     : $this->buildSeriesWindowForShift($futureShift, $editedStart, $editedEnd);
 
+                $previousStartsAt = $futureShift->starts_at?->copy();
                 $futureShift->update(array_merge(
                     Arr::except($data, ['tasks', 'series_scope', 'coverage_reservation_token', 'coverage_rule_id']),
                     [
@@ -2252,6 +2256,7 @@ class ShiftController extends Controller
                         'ends_at' => $targetEnd,
                     ],
                 ));
+                ShiftTaskSupport::clearRemindersForShiftStartChange($futureShift, $previousStartsAt);
 
                 if (array_key_exists('tasks', $data)) {
                     $this->syncShiftTasks($futureShift, $data['tasks'] ?? []);
@@ -2307,39 +2312,7 @@ class ShiftController extends Controller
 
     protected function syncShiftTasks(Shift $shift, array $tasks): void
     {
-        $existing = $shift->tasks()->get()->keyBy('id');
-        $incoming = collect($tasks)
-            ->map(fn ($task, $index) => [
-                'id' => $task['id'] ?? null,
-                'label' => (string) ($task['label'] ?? ''),
-                'sort_order' => $index,
-            ])
-            ->filter(fn ($task) => trim($task['label']) !== '')
-            ->values();
-
-        $keepIds = $incoming->pluck('id')->filter()->all();
-        if ($keepIds === []) {
-            $shift->tasks()->delete();
-        } else {
-            $shift->tasks()->whereNotIn('id', $keepIds)->delete();
-        }
-
-        foreach ($incoming as $task) {
-            if ($task['id'] && $existing->has($task['id'])) {
-                $existing[$task['id']]->update([
-                    'label' => $task['label'],
-                    'sort_order' => $task['sort_order'],
-                ]);
-
-                continue;
-            }
-
-            ShiftTask::create([
-                'shift_id' => $shift->id,
-                'label' => $task['label'],
-                'sort_order' => $task['sort_order'],
-            ]);
-        }
+        ShiftTaskSupport::syncForShift($shift, $tasks);
     }
 
     protected function resolveSiteIdForPayload(array $data, ?Shift $existingShift = null): ?int
@@ -2361,7 +2334,7 @@ class ShiftController extends Controller
         }
 
         if ($coverageRuleId) {
-            $ruleSiteId = \App\Models\SiteCoverageRequirement::query()
+            $ruleSiteId = SiteCoverageRequirement::query()
                 ->whereKey($coverageRuleId)
                 ->value('site_id');
 

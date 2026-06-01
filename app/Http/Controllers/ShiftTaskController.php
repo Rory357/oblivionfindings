@@ -14,7 +14,7 @@ class ShiftTaskController extends Controller
         abort_unless($auth && ($auth->canDo('shifts.update') || $auth->canDo('shifts.tasks.updateSelf') || $auth->canDo('shifts.manageAny')), 403);
 
         // Staff can update only their own shifts unless manageAny
-        if (!$auth->canDo('shifts.manageAny') && $shift->user_id !== $auth->id) {
+        if (! $auth->canDo('shifts.manageAny') && $shift->user_id !== $auth->id) {
             abort(403);
         }
 
@@ -40,6 +40,7 @@ class ShiftTaskController extends Controller
                 'is_completed' => false,
                 'completed_at' => null,
                 'completed_by' => null,
+                'reminder_sent_at' => null,
             ]);
         }
 

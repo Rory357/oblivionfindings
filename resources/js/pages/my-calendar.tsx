@@ -217,6 +217,7 @@ function renderEventContent(eventInfo: {
     const props = eventInfo.event.extendedProps;
     const isTime = eventInfo.view.type.includes('timeGrid');
     const isDay = eventInfo.view.type === 'timeGridDay';
+    const timedTasks = props.timed_tasks ?? props.tasks ?? [];
 
     return (
         <div className="flex h-full flex-col overflow-hidden">
@@ -236,6 +237,11 @@ function renderEventContent(eventInfo: {
                 <span className="mt-auto flex items-center gap-0.5 truncate text-[10px] opacity-50">
                     <MapPin className="h-2.5 w-2.5 shrink-0" />
                     {props.location}
+                </span>
+            )}
+            {isTime && timedTasks[0]?.scheduled_time && (
+                <span className="truncate text-[10px] opacity-70">
+                    {timedTasks[0].scheduled_time} {timedTasks[0].label}
                 </span>
             )}
         </div>
@@ -587,6 +593,26 @@ export default function MyCalendar() {
                                 selectable={true}
                                 editable={true}
                                 eventResizableFromStart={true}
+                                eventDidMount={(info) => {
+                                    const tasks =
+                                        info.event.extendedProps.timed_tasks ??
+                                        info.event.extendedProps.tasks ??
+                                        [];
+                                    if (!tasks.length) return;
+
+                                    info.el.setAttribute(
+                                        'title',
+                                        tasks
+                                            .map(
+                                                (task: {
+                                                    scheduled_time?: string;
+                                                    label: string;
+                                                }) =>
+                                                    `${task.scheduled_time ?? ''} ${task.label}`.trim(),
+                                            )
+                                            .join('\n'),
+                                    );
+                                }}
                                 selectMirror={true}
                                 businessHours={{
                                     daysOfWeek: [1, 2, 3, 4, 5],

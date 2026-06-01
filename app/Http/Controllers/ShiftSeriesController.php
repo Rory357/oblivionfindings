@@ -2,25 +2,29 @@
 
 namespace App\Http\Controllers;
 
-use App\Models\Shift;
-use App\Models\ShiftSeries;
 use App\Models\Client;
 use App\Models\ServiceContext;
-use App\Services\NotificationService;
-use App\Services\CoverageReservationService;
+use App\Models\Shift;
+use App\Models\ShiftOpenPosition;
+use App\Models\ShiftSeries;
 use App\Models\ShiftTask;
+use App\Models\SiteCoverageRequirement;
 use App\Models\User;
+use App\Services\CoverageReservationService;
+use App\Services\NotificationService;
 use App\Services\ShiftConflictService;
 use App\Services\ShiftCoverageService;
 use App\Services\ShiftReplacementService;
-use App\Services\ShiftStaffEligibilityService;
 use App\Services\ShiftStateGuardService;
 use App\Services\ShiftTimelineService;
+use App\Support\ShiftTaskSupport;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
+use Illuminate\Validation\ValidationException;
 
 class ShiftSeriesController extends Controller
 {
@@ -257,7 +261,7 @@ class ShiftSeriesController extends Controller
             foreach ($futureShifts as $shift) {
                 app(ShiftReplacementService::class)->cancelActiveForShift($shift, $auth);
                 app(CoverageReservationService::class)->releaseForShift($shift);
-                \App\Models\ShiftOpenPosition::query()
+                ShiftOpenPosition::query()
                     ->where('shift_id', $shift->id)
                     ->whereIn('status', ['open', 'claimed'])
                     ->update(['status' => 'cancelled']);
@@ -304,6 +308,7 @@ class ShiftSeriesController extends Controller
             'return_to' => ['nullable', 'string', 'max:2048'],
             'tasks' => ['sometimes', 'array'],
             'tasks.*.label' => ['required_with:tasks', 'string', 'max:255'],
+            'tasks.*.scheduled_time' => ['nullable', 'date_format:H:i'],
         ]);
 
         $data = $this->normalizeSeriesData($data);
@@ -396,7 +401,7 @@ class ShiftSeriesController extends Controller
                     session()->flash('assignment_warnings', $allWarnings);
                 }
             } catch (\Throwable $e) {
-                \Illuminate\Support\Facades\Log::warning('Eligibility check failed during series creation', [
+                Log::warning('Eligibility check failed during series creation', [
                     'error' => $e->getMessage(),
                 ]);
             }
@@ -422,7 +427,7 @@ class ShiftSeriesController extends Controller
             }
         }
 
-        if (!empty($conflicts)) {
+        if (! empty($conflicts)) {
             if ($request->wantsJson()) {
                 return response()->json([
                     'message' => 'Conflicting shifts detected for one or more occurrences.',
@@ -464,10 +469,7 @@ class ShiftSeriesController extends Controller
                     'created_by' => $auth->id,
                 ]);
 
-                $tasks = collect($data['tasks'] ?? [])
-                    ->map(fn ($t, $i) => ['label' => (string) ($t['label'] ?? ''), 'sort_order' => $i])
-                    ->filter(fn ($t) => trim($t['label']) !== '')
-                    ->values();
+                $tasks = ShiftTaskSupport::normalizeInputs($data['tasks'] ?? []);
 
                 foreach ($occurrences as $date) {
                     [$startsAt, $endsAt] = $this->combineDateAndTimes($date, $data['starts_time'], $data['ends_time'], $tz);
@@ -495,6 +497,7 @@ class ShiftSeriesController extends Controller
                         ShiftTask::create([
                             'shift_id' => $shift->id,
                             'label' => $t['label'],
+                            'scheduled_time' => $t['scheduled_time'],
                             'sort_order' => $t['sort_order'],
                         ]);
                     }
@@ -512,12 +515,11 @@ class ShiftSeriesController extends Controller
             throw $e;
         }
 
-
-        $seriesModel = \App\Models\ShiftSeries::query()->find($result['series_id'] ?? null);
-        $client = \App\Models\Client::query()->find($data['client_id'] ?? null);
+        $seriesModel = ShiftSeries::query()->find($result['series_id'] ?? null);
+        $client = Client::query()->find($data['client_id'] ?? null);
         app(NotificationService::class)->notifyCrud($request->user(), 'created', 'shift series', $seriesModel, $client, [
             'title' => 'Recurring shifts created',
-            'body' => 'Created ' . ($result['count'] ?? 0) . ' shifts.',
+            'body' => 'Created '.($result['count'] ?? 0).' shifts.',
             'url' => url('/operations/shifts'),
             'target_user_ids' => array_values(array_filter([$data['user_id'] ?? null])),
         ]);
@@ -530,7 +532,7 @@ class ShiftSeriesController extends Controller
         }
 
         return redirect($data['return_to'] ?? route('operations.shifts.index'))
-            ->with('success', 'Recurring shifts created (' . $result['count'] . ').');
+            ->with('success', 'Recurring shifts created ('.$result['count'].').');
     }
 
     private function mapOccurrence(Shift $shift): array
@@ -578,18 +580,18 @@ class ShiftSeriesController extends Controller
         $clientSiteId = Client::query()->whereKey($clientId)->value('site_id');
 
         if ($siteId && (int) $clientSiteId !== (int) $siteId) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
+            throw ValidationException::withMessages([
                 'client_id' => 'The selected planning client does not belong to the site coverage window you are filling.',
             ]);
         }
 
         if ($coverageRuleId) {
-            $ruleSiteId = \App\Models\SiteCoverageRequirement::query()
+            $ruleSiteId = SiteCoverageRequirement::query()
                 ->whereKey($coverageRuleId)
                 ->value('site_id');
 
             if ($ruleSiteId && (int) $clientSiteId !== (int) $ruleSiteId) {
-                throw \Illuminate\Validation\ValidationException::withMessages([
+                throw ValidationException::withMessages([
                     'client_id' => 'The selected planning client no longer matches the linked site coverage rule.',
                 ]);
             }
@@ -631,13 +633,14 @@ class ShiftSeriesController extends Controller
                 $out[] = $d;
             }
         }
+
         return $out;
     }
 
     private function combineDateAndTimes(CarbonImmutable $date, string $startsTime, string $endsTime, string $tz): array
     {
-        $start = CarbonImmutable::parse($date->toDateString() . ' ' . $startsTime, $tz);
-        $end = CarbonImmutable::parse($date->toDateString() . ' ' . $endsTime, $tz);
+        $start = CarbonImmutable::parse($date->toDateString().' '.$startsTime, $tz);
+        $end = CarbonImmutable::parse($date->toDateString().' '.$endsTime, $tz);
 
         if (! $end->greaterThan($start)) {
             $end = $end->addDay();
@@ -654,7 +657,7 @@ class ShiftSeriesController extends Controller
     }
 
     /**
-     * @param array<int, array{starts_at: CarbonImmutable, ends_at: CarbonImmutable}> $windows
+     * @param  array<int, array{starts_at: CarbonImmutable, ends_at: CarbonImmutable}>  $windows
      */
     private function hasSelfOverlappingWindows(array $windows): bool
     {

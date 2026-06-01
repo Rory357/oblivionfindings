@@ -4,9 +4,9 @@ use App\Domain\Finance\Jobs\CalculateGstReturnJob;
 use App\Domain\Finance\Jobs\CheckBillDueDatesJob;
 use App\Domain\Finance\Jobs\GenerateRecurringJournalsJob;
 use App\Domain\Finance\Jobs\PostLeaveProvisionJob;
-use App\Domain\Finance\Jobs\PruneFinanceAuditExportsJob;
 use App\Domain\Finance\Jobs\PostSiteRentJob;
 use App\Domain\Finance\Jobs\PostSiteUtilitiesJob;
+use App\Domain\Finance\Jobs\PruneFinanceAuditExportsJob;
 use App\Domain\Finance\Jobs\RunDepreciationJob;
 use App\Domain\Finance\Jobs\RunPaymentMatchingJob;
 use App\Domain\Finance\Jobs\SnapshotFinancialReportsJob;
@@ -30,6 +30,11 @@ use App\Domain\Roadmap\Jobs\SendRoadmapDigestJob;
 use App\Jobs\AutoEscalateControlRoomQueues;
 use App\Jobs\CheckControlRoomSlaBreaches;
 use App\Jobs\ChecklistDueJob;
+use App\Jobs\CheckLoneWorkerOverdueJob;
+use App\Jobs\CheckOverdueCorrectiveActionsJob;
+use App\Jobs\CheckOverdueInvestigationsJob;
+use App\Jobs\CheckRiskAssessmentReviewsJob;
+use App\Jobs\DetectCrDeviceOfflineJob;
 use App\Jobs\DetectFleetOfflineDevices;
 use App\Jobs\EnforceDataRetentionJob;
 use App\Jobs\EscalateUnresolvedEligibilityJob;
@@ -42,6 +47,8 @@ use App\Jobs\RecalculateFutureShiftEligibility;
 use App\Jobs\ReconcileTimesheetsJob;
 use App\Jobs\SendEventReminderJob;
 use App\Jobs\ShiftAutoAlertJob;
+use App\Jobs\ShiftTaskDueJob;
+use App\Services\MedicationAlertService;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Support\Facades\Artisan;
@@ -94,7 +101,7 @@ app(Schedule::class)
 
 // Control Room device offline detection (non-fleet: bed sensors, cameras, alarm panels, etc.)
 app(Schedule::class)
-    ->job(new \App\Jobs\DetectCrDeviceOfflineJob)
+    ->job(new DetectCrDeviceOfflineJob)
     ->timezone('Pacific/Auckland')
     ->everyFiveMinutes();
 
@@ -128,9 +135,16 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->everyFiveMinutes();
 
+// Timed shift task reminders for My Day, email, in-app, and push delivery.
+app(Schedule::class)
+    ->job(new ShiftTaskDueJob)
+    ->timezone('Pacific/Auckland')
+    ->everyFiveMinutes()
+    ->withoutOverlapping();
+
 // Lone worker overdue check-in detection and control-room signal emission
 app(Schedule::class)
-    ->job(new \App\Jobs\CheckLoneWorkerOverdueJob)
+    ->job(new CheckLoneWorkerOverdueJob)
     ->timezone('Pacific/Auckland')
     ->everyFiveMinutes();
 
@@ -162,18 +176,18 @@ app(Schedule::class)
 
 // H&S monitoring — overdue investigations and corrective actions
 app(Schedule::class)
-    ->job(new \App\Jobs\CheckOverdueInvestigationsJob)
+    ->job(new CheckOverdueInvestigationsJob)
     ->timezone('Pacific/Auckland')
     ->everyFifteenMinutes();
 
 app(Schedule::class)
-    ->job(new \App\Jobs\CheckOverdueCorrectiveActionsJob)
+    ->job(new CheckOverdueCorrectiveActionsJob)
     ->timezone('Pacific/Auckland')
     ->everyFifteenMinutes();
 
 // H&S monitoring — risk assessment review dates (daily)
 app(Schedule::class)
-    ->job(new \App\Jobs\CheckRiskAssessmentReviewsJob)
+    ->job(new CheckRiskAssessmentReviewsJob)
     ->timezone('Pacific/Auckland')
     ->dailyAt('08:15');
 
@@ -343,7 +357,7 @@ app(Schedule::class)
 
 // Clear stale medication alerts: hourly
 app(Schedule::class)
-    ->call(fn () => app(\App\Services\MedicationAlertService::class)->clearStaleAlerts())
+    ->call(fn () => app(MedicationAlertService::class)->clearStaleAlerts())
     ->timezone('Pacific/Auckland')
     ->hourly();
 

@@ -1,5 +1,5 @@
-import PageShell from '@/components/page-shell';
 import { PageHero } from '@/components/page';
+import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Checkbox } from '@/components/ui/checkbox';
@@ -38,6 +38,7 @@ import {
     CalendarDays,
     ChevronLeft,
     ChevronRight,
+    Clock,
     Heart,
     MapPin,
     Plus,
@@ -178,6 +179,7 @@ function renderEventContent(eventInfo: {
     const props = eventInfo.event.extendedProps;
     const isTime = eventInfo.view.type.includes('timeGrid');
     const isDay = eventInfo.view.type === 'timeGridDay';
+    const timedTasks = props.timed_tasks ?? props.tasks ?? [];
     return (
         <div className="flex h-full flex-col overflow-hidden">
             <span
@@ -196,6 +198,11 @@ function renderEventContent(eventInfo: {
                 <span className="mt-auto flex items-center gap-0.5 truncate text-[10px] opacity-50">
                     <MapPin className="h-2.5 w-2.5 shrink-0" />
                     {props.location}
+                </span>
+            )}
+            {isTime && timedTasks[0]?.scheduled_time && (
+                <span className="truncate text-[10px] opacity-70">
+                    {timedTasks[0].scheduled_time} {timedTasks[0].label}
                 </span>
             )}
         </div>
@@ -676,6 +683,39 @@ export default function ClientCalendar({ client, pending_visit_count }: Props) {
                                                 {detail.staff_name}
                                             </p>
                                         )}
+                                        {(detail.timed_tasks ?? detail.tasks)
+                                            ?.length ? (
+                                            <div className="mt-2 space-y-1.5">
+                                                <div className="text-xs font-medium text-foreground">
+                                                    Timed tasks
+                                                </div>
+                                                {(
+                                                    detail.timed_tasks ??
+                                                    detail.tasks
+                                                ).map(
+                                                    (task: {
+                                                        id: number;
+                                                        label: string;
+                                                        scheduled_time: string;
+                                                    }) => (
+                                                        <div
+                                                            key={task.id}
+                                                            className="flex items-center gap-2 text-xs text-muted-foreground"
+                                                        >
+                                                            <Clock className="h-3 w-3" />
+                                                            <span className="font-medium text-foreground">
+                                                                {
+                                                                    task.scheduled_time
+                                                                }
+                                                            </span>
+                                                            <span>
+                                                                {task.label}
+                                                            </span>
+                                                        </div>
+                                                    ),
+                                                )}
+                                            </div>
+                                        ) : null}
                                         {detail.description && (
                                             <p className="mt-2 text-sm text-muted-foreground">
                                                 {detail.description}

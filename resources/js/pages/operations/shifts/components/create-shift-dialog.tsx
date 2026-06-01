@@ -101,7 +101,17 @@ export type EditableShift = {
     site?: { id: number; name: string } | null;
     service_context_id?: number | null;
     coverage_roles?: string[] | null;
-    tasks?: Array<{ id: number; label: string }>;
+    tasks?: Array<{
+        id: number;
+        label: string;
+        scheduled_time?: string | null;
+    }>;
+};
+
+type ShiftDialogTask = {
+    id?: number;
+    label: string;
+    scheduled_time: string | null;
 };
 
 type EligibilityPreview = {
@@ -281,7 +291,8 @@ export function CreateShiftDialog({
         tasks: (initialShift?.tasks?.map((t) => ({
             id: t.id,
             label: t.label,
-        })) ?? []) as Array<{ id?: number; label: string }>,
+            scheduled_time: t.scheduled_time ?? null,
+        })) ?? []) as ShiftDialogTask[],
         repeat_weekly: defaultRepeatWeekly,
         repeat_end_date: (defaultRepeatEndDate ?? '') as string,
         repeat_by_weekday: [
@@ -356,12 +367,23 @@ export function CreateShiftDialog({
     }
 
     function addTask() {
-        form.setData('tasks', [...form.data.tasks, { label: '' }]);
+        form.setData('tasks', [
+            ...form.data.tasks,
+            { label: '', scheduled_time: null },
+        ]);
     }
     function setTask(i: number, label: string) {
         const next = [...form.data.tasks];
         next[i] = { ...next[i], label };
         form.setData('tasks', next);
+    }
+    function setTaskScheduled(i: number, scheduled_time: string | null) {
+        const next = [...form.data.tasks];
+        next[i] = { ...next[i], scheduled_time };
+        form.setData('tasks', next);
+    }
+    function defaultTaskScheduledTime() {
+        return form.data.starts_at?.slice(11, 16) || '09:00';
     }
     function removeTask(i: number) {
         form.setData(
@@ -1050,13 +1072,13 @@ export function CreateShiftDialog({
                                                 {form.data.tasks.map((t, i) => (
                                                     <li
                                                         key={i}
-                                                        className="flex items-center gap-2"
+                                                        className="grid gap-2 rounded-lg border border-border/70 bg-background p-2 sm:grid-cols-[auto,minmax(0,1fr),auto,auto] sm:items-center"
                                                     >
                                                         <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-md bg-muted text-xs font-semibold text-muted-foreground tabular-nums">
                                                             {i + 1}
                                                         </span>
                                                         <input
-                                                            className="input flex-1"
+                                                            className="input min-w-0"
                                                             placeholder={`Task ${i + 1}`}
                                                             value={t.label}
                                                             onChange={(e) =>
@@ -1067,6 +1089,45 @@ export function CreateShiftDialog({
                                                                 )
                                                             }
                                                         />
+                                                        <label className="inline-flex h-9 items-center gap-2 rounded-md border border-border px-2 text-xs whitespace-nowrap text-muted-foreground">
+                                                            <input
+                                                                type="checkbox"
+                                                                className="h-4 w-4 rounded border-border"
+                                                                checked={
+                                                                    !!t.scheduled_time
+                                                                }
+                                                                onChange={(e) =>
+                                                                    setTaskScheduled(
+                                                                        i,
+                                                                        e.target
+                                                                            .checked
+                                                                            ? defaultTaskScheduledTime()
+                                                                            : null,
+                                                                    )
+                                                                }
+                                                            />
+                                                            <span>
+                                                                Specific time
+                                                            </span>
+                                                        </label>
+                                                        {t.scheduled_time ? (
+                                                            <input
+                                                                type="time"
+                                                                aria-label={`Task ${i + 1} scheduled time`}
+                                                                className="input h-9 w-full sm:w-[7.5rem]"
+                                                                value={
+                                                                    t.scheduled_time
+                                                                }
+                                                                onChange={(e) =>
+                                                                    setTaskScheduled(
+                                                                        i,
+                                                                        e.target
+                                                                            .value ||
+                                                                            null,
+                                                                    )
+                                                                }
+                                                            />
+                                                        ) : null}
                                                         <button
                                                             type="button"
                                                             onClick={() =>

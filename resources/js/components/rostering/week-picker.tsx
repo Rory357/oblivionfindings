@@ -10,10 +10,8 @@ import {
 } from 'react';
 import { createPortal } from 'react-dom';
 import {
-    CalendarRange,
     ChevronLeft,
     ChevronRight,
-    ChevronsLeftRight,
     Copy,
     Download,
     Eraser,
@@ -667,8 +665,5 @@ function WeekRowContextMenu({
         </div>
     );
 }
-
-// Re-export for direct usage by callers
-export { CalendarRange, ChevronsLeftRight };
 
 export default WeekPicker;

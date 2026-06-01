@@ -143,6 +143,7 @@ class HandleInertiaRequests extends Middleware
                 'app' => trans('app'),
                 'rostering' => trans('rostering'),
             ],
+            'webpush_public_key' => config('services.webpush.public_key'),
 
             // NEW: organisation theme tokens and branding assets
             'theme' => [

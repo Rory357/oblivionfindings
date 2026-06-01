@@ -24,6 +24,7 @@ use App\Services\GuidedRoundService;
 use App\Services\ShiftHandoverService;
 use App\Support\EmarUrl;
 use App\Support\ResidentHue;
+use App\Support\ShiftTaskSupport;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
@@ -366,6 +367,8 @@ class MyTasksController extends Controller
                 'tasks' => $openShiftTasks->map(fn ($task) => [
                     'id' => $task->id,
                     'label' => $task->label,
+                    'scheduled_time' => ShiftTaskSupport::normalizeTime($task->scheduled_time),
+                    'scheduled_for' => $openShift ? $task->setRelation('shift', $openShift)->scheduledFor()?->toIso8601String() : null,
                     'is_completed' => (bool) $task->is_completed,
                     'completed_at' => $task->completed_at?->toIso8601String(),
                 ])->values()->all(),
