@@ -534,7 +534,6 @@ export default function GlobalVendorsCredentials({
 
             <div className="flex flex-col gap-6 p-6">
                 <PageHero
-                    category="sites"
                     icon={Package}
                     title={
                         <span className="block space-y-1.5">
@@ -1104,7 +1103,7 @@ function TableShell({
             <div className="flex items-start justify-between gap-3 border-b border-border px-4 py-3">
                 <div>
                     <h3 className="flex items-center gap-2 text-sm font-semibold">
-                        <Icon className="h-4 w-4 text-category-sites" />
+                        <Icon className="h-4 w-4 text-primary" />
                         {title}
                     </h3>
                     <p className="mt-0.5 text-xs text-muted-foreground">{subtitle}</p>
