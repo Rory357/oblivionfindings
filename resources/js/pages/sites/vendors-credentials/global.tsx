@@ -611,7 +611,14 @@ export default function GlobalVendorsCredentials({
                             )}
                             <DropdownMenu>
                                 <DropdownMenuTrigger asChild>
-                                    <Button size="icon" variant="outline" aria-label="More actions">
+                                    {/* Explicit on-dark styling: as a Radix trigger this Button
+                                        loses its data-slot, so PageHeroActions can't reach it. */}
+                                    <Button
+                                        size="icon"
+                                        variant="outline"
+                                        aria-label="More actions"
+                                        className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground shadow-none hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                    >
                                         <MoreHorizontal className="h-4 w-4" />
                                     </Button>
                                 </DropdownMenuTrigger>
