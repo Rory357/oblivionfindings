@@ -244,6 +244,8 @@ class RbacSeeder extends Seeder
             // Medications
             ['key' => 'medications.view', 'description' => 'View medications module', 'group' => 'medications', 'module' => 'Clinical'],
             ['key' => 'medications.orders.manage', 'description' => 'Create/update medication orders', 'group' => 'medications', 'module' => 'Clinical'],
+            ['key' => 'medications.orders.verify', 'description' => 'Verify medication orders before administration', 'group' => 'medications', 'module' => 'Clinical'],
+            ['key' => 'medications.settings.manage', 'description' => 'Manage facility medication administration rules', 'group' => 'medications', 'module' => 'Clinical'],
             ['key' => 'medications.administer.record', 'description' => 'Record medication administrations (MAR)', 'group' => 'medications', 'module' => 'Clinical'],
             ['key' => 'medications.administer.correct', 'description' => 'Correct medication administrations', 'group' => 'medications', 'module' => 'Clinical'],
             ['key' => 'medications.stock.update', 'description' => 'Update medication stock counts', 'group' => 'medications', 'module' => 'Clinical'],
@@ -546,7 +548,7 @@ class RbacSeeder extends Seeder
             'timesheets.viewAny', 'timesheets.create', 'timesheets.update', 'timesheets.approve', 'timesheets.manageAny',
             'clients.viewAny', 'clients.create', 'clients.update', 'clients.assignments.update', 'clients.onboarding.manage',
             'family_portal.viewAny', 'family_portal.manage',
-            'medications.view', 'medications.orders.manage', 'medications.administer.record',
+            'medications.view', 'medications.orders.manage', 'medications.orders.verify', 'medications.settings.manage', 'medications.administer.record',
             'medications.administer.correct', 'medications.stock.update', 'medications.controlled.view',
             'medications.controlled.record', 'medications.controlled.witness', 'medications.controlled.override',
             'medications.audit.view', 'medications.reports.export', 'medications.breakglass',
@@ -597,7 +599,7 @@ class RbacSeeder extends Seeder
             'staff.viewAny', 'staff.credentials.viewAny', 'staff.credentials.updateAny',
             'staff.availability.updateAny', 'clients.viewAny', 'clients.assignments.update',
             'clients.onboarding.manage', 'family_portal.viewAny', 'family_portal.manage',
-            'medications.view', 'medications.orders.manage',
+            'medications.view', 'medications.orders.manage', 'medications.orders.verify', 'medications.settings.manage',
             'medications.administer.record', 'medications.administer.correct', 'medications.stock.update',
             'medications.controlled.view', 'medications.controlled.record', 'medications.controlled.witness',
             'medications.audit.view', 'medications.reports.export',
@@ -760,6 +762,7 @@ class RbacSeeder extends Seeder
             'clinical.events.viewAny',
             'clinical.protocols.viewAny',
             'clinical.dashboard',
+            'medications.view', 'medications.orders.verify',
             'progress_notes.viewAny', 'progress_notes.create', 'progress_notes.update', 'progress_notes.review',
         ]);
 
@@ -805,7 +808,7 @@ class RbacSeeder extends Seeder
             'clinical.events.viewAny', 'clinical.events.review',
             'clinical.protocols.viewAny', 'clinical.protocols.manage',
             'clinical.dashboard',
-            'medications.view', 'medications.orders.manage',
+            'medications.view', 'medications.orders.manage', 'medications.orders.verify', 'medications.settings.manage',
             'medications.administer.record', 'medications.audit.view',
             'clients.viewAny',
         ]);

@@ -110,6 +110,7 @@ type Props = {
     can: {
         manage_allergies: boolean;
         manage_interactions: boolean;
+        verify_orders?: boolean;
     };
 };
 
@@ -276,6 +277,8 @@ function defaultFormData() {
         witness_required: false as boolean,
         start_date: '',
         prescriber: '',
+        pharmac_therapeutic_group: '',
+        pharmac_subgroup: '',
     };
 }
 
@@ -581,6 +584,38 @@ function MedicationFormFields({
                 </div>
             </div>
 
+            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
+                <div className="space-y-1.5">
+                    <Label htmlFor={`${idPrefix}_therapeutic_group`}>
+                        Pharmac Therapeutic Group
+                    </Label>
+                    <Input
+                        id={`${idPrefix}_therapeutic_group`}
+                        value={form.data.pharmac_therapeutic_group}
+                        onChange={(e) =>
+                            form.setData(
+                                'pharmac_therapeutic_group',
+                                e.target.value,
+                            )
+                        }
+                        placeholder="e.g. Anticoagulants"
+                    />
+                </div>
+                <div className="space-y-1.5">
+                    <Label htmlFor={`${idPrefix}_subgroup`}>
+                        Therapeutic Subgroup
+                    </Label>
+                    <Input
+                        id={`${idPrefix}_subgroup`}
+                        value={form.data.pharmac_subgroup}
+                        onChange={(e) =>
+                            form.setData('pharmac_subgroup', e.target.value)
+                        }
+                        placeholder="e.g. Vitamin K antagonists"
+                    />
+                </div>
+            </div>
+
             {/* PRN fields - shown when is_prn is checked */}
             {form.data.is_prn && (
                 <div className="rounded-md border border-status-info/30 bg-status-info-bg p-4 dark:border-status-info/30">
@@ -727,6 +762,8 @@ function EditMedicationDialog({
         witness_required: !!med.witness_required,
         start_date: med.start_date ?? '',
         prescriber: med.prescriber ?? '',
+        pharmac_therapeutic_group: med.pharmac_therapeutic_group ?? '',
+        pharmac_subgroup: med.pharmac_subgroup ?? '',
     });
 
     function handleSubmit(e: React.FormEvent) {
@@ -1092,6 +1129,26 @@ export default function Medications({
         if (reason !== null) {
             router.post(`/emar/medications/${med.id}/discontinue`, { reason });
         }
+    }
+
+    function handleVerifyMedication(med: any) {
+        router.post(
+            `/emar/medications/${med.id}/verify`,
+            {},
+            { preserveScroll: true },
+        );
+    }
+
+    function handleRejectMedication(med: any) {
+        const reason = prompt('Reason for rejecting this medication order:');
+        if (reason === null || !reason.trim()) {
+            return;
+        }
+        router.post(
+            `/emar/medications/${med.id}/reject`,
+            { rejection_reason: reason },
+            { preserveScroll: true },
+        );
     }
 
     return (
@@ -1537,18 +1594,39 @@ export default function Medications({
                                             </div>
                                         </td>
                                         <td className="p-3">
-                                            <Badge
-                                                variant={
-                                                    m.state === 'active'
-                                                        ? 'default'
-                                                        : m.state === 'paused'
-                                                          ? 'secondary'
-                                                          : 'outline'
-                                                }
-                                                className="text-xs"
-                                            >
-                                                {m.state}
-                                            </Badge>
+                                            <div className="flex flex-col items-start gap-1">
+                                                <Badge
+                                                    variant={
+                                                        m.state === 'active'
+                                                            ? 'default'
+                                                            : m.state ===
+                                                                'paused'
+                                                              ? 'secondary'
+                                                              : 'outline'
+                                                    }
+                                                    className="text-xs"
+                                                >
+                                                    {m.state}
+                                                </Badge>
+                                                {m.approval_status &&
+                                                    m.approval_status !==
+                                                        'verified' && (
+                                                        <Badge
+                                                            variant={
+                                                                m.approval_status ===
+                                                                'rejected'
+                                                                    ? 'destructive'
+                                                                    : 'outline'
+                                                            }
+                                                            className="border-status-warning/40 text-[10px] text-status-warning"
+                                                        >
+                                                            {m.approval_status ===
+                                                            'rejected'
+                                                                ? 'Rejected'
+                                                                : 'Awaiting verification'}
+                                                        </Badge>
+                                                    )}
+                                            </div>
                                         </td>
                                         <td className="p-3 font-mono text-xs">
                                             {m.stock?.on_hand ?? '—'}
@@ -1566,6 +1644,40 @@ export default function Medications({
                                                     med={m}
                                                     clients={clients}
                                                 />
+                                                {can.verify_orders &&
+                                                    m.approval_status &&
+                                                    m.approval_status !==
+                                                        'verified' && (
+                                                        <>
+                                                            <Button
+                                                                size="sm"
+                                                                variant="ghost"
+                                                                className="h-7 px-2 text-xs text-status-success hover:text-status-success"
+                                                                onClick={() =>
+                                                                    handleVerifyMedication(
+                                                                        m,
+                                                                    )
+                                                                }
+                                                            >
+                                                                Verify
+                                                            </Button>
+                                                            {m.approval_status !==
+                                                                'rejected' && (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="ghost"
+                                                                    className="h-7 px-2 text-xs"
+                                                                    onClick={() =>
+                                                                        handleRejectMedication(
+                                                                            m,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    Reject
+                                                                </Button>
+                                                            )}
+                                                        </>
+                                                    )}
                                                 {m.state === 'active' && (
                                                     <Button
                                                         size="sm"

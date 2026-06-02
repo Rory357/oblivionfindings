@@ -122,8 +122,32 @@ type ErrorSummaryData = {
     list: { date: string; client: string; type: string; severity: string; status: string }[];
 };
 
+const CARE_LEVELS = [
+    { value: 'rest_home', label: 'Rest Home' },
+    { value: 'hospital', label: 'Hospital' },
+    { value: 'dementia', label: 'Dementia' },
+    { value: 'psychogeriatric', label: 'Psychogeriatric' },
+    { value: 'supported_independent', label: 'Supported Independent' },
+    { value: 'respite', label: 'Respite' },
+];
+
+const USAGE_REPORTS = [
+    { type: 'regular', label: 'Regular Medicine Usage' },
+    { type: 'short_course', label: 'Short Course Usage' },
+    { type: 'prn', label: 'PRN Usage' },
+    { type: 'observations', label: 'BSL / Pulse / INR' },
+    { type: 'syringe_drivers', label: 'Syringe Driver Usage' },
+    { type: 'chart_reviews', label: 'Chart Review Schedule' },
+];
+
 type Props = {
-    filters: { date_from: string; date_to: string; client_id: number | null; report_type: string | null };
+    filters: {
+        date_from: string;
+        date_to: string;
+        client_id: number | null;
+        care_level?: string | null;
+        report_type: string | null;
+    };
     clients: ClientOption[];
     adminSummary: AdminSummary;
     dailyAdmin: DailyAdmin[];
@@ -187,6 +211,7 @@ export default function EmarReports({
     const [dateFrom, setDateFrom] = useState(filters.date_from);
     const [dateTo, setDateTo] = useState(filters.date_to);
     const [clientId, setClientId] = useState<string>(filters.client_id?.toString() ?? 'all');
+    const [careLevel, setCareLevel] = useState<string>(filters.care_level ?? 'all');
 
     const applyFilters = () => {
         router.get(
@@ -195,6 +220,7 @@ export default function EmarReports({
                 date_from: dateFrom,
                 date_to: dateTo,
                 client_id: clientId !== 'all' ? clientId : undefined,
+                care_level: careLevel !== 'all' ? careLevel : undefined,
             },
             { preserveState: true, preserveScroll: true },
         );
@@ -207,6 +233,7 @@ export default function EmarReports({
             report_type: reportType,
         });
         if (clientId !== 'all') params.set('client_id', clientId);
+        if (careLevel !== 'all') params.set('care_level', careLevel);
         window.open(`/emar/reports/export?${params.toString()}`, '_blank');
     };
 
@@ -252,9 +279,51 @@ export default function EmarReports({
                                 </SelectContent>
                             </Select>
                         </div>
+                        <div className="space-y-1">
+                            <label className="text-xs font-medium text-muted-foreground">Care Level</label>
+                            <Select value={careLevel} onValueChange={setCareLevel}>
+                                <SelectTrigger className="w-48">
+                                    <SelectValue placeholder="All care levels" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    <SelectItem value="all">All Care Levels</SelectItem>
+                                    {CARE_LEVELS.map((c) => (
+                                        <SelectItem key={c.value} value={c.value}>
+                                            {c.label}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
                         <Button onClick={applyFilters} size="sm">
                             Apply Filters
                         </Button>
+                    </CardContent>
+                </Card>
+
+                {/* ── 1CHART Usage Report Exports ─────────────────── */}
+                <Card className="mb-6">
+                    <CardHeader className="pb-2">
+                        <CardTitle className="text-sm font-medium">Usage &amp; Compliance Reports (CSV)</CardTitle>
+                    </CardHeader>
+                    <CardContent>
+                        <p className="mb-3 text-xs text-muted-foreground">
+                            Export 1CHART-equivalent reports for the selected date range, client, and care level. Pharmac
+                            therapeutic groups are included where applicable. Ranges are capped at three months.
+                        </p>
+                        <div className="flex flex-wrap gap-2">
+                            {USAGE_REPORTS.map((report) => (
+                                <Button
+                                    key={report.type}
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={() => handleExport(report.type)}
+                                >
+                                    <Download className="mr-1.5 h-3.5 w-3.5" />
+                                    {report.label}
+                                </Button>
+                            ))}
+                        </div>
                     </CardContent>
                 </Card>
 

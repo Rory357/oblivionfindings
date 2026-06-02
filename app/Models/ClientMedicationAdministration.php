@@ -27,6 +27,7 @@ class ClientMedicationAdministration extends Model
         'administered_at',
         'status',
         'reason',
+        'reason_code',
         'correction_reason',
         'dose_given',
         'notes',
@@ -35,6 +36,9 @@ class ClientMedicationAdministration extends Model
         'review_flagged_at',
         'review_flagged_by',
         'blood_glucose_level',
+        'pulse_bpm',
+        'blood_pressure_systolic',
+        'blood_pressure_diastolic',
         'insulin_units_given',
         'injection_site',
         'inhaler_technique_observed',
@@ -47,6 +51,8 @@ class ClientMedicationAdministration extends Model
         'correction_approved_by',
         'correction_approved_at',
         'correction_rejection_reason',
+        'witnessed_at',
+        'witness_method',
     ];
 
     protected $casts = [
@@ -56,12 +62,16 @@ class ClientMedicationAdministration extends Model
         'review_required' => 'boolean',
         'review_flagged_at' => 'datetime',
         'blood_glucose_level' => 'decimal:1',
+        'pulse_bpm' => 'integer',
+        'blood_pressure_systolic' => 'integer',
+        'blood_pressure_diastolic' => 'integer',
         'insulin_units_given' => 'decimal:1',
         'inhaler_technique_observed' => 'boolean',
         'spacer_used' => 'boolean',
         'peak_flow_before' => 'integer',
         'peak_flow_after' => 'integer',
         'correction_approved_at' => 'datetime',
+        'witnessed_at' => 'datetime',
     ];
 
     public function client()

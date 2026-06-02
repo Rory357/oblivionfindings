@@ -630,14 +630,20 @@ class MedicationsApiController extends Controller
         $data = $request->validate([
             'status' => ['required', 'in:given,refused,missed,withheld'],
             'reason' => ['nullable', 'string', 'max:500'],
+            'reason_code' => ['nullable', 'string', 'max:60'],
             'dose_given' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'scheduled_for' => ['nullable', 'date'],
             'administered_at' => ['nullable', 'date'],
             'witnessed_by' => ['nullable', 'integer', 'exists:users,id'],
+            'witness_credential' => ['nullable', 'string', 'max:255'],
             'shift_id' => ['nullable', 'integer', 'exists:shifts,id'],
             'outcome' => ['nullable', 'string', 'in:effective,ineffective,adverse_reaction'],
             'site' => ['nullable', 'string', 'max:100'],
+            'blood_glucose_level' => ['nullable', 'numeric', 'min:0', 'max:999.9'],
+            'pulse_bpm' => ['nullable', 'integer', 'min:20', 'max:250'],
+            'blood_pressure_systolic' => ['nullable', 'integer', 'min:40', 'max:300'],
+            'blood_pressure_diastolic' => ['nullable', 'integer', 'min:20', 'max:200'],
             'override_safety' => ['nullable', 'boolean'],
             'override_window' => ['nullable', 'boolean'],
             'client_request_uuid' => ['nullable', 'uuid'],
@@ -654,11 +660,13 @@ class MedicationsApiController extends Controller
             return response()->json($cached);
         }
 
-        // Require reason for non-given
-        if ($data['status'] !== 'given' && empty($data['reason'])) {
+        // Require a structured reason for non-given administrations. Free text
+        // remains available for detail but is no longer the primary audit code.
+        if ($data['status'] !== 'given' && empty($data['reason_code'])) {
             return response()->json([
                 'success' => false,
-                'error' => 'Reason is required when medication is not given.',
+                'error' => 'Select the reason this medication was not given.',
+                'error_field' => 'reason_code',
             ], 422);
         }
 
@@ -676,6 +684,7 @@ class MedicationsApiController extends Controller
                 return response()->json([
                     'success' => false,
                     'error' => 'Witness is required for this medication.',
+                    'error_field' => 'witnessed_by',
                 ], 422);
             }
 
@@ -683,6 +692,7 @@ class MedicationsApiController extends Controller
                 return response()->json([
                     'success' => false,
                     'error' => 'Witness must be a different user.',
+                    'error_field' => 'witnessed_by',
                 ], 422);
             }
 
@@ -691,6 +701,7 @@ class MedicationsApiController extends Controller
                 return response()->json([
                     'success' => false,
                     'error' => 'Selected witness is not authorized to witness controlled drug administrations.',
+                    'error_field' => 'witnessed_by',
                 ], 422);
             }
         }
@@ -783,7 +794,12 @@ class MedicationsApiController extends Controller
                 'dose_given' => $data['dose_given'] ?? null,
                 'status' => $data['status'],
                 'reason' => $data['reason'] ?? null,
+                'reason_code' => $data['reason_code'] ?? null,
                 'witnessed_by' => $data['witnessed_by'] ?? null,
+                'witness_method' => $administration->witness_method,
+                'pulse_bpm' => $data['pulse_bpm'] ?? null,
+                'blood_pressure_systolic' => $data['blood_pressure_systolic'] ?? null,
+                'blood_pressure_diastolic' => $data['blood_pressure_diastolic'] ?? null,
                 'client_request_uuid' => $data['client_request_uuid'] ?? null,
                 'captured_offline_at' => $data['captured_offline_at'] ?? null,
                 'origin_device_id' => $data['origin_device_id'] ?? null,

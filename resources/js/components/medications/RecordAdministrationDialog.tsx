@@ -3,6 +3,7 @@ import { Button } from '@/components/ui/button';
 import {
     Dialog,
     DialogContent,
+    DialogDescription,
     DialogFooter,
     DialogHeader,
     DialogTitle,
@@ -63,6 +64,10 @@ interface Medication {
     controlled_drug: boolean;
     high_risk: boolean;
     witness_required: boolean;
+    admin_rules?: {
+        requires_countersign?: boolean;
+        required_observations?: string[];
+    };
     instructions?: string;
     stock?: { on_hand: number; unit: string } | null;
     scan_verification?: ScanVerification | null;
@@ -102,6 +107,22 @@ const statusOptions = [
     { value: 'missed', label: 'Missed', color: 'text-status-critical' },
 ];
 
+const notGivenReasonOptions = [
+    { value: 'absent', label: 'Absent' },
+    { value: 'destroyed', label: 'Destroyed' },
+    { value: 'doctors_instruction', label: "Doctor's instruction" },
+    { value: 'fasting', label: 'Fasting' },
+    { value: 'transferred', label: 'Transferred' },
+    { value: 'refused', label: 'Refused' },
+    { value: 'social_leave', label: 'Social leave' },
+    { value: 'hospitalised', label: 'Hospitalised' },
+    { value: 'medication_unavailable', label: 'Medication unavailable' },
+    { value: 'vomit_or_nausea', label: 'Vomit or nausea' },
+    { value: 'self_administered', label: 'Self-administered' },
+    { value: 'withheld', label: 'Withheld' },
+    { value: 'other', label: 'Other' },
+];
+
 export default function RecordAdministrationDialog({
     isOpen,
     onClose,
@@ -116,13 +137,19 @@ export default function RecordAdministrationDialog({
     isLoading,
 }: Props) {
     const [status, setStatus] = useState('given');
+    const [reasonCode, setReasonCode] = useState('');
     const [reason, setReason] = useState('');
     const [doseGiven, setDoseGiven] = useState('');
     const [notes, setNotes] = useState('');
     const [administeredAt, setAdministeredAt] = useState('');
     const [witnessedBy, setWitnessedBy] = useState('');
+    const [witnessCredential, setWitnessCredential] = useState('');
     const [outcome, setOutcome] = useState('');
     const [site, setSite] = useState('');
+    const [bloodGlucoseLevel, setBloodGlucoseLevel] = useState('');
+    const [pulseBpm, setPulseBpm] = useState('');
+    const [bloodPressureSystolic, setBloodPressureSystolic] = useState('');
+    const [bloodPressureDiastolic, setBloodPressureDiastolic] = useState('');
     const [showOverride, setShowOverride] = useState(false);
     const [specialistFields, setSpecialistFields] = useState<
         Record<string, unknown>
@@ -138,13 +165,19 @@ export default function RecordAdministrationDialog({
     useEffect(() => {
         if (isOpen && medication) {
             setStatus('given');
+            setReasonCode('');
             setReason('');
             setDoseGiven(medication.dosage || '');
             setNotes('');
             setAdministeredAt(new Date().toISOString().slice(0, 16));
             setWitnessedBy('');
+            setWitnessCredential('');
             setOutcome('');
             setSite('');
+            setBloodGlucoseLevel('');
+            setPulseBpm('');
+            setBloodPressureSystolic('');
+            setBloodPressureDiastolic('');
             setShowOverride(false);
             setSpecialistFields({});
             setScanCode('');
@@ -154,16 +187,23 @@ export default function RecordAdministrationDialog({
         }
     }, [isOpen, medication?.id, medication?.dosage]);
 
-    const needsReason = useMemo(() => {
-        if (status !== 'given') return true;
-        if (medication?.is_prn) return true;
-        return false;
-    }, [status, medication]);
+    const needsReason = useMemo(
+        () => status !== 'given' || !!medication?.is_prn,
+        [status, medication],
+    );
+
+    const requiredObservations = useMemo(
+        () => medication?.admin_rules?.required_observations ?? [],
+        [medication],
+    );
 
     const needsWitness = useMemo(() => {
         if (status !== 'given') return false;
         return (
-            medication?.controlled_drug || medication?.witness_required || false
+            medication?.controlled_drug ||
+            medication?.witness_required ||
+            medication?.admin_rules?.requires_countersign ||
+            false
         );
     }, [status, medication]);
 
@@ -178,18 +218,50 @@ export default function RecordAdministrationDialog({
     const canSubmit = useMemo(() => {
         if (!safetyCheck) return false;
         if (safetyCheck.blocked && !showOverride) return false;
-        if (needsReason && !reason.trim()) return false;
-        if (needsWitness && !witnessedBy) return false;
+        if (status !== 'given' && !reasonCode) return false;
+        if (reasonCode === 'other' && !reason.trim()) return false;
+        if (status === 'given' && medication?.is_prn && !reason.trim())
+            return false;
+        if (needsWitness && (!witnessedBy || !witnessCredential.trim()))
+            return false;
+        if (
+            status === 'given' &&
+            requiredObservations.includes('bsl') &&
+            bloodGlucoseLevel.trim() === ''
+        )
+            return false;
+        if (
+            status === 'given' &&
+            requiredObservations.includes('pulse') &&
+            pulseBpm.trim() === ''
+        )
+            return false;
+        if (
+            status === 'given' &&
+            requiredObservations.includes('blood_pressure') &&
+            (bloodPressureSystolic.trim() === '' ||
+                bloodPressureDiastolic.trim() === '')
+        )
+            return false;
         if (needsScanVerification && scanStatus !== 'verified') return false;
         return true;
     }, [
+        bloodGlucoseLevel,
+        bloodPressureDiastolic,
+        bloodPressureSystolic,
+        medication,
         needsReason,
         needsScanVerification,
         needsWitness,
+        pulseBpm,
         reason,
+        reasonCode,
+        requiredObservations,
         safetyCheck,
         scanStatus,
         showOverride,
+        status,
+        witnessCredential,
         witnessedBy,
     ]);
 
@@ -199,15 +271,21 @@ export default function RecordAdministrationDialog({
         const data: Record<string, unknown> = {
             status,
             reason: reason || null,
+            reason_code: status !== 'given' ? reasonCode : null,
             dose_given: doseGiven || null,
             notes: notes || null,
             administered_at: administeredAt
                 ? new Date(administeredAt).toISOString()
                 : null,
             witnessed_by: witnessedBy ? parseInt(witnessedBy, 10) : null,
+            witness_credential: witnessCredential || null,
             scheduled_for: scheduledTime || null,
             outcome: outcome || null,
             site: site || null,
+            blood_glucose_level: bloodGlucoseLevel || null,
+            pulse_bpm: pulseBpm || null,
+            blood_pressure_systolic: bloodPressureSystolic || null,
+            blood_pressure_diastolic: bloodPressureDiastolic || null,
             ...specialistFields,
         };
 
@@ -278,6 +356,10 @@ export default function RecordAdministrationDialog({
                         <Pill className="h-5 w-5" />
                         Record Administration
                     </DialogTitle>
+                    <DialogDescription>
+                        Record the medication outcome, required checks, and any
+                        observations needed for this dose.
+                    </DialogDescription>
                 </DialogHeader>
 
                 <div className="min-h-0 space-y-4 overflow-y-auto pr-1">
@@ -512,25 +594,48 @@ export default function RecordAdministrationDialog({
                             />
                         </div>
 
-                        {needsReason && (
+                        {status !== 'given' && (
+                            <div className="space-y-2">
+                                <Label>Reason Not Given *</Label>
+                                <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-3">
+                                    {notGivenReasonOptions.map((option) => (
+                                        <Button
+                                            key={option.value}
+                                            type="button"
+                                            variant={
+                                                reasonCode === option.value
+                                                    ? 'default'
+                                                    : 'outline'
+                                            }
+                                            className="h-auto min-h-10 justify-start whitespace-normal text-left"
+                                            onClick={() =>
+                                                setReasonCode(option.value)
+                                            }
+                                        >
+                                            {option.label}
+                                        </Button>
+                                    ))}
+                                </div>
+                                {reasonCode === 'other' && (
+                                    <Textarea
+                                        value={reason}
+                                        onChange={(e) =>
+                                            setReason(e.target.value)
+                                        }
+                                        placeholder="Add the reason not covered by the standard list."
+                                        className="min-h-[60px]"
+                                    />
+                                )}
+                            </div>
+                        )}
+
+                        {status === 'given' && medication.is_prn && (
                             <div>
-                                <Label>
-                                    Reason / Indication *
-                                    {medication.is_prn &&
-                                        status === 'given' && (
-                                            <span className="ml-1 text-xs text-muted-foreground">
-                                                (PRN indication required)
-                                            </span>
-                                        )}
-                                </Label>
+                                <Label>PRN Indication *</Label>
                                 <Textarea
                                     value={reason}
                                     onChange={(e) => setReason(e.target.value)}
-                                    placeholder={
-                                        status === 'given' && medication.is_prn
-                                            ? 'Why is this PRN being given?'
-                                            : 'Why was medication not given?'
-                                    }
+                                    placeholder="Why is this PRN being given?"
                                     className="min-h-[60px]"
                                 />
                             </div>
@@ -561,13 +666,111 @@ export default function RecordAdministrationDialog({
                                     </SelectContent>
                                 </Select>
                                 <p className="mt-1 text-xs text-muted-foreground">
-                                    A witness is required for controlled drugs
+                                    The second checker must enter their own
+                                    password or PIN before the dose is saved.
                                 </p>
+                                <div className="mt-3">
+                                    <Label>Witness Password / PIN *</Label>
+                                    <Input
+                                        type="password"
+                                        value={witnessCredential}
+                                        onChange={(event) =>
+                                            setWitnessCredential(
+                                                event.target.value,
+                                            )
+                                        }
+                                        placeholder="Second checker credential"
+                                    />
+                                </div>
                             </div>
                         )}
 
                         {status === 'given' && (
                             <>
+                                {requiredObservations.length > 0 && (
+                                    <div className="space-y-3 rounded-md border p-3">
+                                        <div className="font-medium">
+                                            Required observations
+                                        </div>
+                                        {requiredObservations.includes(
+                                            'bsl',
+                                        ) && (
+                                            <div>
+                                                <Label>BSL *</Label>
+                                                <Input
+                                                    type="number"
+                                                    step="0.1"
+                                                    value={bloodGlucoseLevel}
+                                                    onChange={(event) =>
+                                                        setBloodGlucoseLevel(
+                                                            event.target.value,
+                                                        )
+                                                    }
+                                                    placeholder="e.g., 6.4"
+                                                />
+                                            </div>
+                                        )}
+                                        {requiredObservations.includes(
+                                            'pulse',
+                                        ) && (
+                                            <div>
+                                                <Label>Pulse *</Label>
+                                                <Input
+                                                    type="number"
+                                                    inputMode="numeric"
+                                                    value={pulseBpm}
+                                                    onChange={(event) =>
+                                                        setPulseBpm(
+                                                            event.target.value,
+                                                        )
+                                                    }
+                                                    placeholder="e.g., 72"
+                                                />
+                                            </div>
+                                        )}
+                                        {requiredObservations.includes(
+                                            'blood_pressure',
+                                        ) && (
+                                            <div className="grid gap-3 sm:grid-cols-2">
+                                                <div>
+                                                    <Label>Systolic *</Label>
+                                                    <Input
+                                                        type="number"
+                                                        inputMode="numeric"
+                                                        value={
+                                                            bloodPressureSystolic
+                                                        }
+                                                        onChange={(event) =>
+                                                            setBloodPressureSystolic(
+                                                                event.target
+                                                                    .value,
+                                                            )
+                                                        }
+                                                        placeholder="e.g., 120"
+                                                    />
+                                                </div>
+                                                <div>
+                                                    <Label>Diastolic *</Label>
+                                                    <Input
+                                                        type="number"
+                                                        inputMode="numeric"
+                                                        value={
+                                                            bloodPressureDiastolic
+                                                        }
+                                                        onChange={(event) =>
+                                                            setBloodPressureDiastolic(
+                                                                event.target
+                                                                    .value,
+                                                            )
+                                                        }
+                                                        placeholder="e.g., 80"
+                                                    />
+                                                </div>
+                                            </div>
+                                        )}
+                                    </div>
+                                )}
+
                                 <div>
                                     <Label>Outcome (Optional)</Label>
                                     <Select

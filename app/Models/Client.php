@@ -35,6 +35,7 @@ class Client extends Model
         'city',
         'postcode',
         'funding_type',
+        'care_level',
         'funding_notes',
         'openai_vector_store_id',
         'profile_photo_path',
@@ -62,6 +63,12 @@ class Client extends Model
         'fluid_intake_min_ml',
         'fluid_intake_max_ml',
         'seizure_duration_escalation_seconds',
+        'suppress_med_admin_alerts',
+        'med_alerts_suppressed_reason',
+        'med_alerts_suppressed_by',
+        'med_alerts_suppressed_at',
+        'chart_review_interval_months',
+        'next_chart_review_date',
     ];
 
     protected $casts = [
@@ -70,6 +77,10 @@ class Client extends Model
         'languages' => 'array',
         'service_start_date' => 'date',
         'safeguarding_flag' => 'boolean',
+        'suppress_med_admin_alerts' => 'boolean',
+        'med_alerts_suppressed_at' => 'datetime',
+        'chart_review_interval_months' => 'integer',
+        'next_chart_review_date' => 'date',
         'phone' => 'encrypted',
         'email' => 'encrypted',
         'nhi_number' => 'encrypted',
@@ -160,6 +171,21 @@ class Client extends Model
     public function medicationAdministrations()
     {
         return $this->hasMany(ClientMedicationAdministration::class);
+    }
+
+    public function medicationAlerts()
+    {
+        return $this->hasMany(ClientMedicationAlert::class);
+    }
+
+    public function inrRecords()
+    {
+        return $this->hasMany(ClientInrRecord::class);
+    }
+
+    public function syringeDrivers()
+    {
+        return $this->hasMany(MedicationSyringeDriver::class);
     }
 
     public function breakGlassAccesses()

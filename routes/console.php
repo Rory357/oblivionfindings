@@ -367,6 +367,13 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->everyFifteenMinutes();
 
+// Generate medication chart review, medicine review, and INR due alerts: daily
+app(Schedule::class)
+    ->command('emar:check-medication-reviews')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('07:05')
+    ->withoutOverlapping();
+
 // Sync Governance clinical indicators from Health & Clinical/eMAR: daily at 00:20
 app(Schedule::class)
     ->command('governance:sync-clinical-data')

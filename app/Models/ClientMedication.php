@@ -37,6 +37,8 @@ class ClientMedication extends Model
         'prescriber',
         'indication',
         'pharmacy',
+        'pharmac_therapeutic_group',
+        'pharmac_subgroup',
         'start_date',
         'end_date',
         'review_date',
@@ -45,6 +47,10 @@ class ClientMedication extends Model
         'instructions',
         'active',
         'state',
+        'approval_status',
+        'verified_by',
+        'verified_at',
+        'rejection_reason',
         'paused_at',
         'version',
         'superseded_by',
@@ -57,6 +63,7 @@ class ClientMedication extends Model
         'review_date' => 'date',
         'ceased_at' => 'date',
         'paused_at' => 'datetime',
+        'verified_at' => 'datetime',
         'superseded_at' => 'datetime',
         'is_prn' => 'boolean',
         'controlled_drug' => 'boolean',
@@ -83,6 +90,11 @@ class ClientMedication extends Model
     public function administrations(): HasMany
     {
         return $this->hasMany(ClientMedicationAdministration::class, 'client_medication_id');
+    }
+
+    public function inrRecords(): HasMany
+    {
+        return $this->hasMany(ClientInrRecord::class, 'client_medication_id');
     }
 
     public function versions(): HasMany
@@ -145,6 +157,10 @@ class ClientMedication extends Model
     {
         return $query->where('state', 'active')
             ->where('active', true)
+            ->where(function ($q) {
+                $q->where('approval_status', 'verified')
+                    ->orWhereNull('approval_status');
+            })
             ->whereNull('superseded_by')
             ->whereNull('deleted_at');
     }
@@ -175,6 +191,18 @@ class ClientMedication extends Model
     }
 
     /**
+     * Scope for active orders that are visible but cannot yet be administered.
+     */
+    public function scopeAwaitingVerification($query)
+    {
+        return $query->where('state', 'active')
+            ->where('active', true)
+            ->whereNull('superseded_by')
+            ->whereNull('deleted_at')
+            ->whereNotIn('approval_status', ['verified']);
+    }
+
+    /**
      * Scope for high-risk medications
      */
     public function scopeHighRisk($query)
@@ -198,7 +226,22 @@ class ClientMedication extends Model
         return $this->state === 'active' 
             && $this->active 
             && $this->superseded_by === null
-            && $this->deleted_at === null;
+            && $this->deleted_at === null
+            && $this->isVerifiedForAdministration();
+    }
+
+    public function isVerifiedForAdministration(): bool
+    {
+        return ($this->approval_status ?? 'verified') === 'verified';
+    }
+
+    public function isAdministrable(): bool
+    {
+        return $this->state === 'active'
+            && (bool) $this->active
+            && $this->superseded_by === null
+            && $this->deleted_at === null
+            && $this->isVerifiedForAdministration();
     }
 
     /**

@@ -23,6 +23,7 @@ import {
     Package,
     Pill,
     Play,
+    Settings2,
     Shield,
     Syringe,
     TrendingUp,
@@ -132,6 +133,7 @@ type Props = {
     recentActivity: RecentActivityItem[];
     activeAlertsList: DashboardAlert[];
     compliance: Compliance;
+    canManageSettings?: boolean;
 };
 
 function AlertCard({ icon: Icon, title, count, color, href }: { icon: any; title: string; count: number; color: string; href: string }) {
@@ -200,7 +202,7 @@ const statusColor: Record<string, string> = {
     pending: 'text-status-info',
 };
 
-export default function EmarDashboard({ stats, trend, overdueMedications, nextRound, clientStatuses, recentActivity, activeAlertsList, compliance }: Props) {
+export default function EmarDashboard({ stats, trend, overdueMedications, nextRound, clientStatuses, recentActivity, activeAlertsList, compliance, canManageSettings }: Props) {
     const donutSegments = [
         { label: 'Given', value: stats.givenToday, color: OPS_COLORS.success },
         { label: 'Refused', value: stats.refusedToday, color: OPS_COLORS.warning },
@@ -684,6 +686,9 @@ export default function EmarDashboard({ stats, trend, overdueMedications, nextRo
                                 { title: 'MAR Charts', href: '/emar/mar', icon: Pill, color: 'bg-primary/10 text-primary dark:bg-primary/40 dark:text-primary/70' },
                                 { title: 'Controlled Drugs', href: '/emar/controlled', icon: Lock, color: 'bg-status-critical-bg text-status-critical dark:bg-status-critical-bg dark:text-status-critical' },
                                 { title: 'Reports', href: '/emar/reports', icon: TrendingUp, color: 'bg-primary/10 text-primary dark:bg-primary/40 dark:text-primary/70' },
+                                ...(canManageSettings
+                                    ? [{ title: 'Admin Rules', href: '/emar/settings', icon: Settings2, color: 'bg-status-warning-bg text-status-warning dark:bg-status-warning-bg dark:text-status-warning' }]
+                                    : []),
                             ].map((item) => {
                                 const Icon = item.icon;
                                 return (

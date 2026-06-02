@@ -2,28 +2,36 @@
 
 namespace App\Services;
 
+use App\Domain\Clinical\Enums\ObservationType;
+use App\Domain\Clinical\Models\ClinicalObservation;
+use App\Enums\Medication\NotGivenReason;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ServiceContext;
 use App\Models\Shift;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
 
 class EnhancedMarService
 {
     protected MarScheduleService $scheduleService;
     protected MedicationSafetyService $safetyService;
     protected MedicationScanVerificationService $scanVerificationService;
+    protected MedicationRuleService $ruleService;
 
     public function __construct(
         MarScheduleService $scheduleService,
         MedicationSafetyService $safetyService,
-        MedicationScanVerificationService $scanVerificationService
+        MedicationScanVerificationService $scanVerificationService,
+        MedicationRuleService $ruleService
     ) {
         $this->scheduleService = $scheduleService;
         $this->safetyService = $safetyService;
         $this->scanVerificationService = $scanVerificationService;
+        $this->ruleService = $ruleService;
     }
 
     /**
@@ -58,6 +66,26 @@ class EnhancedMarService
             })
             ->with(['stock'])
             ->get();
+
+        $awaitingVerification = $client->medications()
+            ->awaitingVerification()
+            ->where(function ($q) use ($date) {
+                $q->whereNull('start_date')->orWhere('start_date', '<=', $date);
+            })
+            ->where(function ($q) use ($date) {
+                $q->whereNull('end_date')->orWhere('end_date', '>=', $date);
+            })
+            ->with(['stock'])
+            ->get()
+            ->map(fn (ClientMedication $medication) => [
+                'client_medication_id' => $medication->id,
+                'medication' => $this->formatMedication($medication, $client),
+                'approval_status' => $medication->approval_status,
+                'can_record' => false,
+                'reason' => 'Medication order is awaiting verification.',
+            ])
+            ->values()
+            ->all();
 
         // Build scheduled rows
         $scheduledRows = [];
@@ -96,6 +124,10 @@ class EnhancedMarService
             'scheduled' => $scheduledRows,
             'prn' => $prnRows,
             'history' => $history,
+            'awaiting_verification' => $awaitingVerification,
+            'attention_alerts' => $this->getAttentionAlerts($client),
+            'inr_records' => $this->getInrRecords($client),
+            'syringe_drivers' => $this->getRunningSyringeDrivers($client),
             'upcoming' => $upcoming,
             'stats' => $stats,
             'allergies' => $allergies,
@@ -103,9 +135,99 @@ class EnhancedMarService
                 'window_before_minutes' => $this->scheduleService->windowBeforeMinutes(),
                 'window_after_minutes' => $this->scheduleService->windowAfterMinutes(),
                 'due_soon_minutes' => $this->scheduleService->dueSoonMinutes(),
+                'suppress_med_admin_alerts' => (bool) $client->suppress_med_admin_alerts,
+                'med_alerts_suppressed_reason' => $client->med_alerts_suppressed_reason,
+                'chart_review_interval_months' => $client->chart_review_interval_months,
+                'next_chart_review_date' => $client->next_chart_review_date?->toDateString(),
+                'care_level' => $client->care_level,
             ],
             'active_shift_id' => $activeShiftId,
         ];
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function getAttentionAlerts(Client $client): array
+    {
+        return $client->medicationAlerts()
+            ->enabled()
+            ->unresolved()
+            ->latest()
+            ->get()
+            ->map(fn ($alert) => [
+                'id' => $alert->id,
+                'type' => $alert->type,
+                'title' => $alert->title,
+                'detail' => $alert->detail,
+                'prompt_on_open' => (bool) $alert->prompt_on_open,
+                'created_at' => $alert->created_at?->toIso8601String(),
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function getInrRecords(Client $client): array
+    {
+        return $client->inrRecords()
+            ->with('medication:id,name')
+            ->latest('tested_on')
+            ->limit(20)
+            ->get()
+            ->map(fn ($record) => [
+                'id' => $record->id,
+                'client_medication_id' => $record->client_medication_id,
+                'medication_name' => $record->medication?->name,
+                'inr_value' => $record->inr_value,
+                'target_range_low' => $record->target_range_low,
+                'target_range_high' => $record->target_range_high,
+                'dose_mg' => $record->dose_mg,
+                'tested_on' => $record->tested_on?->toDateString(),
+                'next_test_date' => $record->next_test_date?->toDateString(),
+                'disabled_at' => $record->disabled_at?->toIso8601String(),
+                'notes' => $record->notes,
+            ])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function getRunningSyringeDrivers(Client $client): array
+    {
+        return $client->syringeDrivers()
+            ->running()
+            ->with(['checks' => fn ($query) => $query->latest('checked_at')->limit(5)])
+            ->latest('commenced_at')
+            ->get()
+            ->map(fn ($driver) => [
+                'id' => $driver->id,
+                'status' => $driver->status,
+                'commenced_at' => $driver->commenced_at?->toIso8601String(),
+                'rate' => $driver->rate,
+                'rate_unit' => $driver->rate_unit,
+                'duration_hours' => $driver->duration_hours,
+                'contents' => $driver->contents ?? [],
+                'site_of_insertion' => $driver->site_of_insertion,
+                'notes' => $driver->notes,
+                'checks' => $driver->checks
+                    ->map(fn ($check) => [
+                        'id' => $check->id,
+                        'checked_at' => $check->checked_at?->toIso8601String(),
+                        'infusion_running' => (bool) $check->infusion_running,
+                        'site_condition' => $check->site_condition,
+                        'volume_remaining' => $check->volume_remaining,
+                        'notes' => $check->notes,
+                    ])
+                    ->values()
+                    ->all(),
+            ])
+            ->values()
+            ->all();
     }
 
     /**
@@ -133,6 +255,7 @@ class EnhancedMarService
 
         // Perform safety check
         $safetyCheck = $existing ? null : $this->safetyService->performSafetyCheck($client, $medication, $now);
+        $adminRules = $this->ruleService->requirementsFor($medication);
 
         return [
             'id' => $existing?->id,
@@ -144,9 +267,9 @@ class EnhancedMarService
             'schedule_state_label' => $this->getScheduleStateLabel($scheduleState),
             'window_start' => $windowStart->toIso8601String(),
             'window_end' => $windowEnd->toIso8601String(),
-            'can_record' => $scheduleState !== 'completed' && $scheduleState !== 'future',
+            'can_record' => $scheduleState !== 'completed' && $scheduleState !== 'future' && $medication->isAdministrable(),
             'is_overdue' => $scheduleState === 'missed_auto' || $scheduleState === 'late',
-            'requires_witness' => $medication->requiresWitness(),
+            'requires_witness' => $medication->requiresWitness() || $adminRules['requires_countersign'],
             'administration' => $existing ? $this->formatAdministration($existing) : null,
             'safety_check' => $safetyCheck,
             'is_correction' => $existing?->is_correction ?? false,
@@ -167,6 +290,7 @@ class EnhancedMarService
         
         // Perform safety check
         $safetyCheck = $this->safetyService->performSafetyCheck($client, $medication, $now);
+        $adminRules = $this->ruleService->requirementsFor($medication);
 
         return [
             'client_medication_id' => $medication->id,
@@ -180,8 +304,8 @@ class EnhancedMarService
             'is_near_limit' => $medication->isPrnNearLimit(),
             'is_over_limit' => $medication->isPrnOverLimit(),
             'is_blocked' => $safetyCheck['blocked'],
-            'can_record' => !$safetyCheck['blocked'] && $medication->isActive(),
-            'requires_witness' => $medication->requiresWitness(),
+            'can_record' => !$safetyCheck['blocked'] && $medication->isAdministrable(),
+            'requires_witness' => $medication->requiresWitness() || $adminRules['requires_countersign'],
             'safety_check' => $safetyCheck,
         ];
     }
@@ -206,7 +330,12 @@ class EnhancedMarService
             'witness_required' => $medication->witness_required,
             'prescriber' => $medication->prescriber,
             'pharmacy' => $medication->pharmacy,
+            'pharmac_therapeutic_group' => $medication->pharmac_therapeutic_group,
+            'pharmac_subgroup' => $medication->pharmac_subgroup,
             'state' => $medication->state,
+            'approval_status' => $medication->approval_status ?? 'verified',
+            'is_administrable' => $medication->isAdministrable(),
+            'admin_rules' => $this->ruleService->requirementsFor($medication),
             'stock' => $medication->stock ? [
                 'on_hand' => $medication->stock->on_hand,
                 'unit' => $medication->stock->unit,
@@ -229,11 +358,19 @@ class EnhancedMarService
             'status_label' => $this->getStatusLabel($admin->status),
             'dose_given' => $admin->dose_given,
             'reason' => $admin->reason,
+            'reason_code' => $admin->reason_code,
+            'reason_label' => $admin->reason_code ? NotGivenReason::tryFrom($admin->reason_code)?->label() : null,
             'notes' => $admin->notes,
             'scheduled_for' => $admin->scheduled_for?->toIso8601String(),
             'administered_at' => $admin->administered_at?->toIso8601String(),
             'administered_by' => $admin->administeredBy?->name,
             'witnessed_by' => $admin->witnessedBy?->name,
+            'witnessed_at' => $admin->witnessed_at?->toIso8601String(),
+            'witness_method' => $admin->witness_method,
+            'blood_glucose_level' => $admin->blood_glucose_level,
+            'pulse_bpm' => $admin->pulse_bpm,
+            'blood_pressure_systolic' => $admin->blood_pressure_systolic,
+            'blood_pressure_diastolic' => $admin->blood_pressure_diastolic,
             'late_minutes' => $admin->late_minutes,
             'early_minutes' => $admin->early_minutes,
             'is_correction' => $admin->is_correction,
@@ -397,6 +534,30 @@ class EnhancedMarService
         int $userId,
         ?int $shiftId = null
     ): array {
+        if (! $medication->isAdministrable()) {
+            return [
+                'success' => false,
+                'error' => 'Medication order is awaiting verification before it can be administered.',
+                'error_field' => 'approval_status',
+            ];
+        }
+
+        $notGivenValidation = $this->validateNotGivenReason($data);
+        if ($notGivenValidation !== null) {
+            return $notGivenValidation;
+        }
+
+        $adminRules = $this->ruleService->requirementsFor($medication);
+        $observationValidation = $this->validateRequiredObservations($adminRules['required_observations'], $data);
+        if ($observationValidation !== null) {
+            return $observationValidation;
+        }
+
+        $witnessValidation = $this->validateWitness($medication, $adminRules, $data, $userId);
+        if (! ($witnessValidation['success'] ?? false)) {
+            return $witnessValidation;
+        }
+
         // Validate safety check (including dose validation)
         $safetyCheck = $this->safetyService->performSafetyCheck(
             $client,
@@ -437,9 +598,17 @@ class EnhancedMarService
             }
         }
 
-        return DB::transaction(function () use ($client, $medication, $data, $userId, $shiftId, $safetyCheck, $scheduledFor, $adminAt, $windowCheck) {
+        return DB::transaction(function () use ($client, $medication, $data, $userId, $shiftId, $safetyCheck, $scheduledFor, $adminAt, $windowCheck, $witnessValidation) {
             // Re-fetch medication with lock to prevent race conditions
             $medication = ClientMedication::lockForUpdate()->findOrFail($medication->id);
+
+            if (! $medication->isAdministrable()) {
+                return [
+                    'success' => false,
+                    'error' => 'Medication order is awaiting verification before it can be administered.',
+                    'error_field' => 'approval_status',
+                ];
+            }
 
             // Lock stock record if it exists
             if ($medication->controlled_drug) {
@@ -454,13 +623,20 @@ class EnhancedMarService
             $admin->client_medication_id = $medication->id;
             $admin->shift_id = $shiftId;
             $admin->administered_by = $userId;
-            $admin->witnessed_by = $data['witnessed_by'] ?? null;
+            $admin->witnessed_by = $witnessValidation['witnessed_by'] ?? null;
+            $admin->witnessed_at = $witnessValidation['witnessed_at'] ?? null;
+            $admin->witness_method = $witnessValidation['witness_method'] ?? null;
             $admin->scheduled_for = $scheduledFor;
             $admin->administered_at = $adminAt;
             $admin->status = $data['status'];
             $admin->reason = $data['reason'] ?? null;
+            $admin->reason_code = $data['reason_code'] ?? null;
             $admin->dose_given = $data['dose_given'] ?? null;
             $admin->notes = $data['notes'] ?? null;
+            $admin->blood_glucose_level = $data['blood_glucose_level'] ?? null;
+            $admin->pulse_bpm = $data['pulse_bpm'] ?? null;
+            $admin->blood_pressure_systolic = $data['blood_pressure_systolic'] ?? null;
+            $admin->blood_pressure_diastolic = $data['blood_pressure_diastolic'] ?? null;
             $admin->late_minutes = $windowCheck['late_minutes'] ?? null;
             $admin->early_minutes = $windowCheck['early_minutes'] ?? null;
             $admin->outcome = $data['outcome'] ?? null;
@@ -477,9 +653,13 @@ class EnhancedMarService
 
             $admin->save();
 
+            if ($admin->status === 'given') {
+                $this->mirrorClinicalObservations($admin, $medication, $data, $userId);
+            }
+
             // Handle controlled drug register entry
             if ($medication->controlled_drug && $admin->status === 'given') {
-                $this->recordControlledDrugEntry($medication, $admin, $userId, $data['witnessed_by'] ?? null);
+                $this->recordControlledDrugEntry($medication, $admin, $userId, $admin->witnessed_by);
             }
 
             return [
@@ -488,6 +668,166 @@ class EnhancedMarService
                 'safety_check' => $safetyCheck,
             ];
         });
+    }
+
+    private function validateNotGivenReason(array $data): ?array
+    {
+        if (($data['status'] ?? null) === 'given') {
+            return null;
+        }
+
+        $reasonCode = $data['reason_code'] ?? null;
+        if (! $reasonCode) {
+            return [
+                'success' => false,
+                'error' => 'Select the reason this medication was not given.',
+                'error_field' => 'reason_code',
+            ];
+        }
+
+        $reason = NotGivenReason::tryFrom($reasonCode);
+        if (! $reason) {
+            return [
+                'success' => false,
+                'error' => 'Select a valid reason this medication was not given.',
+                'error_field' => 'reason_code',
+            ];
+        }
+
+        if ($reason->requiresDetail() && blank($data['reason'] ?? null)) {
+            return [
+                'success' => false,
+                'error' => 'Add a short note when using Other as the reason.',
+                'error_field' => 'reason',
+            ];
+        }
+
+        return null;
+    }
+
+    private function validateRequiredObservations(array $requiredObservations, array $data): ?array
+    {
+        if (($data['status'] ?? null) !== 'given') {
+            return null;
+        }
+
+        foreach ($requiredObservations as $observation) {
+            $missingField = match ($observation) {
+                'blood_glucose' => $this->missingValue($data, 'blood_glucose_level') ? 'blood_glucose_level' : null,
+                'pulse' => $this->missingValue($data, 'pulse_bpm') ? 'pulse_bpm' : null,
+                'blood_pressure' => $this->missingValue($data, 'blood_pressure_systolic') || $this->missingValue($data, 'blood_pressure_diastolic')
+                    ? 'blood_pressure_systolic'
+                    : null,
+                default => null,
+            };
+
+            if ($missingField) {
+                return [
+                    'success' => false,
+                    'error' => 'Record the required observation before signing this medication.',
+                    'error_field' => $missingField,
+                ];
+            }
+        }
+
+        return null;
+    }
+
+    private function missingValue(array $data, string $field): bool
+    {
+        return ! array_key_exists($field, $data) || $data[$field] === null || $data[$field] === '';
+    }
+
+    private function validateWitness(ClientMedication $medication, array $adminRules, array $data, int $userId): array
+    {
+        $requiresWitness = $medication->requiresWitness() || ($adminRules['requires_countersign'] ?? false);
+
+        if (($data['status'] ?? null) !== 'given' || ! $requiresWitness) {
+            return ['success' => true];
+        }
+
+        if (empty($data['witnessed_by'])) {
+            return [
+                'success' => false,
+                'error' => 'Witness is required for this medication.',
+                'error_field' => 'witnessed_by',
+            ];
+        }
+
+        if ((int) $data['witnessed_by'] === (int) $userId) {
+            return [
+                'success' => false,
+                'error' => 'Witness must be a different user.',
+                'error_field' => 'witnessed_by',
+            ];
+        }
+
+        if (blank($data['witness_credential'] ?? null)) {
+            return [
+                'success' => false,
+                'error' => 'Witness password is required before this medication can be signed.',
+                'error_field' => 'witness_credential',
+            ];
+        }
+
+        $witness = User::query()->find($data['witnessed_by']);
+        if (! $witness || ! $witness->canDo('medications.controlled.witness')) {
+            return [
+                'success' => false,
+                'error' => 'Selected witness is not authorised to witness medication administrations.',
+                'error_field' => 'witnessed_by',
+            ];
+        }
+
+        if (! Hash::check((string) $data['witness_credential'], (string) $witness->password)) {
+            return [
+                'success' => false,
+                'error' => 'Witness password did not match.',
+                'error_field' => 'witness_credential',
+            ];
+        }
+
+        return [
+            'success' => true,
+            'witnessed_by' => $witness->id,
+            'witnessed_at' => now(),
+            'witness_method' => 'password',
+        ];
+    }
+
+    private function mirrorClinicalObservations(
+        ClientMedicationAdministration $admin,
+        ClientMedication $medication,
+        array $data,
+        int $userId
+    ): void {
+        $observationData = array_filter([
+            'blood_glucose' => $data['blood_glucose_level'] ?? null,
+            'pulse' => $data['pulse_bpm'] ?? null,
+            'systolic' => $data['blood_pressure_systolic'] ?? null,
+            'diastolic' => $data['blood_pressure_diastolic'] ?? null,
+            'source' => 'emar_administration',
+            'client_medication_administration_id' => $admin->id,
+            'client_medication_id' => $medication->id,
+        ], fn ($value) => $value !== null && $value !== '');
+
+        $hasClinicalObservation = collect(['blood_glucose', 'pulse', 'systolic', 'diastolic'])
+            ->contains(fn (string $key) => array_key_exists($key, $observationData));
+
+        if (! $hasClinicalObservation) {
+            return;
+        }
+
+        ClinicalObservation::query()->create([
+            'client_id' => $admin->client_id,
+            'shift_id' => $admin->shift_id,
+            'site_id' => $medication->client?->site_id,
+            'recorded_by' => $userId,
+            'observation_type' => ObservationType::Vitals,
+            'recorded_at' => $admin->administered_at ?? now(),
+            'data' => $observationData,
+            'notes' => 'Captured at medication sign-off for '.$medication->name,
+        ]);
     }
 
     /**

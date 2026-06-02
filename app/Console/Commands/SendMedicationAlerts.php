@@ -47,6 +47,11 @@ class SendMedicationAlerts extends Command
             ->with(['medication.client', 'round.assignedTo'])
             ->get()
             ->filter(function ($admin) {
+                $client = $admin->medication?->client ?? $admin->client;
+                if ($client?->suppress_med_admin_alerts) {
+                    return false;
+                }
+
                 // Respect the round's window_minutes if available
                 if ($admin->round && $admin->round->window_minutes) {
                     return now()->gt($admin->scheduled_for->addMinutes($admin->round->window_minutes));

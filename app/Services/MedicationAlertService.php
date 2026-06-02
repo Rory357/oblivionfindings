@@ -7,6 +7,7 @@ use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationDashboardAlert;
+use App\Models\MedicationReview;
 use App\Services\Medication\MedicationSignalService;
 use Carbon\Carbon;
 
@@ -73,6 +74,10 @@ class MedicationAlertService
         $alerts = [];
         $medications = $client->medications()->active()->get();
 
+        foreach ($this->checkClientAttentionAlerts($client) as $attentionAlert) {
+            $alerts[] = $attentionAlert;
+        }
+
         foreach ($medications as $medication) {
             if ($medication->is_prn && $medication->max_per_day) {
                 $prnAlert = $this->checkPrnAlert($client, $medication);
@@ -90,16 +95,172 @@ class MedicationAlertService
             if ($stockAlert) {
                 $alerts[] = $stockAlert;
             }
+
+            if ($this->isWarfarinMedication($medication)) {
+                $inrAlert = $this->checkInrAlert($client, $medication);
+                if ($inrAlert) {
+                    $alerts[] = $inrAlert;
+                }
+            }
         }
 
-        $overdueAlert = $this->checkOverdueDoses($client);
-        if ($overdueAlert) {
-            $alerts[] = $overdueAlert;
+        if (! $client->suppress_med_admin_alerts) {
+            MedicationDashboardAlert::query()
+                ->where('client_id', $client->id)
+                ->where('alert_type', 'med_admin_alerts_suppressed')
+                ->where('status', 'active')
+                ->update([
+                    'status' => 'resolved',
+                    'resolved_at' => now(),
+                ]);
+
+            $overdueAlert = $this->checkOverdueDoses($client);
+            if ($overdueAlert) {
+                $alerts[] = $overdueAlert;
+            }
+        } else {
+            $alerts[] = MedicationDashboardAlert::createOrUpdateAlert(
+                $client->id,
+                'med_admin_alerts_suppressed',
+                'info',
+                trim('Medication administration due alerts are suppressed' . ($client->med_alerts_suppressed_reason ? ': ' . $client->med_alerts_suppressed_reason : '.')),
+            )->toArray();
+        }
+
+        foreach ($this->checkReviewAlerts($client) as $reviewAlert) {
+            $alerts[] = $reviewAlert;
         }
 
         $discrepancyAlert = $this->checkControlledDiscrepancies($client);
         if ($discrepancyAlert) {
             $alerts[] = $discrepancyAlert;
+        }
+
+        return $alerts;
+    }
+
+    /**
+     * Mirror client-level attention bar entries into the dashboard widget layer.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    private function checkClientAttentionAlerts(Client $client): array
+    {
+        return $client->medicationAlerts()
+            ->enabled()
+            ->unresolved()
+            ->get()
+            ->map(function ($clientAlert) use ($client) {
+                $type = match ($clientAlert->type) {
+                    'paper_prescription' => 'paper_prescription',
+                    'warfarin' => 'warfarin',
+                    default => 'chart_warning',
+                };
+
+                $severity = $clientAlert->prompt_on_open ? 'warning' : 'info';
+                $message = trim($clientAlert->title . ($clientAlert->detail ? ': ' . $clientAlert->detail : ''));
+
+                return MedicationDashboardAlert::createOrUpdateAlert(
+                    $client->id,
+                    $type,
+                    $severity,
+                    $message,
+                )->toArray();
+            })
+            ->all();
+    }
+
+    private function isWarfarinMedication(ClientMedication $medication): bool
+    {
+        return str_contains(strtolower($medication->name), 'warfarin');
+    }
+
+    private function checkInrAlert(Client $client, ClientMedication $medication): ?array
+    {
+        $latest = $client->inrRecords()
+            ->active()
+            ->where(function ($query) use ($medication) {
+                $query->whereNull('client_medication_id')
+                    ->orWhere('client_medication_id', $medication->id);
+            })
+            ->latest('tested_on')
+            ->first();
+
+        if (! $latest) {
+            return MedicationDashboardAlert::createOrUpdateAlert(
+                $client->id,
+                'inr_due',
+                'critical',
+                "{$medication->name}: INR has not been recorded.",
+                $medication->id,
+            )->toArray();
+        }
+
+        if (! $latest->next_test_date) {
+            return null;
+        }
+
+        $daysUntilDue = now()->startOfDay()->diffInDays($latest->next_test_date->copy()->startOfDay(), false);
+        if ($daysUntilDue > 3) {
+            return null;
+        }
+
+        $severity = $daysUntilDue < 0 ? 'critical' : 'warning';
+        $message = $daysUntilDue < 0
+            ? "{$medication->name}: INR overdue since {$latest->next_test_date->format('d/m/Y')}."
+            : "{$medication->name}: INR due by {$latest->next_test_date->format('d/m/Y')}.";
+
+        return MedicationDashboardAlert::createOrUpdateAlert(
+            $client->id,
+            'inr_due',
+            $severity,
+            $message,
+            $medication->id,
+        )->toArray();
+    }
+
+    /**
+     * @return array<int, array<string, mixed>>
+     */
+    private function checkReviewAlerts(Client $client): array
+    {
+        $alerts = [];
+
+        if ($client->next_chart_review_date) {
+            $daysUntilReview = now()->startOfDay()->diffInDays($client->next_chart_review_date->copy()->startOfDay(), false);
+            if ($daysUntilReview <= 7) {
+                $alerts[] = MedicationDashboardAlert::createOrUpdateAlert(
+                    $client->id,
+                    'chart_review_due',
+                    $daysUntilReview < 0 ? 'critical' : 'warning',
+                    $daysUntilReview < 0
+                        ? "Medication chart review overdue since {$client->next_chart_review_date->format('d/m/Y')}."
+                        : "Medication chart review due by {$client->next_chart_review_date->format('d/m/Y')}.",
+                )->toArray();
+            }
+        }
+
+        $review = MedicationReview::query()
+            ->where('client_id', $client->id)
+            ->whereIn('status', ['scheduled', 'overdue'])
+            ->where(function ($query) {
+                $query->whereDate('scheduled_date', '<=', now()->addDays(7)->toDateString())
+                    ->orWhereDate('next_review_date', '<=', now()->addDays(7)->toDateString());
+            })
+            ->orderByRaw('COALESCE(next_review_date, scheduled_date) asc')
+            ->first();
+
+        if ($review) {
+            $dueDate = $review->next_review_date ?? $review->scheduled_date;
+            $daysUntilReview = now()->startOfDay()->diffInDays($dueDate->copy()->startOfDay(), false);
+            $alerts[] = MedicationDashboardAlert::createOrUpdateAlert(
+                $client->id,
+                'medication_review_due',
+                $daysUntilReview < 0 ? 'critical' : 'warning',
+                $daysUntilReview < 0
+                    ? "Medication review overdue since {$dueDate->format('d/m/Y')}."
+                    : "Medication review due by {$dueDate->format('d/m/Y')}.",
+            )->toArray();
         }
 
         return $alerts;

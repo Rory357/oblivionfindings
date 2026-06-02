@@ -12,7 +12,9 @@ use App\Models\ClientDocument;
 use App\Models\ControlledDrugLossReport;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\ClientMedicationAlert;
 use App\Models\ClientMedicationStock;
+use App\Models\ClientInrRecord;
 use App\Models\MedicationCompetencyAssessment;
 use App\Models\MedicationCovertAuthorisation;
 use App\Models\MedicationDashboardAlert;
@@ -25,6 +27,7 @@ use App\Models\MedicationReview;
 use App\Models\MedicationRound;
 use App\Models\MedicationRoundTemplate;
 use App\Models\MedicationSelfAdminAssessment;
+use App\Models\MedicationSyringeDriver;
 use App\Models\Site;
 use App\Models\Shift;
 use App\Models\ShiftHandover;
@@ -33,11 +36,15 @@ use App\Services\AuditLogger;
 use App\Services\DoseSchedulingService;
 use App\Services\MedicationAlertService;
 use App\Services\MedicationIncidentIntegrationService;
+use App\Services\MedicationRuleService;
 use App\Services\MedicationScanVerificationService;
 use App\Services\ShiftHandoverService;
 use App\Services\UserSiteAccessService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Hash;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class EmarController extends Controller
@@ -72,6 +79,10 @@ class EmarController extends Controller
         return [
             'record' => (bool) $user && ($user->canDo('medications.administer.record') || $user->canDo('clients.update')),
             'correct' => (bool) $user && ($user->canDo('medications.administer.correct') || $user->canDo('clients.update')),
+            'verify_orders' => $this->canVerifyMedicationOrders($user),
+            'manage_settings' => (bool) $user && ($user->canDo('medications.settings.manage') || $user->canDo('clients.update')),
+            'manage_inr' => (bool) $user && ($user->canDo('medications.orders.manage') || $user->canDo('clients.update')),
+            'manage_syringe_drivers' => (bool) $user && ($user->canDo('medications.orders.manage') || $user->canDo('medications.administer.record') || $user->canDo('clients.update')),
             'manage_allergies' => (bool) $user && $user->canDo('clients.update'),
             'manage_interactions' => (bool) $user && ($user->canDo('medications.administer.correct') || $user->canDo('clients.update')),
             'manage_stock' => (bool) $user && ($user->canDo('medications.stock.update') || $user->canDo('clients.update')),
@@ -79,6 +90,15 @@ class EmarController extends Controller
             'revoke_break_glass' => (bool) $user && ($user->canDo('medications.breakglass') || $user->canDo('medications.audit.view')),
             'export_reports' => (bool) $user && ($user->canDo('medications.reports.export') || $user->canDo('reports.viewAny')),
         ];
+    }
+
+    private function canVerifyMedicationOrders(?User $user): bool
+    {
+        return (bool) $user && (
+            $user->canDo('medications.orders.verify')
+            || $user->canDo('medications.orders.manage')
+            || $user->canDo('clients.update')
+        );
     }
 
     private function buildClientMedicationContext(Client $client): array
@@ -258,6 +278,82 @@ class EmarController extends Controller
             ->all();
     }
 
+    private function getClientMedicationAttentionAlerts(Client $client): array
+    {
+        return $client->medicationAlerts()
+            ->enabled()
+            ->unresolved()
+            ->latest()
+            ->get()
+            ->map(fn (ClientMedicationAlert $alert) => [
+                'id' => $alert->id,
+                'type' => $alert->type,
+                'title' => $alert->title,
+                'detail' => $alert->detail,
+                'prompt_on_open' => (bool) $alert->prompt_on_open,
+                'created_at' => $alert->created_at?->toIso8601String(),
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function getClientInrRecords(Client $client): array
+    {
+        return $client->inrRecords()
+            ->with('medication:id,name')
+            ->latest('tested_on')
+            ->limit(20)
+            ->get()
+            ->map(fn (ClientInrRecord $record) => [
+                'id' => $record->id,
+                'client_medication_id' => $record->client_medication_id,
+                'medication_name' => $record->medication?->name,
+                'inr_value' => $record->inr_value,
+                'target_range_low' => $record->target_range_low,
+                'target_range_high' => $record->target_range_high,
+                'dose_mg' => $record->dose_mg,
+                'tested_on' => $record->tested_on?->toDateString(),
+                'next_test_date' => $record->next_test_date?->toDateString(),
+                'disabled_at' => $record->disabled_at?->toIso8601String(),
+                'notes' => $record->notes,
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function getRunningSyringeDrivers(Client $client): array
+    {
+        return $client->syringeDrivers()
+            ->running()
+            ->with(['checks' => fn ($query) => $query->latest('checked_at')->limit(5)])
+            ->latest('commenced_at')
+            ->get()
+            ->map(fn (MedicationSyringeDriver $driver) => [
+                'id' => $driver->id,
+                'status' => $driver->status,
+                'commenced_at' => $driver->commenced_at?->toIso8601String(),
+                'rate' => $driver->rate,
+                'rate_unit' => $driver->rate_unit,
+                'duration_hours' => $driver->duration_hours,
+                'contents' => $driver->contents ?? [],
+                'site_of_insertion' => $driver->site_of_insertion,
+                'notes' => $driver->notes,
+                'checks' => $driver->checks
+                    ->map(fn ($check) => [
+                        'id' => $check->id,
+                        'checked_at' => $check->checked_at?->toIso8601String(),
+                        'infusion_running' => (bool) $check->infusion_running,
+                        'site_condition' => $check->site_condition,
+                        'volume_remaining' => $check->volume_remaining,
+                        'notes' => $check->notes,
+                    ])
+                    ->values()
+                    ->all(),
+            ])
+            ->values()
+            ->all();
+    }
+
     private function getOpenControlledDiscrepancies(Client $client): array
     {
         return $client->controlledDrugDiscrepancies()
@@ -291,11 +387,18 @@ class EmarController extends Controller
             'status' => $statusOverride ?? $administration?->status,
             'administered_by' => $administration?->administeredBy?->name,
             'witnessed_by' => $administration?->witnessedBy?->name,
+            'witnessed_at' => $administration?->witnessed_at?->toIso8601String(),
+            'witness_method' => $administration?->witness_method,
             'notes' => $administration?->notes,
             'reason' => $administration?->reason,
+            'reason_code' => $administration?->reason_code,
             'dose_given' => $administration?->dose_given,
             'outcome' => $administration?->outcome,
             'site' => $administration?->site,
+            'blood_glucose_level' => $administration?->blood_glucose_level,
+            'pulse_bpm' => $administration?->pulse_bpm,
+            'blood_pressure_systolic' => $administration?->blood_pressure_systolic,
+            'blood_pressure_diastolic' => $administration?->blood_pressure_diastolic,
             'created_at' => $administration?->created_at?->toIso8601String(),
             'is_correction' => (bool) $administration?->is_correction,
             'correction_reason' => $administration?->correction_reason,
@@ -455,6 +558,71 @@ class EmarController extends Controller
     }
 
     /**
+     * @param  array<int, array<string, mixed>>  $contents
+     * @return array<int, array<string, mixed>>
+     */
+    private function normaliseSyringeDriverContents(Client $client, array $contents): array
+    {
+        return collect($contents)
+            ->map(function (array $item) use ($client) {
+                $medication = null;
+                if (! empty($item['client_medication_id'])) {
+                    $medication = ClientMedication::query()
+                        ->whereKey($item['client_medication_id'])
+                        ->where('client_id', $client->id)
+                        ->firstOrFail();
+                }
+
+                return [
+                    'client_medication_id' => $medication?->id ?? $item['client_medication_id'] ?? null,
+                    'name' => $medication?->name ?? $item['name'] ?? 'Medication',
+                    'dose' => $item['dose'] ?? $medication?->dosage,
+                    'unit' => $item['unit'] ?? $medication?->dose_unit,
+                    'requires_witness' => (bool) ($item['requires_witness'] ?? $medication?->requiresWitness() ?? false),
+                ];
+            })
+            ->values()
+            ->all();
+    }
+
+    private function validateWorkflowWitness(array $data, int $currentUserId): User
+    {
+        if (empty($data['witnessed_by'])) {
+            throw ValidationException::withMessages([
+                'witnessed_by' => 'Select a second checker.',
+            ]);
+        }
+
+        if ((int) $data['witnessed_by'] === $currentUserId) {
+            throw ValidationException::withMessages([
+                'witnessed_by' => 'The second checker must be a different staff member.',
+            ]);
+        }
+
+        if (blank($data['witness_credential'] ?? null)) {
+            throw ValidationException::withMessages([
+                'witness_credential' => 'The second checker must enter their password or PIN.',
+            ]);
+        }
+
+        $witness = User::query()->findOrFail($data['witnessed_by']);
+
+        if (! $witness->canDo('medications.controlled.witness')) {
+            throw ValidationException::withMessages([
+                'witnessed_by' => 'This staff member is not approved to countersign medication.',
+            ]);
+        }
+
+        if (! Hash::check((string) $data['witness_credential'], $witness->password)) {
+            throw ValidationException::withMessages([
+                'witness_credential' => 'The second checker password or PIN did not match.',
+            ]);
+        }
+
+        return $witness;
+    }
+
+    /**
      * @return array<int, string>
      */
     private function handoverBypassPermissions(): array
@@ -488,7 +656,7 @@ class EmarController extends Controller
             $payload['dose_times'] = DoseSchedulingService::calculateDoseTimes((string) $validated['frequency']);
         }
 
-        foreach (['route', 'form', 'instructions', 'indication', 'start_date'] as $field) {
+        foreach (['route', 'form', 'instructions', 'indication', 'start_date', 'pharmac_therapeutic_group', 'pharmac_subgroup'] as $field) {
             if (array_key_exists($field, $validated)) {
                 $payload[$field] = $validated[$field];
             }
@@ -708,6 +876,11 @@ class EmarController extends Controller
             'recentActivity' => $recentActivity,
             'activeAlertsList' => $activeAlertsList,
             'compliance' => $compliance,
+            'canManageSettings' => (bool) request()->user() && (
+                request()->user()->canDo('medications.settings.manage')
+                || request()->user()->canDo('medications.orders.manage')
+                || request()->user()->canDo('clients.update')
+            ),
         ]);
     }
 
@@ -771,6 +944,7 @@ class EmarController extends Controller
 
     private function buildMarData(Client $client, string $date): array
     {
+        $ruleService = app(MedicationRuleService::class);
         $medications = $client->medications()->active()->with([
             'stock',
             'administrations' => function ($q) use ($date) {
@@ -784,7 +958,8 @@ class EmarController extends Controller
         $scheduled = $medications->where('is_prn', false)->values();
         $prn = $medications->where('is_prn', true)->values();
 
-        $scheduledPayload = $scheduled->map(function ($med) use ($client, $date) {
+        $scheduledPayload = $scheduled->map(function ($med) use ($client, $date, $ruleService) {
+                $adminRules = $ruleService->requirementsFor($med);
                 $doseTimes = $med->dose_times ?? [];
 
                 // If no dose_times stored yet, auto-calculate from frequency
@@ -830,7 +1005,12 @@ class EmarController extends Controller
                     'instructions' => $med->instructions,
                     'controlled_drug' => $med->controlled_drug,
                     'high_risk' => $med->high_risk,
-                    'witness_required' => $med->requiresWitness(),
+                    'witness_required' => $med->requiresWitness() || $adminRules['requires_countersign'],
+                    'approval_status' => $med->approval_status ?? 'verified',
+                    'is_administrable' => $med->isAdministrable(),
+                    'admin_rules' => $adminRules,
+                    'pharmac_therapeutic_group' => $med->pharmac_therapeutic_group,
+                    'pharmac_subgroup' => $med->pharmac_subgroup,
                     'dose_times' => $doseTimes,
                     'administrations' => $administrations->merge($unmatchedAdmins)->values(),
                     'scan_verification' => $this->buildMedicationScanPayload($client, $med),
@@ -841,7 +1021,10 @@ class EmarController extends Controller
                 ];
             })->values();
 
-        $prnPayload = $prn->map(fn ($med) => [
+        $prnPayload = $prn->map(function ($med) use ($client, $ruleService) {
+            $adminRules = $ruleService->requirementsFor($med);
+
+            return [
                 'id' => $med->id,
                 'name' => $med->name,
                 'dosage' => $med->formatted_dose,
@@ -851,14 +1034,54 @@ class EmarController extends Controller
                 'prn_remaining' => $med->prn_remaining,
                 'controlled_drug' => $med->controlled_drug,
                 'high_risk' => $med->high_risk,
-                'witness_required' => $med->requiresWitness(),
+                'witness_required' => $med->requiresWitness() || $adminRules['requires_countersign'],
+                'approval_status' => $med->approval_status ?? 'verified',
+                'is_administrable' => $med->isAdministrable(),
+                'admin_rules' => $adminRules,
+                'pharmac_therapeutic_group' => $med->pharmac_therapeutic_group,
+                'pharmac_subgroup' => $med->pharmac_subgroup,
                 'administrations' => $med->administrations->map(fn ($a) => $this->serializeAdministration($a))->values(),
                 'scan_verification' => $this->buildMedicationScanPayload($client, $med),
                 'stock' => $med->stock ? [
                     'on_hand' => $med->stock->on_hand,
                     'unit' => $med->stock->unit,
                 ] : null,
-            ])->values();
+            ];
+        })->values();
+
+        $awaitingVerification = $client->medications()
+            ->awaitingVerification()
+            ->with('stock')
+            ->orderBy('name')
+            ->get()
+            ->map(function (ClientMedication $med) use ($client, $ruleService) {
+                $adminRules = $ruleService->requirementsFor($med);
+
+                return [
+                    'id' => $med->id,
+                    'name' => $med->name,
+                    'dosage' => $med->formatted_dose,
+                    'frequency' => $med->frequency,
+                    'route' => $med->route,
+                    'form' => $med->form,
+                    'instructions' => $med->instructions,
+                    'controlled_drug' => $med->controlled_drug,
+                    'high_risk' => $med->high_risk,
+                    'witness_required' => $med->requiresWitness() || $adminRules['requires_countersign'],
+                    'approval_status' => $med->approval_status,
+                    'rejection_reason' => $med->rejection_reason,
+                    'is_administrable' => false,
+                    'admin_rules' => $adminRules,
+                    'pharmac_therapeutic_group' => $med->pharmac_therapeutic_group,
+                    'pharmac_subgroup' => $med->pharmac_subgroup,
+                    'scan_verification' => $this->buildMedicationScanPayload($client, $med),
+                    'stock' => $med->stock ? [
+                        'on_hand' => $med->stock->on_hand,
+                        'unit' => $med->stock->unit,
+                    ] : null,
+                ];
+            })
+            ->values();
 
         $administrationStatuses = $scheduledPayload
             ->flatMap(fn ($medication) => collect($medication['administrations']))
@@ -867,6 +1090,10 @@ class EmarController extends Controller
         return [
             'scheduled' => $scheduledPayload,
             'prn' => $prnPayload,
+            'awaiting_verification' => $awaitingVerification,
+            'attention_alerts' => $this->getClientMedicationAttentionAlerts($client),
+            'inr_records' => $this->getClientInrRecords($client),
+            'syringe_drivers' => $this->getRunningSyringeDrivers($client),
             'stats' => [
                 'total_scheduled' => $scheduled->count(),
                 'total_prn' => $prn->count(),
@@ -875,6 +1102,13 @@ class EmarController extends Controller
                 'withheld' => $administrationStatuses->where('status', 'withheld')->count(),
                 'missed' => $administrationStatuses->where('status', 'missed')->count(),
                 'pending' => $administrationStatuses->where('status', 'pending')->count(),
+            ],
+            'settings' => [
+                'suppress_med_admin_alerts' => (bool) $client->suppress_med_admin_alerts,
+                'med_alerts_suppressed_reason' => $client->med_alerts_suppressed_reason,
+                'chart_review_interval_months' => $client->chart_review_interval_months,
+                'next_chart_review_date' => $client->next_chart_review_date?->toDateString(),
+                'care_level' => $client->care_level,
             ],
         ];
     }
@@ -1645,8 +1879,13 @@ class EmarController extends Controller
 
         $validated['status'] = 'completed';
         $validated['completed_date'] = today();
+        $validated['next_review_date'] = $validated['next_review_date']
+            ?? today()->addMonthsNoOverflow((int) ($review->client?->chart_review_interval_months ?: 3))->toDateString();
 
         $review->update($validated);
+        $review->client?->forceFill([
+            'next_chart_review_date' => $validated['next_review_date'],
+        ])->save();
 
         return redirect()->back();
     }
@@ -1656,6 +1895,228 @@ class EmarController extends Controller
         $review->update(['status' => 'cancelled']);
 
         return redirect()->back();
+    }
+
+    // ─── 1CHART Attention / INR / Syringe Driver Workflows ─────
+
+    public function storeAttentionAlert(Request $request, Client $client)
+    {
+        $validated = $request->validate([
+            'type' => ['required', 'string', Rule::in(['paper_prescription', 'chart_warning', 'warfarin'])],
+            'title' => ['required', 'string', 'max:255'],
+            'detail' => ['nullable', 'string', 'max:2000'],
+            'prompt_on_open' => ['nullable', 'boolean'],
+            'enabled' => ['nullable', 'boolean'],
+        ]);
+
+        $client->medicationAlerts()->create([
+            ...$validated,
+            'prompt_on_open' => (bool) ($validated['prompt_on_open'] ?? false),
+            'enabled' => (bool) ($validated['enabled'] ?? true),
+            'created_by' => $request->user()?->id,
+        ]);
+
+        app(MedicationAlertService::class)->generateClientAlerts($client->fresh());
+
+        return redirect()->back()->with('success', 'Medication chart alert added.');
+    }
+
+    public function updateAttentionAlert(Request $request, ClientMedicationAlert $alert)
+    {
+        $validated = $request->validate([
+            'type' => ['nullable', 'string', Rule::in(['paper_prescription', 'chart_warning', 'warfarin'])],
+            'title' => ['nullable', 'string', 'max:255'],
+            'detail' => ['nullable', 'string', 'max:2000'],
+            'prompt_on_open' => ['nullable', 'boolean'],
+            'enabled' => ['nullable', 'boolean'],
+        ]);
+
+        $alert->update($validated);
+        app(MedicationAlertService::class)->generateClientAlerts($alert->client);
+
+        return redirect()->back()->with('success', 'Medication chart alert updated.');
+    }
+
+    public function resolveAttentionAlert(Request $request, ClientMedicationAlert $alert)
+    {
+        $alert->resolve($request->user()->id);
+
+        return redirect()->back()->with('success', 'Medication chart alert resolved.');
+    }
+
+    public function toggleMedicationAlertSuppression(Request $request, Client $client)
+    {
+        $validated = $request->validate([
+            'suppress_med_admin_alerts' => ['required', 'boolean'],
+            'reason' => ['nullable', 'string', 'max:500'],
+        ]);
+
+        if ($validated['suppress_med_admin_alerts'] && blank($validated['reason'] ?? null)) {
+            throw ValidationException::withMessages([
+                'reason' => 'Enter why medication administration alerts are being suppressed.',
+            ]);
+        }
+
+        $client->forceFill([
+            'suppress_med_admin_alerts' => (bool) $validated['suppress_med_admin_alerts'],
+            'med_alerts_suppressed_reason' => $validated['suppress_med_admin_alerts'] ? $validated['reason'] : null,
+            'med_alerts_suppressed_by' => $validated['suppress_med_admin_alerts'] ? $request->user()?->id : null,
+            'med_alerts_suppressed_at' => $validated['suppress_med_admin_alerts'] ? now() : null,
+        ])->save();
+
+        app(MedicationAlertService::class)->generateClientAlerts($client->fresh());
+
+        return redirect()->back()->with('success', 'Medication alert settings updated.');
+    }
+
+    public function updateMedicationSettings(Request $request, Client $client)
+    {
+        $validated = $request->validate([
+            'care_level' => ['nullable', 'string', 'max:60'],
+            'chart_review_interval_months' => ['nullable', 'integer', 'min:1', 'max:12'],
+            'next_chart_review_date' => ['nullable', 'date'],
+        ]);
+
+        $client->forceFill([
+            'care_level' => $validated['care_level'] ?? null,
+            'chart_review_interval_months' => $validated['chart_review_interval_months'] ?? $client->chart_review_interval_months ?? 3,
+            'next_chart_review_date' => $validated['next_chart_review_date'] ?? null,
+        ])->save();
+
+        app(MedicationAlertService::class)->generateClientAlerts($client->fresh());
+
+        return redirect()->back()->with('success', 'Medication chart settings updated.');
+    }
+
+    public function inrHistory(Client $client)
+    {
+        return response()->json([
+            'records' => $this->getClientInrRecords($client),
+        ]);
+    }
+
+    public function storeInr(Request $request, Client $client)
+    {
+        $validated = $request->validate([
+            'client_medication_id' => ['nullable', 'integer', 'exists:client_medications,id'],
+            'inr_value' => ['required', 'numeric', 'min:0.5', 'max:20'],
+            'target_range_low' => ['nullable', 'numeric', 'min:0.5', 'max:20'],
+            'target_range_high' => ['nullable', 'numeric', 'min:0.5', 'max:20', 'gte:target_range_low'],
+            'dose_mg' => ['nullable', 'numeric', 'min:0', 'max:999.99'],
+            'tested_on' => ['required', 'date'],
+            'next_test_date' => ['nullable', 'date', 'after_or_equal:tested_on'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        if (! empty($validated['client_medication_id'])) {
+            $belongsToClient = ClientMedication::query()
+                ->whereKey($validated['client_medication_id'])
+                ->where('client_id', $client->id)
+                ->exists();
+
+            abort_unless($belongsToClient, 404);
+        }
+
+        $client->inrRecords()->create([
+            ...$validated,
+            'recorded_by' => $request->user()->id,
+        ]);
+
+        app(MedicationAlertService::class)->generateClientAlerts($client->fresh());
+
+        return redirect()->back()->with('success', 'INR result recorded.');
+    }
+
+    public function disableInr(Request $request, ClientInrRecord $inr)
+    {
+        if (! $inr->disabled_at) {
+            $inr->disable($request->user()->id);
+        }
+
+        app(MedicationAlertService::class)->generateClientAlerts($inr->client);
+
+        return redirect()->back()->with('success', 'INR result disabled.');
+    }
+
+    public function storeSyringeDriver(Request $request, Client $client)
+    {
+        $validated = $request->validate([
+            'site_id' => ['nullable', 'integer', 'exists:sites,id'],
+            'commenced_at' => ['required', 'date'],
+            'rate' => ['nullable', 'string', 'max:80'],
+            'rate_unit' => ['nullable', 'string', 'max:40'],
+            'duration_hours' => ['nullable', 'numeric', 'min:0', 'max:999.99'],
+            'contents' => ['required', 'array', 'min:1'],
+            'contents.*.client_medication_id' => ['nullable', 'integer', 'exists:client_medications,id'],
+            'contents.*.name' => ['nullable', 'string', 'max:255'],
+            'contents.*.dose' => ['nullable', 'string', 'max:80'],
+            'contents.*.unit' => ['nullable', 'string', 'max:40'],
+            'contents.*.requires_witness' => ['nullable', 'boolean'],
+            'site_of_insertion' => ['nullable', 'string', 'max:255'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+            'witnessed_by' => ['nullable', 'integer', 'exists:users,id'],
+            'witness_credential' => ['nullable', 'string'],
+        ]);
+
+        $contents = $this->normaliseSyringeDriverContents($client, $validated['contents']);
+        $requiresWitness = collect($contents)->contains(fn ($item) => (bool) ($item['requires_witness'] ?? false));
+        $witness = $requiresWitness
+            ? $this->validateWorkflowWitness($validated, $request->user()->id)
+            : null;
+
+        $driver = $client->syringeDrivers()->create([
+            'site_id' => $validated['site_id'] ?? $client->site_id,
+            'status' => 'running',
+            'commenced_at' => $validated['commenced_at'],
+            'commenced_by' => $request->user()->id,
+            'witnessed_by' => $witness?->id,
+            'witnessed_at' => $witness ? now() : null,
+            'witness_method' => $witness ? 'password' : null,
+            'rate' => $validated['rate'] ?? null,
+            'rate_unit' => $validated['rate_unit'] ?? null,
+            'duration_hours' => $validated['duration_hours'] ?? null,
+            'contents' => $contents,
+            'site_of_insertion' => $validated['site_of_insertion'] ?? null,
+            'notes' => $validated['notes'] ?? null,
+        ]);
+
+        return redirect()->back()->with('success', "Syringe driver {$driver->id} commenced.");
+    }
+
+    public function addSyringeDriverCheck(Request $request, MedicationSyringeDriver $driver)
+    {
+        $validated = $request->validate([
+            'checked_at' => ['nullable', 'date'],
+            'infusion_running' => ['required', 'boolean'],
+            'site_condition' => ['nullable', 'string', 'max:255'],
+            'volume_remaining' => ['nullable', 'string', 'max:255'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $driver->checks()->create([
+            ...$validated,
+            'checked_at' => $validated['checked_at'] ?? now(),
+            'checked_by' => $request->user()->id,
+        ]);
+
+        return redirect()->back()->with('success', 'Syringe driver check recorded.');
+    }
+
+    public function completeSyringeDriver(Request $request, MedicationSyringeDriver $driver)
+    {
+        $validated = $request->validate([
+            'status' => ['nullable', 'string', Rule::in(['completed', 'stopped'])],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $driver->forceFill([
+            'status' => $validated['status'] ?? 'completed',
+            'completed_at' => now(),
+            'completed_by' => $request->user()->id,
+            'notes' => trim($driver->notes . "\n" . ($validated['notes'] ?? '')) ?: $driver->notes,
+        ])->save();
+
+        return redirect()->back()->with('success', 'Syringe driver completed.');
     }
 
     // ─── Competency CRUD ────────────────────────────────────
@@ -2435,7 +2896,11 @@ class EmarController extends Controller
             'start_date' => 'nullable|date',
             'prescriber' => 'nullable|string|max:255',
             'prescriber_name' => 'nullable|string|max:255',
+            'pharmac_therapeutic_group' => 'nullable|string|max:255',
+            'pharmac_subgroup' => 'nullable|string|max:255',
         ]);
+
+        $canVerify = $this->canVerifyMedicationOrders($request->user());
 
         $medication = ClientMedication::create(array_merge(
             $this->buildMedicationPayload($validated),
@@ -2443,6 +2908,9 @@ class EmarController extends Controller
                 'start_date' => $validated['start_date'] ?? now()->toDateString(),
                 'state' => 'active',
                 'active' => true,
+                'approval_status' => $canVerify ? 'verified' : 'pending_verification',
+                'verified_by' => $canVerify ? $request->user()?->id : null,
+                'verified_at' => $canVerify ? now() : null,
             ],
         ));
 
@@ -2475,11 +2943,54 @@ class EmarController extends Controller
             'start_date' => 'nullable|date',
             'prescriber' => 'nullable|string|max:255',
             'prescriber_name' => 'nullable|string|max:255',
+            'pharmac_therapeutic_group' => 'nullable|string|max:255',
+            'pharmac_subgroup' => 'nullable|string|max:255',
         ]);
 
-        $medication->update($this->buildMedicationPayload($validated));
+        $payload = $this->buildMedicationPayload($validated);
+
+        if (! $this->canVerifyMedicationOrders($request->user())) {
+            $payload['approval_status'] = 'pending_verification';
+            $payload['verified_by'] = null;
+            $payload['verified_at'] = null;
+            $payload['rejection_reason'] = null;
+        }
+
+        $medication->update($payload);
 
         return redirect()->back();
+    }
+
+    public function verifyMedication(Request $request, ClientMedication $medication)
+    {
+        abort_unless($this->canVerifyMedicationOrders($request->user()), 403);
+
+        $medication->forceFill([
+            'approval_status' => 'verified',
+            'verified_by' => $request->user()?->id,
+            'verified_at' => now(),
+            'rejection_reason' => null,
+        ])->save();
+
+        return redirect()->back()->with('success', 'Medication order verified.');
+    }
+
+    public function rejectMedication(Request $request, ClientMedication $medication)
+    {
+        abort_unless($this->canVerifyMedicationOrders($request->user()), 403);
+
+        $validated = $request->validate([
+            'rejection_reason' => ['required', 'string', 'max:1000'],
+        ]);
+
+        $medication->forceFill([
+            'approval_status' => 'rejected',
+            'verified_by' => null,
+            'verified_at' => null,
+            'rejection_reason' => $validated['rejection_reason'],
+        ])->save();
+
+        return redirect()->back()->with('success', 'Medication order rejected.');
     }
 
     public function discontinueMedication(Request $request, ClientMedication $medication)
@@ -2939,6 +3450,8 @@ class EmarController extends Controller
             // Calculate dose times from frequency
             $doseTimes = DoseSchedulingService::calculateDoseTimes($frequency);
 
+            $canVerify = $this->canVerifyMedicationOrders($request->user());
+
             ClientMedication::create([
                 'client_id' => $client->id,
                 'name' => $medicationName,
@@ -2949,6 +3462,9 @@ class EmarController extends Controller
                 'state' => 'active',
                 'active' => true,
                 'start_date' => now()->toDateString(),
+                'approval_status' => $canVerify ? 'verified' : 'pending_verification',
+                'verified_by' => $canVerify ? $request->user()?->id : null,
+                'verified_at' => $canVerify ? now() : null,
             ]);
 
             $imported++;

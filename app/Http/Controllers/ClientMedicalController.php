@@ -403,12 +403,18 @@ class ClientMedicalController extends Controller
         $data = $request->validate([
             'status' => ['required', 'in:given,refused,missed,withheld'],
             'reason' => ['nullable', 'string', 'max:255'],
+            'reason_code' => ['nullable', 'string', 'max:60'],
             'dose_given' => ['nullable', 'string', 'max:255'],
             'scheduled_for' => ['nullable', 'date'],
             'administered_at' => ['nullable', 'date'],
             'shift_id' => ['nullable', 'integer'],
             'witnessed_by' => ['nullable', 'integer'],
+            'witness_credential' => ['nullable', 'string', 'max:255'],
             'notes' => ['nullable', 'string'],
+            'blood_glucose_level' => ['nullable', 'numeric', 'min:0', 'max:999.9'],
+            'pulse_bpm' => ['nullable', 'integer', 'min:20', 'max:250'],
+            'blood_pressure_systolic' => ['nullable', 'integer', 'min:40', 'max:300'],
+            'blood_pressure_diastolic' => ['nullable', 'integer', 'min:20', 'max:200'],
             'client_request_uuid' => ['nullable', 'uuid'],
             'captured_offline_at' => ['nullable', 'date'],
             'origin_device_id' => ['nullable', 'string', 'max:255'],
@@ -423,9 +429,11 @@ class ClientMedicalController extends Controller
             return back()->with('success', 'Already saved — no changes needed.');
         }
 
-        // Require a reason whenever the outcome is not "given".
-        if (($data['status'] ?? 'given') !== 'given' && empty($data['reason'])) {
-            return back()->withInput()->with('error', 'Please provide a reason when the medication is not given.');
+        // Require a structured code whenever the outcome is not "given".
+        if (($data['status'] ?? 'given') !== 'given' && empty($data['reason_code'])) {
+            return back()->withInput()->withErrors([
+                'reason_code' => 'Please choose why the medication was not given.',
+            ]);
         }
 
         // For PRN (as-needed) medication, require an indication/reason even when "given".
@@ -555,7 +563,12 @@ class ClientMedicalController extends Controller
                     'dose_given' => $data['dose_given'] ?? null,
                     'status' => $data['status'],
                     'reason' => $data['reason'] ?? null,
+                    'reason_code' => $data['reason_code'] ?? null,
                     'witnessed_by' => $data['witnessed_by'] ?? null,
+                    'witness_method' => $a->witness_method,
+                    'pulse_bpm' => $data['pulse_bpm'] ?? null,
+                    'blood_pressure_systolic' => $data['blood_pressure_systolic'] ?? null,
+                    'blood_pressure_diastolic' => $data['blood_pressure_diastolic'] ?? null,
                     'client_request_uuid' => $data['client_request_uuid'] ?? null,
                     'captured_offline_at' => $data['captured_offline_at'] ?? null,
                     'origin_device_id' => $data['origin_device_id'] ?? null,

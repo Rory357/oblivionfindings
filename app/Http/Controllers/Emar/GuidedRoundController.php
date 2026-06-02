@@ -89,8 +89,14 @@ class GuidedRoundController extends Controller
         $data = $request->validate([
             'status' => ['required', 'in:given,refused,held'],
             'reason' => ['nullable', 'string', 'max:500'],
+            'reason_code' => ['nullable', 'string', 'max:60'],
             'scheduled_for' => ['required', 'date'],
             'witnessed_by' => ['nullable', 'integer', 'exists:users,id'],
+            'witness_credential' => ['nullable', 'string', 'max:255'],
+            'blood_glucose_level' => ['nullable', 'numeric', 'min:0', 'max:999.9'],
+            'pulse_bpm' => ['nullable', 'integer', 'min:20', 'max:250'],
+            'blood_pressure_systolic' => ['nullable', 'integer', 'min:40', 'max:300'],
+            'blood_pressure_diastolic' => ['nullable', 'integer', 'min:20', 'max:200'],
             'client_request_uuid' => ['nullable', 'uuid'],
             'captured_offline_at' => ['nullable', 'date'],
             'origin_device_id' => ['nullable', 'string', 'max:255'],
@@ -108,22 +114,22 @@ class GuidedRoundController extends Controller
         // Worker vocabulary: "held" → backend "withheld".
         $backendStatus = $data['status'] === 'held' ? 'withheld' : $data['status'];
 
-        if ($backendStatus !== 'given' && empty($data['reason'])) {
+        if ($backendStatus !== 'given' && empty($data['reason_code'])) {
             if ($request->expectsJson()) {
                 return response()->json(
                     $this->withMedicationSync(
-                        ['success' => false, 'error' => 'Please tell us why this dose was not given.'],
+                        ['success' => false, 'error' => 'Please choose why this dose was not given.', 'error_field' => 'reason_code'],
                         $data,
                         'rejected',
                         false,
-                        'Please tell us why this dose was not given.',
+                        'Please choose why this dose was not given.',
                     ),
                     422,
                 );
             }
 
             return back()->withErrors([
-                'reason' => 'Please tell us why this dose was not given.',
+                'reason_code' => 'Please choose why this dose was not given.',
             ]);
         }
 
@@ -181,9 +187,15 @@ class GuidedRoundController extends Controller
                 [
                     'status' => $backendStatus,
                     'reason' => $data['reason'] ?? null,
+                    'reason_code' => $data['reason_code'] ?? null,
                     'scheduled_for' => $scheduled->toIso8601String(),
                     'administered_at' => now()->toIso8601String(),
                     'witnessed_by' => $data['witnessed_by'] ?? null,
+                    'witness_credential' => $data['witness_credential'] ?? null,
+                    'blood_glucose_level' => $data['blood_glucose_level'] ?? null,
+                    'pulse_bpm' => $data['pulse_bpm'] ?? null,
+                    'blood_pressure_systolic' => $data['blood_pressure_systolic'] ?? null,
+                    'blood_pressure_diastolic' => $data['blood_pressure_diastolic'] ?? null,
                     // The round's own window_minutes is the authoritative
                     // schedule for a guided round; skip the narrower MAR
                     // time-window check here so workers aren't blocked by it

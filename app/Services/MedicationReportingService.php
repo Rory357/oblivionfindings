@@ -7,7 +7,10 @@ use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
+use App\Models\ClientInrRecord;
 use App\Models\MedicationOrderVersion;
+use App\Models\MedicationReview;
+use App\Models\MedicationSyringeDriver;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
@@ -23,14 +26,15 @@ class MedicationReportingService
         ?Carbon $dateFrom = null,
         ?Carbon $dateTo = null,
         ?int $serviceContextId = null,
-        ?string $status = null
+        ?string $status = null,
+        ?string $careLevel = null
     ): array {
         $dateFrom = $dateFrom ?? now()->subDays(30);
         $dateTo = $dateTo ?? now();
 
         $query = ClientMedicationAdministration::with([
-            'client:id,first_name,last_name',
-            'medication:id,name,dosage,controlled_drug,is_prn,route,form',
+            'client:id,first_name,last_name,care_level',
+            'medication:id,name,dosage,controlled_drug,is_prn,route,form,pharmac_therapeutic_group,pharmac_subgroup',
             'administeredBy:id,name',
             'witnessedBy:id,name',
             'serviceContext:id,name',
@@ -50,6 +54,10 @@ class MedicationReportingService
             $query->where('status', $status);
         }
 
+        if ($careLevel) {
+            $query->whereHas('client', fn ($q) => $q->where('care_level', $careLevel));
+        }
+
         $administrations = $query->orderBy('administered_at')->get();
 
         return [
@@ -65,18 +73,27 @@ class MedicationReportingService
                 'time' => $a->administered_at?->format('H:i'),
                 'client' => $a->client ? trim("{$a->client->first_name} {$a->client->last_name}") : 'Unknown',
                 'client_id' => $a->client_id,
+                'care_level' => $a->client?->care_level,
                 'medication' => $a->medication?->name ?? 'Unknown',
                 'dosage' => $a->medication?->dosage ?? 'N/A',
                 'route' => $a->medication?->route ?? 'N/A',
                 'form' => $a->medication?->form ?? 'N/A',
+                'pharmac_therapeutic_group' => $a->medication?->pharmac_therapeutic_group,
+                'pharmac_subgroup' => $a->medication?->pharmac_subgroup,
                 'is_prn' => $a->medication?->is_prn ?? false,
                 'controlled_drug' => $a->medication?->controlled_drug ?? false,
                 'status' => $a->status,
                 'dose_given' => $a->dose_given,
+                'reason_code' => $a->reason_code,
                 'reason' => $a->reason,
                 'notes' => $a->notes,
                 'administered_by' => $a->administeredBy?->name ?? 'Unknown',
                 'witnessed_by' => $a->witnessedBy?->name,
+                'blood_glucose_level' => $a->blood_glucose_level,
+                'pulse_bpm' => $a->pulse_bpm,
+                'blood_pressure' => $a->blood_pressure_systolic && $a->blood_pressure_diastolic
+                    ? "{$a->blood_pressure_systolic}/{$a->blood_pressure_diastolic}"
+                    : null,
                 'scheduled_for' => $a->scheduled_for?->toDateTimeString(),
                 'shift_date' => $a->shift?->starts_at?->toDateString(),
                 'service_context' => $a->serviceContext?->name ?? 'N/A',
@@ -94,7 +111,8 @@ class MedicationReportingService
     public function reportPrnUsage(
         ?int $clientId = null,
         ?Carbon $dateFrom = null,
-        ?Carbon $dateTo = null
+        ?Carbon $dateTo = null,
+        ?string $careLevel = null
     ): array {
         $dateFrom = $dateFrom ?? now()->subDays(30);
         $dateTo = $dateTo ?? now();
@@ -102,10 +120,14 @@ class MedicationReportingService
         $query = ClientMedicationAdministration::whereHas('medication', fn ($q) => $q->where('is_prn', true))
             ->where('status', 'given')
             ->whereBetween('administered_at', [$dateFrom->startOfDay(), $dateTo->endOfDay()])
-            ->with(['medication:id,name,max_per_day,client_id', 'client:id,first_name,last_name']);
+            ->with(['medication:id,name,max_per_day,client_id,pharmac_therapeutic_group', 'client:id,first_name,last_name,care_level']);
 
         if ($clientId) {
             $query->where('client_id', $clientId);
+        }
+
+        if ($careLevel) {
+            $query->whereHas('client', fn ($q) => $q->where('care_level', $careLevel));
         }
 
         $administrations = $query->orderBy('administered_at')->get();
@@ -126,8 +148,10 @@ class MedicationReportingService
             return [
                 'client_id' => $first->client_id,
                 'client_name' => $first->client ? trim("{$first->client->first_name} {$first->client->last_name}") : 'Unknown',
+                'care_level' => $first->client?->care_level,
                 'medication_id' => $first->client_medication_id,
                 'medication_name' => $first->medication?->name ?? 'Unknown',
+                'pharmac_therapeutic_group' => $first->medication?->pharmac_therapeutic_group,
                 'max_per_day' => $maxPerDay ?: null,
                 'total_administrations' => $count,
                 'average_per_day' => round($count / $daysInRange, 2),
@@ -152,6 +176,194 @@ class MedicationReportingService
             ],
             'summaries' => $summaries->toArray(),
             'daily_breakdown' => $this->getPrnDailyBreakdown($administrations),
+        ];
+    }
+
+    public function reportRegularUsage(?int $clientId = null, ?Carbon $dateFrom = null, ?Carbon $dateTo = null, ?string $careLevel = null): array
+    {
+        return $this->reportMedicationUsageByType('regular', $clientId, $dateFrom, $dateTo, $careLevel);
+    }
+
+    public function reportShortCourseUsage(?int $clientId = null, ?Carbon $dateFrom = null, ?Carbon $dateTo = null, ?string $careLevel = null): array
+    {
+        return $this->reportMedicationUsageByType('short_course', $clientId, $dateFrom, $dateTo, $careLevel);
+    }
+
+    private function reportMedicationUsageByType(string $type, ?int $clientId, ?Carbon $dateFrom, ?Carbon $dateTo, ?string $careLevel): array
+    {
+        $dateFrom = $dateFrom ?? now()->subDays(30);
+        $dateTo = $dateTo ?? now();
+
+        $query = ClientMedicationAdministration::query()
+            ->with(['client:id,first_name,last_name,care_level', 'medication:id,name,dosage,is_prn,end_date,pharmac_therapeutic_group,pharmac_subgroup', 'administeredBy:id,name'])
+            ->where('status', 'given')
+            ->whereBetween('administered_at', [$dateFrom->startOfDay(), $dateTo->endOfDay()])
+            ->whereHas('medication', function ($q) use ($type) {
+                $q->where('is_prn', false);
+                if ($type === 'short_course') {
+                    $q->whereNotNull('end_date');
+                } else {
+                    $q->whereNull('end_date');
+                }
+            })
+            ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
+            ->when($careLevel, fn ($q) => $q->whereHas('client', fn ($clientQuery) => $clientQuery->where('care_level', $careLevel)));
+
+        $records = $query->orderBy('administered_at')->get();
+
+        return [
+            'meta' => [
+                'type' => $type,
+                'date_from' => $dateFrom->toDateString(),
+                'date_to' => $dateTo->toDateString(),
+                'total_records' => $records->count(),
+            ],
+            'records' => $records->map(fn ($a) => [
+                'date' => $a->administered_at?->toDateTimeString(),
+                'client' => $a->client ? trim("{$a->client->first_name} {$a->client->last_name}") : 'Unknown',
+                'care_level' => $a->client?->care_level,
+                'medication' => $a->medication?->name ?? 'Unknown',
+                'dosage' => $a->medication?->dosage,
+                'pharmac_therapeutic_group' => $a->medication?->pharmac_therapeutic_group,
+                'pharmac_subgroup' => $a->medication?->pharmac_subgroup,
+                'dose_given' => $a->dose_given,
+                'administered_by' => $a->administeredBy?->name,
+            ])->toArray(),
+        ];
+    }
+
+    public function reportObservationUsage(?int $clientId = null, ?Carbon $dateFrom = null, ?Carbon $dateTo = null, ?string $careLevel = null): array
+    {
+        $dateFrom = $dateFrom ?? now()->subDays(30);
+        $dateTo = $dateTo ?? now();
+
+        $observations = ClientMedicationAdministration::query()
+            ->with(['client:id,first_name,last_name,care_level', 'medication:id,name,pharmac_therapeutic_group'])
+            ->whereBetween('administered_at', [$dateFrom->startOfDay(), $dateTo->endOfDay()])
+            ->where(function ($query) {
+                $query->whereNotNull('blood_glucose_level')
+                    ->orWhereNotNull('pulse_bpm')
+                    ->orWhereNotNull('blood_pressure_systolic')
+                    ->orWhereNotNull('blood_pressure_diastolic');
+            })
+            ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
+            ->when($careLevel, fn ($q) => $q->whereHas('client', fn ($clientQuery) => $clientQuery->where('care_level', $careLevel)))
+            ->orderBy('administered_at')
+            ->get()
+            ->map(fn ($a) => [
+                'date' => $a->administered_at?->toDateTimeString(),
+                'client' => $a->client ? trim("{$a->client->first_name} {$a->client->last_name}") : 'Unknown',
+                'care_level' => $a->client?->care_level,
+                'medication' => $a->medication?->name,
+                'observation_type' => 'administration_observation',
+                'value' => collect([
+                    'bsl' => $a->blood_glucose_level,
+                    'pulse' => $a->pulse_bpm,
+                    'blood_pressure' => $a->blood_pressure_systolic && $a->blood_pressure_diastolic
+                        ? "{$a->blood_pressure_systolic}/{$a->blood_pressure_diastolic}"
+                        : null,
+                ])->filter()->toJson(),
+                'pharmac_therapeutic_group' => $a->medication?->pharmac_therapeutic_group,
+            ]);
+
+        $inrs = ClientInrRecord::query()
+            ->with(['client:id,first_name,last_name,care_level', 'medication:id,name,pharmac_therapeutic_group'])
+            ->whereBetween('tested_on', [$dateFrom->toDateString(), $dateTo->toDateString()])
+            ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
+            ->when($careLevel, fn ($q) => $q->whereHas('client', fn ($clientQuery) => $clientQuery->where('care_level', $careLevel)))
+            ->orderBy('tested_on')
+            ->get()
+            ->map(fn ($record) => [
+                'date' => $record->tested_on?->toDateString(),
+                'client' => $record->client ? trim("{$record->client->first_name} {$record->client->last_name}") : 'Unknown',
+                'care_level' => $record->client?->care_level,
+                'medication' => $record->medication?->name ?? 'Warfarin',
+                'observation_type' => 'inr',
+                'value' => $record->inr_value,
+                'pharmac_therapeutic_group' => $record->medication?->pharmac_therapeutic_group,
+            ]);
+
+        $records = $observations->merge($inrs)->sortBy('date')->values();
+
+        return [
+            'meta' => [
+                'date_from' => $dateFrom->toDateString(),
+                'date_to' => $dateTo->toDateString(),
+                'total_records' => $records->count(),
+            ],
+            'records' => $records->toArray(),
+        ];
+    }
+
+    public function reportSyringeDriverUsage(?int $clientId = null, ?Carbon $dateFrom = null, ?Carbon $dateTo = null, ?string $careLevel = null): array
+    {
+        $dateFrom = $dateFrom ?? now()->subDays(30);
+        $dateTo = $dateTo ?? now();
+
+        $drivers = MedicationSyringeDriver::query()
+            ->with(['client:id,first_name,last_name,care_level', 'commencedBy:id,name', 'completedBy:id,name'])
+            ->whereBetween('commenced_at', [$dateFrom->startOfDay(), $dateTo->endOfDay()])
+            ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
+            ->when($careLevel, fn ($q) => $q->whereHas('client', fn ($clientQuery) => $clientQuery->where('care_level', $careLevel)))
+            ->orderBy('commenced_at')
+            ->get();
+
+        return [
+            'meta' => [
+                'date_from' => $dateFrom->toDateString(),
+                'date_to' => $dateTo->toDateString(),
+                'total_records' => $drivers->count(),
+            ],
+            'records' => $drivers->map(fn ($driver) => [
+                'commenced_at' => $driver->commenced_at?->toDateTimeString(),
+                'client' => $driver->client ? trim("{$driver->client->first_name} {$driver->client->last_name}") : 'Unknown',
+                'care_level' => $driver->client?->care_level,
+                'status' => $driver->status,
+                'rate' => $driver->rate,
+                'rate_unit' => $driver->rate_unit,
+                'duration_hours' => $driver->duration_hours,
+                'contents' => $driver->contents,
+                'site_of_insertion' => $driver->site_of_insertion,
+                'commenced_by' => $driver->commencedBy?->name,
+                'completed_at' => $driver->completed_at?->toDateTimeString(),
+                'completed_by' => $driver->completedBy?->name,
+            ])->toArray(),
+        ];
+    }
+
+    public function reportChartReviews(?int $clientId = null, ?Carbon $dateFrom = null, ?Carbon $dateTo = null, ?string $careLevel = null): array
+    {
+        $dateFrom = $dateFrom ?? now()->subDays(30);
+        $dateTo = $dateTo ?? now();
+
+        $reviews = MedicationReview::query()
+            ->with('client:id,first_name,last_name,care_level,next_chart_review_date')
+            ->where(function ($query) use ($dateFrom, $dateTo) {
+                $query->whereBetween('scheduled_date', [$dateFrom->toDateString(), $dateTo->toDateString()])
+                    ->orWhereBetween('completed_date', [$dateFrom->toDateString(), $dateTo->toDateString()])
+                    ->orWhereBetween('next_review_date', [$dateFrom->toDateString(), $dateTo->toDateString()]);
+            })
+            ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
+            ->when($careLevel, fn ($q) => $q->whereHas('client', fn ($clientQuery) => $clientQuery->where('care_level', $careLevel)))
+            ->orderBy('scheduled_date')
+            ->get();
+
+        return [
+            'meta' => [
+                'date_from' => $dateFrom->toDateString(),
+                'date_to' => $dateTo->toDateString(),
+                'total_records' => $reviews->count(),
+            ],
+            'records' => $reviews->map(fn ($review) => [
+                'client' => $review->client ? trim("{$review->client->first_name} {$review->client->last_name}") : 'Unknown',
+                'care_level' => $review->client?->care_level,
+                'review_type' => $review->review_type,
+                'status' => $review->status,
+                'scheduled_date' => $review->scheduled_date?->toDateString(),
+                'completed_date' => $review->completed_date?->toDateString(),
+                'next_review_date' => $review->next_review_date?->toDateString(),
+                'next_chart_review_date' => $review->client?->next_chart_review_date?->toDateString(),
+            ])->toArray(),
         ];
     }
 

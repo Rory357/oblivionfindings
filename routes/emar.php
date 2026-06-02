@@ -7,6 +7,7 @@ use App\Http\Controllers\Emar\EmarPdfController;
 use App\Http\Controllers\Emar\GuidedRoundController;
 use App\Http\Controllers\Emar\EmarReportController;
 use App\Http\Controllers\Emar\MedicationErrorController;
+use App\Http\Controllers\Emar\MedicationSettingsController;
 use App\Http\Controllers\Emar\RefusalFollowUpController;
 use App\Http\Controllers\Emar\WorkerMedsController;
 use App\Http\Controllers\BreakGlassController;
@@ -95,6 +96,10 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
         ->middleware('permission:medications.view')
         ->name('emar.reviews');
 
+    Route::get('/clients/{client}/inr', [EmarController::class, 'inrHistory'])
+        ->middleware('permission:medications.view')
+        ->name('emar.clients.inr.index');
+
     // Medication Rounds
     Route::get('/rounds', [EmarController::class, 'rounds'])
         ->middleware('permission:medications.view')
@@ -146,6 +151,18 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
     Route::post('/reviews/{review}/complete', [EmarController::class, 'completeReview'])->name('emar.reviews.complete');
     Route::delete('/reviews/{review}', [EmarController::class, 'destroyReview'])->name('emar.reviews.destroy');
 
+    // 1CHART attention, INR, and syringe-driver workflows
+    Route::post('/clients/{client}/attention-alerts', [EmarController::class, 'storeAttentionAlert'])->name('emar.clients.attention_alerts.store');
+    Route::put('/attention-alerts/{alert}', [EmarController::class, 'updateAttentionAlert'])->name('emar.attention_alerts.update');
+    Route::post('/attention-alerts/{alert}/resolve', [EmarController::class, 'resolveAttentionAlert'])->name('emar.attention_alerts.resolve');
+    Route::post('/clients/{client}/alert-suppression', [EmarController::class, 'toggleMedicationAlertSuppression'])->name('emar.clients.alert_suppression');
+    Route::post('/clients/{client}/medication-settings', [EmarController::class, 'updateMedicationSettings'])->name('emar.clients.medication_settings');
+    Route::post('/clients/{client}/inr', [EmarController::class, 'storeInr'])->name('emar.clients.inr.store');
+    Route::post('/inr/{inr}/disable', [EmarController::class, 'disableInr'])->name('emar.inr.disable');
+    Route::post('/clients/{client}/syringe-drivers', [EmarController::class, 'storeSyringeDriver'])->name('emar.clients.syringe_drivers.store');
+    Route::post('/syringe-drivers/{driver}/checks', [EmarController::class, 'addSyringeDriverCheck'])->name('emar.syringe_drivers.checks.store');
+    Route::post('/syringe-drivers/{driver}/complete', [EmarController::class, 'completeSyringeDriver'])->name('emar.syringe_drivers.complete');
+
     // Competency Assessments
     Route::post('/competency', [EmarController::class, 'storeCompetency'])->name('emar.competency.store');
     Route::put('/competency/{assessment}', [EmarController::class, 'updateCompetency'])->name('emar.competency.update');
@@ -193,6 +210,19 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
     Route::post('/prn/effectiveness', [EmarController::class, 'storePrnEffectiveness'])->name('emar.prn_effectiveness.store');
 
     }); // end medications.orders.manage middleware group
+
+    Route::middleware('permission:medications.orders.verify|medications.orders.manage|clients.update')->group(function () {
+        Route::post('/medications/{medication}/verify', [EmarController::class, 'verifyMedication'])->name('emar.medications.verify');
+        Route::post('/medications/{medication}/reject', [EmarController::class, 'rejectMedication'])->name('emar.medications.reject');
+    });
+
+    // ─── Facility Medication Admin Rules (1CHART §6.1 — countersign / observation prompts) ───
+    Route::middleware('permission:medications.settings.manage|medications.orders.manage|clients.update')->group(function () {
+        Route::get('/settings', [MedicationSettingsController::class, 'index'])->name('emar.settings');
+        Route::post('/settings/rules', [MedicationSettingsController::class, 'store'])->name('emar.settings.rules.store');
+        Route::put('/settings/rules/{rule}', [MedicationSettingsController::class, 'update'])->name('emar.settings.rules.update');
+        Route::delete('/settings/rules/{rule}', [MedicationSettingsController::class, 'destroy'])->name('emar.settings.rules.destroy');
+    });
 
     // ─── End CRUD Routes ────────────────────────────────────
 

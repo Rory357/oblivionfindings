@@ -13,6 +13,7 @@ use App\Models\MedicationCompetencyAssessment;
 use App\Models\MedicationDestruction;
 use App\Models\MedicationError;
 use App\Models\MedicationRound;
+use App\Services\MedicationReportingService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -25,6 +26,7 @@ class EmarReportController extends Controller
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date'],
             'client_id' => ['nullable', 'integer'],
+            'care_level' => ['nullable', 'string', 'max:60'],
             'report_type' => ['nullable', 'string'],
         ]);
 
@@ -36,12 +38,16 @@ class EmarReportController extends Controller
             : now()->endOfDay();
 
         $clientId = $filters['client_id'] ?? null;
+        $careLevel = $filters['care_level'] ?? null;
 
         // ─── Administration Summary ──────────────────────────
         $adminQuery = ClientMedicationAdministration::query()
             ->whereBetween('administered_at', [$dateFrom, $dateTo]);
         if ($clientId) {
             $adminQuery->where('client_id', $clientId);
+        }
+        if ($careLevel) {
+            $adminQuery->whereHas('client', fn ($query) => $query->where('care_level', $careLevel));
         }
 
         $adminTotals = (clone $adminQuery)->selectRaw("
@@ -120,6 +126,11 @@ class EmarReportController extends Controller
         if ($clientId) {
             $prnQuery->where('client_medication_administrations.client_id', $clientId);
         }
+        if ($careLevel) {
+            $prnQuery
+                ->join('clients as prn_clients', 'prn_clients.id', '=', 'client_medication_administrations.client_id')
+                ->where('prn_clients.care_level', $careLevel);
+        }
 
         $topPrnMeds = (clone $prnQuery)
             ->selectRaw('client_medications.name as medication_name, COUNT(*) as usage_count')
@@ -161,17 +172,20 @@ class EmarReportController extends Controller
             ->where('client_medications.controlled_drug', true)
             ->whereBetween('client_medication_administrations.administered_at', [$dateFrom, $dateTo])
             ->when($clientId, fn ($q) => $q->where('client_medication_administrations.client_id', $clientId))
+            ->when($careLevel, fn ($q) => $q->whereHas('client', fn ($clientQuery) => $clientQuery->where('care_level', $careLevel)))
             ->count();
 
         $destructionsCount = MedicationDestruction::query()
             ->where('is_controlled_drug', true)
             ->whereBetween('destroyed_at', [$dateFrom, $dateTo])
             ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
+            ->when($careLevel, fn ($q) => $q->whereHas('client', fn ($clientQuery) => $clientQuery->where('care_level', $careLevel)))
             ->count();
 
         $discrepancyQuery = ClientControlledDrugDiscrepancy::query()
             ->whereBetween('reported_at', [$dateFrom, $dateTo])
-            ->when($clientId, fn ($q) => $q->where('client_id', $clientId));
+            ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
+            ->when($careLevel, fn ($q) => $q->whereHas('client', fn ($clientQuery) => $clientQuery->where('care_level', $careLevel)));
 
         $discrepancyCount = (clone $discrepancyQuery)->count();
 
@@ -180,6 +194,7 @@ class EmarReportController extends Controller
             ->where('client_medications.controlled_drug', true)
             ->whereBetween('client_medication_administrations.administered_at', [$dateFrom, $dateTo])
             ->when($clientId, fn ($q) => $q->where('client_medication_administrations.client_id', $clientId))
+            ->when($careLevel, fn ($q) => $q->whereHas('client', fn ($clientQuery) => $clientQuery->where('care_level', $careLevel)))
             ->selectRaw('client_medications.name as medication_name, COUNT(*) as admin_count')
             ->groupBy('client_medications.name')
             ->orderByDesc('admin_count')
@@ -328,7 +343,8 @@ class EmarReportController extends Controller
         // ─── Error Summary ───────────────────────────────────
         $errorQuery = MedicationError::query()
             ->whereBetween('reported_at', [$dateFrom, $dateTo])
-            ->when($clientId, fn ($q) => $q->where('client_id', $clientId));
+            ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
+            ->when($careLevel, fn ($q) => $q->whereHas('client', fn ($clientQuery) => $clientQuery->where('care_level', $careLevel)));
 
         $errorTotals = (clone $errorQuery)->selectRaw("
             COUNT(*) as total,
@@ -366,11 +382,19 @@ class EmarReportController extends Controller
         $clients = Client::query()
             ->orderBy('first_name')
             ->orderBy('last_name')
-            ->get(['id', 'first_name', 'last_name'])
+            ->get(['id', 'first_name', 'last_name', 'care_level'])
             ->map(fn (Client $c) => [
                 'id' => $c->id,
                 'name' => trim("{$c->first_name} {$c->last_name}"),
+                'care_level' => $c->care_level,
             ])
+            ->values();
+
+        $careLevels = Client::query()
+            ->whereNotNull('care_level')
+            ->distinct()
+            ->orderBy('care_level')
+            ->pluck('care_level')
             ->values();
 
         return Inertia::render('emar/Reports', [
@@ -378,9 +402,11 @@ class EmarReportController extends Controller
                 'date_from' => $dateFrom->toDateString(),
                 'date_to' => $dateTo->toDateString(),
                 'client_id' => $clientId ? (int) $clientId : null,
+                'care_level' => $careLevel,
                 'report_type' => $filters['report_type'] ?? null,
             ],
             'clients' => $clients,
+            'careLevels' => $careLevels,
             'adminSummary' => $adminSummary,
             'dailyAdmin' => $dailyAdmin,
             'clientBreakdown' => $clientBreakdown,
@@ -427,7 +453,8 @@ class EmarReportController extends Controller
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date'],
             'client_id' => ['nullable', 'integer'],
-            'report_type' => ['nullable', 'string', 'in:administration,prn,controlled,rounds,errors'],
+            'care_level' => ['nullable', 'string', 'max:60'],
+            'report_type' => ['nullable', 'string', 'in:administration,prn,controlled,rounds,errors,regular,short_course,observations,chart_reviews,syringe_drivers'],
         ]);
 
         $dateFrom = isset($filters['date_from']) && $filters['date_from']
@@ -437,21 +464,32 @@ class EmarReportController extends Controller
             ? Carbon::parse($filters['date_to'])->endOfDay()
             : now()->endOfDay();
 
+        if ($dateFrom->diffInDays($dateTo) > 93) {
+            $dateFrom = $dateTo->copy()->subMonthsNoOverflow(3)->startOfDay();
+        }
+
         $clientId = $filters['client_id'] ?? null;
+        $careLevel = $filters['care_level'] ?? null;
         $type = $filters['report_type'] ?? 'administration';
 
         $filename = "emar_{$type}_report_" . now()->format('Ymd_His') . '.csv';
 
-        return response()->streamDownload(function () use ($type, $dateFrom, $dateTo, $clientId) {
+        return response()->streamDownload(function () use ($type, $dateFrom, $dateTo, $clientId, $careLevel) {
             $out = fopen('php://output', 'w');
+            $reporting = app(MedicationReportingService::class);
 
             match ($type) {
-                'administration' => $this->exportAdministrations($out, $dateFrom, $dateTo, $clientId),
-                'prn' => $this->exportPrn($out, $dateFrom, $dateTo, $clientId),
-                'controlled' => $this->exportControlled($out, $dateFrom, $dateTo, $clientId),
+                'administration' => $this->exportAdministrations($out, $dateFrom, $dateTo, $clientId, $careLevel),
+                'prn' => $this->exportPrn($out, $dateFrom, $dateTo, $clientId, $careLevel),
+                'controlled' => $this->exportControlled($out, $dateFrom, $dateTo, $clientId, $careLevel),
                 'rounds' => $this->exportRounds($out, $dateFrom, $dateTo),
-                'errors' => $this->exportErrors($out, $dateFrom, $dateTo, $clientId),
-                default => $this->exportAdministrations($out, $dateFrom, $dateTo, $clientId),
+                'errors' => $this->exportErrors($out, $dateFrom, $dateTo, $clientId, $careLevel),
+                'regular' => $this->exportServiceRecords($out, $reporting->reportRegularUsage($clientId, $dateFrom, $dateTo, $careLevel)),
+                'short_course' => $this->exportServiceRecords($out, $reporting->reportShortCourseUsage($clientId, $dateFrom, $dateTo, $careLevel)),
+                'observations' => $this->exportServiceRecords($out, $reporting->reportObservationUsage($clientId, $dateFrom, $dateTo, $careLevel)),
+                'chart_reviews' => $this->exportServiceRecords($out, $reporting->reportChartReviews($clientId, $dateFrom, $dateTo, $careLevel)),
+                'syringe_drivers' => $this->exportServiceRecords($out, $reporting->reportSyringeDriverUsage($clientId, $dateFrom, $dateTo, $careLevel)),
+                default => $this->exportAdministrations($out, $dateFrom, $dateTo, $clientId, $careLevel),
             };
 
             fclose($out);
@@ -460,14 +498,15 @@ class EmarReportController extends Controller
         ]);
     }
 
-    private function exportAdministrations($out, Carbon $dateFrom, Carbon $dateTo, ?int $clientId): void
+    private function exportAdministrations($out, Carbon $dateFrom, Carbon $dateTo, ?int $clientId, ?string $careLevel): void
     {
-        fputcsv($out, ['Date', 'Client', 'Medication', 'Status', 'Administered By', 'Notes']);
+        fputcsv($out, ['Date', 'Client', 'Care Level', 'Medication', 'Therapeutic Group', 'Status', 'Reason Code', 'Administered By', 'Witness', 'BSL', 'Pulse', 'Blood Pressure', 'Notes']);
 
         ClientMedicationAdministration::query()
-            ->with(['client:id,first_name,last_name', 'medication:id,name', 'administeredBy:id,name'])
+            ->with(['client:id,first_name,last_name,care_level', 'medication:id,name,pharmac_therapeutic_group', 'administeredBy:id,name', 'witnessedBy:id,name'])
             ->whereBetween('administered_at', [$dateFrom, $dateTo])
             ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
+            ->when($careLevel, fn ($q) => $q->whereHas('client', fn ($clientQuery) => $clientQuery->where('care_level', $careLevel)))
             ->orderBy('administered_at')
             ->chunk(500, function ($rows) use ($out) {
                 foreach ($rows as $a) {
@@ -475,24 +514,32 @@ class EmarReportController extends Controller
                     fputcsv($out, [
                         optional($a->administered_at)->toDateTimeString(),
                         $clientName,
+                        $a->client?->care_level,
                         $a->medication?->name ?? '',
+                        $a->medication?->pharmac_therapeutic_group ?? '',
                         $a->status,
+                        $a->reason_code,
                         $a->administeredBy?->name ?? '',
+                        $a->witnessedBy?->name ?? '',
+                        $a->blood_glucose_level,
+                        $a->pulse_bpm,
+                        $a->blood_pressure_systolic && $a->blood_pressure_diastolic ? "{$a->blood_pressure_systolic}/{$a->blood_pressure_diastolic}" : '',
                         $a->notes,
                     ]);
                 }
             });
     }
 
-    private function exportPrn($out, Carbon $dateFrom, Carbon $dateTo, ?int $clientId): void
+    private function exportPrn($out, Carbon $dateFrom, Carbon $dateTo, ?int $clientId, ?string $careLevel): void
     {
-        fputcsv($out, ['Date', 'Client', 'Medication', 'Dose', 'Reason', 'Administered By']);
+        fputcsv($out, ['Date', 'Client', 'Care Level', 'Medication', 'Therapeutic Group', 'Dose', 'Reason', 'Administered By']);
 
         ClientMedicationAdministration::query()
-            ->with(['client:id,first_name,last_name', 'medication:id,name,is_prn', 'administeredBy:id,name'])
+            ->with(['client:id,first_name,last_name,care_level', 'medication:id,name,is_prn,pharmac_therapeutic_group', 'administeredBy:id,name'])
             ->whereHas('medication', fn ($q) => $q->where('is_prn', true))
             ->whereBetween('administered_at', [$dateFrom, $dateTo])
             ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
+            ->when($careLevel, fn ($q) => $q->whereHas('client', fn ($clientQuery) => $clientQuery->where('care_level', $careLevel)))
             ->orderBy('administered_at')
             ->chunk(500, function ($rows) use ($out) {
                 foreach ($rows as $a) {
@@ -500,7 +547,9 @@ class EmarReportController extends Controller
                     fputcsv($out, [
                         optional($a->administered_at)->toDateTimeString(),
                         $clientName,
+                        $a->client?->care_level,
                         $a->medication?->name ?? '',
+                        $a->medication?->pharmac_therapeutic_group ?? '',
                         $a->dose_given,
                         $a->reason,
                         $a->administeredBy?->name ?? '',
@@ -509,15 +558,16 @@ class EmarReportController extends Controller
             });
     }
 
-    private function exportControlled($out, Carbon $dateFrom, Carbon $dateTo, ?int $clientId): void
+    private function exportControlled($out, Carbon $dateFrom, Carbon $dateTo, ?int $clientId, ?string $careLevel): void
     {
-        fputcsv($out, ['Date', 'Client', 'Medication', 'Status', 'Dose', 'Administered By', 'Witness']);
+        fputcsv($out, ['Date', 'Client', 'Care Level', 'Medication', 'Therapeutic Group', 'Status', 'Dose', 'Administered By', 'Witness']);
 
         ClientMedicationAdministration::query()
-            ->with(['client:id,first_name,last_name', 'medication:id,name,controlled_drug', 'administeredBy:id,name'])
+            ->with(['client:id,first_name,last_name,care_level', 'medication:id,name,controlled_drug,pharmac_therapeutic_group', 'administeredBy:id,name', 'witnessedBy:id,name'])
             ->whereHas('medication', fn ($q) => $q->where('controlled_drug', true))
             ->whereBetween('administered_at', [$dateFrom, $dateTo])
             ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
+            ->when($careLevel, fn ($q) => $q->whereHas('client', fn ($clientQuery) => $clientQuery->where('care_level', $careLevel)))
             ->orderBy('administered_at')
             ->chunk(500, function ($rows) use ($out) {
                 foreach ($rows as $a) {
@@ -525,11 +575,13 @@ class EmarReportController extends Controller
                     fputcsv($out, [
                         optional($a->administered_at)->toDateTimeString(),
                         $clientName,
+                        $a->client?->care_level,
                         $a->medication?->name ?? '',
+                        $a->medication?->pharmac_therapeutic_group ?? '',
                         $a->status,
                         $a->dose_given,
                         $a->administeredBy?->name ?? '',
-                        '',
+                        $a->witnessedBy?->name ?? '',
                     ]);
                 }
             });
@@ -560,14 +612,15 @@ class EmarReportController extends Controller
             });
     }
 
-    private function exportErrors($out, Carbon $dateFrom, Carbon $dateTo, ?int $clientId): void
+    private function exportErrors($out, Carbon $dateFrom, Carbon $dateTo, ?int $clientId, ?string $careLevel): void
     {
-        fputcsv($out, ['Date', 'Client', 'Type', 'Severity', 'Status', 'Description']);
+        fputcsv($out, ['Date', 'Client', 'Care Level', 'Type', 'Severity', 'Status', 'Description']);
 
         MedicationError::query()
-            ->with(['client:id,first_name,last_name'])
+            ->with(['client:id,first_name,last_name,care_level'])
             ->whereBetween('reported_at', [$dateFrom, $dateTo])
             ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
+            ->when($careLevel, fn ($q) => $q->whereHas('client', fn ($clientQuery) => $clientQuery->where('care_level', $careLevel)))
             ->orderBy('reported_at')
             ->chunk(500, function ($rows) use ($out) {
                 foreach ($rows as $e) {
@@ -575,6 +628,7 @@ class EmarReportController extends Controller
                     fputcsv($out, [
                         optional($e->reported_at)->toDateTimeString(),
                         $clientName,
+                        $e->client?->care_level,
                         $e->error_type,
                         $e->severity,
                         $e->status,
@@ -582,5 +636,23 @@ class EmarReportController extends Controller
                     ]);
                 }
             });
+    }
+
+    private function exportServiceRecords($out, array $report): void
+    {
+        $records = $report['records'] ?? [];
+        if (empty($records)) {
+            fputcsv($out, ['No data available']);
+            return;
+        }
+
+        $headers = array_keys($records[0]);
+        fputcsv($out, $headers);
+
+        foreach ($records as $record) {
+            fputcsv($out, array_map(function ($value) {
+                return is_array($value) ? json_encode($value) : $value;
+            }, $record));
+        }
     }
 }

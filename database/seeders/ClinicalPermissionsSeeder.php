@@ -35,6 +35,10 @@ class ClinicalPermissionsSeeder extends Seeder
 
             // Module access
             ['key' => 'clinical.dashboard', 'description' => 'Access the Health & Clinical dashboard', 'group' => 'clinical', 'module' => 'Health & Clinical'],
+
+            // Medication verification and administration-rule governance
+            ['key' => 'medications.orders.verify', 'description' => 'Verify medication orders before administration', 'group' => 'medications', 'module' => 'Clinical'],
+            ['key' => 'medications.settings.manage', 'description' => 'Manage facility medication administration rules', 'group' => 'medications', 'module' => 'Clinical'],
         ];
 
         $allPermissions = [];
@@ -80,6 +84,7 @@ class ClinicalPermissionsSeeder extends Seeder
             'clinical.events.record',
             'clinical.protocols.viewAny',
             'clinical.dashboard',
+            'medications.orders.verify',
         ]);
 
         // Clinical Lead: full clinical access
@@ -94,6 +99,8 @@ class ClinicalPermissionsSeeder extends Seeder
             'clinical.protocols.viewAny',
             'clinical.protocols.manage',
             'clinical.dashboard',
+            'medications.orders.verify',
+            'medications.settings.manage',
         ]);
 
         // Coordinator: same as clinical lead
@@ -108,6 +115,8 @@ class ClinicalPermissionsSeeder extends Seeder
             'clinical.protocols.viewAny',
             'clinical.protocols.manage',
             'clinical.dashboard',
+            'medications.orders.verify',
+            'medications.settings.manage',
         ]);
 
         // Provider Manager: full access
@@ -122,6 +131,8 @@ class ClinicalPermissionsSeeder extends Seeder
             'clinical.protocols.viewAny',
             'clinical.protocols.manage',
             'clinical.dashboard',
+            'medications.orders.verify',
+            'medications.settings.manage',
         ]);
     }
 }

@@ -2,6 +2,7 @@ import ClientAllergyBanner from '@/components/emar/ClientAllergyBanner';
 import DrugInteractionAlert from '@/components/emar/DrugInteractionAlert';
 import { PageHero } from '@/components/page';
 import AdministrationEvidenceDialog from '@/components/medications/AdministrationEvidenceDialog';
+import ClientMedicationTools from '@/components/medications/ClientMedicationTools';
 import RecordAdministrationDialog from '@/components/medications/RecordAdministrationDialog';
 import RefusalFollowUpDialog from '@/components/medications/RefusalFollowUpDialog';
 import { type SafetyCheck } from '@/components/medications/SafetyCheckPanel';
@@ -9,6 +10,14 @@ import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import {
     Select,
@@ -77,9 +86,14 @@ type Administration = {
     witnessed_by: string | null;
     notes: string | null;
     reason: string | null;
+    reason_code?: string | null;
     dose_given?: string | null;
     outcome?: string | null;
     site?: string | null;
+    blood_glucose_level?: string | number | null;
+    pulse_bpm?: string | number | null;
+    blood_pressure_systolic?: string | number | null;
+    blood_pressure_diastolic?: string | number | null;
     created_at?: string | null;
     is_correction?: boolean;
     correction_reason?: string | null;
@@ -109,6 +123,12 @@ type MedicationStock = {
     unit: string;
 };
 
+type MedicationAdminRules = {
+    requires_countersign: boolean;
+    required_observations: string[];
+    matched_rules?: Array<Record<string, unknown>>;
+};
+
 type ScheduledMed = {
     id: number;
     name: string;
@@ -120,6 +140,11 @@ type ScheduledMed = {
     controlled_drug: boolean;
     high_risk: boolean;
     witness_required: boolean;
+    approval_status?: string;
+    is_administrable?: boolean;
+    admin_rules?: MedicationAdminRules;
+    pharmac_therapeutic_group?: string | null;
+    pharmac_subgroup?: string | null;
     dose_times: string[];
     administrations: Administration[];
     scan_verification: MedicationScanVerification;
@@ -137,6 +162,11 @@ type PrnMed = {
     controlled_drug: boolean;
     high_risk: boolean;
     witness_required: boolean;
+    approval_status?: string;
+    is_administrable?: boolean;
+    admin_rules?: MedicationAdminRules;
+    pharmac_therapeutic_group?: string | null;
+    pharmac_subgroup?: string | null;
     administrations: Administration[];
     scan_verification: MedicationScanVerification;
     stock: MedicationStock | null;
@@ -148,6 +178,47 @@ type MarSortDirection = 'asc' | 'desc';
 type MarData = {
     scheduled: ScheduledMed[];
     prn: PrnMed[];
+    awaiting_verification?: Array<
+        Partial<ScheduledMed> & {
+            id: number;
+            name: string;
+            dosage: string;
+            approval_status?: string;
+            rejection_reason?: string | null;
+        }
+    >;
+    attention_alerts?: Array<{
+        id: number;
+        type: string;
+        title: string;
+        detail?: string | null;
+        prompt_on_open: boolean;
+        created_at?: string | null;
+    }>;
+    inr_records?: Array<{
+        id: number;
+        medication_name?: string | null;
+        inr_value: string | number;
+        tested_on?: string | null;
+        next_test_date?: string | null;
+        disabled_at?: string | null;
+    }>;
+    syringe_drivers?: Array<{
+        id: number;
+        status: string;
+        commenced_at?: string | null;
+        rate?: string | null;
+        rate_unit?: string | null;
+        contents?: Array<Record<string, unknown>>;
+        site_of_insertion?: string | null;
+    }>;
+    settings?: {
+        suppress_med_admin_alerts?: boolean;
+        med_alerts_suppressed_reason?: string | null;
+        next_chart_review_date?: string | null;
+        chart_review_interval_months?: number | null;
+        care_level?: string | null;
+    };
     stats: {
         total_scheduled: number;
         total_prn: number;
@@ -273,6 +344,10 @@ type Props = {
     can: {
         record: boolean;
         correct: boolean;
+        verify_orders?: boolean;
+        manage_settings?: boolean;
+        manage_inr?: boolean;
+        manage_syringe_drivers?: boolean;
         revoke_break_glass: boolean;
         view_controlled: boolean;
         export_reports: boolean;
@@ -422,6 +497,8 @@ export default function MarCharts({
     const [attachmentOverrides, setAttachmentOverrides] = useState<
         Record<number, AdministrationAttachment[]>
     >({});
+    const [acknowledgedAttentionPromptIds, setAcknowledgedAttentionPromptIds] =
+        useState<number[]>([]);
 
     function navigateDate(offset: number) {
         const d = new Date(date);
@@ -636,6 +713,45 @@ export default function MarCharts({
         null;
 
     const selectedDetailKey = detailEntry?.key ?? null;
+    const attentionAlerts = marData?.attention_alerts ?? [];
+    const attentionPrompt = attentionAlerts.find(
+        (alert) =>
+            alert.prompt_on_open &&
+            !acknowledgedAttentionPromptIds.includes(alert.id),
+    );
+    const awaitingVerification = marData?.awaiting_verification ?? [];
+    const latestInr = (marData?.inr_records ?? []).find(
+        (record) => !record.disabled_at,
+    );
+    const runningSyringeDrivers = marData?.syringe_drivers ?? [];
+    const toolMedications = [
+        ...(marData?.scheduled ?? []),
+        ...(marData?.prn ?? []),
+    ].map((med) => ({ id: med.id, name: med.name }));
+
+    function handleRejectMedication(medicationId: number) {
+        const reason = window.prompt(
+            'Reason for rejecting this medication order:',
+        );
+        if (reason === null || !reason.trim()) {
+            return;
+        }
+        router.post(
+            `/emar/medications/${medicationId}/reject`,
+            { rejection_reason: reason },
+            { preserveScroll: true },
+        );
+    }
+
+    function acknowledgeAttentionPrompt() {
+        if (!attentionPrompt) return;
+
+        setAcknowledgedAttentionPromptIds((ids) =>
+            ids.includes(attentionPrompt.id)
+                ? ids
+                : [...ids, attentionPrompt.id],
+        );
+    }
 
     function selectMedicationForDetail(
         med: ScheduledMed | PrnMed,
@@ -746,6 +862,10 @@ export default function MarCharts({
                   'witness_required' in selectedMed
                       ? selectedMed.witness_required
                       : false,
+              admin_rules:
+                  'admin_rules' in selectedMed
+                      ? selectedMed.admin_rules
+                      : undefined,
               instructions:
                   'instructions' in selectedMed
                       ? (selectedMed.instructions ?? undefined)
@@ -924,6 +1044,173 @@ export default function MarCharts({
                                     interactions={interactions}
                                 />
                             </div>
+                        )}
+
+                        <div className="mb-4">
+                            <ClientMedicationTools
+                                client={selectedClient}
+                                staff={staff}
+                                medications={toolMedications}
+                                attentionAlerts={attentionAlerts}
+                                inrRecords={marData?.inr_records ?? []}
+                                syringeDrivers={runningSyringeDrivers}
+                                settings={marData?.settings ?? {}}
+                                can={{
+                                    manage_settings: can.manage_settings,
+                                    manage_inr: can.manage_inr,
+                                    manage_syringe_drivers:
+                                        can.manage_syringe_drivers,
+                                }}
+                            />
+                        </div>
+
+                        {(attentionAlerts.length > 0 ||
+                            marData?.settings?.suppress_med_admin_alerts ||
+                            latestInr ||
+                            runningSyringeDrivers.length > 0) && (
+                            <div className="mb-4 grid gap-3 lg:grid-cols-2">
+                                {marData?.settings
+                                    ?.suppress_med_admin_alerts && (
+                                    <Alert>
+                                        <AlertTriangle className="h-4 w-4" />
+                                        <AlertTitle>
+                                            Medication administration alerts
+                                            suppressed
+                                        </AlertTitle>
+                                        <AlertDescription>
+                                            {marData.settings
+                                                .med_alerts_suppressed_reason ??
+                                                'Due and overdue medication alerts are currently suppressed for this client.'}
+                                        </AlertDescription>
+                                    </Alert>
+                                )}
+
+                                {attentionAlerts.map((alert) => (
+                                    <Alert
+                                        key={alert.id}
+                                        variant={
+                                            alert.prompt_on_open
+                                                ? 'destructive'
+                                                : 'default'
+                                        }
+                                    >
+                                        <AlertTriangle className="h-4 w-4" />
+                                        <AlertTitle>{alert.title}</AlertTitle>
+                                        {alert.detail && (
+                                            <AlertDescription>
+                                                {alert.detail}
+                                            </AlertDescription>
+                                        )}
+                                    </Alert>
+                                ))}
+
+                                {latestInr && (
+                                    <Alert>
+                                        <Shield className="h-4 w-4" />
+                                        <AlertTitle>
+                                            Latest INR {latestInr.inr_value}
+                                        </AlertTitle>
+                                        <AlertDescription>
+                                            {latestInr.medication_name ??
+                                                'Warfarin'}
+                                            {latestInr.tested_on
+                                                ? ` tested ${latestInr.tested_on}`
+                                                : ''}
+                                            {latestInr.next_test_date
+                                                ? `, next due ${latestInr.next_test_date}`
+                                                : ''}
+                                        </AlertDescription>
+                                    </Alert>
+                                )}
+
+                                {runningSyringeDrivers.map((driver) => (
+                                    <Alert key={driver.id}>
+                                        <Syringe className="h-4 w-4" />
+                                        <AlertTitle>
+                                            Syringe driver running
+                                        </AlertTitle>
+                                        <AlertDescription>
+                                            {driver.rate
+                                                ? `${driver.rate} ${driver.rate_unit ?? ''}`
+                                                : 'Rate not recorded'}
+                                            {driver.site_of_insertion
+                                                ? ` • ${driver.site_of_insertion}`
+                                                : ''}
+                                        </AlertDescription>
+                                    </Alert>
+                                ))}
+                            </div>
+                        )}
+
+                        {awaitingVerification.length > 0 && (
+                            <Card className="mb-4">
+                                <CardHeader className="pb-3">
+                                    <CardTitle className="text-base">
+                                        Medication orders awaiting verification
+                                    </CardTitle>
+                                </CardHeader>
+                                <CardContent className="space-y-3">
+                                    {awaitingVerification.map((med) => (
+                                        <div
+                                            key={med.id}
+                                            className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3 text-sm"
+                                        >
+                                            <div>
+                                                <div className="font-medium">
+                                                    {med.name}
+                                                </div>
+                                                <div className="text-muted-foreground">
+                                                    {med.dosage}
+                                                    {med.route
+                                                        ? ` • ${med.route}`
+                                                        : ''}
+                                                    {med.approval_status
+                                                        ? ` • ${med.approval_status.replace('_', ' ')}`
+                                                        : ''}
+                                                </div>
+                                                {med.rejection_reason && (
+                                                    <div className="mt-1 text-xs text-status-critical">
+                                                        {med.rejection_reason}
+                                                    </div>
+                                                )}
+                                            </div>
+                                            {can.verify_orders && (
+                                                <div className="flex gap-2">
+                                                    <Button
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            router.post(
+                                                                `/emar/medications/${med.id}/verify`,
+                                                                {},
+                                                                {
+                                                                    preserveScroll:
+                                                                        true,
+                                                                },
+                                                            )
+                                                        }
+                                                    >
+                                                        Verify
+                                                    </Button>
+                                                    {med.approval_status !==
+                                                        'rejected' && (
+                                                        <Button
+                                                            size="sm"
+                                                            variant="outline"
+                                                            onClick={() =>
+                                                                handleRejectMedication(
+                                                                    med.id,
+                                                                )
+                                                            }
+                                                        >
+                                                            Reject
+                                                        </Button>
+                                                    )}
+                                                </div>
+                                            )}
+                                        </div>
+                                    ))}
+                                </CardContent>
+                            </Card>
                         )}
 
                         <div className="mb-6 grid gap-4 xl:grid-cols-2">
@@ -1642,10 +1929,12 @@ export default function MarCharts({
                                                                                                                 }
                                                                                                             </p>
                                                                                                         )}
-                                                                                                        {a.reason && (
+                                                                                                        {(a.reason_code ||
+                                                                                                            a.reason) && (
                                                                                                             <p>
                                                                                                                 Reason:{' '}
                                                                                                                 {
+                                                                                                                    a.reason_code ??
                                                                                                                     a.reason
                                                                                                                 }
                                                                                                             </p>
@@ -2164,6 +2453,42 @@ export default function MarCharts({
                             isLoading={loadingSafety}
                         />
 
+                        <Dialog
+                            open={!!attentionPrompt}
+                            onOpenChange={(open) => {
+                                if (!open) acknowledgeAttentionPrompt();
+                            }}
+                        >
+                            <DialogContent className="sm:max-w-lg">
+                                <DialogHeader>
+                                    <DialogTitle>
+                                        Medication chart warning
+                                    </DialogTitle>
+                                    <DialogDescription>
+                                        Review this warning before recording or
+                                        checking medication for this client.
+                                    </DialogDescription>
+                                </DialogHeader>
+                                {attentionPrompt && (
+                                    <div className="rounded-md border border-status-warning/40 bg-status-warning/10 p-3 text-sm">
+                                        <div className="font-medium">
+                                            {attentionPrompt.title}
+                                        </div>
+                                        {attentionPrompt.detail && (
+                                            <p className="mt-1 text-muted-foreground">
+                                                {attentionPrompt.detail}
+                                            </p>
+                                        )}
+                                    </div>
+                                )}
+                                <DialogFooter>
+                                    <Button onClick={acknowledgeAttentionPrompt}>
+                                        OK to proceed
+                                    </Button>
+                                </DialogFooter>
+                            </DialogContent>
+                        </Dialog>
+
                         <AdministrationEvidenceDialog
                             isOpen={!!evidenceTarget}
                             onClose={() => setEvidenceTarget(null)}
@@ -2348,9 +2673,11 @@ function MedicationDetailPanel({
                                                 ? ` · ${administration.administered_by}`
                                                 : ''}
                                         </div>
-                                        {administration.reason && (
+                                        {(administration.reason_code ||
+                                            administration.reason) && (
                                             <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                                                {administration.reason}
+                                                {administration.reason_code ??
+                                                    administration.reason}
                                             </div>
                                         )}
                                     </div>

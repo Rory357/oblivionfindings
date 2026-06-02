@@ -65,6 +65,14 @@ class MedicationDashboardAlert extends Model
         'unsafe_correction' => 'Unsafe Correction',
         'controlled_loss' => 'Controlled Drug Loss',
         'transit_exception' => 'Medication Transit Exception',
+        'paper_prescription' => 'Paper Prescription Attention',
+        'chart_warning' => 'Medication Chart Warning',
+        'warfarin' => 'Warfarin Attention',
+        'inr_due' => 'INR Due',
+        'chart_review_due' => 'Medication Chart Review Due',
+        'medication_review_due' => 'Medication Review Due',
+        'med_admin_alerts_suppressed' => 'Medication Administration Alerts Suppressed',
+        'awaiting_verification' => 'Medication Order Awaiting Verification',
     ];
 
     public const SEVERITY_LEVELS = [
