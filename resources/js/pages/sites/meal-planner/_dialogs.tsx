@@ -1,18 +1,20 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { router, useForm } from '@inertiajs/react';
 import axios from 'axios';
-import { AlertTriangle, ChefHat, Info, Lock, ShieldAlert, ShoppingBag, Utensils } from 'lucide-react';
+import { AlertTriangle, ChefHat, Info, LayoutTemplate, Lock, Settings, ShieldAlert, ShoppingBag, Soup, Trash2, Utensils, Wallet } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
+import { toast } from 'sonner';
+import { cn } from '@/lib/utils';
 import { ConfirmAction } from '../_confirm-action';
-import { MEAL_SLOTS, SLOT_LABEL, formatQty, type InventoryItem, type MealSlot, type PlanEntry, type RecipeOption, type SourceType } from './_helpers';
+import { addDays, MEAL_SLOTS, SLOT_LABEL, formatQty, toIsoDate, type InventoryItem, type MealSlot, type PlanEntry, type RecipeFull, type RecipeOption, type Resident, type SourceType, type WeekTemplate } from './_helpers';
+import { TemplateBuilderDialog } from './_templates-panel';
 
-type ClientOption = { id: number; name: string };
 type ProductOpt = { id: number; name: string; default_unit: string };
 
 type ConflictMatch = {
@@ -54,8 +56,10 @@ export function PlanEntryDialog({
     entry,
     initialDate,
     initialSlot,
+    initialRecipeId,
     recipes,
-    clients,
+    residents,
+    canOverride,
 }: {
     open: boolean;
     onClose: () => void;
@@ -64,14 +68,16 @@ export function PlanEntryDialog({
     entry: PlanEntry | null;
     initialDate: string;
     initialSlot: MealSlot;
+    initialRecipeId?: number;
     recipes: RecipeOption[];
-    clients: ClientOption[];
+    residents: Resident[];
+    canOverride: boolean;
 }) {
     const isNew = !entry;
     const existingOverrideReason = entry?.allergen_override_reason ?? '';
 
     const initialSource: SourceType = entry?.source_type
-        ?? (entry?.takeaway_vendor ? 'takeaway' : entry?.recipe_id ? 'recipe' : 'ad_hoc');
+        ?? (entry?.takeaway_vendor ? 'takeaway' : (entry?.recipe_id || initialRecipeId) ? 'recipe' : 'ad_hoc');
 
     const initialTakeawayCost = entry?.takeaway_cost_cents != null
         ? (entry.takeaway_cost_cents / 100).toFixed(2)
@@ -81,7 +87,7 @@ export function PlanEntryDialog({
         plan_date: (entry?.plan_date ?? initialDate).slice(0, 10),
         meal_slot: (entry?.meal_slot ?? initialSlot) as MealSlot,
         source_type: initialSource,
-        recipe_id: entry?.recipe_id ?? null,
+        recipe_id: entry?.recipe_id ?? initialRecipeId ?? null,
         ad_hoc_name: entry?.ad_hoc_name ?? '',
         takeaway_vendor: entry?.takeaway_vendor ?? '',
         takeaway_cost: initialTakeawayCost,
@@ -103,14 +109,14 @@ export function PlanEntryDialog({
             plan_date: (entry?.plan_date ?? initialDate).slice(0, 10),
             meal_slot: (entry?.meal_slot ?? initialSlot) as MealSlot,
             source_type: initialSource,
-            recipe_id: entry?.recipe_id ?? null,
+            recipe_id: entry?.recipe_id ?? initialRecipeId ?? null,
             ad_hoc_name: entry?.ad_hoc_name ?? '',
             takeaway_vendor: entry?.takeaway_vendor ?? '',
             takeaway_cost: initialTakeawayCost,
             takeaway_reference: entry?.takeaway_reference ?? '',
             servings: entry?.servings ?? 4,
             notes: entry?.notes ?? '',
-            client_ids: entry?.client_ids ?? [],
+            client_ids: entry?.client_ids ?? (isNew && siteType === 'house' ? residents.map((r) => r.id) : []),
             allergen_override_reason: '',
         });
         setReport(EMPTY_REPORT);
@@ -158,12 +164,13 @@ export function PlanEntryDialog({
         };
     }, [open, siteId, form.data.source_type, form.data.recipe_id, JSON.stringify(form.data.client_ids)]);
 
-    const showClients = siteType === 'house';
+    const showResidents = siteType === 'house';
 
     const hasHard = report.has_hard_blocks;
     const hasSoft = report.has_soft_warnings;
     const overrideValid = form.data.allergen_override_reason.trim().length >= OVERRIDE_MIN_CHARS;
-    const saveDisabled = form.processing || (hasHard && !overrideValid) || (hasSoft && !acknowledgedSoft && !hasHard);
+    const blockedByRole = hasHard && !canOverride;
+    const saveDisabled = form.processing || blockedByRole || (hasHard && canOverride && !overrideValid) || (hasSoft && !acknowledgedSoft && !hasHard);
 
     function submit(e: React.FormEvent) {
         e.preventDefault();
@@ -363,16 +370,28 @@ export function PlanEntryDialog({
                         <Label>Notes</Label>
                         <Textarea value={form.data.notes} onChange={(e) => form.setData('notes', e.target.value)} rows={2} />
                     </div>
-                    {showClients && clients.length > 0 && (
+                    {showResidents && residents.length > 0 && (
                         <div>
-                            <Label>Residents (allergens are checked against these)</Label>
-                            <div className="mt-1 max-h-32 overflow-y-auto rounded-md border p-2">
-                                {clients.map((c) => {
+                            <div className="mb-1 flex items-center justify-between">
+                                <Label className="mb-0">Residents <span className="font-normal text-muted-foreground">(allergens checked against these)</span></Label>
+                                <div className="flex gap-2 text-[11px] font-medium text-primary">
+                                    <button type="button" onClick={() => form.setData('client_ids', residents.map((r) => r.id))} className="hover:underline">All</button>
+                                    <button type="button" onClick={() => form.setData('client_ids', [])} className="hover:underline">None</button>
+                                </div>
+                            </div>
+                            <div className="mt-1 grid max-h-40 grid-cols-1 gap-1 overflow-y-auto rounded-md border border-border p-2 sm:grid-cols-2">
+                                {residents.map((c) => {
                                     const selected = (form.data.client_ids ?? []).includes(c.id);
                                     return (
-                                        <label key={c.id} className="flex items-center gap-2 py-1 text-sm">
-                                            <input type="checkbox" checked={selected} onChange={() => toggleClient(c.id)} />
-                                            {c.name}
+                                        <label key={c.id} className={cn('flex cursor-pointer items-center gap-2 rounded-md px-2 py-1.5 text-sm transition-colors', selected ? 'bg-sites-bg' : 'hover:bg-accent')}>
+                                            <input type="checkbox" checked={selected} onChange={() => toggleClient(c.id)} className="accent-[var(--sites)]" />
+                                            <span className="min-w-0 flex-1">
+                                                <span className="block truncate font-medium text-foreground">{c.name}</span>
+                                                <span className="flex flex-wrap items-center gap-1 text-[10.5px] leading-tight">
+                                                    {c.allergens.length > 0 && <span className="inline-flex items-center gap-0.5 text-status-critical"><ShieldAlert className="h-2.5 w-2.5" />{c.allergens.join(', ')}</span>}
+                                                    {c.texture && c.texture.level < 7 && <span className="inline-flex items-center gap-0.5 text-primary"><Soup className="h-2.5 w-2.5" />IDDSI {c.texture.level}</span>}
+                                                </span>
+                                            </span>
                                         </label>
                                     );
                                 })}
@@ -385,32 +404,37 @@ export function PlanEntryDialog({
                     )}
 
                     {hasHard && (
-                        <div className="rounded-md border-2 border-red-400 bg-red-50 p-3 text-sm">
-                            <div className="mb-2 flex items-center gap-2 font-semibold text-red-900">
-                                <ShieldAlert className="h-4 w-4" /> Allergy alert — override required to save
+                        <div className="rounded-md border-2 border-status-critical bg-status-critical-bg/60 p-3 text-sm">
+                            <div className="mb-2 flex items-center gap-2 font-semibold text-status-critical">
+                                <ShieldAlert className="h-4 w-4" /> Allergy alert — {canOverride ? 'override required to save' : 'this meal is unsafe for a resident'}
                             </div>
-                            <ul className="space-y-1 text-red-900">
+                            <ul className="space-y-1 text-status-critical">
                                 {report.hard_blocks.map((panel) => (
                                     <li key={panel.client_id}>
-                                        <strong>{panel.client_name}</strong>:{' '}
-                                        {panel.matches.map((m) => m.label).join(', ')}
+                                        <strong>{panel.client_name}</strong>: {panel.matches.map((m) => m.label).join(', ')}
                                     </li>
                                 ))}
                             </ul>
-                            <div className="mt-3">
-                                <Label className="text-xs font-medium text-red-900">Override reason (min {OVERRIDE_MIN_CHARS} chars, logged)</Label>
-                                <Textarea
-                                    value={form.data.allergen_override_reason}
-                                    onChange={(e) => form.setData('allergen_override_reason', e.target.value)}
-                                    rows={2}
-                                    placeholder="e.g. Cook prepared a separate gluten-free portion for Mila"
-                                    className="mt-1"
-                                />
-                                <div className="mt-1 text-xs text-red-900/80">
-                                    {form.data.allergen_override_reason.trim().length} / {OVERRIDE_MIN_CHARS} chars
-                                    {overrideValid && ' ✓'}
+                            {canOverride ? (
+                                <div className="mt-3">
+                                    <Label className="text-xs font-medium text-status-critical">Override reason (min {OVERRIDE_MIN_CHARS} chars, logged)</Label>
+                                    <Textarea
+                                        value={form.data.allergen_override_reason}
+                                        onChange={(e) => form.setData('allergen_override_reason', e.target.value)}
+                                        rows={2}
+                                        placeholder="e.g. Cook plates a separate gluten-free, dairy-free portion for Mila from the same base"
+                                        className="mt-1"
+                                    />
+                                    <div className="mt-1 text-xs text-status-critical/80">
+                                        {form.data.allergen_override_reason.trim().length} / {OVERRIDE_MIN_CHARS} chars{overrideValid && ' ✓'}
+                                    </div>
                                 </div>
-                            </div>
+                            ) : (
+                                <div className="mt-3 flex items-start gap-2 rounded-md border border-status-critical/40 bg-card/60 p-2 text-xs text-status-critical">
+                                    <Lock className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                                    <span>Your role cannot override an allergen conflict. Ask a <strong>Service Manager</strong> or <strong>Registered Nurse</strong> to plan this meal, or choose a safe alternative.</span>
+                                </div>
+                            )}
                         </div>
                     )}
 
@@ -462,7 +486,7 @@ export function PlanEntryDialog({
                         <div className="flex gap-2">
                             <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
                             <Button type="submit" disabled={saveDisabled}>
-                                {hasHard ? 'Override and save' : (isNew ? 'Add meal' : 'Save')}
+                                {blockedByRole ? 'Cannot override' : hasHard ? 'Override and save' : isNew ? 'Add meal' : 'Save'}
                             </Button>
                         </div>
                     </DialogFooter>
@@ -951,18 +975,20 @@ export function ShoppingListGenerateDialog({
     open,
     onClose,
     siteId,
+    weekStart,
 }: {
     open: boolean;
     onClose: () => void;
     siteId: number;
+    weekStart?: Date;
 }) {
-    const today = new Date();
-    const end = new Date();
-    end.setDate(today.getDate() + 6);
+    const start = weekStart ?? new Date();
+    const end = new Date(start);
+    end.setDate(start.getDate() + 6);
 
     const form = useForm({
-        covers_from: today.toISOString().slice(0, 10),
-        covers_to: end.toISOString().slice(0, 10),
+        covers_from: toIsoDate(start),
+        covers_to: toIsoDate(end),
         include_restock_to_par: true,
     });
 
@@ -1002,6 +1028,162 @@ export function ShoppingListGenerateDialog({
                     </DialogFooter>
                 </form>
             </DialogContent>
+        </Dialog>
+    );
+}
+
+export function SettingsDialog({
+    open,
+    onClose,
+    siteId,
+    budgetCents,
+    templates,
+    recipes,
+    weekStart,
+    entries,
+    canManage,
+    onTemplatesChanged,
+}: {
+    open: boolean;
+    onClose: () => void;
+    siteId: number;
+    budgetCents: number | null;
+    templates: WeekTemplate[];
+    recipes: RecipeFull[];
+    weekStart: Date;
+    entries: PlanEntry[];
+    canManage: boolean;
+    onTemplatesChanged: () => void;
+}) {
+    const [budget, setBudget] = useState(budgetCents ? (budgetCents / 100).toFixed(0) : '');
+    const [savingBudget, setSavingBudget] = useState(false);
+    const [savedBudget, setSavedBudget] = useState(false);
+    const [tplName, setTplName] = useState('');
+    const [savingTpl, setSavingTpl] = useState(false);
+    const [builderOpen, setBuilderOpen] = useState(false);
+
+    const weekDates = Array.from({ length: 7 }, (_, i) => toIsoDate(addDays(weekStart, i)));
+    const weekMeals = entries.filter((e) => weekDates.includes(e.plan_date.slice(0, 10)) && e.source_type === 'recipe' && e.recipe_id != null);
+
+    async function saveBudget() {
+        setSavingBudget(true);
+        try {
+            await axios.put(`/sites/${siteId}/meal-planner/settings`, { weekly_food_budget_cents: budget === '' ? null : Math.round(Number(budget) * 100) });
+            setSavedBudget(true);
+            setTimeout(() => setSavedBudget(false), 1800);
+        } catch {
+            toast.error('Could not save budget');
+        } finally {
+            setSavingBudget(false);
+        }
+    }
+
+    async function saveCurrentWeek() {
+        if (!tplName.trim() || weekMeals.length === 0) return;
+        setSavingTpl(true);
+        try {
+            const meals = weekMeals.map((e) => ({ day: weekDates.indexOf(e.plan_date.slice(0, 10)), slot: e.meal_slot, recipe_id: e.recipe_id, servings: e.servings }));
+            await axios.post(`/sites/${siteId}/meal-templates`, { name: tplName.trim(), description: `${meals.length} meals`, meals });
+            toast.success(`Template “${tplName.trim()}” saved`);
+            setTplName('');
+            onTemplatesChanged();
+        } catch {
+            toast.error('Could not save template');
+        } finally {
+            setSavingTpl(false);
+        }
+    }
+
+    async function deleteTemplate(id: number) {
+        try {
+            await axios.delete(`/sites/${siteId}/meal-templates/${id}`);
+            toast.success('Template deleted');
+            onTemplatesChanged();
+        } catch {
+            toast.error('Could not delete');
+        }
+    }
+
+    return (
+        <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
+            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-xl">
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2"><Settings className="h-4 w-4 text-primary" /> Meal planner settings</DialogTitle>
+                    <DialogDescription>Weekly food budget and reusable week templates.</DialogDescription>
+                </DialogHeader>
+                <div className="space-y-5">
+                    <section>
+                        <h3 className="mb-1.5 flex items-center gap-2 text-[13.5px] font-semibold text-foreground"><Wallet className="h-[15px] w-[15px] text-muted-foreground" /> Weekly food budget</h3>
+                        <p className="mb-2 text-[12px] text-muted-foreground">Drives the budget bar and spend report for this house.</p>
+                        <div className="flex items-end gap-2">
+                            <div className="flex-1">
+                                <Label>Amount per week (NZD)</Label>
+                                <div className="relative">
+                                    <span className="pointer-events-none absolute left-3 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
+                                    <Input type="number" min={0} step="10" value={budget} onChange={(e) => setBudget(e.target.value)} placeholder="0" className="pl-6" disabled={!canManage} />
+                                </div>
+                            </div>
+                            {canManage && <Button onClick={saveBudget} disabled={savingBudget}>{savedBudget ? 'Saved ✓' : 'Save budget'}</Button>}
+                        </div>
+                    </section>
+
+                    <div className="h-px bg-border" />
+
+                    <section>
+                        <h3 className="mb-1.5 flex items-center gap-2 text-[13.5px] font-semibold text-foreground"><LayoutTemplate className="h-[15px] w-[15px] text-muted-foreground" /> Week templates</h3>
+                        <p className="mb-2 text-[12px] text-muted-foreground">Reusable meal rotations you can apply to any week.</p>
+
+                        {canManage && (
+                            <button type="button" onClick={() => setBuilderOpen(true)} className="mb-2 flex w-full items-center gap-3 rounded-xl border border-primary/30 bg-primary/5 px-3.5 py-3 text-left transition-colors hover:bg-primary/10">
+                                <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary text-primary-foreground"><LayoutTemplate className="h-5 w-5" /></span>
+                                <span className="min-w-0 flex-1">
+                                    <span className="block text-[13.5px] font-semibold text-foreground">Build a template from scratch</span>
+                                    <span className="block text-[11.5px] text-muted-foreground">Compose a full week on a day × meal grid</span>
+                                </span>
+                            </button>
+                        )}
+
+                        {canManage && (
+                            <details className="mb-3 rounded-xl border border-border bg-muted/40">
+                                <summary className="cursor-pointer list-none px-3.5 py-2.5 text-[12.5px] font-medium text-foreground [&::-webkit-details-marker]:hidden">
+                                    <span className="inline-flex items-center gap-1.5"><LayoutTemplate className="h-3.5 w-3.5 text-muted-foreground" /> Or save the week you're viewing</span>
+                                </summary>
+                                <div className="border-t border-border p-3">
+                                    <div className="flex items-end gap-2">
+                                        <Input value={tplName} onChange={(e) => setTplName(e.target.value)} placeholder="e.g. Winter rotation" className="flex-1" />
+                                        <Button onClick={saveCurrentWeek} disabled={savingTpl || !tplName.trim() || weekMeals.length === 0}>Save</Button>
+                                    </div>
+                                    <p className="mt-1.5 text-[11.5px] text-muted-foreground">
+                                        {weekMeals.length > 0 ? `Captures ${weekMeals.length} recipe meal${weekMeals.length === 1 ? '' : 's'} from the week you're viewing.` : 'Plan some recipe meals this week first, then save them as a template.'}
+                                    </p>
+                                </div>
+                            </details>
+                        )}
+
+                        <div className="space-y-1.5">
+                            {templates.map((t) => (
+                                <div key={t.id} className="flex items-center gap-3 rounded-lg border border-border bg-card px-3 py-2">
+                                    <LayoutTemplate className="h-4 w-4 shrink-0 text-muted-foreground" />
+                                    <div className="min-w-0 flex-1">
+                                        <div className="truncate text-[13px] font-medium text-foreground">{t.name}</div>
+                                        <div className="truncate text-[11px] text-muted-foreground">{t.meals.length} meals{t.description ? ` · ${t.description}` : ''}</div>
+                                    </div>
+                                    {canManage && (
+                                        <ConfirmAction title={`Delete “${t.name}”?`} description="Removes the template." confirmLabel="Delete" onConfirm={() => deleteTemplate(t.id)}>
+                                            <Button variant="ghost" size="icon" className="h-7 w-7"><Trash2 className="h-4 w-4 text-status-critical" /></Button>
+                                        </ConfirmAction>
+                                    )}
+                                </div>
+                            ))}
+                            {templates.length === 0 && <div className="rounded-lg border border-dashed border-border px-3 py-4 text-center text-[12px] text-muted-foreground">No templates yet.</div>}
+                        </div>
+                    </section>
+                </div>
+                <DialogFooter><Button onClick={onClose}>Done</Button></DialogFooter>
+            </DialogContent>
+            {builderOpen && (
+                <TemplateBuilderDialog siteId={siteId} recipes={recipes} initial={null} onClose={() => setBuilderOpen(false)} onSaved={() => { setBuilderOpen(false); onTemplatesChanged(); }} />
+            )}
         </Dialog>
     );
 }

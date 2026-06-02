@@ -69,6 +69,9 @@ class Client extends Model
         'med_alerts_suppressed_at',
         'chart_review_interval_months',
         'next_chart_review_date',
+        'meal_iddsi_level',
+        'meal_iddsi_label',
+        'meal_fluids_label',
     ];
 
     protected $casts = [

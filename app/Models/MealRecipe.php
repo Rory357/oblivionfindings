@@ -26,6 +26,8 @@ class MealRecipe extends Model
         'instructions',
         'image_path',
         'is_active',
+        'scope',
+        'site_id',
         'created_by',
     ];
 
@@ -73,6 +75,23 @@ class MealRecipe extends Model
     public function creator(): BelongsTo
     {
         return $this->belongsTo(\App\Models\User::class, 'created_by');
+    }
+
+    public function site(): BelongsTo
+    {
+        return $this->belongsTo(Site::class);
+    }
+
+    /**
+     * Recipes visible to a site: the shared (org-wide) library plus any
+     * recipes scoped to this house. Used by the Meal Planner.
+     */
+    public function scopeVisibleToSite($query, int $siteId)
+    {
+        return $query->where(function ($q) use ($siteId) {
+            $q->where('scope', 'shared')
+                ->orWhere(fn ($qq) => $qq->where('scope', 'house')->where('site_id', $siteId));
+        });
     }
 
     public function scopeActive($query)

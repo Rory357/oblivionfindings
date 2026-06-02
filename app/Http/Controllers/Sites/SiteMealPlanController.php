@@ -4,12 +4,16 @@ namespace App\Http\Controllers\Sites;
 
 use App\Http\Controllers\Controller;
 use App\Models\Client;
+use App\Models\ClientMealDislike;
+use App\Models\MealDietaryTag;
 use App\Models\MealProduct;
 use App\Models\MealRecipe;
 use App\Models\Site;
 use App\Models\SiteMealPlanEntry;
+use App\Models\SiteMealWeekTemplate;
 use App\Services\AuditLogger;
 use App\Services\Catering\DietaryConflictChecker;
+use App\Services\Catering\InventoryMovementRecorder;
 use App\Services\Catering\MealCostCalculator;
 use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
@@ -17,23 +21,35 @@ use Illuminate\Validation\ValidationException;
 
 class SiteMealPlanController extends Controller
 {
+    /** IDDSI food framework levels offered in the resident dietary editor. */
+    public const IDDSI_LEVELS = [
+        ['level' => 7, 'label' => 'Regular / Easy to chew'],
+        ['level' => 6, 'label' => 'Soft & Bite-sized'],
+        ['level' => 5, 'label' => 'Minced & Moist'],
+        ['level' => 4, 'label' => 'Puréed'],
+        ['level' => 3, 'label' => 'Liquidised'],
+    ];
+
     public function __construct(
         private DietaryConflictChecker $conflictChecker,
         private MealCostCalculator $costCalculator,
+        private InventoryMovementRecorder $inventory,
     ) {}
 
     public function bootstrap(Site $site)
     {
         $user = auth()->user();
+
         $recipes = MealRecipe::active()
+            ->visibleToSite($site->id)
+            ->with([
+                'tags:id,label,kind,severity',
+                'ingredients.product:id,name,default_unit,category',
+                'ingredients.product.tags:id,kind',
+            ])
             ->orderBy('name')
-            ->get(['id', 'name', 'slug', 'serves_default'])
-            ->map(fn ($r) => [
-                'id' => $r->id,
-                'name' => $r->name,
-                'slug' => $r->slug,
-                'serves_default' => $r->serves_default,
-            ]);
+            ->get()
+            ->map(fn (MealRecipe $r) => $this->recipePayload($r));
 
         $products = MealProduct::active()
             ->orderBy('name')
@@ -48,23 +64,124 @@ class SiteMealPlanController extends Controller
 
         $clients = Client::query()
             ->where('site_id', $site->id)
+            ->with(['mealDietaryTags:id,label,kind', 'mealDislikes.product:id,name'])
             ->orderBy('first_name')
-            ->get(['id', 'first_name', 'last_name'])
-            ->map(fn ($c) => ['id' => $c->id, 'name' => trim($c->first_name . ' ' . $c->last_name)]);
+            ->get()
+            ->map(fn (Client $c) => $this->residentPayload($c));
+
+        $templates = SiteMealWeekTemplate::query()
+            ->where('site_id', $site->id)
+            ->orderBy('name')
+            ->get()
+            ->map(fn (SiteMealWeekTemplate $t) => $this->templatePayload($t));
+
+        // Slim list of houses & offices for the hero site switcher.
+        $sites = Site::query()
+            ->where('tenant_id', $site->tenant_id)
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'type', 'suburb', 'region'])
+            ->map(fn (Site $s) => [
+                'id' => $s->id,
+                'name' => $s->name,
+                'type' => $s->type,
+                'suburb' => $s->suburb,
+                'region' => $s->resolved_region ?? $s->region,
+                'beds' => $s->clients()->count(),
+            ]);
 
         return response()->json([
-            'site' => ['id' => $site->id, 'name' => $site->name, 'type' => $site->type],
+            'site' => [
+                'id' => $site->id,
+                'name' => $site->name,
+                'type' => $site->type,
+                'suburb' => $site->suburb,
+                'region' => $site->resolved_region ?? $site->region,
+                'weekly_food_budget_cents' => $site->weekly_food_budget_cents,
+            ],
             'recipes' => $recipes,
             'products' => $products,
             'product_categories' => $productCategories,
             'clients' => $clients,
+            'templates' => $templates,
+            'sites' => $sites,
+            'iddsi_levels' => self::IDDSI_LEVELS,
+            'dietary_tags' => MealDietaryTag::orderBy('label')->get(['id', 'label', 'kind']),
             'permissions' => [
                 'plan' => (bool) $user?->canDo('sites.meals.plan'),
                 'inventory_adjust' => (bool) $user?->canDo('sites.meals.inventory.adjust'),
                 'shopping_manage' => (bool) $user?->canDo('sites.meals.shopping.manage'),
                 'products_manage' => (bool) $user?->canDo('catering.products.manage'),
+                'recipes_manage' => (bool) $user?->canDo('catering.recipes.manage'),
+                'can_override' => (bool) $user?->canDo('sites.meals.allergen.override'),
             ],
         ]);
+    }
+
+    private function recipePayload(MealRecipe $r): array
+    {
+        $allergenTagIds = $r->tags->where('kind', 'allergen')->pluck('id')
+            ->merge($r->ingredients->flatMap(fn ($i) => $i->product?->tags?->where('kind', 'allergen')->pluck('id') ?? collect()))
+            ->unique()->values();
+
+        return [
+            'id' => $r->id,
+            'name' => $r->name,
+            'slug' => $r->slug,
+            'serves_default' => $r->serves_default,
+            'prep_minutes' => $r->prep_minutes,
+            'cook_minutes' => $r->cook_minutes,
+            'scope' => $r->scope ?? 'shared',
+            'site_id' => $r->site_id,
+            'instructions' => $r->instructions,
+            'tags' => $r->tags->map(fn ($t) => ['id' => $t->id, 'label' => $t->label, 'kind' => $t->kind, 'severity' => $t->severity])->values(),
+            'tag_ids' => $r->tags->pluck('id')->values(),
+            'allergen_tag_ids' => $allergenTagIds,
+            'cost_cents' => $this->costCalculator->forRecipe($r, $r->serves_default),
+            'ingredients' => $r->ingredients->map(fn ($i) => [
+                'product_id' => $i->product_id,
+                'name' => $i->product?->name ?? $i->free_text_name,
+                'qty' => (float) $i->quantity,
+                'unit' => $i->unit,
+                'category' => $i->product?->category,
+            ])->values(),
+        ];
+    }
+
+    private function residentPayload(Client $c): array
+    {
+        $name = trim($c->first_name . ' ' . $c->last_name);
+        $initials = strtoupper(mb_substr($c->first_name ?? '', 0, 1) . mb_substr($c->last_name ?? '', 0, 1));
+        $allergens = $c->mealDietaryTags->where('kind', 'allergen');
+        $dietary = $c->mealDietaryTags->where('kind', 'dietary');
+
+        return [
+            'id' => $c->id,
+            'name' => $name,
+            'initials' => $initials ?: 'NA',
+            'hue' => ($c->id * 47) % 360,
+            'allergens' => $allergens->pluck('label')->values(),
+            'allergen_tag_ids' => $allergens->pluck('id')->values(),
+            'dietary' => $dietary->pluck('label')->values(),
+            'dietary_tag_ids' => $dietary->pluck('id')->values(),
+            'dislikes' => $c->mealDislikes->map(fn (ClientMealDislike $d) => $d->product?->name ?? $d->free_text_name)->filter()->values(),
+            'dislike_product_ids' => $c->mealDislikes->pluck('product_id')->filter()->values(),
+            'texture' => $c->meal_iddsi_level
+                ? ['level' => (int) $c->meal_iddsi_level, 'label' => $c->meal_iddsi_label ?? '']
+                : null,
+            'fluids' => $c->meal_fluids_label,
+        ];
+    }
+
+    private function templatePayload(SiteMealWeekTemplate $t): array
+    {
+        return [
+            'id' => $t->id,
+            'name' => $t->name,
+            'description' => $t->description,
+            'is_starter' => (bool) $t->is_starter,
+            'meals' => $t->meals ?? [],
+        ];
     }
 
     public function index(Request $request, Site $site)
@@ -215,12 +332,197 @@ class SiteMealPlanController extends Controller
         abort_unless(auth()->user()?->canDo('sites.meals.plan'), 403);
         abort_unless($entry->site_id === $site->id, 404);
 
+        if ($entry->served_at) {
+            return back()->with('status', 'Already served');
+        }
+
         $entry->update([
             'served_at' => now(),
             'served_by' => auth()->id(),
         ]);
 
-        return back()->with('status', 'Marked as served');
+        // Closed loop: deduct the recipe's tracked ingredients from inventory.
+        $count = $this->applyServeStock($site, $entry, -1);
+
+        return back()->with('status', $count > 0
+            ? "Served · {$count} ingredient" . ($count === 1 ? '' : 's') . ' deducted from stock'
+            : 'Marked as served');
+    }
+
+    public function unserve(Site $site, SiteMealPlanEntry $entry)
+    {
+        abort_unless(auth()->user()?->canDo('sites.meals.plan'), 403);
+        abort_unless($entry->site_id === $site->id, 404);
+
+        if (! $entry->served_at) {
+            return back()->with('status', 'Not served');
+        }
+
+        // Restore stock that was deducted on serve, then clear the served flag.
+        $count = $this->applyServeStock($site, $entry, 1);
+
+        $entry->update([
+            'served_at' => null,
+            'served_by' => null,
+        ]);
+
+        return back()->with('status', $count > 0 ? 'Un-served · stock restored' : 'Marked not served');
+    }
+
+    /**
+     * Adjust inventory for a recipe meal being served (sign -1) or
+     * un-served (+1). Scales each tracked ingredient by servings ÷ default.
+     * Returns the number of inventory movements written.
+     */
+    private function applyServeStock(Site $site, SiteMealPlanEntry $entry, int $sign): int
+    {
+        if ($entry->source_type !== 'recipe' || ! $entry->recipe_id) {
+            return 0;
+        }
+        $recipe = MealRecipe::with('ingredients')->find($entry->recipe_id);
+        if (! $recipe || $recipe->ingredients->isEmpty()) {
+            return 0;
+        }
+        $base = max(1, (int) $recipe->serves_default);
+        $scale = ((int) ($entry->servings ?: $base)) / $base;
+        $touched = 0;
+        foreach ($recipe->ingredients as $ing) {
+            if (! $ing->product_id) {
+                continue;
+            }
+            $delta = $sign * ((float) $ing->quantity) * $scale;
+            if ($delta === 0.0) {
+                continue;
+            }
+            $this->inventory->record(
+                site: $site,
+                productId: $ing->product_id,
+                delta: $delta,
+                unit: $ing->unit,
+                reason: 'plan_consumption',
+                referenceType: SiteMealPlanEntry::class,
+                referenceId: $entry->id,
+                performedBy: auth()->id(),
+                note: ($sign < 0 ? 'Served: ' : 'Un-served: ') . $entry->displayName(),
+            );
+            $touched++;
+        }
+        return $touched;
+    }
+
+    public function saveSettings(Request $request, Site $site)
+    {
+        abort_unless(auth()->user()?->canDo('sites.meals.shopping.manage'), 403);
+        $data = $request->validate([
+            'weekly_food_budget_cents' => 'nullable|integer|min:0|max:100000000',
+        ]);
+        $site->update(['weekly_food_budget_cents' => $data['weekly_food_budget_cents'] ?? null]);
+        return back()->with('status', 'Meal planner settings saved');
+    }
+
+    /**
+     * Update a resident's dietary profile from the calendar's resident
+     * editor — allergen/dietary tags, dislikes, IDDSI texture and fluids.
+     */
+    public function updateResident(Request $request, Site $site, Client $client)
+    {
+        abort_unless(auth()->user()?->canDo('sites.meals.plan'), 403);
+        abort_unless($client->site_id === $site->id, 404);
+
+        $data = $request->validate([
+            'tag_ids' => 'nullable|array',
+            'tag_ids.*' => 'integer|exists:meal_dietary_tags,id',
+            'dislikes' => 'nullable|array',
+            'dislikes.*' => 'string|max:255',
+            'iddsi_level' => 'nullable|integer|min:1|max:7',
+            'iddsi_label' => 'nullable|string|max:120',
+            'fluids' => 'nullable|string|max:120',
+        ]);
+
+        $client->mealDietaryTags()->sync($data['tag_ids'] ?? []);
+
+        // Replace free-text dislikes (the editor sends the full set).
+        $client->mealDislikes()->whereNull('product_id')->delete();
+        foreach (array_unique($data['dislikes'] ?? []) as $name) {
+            $name = trim($name);
+            if ($name === '') {
+                continue;
+            }
+            ClientMealDislike::create([
+                'client_id' => $client->id,
+                'free_text_name' => $name,
+                'created_by' => auth()->id(),
+            ]);
+        }
+
+        $client->update([
+            'meal_iddsi_level' => $data['iddsi_level'] ?? null,
+            'meal_iddsi_label' => $data['iddsi_label'] ?? null,
+            'meal_fluids_label' => $data['fluids'] ?? null,
+        ]);
+
+        return back()->with('status', 'Resident dietary profile updated');
+    }
+
+    public function clearWeek(Request $request, Site $site)
+    {
+        abort_unless(auth()->user()?->canDo('sites.meals.plan'), 403);
+        $start = $this->resolveStart($request->string('week')->toString());
+        $end = $start->addDays(6);
+        SiteMealPlanEntry::query()
+            ->where('site_id', $site->id)
+            ->whereBetween('plan_date', [$start->toDateString(), $end->toDateString()])
+            ->delete();
+        return back()->with('status', 'Week cleared');
+    }
+
+    public function copyWeek(Request $request, Site $site)
+    {
+        abort_unless(auth()->user()?->canDo('sites.meals.plan'), 403);
+        $data = $request->validate([
+            'from_week' => 'required|date',
+            'to_week' => 'required|date',
+            'replace' => 'nullable|boolean',
+        ]);
+        $from = CarbonImmutable::parse($data['from_week'])->startOfWeek();
+        $to = CarbonImmutable::parse($data['to_week'])->startOfWeek();
+        $fromEnd = $from->addDays(6);
+
+        if (! empty($data['replace'])) {
+            SiteMealPlanEntry::query()
+                ->where('site_id', $site->id)
+                ->whereBetween('plan_date', [$to->toDateString(), $to->addDays(6)->toDateString()])
+                ->delete();
+        }
+
+        $src = SiteMealPlanEntry::query()
+            ->where('site_id', $site->id)
+            ->whereBetween('plan_date', [$from->toDateString(), $fromEnd->toDateString()])
+            ->get();
+
+        $copied = 0;
+        foreach ($src as $e) {
+            $offset = $from->diffInDays(CarbonImmutable::parse($e->plan_date));
+            SiteMealPlanEntry::create([
+                'tenant_id' => $e->tenant_id,
+                'site_id' => $site->id,
+                'plan_date' => $to->addDays((int) $offset)->toDateString(),
+                'meal_slot' => $e->meal_slot,
+                'source_type' => $e->source_type,
+                'recipe_id' => $e->recipe_id,
+                'ad_hoc_name' => $e->ad_hoc_name,
+                'takeaway_vendor' => $e->takeaway_vendor,
+                'takeaway_cost_cents' => $e->takeaway_cost_cents,
+                'takeaway_reference' => $e->takeaway_reference,
+                'servings' => $e->servings,
+                'notes' => $e->notes,
+                'client_ids' => $e->client_ids,
+                'created_by' => auth()->id(),
+            ]);
+            $copied++;
+        }
+
+        return back()->with('status', "Copied {$copied} meal" . ($copied === 1 ? '' : 's'));
     }
 
     public function weekSummary(Request $request, Site $site)
@@ -299,6 +601,13 @@ class SiteMealPlanController extends Controller
         $report = $this->conflictChecker->checkRecipeAgainstClients($recipe, $data['client_ids']);
         if (!$report['has_hard_blocks']) {
             return;
+        }
+        // Only Service Managers / Registered Nurses (or admins) may override a
+        // hard allergen conflict — Support Workers are blocked outright.
+        if (! auth()->user()?->canDo('sites.meals.allergen.override')) {
+            throw ValidationException::withMessages([
+                'allergen_override_reason' => ['This meal conflicts with a resident allergen and your role cannot override it. Ask a Service Manager or Registered Nurse.'],
+            ])->status(422);
         }
         $reason = trim((string) ($data['allergen_override_reason'] ?? ''));
         if (mb_strlen($reason) < 10) {

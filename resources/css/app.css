@@ -28,6 +28,19 @@
         }
     }
 
+    /* Meal planner popovers/menus — transform-only so paused animations
+       never leave content invisible (see open-state safety net below). */
+    --animate-pop: pop 0.16s ease-out;
+
+    @keyframes pop {
+        from {
+            transform: translateY(-4px) scale(0.985);
+        }
+        to {
+            transform: none;
+        }
+    }
+
     --color-background: var(--background);
     --color-foreground: var(--foreground);
 
@@ -100,6 +113,20 @@
     --color-category-sites-bg: var(--category-sites-bg);
     --color-category-fleet: var(--category-fleet);
     --color-category-fleet-bg: var(--category-fleet-bg);
+
+    /* Sites / Meal Planner green accent (bare utilities: bg-sites, text-sites-deep, …) */
+    --color-sites: var(--sites);
+    --color-sites-deep: var(--sites-deep);
+    --color-sites-bg: var(--sites-bg);
+    --color-sites-foreground: var(--primary-foreground);
+
+    /* Takeaway amber accent */
+    --color-amberx: var(--amberx);
+    --color-amberx-bg: var(--amberx-bg);
+
+    /* Meal planner elevation */
+    --shadow-float: 0 18px 40px -12px oklch(0.30 0.06 153 / 0.30);
+    --shadow-hero: 0 24px 60px -22px oklch(0.40 0.13 153 / 0.45);
 
     --color-brand-deep: var(--brand-deep);
     --color-brand-tint-deep: var(--brand-tint-deep);
@@ -185,6 +212,13 @@
     --category-fleet: oklch(from var(--primary) l c calc(h + 45));
     --category-fleet-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 45)) 12%, transparent);
 
+    /* Sites / Meal Planner green (anchored to category-sites hue for hero parity) */
+    --sites: var(--category-sites);
+    --sites-deep: oklch(from var(--category-sites) calc(l - 0.13) c h);
+    --sites-bg: color-mix(in oklch, var(--category-sites) 13%, var(--card));
+    --amberx: oklch(0.62 0.14 70);
+    --amberx-bg: color-mix(in oklch, oklch(0.62 0.14 70) 14%, var(--card));
+
     /* Brand-derived shades used by the /my-day redesign. The hero uses
        --brand-tint-deep for the "now" rule borders, and --text-faint for
        caps-uppercase microcopy (e.g. tip text below the rail). */
@@ -268,6 +302,13 @@
     --category-sites-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 210)) 20%, transparent);
     --category-fleet: oklch(from var(--primary) l c calc(h + 45));
     --category-fleet-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 45)) 20%, transparent);
+
+    /* Sites / Meal Planner green (dark) */
+    --sites: var(--category-sites);
+    --sites-deep: oklch(from var(--category-sites) calc(l + 0.14) c h);
+    --sites-bg: color-mix(in oklch, var(--category-sites) 24%, var(--card));
+    --amberx: oklch(0.75 0.13 75);
+    --amberx-bg: color-mix(in oklch, oklch(0.75 0.13 75) 24%, var(--card));
 
     /* Brand-derived shades — dark variants */
     --brand-deep: oklch(from var(--primary) calc(l + 0.06) c h);
@@ -565,4 +606,46 @@ html[data-density="comfortable"] [data-slot="sidebar-menu-button"] {
     --tw-enter-translate-x: 0;
     --tw-enter-translate-y: 0;
     --tw-enter-rotate: 0;
+}
+
+/* Slim scrollbars for meal-planner grids, popovers & dropdowns. */
+.nice-scroll {
+    scrollbar-width: thin;
+    scrollbar-color: color-mix(in oklch, var(--muted-foreground) 35%, transparent) transparent;
+}
+.nice-scroll::-webkit-scrollbar {
+    width: 8px;
+    height: 8px;
+}
+.nice-scroll::-webkit-scrollbar-thumb {
+    background: color-mix(in oklch, var(--muted-foreground) 30%, transparent);
+    border-radius: 9999px;
+}
+.nice-scroll::-webkit-scrollbar-track {
+    background: transparent;
+}
+
+/* Meal planner branded print docs (kitchen sheet / shopping list). */
+.mp-print-doc {
+    display: none;
+}
+@media print {
+    body * {
+        visibility: hidden;
+    }
+    .mp-print-doc,
+    .mp-print-doc * {
+        visibility: visible;
+    }
+    .mp-print-doc {
+        display: block;
+        position: absolute;
+        inset: 0;
+        margin: 0;
+        padding: 24px;
+        background: #fff;
+    }
+    .mp-print-doc .pg-break {
+        break-inside: avoid;
+    }
 }

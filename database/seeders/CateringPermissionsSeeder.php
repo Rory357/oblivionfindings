@@ -21,6 +21,7 @@ class CateringPermissionsSeeder extends Seeder
             ['key' => 'sites.meals.plan', 'description' => 'Add, edit, remove planned meals'],
             ['key' => 'sites.meals.inventory.adjust', 'description' => 'Adjust site kitchen inventory'],
             ['key' => 'sites.meals.shopping.manage', 'description' => 'Generate and manage shopping lists'],
+            ['key' => 'sites.meals.allergen.override', 'description' => 'Override a hard allergen conflict when planning a meal'],
         ];
 
         foreach ($permissions as $perm) {
@@ -62,6 +63,7 @@ class CateringPermissionsSeeder extends Seeder
                 'sites.meals.plan',
                 'sites.meals.inventory.adjust',
                 'sites.meals.shopping.manage',
+                'sites.meals.allergen.override',
             ];
             foreach ($houseLeadKeys as $key) {
                 $p = Permission::where('key', $key)->first();
