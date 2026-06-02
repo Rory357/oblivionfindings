@@ -1,7 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head } from '@inertiajs/react';
 import MealPlannerSubTabs from '@/pages/sites/meal-planner';
-import { CateringTabs } from './_tabs';
 
 type Props = { default_site_id: number | null };
 
@@ -11,7 +10,7 @@ export default function CateringMealPlanner({ default_site_id }: Props) {
             <Head title="Meal Planner" />
             <div className="space-y-4 p-6">
                 {default_site_id ? (
-                    <MealPlannerSubTabs mode="standalone" defaultSiteId={default_site_id} headerSlot={<CateringTabs active="meal-planner" />} />
+                    <MealPlannerSubTabs mode="standalone" defaultSiteId={default_site_id} />
                 ) : (
                     <div className="rounded-xl border border-dashed border-border bg-card p-10 text-center text-sm text-muted-foreground">
                         No active sites yet — create a site to start planning meals.

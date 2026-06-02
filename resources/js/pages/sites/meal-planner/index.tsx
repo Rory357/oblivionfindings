@@ -2,7 +2,7 @@ import { cn } from '@/lib/utils';
 import { router, usePage } from '@inertiajs/react';
 import axios from 'axios';
 import { CalendarDays, ChefHat, CircleAlert, Clock, LayoutTemplate, Package, ShieldAlert, ShoppingCart, TriangleAlert, type LucideIcon } from 'lucide-react';
-import { lazy, Suspense, useCallback, useEffect, useMemo, useState, type ReactNode } from 'react';
+import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import CalendarGrid from './_calendar-grid';
 import MealPlannerHero, { MealPlannerToolbar, type HeroNotification, type HeroStats } from './_hero';
 import InventoryTable from './_inventory-table';
@@ -42,13 +42,11 @@ type Props = {
     mode?: 'standalone' | 'embedded';
     /** Initial site for standalone mode (the /catering page). */
     defaultSiteId?: number;
-    /** Optional content rendered just below the hero (the /catering page passes the catering section tabs here). */
-    headerSlot?: ReactNode;
 };
 
 type SubTab = 'calendar' | 'inventory' | 'shopping' | 'recipes' | 'templates';
 
-export default function MealPlannerSubTabs({ site: siteProp, mode = 'embedded', defaultSiteId, headerSlot }: Props) {
+export default function MealPlannerSubTabs({ site: siteProp, mode = 'embedded', defaultSiteId }: Props) {
     const page = usePage<{ auth?: { user?: { name?: string } } }>();
     const firstName = (page.props.auth?.user?.name ?? 'there').split(' ')[0];
     const standalone = mode === 'standalone';
@@ -303,8 +301,6 @@ export default function MealPlannerSubTabs({ site: siteProp, mode = 'embedded', 
                     onNotificationClick={(t) => setTab(t as SubTab)}
                 />
             )}
-
-            {headerSlot}
 
             <SubTabs tab={tab} onChange={setTab} isHouse={isHouse} />
 
