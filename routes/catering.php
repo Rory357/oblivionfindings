@@ -22,9 +22,6 @@ Route::middleware(['auth', 'verified'])->prefix('catering')->name('catering.')->
     Route::get('/', [DashboardController::class, 'mealPlanner'])
         ->middleware('permission:sites.meals.view')
         ->name('meal-planner');
-    Route::get('/overview', [DashboardController::class, 'index'])
-        ->middleware('permission:sites.meals.view')
-        ->name('dashboard');
     Route::get('/library-counts', [DashboardController::class, 'libraryCounts'])
         ->middleware('permission:sites.meals.view')
         ->name('library-counts');

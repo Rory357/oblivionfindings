@@ -7,12 +7,15 @@ import { CalendarPlus, Check, ChefHat, Clock, Minus, Pencil, Plus, Search, Shopp
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { formatMoneyFromCents as money, toNum, type InventoryItem, type RecipeFull } from './_helpers';
+import RecipeEditDialog from './_recipe-edit-dialog';
 
 type Props = {
     siteId: number;
     siteName: string;
     recipes: RecipeFull[];
     inventory: InventoryItem[];
+    products: { id: number; name: string; default_unit: string }[];
+    tags: { id: number; label: string; kind: 'allergen' | 'dietary' }[];
     canManage: boolean;
     canPlan: boolean;
     onPlanRecipe: (recipeId: number) => void;
@@ -49,10 +52,11 @@ function recipeStockSummary(recipe: RecipeFull, inventory: InventoryItem[], scal
     return { toBuy, estCents };
 }
 
-export default function RecipesPanel({ siteId, recipes, inventory, canManage, canPlan, onPlanRecipe }: Props) {
+export default function RecipesPanel({ siteId, recipes, inventory, products, tags, canManage, canPlan, onPlanRecipe, onChanged }: Props) {
     const [scope, setScope] = useState<Scope>('all');
     const [q, setQ] = useState('');
     const [view, setView] = useState<RecipeFull | null>(null);
+    const [editor, setEditor] = useState<{ open: boolean; recipeId: number | null }>({ open: false, recipeId: null });
 
     const filtered = useMemo(() => {
         const needle = q.trim().toLowerCase();
@@ -85,16 +89,15 @@ export default function RecipesPanel({ siteId, recipes, inventory, canManage, ca
                         ))}
                     </div>
                     {canManage && (
-                        <a href="/catering/recipes/create" className="inline-flex h-9 items-center gap-1.5 rounded-md bg-sites px-3 text-sm font-semibold text-primary-foreground transition hover:opacity-90">
+                        <button type="button" onClick={() => setEditor({ open: true, recipeId: null })} className="inline-flex h-9 items-center gap-1.5 rounded-md bg-sites px-3 text-sm font-semibold text-primary-foreground transition hover:opacity-90">
                             <Plus className="h-4 w-4" /> Add recipe
-                        </a>
+                        </button>
                     )}
                 </div>
             </div>
 
             <p className="text-[12.5px] text-muted-foreground">
-                The <strong className="font-medium text-foreground">shared library</strong> is your org-wide starting point — nothing is locked. A house can use a recipe as-is, or you can add house-only recipes in the
-                <a href="/catering/recipes" className="text-sites-deep underline"> catering library</a>.
+                The <strong className="font-medium text-foreground">shared library</strong> is your org-wide starting point — nothing is locked. A house can use a recipe as-is, or add house-only recipes with <strong className="font-medium text-foreground">Add recipe</strong>.
             </p>
 
             {filtered.length === 0 ? (
@@ -142,17 +145,31 @@ export default function RecipesPanel({ siteId, recipes, inventory, canManage, ca
                     canManage={canManage}
                     canPlan={canPlan}
                     onClose={() => setView(null)}
+                    onEdit={() => {
+                        const id = view.id;
+                        setView(null);
+                        setEditor({ open: true, recipeId: id });
+                    }}
                     onPlan={() => {
                         onPlanRecipe(view.id);
                         setView(null);
                     }}
                 />
             )}
+
+            <RecipeEditDialog
+                open={editor.open}
+                recipeId={editor.recipeId}
+                products={products}
+                tags={tags}
+                onClose={() => setEditor({ open: false, recipeId: null })}
+                onSaved={onChanged}
+            />
         </div>
     );
 }
 
-function RecipeDetailDialog({ siteId, recipe, inventory, canManage, canPlan, onClose, onPlan }: { siteId: number; recipe: RecipeFull; inventory: InventoryItem[]; canManage: boolean; canPlan: boolean; onClose: () => void; onPlan: () => void }) {
+function RecipeDetailDialog({ siteId, recipe, inventory, canManage, canPlan, onClose, onEdit, onPlan }: { siteId: number; recipe: RecipeFull; inventory: InventoryItem[]; canManage: boolean; canPlan: boolean; onClose: () => void; onEdit: () => void; onPlan: () => void }) {
     const [servings, setServings] = useState(recipe.serves_default);
     const scale = servings / Math.max(1, recipe.serves_default);
     const invByProduct = useMemo(() => new Map(inventory.map((i) => [i.product_id, i])), [inventory]);
@@ -287,9 +304,9 @@ function RecipeDetailDialog({ siteId, recipe, inventory, canManage, canPlan, onC
                 </div>
                 <DialogFooter className="sm:justify-between">
                     {canManage ? (
-                        <a href={`/catering/recipes/${recipe.id}/edit`} className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground">
+                        <button type="button" onClick={onEdit} className="inline-flex items-center gap-1.5 text-sm font-medium text-muted-foreground hover:text-foreground">
                             <Pencil className="h-3.5 w-3.5" /> Edit recipe
-                        </a>
+                        </button>
                     ) : (
                         <span />
                     )}

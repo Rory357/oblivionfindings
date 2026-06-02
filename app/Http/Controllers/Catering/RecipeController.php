@@ -73,10 +73,16 @@ class RecipeController extends Controller
         ]);
     }
 
-    public function edit(MealRecipe $recipe)
+    public function edit(Request $request, MealRecipe $recipe)
     {
         abort_unless($this->canManage(), 403);
         $recipe->load(['ingredients', 'tags:id']);
+
+        // The in-planner recipe editor (folded into /catering) fetches the
+        // editable payload as JSON rather than navigating to this page.
+        if ($request->wantsJson()) {
+            return response()->json(['recipe' => $recipe]);
+        }
 
         return inertia('catering/recipes/edit', [
             'recipe' => $recipe,
@@ -107,6 +113,10 @@ class RecipeController extends Controller
             return $recipe;
         });
 
+        if ($request->wantsJson()) {
+            return response()->json(['recipe' => $recipe->load(['ingredients', 'tags:id'])]);
+        }
+
         return redirect()->route('catering.recipes.show', $recipe)->with('status', 'Recipe created');
     }
 
@@ -128,6 +138,10 @@ class RecipeController extends Controller
             $recipe->tags()->sync($data['tag_ids'] ?? []);
             $this->syncIngredients($recipe, $data['ingredients'] ?? []);
         });
+
+        if ($request->wantsJson()) {
+            return response()->json(['recipe' => $recipe->fresh(['ingredients', 'tags:id'])]);
+        }
 
         return redirect()->route('catering.recipes.show', $recipe)->with('status', 'Recipe updated');
     }
