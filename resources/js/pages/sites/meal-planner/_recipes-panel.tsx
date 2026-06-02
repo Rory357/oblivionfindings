@@ -3,10 +3,10 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import axios from 'axios';
-import { CalendarPlus, Check, ChefHat, Clock, Minus, Pencil, Plus, Search, ShoppingCart, Tags, Users } from 'lucide-react';
+import { CalendarPlus, Check, ChefHat, Clock, Leaf, Loader2, Minus, Pencil, Plus, RotateCcw, Search, ShieldAlert, ShoppingCart, Tags, Users } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
-import { formatMoneyFromCents as money, toNum, type InventoryItem, type RecipeFull } from './_helpers';
+import { formatMoneyFromCents as money, toNum, type InventoryItem, type RecipeFull, type RecipeIngredient } from './_helpers';
 import RecipeEditDialog from './_recipe-edit-dialog';
 
 type Props = {
@@ -79,6 +79,13 @@ export default function RecipesPanel({ siteId, siteName, recipes, inventory, pro
         { value: 'house', label: 'This house' },
     ];
 
+    const filtersActive = q.trim() !== '' || cat !== 'all' || scope !== 'all';
+    function clearFilters() {
+        setQ('');
+        setCat('all');
+        setScope('all');
+    }
+
     return (
         <div className="space-y-4">
             <div className="flex flex-wrap items-center justify-between gap-2">
@@ -130,7 +137,24 @@ export default function RecipesPanel({ siteId, siteName, recipes, inventory, pro
             )}
 
             {filtered.length === 0 ? (
-                <div className="rounded-xl border border-dashed border-border bg-card px-6 py-12 text-center text-sm text-muted-foreground">No recipes match.</div>
+                filtersActive ? (
+                    <div className="flex flex-col items-center gap-2.5 rounded-xl border border-dashed border-border bg-card px-6 py-12 text-center">
+                        <div className="text-sm font-medium text-foreground">No recipes match your filters</div>
+                        <Button variant="ghost" size="sm" onClick={clearFilters}>Clear filters</Button>
+                    </div>
+                ) : (
+                    <div className="flex flex-col items-center gap-3 rounded-xl border border-dashed border-border bg-card px-6 py-12 text-center">
+                        <span className="flex h-14 w-14 items-center justify-center rounded-2xl bg-sites-bg text-sites-deep"><ChefHat className="h-7 w-7" /></span>
+                        <div>
+                            <div className="text-[15px] font-semibold text-foreground">No recipes yet</div>
+                            <p className="mx-auto mt-1 max-w-md text-[13px] text-muted-foreground">Build your house's first recipe, or activate one from the shared library.</p>
+                            <p className="mx-auto mt-1 max-w-md text-[12px] text-muted-foreground">Some recipes may be saved as drafts — activate them to plan from them.</p>
+                        </div>
+                        {canManage && (
+                            <Button size="sm" onClick={() => setEditor({ open: true, recipe: null })}><Plus className="mr-1.5 h-4 w-4" /> Add recipe</Button>
+                        )}
+                    </div>
+                )
             ) : (
                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2 lg:grid-cols-3">
                     {filtered.map((r) => {
@@ -154,7 +178,7 @@ export default function RecipesPanel({ siteId, siteName, recipes, inventory, pro
                                 {r.tags.length > 0 && (
                                     <div className="mt-2 flex flex-wrap gap-1">
                                         {r.tags.slice(0, 4).map((t) => (
-                                            <span key={t.id} className={cn('rounded-full px-1.5 py-px text-[10px] font-medium', t.kind === 'allergen' ? 'bg-status-critical-bg text-status-critical' : 'bg-sites-bg text-sites-deep')}>{t.label}</span>
+                                            <span key={t.id} className={cn('rounded-full px-1.5 py-px text-[10px] font-medium', t.kind === 'allergen' ? (t.severity === 'critical' ? 'bg-status-critical font-semibold text-white' : 'bg-status-critical-bg text-status-critical') : 'bg-sites-bg text-sites-deep')}>{t.label}</span>
                                         ))}
                                     </div>
                                 )}
@@ -210,20 +234,29 @@ function RecipeDetailDialog({ siteId, recipe, inventory, canManage, canPlan, onC
     const invByProduct = useMemo(() => new Map(inventory.map((i) => [i.product_id, i])), [inventory]);
     const { toBuy, estCents } = recipeStockSummary(recipe, inventory, scale);
     const inStock = recipe.ingredients.filter((i) => i.product_id != null).length - toBuy;
+    const allergenTags = recipe.tags.filter((t) => t.kind === 'allergen');
+    const dietaryTags = recipe.tags.filter((t) => t.kind === 'dietary');
     const [adding, setAdding] = useState(false);
+    const [addProgress, setAddProgress] = useState<{ current: number; total: number } | null>(null);
+    const [addFailures, setAddFailures] = useState<RecipeIngredient[]>([]);
 
-    async function addToShopping() {
-        const buyable = recipe.ingredients.filter((ing) => {
+    function buyableIngredients(): RecipeIngredient[] {
+        return recipe.ingredients.filter((ing) => {
             if (ing.product_id == null) return true;
             const needed = ing.qty * scale;
             const status = stockStatus(needed, invByProduct.get(ing.product_id));
             return status === 'short' || status === 'out' || status === 'untracked';
         });
-        if (buyable.length === 0) {
+    }
+
+    async function addToShopping(only?: RecipeIngredient[]) {
+        const items = only ?? buyableIngredients();
+        if (items.length === 0) {
             toast.info('Everything is already in stock');
             return;
         }
         setAdding(true);
+        setAddFailures([]);
         try {
             const listsRes = await axios.get(`/sites/${siteId}/meal-shopping-lists`);
             let draft = (listsRes.data.lists ?? []).find((l: ShoppingDraft) => l.status === 'draft') as ShoppingDraft | undefined;
@@ -243,19 +276,38 @@ function RecipeDetailDialog({ siteId, recipe, inventory, canManage, canPlan, onC
                 toast.error('Could not open a draft list');
                 return;
             }
-            for (const ing of buyable) {
-                await axios.post(`/sites/${siteId}/meal-shopping-lists/${draft.id}/items`, {
-                    product_id: ing.product_id ?? null,
-                    free_text_name: ing.product_id == null ? ing.name : null,
-                    needed_qty: Math.round(ing.qty * scale * 100) / 100,
-                    unit: ing.unit,
-                });
+            // Add each ingredient independently so one failure doesn't strand the rest.
+            const failed: RecipeIngredient[] = [];
+            let done = 0;
+            setAddProgress({ current: 0, total: items.length });
+            for (const ing of items) {
+                try {
+                    await axios.post(`/sites/${siteId}/meal-shopping-lists/${draft.id}/items`, {
+                        product_id: ing.product_id ?? null,
+                        free_text_name: ing.product_id == null ? ing.name : null,
+                        needed_qty: Math.round(ing.qty * scale * 100) / 100,
+                        unit: ing.unit,
+                    });
+                } catch {
+                    failed.push(ing);
+                } finally {
+                    done += 1;
+                    setAddProgress({ current: done, total: items.length });
+                }
             }
-            toast.success(`${buyable.length} item${buyable.length === 1 ? '' : 's'} added to shopping list`);
+            const added = items.length - failed.length;
+            if (failed.length === 0) {
+                toast.success(`Added ${added} item${added === 1 ? '' : 's'} to shopping list`);
+                setAddFailures([]);
+            } else {
+                setAddFailures(failed);
+                toast.error(`Added ${added} of ${items.length} — ${failed.length} couldn't be added`);
+            }
         } catch {
             toast.error('Could not add to shopping list');
         } finally {
             setAdding(false);
+            setAddProgress(null);
         }
     }
 
@@ -265,11 +317,32 @@ function RecipeDetailDialog({ siteId, recipe, inventory, canManage, canPlan, onC
                 <DialogHeader>
                     <DialogTitle className="flex items-center gap-2"><ChefHat className="h-4 w-4 text-sites" /> {recipe.name}</DialogTitle>
                     <DialogDescription>
-                        <span className={cn('mr-1 rounded-full px-1.5 py-px text-[10px] font-semibold', recipe.scope === 'house' ? 'bg-sites-bg text-sites-deep' : 'bg-muted text-muted-foreground')}>{recipe.scope === 'house' ? 'This house' : 'Shared library'}</span>
-                        {recipe.tags.map((t) => t.label).join(' · ')}
+                        <span className={cn('rounded-full px-1.5 py-px text-[10px] font-semibold', recipe.scope === 'house' ? 'bg-sites-bg text-sites-deep' : 'bg-muted text-muted-foreground')}>{recipe.scope === 'house' ? 'This house' : 'Shared library'}</span>
                     </DialogDescription>
                 </DialogHeader>
                 <div className="space-y-4">
+                    {/* Allergen + dietary tags — allergens never flattened into low-contrast text (P2-4/P2-8). */}
+                    <div className="space-y-1.5 rounded-xl border border-border bg-muted/20 p-3">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                            <span className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-status-critical"><ShieldAlert className="h-3 w-3" /> Contains allergens:</span>
+                            {allergenTags.length === 0 ? (
+                                <span className="text-[12px] text-muted-foreground">No allergens tagged</span>
+                            ) : (
+                                allergenTags.map((t) => (
+                                    <span key={t.id} className={cn('inline-flex items-center gap-1 rounded-full px-2 py-px text-[11px] font-medium', t.severity === 'critical' ? 'bg-status-critical text-white' : 'bg-status-critical-bg text-status-critical')}>
+                                        {t.label}{t.severity === 'critical' && <span className="rounded-full bg-white/25 px-1 text-[8.5px] font-bold uppercase">Critical</span>}
+                                    </span>
+                                ))
+                            )}
+                        </div>
+                        {dietaryTags.length > 0 && (
+                            <div className="flex flex-wrap items-center gap-1.5">
+                                <span className="inline-flex items-center gap-1 text-[11px] font-semibold uppercase tracking-wide text-sites-deep"><Leaf className="h-3 w-3" /> Dietary:</span>
+                                {dietaryTags.map((t) => <span key={t.id} className="rounded-full bg-sites-bg px-2 py-px text-[11px] font-medium text-sites-deep">{t.label}</span>)}
+                            </div>
+                        )}
+                    </div>
+
                     {/* serving scaler + stock summary */}
                     <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-border bg-muted/30 p-3">
                         <div className="flex items-center gap-2">
@@ -324,9 +397,24 @@ function RecipeDetailDialog({ siteId, recipe, inventory, canManage, canPlan, onC
                             </table>
                         </div>
                         {toBuy > 0 && (
-                            <Button variant="outline" size="sm" className="mt-2" disabled={adding} onClick={addToShopping}>
-                                <ShoppingCart className="mr-1.5 h-3.5 w-3.5" /> Add {toBuy} to shopping list
+                            <Button variant="outline" size="sm" className="mt-2" disabled={adding} onClick={() => addToShopping()}>
+                                {adding ? (
+                                    <><Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" /> Adding {addProgress ? `${addProgress.current} of ${addProgress.total}` : ''}…</>
+                                ) : (
+                                    <><ShoppingCart className="mr-1.5 h-3.5 w-3.5" /> Add {toBuy} to shopping list</>
+                                )}
                             </Button>
+                        )}
+                        {addFailures.length > 0 && (
+                            <div className="mt-2 rounded-lg border border-status-warning/40 bg-status-warning-bg/40 p-2.5 text-[12px]">
+                                <div className="font-medium text-status-warning">{addFailures.length} item{addFailures.length === 1 ? '' : 's'} couldn't be added:</div>
+                                <ul className="mt-1 list-inside list-disc text-muted-foreground">
+                                    {addFailures.map((f, i) => <li key={i}>{f.name || 'item'}</li>)}
+                                </ul>
+                                <Button variant="outline" size="sm" className="mt-2" disabled={adding} onClick={() => addToShopping(addFailures)}>
+                                    <RotateCcw className="mr-1.5 h-3.5 w-3.5" /> Retry remaining
+                                </Button>
+                            </div>
                         )}
                     </div>
 

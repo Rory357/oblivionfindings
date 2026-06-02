@@ -6,7 +6,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { PageHero } from '@/components/page';
 import { Head, router, useForm } from '@inertiajs/react';
-import { ChefHat, Plus, Trash2, Utensils } from 'lucide-react';
+import { ChefHat, Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { CateringTabs } from '../_tabs';
 import { type DietaryTag, type Recipe, type RecipeIngredient, tagBadgeStyle } from '../_helpers';
@@ -100,19 +100,11 @@ export default function CateringRecipeEdit({ recipe, tags, products }: Props) {
             <Head title={isNew ? 'New recipe' : `Edit ${recipe!.name}`} />
             <form onSubmit={submit} className="space-y-6 p-6">
                 <PageHero
-                    icon={Utensils}
-                    title="Meal Planner"
-                    description="Cross-site overview of meal plans, kitchen inventory and the catering library."
+                    icon={ChefHat}
+                    title={isNew ? 'New recipe' : `Edit ${recipe!.name}`}
+                    description="Recipes are reusable across all sites for meal planning."
                 />
                 <CateringTabs active="recipes" />
-
-                <div className="flex items-start gap-3">
-                    <div className="rounded-full bg-primary/10 p-3 text-primary"><ChefHat className="h-6 w-6" /></div>
-                    <div>
-                        <h2 className="text-2xl font-semibold">{isNew ? 'New recipe' : `Edit ${recipe!.name}`}</h2>
-                        <p className="text-sm text-muted-foreground">Recipes are reusable across all sites for meal planning.</p>
-                    </div>
-                </div>
 
                 <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
                     <div className="lg:col-span-2 space-y-4 rounded-md border p-4">

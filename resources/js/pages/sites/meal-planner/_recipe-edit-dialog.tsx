@@ -6,13 +6,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import axios, { AxiosError } from 'axios';
-import { BookPlus, Home, Library, Loader2, Pencil, Plus, Trash2, X, type LucideIcon } from 'lucide-react';
+import { BookPlus, Home, Leaf, Library, Loader2, Pencil, Plus, ShieldAlert, Trash2, X, type LucideIcon } from 'lucide-react';
 import { useState } from 'react';
 import { toast } from 'sonner';
 import type { RecipeFull } from './_helpers';
 
 type ProductOpt = { id: number; name: string; default_unit: string };
-type TagOpt = { id: number; label: string; kind: 'allergen' | 'dietary' };
+type TagOpt = { id: number; label: string; kind: 'allergen' | 'dietary'; severity?: string };
 
 type IngredientRow = {
     product_id: number | null;
@@ -29,6 +29,7 @@ type FormData = {
     prep_minutes: number | string;
     cook_minutes: number | string;
     instructions: string;
+    is_active: boolean;
     tag_ids: number[];
     ingredients: IngredientRow[];
 };
@@ -64,6 +65,7 @@ function initialData(recipe: RecipeFull | null): FormData {
             prep_minutes: 10,
             cook_minutes: 20,
             instructions: '',
+            is_active: true,
             tag_ids: [],
             ingredients: [blankIngredient()],
         };
@@ -76,6 +78,7 @@ function initialData(recipe: RecipeFull | null): FormData {
         prep_minutes: recipe.prep_minutes ?? '',
         cook_minutes: recipe.cook_minutes ?? '',
         instructions: recipe.instructions ?? '',
+        is_active: recipe.is_active ?? true,
         tag_ids: recipe.tag_ids ?? [],
         ingredients: recipe.ingredients.length
             ? recipe.ingredients.map((i) => ({ product_id: i.product_id, name: i.name ?? '', qty: i.qty, unit: i.unit }))
@@ -95,6 +98,8 @@ export default function RecipeEditDialog(props: Props) {
 
 function RecipeEditBody({ recipe, products, tags, siteId, siteName, canManage, onClose, onSaved }: Props) {
     const isNew = recipe == null;
+    const allergenTags = tags.filter((t) => t.kind === 'allergen');
+    const dietaryTagOpts = tags.filter((t) => t.kind === 'dietary');
     const [data, setData] = useState<FormData>(() => initialData(recipe));
     const [saving, setSaving] = useState(false);
     const [deleting, setDeleting] = useState(false);
@@ -139,7 +144,7 @@ function RecipeEditBody({ recipe, products, tags, siteId, siteName, canManage, o
             prep_minutes: data.prep_minutes === '' ? null : Number(data.prep_minutes),
             cook_minutes: data.cook_minutes === '' ? null : Number(data.cook_minutes),
             instructions: data.instructions,
-            is_active: true,
+            is_active: data.is_active,
             tag_ids: data.tag_ids,
             ingredients: data.ingredients
                 .filter((i) => i.product_id != null || i.name.trim() !== '')
@@ -266,28 +271,58 @@ function RecipeEditBody({ recipe, products, tags, siteId, siteName, canManage, o
                     </div>
                 </div>
 
-                {/* dietary & allergen tags */}
-                <div>
-                    <Label>Dietary &amp; allergen tags</Label>
-                    <div className="mt-1.5 flex flex-wrap gap-1.5">
-                        {tags.length === 0 && <span className="text-xs text-muted-foreground">No dietary tags are set up yet.</span>}
-                        {tags.map((t) => {
-                            const sel = data.tag_ids.includes(t.id);
-                            return (
-                                <button
-                                    key={t.id}
-                                    type="button"
-                                    onClick={() => toggleTag(t.id)}
-                                    className={cn(
-                                        'rounded-full border px-2.5 py-1 text-[12px] font-medium transition-colors',
-                                        sel ? 'border-sites bg-sites-bg text-sites-deep' : 'border-border bg-card text-muted-foreground hover:bg-accent',
-                                    )}
-                                    aria-pressed={sel}
-                                >
-                                    {t.label}
-                                </button>
-                            );
-                        })}
+                {/* dietary & allergen tags — split so the safety weight of allergens is unmissable */}
+                <div className="space-y-3">
+                    <div>
+                        <Label className="flex items-center gap-1.5 text-status-critical"><ShieldAlert className="h-3.5 w-3.5" /> Contains allergens</Label>
+                        <p className="mt-0.5 text-[11px] text-muted-foreground">Allergen tags drive the safety check shown when planning meals.</p>
+                        <div role="group" aria-label="Allergen tags" className="mt-1.5 flex flex-wrap gap-1.5">
+                            {allergenTags.length === 0 && <span className="text-xs text-muted-foreground">No allergen tags are set up yet.</span>}
+                            {allergenTags.map((t) => {
+                                const sel = data.tag_ids.includes(t.id);
+                                const critical = t.severity === 'critical';
+                                return (
+                                    <button
+                                        key={t.id}
+                                        type="button"
+                                        aria-pressed={sel}
+                                        aria-label={`${t.label}, allergen${critical ? ', critical' : ''}`}
+                                        onClick={() => toggleTag(t.id)}
+                                        className={cn(
+                                            'inline-flex min-h-6 items-center gap-1 rounded-full border px-2.5 py-1 text-[12px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                                            sel ? 'border-status-critical bg-status-critical-bg text-status-critical' : 'border-border bg-card text-muted-foreground hover:bg-accent',
+                                        )}
+                                    >
+                                        <ShieldAlert className="h-3 w-3" aria-hidden="true" /> {t.label}
+                                        {critical && <span className="rounded-full bg-status-critical px-1 text-[8.5px] font-bold uppercase leading-tight text-white">Critical</span>}
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                    <div>
+                        <Label className="flex items-center gap-1.5"><Leaf className="h-3.5 w-3.5 text-sites" /> Dietary</Label>
+                        <div role="group" aria-label="Dietary tags" className="mt-1.5 flex flex-wrap gap-1.5">
+                            {dietaryTagOpts.length === 0 && <span className="text-xs text-muted-foreground">No dietary tags are set up yet.</span>}
+                            {dietaryTagOpts.map((t) => {
+                                const sel = data.tag_ids.includes(t.id);
+                                return (
+                                    <button
+                                        key={t.id}
+                                        type="button"
+                                        aria-pressed={sel}
+                                        aria-label={`${t.label}, dietary`}
+                                        onClick={() => toggleTag(t.id)}
+                                        className={cn(
+                                            'inline-flex min-h-6 items-center rounded-full border px-2.5 py-1 text-[12px] font-medium transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring',
+                                            sel ? 'border-sites bg-sites-bg text-sites-deep' : 'border-border bg-card text-muted-foreground hover:bg-accent',
+                                        )}
+                                    >
+                                        {t.label}
+                                    </button>
+                                );
+                            })}
+                        </div>
                     </div>
                 </div>
 
@@ -364,6 +399,15 @@ function RecipeEditBody({ recipe, products, tags, siteId, siteName, canManage, o
                     </Label>
                     <Textarea className="mt-1" rows={3} value={data.instructions} onChange={(e) => patch({ instructions: e.target.value })} placeholder="Short cooking steps…" />
                 </div>
+
+                {/* active / draft */}
+                <label className="flex items-start gap-2 rounded-lg border border-border bg-muted/30 p-2.5 text-sm">
+                    <input type="checkbox" className="mt-0.5" checked={data.is_active} onChange={(e) => patch({ is_active: e.target.checked })} />
+                    <span>
+                        <span className="font-medium text-foreground">Active</span>
+                        <span className="ml-1 font-normal text-muted-foreground">— available to plan meals from. Uncheck to keep it as a draft.</span>
+                    </span>
+                </label>
             </div>
 
             <DialogFooter className="mt-4 sm:justify-between">

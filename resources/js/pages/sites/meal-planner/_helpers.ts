@@ -67,6 +67,8 @@ export type RecipeFull = RecipeOption & {
     allergen_tag_ids: number[];
     cost_cents: number;
     ingredients: RecipeIngredient[];
+    /** Present when the bootstrap exposes it; planner normally loads only active recipes. */
+    is_active?: boolean;
 };
 
 export type Resident = {
@@ -316,6 +318,84 @@ export function conflictsFor(entry: PlanEntry, residents: Resident[], recipes: R
         if (dislikeHits.length) soft.push({ resident: r, matches: r.dislikes });
     }
     return { hard, soft };
+}
+
+/* ── resident-aware advisory helpers (UI surfacing of existing data) ────── */
+
+/** Join names humanely: "A" · "A and B" · "A, B and C". */
+export function joinNames(names: string[]): string {
+    if (names.length === 0) return '';
+    if (names.length === 1) return names[0];
+    return `${names.slice(0, -1).join(', ')} and ${names[names.length - 1]}`;
+}
+
+/** First name only, for compact advisories. */
+export function firstName(name: string): string {
+    return name.split(' ')[0];
+}
+
+/** Selected residents on a texture-modified diet (IDDSI < 7). */
+export function textureResidentsFor(residents: Resident[], clientIds: number[]): Resident[] {
+    return residents.filter((r) => clientIds.includes(r.id) && r.texture != null && r.texture.level < 7);
+}
+
+/** Selected residents who need thickened/modified fluids. */
+export function fluidsResidentsFor(residents: Resident[], clientIds: number[]): Resident[] {
+    return residents.filter((r) => clientIds.includes(r.id) && !!r.fluids);
+}
+
+/** Selected residents with any recorded allergen (used for ad-hoc/takeaway reminders). */
+export function allergenResidentsFor(residents: Resident[], clientIds: number[]): Resident[] {
+    return residents.filter((r) => clientIds.includes(r.id) && r.allergens.length > 0);
+}
+
+/** Texture-modified assignees on a saved entry (drives the MealCard texture pill). */
+export function entryTextureResidents(entry: PlanEntry, residents: Resident[]): Resident[] {
+    return textureResidentsFor(residents, entry.client_ids ?? []);
+}
+
+/** Allergic assignees on a saved ad-hoc/takeaway entry (drives the "Check allergens" pill). */
+export function entryAllergenResidents(entry: PlanEntry, residents: Resident[]): Resident[] {
+    return allergenResidentsFor(residents, entry.client_ids ?? []);
+}
+
+export type DietaryMismatch = { resident: Resident; requirements: string[] };
+
+/**
+ * Heuristic dietary-requirement advisory: a selected resident has dietary tags
+ * (kind=dietary, e.g. halal/vegetarian) the recipe doesn't carry. Advisory only —
+ * tag presence isn't an authoritative rule (a blocking gate is Deferred).
+ */
+export function dietaryMismatchesFor(recipe: RecipeFull | undefined | null, residents: Resident[], clientIds: number[]): DietaryMismatch[] {
+    if (!recipe) return [];
+    const recipeDietaryIds = new Set(recipe.tags.filter((t) => t.kind === 'dietary').map((t) => t.id));
+    const out: DietaryMismatch[] = [];
+    for (const r of residents) {
+        if (!clientIds.includes(r.id)) continue;
+        const requirements = r.dietary_tag_ids
+            .map((id, i) => ({ id, label: r.dietary[i] }))
+            .filter((d) => !recipeDietaryIds.has(d.id) && !!d.label)
+            .map((d) => d.label);
+        if (requirements.length) out.push({ resident: r, requirements });
+    }
+    return out;
+}
+
+/** Same heuristic for a saved entry (drives the MealCard "Diet check" pill). */
+export function dietaryMismatches(entry: PlanEntry, residents: Resident[], recipes: RecipeMap): DietaryMismatch[] {
+    if (entry.source_type !== 'recipe' || entry.recipe_id == null) return [];
+    return dietaryMismatchesFor(recipes.get(entry.recipe_id), residents, entry.client_ids ?? []);
+}
+
+/** True when a selected resident matches a CRITICAL-severity allergen tag on the recipe (P2-8). */
+export function entryHasCriticalAllergen(entry: PlanEntry, residents: Resident[], recipes: RecipeMap): boolean {
+    if (entry.source_type !== 'recipe' || entry.recipe_id == null) return false;
+    const recipe = recipes.get(entry.recipe_id);
+    if (!recipe) return false;
+    const criticalIds = new Set(recipe.tags.filter((t) => t.kind === 'allergen' && t.severity === 'critical').map((t) => t.id));
+    if (criticalIds.size === 0) return false;
+    const ids = entry.client_ids ?? [];
+    return residents.some((r) => ids.includes(r.id) && r.allergen_tag_ids.some((t) => criticalIds.has(t)));
 }
 
 export function residentRelation(

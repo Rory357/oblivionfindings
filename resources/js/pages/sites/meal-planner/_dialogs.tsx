@@ -7,12 +7,13 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Textarea } from '@/components/ui/textarea';
 import { router, useForm } from '@inertiajs/react';
 import axios from 'axios';
-import { AlertTriangle, ChefHat, Info, LayoutTemplate, Lock, Settings, ShieldAlert, ShoppingBag, Soup, Trash2, Utensils, Wallet } from 'lucide-react';
+import { AlertTriangle, ChefHat, CupSoda, Info, LayoutTemplate, Leaf, Loader2, Lock, Settings, ShieldAlert, ShoppingBag, Soup, Trash2, Utensils, Wallet } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { cn } from '@/lib/utils';
 import { ConfirmAction } from '../_confirm-action';
-import { addDays, MEAL_SLOTS, SLOT_LABEL, formatQty, toIsoDate, type InventoryItem, type MealSlot, type PlanEntry, type RecipeFull, type RecipeOption, type Resident, type SourceType, type WeekTemplate } from './_helpers';
+import { announce } from './_announcer';
+import { addDays, allergenResidentsFor, dietaryMismatchesFor, firstName, fluidsResidentsFor, joinNames, MEAL_SLOTS, SLOT_LABEL, formatQty, textureResidentsFor, toIsoDate, type InventoryItem, type MealSlot, type PlanEntry, type RecipeFull, type Resident, type SourceType, type WeekTemplate } from './_helpers';
 import { TemplateBuilderDialog } from './_templates-panel';
 
 type ProductOpt = { id: number; name: string; default_unit: string };
@@ -69,7 +70,7 @@ export function PlanEntryDialog({
     initialDate: string;
     initialSlot: MealSlot;
     initialRecipeId?: number;
-    recipes: RecipeOption[];
+    recipes: RecipeFull[];
     residents: Resident[];
     canOverride: boolean;
 }) {
@@ -100,6 +101,9 @@ export function PlanEntryDialog({
 
     const [report, setReport] = useState<ConflictReport>(EMPTY_REPORT);
     const [reportLoading, setReportLoading] = useState(false);
+    // When the allergen check itself FAILS (500/419/dropped wifi) we must NOT
+    // fall back to a clean EMPTY_REPORT — that would let an unsafe meal save.
+    const [reportError, setReportError] = useState(false);
     const [acknowledgedSoft, setAcknowledgedSoft] = useState(false);
     const [pastVendors, setPastVendors] = useState<string[]>([]);
 
@@ -120,6 +124,7 @@ export function PlanEntryDialog({
             allergen_override_reason: '',
         });
         setReport(EMPTY_REPORT);
+        setReportError(false);
         setAcknowledgedSoft(false);
         // Lazy-load past vendors on open so autocomplete is ready
         axios.get(`/sites/${siteId}/meal-planner/takeaway-vendors`).then((res) => {
@@ -150,10 +155,13 @@ export function PlanEntryDialog({
             }).then((res) => {
                 if (cancelled) return;
                 setReport(res.data ?? EMPTY_REPORT);
+                setReportError(false);
                 setAcknowledgedSoft(false);
             }).catch(() => {
                 if (cancelled) return;
+                // FAIL CLOSED: empty the report AND flag the failure so Save locks.
                 setReport(EMPTY_REPORT);
+                setReportError(true);
             }).finally(() => {
                 if (!cancelled) setReportLoading(false);
             });
@@ -164,13 +172,50 @@ export function PlanEntryDialog({
         };
     }, [open, siteId, form.data.source_type, form.data.recipe_id, JSON.stringify(form.data.client_ids)]);
 
+    // Explicit, non-debounced re-check (the "Retry check" button + submit-time re-verify).
+    function retryCheck() {
+        const recipeId = form.data.recipe_id;
+        const clientIds = form.data.client_ids ?? [];
+        if (form.data.source_type !== 'recipe' || !recipeId || clientIds.length === 0) {
+            setReport(EMPTY_REPORT);
+            setReportError(false);
+            return;
+        }
+        setReportLoading(true);
+        axios.post(`/sites/${siteId}/meal-planner/check-conflicts`, { recipe_id: recipeId, client_ids: clientIds })
+            .then((res) => { setReport(res.data ?? EMPTY_REPORT); setReportError(false); setAcknowledgedSoft(false); })
+            .catch(() => { setReport(EMPTY_REPORT); setReportError(true); })
+            .finally(() => setReportLoading(false));
+    }
+
     const showResidents = siteType === 'house';
+
+    // Resident-aware advisories (P0-4/5/10) — all surfaced from data already in state.
+    const selectedClientIds = form.data.client_ids ?? [];
+    const selectedRecipe = form.data.source_type === 'recipe' && form.data.recipe_id != null ? recipes.find((r) => r.id === form.data.recipe_id) : undefined;
+    const textureResidents = showResidents ? textureResidentsFor(residents, selectedClientIds) : [];
+    const fluidsResidents = showResidents ? fluidsResidentsFor(residents, selectedClientIds) : [];
+    const allergenResidents = showResidents ? allergenResidentsFor(residents, selectedClientIds) : [];
+    const dietaryMismatchList = showResidents && selectedRecipe ? dietaryMismatchesFor(selectedRecipe, residents, selectedClientIds) : [];
+
+    // Named ad-hoc/takeaway allergen reminder (no recipe to auto-check against).
+    const allergenReminder = allergenResidents.length
+        ? `Check carefully — ${joinNames(allergenResidents.map((r) => `${firstName(r.name)} (${r.allergens.join(', ')})`))} ${allergenResidents.length === 1 ? 'has' : 'have'} recorded allergens.`
+        : null;
+
+    // Combined texture + thickened-fluids clauses for the persistent advisory banner.
+    const careClauses = [
+        ...textureResidents.map((r) => `${firstName(r.name)} needs IDDSI ${r.texture!.level} (${r.texture!.label})`),
+        ...fluidsResidents.map((r) => `${firstName(r.name)} needs ${r.fluids} fluids`),
+    ];
 
     const hasHard = report.has_hard_blocks;
     const hasSoft = report.has_soft_warnings;
     const overrideValid = form.data.allergen_override_reason.trim().length >= OVERRIDE_MIN_CHARS;
     const blockedByRole = hasHard && !canOverride;
-    const saveDisabled = form.processing || blockedByRole || (hasHard && canOverride && !overrideValid) || (hasSoft && !acknowledgedSoft && !hasHard);
+    // A failed allergen check on a house meal with residents must hard-block Save.
+    const blockedByCheckError = reportError && siteType === 'house' && (form.data.client_ids ?? []).length > 0;
+    const saveDisabled = form.processing || blockedByRole || blockedByCheckError || (hasHard && canOverride && !overrideValid) || (hasSoft && !acknowledgedSoft && !hasHard);
 
     function submit(e: React.FormEvent) {
         e.preventDefault();
@@ -178,12 +223,12 @@ export function PlanEntryDialog({
         const onSuccess = () => onClose();
         const onError = () => {
             // server may have detected a conflict the client missed —
-            // re-run the preview so the warning surfaces
-            if (form.data.recipe_id && (form.data.client_ids ?? []).length > 0) {
+            // re-run the preview so the warning surfaces (fail closed if it errors)
+            if (form.data.source_type === 'recipe' && form.data.recipe_id && (form.data.client_ids ?? []).length > 0) {
                 axios.post(`/sites/${siteId}/meal-planner/check-conflicts`, {
                     recipe_id: form.data.recipe_id,
                     client_ids: form.data.client_ids,
-                }).then((res) => setReport(res.data ?? EMPTY_REPORT));
+                }).then((res) => { setReport(res.data ?? EMPTY_REPORT); setReportError(false); }).catch(() => { setReport(EMPTY_REPORT); setReportError(true); });
             }
         };
         if (isNew) {
@@ -201,11 +246,13 @@ export function PlanEntryDialog({
         });
     }
 
-    function markServed() {
+    function toggleServed() {
         if (!entry) return;
-        router.post(`/sites/${siteId}/meal-plan/${entry.id}/serve`, {}, {
+        const path = entry.served_at ? 'unserve' : 'serve';
+        router.post(`/sites/${siteId}/meal-plan/${entry.id}/${path}`, {}, {
             preserveScroll: true,
             onSuccess: () => onClose(),
+            onError: () => toast.error(entry.served_at ? "Couldn't mark not served — try again" : "Couldn't mark served — try again"),
         });
     }
 
@@ -307,10 +354,17 @@ export function PlanEntryDialog({
                                 <Label>Ad-hoc meal name</Label>
                                 <Input value={form.data.ad_hoc_name} onChange={(e) => form.setData('ad_hoc_name', e.target.value)} placeholder="e.g. Cheese toasties" />
                             </div>
-                            <div className="flex items-start gap-2 rounded-md border border-muted bg-muted/30 p-2 text-xs text-muted-foreground">
-                                <Info className="mt-0.5 h-3.5 w-3.5 flex-none" />
-                                <span>No allergen check available for ad-hoc meals — check ingredients carefully before serving.</span>
-                            </div>
+                            {allergenReminder ? (
+                                <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-2 text-xs text-amber-900">
+                                    <ShieldAlert className="mt-0.5 h-3.5 w-3.5 flex-none" aria-hidden="true" />
+                                    <span>{allergenReminder} Ad-hoc meals aren't auto-checked — confirm ingredients before serving.</span>
+                                </div>
+                            ) : (
+                                <div className="flex items-start gap-2 rounded-md border border-muted bg-muted/30 p-2 text-xs text-muted-foreground">
+                                    <Info className="mt-0.5 h-3.5 w-3.5 flex-none" aria-hidden="true" />
+                                    <span>No allergen check available for ad-hoc meals — check ingredients carefully before serving.</span>
+                                </div>
+                            )}
                         </>
                     )}
 
@@ -357,8 +411,8 @@ export function PlanEntryDialog({
                                 </div>
                             </div>
                             <div className="flex items-start gap-2 rounded-md border border-amber-200 bg-amber-50 p-2 text-xs text-amber-900">
-                                <Info className="mt-0.5 h-3.5 w-3.5 flex-none" />
-                                <span><strong>Takeaway meal</strong> — allergen check unavailable. Confirm dietary suitability with the vendor before serving.</span>
+                                {allergenReminder ? <ShieldAlert className="mt-0.5 h-3.5 w-3.5 flex-none" aria-hidden="true" /> : <Info className="mt-0.5 h-3.5 w-3.5 flex-none" aria-hidden="true" />}
+                                <span><strong>Takeaway meal</strong> — {allergenReminder ? `${allergenReminder} Confirm dietary suitability with the vendor before serving.` : 'allergen check unavailable. Confirm dietary suitability with the vendor before serving.'}</span>
                             </div>
                         </>
                     )}
@@ -367,8 +421,9 @@ export function PlanEntryDialog({
                         <Input type="number" min={1} value={form.data.servings} onChange={(e) => form.setData('servings', Number(e.target.value))} />
                     </div>
                     <div>
-                        <Label>Notes</Label>
-                        <Textarea value={form.data.notes} onChange={(e) => form.setData('notes', e.target.value)} rows={2} />
+                        <Label>Meal record <span className="font-normal text-muted-foreground">(free-text note)</span></Label>
+                        <Textarea value={form.data.notes} onChange={(e) => form.setData('notes', e.target.value)} rows={2} placeholder="Intake / refusals (e.g. 'Aroha ate half, refused vegetables'; 'Mila — dairy-free portion plated')" />
+                        <p className="mt-1 text-[11px] text-muted-foreground">One free-text note for the whole meal — not a per-resident intake record.</p>
                     </div>
                     {showResidents && residents.length > 0 && (
                         <div>
@@ -390,6 +445,7 @@ export function PlanEntryDialog({
                                                 <span className="flex flex-wrap items-center gap-1 text-[10.5px] leading-tight">
                                                     {c.allergens.length > 0 && <span className="inline-flex items-center gap-0.5 text-status-critical"><ShieldAlert className="h-2.5 w-2.5" />{c.allergens.join(', ')}</span>}
                                                     {c.texture && c.texture.level < 7 && <span className="inline-flex items-center gap-0.5 text-primary"><Soup className="h-2.5 w-2.5" />IDDSI {c.texture.level}</span>}
+                                                    {c.fluids && <span className="inline-flex items-center gap-0.5 text-primary"><CupSoda className="h-2.5 w-2.5" />{c.fluids}</span>}
                                                 </span>
                                             </span>
                                         </label>
@@ -399,21 +455,67 @@ export function PlanEntryDialog({
                         </div>
                     )}
 
-                    {reportLoading && (
-                        <div className="text-xs text-muted-foreground">Checking dietary conflicts…</div>
+                    {careClauses.length > 0 && (
+                        <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900">
+                            <Soup className="mt-0.5 h-4 w-4 flex-none" aria-hidden="true" />
+                            <div>
+                                <div className="font-semibold">{textureResidents.length > 0 ? 'Texture-modified diet' : 'Thickened fluids'}</div>
+                                <div className="mt-0.5">{careClauses.join(', ')}. Confirm this meal is prepared to the right texture and consistency.</div>
+                            </div>
+                        </div>
                     )}
 
-                    {hasHard && (
-                        <div className="rounded-md border-2 border-status-critical bg-status-critical-bg/60 p-3 text-sm">
-                            <div className="mb-2 flex items-center gap-2 font-semibold text-status-critical">
-                                <ShieldAlert className="h-4 w-4" /> Allergy alert — {canOverride ? 'override required to save' : 'this meal is unsafe for a resident'}
+                    {dietaryMismatchList.length > 0 && (
+                        <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900">
+                            <Leaf className="mt-0.5 h-4 w-4 flex-none" aria-hidden="true" />
+                            <div>
+                                <div className="font-semibold">Dietary requirement</div>
+                                <div className="mt-0.5">
+                                    {joinNames(dietaryMismatchList.map((m) => `${firstName(m.resident.name)} is ${m.requirements.join(', ')}`))} — confirm this meal meets {dietaryMismatchList.length === 1 ? 'it' : 'them'}.
+                                </div>
                             </div>
-                            <ul className="space-y-1 text-status-critical">
-                                {report.hard_blocks.map((panel) => (
-                                    <li key={panel.client_id}>
-                                        <strong>{panel.client_name}</strong>: {panel.matches.map((m) => m.label).join(', ')}
-                                    </li>
-                                ))}
+                        </div>
+                    )}
+
+                    {/* Single live region: loading → failure/result is announced to assistive tech (P0-1/P0-6). */}
+                    <div role="status" aria-live="assertive" aria-atomic="true">
+                        {reportLoading && (
+                            <div className="flex items-center gap-2 text-xs text-muted-foreground">
+                                <Loader2 className="h-3.5 w-3.5 animate-spin" aria-hidden="true" /> Checking dietary conflicts…
+                            </div>
+                        )}
+                        {reportError && !reportLoading && (
+                            <div className="rounded-md border-2 border-status-critical bg-status-critical-bg/60 p-3 text-sm">
+                                <div className="mb-1 flex items-center gap-2 font-semibold text-status-critical">
+                                    <ShieldAlert className="h-4 w-4" aria-hidden="true" /> Couldn't verify allergens for this meal
+                                </div>
+                                <p className="text-status-critical">Do not save until allergens are verified.</p>
+                                <Button type="button" size="sm" variant="outline" className="mt-2 border-status-critical/50 text-status-critical hover:bg-status-critical-bg" onClick={retryCheck}>
+                                    <Loader2 className={cn('mr-1.5 h-3.5 w-3.5', reportLoading ? 'animate-spin' : 'hidden')} aria-hidden="true" /> Retry check
+                                </Button>
+                            </div>
+                        )}
+                    </div>
+
+                    {hasHard && (
+                        <div role="alert" className="rounded-md border-2 border-status-critical bg-status-critical-bg/60 p-3 text-sm">
+                            <div className="mb-2 flex items-center gap-2 font-semibold text-status-critical">
+                                <ShieldAlert className="h-4 w-4" aria-hidden="true" /> Allergy alert — {canOverride ? 'override required to save' : 'this meal is unsafe for a resident'}
+                            </div>
+                            <ul className="space-y-1.5 text-status-critical">
+                                {report.hard_blocks.map((panel) => {
+                                    const sorted = [...panel.matches].sort((a, b) => Number(b.severity === 'critical') - Number(a.severity === 'critical'));
+                                    return (
+                                        <li key={panel.client_id} className="flex flex-wrap items-center gap-1.5">
+                                            <strong>{panel.client_name}:</strong>
+                                            {sorted.map((m, i) => (
+                                                <span key={i} className={cn('inline-flex items-center gap-1 rounded-full px-1.5 py-px text-[11px] font-medium', m.severity === 'critical' ? 'bg-status-critical text-white' : 'bg-status-critical-bg text-status-critical')}>
+                                                    {m.label}{m.severity === 'critical' && <span className="text-[8.5px] font-bold uppercase">⚠ Critical</span>}
+                                                </span>
+                                            ))}
+                                        </li>
+                                    );
+                                })}
                             </ul>
                             {canOverride ? (
                                 <div className="mt-3">
@@ -481,12 +583,15 @@ export function PlanEntryDialog({
                                     <Button type="button" variant="ghost" className="text-destructive">Delete</Button>
                                 </ConfirmAction>
                             )}
-                            {!isNew && !entry?.served_at && <Button type="button" variant="outline" onClick={markServed}>Mark served</Button>}
                         </div>
-                        <div className="flex gap-2">
+                        <div className="flex items-center gap-2">
+                            {!isNew && (
+                                <Button type="button" variant="outline" onClick={toggleServed}>{entry?.served_at ? 'Mark not served' : 'Mark served'}</Button>
+                            )}
+                            {!isNew && <span className="hidden h-5 w-px bg-border sm:block" />}
                             <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
-                            <Button type="submit" disabled={saveDisabled}>
-                                {blockedByRole ? 'Cannot override' : hasHard ? 'Override and save' : isNew ? 'Add meal' : 'Save'}
+                            <Button type="submit" disabled={saveDisabled} aria-busy={form.processing}>
+                                {blockedByCheckError ? 'Re-check before saving' : blockedByRole ? 'Cannot override' : hasHard ? 'Override and save' : isNew ? 'Add meal' : 'Save'}
                             </Button>
                         </div>
                     </DialogFooter>
@@ -555,6 +660,7 @@ export function AdjustInventoryDialog({
     const [reason, setReason] = useState<string>('delivery');
     const [note, setNote] = useState<string>('');
     const [submitting, setSubmitting] = useState(false);
+    const [submitError, setSubmitError] = useState<string | null>(null);
 
     // Inline product creation
     const [creatingProduct, setCreatingProduct] = useState(false);
@@ -603,6 +709,13 @@ export function AdjustInventoryDialog({
         if (numericQty === null || Number.isNaN(numericQty) || numericQty < 0) return;
 
         setSubmitting(true);
+        setSubmitError(null);
+        const onError = (errors: Record<string, string>) => {
+            const first = Object.values(errors)[0];
+            setSubmitError(typeof first === 'string' ? first : null);
+            toast.error("Couldn't save the adjustment — try again");
+            announce("Couldn't save the adjustment");
+        };
         if (mode === 'set') {
             router.post(`/sites/${siteId}/meal-inventory/stocktake`, {
                 counts: [{ product_id: productId, qty: numericQty, unit }],
@@ -610,6 +723,7 @@ export function AdjustInventoryDialog({
             }, {
                 preserveScroll: true,
                 onSuccess: () => onClose(),
+                onError,
                 onFinish: () => setSubmitting(false),
             });
         } else {
@@ -623,6 +737,7 @@ export function AdjustInventoryDialog({
             }, {
                 preserveScroll: true,
                 onSuccess: () => onClose(),
+                onError,
                 onFinish: () => setSubmitting(false),
             });
         }
@@ -810,6 +925,7 @@ export function AdjustInventoryDialog({
                                     <strong className={preview < 0 ? 'text-destructive' : ''}>{preview} {item.unit}</strong>
                                 </>
                             )}
+                            {preview !== null && preview < 0 && <div className="mt-0.5 text-xs text-destructive">This sets stock below zero.</div>}
                         </div>
                     )}
 
@@ -856,9 +972,11 @@ export function AdjustInventoryDialog({
                         <Input value={note} onChange={(e) => setNote(e.target.value)} placeholder="e.g. delivered by FreshChoice" />
                     </div>
 
+                    {submitError && <div className="rounded-md border border-destructive/40 bg-destructive/5 px-3 py-2 text-xs text-destructive">{submitError}</div>}
+
                     <DialogFooter>
                         <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
-                        <Button type="submit" disabled={submitting || !productId || qty === ''}>
+                        <Button type="submit" disabled={submitting || !productId || qty === ''} aria-busy={submitting}>
                             {mode === 'add' && 'Add to stock'}
                             {mode === 'remove' && 'Remove from stock'}
                             {mode === 'set' && 'Set total'}
@@ -907,6 +1025,7 @@ export function StocktakeDialog({
         router.post(`/sites/${siteId}/meal-inventory/stocktake`, { counts: rows, note }, {
             preserveScroll: true,
             onSuccess: () => onClose(),
+            onError: () => { toast.error("Stocktake didn't save — try again"); announce("Stocktake didn't save"); },
             onFinish: () => setSubmitting(false),
         });
     }
@@ -963,7 +1082,7 @@ export function StocktakeDialog({
                     </div>
                     <DialogFooter>
                         <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
-                        <Button type="submit" disabled={submitting || total === 0}>Record {total} count{total === 1 ? '' : 's'}</Button>
+                        <Button type="submit" disabled={submitting || total === 0} aria-busy={submitting}>Record {total} count{total === 1 ? '' : 's'}</Button>
                     </DialogFooter>
                 </form>
             </DialogContent>
@@ -976,11 +1095,13 @@ export function ShoppingListGenerateDialog({
     onClose,
     siteId,
     weekStart,
+    mealsPlanned = 0,
 }: {
     open: boolean;
     onClose: () => void;
     siteId: number;
     weekStart?: Date;
+    mealsPlanned?: number;
 }) {
     const start = weekStart ?? new Date();
     const end = new Date(start);
@@ -997,24 +1118,36 @@ export function ShoppingListGenerateDialog({
         form.post(`/sites/${siteId}/meal-shopping-lists/generate`, {
             preserveScroll: true,
             onSuccess: () => onClose(),
+            onError: () => toast.error("Couldn't generate the shopping list — try again"),
         });
     }
+
+    const noMeals = mealsPlanned === 0;
 
     return (
         <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
             <DialogContent>
                 <DialogHeader>
                     <DialogTitle>Generate shopping list</DialogTitle>
+                    <DialogDescription>Builds a list from this week's planned meals, plus anything below par if enabled.</DialogDescription>
                 </DialogHeader>
                 <form onSubmit={submit} className="space-y-3">
+                    {noMeals && (
+                        <div className="flex items-start gap-2 rounded-md border border-amber-300 bg-amber-50 p-2.5 text-xs text-amber-900">
+                            <Info className="mt-0.5 h-3.5 w-3.5 flex-none" aria-hidden="true" />
+                            <span>No planned meals this week to build a list from — plan meals first. You can still top up stock to par.</span>
+                        </div>
+                    )}
                     <div className="grid grid-cols-2 gap-3">
                         <div>
-                            <Label>From</Label>
-                            <Input type="date" value={form.data.covers_from} onChange={(e) => form.setData('covers_from', e.target.value)} />
+                            <Label htmlFor="gen-from">From</Label>
+                            <Input id="gen-from" type="date" autoFocus value={form.data.covers_from} onChange={(e) => form.setData('covers_from', e.target.value)} />
+                            {form.errors.covers_from && <p className="mt-1 text-xs text-destructive">{form.errors.covers_from}</p>}
                         </div>
                         <div>
-                            <Label>To</Label>
-                            <Input type="date" value={form.data.covers_to} onChange={(e) => form.setData('covers_to', e.target.value)} />
+                            <Label htmlFor="gen-to">To</Label>
+                            <Input id="gen-to" type="date" value={form.data.covers_to} onChange={(e) => form.setData('covers_to', e.target.value)} />
+                            {form.errors.covers_to && <p className="mt-1 text-xs text-destructive">{form.errors.covers_to}</p>}
                         </div>
                     </div>
                     <label className="flex items-center gap-2 text-sm">
@@ -1024,7 +1157,7 @@ export function ShoppingListGenerateDialog({
                     <Badge variant="outline" className="text-xs">Manual items on the current draft are preserved.</Badge>
                     <DialogFooter>
                         <Button type="button" variant="ghost" onClick={onClose}>Cancel</Button>
-                        <Button type="submit" disabled={form.processing}>Generate</Button>
+                        <Button type="submit" disabled={form.processing || (noMeals && !form.data.include_restock_to_par)}>Generate</Button>
                     </DialogFooter>
                 </form>
             </DialogContent>
