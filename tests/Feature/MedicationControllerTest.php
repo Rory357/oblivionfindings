@@ -833,7 +833,7 @@ class MedicationControllerTest extends TestCase
                 'administered_at' => now()->format('Y-m-d H:i:s'),
             ])
             ->assertRedirect()
-            ->assertSessionHas('error');
+            ->assertSessionHasErrors('reason_code');
     }
 
     public function test_store_administration_missed_requires_reason(): void
@@ -847,7 +847,7 @@ class MedicationControllerTest extends TestCase
                 'administered_at' => now()->format('Y-m-d H:i:s'),
             ])
             ->assertRedirect()
-            ->assertSessionHas('error');
+            ->assertSessionHasErrors('reason_code');
     }
 
     public function test_store_administration_withheld_requires_reason(): void
@@ -861,7 +861,7 @@ class MedicationControllerTest extends TestCase
                 'administered_at' => now()->format('Y-m-d H:i:s'),
             ])
             ->assertRedirect()
-            ->assertSessionHas('error');
+            ->assertSessionHasErrors('reason_code');
     }
 
     public function test_store_administration_refused_succeeds_with_reason(): void
@@ -872,6 +872,7 @@ class MedicationControllerTest extends TestCase
         $this->actingAs($this->supportWorker)
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [
                 'status' => 'refused',
+                'reason_code' => 'refused',
                 'reason' => 'Client declined medication',
                 'scheduled_for' => now()->format('Y-m-d H:i:s'),
                 'administered_at' => now()->format('Y-m-d H:i:s'),
@@ -1070,6 +1071,7 @@ class MedicationControllerTest extends TestCase
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [
                 'status' => 'given',
                 'witnessed_by' => $witness->id,
+                'witness_credential' => 'password',
                 'scheduled_for' => now()->format('Y-m-d H:i:s'),
                 'administered_at' => now()->format('Y-m-d H:i:s'),
             ])
@@ -1092,6 +1094,7 @@ class MedicationControllerTest extends TestCase
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [
                 'status' => 'given',
                 'witnessed_by' => $witness->id,
+                'witness_credential' => 'password',
                 'scheduled_for' => now()->format('Y-m-d H:i:s'),
                 'administered_at' => now()->format('Y-m-d H:i:s'),
             ])
@@ -1114,6 +1117,7 @@ class MedicationControllerTest extends TestCase
         $this->actingAs($this->supportWorker)
             ->post("/clients/{$this->client->id}/medical/medications/{$med->id}/administrations", [
                 'status' => 'refused',
+                'reason_code' => 'refused',
                 'reason' => 'Client refused medication',
                 'scheduled_for' => now()->format('Y-m-d H:i:s'),
                 'administered_at' => now()->format('Y-m-d H:i:s'),

@@ -145,13 +145,32 @@ export default function ClientMedical({
         medication_id: medications?.[0]?.id ?? '',
         status: 'given',
         reason: '',
+        reason_code: '',
         dose_given: '',
         administered_at: new Date().toISOString().slice(0, 16),
         scheduled_for: '',
         shift_id: '',
         witnessed_by: '',
+        witness_credential: '',
         notes: '',
     });
+
+    // NZ-standard "not given" reason codes (mirrors App\Enums\Medication\NotGivenReason).
+    const notGivenReasonOptions = [
+        { value: 'absent', label: 'Absent' },
+        { value: 'destroyed', label: 'Destroyed' },
+        { value: 'doctors_instruction', label: "Doctor's instruction" },
+        { value: 'fasting', label: 'Fasting' },
+        { value: 'transferred', label: 'Transferred' },
+        { value: 'refused', label: 'Refused' },
+        { value: 'social_leave', label: 'Social leave' },
+        { value: 'hospitalised', label: 'Hospitalised' },
+        { value: 'medication_unavailable', label: 'Medication unavailable' },
+        { value: 'vomit_or_nausea', label: 'Vomit or nausea' },
+        { value: 'self_administered', label: 'Self-administered' },
+        { value: 'withheld', label: 'Withheld' },
+        { value: 'other', label: 'Other' },
+    ];
 
     const selectedMedication = medications.find(
         (m) => `${m.id}` === `${administrationForm.data.medication_id}`,
@@ -205,8 +224,10 @@ export default function ClientMedical({
                         'scheduled_for',
                         'notes',
                         'reason',
+                        'reason_code',
                     );
                     administrationForm.reset('witnessed_by');
+                    administrationForm.reset('witness_credential');
                     setConfirmAdminOpen(false);
                 },
             },
@@ -2252,12 +2273,66 @@ export default function ClientMedical({
                                                 </Select>
                                             </div>
 
+                                            {administrationForm.data.status !==
+                                                'given' && (
+                                                <div className="md:col-span-2">
+                                                    <Label>
+                                                        Reason not given
+                                                        (required)
+                                                    </Label>
+                                                    <Select
+                                                        value={
+                                                            administrationForm
+                                                                .data.reason_code
+                                                        }
+                                                        onValueChange={(v) =>
+                                                            administrationForm.setData(
+                                                                'reason_code',
+                                                                v,
+                                                            )
+                                                        }
+                                                    >
+                                                        <SelectTrigger>
+                                                            <SelectValue placeholder="Select a reason..." />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            {notGivenReasonOptions.map(
+                                                                (opt) => (
+                                                                    <SelectItem
+                                                                        key={
+                                                                            opt.value
+                                                                        }
+                                                                        value={
+                                                                            opt.value
+                                                                        }
+                                                                    >
+                                                                        {
+                                                                            opt.label
+                                                                        }
+                                                                    </SelectItem>
+                                                                ),
+                                                            )}
+                                                        </SelectContent>
+                                                    </Select>
+                                                    {administrationForm.errors
+                                                        .reason_code && (
+                                                        <div className="mt-1 text-xs text-status-critical">
+                                                            {
+                                                                administrationForm
+                                                                    .errors
+                                                                    .reason_code
+                                                            }
+                                                        </div>
+                                                    )}
+                                                </div>
+                                            )}
+
                                             {administrationNeedsReason && (
                                                 <div className="md:col-span-2">
                                                     <Label>
                                                         {selectedMedication?.is_prn
                                                             ? 'Indication (required for PRN)'
-                                                            : 'Reason (required)'}
+                                                            : 'Additional detail (optional)'}
                                                     </Label>
                                                     <Input
                                                         value={
@@ -2340,6 +2415,39 @@ export default function ClientMedical({
                                                                 }
                                                             </div>
                                                         )}
+                                                        <div className="mt-2">
+                                                            <Label>
+                                                                Witness password
+                                                                / PIN (required)
+                                                            </Label>
+                                                            <Input
+                                                                type="password"
+                                                                value={
+                                                                    administrationForm
+                                                                        .data
+                                                                        .witness_credential
+                                                                }
+                                                                onChange={(e) =>
+                                                                    administrationForm.setData(
+                                                                        'witness_credential',
+                                                                        e.target
+                                                                            .value,
+                                                                    )
+                                                                }
+                                                                placeholder="The second checker authenticates"
+                                                            />
+                                                            {administrationForm
+                                                                .errors
+                                                                .witness_credential && (
+                                                                <div className="mt-1 text-xs text-status-critical">
+                                                                    {
+                                                                        administrationForm
+                                                                            .errors
+                                                                            .witness_credential
+                                                                    }
+                                                                </div>
+                                                            )}
+                                                        </div>
                                                     </div>
                                                 )}
 
@@ -2422,13 +2530,42 @@ export default function ClientMedical({
                                                     )
                                                         return;
                                                     if (
-                                                        administrationNeedsReason &&
+                                                        selectedMedication?.is_prn &&
+                                                        administrationForm.data
+                                                            .status ===
+                                                            'given' &&
                                                         !administrationForm.data
                                                             .reason
                                                     ) {
                                                         administrationForm.setError(
                                                             'reason',
-                                                            'A reason/indication is required.',
+                                                            'An indication is required for PRN medication.',
+                                                        );
+                                                        return;
+                                                    }
+                                                    if (
+                                                        administrationForm.data
+                                                            .status !==
+                                                            'given' &&
+                                                        !administrationForm.data
+                                                            .reason_code
+                                                    ) {
+                                                        administrationForm.setError(
+                                                            'reason_code',
+                                                            'Select a reason for not giving the medication.',
+                                                        );
+                                                        return;
+                                                    }
+                                                    if (
+                                                        administrationForm.data
+                                                            .reason_code ===
+                                                            'other' &&
+                                                        !administrationForm.data
+                                                            .reason
+                                                    ) {
+                                                        administrationForm.setError(
+                                                            'reason',
+                                                            'Describe the reason when choosing "Other".',
                                                         );
                                                         return;
                                                     }
@@ -2443,6 +2580,22 @@ export default function ClientMedical({
                                                         administrationForm.setError(
                                                             'witnessed_by',
                                                             'A witness is required for controlled drug administration.',
+                                                        );
+                                                        return;
+                                                    }
+                                                    if (
+                                                        selectedMedication?.controlled_drug &&
+                                                        administrationForm.data
+                                                            .status ===
+                                                            'given' &&
+                                                        administrationForm.data
+                                                            .witnessed_by &&
+                                                        !administrationForm.data
+                                                            .witness_credential
+                                                    ) {
+                                                        administrationForm.setError(
+                                                            'witness_credential',
+                                                            'The witness must enter their password or PIN.',
                                                         );
                                                         return;
                                                     }
