@@ -51,6 +51,7 @@ class Site extends Model
         'lease_end_date',
         'landlord_name',
         'landlord_contact',
+        'weekly_food_budget_cents',
     ];
 
     protected $casts = [
@@ -65,6 +66,7 @@ class Site extends Model
         'rent_amount' => 'decimal:2',
         'lease_start_date' => 'date',
         'lease_end_date' => 'date',
+        'weekly_food_budget_cents' => 'integer',
     ];
 
     protected $appends = [

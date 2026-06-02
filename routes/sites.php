@@ -27,6 +27,7 @@ use App\Http\Controllers\Sites\{
     SiteTypePlanPinController,
     SiteEmergencyPlanController,
     SiteMealPlanController,
+    SiteMealWeekTemplateController,
     SiteMealInventoryController,
     SiteMealShoppingListController
 };
@@ -288,6 +289,44 @@ Route::middleware(['auth', 'verified'])->group(function () {
             Route::post('/meal-plan/{entry}/serve', [SiteMealPlanController::class, 'markServed'])
                 ->whereNumber('entry')
                 ->name('sites.meals.plan.serve')
+                ->middleware('permission:sites.meals.plan');
+            Route::post('/meal-plan/{entry}/unserve', [SiteMealPlanController::class, 'unserve'])
+                ->whereNumber('entry')
+                ->name('sites.meals.plan.unserve')
+                ->middleware('permission:sites.meals.plan');
+            Route::delete('/meal-plan-week/clear', [SiteMealPlanController::class, 'clearWeek'])
+                ->name('sites.meals.plan.clearWeek')
+                ->middleware('permission:sites.meals.plan');
+            Route::post('/meal-plan-week/copy', [SiteMealPlanController::class, 'copyWeek'])
+                ->name('sites.meals.plan.copyWeek')
+                ->middleware('permission:sites.meals.plan');
+
+            // Per-site planner settings (weekly food budget) + resident dietary editor
+            Route::put('/meal-planner/settings', [SiteMealPlanController::class, 'saveSettings'])
+                ->name('sites.meals.settings')
+                ->middleware('permission:sites.meals.shopping.manage');
+            Route::put('/meal-planner/residents/{client}', [SiteMealPlanController::class, 'updateResident'])
+                ->whereNumber('client')
+                ->name('sites.meals.residents.update')
+                ->middleware('permission:sites.meals.plan');
+
+            // Week templates
+            Route::get('/meal-templates', [SiteMealWeekTemplateController::class, 'index'])
+                ->name('sites.meals.templates.index');
+            Route::post('/meal-templates', [SiteMealWeekTemplateController::class, 'store'])
+                ->name('sites.meals.templates.store')
+                ->middleware('permission:sites.meals.plan');
+            Route::put('/meal-templates/{template}', [SiteMealWeekTemplateController::class, 'update'])
+                ->whereNumber('template')
+                ->name('sites.meals.templates.update')
+                ->middleware('permission:sites.meals.plan');
+            Route::delete('/meal-templates/{template}', [SiteMealWeekTemplateController::class, 'destroy'])
+                ->whereNumber('template')
+                ->name('sites.meals.templates.destroy')
+                ->middleware('permission:sites.meals.plan');
+            Route::post('/meal-templates/{template}/apply', [SiteMealWeekTemplateController::class, 'apply'])
+                ->whereNumber('template')
+                ->name('sites.meals.templates.apply')
                 ->middleware('permission:sites.meals.plan');
 
             Route::get('/meal-inventory', [SiteMealInventoryController::class, 'index'])
