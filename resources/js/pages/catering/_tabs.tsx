@@ -1,10 +1,10 @@
 import { Badge } from '@/components/ui/badge';
 import { Link } from '@inertiajs/react';
 import axios from 'axios';
-import { CalendarDays, ChefHat, LayoutDashboard, Package, ShieldAlert } from 'lucide-react';
+import { CalendarDays, ChefHat, Package, ShieldAlert } from 'lucide-react';
 import { useEffect, useState, type ComponentType } from 'react';
 
-export type CateringTabKey = 'meal-planner' | 'overview' | 'recipes' | 'products' | 'tags';
+export type CateringTabKey = 'meal-planner' | 'recipes' | 'products' | 'tags';
 
 type Tab = {
     key: CateringTabKey;
@@ -16,7 +16,6 @@ type Tab = {
 
 const TABS: Tab[] = [
     { key: 'meal-planner', label: 'Meal Planner', href: '/catering', icon: CalendarDays, description: 'Plan meals, inventory & shopping' },
-    { key: 'overview', label: 'Overview', href: '/catering/overview', icon: LayoutDashboard, description: 'Cross-site dashboard' },
     { key: 'recipes', label: 'Recipes', href: '/catering/recipes', icon: ChefHat, description: 'Manage recipe library' },
     { key: 'products', label: 'Products', href: '/catering/products', icon: Package, description: 'Manage product catalogue' },
     { key: 'tags', label: 'Dietary & Allergens', href: '/catering/tags', icon: ShieldAlert, description: 'Manage dietary + allergen tags' },

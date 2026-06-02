@@ -360,6 +360,8 @@ export default function MealPlannerSubTabs({ site: siteProp, mode = 'embedded', 
                         siteName={site.name}
                         recipes={recipes}
                         inventory={inventory}
+                        products={products}
+                        tags={dietaryTags}
                         canManage={perms.recipes_manage}
                         canPlan={perms.plan}
                         onPlanRecipe={(recipeId) => setPlanDialog({ open: true, entry: null, date: toIsoDate(new Date()), slot: 'dinner', prefillRecipeId: recipeId })}
