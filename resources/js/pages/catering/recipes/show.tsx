@@ -33,7 +33,7 @@ type Props = { recipe: Recipe; canManage: boolean; impact: Impact | null };
 
 export default function CateringRecipeShow({ recipe, canManage, impact }: Props) {
     return (
-        <AppLayout breadcrumbs={[{ title: 'Catering', href: '/catering' }, { title: 'Recipes', href: '/catering/recipes' }, { title: recipe.name, href: `/catering/recipes/${recipe.id}` }]}>
+        <AppLayout breadcrumbs={[{ title: 'Sites & Locations', href: '/sites' }, { title: 'Catering', href: '/catering' }, { title: 'Recipes', href: '/catering/recipes' }, { title: recipe.name, href: `/catering/recipes/${recipe.id}` }]}>
             <Head title={recipe.name} />
             <PageLayout
                 hero={

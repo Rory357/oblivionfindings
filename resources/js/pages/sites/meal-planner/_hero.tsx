@@ -46,10 +46,12 @@ export type HeroNotification = {
     tab: string;
 };
 
-const SITES_GRADIENT_STYLE: CSSProperties = {
-    ['--hero-base' as string]: 'var(--category-sites)',
+// Brand-derived hero base — matches the shared PageHero (e.g. Rostering's
+// category="ops", which resolves to --primary). Follows Settings → Branding.
+const HERO_GRADIENT_STYLE: CSSProperties = {
+    ['--hero-base' as string]: 'var(--primary)',
 };
-const SITES_GRADIENT_CLASS =
+const HERO_GRADIENT_CLASS =
     'bg-[linear-gradient(to_bottom_right,color-mix(in_oklch,var(--hero-base)_90%,transparent),var(--hero-base),color-mix(in_oklch,var(--hero-base)_80%,transparent))]';
 
 function HeroStat({ label, value, sub, emphasis }: { label: string; value: ReactNode; sub?: string; emphasis?: boolean }) {
@@ -380,7 +382,7 @@ export default function MealPlannerHero(props: MealPlannerHeroProps) {
     badges.push({ tone: 'success', icon: CircleCheck, label: isHouse ? `${stats.served} meals served` : 'Kitchen stocked' });
 
     return (
-        <div style={SITES_GRADIENT_STYLE} className={cn('relative overflow-hidden rounded-2xl text-primary-foreground shadow-hero', SITES_GRADIENT_CLASS)}>
+        <div style={HERO_GRADIENT_STYLE} className={cn('relative overflow-hidden rounded-2xl text-primary-foreground shadow-hero', HERO_GRADIENT_CLASS)}>
             <div className="pointer-events-none absolute inset-0 overflow-hidden rounded-2xl">
                 <div className="absolute -right-20 -top-24 h-72 w-72 rounded-full bg-primary-foreground/[0.07]" />
                 <div className="absolute -bottom-24 -left-16 h-56 w-56 rounded-full bg-primary-foreground/[0.06]" />
@@ -390,8 +392,8 @@ export default function MealPlannerHero(props: MealPlannerHeroProps) {
             <div className="relative p-5 sm:p-7">
                 <div className="mb-2 flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-[0.14em] text-primary-foreground/80">
                     <span className="relative inline-flex h-2 w-2">
-                        <span className="absolute inline-flex h-2 w-2 animate-ping rounded-full bg-emerald-200 opacity-75" />
-                        <span className="relative inline-flex h-2 w-2 rounded-full bg-emerald-100" />
+                        <span className="absolute inline-flex h-2 w-2 animate-ping rounded-full bg-status-success opacity-75" />
+                        <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success" />
                     </span>
                     Meal Planner · {isHouse ? 'Resident meals' : 'Kitchen supplies'} · updated just now
                 </div>

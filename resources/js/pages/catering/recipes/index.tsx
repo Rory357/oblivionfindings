@@ -33,7 +33,7 @@ export default function CateringRecipesIndex({ recipes, filters, canManage }: Pr
     const draftCount = recipes.data.length - activeCount;
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Catering', href: '/catering' }, { title: 'Recipes', href: '/catering/recipes' }]}>
+        <AppLayout breadcrumbs={[{ title: 'Sites & Locations', href: '/sites' }, { title: 'Catering', href: '/catering' }, { title: 'Recipes', href: '/catering/recipes' }]}>
             <Head title="Recipes" />
             <PageLayout
                 hero={

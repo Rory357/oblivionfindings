@@ -103,7 +103,7 @@ export default function CateringProductsIndex({ products, categories, tags, filt
     const activeCount = products.data.filter((p) => p.is_active).length;
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Catering', href: '/catering' }, { title: 'Products', href: '/catering/products' }]}>
+        <AppLayout breadcrumbs={[{ title: 'Sites & Locations', href: '/sites' }, { title: 'Catering', href: '/catering' }, { title: 'Products', href: '/catering/products' }]}>
             <Head title="Catering Products" />
             <PageLayout
                 hero={

@@ -92,6 +92,7 @@ export default function CateringRecipeEdit({ recipe, tags, products }: Props) {
 
     return (
         <AppLayout breadcrumbs={[
+            { title: 'Sites & Locations', href: '/sites' },
             { title: 'Catering', href: '/catering' },
             { title: 'Recipes', href: '/catering/recipes' },
             { title: isNew ? 'New recipe' : (recipe!.name), href: isNew ? '/catering/recipes/create' : `/catering/recipes/${recipe!.id}/edit` },

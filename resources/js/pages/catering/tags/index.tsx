@@ -73,7 +73,7 @@ export default function CateringTagsIndex({ tags, canManage }: Props) {
     }, { dietary: [], allergen: [] });
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Catering', href: '/catering' }, { title: 'Dietary & Allergen Tags', href: '/catering/tags' }]}>
+        <AppLayout breadcrumbs={[{ title: 'Sites & Locations', href: '/sites' }, { title: 'Catering', href: '/catering' }, { title: 'Dietary & Allergen Tags', href: '/catering/tags' }]}>
             <Head title="Dietary & Allergen Tags" />
             <PageLayout
                 hero={
