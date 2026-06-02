@@ -79,7 +79,7 @@ function siteIcon(type: string) {
 
 export default function CateringDashboard({ week_start, week_end, sites, totals, library }: Props) {
     return (
-        <AppLayout breadcrumbs={[{ title: 'Catering', href: '/catering' }, { title: 'Overview', href: '/catering' }]}>
+        <AppLayout breadcrumbs={[{ title: 'Catering', href: '/catering' }, { title: 'Overview', href: '/catering/overview' }]}>
             <Head title="Meal Planner — Overview" />
             <div className="space-y-6 p-6">
                 <PageHero

@@ -31,6 +31,25 @@ class DashboardController extends Controller
         ]);
     }
 
+    /**
+     * The dedicated interactive Meal Planner page (green hero + site
+     * switcher). Defaults to the requested ?site=, else the first house,
+     * else the first active site. The React app fetches the rest per-site.
+     */
+    public function mealPlanner(\Illuminate\Http\Request $request)
+    {
+        $requested = $request->integer('site');
+        $default = $requested
+            ? Site::query()->where('is_active', true)->whereKey($requested)->value('id')
+            : null;
+        $default ??= Site::query()->where('is_active', true)->where('type', 'house')->orderBy('name')->value('id')
+            ?? Site::query()->where('is_active', true)->orderBy('name')->value('id');
+
+        return inertia('catering/meal-planner', [
+            'default_site_id' => $default,
+        ]);
+    }
+
     public function index()
     {
         $weekStart = CarbonImmutable::now()->startOfWeek();
