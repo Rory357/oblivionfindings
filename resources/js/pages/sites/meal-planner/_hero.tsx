@@ -24,6 +24,7 @@ import type { CSSProperties, ReactNode } from 'react';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { createPortal } from 'react-dom';
 import { formatMoneyFromCents, type SiteInfo, type SiteSearchItem } from './_helpers';
+import { WeekPicker } from '@/components/rostering/week-picker';
 
 export type HeroStats = {
     mealsPlanned: number;
@@ -359,9 +360,13 @@ export type MealPlannerHeroProps = {
     sites: SiteSearchItem[];
     notifications: HeroNotification[];
     backHref?: string;
+    /** Monday-start Date of the displayed week — drives the calendar week-picker. */
+    weekStart: Date;
     canPlan: boolean;
     canShop: boolean;
     onSelectSite: (id: number) => void;
+    /** Jump to an arbitrary week from the calendar picker. */
+    onSelectWeek: (weekStart: Date) => void;
     onNotificationClick: (tab: string) => void;
     onPlan: () => void;
     onBuildList: () => void;
@@ -374,6 +379,8 @@ export type MealPlannerHeroProps = {
 
 export default function MealPlannerHero(props: MealPlannerHeroProps) {
     const { site, firstName, weekLabel, rangeStart, rangeEnd, isThisWeek, isHouse, residentCount, stats, sites } = props;
+    const weekBtnRef = useRef<HTMLButtonElement>(null);
+    const [weekPickerOpen, setWeekPickerOpen] = useState(false);
 
     const badges: { tone: 'success' | 'warning' | 'critical' | 'info'; icon?: LucideIcon; label: string }[] = [];
     if (isHouse && stats.overrides > 0)
@@ -532,8 +539,9 @@ export default function MealPlannerHero(props: MealPlannerHeroProps) {
                             <ChevronLeft className="h-3.5 w-3.5" /> Prev
                         </button>
                         <button
+                            ref={weekBtnRef}
                             type="button"
-                            onClick={props.onThisWeek}
+                            onClick={() => setWeekPickerOpen((v) => !v)}
                             className={cn(
                                 'inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-[12px] font-semibold text-primary-foreground transition',
                                 isThisWeek
@@ -542,7 +550,17 @@ export default function MealPlannerHero(props: MealPlannerHeroProps) {
                             )}
                         >
                             <CalendarRange className="h-3.5 w-3.5" /> {weekLabel} · {rangeStart} → {rangeEnd}
+                            <ChevronsUpDown className="ml-0.5 h-3 w-3 opacity-70" />
                         </button>
+                        {weekPickerOpen && (
+                            <WeekPicker
+                                selectedWeekStart={props.weekStart}
+                                anchorRef={weekBtnRef}
+                                onSelect={(d) => props.onSelectWeek(d)}
+                                onClose={() => setWeekPickerOpen(false)}
+                                showContextMenu={false}
+                            />
+                        )}
                         <button
                             type="button"
                             onClick={props.onNextWeek}
