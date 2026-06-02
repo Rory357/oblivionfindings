@@ -97,15 +97,19 @@ class RecipeController extends Controller
 
         $data = $this->validateInput($request);
         $recipe = DB::transaction(function () use ($data) {
+            $scope = $data['scope'] ?? 'shared';
             $recipe = MealRecipe::create([
                 'tenant_id' => auth()->user()?->tenant_id,
                 'name' => $data['name'],
                 'description' => $data['description'] ?? null,
+                'category' => $data['category'] ?? null,
                 'serves_default' => $data['serves_default'] ?? 1,
                 'prep_minutes' => $data['prep_minutes'] ?? null,
                 'cook_minutes' => $data['cook_minutes'] ?? null,
                 'instructions' => $data['instructions'] ?? null,
                 'is_active' => $data['is_active'] ?? true,
+                'scope' => $scope,
+                'site_id' => $scope === 'house' ? ($data['site_id'] ?? null) : null,
                 'created_by' => auth()->id(),
             ]);
             $recipe->tags()->sync($data['tag_ids'] ?? []);
@@ -125,16 +129,32 @@ class RecipeController extends Controller
         abort_unless($this->canManage(), 403);
 
         $data = $this->validateInput($request);
-        DB::transaction(function () use ($recipe, $data) {
-            $recipe->update([
+        DB::transaction(function () use ($request, $recipe, $data) {
+            $update = [
                 'name' => $data['name'],
-                'description' => $data['description'] ?? null,
                 'serves_default' => $data['serves_default'] ?? 1,
                 'prep_minutes' => $data['prep_minutes'] ?? null,
                 'cook_minutes' => $data['cook_minutes'] ?? null,
                 'instructions' => $data['instructions'] ?? null,
                 'is_active' => $data['is_active'] ?? true,
-            ]);
+            ];
+
+            // Only overwrite these when the submitting form actually sent them,
+            // so the in-planner dialog (category/scope/site_id) and the legacy
+            // library page (description) don't clobber each other's fields.
+            if ($request->has('description')) {
+                $update['description'] = $data['description'] ?? null;
+            }
+            if ($request->has('category')) {
+                $update['category'] = $data['category'] ?? null;
+            }
+            if ($request->has('scope')) {
+                $scope = $data['scope'] ?? 'shared';
+                $update['scope'] = $scope;
+                $update['site_id'] = $scope === 'house' ? ($data['site_id'] ?? null) : null;
+            }
+
+            $recipe->update($update);
             $recipe->tags()->sync($data['tag_ids'] ?? []);
             $this->syncIngredients($recipe, $data['ingredients'] ?? []);
         });
@@ -146,10 +166,16 @@ class RecipeController extends Controller
         return redirect()->route('catering.recipes.show', $recipe)->with('status', 'Recipe updated');
     }
 
-    public function destroy(MealRecipe $recipe)
+    public function destroy(Request $request, MealRecipe $recipe)
     {
         abort_unless($this->canManage(), 403);
         $recipe->delete();
+
+        // The in-planner recipe editor deletes via axios and expects JSON.
+        if ($request->wantsJson()) {
+            return response()->json(['deleted' => true]);
+        }
+
         return redirect()->route('catering.recipes.index')->with('status', 'Recipe archived');
     }
 
@@ -179,11 +205,14 @@ class RecipeController extends Controller
         return $request->validate([
             'name' => 'required|string|max:255',
             'description' => 'nullable|string|max:2000',
+            'category' => 'nullable|string|max:80',
             'serves_default' => 'nullable|integer|min:1|max:500',
             'prep_minutes' => 'nullable|integer|min:0|max:1440',
             'cook_minutes' => 'nullable|integer|min:0|max:1440',
             'instructions' => 'nullable|string|max:20000',
             'is_active' => 'sometimes|boolean',
+            'scope' => 'nullable|in:house,shared',
+            'site_id' => 'nullable|integer|exists:sites,id',
             'tag_ids' => 'nullable|array',
             'tag_ids.*' => 'integer|exists:meal_dietary_tags,id',
             'ingredients' => 'nullable|array',

@@ -58,6 +58,7 @@ export type RecipeOption = {
 export type RecipeFull = RecipeOption & {
     prep_minutes: number | null;
     cook_minutes: number | null;
+    category: string | null;
     scope: 'shared' | 'house';
     site_id: number | null;
     instructions: string | null;
