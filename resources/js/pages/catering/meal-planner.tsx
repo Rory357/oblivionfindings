@@ -1,16 +1,14 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head } from '@inertiajs/react';
 import MealPlannerSubTabs from '@/pages/sites/meal-planner';
-import { CateringTabs } from './_tabs';
 
 type Props = { default_site_id: number | null };
 
 export default function CateringMealPlanner({ default_site_id }: Props) {
     return (
-        <AppLayout breadcrumbs={[{ title: 'Sites & Locations', href: '/sites' }, { title: 'Catering', href: '/catering' }, { title: 'Meal Planner', href: '/catering' }]}>
+        <AppLayout breadcrumbs={[{ title: 'Sites & Locations', href: '/sites' }, { title: 'Meal Planner', href: '/catering' }]}>
             <Head title="Meal Planner" />
             <div className="space-y-4 p-6">
-                <CateringTabs active="meal-planner" />
                 {default_site_id ? (
                     <MealPlannerSubTabs mode="standalone" defaultSiteId={default_site_id} />
                 ) : (
