@@ -124,9 +124,9 @@
     --color-amberx: var(--amberx);
     --color-amberx-bg: var(--amberx-bg);
 
-    /* Meal planner elevation */
-    --shadow-float: 0 18px 40px -12px oklch(0.30 0.06 153 / 0.30);
-    --shadow-hero: 0 24px 60px -22px oklch(0.40 0.13 153 / 0.45);
+    /* Meal planner elevation — brand-derived (was a fixed green hue 153) */
+    --shadow-float: 0 18px 40px -12px oklch(from var(--primary) 0.30 0.06 h / 0.30);
+    --shadow-hero: 0 24px 60px -22px oklch(from var(--primary) 0.40 0.13 h / 0.45);
 
     --color-brand-deep: var(--brand-deep);
     --color-brand-tint-deep: var(--brand-tint-deep);
@@ -212,10 +212,13 @@
     --category-fleet: oklch(from var(--primary) l c calc(h + 45));
     --category-fleet-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 45)) 12%, transparent);
 
-    /* Sites / Meal Planner green (anchored to category-sites hue for hero parity) */
-    --sites: var(--category-sites);
-    --sites-deep: oklch(from var(--category-sites) calc(l - 0.13) c h);
-    --sites-bg: color-mix(in oklch, var(--category-sites) 13%, var(--card));
+    /* Meal Planner accent — brand-derived. Was the Sites green; now follows --primary
+       so the planner matches the brand colour from Settings → Branding (parity with the
+       shared PageHero used by Rostering etc.). Used only by the meal-planner pages; the
+       Sites module itself still uses --category-sites. */
+    --sites: var(--primary);
+    --sites-deep: oklch(from var(--primary) calc(l - 0.13) c h);
+    --sites-bg: color-mix(in oklch, var(--primary) 13%, var(--card));
     --amberx: oklch(0.62 0.14 70);
     --amberx-bg: color-mix(in oklch, oklch(0.62 0.14 70) 14%, var(--card));
 
@@ -303,10 +306,10 @@
     --category-fleet: oklch(from var(--primary) l c calc(h + 45));
     --category-fleet-bg: color-mix(in oklch, oklch(from var(--primary) l c calc(h + 45)) 20%, transparent);
 
-    /* Sites / Meal Planner green (dark) */
-    --sites: var(--category-sites);
-    --sites-deep: oklch(from var(--category-sites) calc(l + 0.14) c h);
-    --sites-bg: color-mix(in oklch, var(--category-sites) 24%, var(--card));
+    /* Meal Planner accent — brand-derived (dark) */
+    --sites: var(--primary);
+    --sites-deep: oklch(from var(--primary) calc(l + 0.14) c h);
+    --sites-bg: color-mix(in oklch, var(--primary) 24%, var(--card));
     --amberx: oklch(0.75 0.13 75);
     --amberx-bg: color-mix(in oklch, oklch(0.75 0.13 75) 24%, var(--card));
 
