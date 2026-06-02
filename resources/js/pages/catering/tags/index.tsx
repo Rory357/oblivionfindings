@@ -12,7 +12,7 @@ import { Head, router, useForm } from '@inertiajs/react';
 import { Pencil, Plus, Tag, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { ConfirmAction } from '@/pages/sites/_confirm-action';
-import { CateringTabs } from '../_tabs';
+import { CateringTabs, LibraryDeprecationNotice } from '../_tabs';
 import { type DietaryTag, type TagKind, type TagSeverity, tagBadgeStyle } from '../_helpers';
 
 type Props = {
@@ -97,6 +97,7 @@ export default function CateringTagsIndex({ tags, canManage }: Props) {
                 }
             >
                 <CateringTabs active="tags" />
+                <LibraryDeprecationNotice thing="Dietary &amp; allergen tags" />
 
                 {(['dietary', 'allergen'] as TagKind[]).map((kind) => (
                     <section key={kind}>
@@ -184,8 +185,11 @@ export default function CateringTagsIndex({ tags, canManage }: Props) {
                                 </div>
                             </div>
                             <div>
-                                <Label>Colour (hex, optional)</Label>
-                                <Input value={form.data.color} onChange={(e) => form.setData('color', e.target.value)} placeholder="#b91c1c" />
+                                <Label>Colour</Label>
+                                <div className="mt-1 flex items-center gap-2">
+                                    <input type="color" value={form.data.color || '#16a34a'} onChange={(e) => form.setData('color', e.target.value)} className="h-9 w-12 shrink-0 cursor-pointer rounded-md border border-input bg-background" aria-label="Tag colour" />
+                                    <Input value={form.data.color} onChange={(e) => form.setData('color', e.target.value)} placeholder="#b91c1c" className="font-mono" />
+                                </div>
                             </div>
                             <div>
                                 <Label>Description</Label>

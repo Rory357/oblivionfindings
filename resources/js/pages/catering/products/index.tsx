@@ -13,7 +13,7 @@ import { Head, router, useForm } from '@inertiajs/react';
 import { Package, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 import { ConfirmAction } from '@/pages/sites/_confirm-action';
-import { CateringTabs } from '../_tabs';
+import { CateringTabs, LibraryDeprecationNotice } from '../_tabs';
 import { type DietaryTag, type Product, formatMoneyFromCents, tagBadgeStyle } from '../_helpers';
 
 type PaginationLink = { url: string | null; label: string; active: boolean };
@@ -35,6 +35,8 @@ export default function CateringProductsIndex({ products, categories, tags, filt
     const [editing, setEditing] = useState<Editing | null>(null);
     const [search, setSearch] = useState(filters.q ?? '');
     const [category, setCategory] = useState(filters.category ?? '');
+    // Cost is entered in dollars (NZD) but submitted as integer cents (server rule unchanged).
+    const [costDollars, setCostDollars] = useState('');
 
     const form = useForm({
         name: '',
@@ -60,6 +62,7 @@ export default function CateringProductsIndex({ products, categories, tags, filt
             name: '', category: '', default_unit: 'each', pack_size: '', pack_unit: '',
             cost_per_unit_cents: '', currency: 'NZD', barcode: '', is_active: true, notes: '', tag_ids: [],
         });
+        setCostDollars('');
         setEditing({ _isNew: true });
     }
 
@@ -77,11 +80,14 @@ export default function CateringProductsIndex({ products, categories, tags, filt
             notes: p.notes ?? '',
             tag_ids: (p.tags ?? []).map((t) => t.id),
         });
+        setCostDollars(p.cost_per_unit_cents != null ? (p.cost_per_unit_cents / 100).toString() : '');
         setEditing(p);
     }
 
     function submit(e: React.FormEvent) {
         e.preventDefault();
+        // Convert dollars → integer cents on submit; the controller's cents rule stays unchanged.
+        form.transform((data) => ({ ...data, cost_per_unit_cents: costDollars === '' ? null : Math.round(Number(costDollars) * 100) }));
         const onSuccess = () => setEditing(null);
         if (editing?._isNew) {
             form.post('/catering/products', { onSuccess });
@@ -127,6 +133,7 @@ export default function CateringProductsIndex({ products, categories, tags, filt
                 }
             >
                 <CateringTabs active="products" />
+                <LibraryDeprecationNotice thing="Products" />
 
                 <div className="flex flex-wrap items-end gap-3">
                     <div className="flex-1 min-w-[240px]">
@@ -235,8 +242,11 @@ export default function CateringProductsIndex({ products, categories, tags, filt
                                     <Input value={form.data.pack_unit} onChange={(e) => form.setData('pack_unit', e.target.value)} placeholder="g, ml, L…" />
                                 </div>
                                 <div>
-                                    <Label>Cost per unit (cents)</Label>
-                                    <Input type="number" min="0" value={form.data.cost_per_unit_cents} onChange={(e) => form.setData('cost_per_unit_cents', e.target.value === '' ? '' : Number(e.target.value))} />
+                                    <Label>Cost (NZD)</Label>
+                                    <div className="relative">
+                                        <span className="pointer-events-none absolute left-2.5 top-1/2 -translate-y-1/2 text-sm text-muted-foreground">$</span>
+                                        <Input type="number" step="0.01" min="0" value={costDollars} onChange={(e) => setCostDollars(e.target.value)} placeholder="0.00" className="pl-6" />
+                                    </div>
                                 </div>
                                 <div>
                                     <Label>Currency</Label>
@@ -259,6 +269,7 @@ export default function CateringProductsIndex({ products, categories, tags, filt
                                                 <button
                                                     key={t.id}
                                                     type="button"
+                                                    aria-pressed={selected}
                                                     onClick={() => toggleTag(t.id)}
                                                     className={`rounded-md border px-2 py-1 text-xs transition ${selected ? 'border-primary bg-primary/10' : 'border-transparent hover:bg-accent'}`}
                                                     style={tagBadgeStyle(t)}

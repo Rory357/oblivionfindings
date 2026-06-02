@@ -1,7 +1,8 @@
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Link } from '@inertiajs/react';
 import axios from 'axios';
-import { CalendarDays, ChefHat, Package, ShieldAlert } from 'lucide-react';
+import { CalendarDays, Info } from 'lucide-react';
 import { useEffect, useState, type ComponentType } from 'react';
 
 export type CateringTabKey = 'meal-planner' | 'recipes' | 'products' | 'tags';
@@ -14,12 +15,26 @@ type Tab = {
     description?: string;
 };
 
+// Recipes / Products / Tags are now managed inside the Meal Planner — only the
+// planner remains in the tab bar to kill the orphaned cross-links (P2-16).
 const TABS: Tab[] = [
     { key: 'meal-planner', label: 'Meal Planner', href: '/catering', icon: CalendarDays, description: 'Plan meals, inventory & shopping' },
-    { key: 'recipes', label: 'Recipes', href: '/catering/recipes', icon: ChefHat, description: 'Manage recipe library' },
-    { key: 'products', label: 'Products', href: '/catering/products', icon: Package, description: 'Manage product catalogue' },
-    { key: 'tags', label: 'Dietary & Allergens', href: '/catering/tags', icon: ShieldAlert, description: 'Manage dietary + allergen tags' },
 ];
+
+/** Deprecation banner shown on the legacy library index pages. */
+export function LibraryDeprecationNotice({ thing }: { thing: string }) {
+    return (
+        <div className="mb-4 flex flex-wrap items-center gap-3 rounded-lg border border-primary/30 bg-primary/5 px-4 py-3">
+            <Info className="h-4 w-4 shrink-0 text-primary" />
+            <span className="flex-1 text-sm text-foreground">
+                {thing} are now managed inside the <strong>Meal Planner</strong> — open the planner to make changes.
+            </span>
+            <Button asChild size="sm" variant="outline">
+                <Link href="/catering">Open Meal Planner</Link>
+            </Button>
+        </div>
+    );
+}
 
 const CACHE_KEY = 'catering:library-counts';
 

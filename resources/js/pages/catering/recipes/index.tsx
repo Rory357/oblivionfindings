@@ -9,7 +9,7 @@ import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@
 import { Head, Link, router } from '@inertiajs/react';
 import { ChefHat, Eye, Pencil, Plus } from 'lucide-react';
 import { useState } from 'react';
-import { CateringTabs } from '../_tabs';
+import { CateringTabs, LibraryDeprecationNotice } from '../_tabs';
 import { type DietaryTag, type Recipe, tagBadgeStyle } from '../_helpers';
 
 type PaginationLink = { url: string | null; label: string; active: boolean };
@@ -24,9 +24,10 @@ type Props = {
 
 export default function CateringRecipesIndex({ recipes, filters, canManage }: Props) {
     const [search, setSearch] = useState(filters.q ?? '');
+    const [showDrafts, setShowDrafts] = useState(filters.inactive ?? false);
 
-    function applyFilters() {
-        router.get('/catering/recipes', { q: search || undefined }, { preserveState: true, replace: true });
+    function applyFilters(nextDrafts = showDrafts) {
+        router.get('/catering/recipes', { q: search || undefined, inactive: nextDrafts ? 1 : undefined }, { preserveState: true, replace: true });
     }
 
     const activeCount = recipes.data.filter((r) => r.is_active).length;
@@ -59,13 +60,18 @@ export default function CateringRecipesIndex({ recipes, filters, canManage }: Pr
                 }
             >
                 <CateringTabs active="recipes" />
+                <LibraryDeprecationNotice thing="Recipes" />
 
                 <div className="flex flex-wrap items-end gap-3">
                     <div className="flex-1 min-w-[240px]">
                         <Label>Search</Label>
                         <Input value={search} onChange={(e) => setSearch(e.target.value)} onKeyDown={(e) => e.key === 'Enter' && applyFilters()} placeholder="Search recipe name" />
                     </div>
-                    <Button variant="outline" onClick={applyFilters}>Apply</Button>
+                    <label className="flex h-9 items-center gap-2 rounded-md border border-border bg-card px-3 text-sm">
+                        <input type="checkbox" checked={showDrafts} onChange={(e) => { setShowDrafts(e.target.checked); applyFilters(e.target.checked); }} />
+                        Show drafts
+                    </label>
+                    <Button variant="outline" onClick={() => applyFilters()}>Apply</Button>
                 </div>
 
                 <div className="rounded-md border">
@@ -81,7 +87,23 @@ export default function CateringRecipesIndex({ recipes, filters, canManage }: Pr
                         </TableHeader>
                         <TableBody>
                             {recipes.data.length === 0 && (
-                                <TableRow><TableCell colSpan={5} className="text-center text-muted-foreground">No recipes match.</TableCell></TableRow>
+                                <TableRow>
+                                    <TableCell colSpan={5} className="py-8 text-center text-muted-foreground">
+                                        {filters.q ? (
+                                            <div className="flex flex-col items-center gap-2">
+                                                <span>No recipes match your search.</span>
+                                                <Button variant="ghost" size="sm" onClick={() => { setSearch(''); router.get('/catering/recipes', {}, { preserveState: true, replace: true }); }}>Clear search</Button>
+                                            </div>
+                                        ) : (
+                                            <div className="flex flex-col items-center gap-2">
+                                                <ChefHat className="h-8 w-8 text-muted-foreground/50" />
+                                                <span className="font-medium text-foreground">No recipes yet</span>
+                                                <span className="text-xs">Build your first recipe, or activate a draft from the shared library.</span>
+                                                {canManage && <Button asChild size="sm"><Link href="/catering/recipes/create"><Plus className="mr-1.5 h-4 w-4" /> New recipe</Link></Button>}
+                                            </div>
+                                        )}
+                                    </TableCell>
+                                </TableRow>
                             )}
                             {recipes.data.map((r) => (
                                 <TableRow key={r.id}>

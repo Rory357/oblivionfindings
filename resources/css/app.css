@@ -652,3 +652,15 @@ html[data-density="comfortable"] [data-slot="sidebar-menu-button"] {
         break-inside: avoid;
     }
 }
+
+/* Reduced-motion: freeze the meal-planner pulse dot, spinners, pop-ins and
+   skeleton shimmer to a static state (WCAG 2.3.3). Transform-only animations
+   resolve to their natural position, so nothing is left invisible. */
+@media (prefers-reduced-motion: reduce) {
+    .animate-ping,
+    .animate-spin,
+    .animate-pop,
+    .animate-pulse {
+        animation: none !important;
+    }
+}

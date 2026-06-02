@@ -128,6 +128,27 @@ Edit [`resources/css/app.css`](../resources/css/app.css):
 4. If it should respond to brand colour, express it via
    `oklch(from var(--primary) …)` rather than a fixed value.
 
+## Accessibility: contrast floor & reduced motion
+
+- **Safety colours are brand-independent.** Allergen/conflict banners and safety
+  pills must use the fixed `status-critical` / `status-warning` token pairs (solid
+  background + contrast-checked white or `status-*-foreground`), **never**
+  `primary-foreground` opacity over the brand gradient — contrast there tracks
+  whatever hue an admin picks and can fall below WCAG 1.4.3 (4.5:1). The meal
+  planner hero conflict banner is pinned to solid `bg-status-critical text-white`
+  for this reason.
+- **Colour is never the only signal.** Pair every colour-coded state with a text
+  label or icon (MealCard "Allergen"/"Texture"/"Diet check" pills, the composed
+  `aria-label`, the left status bar) so it survives WCAG 1.4.1.
+- **Small pills.** Keep safety-pill text ≥11px or give sub-11px pills a bordered /
+  iconned non-colour cue.
+- **Focus is always visible.** Interactive chrome (hero CTAs, sub-tabs, MealCards,
+  Add buttons, menu items) carries `focus-visible:ring-2 focus-visible:ring-ring`.
+- **Reduced motion.** A global `@media (prefers-reduced-motion: reduce)` block in
+  `app.css` disables `animate-ping` / `animate-spin` / `animate-pop` /
+  `animate-pulse`. New animated chrome should rely on that block (or a
+  `motion-reduce:` utility) rather than animating unconditionally (WCAG 2.3.3).
+
 ## See also
 
 - [`resources/css/app.css`](../resources/css/app.css) — token definitions

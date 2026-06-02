@@ -59,12 +59,13 @@ function StockGauge({ item }: { item: InventoryItem }) {
     const reorderPct = reorder != null ? Math.min(100, (reorder / scaleMax) * 100) : null;
     const barColor = state === 'out' ? 'bg-status-critical' : state === 'low' ? 'bg-status-warning' : 'bg-sites';
 
+    const stateLabel = state === 'out' ? 'out of stock' : state === 'low' ? 'below par' : 'at or above par';
     return (
         <div className="w-40">
-            <div className="relative h-2.5 w-full overflow-hidden rounded-full bg-muted">
+            <div role="meter" aria-valuenow={Math.round(cur)} aria-valuemin={0} aria-valuemax={Math.round(scaleMax)} aria-label={`${formatQty(cur, item.unit)} in stock, ${stateLabel}`} className="relative h-2.5 w-full overflow-hidden rounded-full bg-muted">
                 <div className={cn('h-full rounded-full transition-all', barColor)} style={{ width: `${Math.max(2, pct)}%` }} />
                 {reorderPct != null && (
-                    <div className="absolute top-1/2 h-3.5 w-px -translate-y-1/2 bg-status-critical/70" style={{ left: `${reorderPct}%` }} title={`Reorder at ${reorder}`} />
+                    <div className="absolute top-1/2 h-3.5 w-px -translate-y-1/2 bg-status-critical/70" style={{ left: `${reorderPct}%` }} title={`Reorder at par (${formatQty(reorder, item.unit)})`} aria-hidden="true" />
                 )}
             </div>
             <div className="mt-1 text-[11px] tabular-nums text-muted-foreground">
@@ -123,13 +124,14 @@ export default function InventoryTable({ siteId, items, canAdjust, canManageProd
             </div>
 
             <div className="flex flex-wrap items-center justify-between gap-2">
-                <div className="flex flex-wrap items-center gap-1.5">
+                <div role="group" aria-label="Filter by category" className="flex flex-wrap items-center gap-1.5">
                     {categories.map((c) => (
                         <button
                             key={c}
                             type="button"
+                            aria-pressed={c === cat}
                             onClick={() => setCat(c)}
-                            className={cn('rounded-full border px-3 py-1 text-[12px] font-medium capitalize transition-colors', c === cat ? 'border-sites bg-sites-bg text-sites-deep' : 'border-border bg-card text-muted-foreground hover:bg-accent')}
+                            className={cn('rounded-full border px-3 py-1 text-[12px] font-medium capitalize transition-colors focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring', c === cat ? 'border-sites bg-sites-bg text-sites-deep' : 'border-border bg-card text-muted-foreground hover:bg-accent')}
                         >
                             {c === 'all' ? 'All items' : c}
                         </button>
@@ -149,14 +151,15 @@ export default function InventoryTable({ siteId, items, canAdjust, canManageProd
             <div className="overflow-hidden rounded-xl border border-border bg-card shadow-sm">
                 <div className="nice-scroll overflow-x-auto">
                     <table className="w-full min-w-[820px] text-sm">
+                        <caption className="sr-only">Inventory items</caption>
                         <thead className="border-b border-border bg-muted/40 text-[11px] uppercase tracking-wide text-muted-foreground">
                             <tr>
-                                <th className="px-4 py-2.5 text-left font-semibold">Product</th>
-                                <th className="px-4 py-2.5 text-left font-semibold">Stock level</th>
-                                <th className="px-4 py-2.5 text-left font-semibold">Location</th>
-                                <th className="px-4 py-2.5 text-left font-semibold">Last counted</th>
-                                <th className="px-4 py-2.5 text-right font-semibold">Value</th>
-                                {canAdjust && <th className="px-4 py-2.5 text-right font-semibold">Adjust</th>}
+                                <th scope="col" className="px-4 py-2.5 text-left font-semibold">Product</th>
+                                <th scope="col" className="px-4 py-2.5 text-left font-semibold">Stock level</th>
+                                <th scope="col" className="px-4 py-2.5 text-left font-semibold">Location</th>
+                                <th scope="col" className="px-4 py-2.5 text-left font-semibold">Last counted</th>
+                                <th scope="col" className="px-4 py-2.5 text-right font-semibold">Value</th>
+                                {canAdjust && <th scope="col" className="px-4 py-2.5 text-right font-semibold">Adjust</th>}
                             </tr>
                         </thead>
                         <tbody>
@@ -183,11 +186,11 @@ export default function InventoryTable({ siteId, items, canAdjust, canManageProd
                                         {canAdjust && (
                                             <td className="px-4 py-2.5">
                                                 <div className="flex items-center justify-end gap-1">
-                                                    <Button size="icon" variant="outline" className="h-7 w-7" disabled={busyId === i.id} onClick={() => quickAdjust(i, -1)}><Minus className="h-3.5 w-3.5" /></Button>
-                                                    <Button size="icon" variant="outline" className="h-7 w-7" disabled={busyId === i.id} onClick={() => quickAdjust(i, 1)}><Plus className="h-3.5 w-3.5" /></Button>
-                                                    <Button size="icon" variant="ghost" className="h-7 w-7" onClick={() => onOpenAdjust(i)}><Pencil className="h-3.5 w-3.5" /></Button>
+                                                    <Button size="icon" variant="outline" className="h-7 w-7" aria-label={`Remove one ${i.product.name}`} aria-busy={busyId === i.id} disabled={busyId === i.id} onClick={() => quickAdjust(i, -1)}><Minus className="h-3.5 w-3.5" /></Button>
+                                                    <Button size="icon" variant="outline" className="h-7 w-7" aria-label={`Add one ${i.product.name}`} aria-busy={busyId === i.id} disabled={busyId === i.id} onClick={() => quickAdjust(i, 1)}><Plus className="h-3.5 w-3.5" /></Button>
+                                                    <Button size="icon" variant="ghost" className="h-7 w-7" aria-label={`Adjust ${i.product.name}`} onClick={() => onOpenAdjust(i)}><Pencil className="h-3.5 w-3.5" /></Button>
                                                     <ConfirmAction title={`Remove ${i.product.name}?`} description="Removes the product from this site's inventory list. Movement history is kept for audit." confirmLabel="Remove" onConfirm={() => destroy(i)}>
-                                                        <Button size="icon" variant="ghost" className="h-7 w-7"><Package className="h-3.5 w-3.5 text-status-critical" /></Button>
+                                                        <Button size="icon" variant="ghost" className="h-7 w-7" aria-label={`Delete ${i.product.name}`}><Package className="h-3.5 w-3.5 text-status-critical" /></Button>
                                                     </ConfirmAction>
                                                 </div>
                                             </td>

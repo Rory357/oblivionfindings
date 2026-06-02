@@ -5,11 +5,11 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { cn } from '@/lib/utils';
 import axios from 'axios';
-import { CalendarCheck, CalendarDays, Check, Clock, Copy, LayoutTemplate, Minus, Pencil, Plus, RefreshCw, Trash2, UtensilsCrossed, X } from 'lucide-react';
+import { CalendarCheck, CalendarDays, Check, Clock, Copy, LayoutTemplate, Minus, Pencil, Plus, RefreshCw, ShieldAlert, Trash2, UtensilsCrossed, X } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { ConfirmAction } from '../_confirm-action';
-import { MEAL_SLOTS, SLOT_ICON, SLOT_LABEL, toIsoDate, type MealSlot, type RecipeFull, type WeekTemplate, type WeekTemplateMeal } from './_helpers';
+import { buildRecipeMap, conflictsFor, MEAL_SLOTS, SLOT_ICON, SLOT_LABEL, toIsoDate, type MealSlot, type PlanEntry, type RecipeFull, type RecipeMap, type Resident, type WeekTemplate, type WeekTemplateMeal } from './_helpers';
 
 const DOW = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
 
@@ -17,6 +17,7 @@ type Props = {
     siteId: number;
     templates: WeekTemplate[];
     recipes: RecipeFull[];
+    residents: Resident[];
     weekLabel: string;
     rangeLabel: string;
     weekStart: Date;
@@ -25,10 +26,17 @@ type Props = {
     onApplied: () => void;
 };
 
-export default function TemplatesPanel({ siteId, templates, recipes, weekLabel, rangeLabel, weekStart, canManage, onChanged, onApplied }: Props) {
+export default function TemplatesPanel({ siteId, templates, recipes, residents, weekLabel, rangeLabel, weekStart, canManage, onChanged, onApplied }: Props) {
     const [applyTpl, setApplyTpl] = useState<WeekTemplate | null>(null);
     const [builder, setBuilder] = useState<{ open: boolean; initial: WeekTemplate | null }>({ open: false, initial: null });
+    const recipeMap = useMemo(() => buildRecipeMap(recipes), [recipes]);
     const recipeName = (id: number) => recipes.find((r) => r.id === id)?.name ?? 'Meal';
+    // Distinct allergen tags across a template's recipes — its allergen "footprint".
+    const templateAllergens = (t: WeekTemplate): string[] => {
+        const set = new Map<number, string>();
+        t.meals.forEach((m) => recipeMap.get(m.recipe_id)?.tags.filter((tag) => tag.kind === 'allergen').forEach((tag) => set.set(tag.id, tag.label)));
+        return Array.from(set.values());
+    };
 
     async function duplicate(t: WeekTemplate) {
         try {
@@ -108,17 +116,25 @@ export default function TemplatesPanel({ siteId, templates, recipes, weekLabel, 
                                     <div className="mb-3 grid grid-cols-7 gap-1">
                                         {byDay.map((meals, d) => (
                                             <div key={d} className="rounded-md border border-border bg-muted/30 p-1">
-                                                <div className="mb-0.5 text-center text-[9px] font-semibold uppercase tracking-wide text-muted-foreground">{DOW[d]}</div>
+                                                <div className="mb-0.5 text-center text-[10px] font-semibold uppercase tracking-wide text-muted-foreground">{DOW[d]}</div>
                                                 <div className="space-y-0.5">
-                                                    {meals.slice(0, 3).map((m, i) => (
-                                                        <div key={i} className="truncate rounded bg-sites-bg/70 px-1 py-0.5 text-[8.5px] font-medium leading-tight text-sites-deep" title={recipeName(m.recipe_id)}>{recipeName(m.recipe_id)}</div>
+                                                    {meals.slice(0, 2).map((m, i) => (
+                                                        <div key={i} className="truncate rounded bg-sites-bg/70 px-1 py-0.5 text-[11px] font-medium leading-tight text-sites-deep" title={recipeName(m.recipe_id)}>{recipeName(m.recipe_id)}</div>
                                                     ))}
-                                                    {meals.length === 0 && <div className="py-0.5 text-center text-[9px] text-muted-foreground/50">–</div>}
-                                                    {meals.length > 3 && <div className="text-center text-[8.5px] text-muted-foreground">+{meals.length - 3}</div>}
+                                                    {meals.length === 0 && <div className="py-0.5 text-center text-[10px] text-muted-foreground/50">–</div>}
+                                                    {meals.length > 2 && <div className="text-center text-[10px] text-muted-foreground">+{meals.length - 2} more</div>}
                                                 </div>
                                             </div>
                                         ))}
                                     </div>
+                                    {templateAllergens(t).length > 0 && (
+                                        <div className="mb-3 flex flex-wrap items-center gap-1">
+                                            <span className="inline-flex items-center gap-1 text-[10px] font-semibold uppercase tracking-wide text-status-critical"><ShieldAlert className="h-3 w-3" /> Allergens:</span>
+                                            {templateAllergens(t).map((label) => (
+                                                <span key={label} className="rounded-full bg-status-critical-bg px-1.5 py-px text-[10px] font-medium text-status-critical">{label}</span>
+                                            ))}
+                                        </div>
+                                    )}
                                     <div className="mt-auto flex items-center gap-2">
                                         <Button size="sm" className="flex-1" onClick={() => setApplyTpl(t)}><CalendarCheck className="mr-1.5 h-[15px] w-[15px]" /> Apply to week</Button>
                                         {canManage && (
@@ -138,14 +154,25 @@ export default function TemplatesPanel({ siteId, templates, recipes, weekLabel, 
                 </div>
             )}
 
-            {applyTpl && <ApplyTemplateDialog tpl={applyTpl} weekLabel={weekLabel} rangeLabel={rangeLabel} onClose={() => setApplyTpl(null)} onConfirm={applyTemplate} />}
+            {applyTpl && <ApplyTemplateDialog tpl={applyTpl} weekLabel={weekLabel} rangeLabel={rangeLabel} residents={residents} recipeMap={recipeMap} onClose={() => setApplyTpl(null)} onConfirm={applyTemplate} />}
             {builder.open && <TemplateBuilderDialog siteId={siteId} recipes={recipes} initial={builder.initial} onClose={() => setBuilder({ open: false, initial: null })} onSaved={() => { setBuilder({ open: false, initial: null }); onChanged(); }} />}
         </div>
     );
 }
 
-function ApplyTemplateDialog({ tpl, weekLabel, rangeLabel, onClose, onConfirm }: { tpl: WeekTemplate; weekLabel: string; rangeLabel: string; onClose: () => void; onConfirm: (t: WeekTemplate, replace: boolean) => void }) {
+function ApplyTemplateDialog({ tpl, weekLabel, rangeLabel, residents, recipeMap, onClose, onConfirm }: { tpl: WeekTemplate; weekLabel: string; rangeLabel: string; residents: Resident[]; recipeMap: RecipeMap; onClose: () => void; onConfirm: (t: WeekTemplate, replace: boolean) => void }) {
     const [mode, setMode] = useState<'replace' | 'merge'>('replace');
+    // Pre-flight: how many of the template's meals would clash with current residents' allergens.
+    const conflictCount = useMemo(() => {
+        if (residents.length === 0) return 0;
+        const clientIds = residents.map((r) => r.id);
+        let n = 0;
+        tpl.meals.forEach((m) => {
+            const pseudo = { source_type: 'recipe', recipe_id: m.recipe_id, client_ids: clientIds } as PlanEntry;
+            if (conflictsFor(pseudo, residents, recipeMap).hard.length) n++;
+        });
+        return n;
+    }, [tpl, residents, recipeMap]);
     return (
         <Dialog open onOpenChange={(o) => !o && onClose()}>
             <DialogContent className="sm:max-w-md">
@@ -153,6 +180,12 @@ function ApplyTemplateDialog({ tpl, weekLabel, rangeLabel, onClose, onConfirm }:
                     <DialogTitle className="flex items-center gap-2"><CalendarCheck className="h-4 w-4 text-sites" /> Apply “{tpl.name}”</DialogTitle>
                     <DialogDescription>{tpl.meals.length} meals → {weekLabel} ({rangeLabel})</DialogDescription>
                 </DialogHeader>
+                {conflictCount > 0 && (
+                    <div className="flex items-start gap-2 rounded-md border border-status-critical/40 bg-status-critical-bg/60 p-2.5 text-xs text-status-critical">
+                        <ShieldAlert className="mt-0.5 h-4 w-4 shrink-0" />
+                        <span>Heads up: {conflictCount} meal{conflictCount === 1 ? '' : 's'} conflict with residents' allergens. Review them after applying.</span>
+                    </div>
+                )}
                 <div className="space-y-2">
                     <button type="button" onClick={() => setMode('replace')} className={cn('flex w-full items-start gap-3 rounded-xl border p-3 text-left transition-all', mode === 'replace' ? 'border-primary bg-primary/5 ring-1 ring-primary/30' : 'border-border hover:bg-accent')}>
                         <RefreshCw className={cn('mt-0.5 h-4 w-4', mode === 'replace' ? 'text-primary' : 'text-muted-foreground')} />
@@ -318,11 +351,11 @@ export function TemplateBuilderDialog({ siteId, recipes, initial, onClose, onSav
                                                             <button type="button" onClick={() => setEditing(key)} className="line-clamp-2 flex-1 text-left text-[11px] font-medium leading-tight text-sites-deep">{recipeName(cell.recipe_id)}</button>
                                                             <div className="mt-0.5 flex items-center justify-between">
                                                                 <div className="flex items-center gap-0.5">
-                                                                    <button type="button" onClick={() => setServings(day, slot, cell.servings - 1)} className="flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:bg-card"><Minus className="h-2.5 w-2.5" /></button>
+                                                                    <button type="button" aria-label="Decrease servings" onClick={() => setServings(day, slot, cell.servings - 1)} className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><Minus className="h-3 w-3" /></button>
                                                                     <span className="w-4 text-center text-[10px] font-semibold tabular-nums text-foreground">{cell.servings}</span>
-                                                                    <button type="button" onClick={() => setServings(day, slot, cell.servings + 1)} className="flex h-4 w-4 items-center justify-center rounded text-muted-foreground hover:bg-card"><Plus className="h-2.5 w-2.5" /></button>
+                                                                    <button type="button" aria-label="Increase servings" onClick={() => setServings(day, slot, cell.servings + 1)} className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:bg-card focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><Plus className="h-3 w-3" /></button>
                                                                 </div>
-                                                                <button type="button" onClick={() => clearCell(day, slot)} className="text-muted-foreground hover:text-status-critical"><X className="h-3 w-3" /></button>
+                                                                <button type="button" aria-label="Clear meal" onClick={() => clearCell(day, slot)} className="flex h-6 w-6 items-center justify-center rounded text-muted-foreground transition-colors hover:text-status-critical focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring"><X className="h-3.5 w-3.5" /></button>
                                                             </div>
                                                         </div>
                                                     ) : (
