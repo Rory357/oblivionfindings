@@ -268,9 +268,11 @@ export default function MealPlannerSubTabs({ site: siteProp, mode = 'embedded', 
                     stats={stats}
                     sites={sites}
                     notifications={notifications}
+                    weekStart={weekStart}
                     canPlan={perms.plan}
                     canShop={perms.shopping_manage}
                     onSelectSite={selectSite}
+                    onSelectWeek={(d) => setWeekStart(startOfWeek(d))}
                     onNotificationClick={(t) => setTab(t as SubTab)}
                     onPlan={planToday}
                     onBuildList={openBuildList}

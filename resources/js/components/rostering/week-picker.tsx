@@ -133,6 +133,8 @@ export type WeekPickerProps = {
     onClose: () => void;
     today?: Date;
     canPublishWeek?: boolean;
+    /** Right-click week context menu (rostering-specific actions). Defaults on. */
+    showContextMenu?: boolean;
 };
 
 export function WeekPicker({
@@ -142,6 +144,7 @@ export function WeekPicker({
     onClose,
     today: todayProp,
     canPublishWeek = false,
+    showContextMenu = true,
 }: WeekPickerProps) {
     const today = useMemo(() => todayProp ?? new Date(), [todayProp]);
     const [viewMonth, setViewMonth] = useState(
@@ -409,7 +412,7 @@ export function WeekPicker({
                                 onSelect(row.weekStart);
                                 onClose();
                             }}
-                            onContextMenu={(e) => openCtx(e, row.weekStart)}
+                            onContextMenu={showContextMenu ? (e) => openCtx(e, row.weekStart) : undefined}
                             aria-label={`Select ${weekLabel(row.weekStart)} starting ${fmtDayShort(row.weekStart)}`}
                         >
                             <span className="py-1.5 text-center text-[10.5px] font-bold tabular-nums text-muted-foreground/70">
@@ -444,9 +447,13 @@ export function WeekPicker({
             </div>
 
             <div className="mt-3 flex items-center justify-between border-t border-border pt-3">
-                <span className="text-[11px] italic text-muted-foreground/80">
-                    Right-click a week for options
-                </span>
+                {showContextMenu ? (
+                    <span className="text-[11px] italic text-muted-foreground/80">
+                        Right-click a week for options
+                    </span>
+                ) : (
+                    <span />
+                )}
                 <div className="flex items-center gap-2">
                     <button
                         type="button"
