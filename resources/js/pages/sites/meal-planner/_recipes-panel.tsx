@@ -3,7 +3,7 @@ import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, D
 import { Input } from '@/components/ui/input';
 import { cn } from '@/lib/utils';
 import axios from 'axios';
-import { CalendarPlus, Check, ChefHat, Clock, Minus, Pencil, Plus, Search, ShoppingCart, Users } from 'lucide-react';
+import { CalendarPlus, Check, ChefHat, Clock, Minus, Pencil, Plus, Search, ShoppingCart, Tags, Users } from 'lucide-react';
 import { useMemo, useState } from 'react';
 import { toast } from 'sonner';
 import { formatMoneyFromCents as money, toNum, type InventoryItem, type RecipeFull } from './_helpers';
@@ -17,8 +17,10 @@ type Props = {
     products: { id: number; name: string; default_unit: string }[];
     tags: { id: number; label: string; kind: 'allergen' | 'dietary' }[];
     canManage: boolean;
+    canManageTags?: boolean;
     canPlan: boolean;
     onPlanRecipe: (recipeId: number) => void;
+    onManageTags?: () => void;
     onChanged: () => void;
 };
 
@@ -52,20 +54,24 @@ function recipeStockSummary(recipe: RecipeFull, inventory: InventoryItem[], scal
     return { toBuy, estCents };
 }
 
-export default function RecipesPanel({ siteId, recipes, inventory, products, tags, canManage, canPlan, onPlanRecipe, onChanged }: Props) {
+export default function RecipesPanel({ siteId, siteName, recipes, inventory, products, tags, canManage, canManageTags, canPlan, onPlanRecipe, onManageTags, onChanged }: Props) {
     const [scope, setScope] = useState<Scope>('all');
+    const [cat, setCat] = useState<string>('all');
     const [q, setQ] = useState('');
     const [view, setView] = useState<RecipeFull | null>(null);
-    const [editor, setEditor] = useState<{ open: boolean; recipeId: number | null }>({ open: false, recipeId: null });
+    const [editor, setEditor] = useState<{ open: boolean; recipe: RecipeFull | null }>({ open: false, recipe: null });
+
+    const categories = useMemo(() => Array.from(new Set(recipes.map((r) => r.category).filter((c): c is string => !!c))).sort(), [recipes]);
 
     const filtered = useMemo(() => {
         const needle = q.trim().toLowerCase();
         return recipes.filter((r) => {
             if (scope !== 'all' && r.scope !== scope) return false;
+            if (cat !== 'all' && r.category !== cat) return false;
             if (needle && !`${r.name} ${r.tags.map((t) => t.label).join(' ')}`.toLowerCase().includes(needle)) return false;
             return true;
         });
-    }, [recipes, scope, q]);
+    }, [recipes, scope, cat, q]);
 
     const scopes: { value: Scope; label: string }[] = [
         { value: 'all', label: 'All' },
@@ -88,8 +94,13 @@ export default function RecipesPanel({ siteId, recipes, inventory, products, tag
                             </button>
                         ))}
                     </div>
+                    {canManageTags && (
+                        <button type="button" onClick={onManageTags} className="inline-flex h-9 items-center gap-1.5 rounded-md border border-border bg-card px-3 text-sm font-medium text-foreground transition hover:bg-accent">
+                            <Tags className="h-4 w-4" /> Manage tags
+                        </button>
+                    )}
                     {canManage && (
-                        <button type="button" onClick={() => setEditor({ open: true, recipeId: null })} className="inline-flex h-9 items-center gap-1.5 rounded-md bg-sites px-3 text-sm font-semibold text-primary-foreground transition hover:opacity-90">
+                        <button type="button" onClick={() => setEditor({ open: true, recipe: null })} className="inline-flex h-9 items-center gap-1.5 rounded-md bg-sites px-3 text-sm font-semibold text-primary-foreground transition hover:opacity-90">
                             <Plus className="h-4 w-4" /> Add recipe
                         </button>
                     )}
@@ -99,6 +110,24 @@ export default function RecipesPanel({ siteId, recipes, inventory, products, tag
             <p className="text-[12.5px] text-muted-foreground">
                 The <strong className="font-medium text-foreground">shared library</strong> is your org-wide starting point — nothing is locked. A house can use a recipe as-is, or add house-only recipes with <strong className="font-medium text-foreground">Add recipe</strong>.
             </p>
+
+            {categories.length > 0 && (
+                <div className="flex flex-wrap items-center gap-1.5">
+                    {['all', ...categories].map((c) => (
+                        <button
+                            key={c}
+                            type="button"
+                            onClick={() => setCat(c)}
+                            className={cn(
+                                'rounded-full border px-3 py-1 text-[12px] font-medium transition-colors',
+                                cat === c ? 'border-sites bg-sites/10 text-sites' : 'border-border bg-card text-muted-foreground hover:bg-accent',
+                            )}
+                        >
+                            {c === 'all' ? 'All recipes' : c}
+                        </button>
+                    ))}
+                </div>
+            )}
 
             {filtered.length === 0 ? (
                 <div className="rounded-xl border border-dashed border-border bg-card px-6 py-12 text-center text-sm text-muted-foreground">No recipes match.</div>
@@ -111,7 +140,10 @@ export default function RecipesPanel({ siteId, recipes, inventory, products, tag
                             <button key={r.id} type="button" onClick={() => setView(r)} className="group flex flex-col rounded-xl border border-border bg-card p-4 text-left shadow-sm transition-all hover:border-sites/50 hover:shadow-md">
                                 <div className="flex items-start justify-between gap-2">
                                     <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-sites-bg text-sites-deep"><ChefHat className="h-5 w-5" /></span>
-                                    <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold', r.scope === 'house' ? 'bg-sites-bg text-sites-deep' : 'bg-muted text-muted-foreground')}>{r.scope === 'house' ? 'This house' : 'Shared library'}</span>
+                                    <div className="flex items-center gap-1.5">
+                                        {r.category && <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">{r.category}</span>}
+                                        <span className={cn('rounded-full px-2 py-0.5 text-[10px] font-semibold', r.scope === 'house' ? 'bg-sites-bg text-sites-deep' : 'bg-muted text-muted-foreground')}>{r.scope === 'house' ? 'This house' : 'Shared library'}</span>
+                                    </div>
                                 </div>
                                 <div className="mt-2.5 text-[14.5px] font-semibold leading-tight text-foreground">{r.name}</div>
                                 <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-[11.5px] text-muted-foreground">
@@ -146,9 +178,9 @@ export default function RecipesPanel({ siteId, recipes, inventory, products, tag
                     canPlan={canPlan}
                     onClose={() => setView(null)}
                     onEdit={() => {
-                        const id = view.id;
+                        const r = view;
                         setView(null);
-                        setEditor({ open: true, recipeId: id });
+                        setEditor({ open: true, recipe: r });
                     }}
                     onPlan={() => {
                         onPlanRecipe(view.id);
@@ -159,10 +191,13 @@ export default function RecipesPanel({ siteId, recipes, inventory, products, tag
 
             <RecipeEditDialog
                 open={editor.open}
-                recipeId={editor.recipeId}
+                recipe={editor.recipe}
                 products={products}
                 tags={tags}
-                onClose={() => setEditor({ open: false, recipeId: null })}
+                siteId={siteId}
+                siteName={siteName}
+                canManage={canManage}
+                onClose={() => setEditor({ open: false, recipe: null })}
                 onSaved={onChanged}
             />
         </div>

@@ -11,9 +11,11 @@ type Props = {
     siteId: number;
     items: InventoryItem[];
     canAdjust: boolean;
+    canManageProducts?: boolean;
     onOpenAdjust: (item: InventoryItem) => void;
     onOpenStocktake: () => void;
     onAddItem: () => void;
+    onManageProducts?: () => void;
     onChanged: () => void;
 };
 
@@ -72,7 +74,7 @@ function StockGauge({ item }: { item: InventoryItem }) {
     );
 }
 
-export default function InventoryTable({ siteId, items, canAdjust, onOpenAdjust, onOpenStocktake, onAddItem, onChanged }: Props) {
+export default function InventoryTable({ siteId, items, canAdjust, canManageProducts, onOpenAdjust, onOpenStocktake, onAddItem, onManageProducts, onChanged }: Props) {
     const [busyId, setBusyId] = useState<number | null>(null);
     const [cat, setCat] = useState<string>('all');
 
@@ -133,10 +135,13 @@ export default function InventoryTable({ siteId, items, canAdjust, onOpenAdjust,
                         </button>
                     ))}
                 </div>
-                {canAdjust && (
+                {(canAdjust || canManageProducts) && (
                     <div className="flex gap-2">
-                        <Button variant="outline" size="sm" onClick={onOpenStocktake}><ClipboardCheck className="mr-1.5 h-[15px] w-[15px]" /> Stocktake</Button>
-                        <Button size="sm" onClick={onAddItem}><Plus className="mr-1.5 h-[15px] w-[15px]" /> Add item</Button>
+                        {canManageProducts && (
+                            <Button variant="outline" size="sm" onClick={onManageProducts}><Package className="mr-1.5 h-[15px] w-[15px]" /> Manage products</Button>
+                        )}
+                        {canAdjust && <Button variant="outline" size="sm" onClick={onOpenStocktake}><ClipboardCheck className="mr-1.5 h-[15px] w-[15px]" /> Stocktake</Button>}
+                        {canAdjust && <Button size="sm" onClick={onAddItem}><Plus className="mr-1.5 h-[15px] w-[15px]" /> Add item</Button>}
                     </div>
                 )}
             </div>

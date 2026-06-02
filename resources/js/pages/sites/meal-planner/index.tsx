@@ -7,6 +7,7 @@ import CalendarGrid from './_calendar-grid';
 import MealPlannerHero, { MealPlannerToolbar, type HeroNotification, type HeroStats } from './_hero';
 import InventoryTable from './_inventory-table';
 import RecipesPanel from './_recipes-panel';
+import { DietaryTagsManagerDialog, ProductsManagerDialog } from './_library-dialogs';
 import ShoppingListPanel from './_shopping-list-panel';
 import TemplatesPanel from './_templates-panel';
 import {
@@ -64,7 +65,7 @@ export default function MealPlannerSubTabs({ site: siteProp, mode = 'embedded', 
     const [sites, setSites] = useState<SiteSearchItem[]>([]);
     const [iddsiLevels, setIddsiLevels] = useState<IddsiLevel[]>([]);
     const [dietaryTags, setDietaryTags] = useState<{ id: number; label: string; kind: 'allergen' | 'dietary' }[]>([]);
-    const [perms, setPerms] = useState({ plan: false, inventory_adjust: false, shopping_manage: false, products_manage: false, recipes_manage: false, can_override: false });
+    const [perms, setPerms] = useState({ plan: false, inventory_adjust: false, shopping_manage: false, products_manage: false, recipes_manage: false, tags_manage: false, can_override: false });
 
     const isHouse = site.type === 'house';
     const [tab, setTab] = useState<SubTab>((siteProp?.type ?? 'house') === 'house' ? 'calendar' : 'inventory');
@@ -80,6 +81,8 @@ export default function MealPlannerSubTabs({ site: siteProp, mode = 'embedded', 
     const [stocktakeOpen, setStocktakeOpen] = useState(false);
     const [generateOpen, setGenerateOpen] = useState(false);
     const [settingsOpen, setSettingsOpen] = useState(false);
+    const [productsManagerOpen, setProductsManagerOpen] = useState(false);
+    const [tagsManagerOpen, setTagsManagerOpen] = useState(false);
 
     const recipeMap = useMemo(() => buildRecipeMap(recipes), [recipes]);
 
@@ -336,9 +339,11 @@ export default function MealPlannerSubTabs({ site: siteProp, mode = 'embedded', 
                         siteId={site.id}
                         items={inventory}
                         canAdjust={perms.inventory_adjust}
+                        canManageProducts={perms.products_manage}
                         onOpenAdjust={(i) => setAdjustDialog({ open: true, item: i })}
                         onOpenStocktake={() => setStocktakeOpen(true)}
                         onAddItem={() => setAdjustDialog({ open: true, item: null })}
+                        onManageProducts={() => setProductsManagerOpen(true)}
                         onChanged={reloadInventory}
                     />
                 )}
@@ -365,8 +370,10 @@ export default function MealPlannerSubTabs({ site: siteProp, mode = 'embedded', 
                         products={products}
                         tags={dietaryTags}
                         canManage={perms.recipes_manage}
+                        canManageTags={perms.tags_manage}
                         canPlan={perms.plan}
                         onPlanRecipe={(recipeId) => setPlanDialog({ open: true, entry: null, date: toIsoDate(new Date()), slot: 'dinner', prefillRecipeId: recipeId })}
+                        onManageTags={() => setTagsManagerOpen(true)}
                         onChanged={bootstrap}
                     />
                 )}
@@ -447,6 +454,16 @@ export default function MealPlannerSubTabs({ site: siteProp, mode = 'embedded', 
                     />
                 )}
             </Suspense>
+
+            <ProductsManagerDialog
+                open={productsManagerOpen}
+                onClose={() => setProductsManagerOpen(false)}
+                onChanged={() => {
+                    bootstrap();
+                    reloadInventory();
+                }}
+            />
+            <DietaryTagsManagerDialog open={tagsManagerOpen} onClose={() => setTagsManagerOpen(false)} onChanged={bootstrap} />
         </div>
     ) : (
         <div className="rounded-2xl border border-border bg-card p-10 text-center text-sm text-muted-foreground">Loading meal planner…</div>

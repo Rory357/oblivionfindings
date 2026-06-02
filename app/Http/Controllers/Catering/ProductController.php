@@ -11,6 +11,16 @@ class ProductController extends Controller
 {
     public function index(Request $request)
     {
+        // The in-planner Products manager fetches the full catalogue as JSON
+        // rather than navigating to this page.
+        if ($request->wantsJson()) {
+            return response()->json([
+                'products' => MealProduct::with('tags:id,label,kind')->orderBy('name')->get(),
+                'categories' => MealProduct::query()->whereNotNull('category')->distinct()->pluck('category')->sort()->values(),
+                'tags' => MealDietaryTag::orderBy('label')->get(['id', 'label', 'kind']),
+            ]);
+        }
+
         $query = MealProduct::query()->with('tags:id,key,label,kind,severity,color');
 
         if ($search = $request->string('q')->toString()) {
@@ -73,13 +83,22 @@ class ProductController extends Controller
             $product->tags()->sync($tagIds);
         }
 
+        if ($request->wantsJson()) {
+            return response()->json($product->fresh('tags'));
+        }
+
         return back()->with('status', 'Product updated');
     }
 
-    public function destroy(MealProduct $product)
+    public function destroy(Request $request, MealProduct $product)
     {
         abort_unless($this->canManage(), 403);
         $product->delete();
+
+        if ($request->wantsJson()) {
+            return response()->json(['deleted' => true]);
+        }
+
         return back()->with('status', 'Product archived');
     }
 

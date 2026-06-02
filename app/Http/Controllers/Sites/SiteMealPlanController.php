@@ -113,6 +113,7 @@ class SiteMealPlanController extends Controller
                 'shopping_manage' => (bool) $user?->canDo('sites.meals.shopping.manage'),
                 'products_manage' => (bool) $user?->canDo('catering.products.manage'),
                 'recipes_manage' => (bool) $user?->canDo('catering.recipes.manage'),
+                'tags_manage' => (bool) $user?->canDo('catering.tags.manage'),
                 'can_override' => (bool) $user?->canDo('sites.meals.allergen.override'),
             ],
         ]);
@@ -131,6 +132,7 @@ class SiteMealPlanController extends Controller
             'serves_default' => $r->serves_default,
             'prep_minutes' => $r->prep_minutes,
             'cook_minutes' => $r->cook_minutes,
+            'category' => $r->category,
             'scope' => $r->scope ?? 'shared',
             'site_id' => $r->site_id,
             'instructions' => $r->instructions,

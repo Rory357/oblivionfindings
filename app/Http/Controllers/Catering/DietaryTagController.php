@@ -9,12 +9,17 @@ use Illuminate\Support\Str;
 
 class DietaryTagController extends Controller
 {
-    public function index()
+    public function index(Request $request)
     {
         $tags = MealDietaryTag::query()
             ->orderBy('kind')
             ->orderBy('label')
             ->get(['id', 'key', 'label', 'kind', 'severity', 'color', 'description']);
+
+        // The in-planner Dietary & allergen tags manager fetches as JSON.
+        if ($request->wantsJson()) {
+            return response()->json(['tags' => $tags]);
+        }
 
         return inertia('catering/tags/index', [
             'tags' => $tags,
@@ -38,9 +43,9 @@ class DietaryTagController extends Controller
         ]);
 
         $tenantId = auth()->user()?->tenant_id;
-        $key = $data['key'] ?: Str::slug($data['label'], '_');
+        $key = ($data['key'] ?? null) ?: Str::slug($data['label'], '_');
 
-        MealDietaryTag::create([
+        $tag = MealDietaryTag::create([
             'tenant_id' => $tenantId,
             'key' => $key,
             'label' => $data['label'],
@@ -49,6 +54,10 @@ class DietaryTagController extends Controller
             'color' => $data['color'] ?? null,
             'description' => $data['description'] ?? null,
         ]);
+
+        if ($request->wantsJson()) {
+            return response()->json($tag);
+        }
 
         return back()->with('status', 'Tag created');
     }
@@ -67,13 +76,22 @@ class DietaryTagController extends Controller
 
         $tag->update($data);
 
+        if ($request->wantsJson()) {
+            return response()->json($tag->fresh());
+        }
+
         return back()->with('status', 'Tag updated');
     }
 
-    public function destroy(MealDietaryTag $tag)
+    public function destroy(Request $request, MealDietaryTag $tag)
     {
         abort_unless($this->canManage(), 403);
         $tag->delete();
+
+        if ($request->wantsJson()) {
+            return response()->json(['deleted' => true]);
+        }
+
         return back()->with('status', 'Tag deleted');
     }
 

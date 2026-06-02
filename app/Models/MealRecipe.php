@@ -20,6 +20,7 @@ class MealRecipe extends Model
         'name',
         'slug',
         'description',
+        'category',
         'serves_default',
         'prep_minutes',
         'cook_minutes',

@@ -1,123 +1,118 @@
 import { Button } from '@/components/ui/button';
-import { Dialog, DialogContent, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
+import { Dialog, DialogContent, DialogDescription, DialogFooter, DialogHeader, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import axios, { AxiosError } from 'axios';
-import { ChefHat, Loader2, Plus, Trash2 } from 'lucide-react';
-import { useEffect, useState } from 'react';
+import { BookPlus, Home, Library, Loader2, Pencil, Plus, Trash2, X, type LucideIcon } from 'lucide-react';
+import { useState } from 'react';
 import { toast } from 'sonner';
+import type { RecipeFull } from './_helpers';
 
 type ProductOpt = { id: number; name: string; default_unit: string };
 type TagOpt = { id: number; label: string; kind: 'allergen' | 'dietary' };
 
 type IngredientRow = {
     product_id: number | null;
-    free_text_name: string;
-    quantity: number | string;
+    name: string;
+    qty: number | string;
     unit: string;
-    notes: string;
 };
 
 type FormData = {
     name: string;
-    description: string;
+    category: string;
+    scope: 'house' | 'shared';
     serves_default: number;
     prep_minutes: number | string;
     cook_minutes: number | string;
     instructions: string;
-    is_active: boolean;
     tag_ids: number[];
     ingredients: IngredientRow[];
 };
 
-type FetchedRecipe = {
-    name: string;
-    description: string | null;
-    serves_default: number | null;
-    prep_minutes: number | null;
-    cook_minutes: number | null;
-    instructions: string | null;
-    is_active: boolean;
-    tags: { id: number }[];
-    ingredients: { product_id: number | null; free_text_name: string | null; quantity: number | string; unit: string; notes: string | null }[];
-};
-
 type Props = {
     open: boolean;
-    recipeId: number | null;
+    /** The recipe to edit, or null to add a new one. */
+    recipe: RecipeFull | null;
     products: ProductOpt[];
     tags: TagOpt[];
+    siteId: number;
+    siteName: string;
+    /** Gates the Delete action (catering.recipes.manage). */
+    canManage: boolean;
     onClose: () => void;
     onSaved: () => void;
 };
 
-const UNIT_OPTIONS = ['each', 'kg', 'g', 'L', 'ml', 'tsp', 'tbsp', 'cup', 'pack', 'tin'];
+const RECIPE_CATEGORIES = ['Mains', 'Breakfast', 'Soups', 'Baking', 'Sides', 'Desserts'];
+const UNIT_OPTIONS = ['each', 'kg', 'g', 'L', 'ml', 'pack', 'tin', 'bottle', 'bunch'];
 
-const BLANK: FormData = {
-    name: '',
-    description: '',
-    serves_default: 4,
-    prep_minutes: '',
-    cook_minutes: '',
-    instructions: '',
-    is_active: true,
-    tag_ids: [],
-    ingredients: [],
-};
+function blankIngredient(): IngredientRow {
+    return { product_id: null, name: '', qty: 1, unit: 'each' };
+}
 
-export default function RecipeEditDialog({ open, recipeId, products, tags, onClose, onSaved }: Props) {
-    const isNew = recipeId == null;
-    const [loading, setLoading] = useState(false);
+function initialData(recipe: RecipeFull | null): FormData {
+    if (!recipe) {
+        return {
+            name: '',
+            category: 'Mains',
+            scope: 'house',
+            serves_default: 6,
+            prep_minutes: 10,
+            cook_minutes: 20,
+            instructions: '',
+            tag_ids: [],
+            ingredients: [blankIngredient()],
+        };
+    }
+    return {
+        name: recipe.name ?? '',
+        category: recipe.category ?? 'Mains',
+        scope: recipe.scope ?? 'house',
+        serves_default: recipe.serves_default ?? 6,
+        prep_minutes: recipe.prep_minutes ?? '',
+        cook_minutes: recipe.cook_minutes ?? '',
+        instructions: recipe.instructions ?? '',
+        tag_ids: recipe.tag_ids ?? [],
+        ingredients: recipe.ingredients.length
+            ? recipe.ingredients.map((i) => ({ product_id: i.product_id, name: i.name ?? '', qty: i.qty, unit: i.unit }))
+            : [blankIngredient()],
+    };
+}
+
+export default function RecipeEditDialog(props: Props) {
+    return (
+        <Dialog open={props.open} onOpenChange={(o) => !o && props.onClose()}>
+            <DialogContent className="max-h-[90vh] overflow-y-auto" style={{ maxWidth: 'min(92vw, 720px)', width: 'min(92vw, 720px)' }}>
+                {props.open && <RecipeEditBody {...props} />}
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function RecipeEditBody({ recipe, products, tags, siteId, siteName, canManage, onClose, onSaved }: Props) {
+    const isNew = recipe == null;
+    const [data, setData] = useState<FormData>(() => initialData(recipe));
     const [saving, setSaving] = useState(false);
-    const [data, setData] = useState<FormData>({ ...BLANK });
-    const [productSearch, setProductSearch] = useState('');
+    const [deleting, setDeleting] = useState(false);
+    const [confirmDelete, setConfirmDelete] = useState(false);
 
-    useEffect(() => {
-        if (!open) return;
-        setProductSearch('');
-        if (isNew) {
-            setData({ ...BLANK, ingredients: [] });
-            return;
-        }
-        setLoading(true);
-        axios
-            .get(`/catering/recipes/${recipeId}/edit`, { headers: { Accept: 'application/json' } })
-            .then((res) => {
-                const r = res.data.recipe as FetchedRecipe;
-                setData({
-                    name: r.name ?? '',
-                    description: r.description ?? '',
-                    serves_default: r.serves_default ?? 4,
-                    prep_minutes: r.prep_minutes ?? '',
-                    cook_minutes: r.cook_minutes ?? '',
-                    instructions: r.instructions ?? '',
-                    is_active: !!r.is_active,
-                    tag_ids: (r.tags ?? []).map((t) => t.id),
-                    ingredients: (r.ingredients ?? []).map((i) => ({
-                        product_id: i.product_id ?? null,
-                        free_text_name: i.free_text_name ?? '',
-                        quantity: i.quantity,
-                        unit: i.unit,
-                        notes: i.notes ?? '',
-                    })),
-                });
-            })
-            .catch(() => toast.error('Could not load the recipe'))
-            .finally(() => setLoading(false));
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [open, recipeId]);
+    const availability: { value: 'house' | 'shared'; icon: LucideIcon; title: string; description: string }[] = [
+        { value: 'house', icon: Home, title: siteName || 'This house', description: 'Only this house sees this recipe.' },
+        { value: 'shared', icon: Library, title: 'Shared library', description: 'Added to the org-wide library for every site.' },
+    ];
 
     function patch(p: Partial<FormData>) {
         setData((d) => ({ ...d, ...p }));
     }
-    function addIngredient() {
-        patch({ ingredients: [...data.ingredients, { product_id: null, free_text_name: '', quantity: 1, unit: 'each', notes: '' }] });
-    }
     function updateIngredient(idx: number, p: Partial<IngredientRow>) {
         patch({ ingredients: data.ingredients.map((row, i) => (i === idx ? { ...row, ...p } : row)) });
+    }
+    function addIngredient() {
+        patch({ ingredients: [...data.ingredients, blankIngredient()] });
     }
     function removeIngredient(idx: number) {
         patch({ ingredients: data.ingredients.filter((_, i) => i !== idx) });
@@ -126,34 +121,39 @@ export default function RecipeEditDialog({ open, recipeId, products, tags, onClo
         patch({ tag_ids: data.tag_ids.includes(id) ? data.tag_ids.filter((x) => x !== id) : [...data.tag_ids, id] });
     }
 
+    const valid = data.name.trim() !== '' && data.ingredients.some((i) => i.product_id != null || i.name.trim() !== '');
+
     async function submit(e: React.FormEvent) {
         e.preventDefault();
-        if (!data.name.trim()) {
-            toast.error('Give the recipe a name');
+        if (!valid) {
+            toast.error('Give the recipe a name and at least one ingredient');
             return;
         }
         setSaving(true);
         const payload = {
-            name: data.name,
-            description: data.description,
+            name: data.name.trim(),
+            category: data.category,
+            scope: data.scope,
+            site_id: data.scope === 'house' ? siteId : null,
             serves_default: data.serves_default,
             prep_minutes: data.prep_minutes === '' ? null : Number(data.prep_minutes),
             cook_minutes: data.cook_minutes === '' ? null : Number(data.cook_minutes),
             instructions: data.instructions,
-            is_active: data.is_active,
+            is_active: true,
             tag_ids: data.tag_ids,
-            ingredients: data.ingredients.map((i) => ({
-                product_id: i.product_id,
-                free_text_name: i.product_id ? null : i.free_text_name || null,
-                quantity: i.quantity === '' ? 0 : Number(i.quantity),
-                unit: i.unit,
-                notes: i.notes || null,
-            })),
+            ingredients: data.ingredients
+                .filter((i) => i.product_id != null || i.name.trim() !== '')
+                .map((i) => ({
+                    product_id: i.product_id,
+                    free_text_name: i.product_id ? null : i.name.trim() || null,
+                    quantity: i.qty === '' ? 0 : Number(i.qty),
+                    unit: i.unit,
+                })),
         };
         try {
             if (isNew) await axios.post('/catering/recipes', payload);
-            else await axios.put(`/catering/recipes/${recipeId}`, payload);
-            toast.success(isNew ? 'Recipe created' : 'Recipe saved');
+            else await axios.put(`/catering/recipes/${recipe.id}`, payload);
+            toast.success(isNew ? 'Recipe added' : 'Recipe saved');
             onSaved();
             onClose();
         } catch (err) {
@@ -166,166 +166,241 @@ export default function RecipeEditDialog({ open, recipeId, products, tags, onClo
         }
     }
 
-    const filteredProducts = productSearch.trim()
-        ? products.filter((p) => p.name.toLowerCase().includes(productSearch.toLowerCase()))
-        : products;
+    async function doDelete() {
+        if (isNew) return;
+        setDeleting(true);
+        try {
+            await axios.delete(`/catering/recipes/${recipe.id}`, { headers: { Accept: 'application/json' } });
+            toast.success('Recipe deleted');
+            onSaved();
+            onClose();
+        } catch {
+            toast.error('Could not delete the recipe');
+        } finally {
+            setDeleting(false);
+        }
+    }
 
     return (
-        <Dialog open={open} onOpenChange={(o) => !o && onClose()}>
-            <DialogContent className="max-h-[92vh] overflow-y-auto sm:max-w-3xl">
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <ChefHat className="h-4 w-4 text-sites" /> {isNew ? 'New recipe' : 'Edit recipe'}
-                    </DialogTitle>
-                </DialogHeader>
-                {loading ? (
-                    <div className="flex items-center justify-center gap-2 py-16 text-sm text-muted-foreground">
-                        <Loader2 className="h-4 w-4 animate-spin" /> Loading recipe…
-                    </div>
-                ) : (
-                    <form onSubmit={submit} className="space-y-4">
-                        <div className="grid grid-cols-1 gap-4 lg:grid-cols-3">
-                            <div className="space-y-3 lg:col-span-2">
-                                <div>
-                                    <Label>Name</Label>
-                                    <Input value={data.name} onChange={(e) => patch({ name: e.target.value })} required />
-                                </div>
-                                <div>
-                                    <Label>Description</Label>
-                                    <Textarea value={data.description} onChange={(e) => patch({ description: e.target.value })} rows={2} />
-                                </div>
-                                <div className="grid grid-cols-3 gap-3">
-                                    <div>
-                                        <Label>Serves</Label>
-                                        <Input type="number" min={1} value={data.serves_default} onChange={(e) => patch({ serves_default: Number(e.target.value) })} />
-                                    </div>
-                                    <div>
-                                        <Label>Prep (min)</Label>
-                                        <Input type="number" min={0} value={data.prep_minutes} onChange={(e) => patch({ prep_minutes: e.target.value })} />
-                                    </div>
-                                    <div>
-                                        <Label>Cook (min)</Label>
-                                        <Input type="number" min={0} value={data.cook_minutes} onChange={(e) => patch({ cook_minutes: e.target.value })} />
-                                    </div>
-                                </div>
-                                <div>
-                                    <Label>Instructions</Label>
-                                    <Textarea value={data.instructions} onChange={(e) => patch({ instructions: e.target.value })} rows={6} />
-                                </div>
-                                <label className="flex items-center gap-2 text-sm">
-                                    <input type="checkbox" checked={data.is_active} onChange={(e) => patch({ is_active: e.target.checked })} />
-                                    Active (available in the meal planner)
-                                </label>
-                            </div>
-                            <div>
-                                <Label>Dietary &amp; allergen tags</Label>
-                                <div className="mt-1 flex flex-wrap gap-1 rounded-md border border-border p-2">
-                                    {tags.length === 0 && <span className="text-xs text-muted-foreground">No tags yet.</span>}
-                                    {tags.map((t) => {
-                                        const selected = data.tag_ids.includes(t.id);
-                                        return (
-                                            <button
-                                                key={t.id}
-                                                type="button"
-                                                onClick={() => toggleTag(t.id)}
-                                                className={cn(
-                                                    'rounded-md border px-2 py-1 text-xs transition',
-                                                    selected ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-accent',
-                                                )}
-                                            >
-                                                {t.label}
-                                            </button>
-                                        );
-                                    })}
-                                </div>
-                            </div>
-                        </div>
+        <form onSubmit={submit}>
+            <DialogHeader>
+                <DialogTitle className="flex items-center gap-2">
+                    {isNew ? <BookPlus className="h-4 w-4 text-sites" /> : <Pencil className="h-4 w-4 text-sites" />}
+                    {isNew ? 'Add recipe' : 'Edit recipe'}
+                </DialogTitle>
+                <DialogDescription>
+                    Recipes power meal planning and the stock check. Link ingredients to inventory products to track stock automatically.
+                </DialogDescription>
+            </DialogHeader>
 
-                        <div className="rounded-md border border-border p-3">
-                            <div className="mb-2 flex items-center justify-between">
-                                <h3 className="text-sm font-medium">Ingredients</h3>
-                                <Button type="button" size="sm" variant="outline" onClick={addIngredient}>
-                                    <Plus className="mr-1.5 h-3.5 w-3.5" /> Add
+            <div className="mt-3 space-y-4">
+                {/* name + category */}
+                <div className="grid gap-3 sm:grid-cols-[1fr_160px]">
+                    <div>
+                        <Label>
+                            Recipe name <span className="text-status-critical">*</span>
+                        </Label>
+                        <Input className="mt-1" value={data.name} onChange={(e) => patch({ name: e.target.value })} placeholder="e.g. Creamy chicken & leek pie" autoFocus />
+                    </div>
+                    <div>
+                        <Label>Category</Label>
+                        <Select value={data.category} onValueChange={(v) => patch({ category: v })}>
+                            <SelectTrigger className="mt-1">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                {RECIPE_CATEGORIES.map((c) => (
+                                    <SelectItem key={c} value={c}>
+                                        {c}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                    </div>
+                </div>
+
+                {/* serves / prep / cook */}
+                <div className="grid grid-cols-3 gap-3">
+                    <div>
+                        <Label>Serves</Label>
+                        <Input className="mt-1" type="number" min={1} value={data.serves_default} onChange={(e) => patch({ serves_default: Number(e.target.value) })} />
+                    </div>
+                    <div>
+                        <Label>Prep (min)</Label>
+                        <Input className="mt-1" type="number" min={0} value={data.prep_minutes} onChange={(e) => patch({ prep_minutes: e.target.value })} />
+                    </div>
+                    <div>
+                        <Label>Cook (min)</Label>
+                        <Input className="mt-1" type="number" min={0} value={data.cook_minutes} onChange={(e) => patch({ cook_minutes: e.target.value })} />
+                    </div>
+                </div>
+
+                {/* availability */}
+                <div>
+                    <Label>Availability</Label>
+                    <div className="mt-1.5 grid grid-cols-2 gap-2">
+                        {availability.map((opt) => {
+                            const Icon = opt.icon;
+                            const active = data.scope === opt.value;
+                            return (
+                                <button
+                                    key={opt.value}
+                                    type="button"
+                                    onClick={() => patch({ scope: opt.value })}
+                                    className={cn(
+                                        'group flex items-start gap-2 rounded-xl border bg-card/40 p-3 text-left transition-all hover:bg-card focus:outline-none focus-visible:ring-2 focus-visible:ring-sites',
+                                        active ? 'border-sites bg-sites/10 ring-1 ring-sites/40' : 'border-border hover:border-sites/50',
+                                    )}
+                                    aria-pressed={active}
+                                >
+                                    <span className="mt-0.5 shrink-0 rounded-lg bg-background/60 p-1.5">
+                                        <Icon className="h-4 w-4 text-sites" />
+                                    </span>
+                                    <span className="min-w-0">
+                                        <span className="block truncate text-sm font-medium">{opt.title}</span>
+                                        <span className="block text-xs text-muted-foreground">{opt.description}</span>
+                                    </span>
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* dietary & allergen tags */}
+                <div>
+                    <Label>Dietary &amp; allergen tags</Label>
+                    <div className="mt-1.5 flex flex-wrap gap-1.5">
+                        {tags.length === 0 && <span className="text-xs text-muted-foreground">No dietary tags are set up yet.</span>}
+                        {tags.map((t) => {
+                            const sel = data.tag_ids.includes(t.id);
+                            return (
+                                <button
+                                    key={t.id}
+                                    type="button"
+                                    onClick={() => toggleTag(t.id)}
+                                    className={cn(
+                                        'rounded-full border px-2.5 py-1 text-[12px] font-medium transition-colors',
+                                        sel ? 'border-sites bg-sites-bg text-sites-deep' : 'border-border bg-card text-muted-foreground hover:bg-accent',
+                                    )}
+                                    aria-pressed={sel}
+                                >
+                                    {t.label}
+                                </button>
+                            );
+                        })}
+                    </div>
+                </div>
+
+                {/* ingredients */}
+                <div>
+                    <div className="mb-1.5 flex items-center justify-between">
+                        <Label className="mb-0">Ingredients</Label>
+                        <span className="text-[11px] text-muted-foreground">Link to a product to enable stock checks</span>
+                    </div>
+                    <div className="space-y-2">
+                        {data.ingredients.map((ing, idx) => (
+                            <div key={idx} className="space-y-1.5">
+                                <div className="grid grid-cols-[1fr_72px_92px_36px] gap-2">
+                                    <Select
+                                        value={ing.product_id ? String(ing.product_id) : 'custom'}
+                                        onValueChange={(v) => {
+                                            if (v === 'custom') {
+                                                updateIngredient(idx, { product_id: null });
+                                            } else {
+                                                const p = products.find((x) => x.id === Number(v));
+                                                updateIngredient(idx, { product_id: Number(v), name: p?.name ?? ing.name, unit: p?.default_unit ?? ing.unit });
+                                            }
+                                        }}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="custom">Custom item (not tracked)</SelectItem>
+                                            {products.map((p) => (
+                                                <SelectItem key={p.id} value={String(p.id)}>
+                                                    {p.name}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <Input type="number" step="0.1" min={0} value={ing.qty} onChange={(e) => updateIngredient(idx, { qty: e.target.value })} />
+                                    <Select value={ing.unit} onValueChange={(v) => updateIngredient(idx, { unit: v })}>
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            {UNIT_OPTIONS.map((u) => (
+                                                <SelectItem key={u} value={u}>
+                                                    {u}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    <Button type="button" variant="ghost" size="icon" className="h-9 w-9" onClick={() => removeIngredient(idx)} aria-label="Remove ingredient">
+                                        <X className="h-4 w-4 text-muted-foreground" />
+                                    </Button>
+                                </div>
+                                {ing.product_id == null && (
+                                    <Input
+                                        value={ing.name}
+                                        onChange={(e) => updateIngredient(idx, { name: e.target.value })}
+                                        placeholder={`Custom item name (row ${idx + 1})`}
+                                        className="h-9 text-[13px]"
+                                    />
+                                )}
+                            </div>
+                        ))}
+                    </div>
+                    <Button type="button" variant="outline" size="sm" className="mt-2" onClick={addIngredient}>
+                        <Plus className="mr-1.5 h-3.5 w-3.5" /> Add ingredient
+                    </Button>
+                </div>
+
+                {/* method */}
+                <div>
+                    <Label>
+                        Method <span className="font-normal text-muted-foreground">(optional)</span>
+                    </Label>
+                    <Textarea className="mt-1" rows={3} value={data.instructions} onChange={(e) => patch({ instructions: e.target.value })} placeholder="Short cooking steps…" />
+                </div>
+            </div>
+
+            <DialogFooter className="mt-4 sm:justify-between">
+                <div className="flex items-center">
+                    {!isNew &&
+                        canManage &&
+                        (confirmDelete ? (
+                            <div className="flex items-center gap-2">
+                                <span className="text-[13px] text-muted-foreground">Delete this recipe?</span>
+                                <Button type="button" variant="ghost" size="sm" onClick={() => setConfirmDelete(false)} disabled={deleting}>
+                                    Cancel
+                                </Button>
+                                <Button type="button" variant="destructive" size="sm" onClick={doDelete} disabled={deleting}>
+                                    {deleting && <Loader2 className="mr-1.5 h-3.5 w-3.5 animate-spin" />} Delete
                                 </Button>
                             </div>
-                            {products.length > 8 && (
-                                <Input className="mb-2" value={productSearch} onChange={(e) => setProductSearch(e.target.value)} placeholder="Filter the product dropdowns…" />
-                            )}
-                            {data.ingredients.length === 0 && <p className="text-sm text-muted-foreground">No ingredients yet.</p>}
-                            <div className="space-y-2">
-                                {data.ingredients.map((ing, idx) => (
-                                    <div key={idx} className="grid grid-cols-12 items-end gap-2 rounded-md border border-border p-2">
-                                        <div className="col-span-5">
-                                            <Label className="text-xs">Product</Label>
-                                            <Select
-                                                value={ing.product_id ? String(ing.product_id) : 'free'}
-                                                onValueChange={(v) => updateIngredient(idx, { product_id: v === 'free' ? null : Number(v) })}
-                                            >
-                                                <SelectTrigger>
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="free">— Free text —</SelectItem>
-                                                    {filteredProducts.map((p) => (
-                                                        <SelectItem key={p.id} value={String(p.id)}>
-                                                            {p.name}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                            {!ing.product_id && (
-                                                <Input
-                                                    className="mt-1"
-                                                    placeholder="Ingredient name"
-                                                    value={ing.free_text_name}
-                                                    onChange={(e) => updateIngredient(idx, { free_text_name: e.target.value })}
-                                                />
-                                            )}
-                                        </div>
-                                        <div className="col-span-2">
-                                            <Label className="text-xs">Qty</Label>
-                                            <Input type="number" step="0.01" min={0} value={ing.quantity} onChange={(e) => updateIngredient(idx, { quantity: e.target.value })} />
-                                        </div>
-                                        <div className="col-span-2">
-                                            <Label className="text-xs">Unit</Label>
-                                            <Select value={ing.unit} onValueChange={(v) => updateIngredient(idx, { unit: v })}>
-                                                <SelectTrigger>
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    {UNIT_OPTIONS.map((u) => (
-                                                        <SelectItem key={u} value={u}>
-                                                            {u}
-                                                        </SelectItem>
-                                                    ))}
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                        <div className="col-span-2">
-                                            <Label className="text-xs">Notes</Label>
-                                            <Input value={ing.notes} onChange={(e) => updateIngredient(idx, { notes: e.target.value })} placeholder="optional" />
-                                        </div>
-                                        <div className="col-span-1 flex justify-end">
-                                            <Button type="button" size="icon" variant="ghost" onClick={() => removeIngredient(idx)}>
-                                                <Trash2 className="h-4 w-4 text-destructive" />
-                                            </Button>
-                                        </div>
-                                    </div>
-                                ))}
-                            </div>
-                        </div>
-
-                        <DialogFooter>
-                            <Button type="button" variant="ghost" onClick={onClose}>
-                                Cancel
+                        ) : (
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                className="text-status-critical hover:bg-status-critical-bg hover:text-status-critical"
+                                onClick={() => setConfirmDelete(true)}
+                            >
+                                <Trash2 className="mr-1.5 h-4 w-4" /> Delete
                             </Button>
-                            <Button type="submit" disabled={saving}>
-                                {saving ? 'Saving…' : isNew ? 'Create recipe' : 'Save changes'}
-                            </Button>
-                        </DialogFooter>
-                    </form>
-                )}
-            </DialogContent>
-        </Dialog>
+                        ))}
+                </div>
+                <div className="flex gap-2">
+                    <Button type="button" variant="outline" onClick={onClose}>
+                        Cancel
+                    </Button>
+                    <Button type="submit" disabled={!valid || saving}>
+                        {saving && <Loader2 className="mr-2 h-4 w-4 animate-spin" />}
+                        {isNew ? 'Add recipe' : 'Save recipe'}
+                    </Button>
+                </div>
+            </DialogFooter>
+        </form>
     );
 }
