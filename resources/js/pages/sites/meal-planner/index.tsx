@@ -4,7 +4,7 @@ import axios from 'axios';
 import { CalendarDays, ChefHat, CircleAlert, Clock, LayoutTemplate, Package, ShieldAlert, ShoppingCart, TriangleAlert, type LucideIcon } from 'lucide-react';
 import { lazy, Suspense, useCallback, useEffect, useMemo, useState } from 'react';
 import CalendarGrid from './_calendar-grid';
-import MealPlannerHero, { type HeroNotification, type HeroStats } from './_hero';
+import MealPlannerHero, { MealPlannerToolbar, type HeroNotification, type HeroStats } from './_hero';
 import InventoryTable from './_inventory-table';
 import RecipesPanel from './_recipes-panel';
 import ShoppingListPanel from './_shopping-list-panel';
@@ -35,16 +35,27 @@ const StocktakeDialog = lazy(() => import('./_dialogs').then((m) => ({ default: 
 const ShoppingListGenerateDialog = lazy(() => import('./_dialogs').then((m) => ({ default: m.ShoppingListGenerateDialog })));
 const SettingsDialog = lazy(() => import('./_dialogs').then((m) => ({ default: m.SettingsDialog })));
 
-type Props = { site: { id: number; name: string; type: string } };
+type Props = {
+    /** Fixed site (embedded in a Site profile). */
+    site?: { id: number; name: string; type: string };
+    /** 'embedded' = inside the Site profile (no banner); 'standalone' = the /catering page (green banner + site switcher). */
+    mode?: 'standalone' | 'embedded';
+    /** Initial site for standalone mode (the /catering page). */
+    defaultSiteId?: number;
+};
 
 type SubTab = 'calendar' | 'inventory' | 'shopping' | 'recipes' | 'templates';
 
-export default function MealPlannerSubTabs({ site: siteProp }: Props) {
+export default function MealPlannerSubTabs({ site: siteProp, mode = 'embedded', defaultSiteId }: Props) {
     const page = usePage<{ auth?: { user?: { name?: string } } }>();
     const firstName = (page.props.auth?.user?.name ?? 'there').split(' ')[0];
+    const standalone = mode === 'standalone';
+
+    const initialSiteId = siteProp?.id ?? defaultSiteId ?? 0;
+    const [currentSiteId, setCurrentSiteId] = useState(initialSiteId);
 
     const [bootstrapped, setBootstrapped] = useState(false);
-    const [site, setSite] = useState<SiteInfo>({ id: siteProp.id, name: siteProp.name, type: siteProp.type, suburb: null, region: null, weekly_food_budget_cents: null });
+    const [site, setSite] = useState<SiteInfo>({ id: initialSiteId, name: siteProp?.name ?? 'Meal Planner', type: siteProp?.type ?? 'house', suburb: null, region: null, weekly_food_budget_cents: null });
     const [recipes, setRecipes] = useState<RecipeFull[]>([]);
     const [products, setProducts] = useState<{ id: number; name: string; default_unit: string }[]>([]);
     const [productCategories, setProductCategories] = useState<string[]>([]);
@@ -56,7 +67,7 @@ export default function MealPlannerSubTabs({ site: siteProp }: Props) {
     const [perms, setPerms] = useState({ plan: false, inventory_adjust: false, shopping_manage: false, products_manage: false, recipes_manage: false, can_override: false });
 
     const isHouse = site.type === 'house';
-    const [tab, setTab] = useState<SubTab>(siteProp.type === 'house' ? 'calendar' : 'inventory');
+    const [tab, setTab] = useState<SubTab>((siteProp?.type ?? 'house') === 'house' ? 'calendar' : 'inventory');
     const [weekStart, setWeekStart] = useState<Date>(startOfWeek(new Date()));
 
     const [entries, setEntries] = useState<PlanEntry[]>([]);
@@ -73,9 +84,20 @@ export default function MealPlannerSubTabs({ site: siteProp }: Props) {
     const recipeMap = useMemo(() => buildRecipeMap(recipes), [recipes]);
 
     const bootstrap = useCallback(async () => {
+        if (!currentSiteId) {
+            setBootstrapped(true);
+            return;
+        }
         try {
-            const res = await axios.get(`/sites/${siteProp.id}/meal-planner/bootstrap`);
-            setSite(res.data.site ?? site);
+            const res = await axios.get(`/sites/${currentSiteId}/meal-planner/bootstrap`);
+            const nextSite = res.data.site as SiteInfo | undefined;
+            if (nextSite) {
+                setSite(nextSite);
+                // Standalone: when switching to an office, leave house-only tabs.
+                if (standalone && nextSite.type !== 'house') {
+                    setTab((t) => (t === 'calendar' || t === 'templates' ? 'inventory' : t));
+                }
+            }
             setRecipes(res.data.recipes ?? []);
             setProducts(res.data.products ?? []);
             setProductCategories(res.data.product_categories ?? []);
@@ -84,43 +106,47 @@ export default function MealPlannerSubTabs({ site: siteProp }: Props) {
             setSites(res.data.sites ?? []);
             setIddsiLevels(res.data.iddsi_levels ?? []);
             setDietaryTags(res.data.dietary_tags ?? []);
-            setPerms({ ...perms, ...(res.data.permissions ?? {}) });
+            setPerms((p) => ({ ...p, ...(res.data.permissions ?? {}) }));
         } catch {
             /* swallow — render with empties */
         } finally {
             setBootstrapped(true);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [siteProp.id]);
+    }, [currentSiteId, standalone]);
 
     useEffect(() => {
         bootstrap();
     }, [bootstrap]);
 
     const reloadCalendar = useCallback(async () => {
+        if (!currentSiteId) return;
         const week = toIsoDate(weekStart);
         const [planRes, summaryRes] = await Promise.all([
-            axios.get(`/sites/${siteProp.id}/meal-plan`, { params: { week } }),
-            axios.get(`/sites/${siteProp.id}/meal-plan/week-summary`, { params: { week } }),
+            axios.get(`/sites/${currentSiteId}/meal-plan`, { params: { week } }),
+            axios.get(`/sites/${currentSiteId}/meal-plan/week-summary`, { params: { week } }),
         ]);
         setEntries(planRes.data.entries ?? []);
         setWeekTotalCents(summaryRes.data.total_cost_cents ?? 0);
-    }, [siteProp.id, weekStart]);
+    }, [currentSiteId, weekStart]);
 
     const reloadInventory = useCallback(async () => {
-        const res = await axios.get(`/sites/${siteProp.id}/meal-inventory`);
+        if (!currentSiteId) return;
+        const res = await axios.get(`/sites/${currentSiteId}/meal-inventory`);
         setInventory(res.data.items ?? []);
-    }, [siteProp.id]);
+    }, [currentSiteId]);
 
     const reloadLists = useCallback(async () => {
-        const res = await axios.get(`/sites/${siteProp.id}/meal-shopping-lists`);
+        if (!currentSiteId) return;
+        const res = await axios.get(`/sites/${currentSiteId}/meal-shopping-lists`);
         setLists(res.data.lists ?? []);
-    }, [siteProp.id]);
+    }, [currentSiteId]);
 
     const reloadTemplates = useCallback(async () => {
-        const res = await axios.get(`/sites/${siteProp.id}/meal-templates`);
+        if (!currentSiteId) return;
+        const res = await axios.get(`/sites/${currentSiteId}/meal-templates`);
         setTemplates(res.data.templates ?? []);
-    }, [siteProp.id]);
+    }, [currentSiteId]);
 
     useEffect(() => {
         reloadCalendar();
@@ -192,8 +218,14 @@ export default function MealPlannerSubTabs({ site: siteProp }: Props) {
 
     /* ── handlers ────────────────────────────────────────────────────────── */
     function selectSite(id: number) {
-        if (id === site.id) return;
-        router.visit(`/sites/${id}`, { data: { tab: 'meal-planner' } });
+        if (id === currentSiteId) return;
+        if (standalone) {
+            // Switch in place on the /catering page and keep the URL shareable.
+            setCurrentSiteId(id);
+            if (typeof window !== 'undefined') window.history.replaceState({}, '', `/catering?site=${id}`);
+        } else {
+            router.visit(`/sites/${id}`, { data: { tab: 'meal-planner' } });
+        }
     }
 
     function shiftWeek(delta: number) {
@@ -223,30 +255,52 @@ export default function MealPlannerSubTabs({ site: siteProp }: Props) {
 
     return bootstrapped ? (
         <div className="space-y-5">
-            <MealPlannerHero
-                site={site}
-                firstName={firstName}
-                weekLabel={weekLabel}
-                rangeStart={rangeStart}
-                rangeEnd={rangeEnd}
-                isThisWeek={isThisWeek}
-                isHouse={isHouse}
-                residentCount={residents.length}
-                stats={stats}
-                sites={sites}
-                notifications={notifications}
-                canPlan={perms.plan}
-                canShop={perms.shopping_manage}
-                onSelectSite={selectSite}
-                onNotificationClick={(t) => setTab(t as SubTab)}
-                onPlan={planToday}
-                onBuildList={openBuildList}
-                onOpenSettings={() => setSettingsOpen(true)}
-                onPrevWeek={() => shiftWeek(-7)}
-                onNextWeek={() => shiftWeek(7)}
-                onThisWeek={() => shiftWeek(0)}
-                onReviewConflicts={() => setTab('calendar')}
-            />
+            {standalone ? (
+                <MealPlannerHero
+                    site={site}
+                    firstName={firstName}
+                    weekLabel={weekLabel}
+                    rangeStart={rangeStart}
+                    rangeEnd={rangeEnd}
+                    isThisWeek={isThisWeek}
+                    isHouse={isHouse}
+                    residentCount={residents.length}
+                    stats={stats}
+                    sites={sites}
+                    notifications={notifications}
+                    canPlan={perms.plan}
+                    canShop={perms.shopping_manage}
+                    onSelectSite={selectSite}
+                    onNotificationClick={(t) => setTab(t as SubTab)}
+                    onPlan={planToday}
+                    onBuildList={openBuildList}
+                    onOpenSettings={() => setSettingsOpen(true)}
+                    onPrevWeek={() => shiftWeek(-7)}
+                    onNextWeek={() => shiftWeek(7)}
+                    onThisWeek={() => shiftWeek(0)}
+                    onReviewConflicts={() => setTab('calendar')}
+                />
+            ) : (
+                <MealPlannerToolbar
+                    weekLabel={weekLabel}
+                    rangeStart={rangeStart}
+                    rangeEnd={rangeEnd}
+                    isThisWeek={isThisWeek}
+                    isHouse={isHouse}
+                    stats={stats}
+                    notifications={notifications}
+                    canPlan={perms.plan}
+                    canShop={perms.shopping_manage}
+                    onPlan={planToday}
+                    onBuildList={openBuildList}
+                    onOpenSettings={() => setSettingsOpen(true)}
+                    onPrevWeek={() => shiftWeek(-7)}
+                    onNextWeek={() => shiftWeek(7)}
+                    onThisWeek={() => shiftWeek(0)}
+                    onReviewConflicts={() => setTab('calendar')}
+                    onNotificationClick={(t) => setTab(t as SubTab)}
+                />
+            )}
 
             <SubTabs tab={tab} onChange={setTab} isHouse={isHouse} />
 

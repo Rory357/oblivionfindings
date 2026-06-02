@@ -19,7 +19,10 @@ use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth', 'verified'])->prefix('catering')->name('catering.')->group(function () {
 
-    Route::get('/', [DashboardController::class, 'index'])
+    Route::get('/', [DashboardController::class, 'mealPlanner'])
+        ->middleware('permission:sites.meals.view')
+        ->name('meal-planner');
+    Route::get('/overview', [DashboardController::class, 'index'])
         ->middleware('permission:sites.meals.view')
         ->name('dashboard');
     Route::get('/library-counts', [DashboardController::class, 'libraryCounts'])

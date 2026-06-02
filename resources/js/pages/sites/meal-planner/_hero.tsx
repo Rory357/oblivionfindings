@@ -91,7 +91,7 @@ function HeroMeta({ icon: Icon, children }: { icon: LucideIcon; children: ReactN
     );
 }
 
-function HeroBell({ notifications, onClick }: { notifications: HeroNotification[]; onClick: (tab: string) => void }) {
+function HeroBell({ notifications, onClick, light }: { notifications: HeroNotification[]; onClick: (tab: string) => void; light?: boolean }) {
     const [open, setOpen] = useState(false);
     const ref = useRef<HTMLDivElement>(null);
     useEffect(() => {
@@ -109,11 +109,16 @@ function HeroBell({ notifications, onClick }: { notifications: HeroNotification[
                 type="button"
                 onClick={() => setOpen((v) => !v)}
                 aria-label="Notifications"
-                className="relative inline-flex h-10 w-10 items-center justify-center rounded-md border border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground transition hover:bg-primary-foreground/20"
+                className={cn(
+                    'relative inline-flex h-10 w-10 items-center justify-center rounded-md border transition',
+                    light
+                        ? 'border-border bg-card text-muted-foreground hover:bg-accent hover:text-foreground'
+                        : 'border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20',
+                )}
             >
                 <Bell className="h-[17px] w-[17px]" />
                 {count > 0 && (
-                    <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white ring-2 ring-[var(--hero-base)]">
+                    <span className={cn('absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-red-500 px-1 text-[10px] font-bold text-white ring-2', light ? 'ring-card' : 'ring-[var(--hero-base)]')}>
                         {count}
                     </span>
                 )}
@@ -553,6 +558,93 @@ export default function MealPlannerHero(props: MealPlannerHeroProps) {
                     )}
                 </div>
             </div>
+        </div>
+    );
+}
+
+/* ── Compact toolbar (embedded in the Site profile — no green banner) ───── */
+export type MealPlannerToolbarProps = {
+    weekLabel: string;
+    rangeStart: string;
+    rangeEnd: string;
+    isThisWeek: boolean;
+    isHouse: boolean;
+    stats: HeroStats;
+    notifications: HeroNotification[];
+    canPlan: boolean;
+    canShop: boolean;
+    onPlan: () => void;
+    onBuildList: () => void;
+    onOpenSettings: () => void;
+    onPrevWeek: () => void;
+    onNextWeek: () => void;
+    onThisWeek: () => void;
+    onReviewConflicts: () => void;
+    onNotificationClick: (tab: string) => void;
+};
+
+function KpiChip({ label, value }: { label: string; value: ReactNode }) {
+    return (
+        <div className="flex flex-col">
+            <span className="text-[15px] font-bold leading-none tabular-nums text-foreground">{value}</span>
+            <span className="text-[10px] font-medium uppercase tracking-wide text-muted-foreground">{label}</span>
+        </div>
+    );
+}
+
+export function MealPlannerToolbar(props: MealPlannerToolbarProps) {
+    const { isHouse, stats } = props;
+    return (
+        <div className="space-y-3">
+            <div className="flex flex-col gap-3 rounded-xl border border-border bg-card p-3 shadow-sm xl:flex-row xl:items-center xl:justify-between">
+                <div className="flex flex-wrap items-center gap-1.5">
+                    <button type="button" onClick={props.onPrevWeek} className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2.5 py-1.5 text-[12px] font-semibold text-muted-foreground transition hover:bg-accent hover:text-foreground">
+                        <ChevronLeft className="h-3.5 w-3.5" /> Prev
+                    </button>
+                    <button type="button" onClick={props.onThisWeek} className={cn('inline-flex items-center gap-1.5 rounded-md border px-3 py-1.5 text-[12px] font-semibold transition', props.isThisWeek ? 'border-sites bg-sites-bg text-sites-deep' : 'border-border bg-card text-foreground hover:bg-accent')}>
+                        <CalendarRange className="h-3.5 w-3.5" /> {props.weekLabel} · {props.rangeStart} → {props.rangeEnd}
+                    </button>
+                    <button type="button" onClick={props.onNextWeek} className="inline-flex items-center gap-1 rounded-md border border-border bg-card px-2.5 py-1.5 text-[12px] font-semibold text-muted-foreground transition hover:bg-accent hover:text-foreground">
+                        Next <ChevronRight className="h-3.5 w-3.5" />
+                    </button>
+                </div>
+
+                <div className="flex flex-wrap items-center gap-x-5 gap-y-2">
+                    <KpiChip label={isHouse ? 'Meals' : 'Items'} value={isHouse ? stats.mealsPlanned : stats.itemsTracked} />
+                    <KpiChip label="Week cost" value={formatMoneyFromCents(stats.weekCostCents)} />
+                    <KpiChip label="Low stock" value={stats.lowStock} />
+                    <KpiChip label={isHouse ? 'Plan filled' : 'At par'} value={`${stats.fillPct}%`} />
+                </div>
+
+                <div className="flex items-center gap-2">
+                    {props.canPlan && (
+                        <button type="button" onClick={props.onPlan} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md bg-sites px-3 text-sm font-semibold text-primary-foreground shadow-sm transition hover:opacity-90">
+                            <Plus className="h-4 w-4" strokeWidth={2.5} /> {isHouse ? 'Plan a meal' : 'Add a meal'}
+                        </button>
+                    )}
+                    {props.canShop && (
+                        <button type="button" onClick={props.onBuildList} className="inline-flex h-9 items-center justify-center gap-1.5 rounded-md border border-border bg-card px-3 text-sm font-semibold text-foreground transition hover:bg-accent">
+                            <ShoppingCart className="h-4 w-4" /> Build list
+                        </button>
+                    )}
+                    <HeroBell light notifications={props.notifications} onClick={props.onNotificationClick} />
+                    {props.canShop && (
+                        <button type="button" onClick={props.onOpenSettings} aria-label="Meal planner settings" className="inline-flex h-9 w-9 items-center justify-center rounded-md border border-border bg-card text-muted-foreground transition hover:bg-accent hover:text-foreground">
+                            <Settings className="h-[17px] w-[17px]" />
+                        </button>
+                    )}
+                </div>
+            </div>
+
+            {isHouse && stats.unresolved > 0 && (
+                <div className="flex items-center gap-2.5 rounded-lg border border-status-critical/30 bg-status-critical-bg/60 px-3 py-2">
+                    <ShieldAlert className="h-4 w-4 shrink-0 text-status-critical" />
+                    <span className="flex-1 text-[12.5px] font-medium text-status-critical">
+                        {stats.unresolved} planned meal{stats.unresolved === 1 ? '' : 's'} contain{stats.unresolved === 1 ? 's' : ''} allergens for current residents
+                    </span>
+                    <button type="button" onClick={props.onReviewConflicts} className="shrink-0 rounded-md bg-status-critical px-2.5 py-1 text-[12px] font-semibold text-white transition hover:opacity-90">Review</button>
+                </div>
+            )}
         </div>
     );
 }
