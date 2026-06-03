@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Sites;
 
+use App\Http\Controllers\Concerns\RespondsToInertiaOrJson;
 use App\Http\Controllers\Controller;
 use App\Models\Site;
 use App\Models\SiteMealInventoryItem;
@@ -11,6 +12,8 @@ use Illuminate\Http\Request;
 
 class SiteMealInventoryController extends Controller
 {
+    use RespondsToInertiaOrJson;
+
     public function __construct(private InventoryMovementRecorder $recorder) {}
 
     public function index(Site $site)
@@ -69,7 +72,7 @@ class SiteMealInventoryController extends Controller
             );
         }
 
-        return back()->with('status', 'Inventory item saved');
+        return $this->inertiaOrJson($request, 'Inventory item saved');
     }
 
     public function updateItem(Request $request, Site $site, SiteMealInventoryItem $item)
@@ -86,15 +89,15 @@ class SiteMealInventoryController extends Controller
 
         $item->update(array_filter($data, fn ($v) => $v !== null));
 
-        return back()->with('status', 'Inventory item updated');
+        return $this->inertiaOrJson($request, 'Inventory item updated');
     }
 
-    public function destroyItem(Site $site, SiteMealInventoryItem $item)
+    public function destroyItem(Request $request, Site $site, SiteMealInventoryItem $item)
     {
         abort_unless(auth()->user()?->canDo('sites.meals.inventory.adjust'), 403);
         abort_unless($item->site_id === $site->id, 404);
         $item->delete();
-        return back()->with('status', 'Inventory item removed');
+        return $this->inertiaOrJson($request, 'Inventory item removed');
     }
 
     public function adjust(Request $request, Site $site)
@@ -118,7 +121,7 @@ class SiteMealInventoryController extends Controller
             note: $data['note'] ?? null,
         );
 
-        return back()->with('status', 'Adjustment recorded');
+        return $this->inertiaOrJson($request, 'Adjustment recorded');
     }
 
     public function stocktake(Request $request, Site $site)
@@ -143,7 +146,7 @@ class SiteMealInventoryController extends Controller
             );
         }
 
-        return back()->with('status', 'Stocktake recorded for ' . count($data['counts']) . ' items');
+        return $this->inertiaOrJson($request, 'Stocktake recorded for ' . count($data['counts']) . ' items');
     }
 
     public function movements(Request $request, Site $site)

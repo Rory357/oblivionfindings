@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Sites;
 
+use App\Http\Controllers\Concerns\RespondsToInertiaOrJson;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientMealDislike;
@@ -21,6 +22,8 @@ use Illuminate\Validation\ValidationException;
 
 class SiteMealPlanController extends Controller
 {
+    use RespondsToInertiaOrJson;
+
     /** IDDSI food framework levels offered in the resident dietary editor. */
     public const IDDSI_LEVELS = [
         ['level' => 7, 'label' => 'Regular / Easy to chew'],
@@ -274,7 +277,7 @@ class SiteMealPlanController extends Controller
             ]);
         }
 
-        return back()->with('status', 'Meal added');
+        return $this->inertiaOrJson($request, 'Meal added');
     }
 
     public function update(Request $request, Site $site, SiteMealPlanEntry $entry)
@@ -318,24 +321,24 @@ class SiteMealPlanController extends Controller
             ]);
         }
 
-        return back()->with('status', 'Meal updated');
+        return $this->inertiaOrJson($request, 'Meal updated');
     }
 
-    public function destroy(Site $site, SiteMealPlanEntry $entry)
+    public function destroy(Request $request, Site $site, SiteMealPlanEntry $entry)
     {
         abort_unless(auth()->user()?->canDo('sites.meals.plan'), 403);
         abort_unless($entry->site_id === $site->id, 404);
         $entry->delete();
-        return back()->with('status', 'Meal removed');
+        return $this->inertiaOrJson($request, 'Meal removed');
     }
 
-    public function markServed(Site $site, SiteMealPlanEntry $entry)
+    public function markServed(Request $request, Site $site, SiteMealPlanEntry $entry)
     {
         abort_unless(auth()->user()?->canDo('sites.meals.plan'), 403);
         abort_unless($entry->site_id === $site->id, 404);
 
         if ($entry->served_at) {
-            return back()->with('status', 'Already served');
+            return $this->inertiaOrJson($request, 'Already served');
         }
 
         $entry->update([
@@ -346,18 +349,18 @@ class SiteMealPlanController extends Controller
         // Closed loop: deduct the recipe's tracked ingredients from inventory.
         $count = $this->applyServeStock($site, $entry, -1);
 
-        return back()->with('status', $count > 0
+        return $this->inertiaOrJson($request, $count > 0
             ? "Served · {$count} ingredient" . ($count === 1 ? '' : 's') . ' deducted from stock'
             : 'Marked as served');
     }
 
-    public function unserve(Site $site, SiteMealPlanEntry $entry)
+    public function unserve(Request $request, Site $site, SiteMealPlanEntry $entry)
     {
         abort_unless(auth()->user()?->canDo('sites.meals.plan'), 403);
         abort_unless($entry->site_id === $site->id, 404);
 
         if (! $entry->served_at) {
-            return back()->with('status', 'Not served');
+            return $this->inertiaOrJson($request, 'Not served');
         }
 
         // Restore stock that was deducted on serve, then clear the served flag.
@@ -368,7 +371,7 @@ class SiteMealPlanController extends Controller
             'served_by' => null,
         ]);
 
-        return back()->with('status', $count > 0 ? 'Un-served · stock restored' : 'Marked not served');
+        return $this->inertiaOrJson($request, $count > 0 ? 'Un-served · stock restored' : 'Marked not served');
     }
 
     /**
@@ -419,7 +422,7 @@ class SiteMealPlanController extends Controller
             'weekly_food_budget_cents' => 'nullable|integer|min:0|max:100000000',
         ]);
         $site->update(['weekly_food_budget_cents' => $data['weekly_food_budget_cents'] ?? null]);
-        return back()->with('status', 'Meal planner settings saved');
+        return $this->inertiaOrJson($request, 'Meal planner settings saved');
     }
 
     /**
@@ -463,7 +466,7 @@ class SiteMealPlanController extends Controller
             'meal_fluids_label' => $data['fluids'] ?? null,
         ]);
 
-        return back()->with('status', 'Resident dietary profile updated');
+        return $this->inertiaOrJson($request, 'Resident dietary profile updated');
     }
 
     public function clearWeek(Request $request, Site $site)
@@ -475,7 +478,7 @@ class SiteMealPlanController extends Controller
             ->where('site_id', $site->id)
             ->whereBetween('plan_date', [$start->toDateString(), $end->toDateString()])
             ->delete();
-        return back()->with('status', 'Week cleared');
+        return $this->inertiaOrJson($request, 'Week cleared');
     }
 
     public function copyWeek(Request $request, Site $site)
@@ -524,7 +527,7 @@ class SiteMealPlanController extends Controller
             $copied++;
         }
 
-        return back()->with('status', "Copied {$copied} meal" . ($copied === 1 ? '' : 's'));
+        return $this->inertiaOrJson($request, "Copied {$copied} meal" . ($copied === 1 ? '' : 's'));
     }
 
     public function weekSummary(Request $request, Site $site)
