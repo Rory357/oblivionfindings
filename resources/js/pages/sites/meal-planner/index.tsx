@@ -1,6 +1,6 @@
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Link, router, usePage } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import axios from 'axios';
 import { ArrowUpRight, Building2, CalendarDays, ChefHat, CircleAlert, Clock, Info, LayoutTemplate, Loader2, Package, RotateCcw, ShieldAlert, ShoppingCart, Soup, TriangleAlert, Users, Wallet, X, type LucideIcon } from 'lucide-react';
 import { Component, lazy, Suspense, useCallback, useEffect, useMemo, useRef, useState, type ReactNode } from 'react';
@@ -688,10 +688,10 @@ function ZeroResidentOnboarding({ siteId, onDismiss, onSetBudget, onPlanMeals }:
                         <li className={stepClass}>
                             <span className={numClass}>1</span>
                             <span className="min-w-0">
-                                <Link href={`/sites/${siteId}`} className="inline-flex items-center gap-1 font-medium text-primary hover:underline">
+                                <a href={`/sites/${siteId}`} target="_blank" rel="noopener noreferrer" className="inline-flex items-center gap-1 font-medium text-primary hover:underline">
                                     Add residents &amp; their dietary needs <ArrowUpRight className="h-3.5 w-3.5" />
-                                </Link>
-                                <span className="ml-1 text-muted-foreground">— on the site profile</span>
+                                </a>
+                                <span className="ml-1 text-muted-foreground">— opens the site profile in a new tab</span>
                             </span>
                         </li>
                         <li className={stepClass}>

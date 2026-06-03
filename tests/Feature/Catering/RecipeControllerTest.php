@@ -157,3 +157,22 @@ it('soft-deletes a recipe and returns json for the axios dialog', function () {
 
     expect(MealRecipe::withTrashed()->find($recipe->id)->trashed())->toBeTrue();
 });
+
+it('redirects the legacy recipe library pages into the meal planner', function () {
+    $recipe = MealRecipe::create(['name' => 'Legacy Page Recipe', 'serves_default' => 4, 'is_active' => true]);
+    $manager = aRecipeManager();
+
+    $this->actingAs($manager)->get('/catering/recipes')->assertRedirect(route('catering.meal-planner'));
+    $this->actingAs($manager)->get('/catering/recipes/create')->assertRedirect(route('catering.meal-planner'));
+    $this->actingAs($manager)->get("/catering/recipes/{$recipe->id}")->assertRedirect(route('catering.meal-planner'));
+    $this->actingAs($manager)->get("/catering/recipes/{$recipe->id}/edit")->assertRedirect(route('catering.meal-planner'));
+});
+
+it('still serves the editable recipe payload as json for the in-planner editor', function () {
+    $recipe = MealRecipe::create(['name' => 'JSON Recipe', 'serves_default' => 4, 'is_active' => true]);
+
+    $this->actingAs(aRecipeManager())
+        ->getJson("/catering/recipes/{$recipe->id}/edit")
+        ->assertOk()
+        ->assertJsonStructure(['recipe' => ['id', 'name']]);
+});

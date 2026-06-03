@@ -127,3 +127,10 @@ it('returns dietary tags as json and supports create / update / delete', functio
         ->assertJson(['deleted' => true]);
     expect(MealDietaryTag::find($tag->id))->toBeNull();
 });
+
+it('redirects the legacy product and tag library pages into the meal planner', function () {
+    $manager = aCateringLibraryManager();
+
+    $this->actingAs($manager)->get('/catering/products')->assertRedirect(route('catering.meal-planner'));
+    $this->actingAs($manager)->get('/catering/tags')->assertRedirect(route('catering.meal-planner'));
+});
