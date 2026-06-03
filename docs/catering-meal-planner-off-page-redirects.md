@@ -70,7 +70,9 @@ permissions were added, so there's no seeder step ([[reference_deploy_seeders]] 
 - **Verification:** `tsc --noEmit` clean; ESLint 0 errors. **Live re-check (after deploy):** open
   `/catering?site=9010`, click step 1 → site profile opens in a **new tab** and the `/catering`
   tab stays put. The onboarding card auto-hides once the house has residents.
-- **Status:** [x] decided  [x] changed  [x] verified (build) · [ ] verified (live, post-deploy)
+- **Status:** [x] decided  [x] changed  [x] verified (build) · [x] **verified live 2026-06-03** —
+  link is `<a target="_blank" rel="noopener noreferrer">` → `/sites/{id}`, helper text "— opens the
+  site profile in a new tab"; clicking it kept the `/catering` tab on `/catering` (new tab opened).
 
 ---
 
@@ -103,7 +105,10 @@ permissions were added, so there's no seeder step ([[reference_deploy_seeders]] 
   `catering/products/index.tsx`, `catering/tags/index.tsx`, and the `LibraryDeprecationNotice`
   helper in `resources/js/pages/catering/_tabs.tsx` (the `CateringTabs` nav + `/catering/library-counts`
   badge fetch are still used by the standalone `/catering` shell, so leave those).
-- **Status:** [x] decided  [x] changed  [x] verified (tests)
+- **Status:** [x] decided  [x] changed  [x] verified (tests) · [x] **verified live 2026-06-03** —
+  `/catering/recipes`, `/products`, `/tags`, `/recipes/1/edit` all redirect → `/catering`; and the
+  JSON branches all return **200** behind the redirects (recipes list, recipe edit, Manage tags
+  `GET /catering/tags`, Manage products `GET /catering/products`) — in-planner dialogs unaffected.
 
 ---
 
@@ -121,20 +126,20 @@ permissions were added, so there's no seeder step ([[reference_deploy_seeders]] 
 
 ---
 
-## Quick re-check checklist (live, after deploy)
+## Quick re-check checklist — ✅ ALL VERIFIED LIVE 2026-06-03
 
-- [ ] Log in to https://oblivionfindings.com as `admin@demo.test` (ask user to click Log in).
-- [ ] **Issue 1:** `/catering?site=9010` → onboarding "Add residents" → opens `/sites/9010` in a
-      **new tab**; the `/catering` tab stays put.
-- [ ] **Issue 2:** open `/catering/recipes`, `/catering/products`, `/catering/tags` (and
-      `/catering/recipes/{id}`, `.../{id}/edit`) → each **redirects to `/catering`**.
-- [ ] **Issue 2 (regression):** in the planner, open the **Recipes** tab + a recipe editor, and
-      the **Inventory** library dialogs (products/tags) → they still load and save (the JSON API
-      still works behind the redirects).
-- [ ] **Issue 3:** `/sites/9007?tab=meal-planner` → still renders the embedded planner (kept).
-- [ ] Bonus sweep: on `/catering?site=9007`, confirm the planner action buttons (Plan a meal,
-      Build list, Spend report, Kitchen sheet, Settings ⚙, resident ✏️) still all open as in-page
-      dialogs and don't navigate away. (All were in-page as of 2026-06-03.)
+- [x] Logged in to https://oblivionfindings.com as `admin@demo.test`.
+- [x] **Issue 1:** `/catering?site=9010` → onboarding "Add residents" is a `target="_blank"` anchor;
+      clicking it kept `/catering` put (new tab opened to `/sites/9010`). ✅
+- [x] **Issue 2:** `/catering/recipes`, `/catering/products`, `/catering/tags`,
+      `/catering/recipes/1/edit` → each **redirected to `/catering`**. ✅
+- [x] **Issue 2 (regression):** Recipes tab list + recipe editor load; Manage tags + Manage products
+      dialogs load — JSON GETs returned **200** (`/catering/recipes`, `/recipes/1/edit`, `/tags`,
+      `/products`). In-planner dialogs unaffected. ✅
+- [x] **Issue 3:** `/sites/9007?tab=meal-planner` → still renders the embedded planner (kept). ✅
+- [x] Bonus sweep: planner action buttons (Plan a meal, Build list, Spend report, Kitchen sheet
+      = `window.print()`, Settings ⚙, resident ✏️) all open as in-page dialogs; sub-tabs stay on
+      `/catering`. ✅
 
 ---
 

@@ -222,6 +222,9 @@ export function PlanEntryDialog({
         if (saveDisabled) return;
         const onSuccess = () => onClose();
         const onError = () => {
+            // surface the failure both visibly and to assistive tech (P2-20) — the form stays open & populated
+            toast.error("Couldn't save the meal — try again");
+            announce("Couldn't save the meal — try again");
             // server may have detected a conflict the client missed —
             // re-run the preview so the warning surfaces (fail closed if it errors)
             if (form.data.source_type === 'recipe' && form.data.recipe_id && (form.data.client_ids ?? []).length > 0) {
@@ -252,7 +255,11 @@ export function PlanEntryDialog({
         router.post(`/sites/${siteId}/meal-plan/${entry.id}/${path}`, {}, {
             preserveScroll: true,
             onSuccess: () => onClose(),
-            onError: () => toast.error(entry.served_at ? "Couldn't mark not served — try again" : "Couldn't mark served — try again"),
+            onError: () => {
+                const msg = entry.served_at ? "Couldn't mark not served — try again" : "Couldn't mark served — try again";
+                toast.error(msg);
+                announce(msg);
+            },
         });
     }
 
@@ -1118,7 +1125,10 @@ export function ShoppingListGenerateDialog({
         form.post(`/sites/${siteId}/meal-shopping-lists/generate`, {
             preserveScroll: true,
             onSuccess: () => onClose(),
-            onError: () => toast.error("Couldn't generate the shopping list — try again"),
+            onError: () => {
+                toast.error("Couldn't generate the shopping list — try again");
+                announce("Couldn't generate the shopping list — try again");
+            },
         });
     }
 
@@ -1206,6 +1216,7 @@ export function SettingsDialog({
             setTimeout(() => setSavedBudget(false), 1800);
         } catch {
             toast.error('Could not save budget');
+            announce('Could not save budget');
         } finally {
             setSavingBudget(false);
         }
