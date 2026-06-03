@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Sites;
 
+use App\Http\Controllers\Concerns\RespondsToInertiaOrJson;
 use App\Http\Controllers\Controller;
 use App\Models\Site;
 use App\Models\SiteMealPlanEntry;
@@ -15,6 +16,8 @@ use Illuminate\Http\Request;
 
 class SiteMealShoppingListController extends Controller
 {
+    use RespondsToInertiaOrJson;
+
     public function __construct(
         private ShoppingListGenerator $generator,
         private InventoryMovementRecorder $recorder,
@@ -101,7 +104,7 @@ class SiteMealShoppingListController extends Controller
             includeRestockToPar: $data['include_restock_to_par'] ?? true,
         );
 
-        return back()->with('status', 'Shopping list generated')->with('list_id', $list->id);
+        return $this->inertiaOrJson($request, 'Shopping list generated', ['list_id' => $list->id]);
     }
 
     public function update(Request $request, Site $site, SiteMealShoppingList $list)
@@ -122,7 +125,7 @@ class SiteMealShoppingListController extends Controller
         }
         $list->update($payload);
 
-        return back()->with('status', 'Shopping list updated');
+        return $this->inertiaOrJson($request, 'Shopping list updated');
     }
 
     public function addItem(Request $request, Site $site, SiteMealShoppingList $list)
@@ -149,10 +152,10 @@ class SiteMealShoppingListController extends Controller
             'notes' => $data['notes'] ?? null,
         ]);
 
-        return back()->with('status', 'Item added');
+        return $this->inertiaOrJson($request, 'Item added');
     }
 
-    public function removeItem(Site $site, SiteMealShoppingList $list, SiteMealShoppingListItem $item)
+    public function removeItem(Request $request, Site $site, SiteMealShoppingList $list, SiteMealShoppingListItem $item)
     {
         abort_unless(auth()->user()?->canDo('sites.meals.shopping.manage'), 403);
         abort_unless($list->site_id === $site->id, 404);
@@ -161,7 +164,7 @@ class SiteMealShoppingListController extends Controller
 
         $item->delete();
 
-        return back()->with('status', 'Item removed');
+        return $this->inertiaOrJson($request, 'Item removed');
     }
 
     public function markReceived(Request $request, Site $site, SiteMealShoppingList $list)
@@ -199,10 +202,10 @@ class SiteMealShoppingListController extends Controller
 
         $list->update(['status' => 'received', 'received_at' => now()]);
 
-        return back()->with('status', 'Shopping list received and inventory updated');
+        return $this->inertiaOrJson($request, 'Shopping list received and inventory updated');
     }
 
-    public function destroy(Site $site, SiteMealShoppingList $list)
+    public function destroy(Request $request, Site $site, SiteMealShoppingList $list)
     {
         abort_unless(auth()->user()?->canDo('sites.meals.shopping.manage'), 403);
         abort_unless($list->site_id === $site->id, 404);
@@ -210,6 +213,6 @@ class SiteMealShoppingListController extends Controller
 
         $list->delete();
 
-        return back()->with('status', 'Shopping list deleted');
+        return $this->inertiaOrJson($request, 'Shopping list deleted');
     }
 }

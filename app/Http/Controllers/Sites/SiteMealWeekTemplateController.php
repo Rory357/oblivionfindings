@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Sites;
 
+use App\Http\Controllers\Concerns\RespondsToInertiaOrJson;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\Site;
@@ -12,6 +13,8 @@ use Illuminate\Http\Request;
 
 class SiteMealWeekTemplateController extends Controller
 {
+    use RespondsToInertiaOrJson;
+
     public function index(Site $site)
     {
         $templates = SiteMealWeekTemplate::query()
@@ -44,7 +47,7 @@ class SiteMealWeekTemplateController extends Controller
             'created_by' => auth()->id(),
         ]);
 
-        return back()->with('status', 'Template saved');
+        return $this->inertiaOrJson($request, 'Template saved');
     }
 
     public function update(Request $request, Site $site, SiteMealWeekTemplate $template)
@@ -59,15 +62,15 @@ class SiteMealWeekTemplateController extends Controller
             'meals' => $data['meals'] ?? [],
         ]);
 
-        return back()->with('status', 'Template updated');
+        return $this->inertiaOrJson($request, 'Template updated');
     }
 
-    public function destroy(Site $site, SiteMealWeekTemplate $template)
+    public function destroy(Request $request, Site $site, SiteMealWeekTemplate $template)
     {
         abort_unless(auth()->user()?->canDo('sites.meals.plan'), 403);
         abort_unless($template->site_id === $site->id, 404);
         $template->delete();
-        return back()->with('status', 'Template deleted');
+        return $this->inertiaOrJson($request, 'Template deleted');
     }
 
     public function apply(Request $request, Site $site, SiteMealWeekTemplate $template)
@@ -113,7 +116,7 @@ class SiteMealWeekTemplateController extends Controller
             $applied++;
         }
 
-        return back()->with('status', "Applied “{$template->name}” · {$applied} meal" . ($applied === 1 ? '' : 's'));
+        return $this->inertiaOrJson($request, "Applied “{$template->name}” · {$applied} meal" . ($applied === 1 ? '' : 's'));
     }
 
     private function validateInput(Request $request): array
