@@ -9,6 +9,11 @@ subscribe to a personal feed. The old staffing/shifts calendar was relocated to 
 
 Use this doc to verify the work end-to-end from a clean session.
 
+> **✅ Executed live on `oblivionfindings.com` — 2026-06-04** (build `8441a0de`, logged in as
+> `admin@demo.test`). The §4 checklist below is marked with results. Full write-up, evidence,
+> and the one significant defect found (a **+12h timezone shift on all calendar times**, P1)
+> are in [`site-calendar-test-findings.md`](site-calendar-test-findings.md).
+
 ---
 
 ## 1. Setup
@@ -61,55 +66,63 @@ Frontend: `npm run build` (clean) and `npx tsc --noEmit` (0 errors).
 
 ---
 
-## 4. Manual test checklist
+## 4. Manual test checklist — executed 2026-06-04 on oblivionfindings.com
+
+Legend: ✅ verified · ⚠️ verified, with a finding · ⛔ not exercised (reason noted).
+Evidence + details in [`site-calendar-test-findings.md`](site-calendar-test-findings.md).
 
 ### Views & display
-- [ ] `/calendar` loads the redesigned calendar (hero + toolbar + source legend).
-- [ ] Switch **Month / Week / Day / Agenda / Timeline** — each renders.
-- [ ] Toolbar **prev / Today / next** navigates; the period label updates per view.
-- [ ] **Colour by**: source / status / owner re-colours entries.
-- [ ] **Density** toggle (comfortable/compact) changes month-cell event caps.
-- [ ] **Legend chips** toggle each source layer on/off (e.g. hide Meals).
-- [ ] Global scope: the **house selector** filters to one site / "All sites".
-- [ ] Demo data shows: manual events (house meeting, boiler service, fire alarm test…),
-      a **pending** "Boiler service", recurring entries (weekly walkaround, monthly alarm test),
-      and **Meal** entries (lunch/dinner) coloured as the meal source.
+- [x] ✅ `/calendar` loads the redesigned calendar (hero + toolbar + source legend; no 403).
+- [x] ✅ Switch **Month / Week / Day / Agenda / Timeline** — each renders.
+- [x] ✅ Toolbar **prev / Today / next** navigates; the period label updates (Next→"July 2026").
+- [x] ✅ **Colour by**: source → status re-colours entries (owner not separately checked).
+- [ ] ⛔ **Density** toggle — control present, but demo data too sparse (≤1 event/day) to see the cap change.
+- [x] ✅ **Legend chips** toggle each source layer on/off (hid Meals → 4 meal events removed).
+- [x] ✅ Global scope: the **house selector** filters to one site / "All sites" (Tōtara 9011 → IN VIEW 0).
+- [x] ⚠️ Demo data: `CalendarDemoSeeder` was **not** run, so the seeded set (pending "Boiler service",
+      recurring walkaround/alarm) wasn't present. Verified instead via **existing meal/checklist obligations**
+      + a **self-created** event. ⚠️ **All times display +12h off — see findings P1.**
 
 ### Obligations / integration
-- [ ] Auto-derived obligations appear read-only and colour-coded by source.
-- [ ] Clicking an obligation → detail modal → **Open record** deep-links to its source
-      (e.g. a Meal → site Meal Planner tab; an inspection → `/sites/{site}/inspections`).
-- [ ] Obligations have **no** Edit/Delete (read-only); only manual events do.
+- [x] ✅ Auto-derived obligations appear read-only and colour-coded by source (meals; checklists via the `.ics` feed).
+- [x] ✅ Clicking an obligation → detail modal → **Open record** deep-links to its source
+      (Meal → `/sites/9004?tab=meal-planner`).
+- [x] ✅ Obligations have **no** Edit/Delete (modal shows only `.ics` + Close).
 
 ### Create / edit / delete (needs `calendar.create` / `calendar.manage`)
-- [ ] **New event** → dialog with a **tile** type picker (not a dropdown), locked-site card
-      (per-site) or site selector (global), required asterisks, Repeats preset, description.
-- [ ] Choosing an approval-required type (Maintenance/Inspection) shows the "submitted as pending" note.
-- [ ] Creating shows it on the calendar.
-- [ ] Open a manual event → **Edit** → change time/title → saves.
-- [ ] **Delete** a manual event removes it.
-- [ ] **Conflict warning**: create/edit an event overlapping a same-room/vendor entry → red clash note.
+- [x] ✅ **New event** → dialog with a **tile** type picker (11 types, not a dropdown), site selector (global),
+      required asterisks, Repeats preset, description.
+- [x] ✅ Choosing Maintenance shows **"This type requires approval — it will be submitted as pending."**
+- [x] ✅ Creating shows it on the calendar (`POST …/events` 200; `IN VIEW` 4→5).
+- [x] ⚠️ Open a manual event → **Edit** → change title → saves (`PUT …/events/1` 200).
+      ⚠️ Saving **shifts the time +12h** (timezone bug, P1).
+- [x] ✅ **Delete** a manual event removes it (toast "deleted"). ⚠️ No confirmation prompt (P3).
+- [ ] ⛔ **Conflict warning** — couldn't trigger: the create/edit dialog has **no Room/Vendor field** (P3).
 
 ### Approvals (needs `calendar.approve`)
-- [ ] Open the pending "Boiler service" → **Approve** / **Reject** buttons appear.
-- [ ] Approve → status becomes Approved; Reject → Cancelled.
+- [x] ✅ Open a pending event → **Approve** / **Reject** buttons appear (admin has `calendar.approve`).
+- [x] ⚠️ Approve → status becomes **Approved** (`POST …/approve` 200). Reject not separately exercised (symmetric endpoint, button present).
 
 ### Reschedule
-- [ ] Drag a **non-recurring** manual event to another day (month) or time (week/day) → it moves (PUT).
-- [ ] Recurring/obligation entries are not drag-moved (edit recurring from the detail panel).
+- [ ] ⛔ Drag a non-recurring event — DnD not reliably automatable via CDP; the `PUT` reschedule endpoint
+      is the one already verified via Edit. Recommend a manual drag check.
+- [ ] ⛔ Recurring/obligation entries not drag-moved — not exercised.
 
 ### Per-user calendar
-- [ ] Detail modal → **Add to your calendar**: Google / Outlook open compose links; **.ics** downloads.
-- [ ] Toolbar **Subscribe** → generate a private feed link → **Copy** / **Subscribe in calendar app** (webcal)
-      / **Reset link**. Opening `/calendar/feed/{token}.ics` returns a valid `.ics`.
+- [x] ✅ Detail modal → **Add to your calendar**: Google / Outlook compose links + **.ics** present.
+- [x] ✅ Toolbar **Subscribe** → **Generate** → feed link + **Copy** / **Subscribe in calendar app** (webcal) /
+      **Reset link**. `POST /calendar/feed/reset` 200 (⇒ migration ran). `GET /calendar/feed/{token}.ics`
+      returns a valid VCALENDAR (7 VEVENTs); unknown token → 404.
 
 ### Profile tab
-- [ ] `/sites/{site}` → **Calendar** tab renders the same calendar inline (no more placeholder).
+- [x] ✅ `/sites/9004?tab=calendar` renders the calendar inline (no more placeholder).
+      ⚠️ Tab activated via URL; a single programmatic click didn't switch it (see findings — dialog cleanup).
 
 ### Scheduling relocation
-- [ ] `/scheduling` shows the staffing/shifts FullCalendar (create/edit shifts still works).
-- [ ] Sidebar shows **Site Calendar** (→ `/calendar`) and **Scheduling** (→ `/scheduling`) — no duplicate.
-- [ ] "Team Calendar" links on My Calendar / client calendar go to `/scheduling`.
+- [x] ✅ `/scheduling` shows the staffing/shifts FullCalendar (25 shifts; month/week/day/list).
+- [x] ✅ Sidebar shows **Site Calendar** (→ `/calendar`, under *Sites & Locations*) and **Scheduling**
+      (→ `/scheduling`, under *Workforce*) — no duplicate.
+- [ ] ⛔ "Team Calendar" links on My Calendar / client calendar → `/scheduling` — not visited this pass.
 
 ---
 
