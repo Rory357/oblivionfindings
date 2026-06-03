@@ -3,8 +3,6 @@
 namespace App\Http\Controllers\Catering;
 
 use App\Http\Controllers\Controller;
-use App\Models\MealDietaryTag;
-use App\Models\MealProduct;
 use App\Models\MealRecipe;
 use App\Models\MealRecipeIngredient;
 use Illuminate\Http\Request;
@@ -12,65 +10,25 @@ use Illuminate\Support\Facades\DB;
 
 class RecipeController extends Controller
 {
-    public function index(Request $request)
+    public function index()
     {
-        $query = MealRecipe::query()->with('tags:id,key,label,kind,severity,color');
-
-        if ($search = $request->string('q')->toString()) {
-            $query->where('name', 'like', "%{$search}%");
-        }
-        if ($request->boolean('inactive')) {
-            $query->withTrashed();
-        }
-
-        $recipes = $query->orderBy('name')->paginate(30)->withQueryString();
-
-        return inertia('catering/recipes/index', [
-            'recipes' => $recipes,
-            'tags' => MealDietaryTag::orderBy('label')->get(['id', 'key', 'label', 'kind', 'severity', 'color']),
-            'filters' => [
-                'q' => $request->string('q')->toString(),
-                'inactive' => $request->boolean('inactive'),
-            ],
-            'canManage' => $this->canManage(),
-        ]);
+        // Recipes are managed inside the Meal Planner (/catering); the standalone
+        // library page has been folded in. Bounce direct/bookmarked hits back to
+        // the planner so there is a single home. The in-planner dialogs talk to
+        // the JSON store/update/destroy endpoints below — not this page.
+        return redirect()->route('catering.meal-planner');
     }
 
-    public function show(\Illuminate\Http\Request $request, MealRecipe $recipe)
+    public function show(MealRecipe $recipe)
     {
-        $recipe->load(['ingredients.product', 'tags', 'creator:id,name']);
-
-        $impact = null;
-        $siteId = $request->integer('site');
-        if ($siteId) {
-            $site = \App\Models\Site::find($siteId);
-            if ($site) {
-                $clientIds = \App\Models\Client::where('site_id', $site->id)->pluck('id')->all();
-                $report = app(\App\Services\Catering\DietaryConflictChecker::class)
-                    ->checkRecipeAgainstClients($recipe, $clientIds);
-                $impact = [
-                    'site' => ['id' => $site->id, 'name' => $site->name, 'type' => $site->type],
-                    'report' => $report,
-                ];
-            }
-        }
-
-        return inertia('catering/recipes/show', [
-            'recipe' => $recipe,
-            'canManage' => $this->canManage(),
-            'impact' => $impact,
-        ]);
+        // Folded into the Meal Planner — see index().
+        return redirect()->route('catering.meal-planner');
     }
 
     public function create()
     {
-        abort_unless($this->canManage(), 403);
-
-        return inertia('catering/recipes/edit', [
-            'recipe' => null,
-            'tags' => MealDietaryTag::orderBy('label')->get(['id', 'key', 'label', 'kind', 'severity', 'color']),
-            'products' => MealProduct::active()->orderBy('name')->get(['id', 'name', 'default_unit']),
-        ]);
+        // Folded into the Meal Planner — recipes are added via the in-page dialog.
+        return redirect()->route('catering.meal-planner');
     }
 
     public function edit(Request $request, MealRecipe $recipe)
@@ -84,11 +42,8 @@ class RecipeController extends Controller
             return response()->json(['recipe' => $recipe]);
         }
 
-        return inertia('catering/recipes/edit', [
-            'recipe' => $recipe,
-            'tags' => MealDietaryTag::orderBy('label')->get(['id', 'key', 'label', 'kind', 'severity', 'color']),
-            'products' => MealProduct::active()->orderBy('name')->get(['id', 'name', 'default_unit']),
-        ]);
+        // The standalone editor page has been folded into the Meal Planner.
+        return redirect()->route('catering.meal-planner');
     }
 
     public function store(Request $request)
@@ -114,6 +69,7 @@ class RecipeController extends Controller
             ]);
             $recipe->tags()->sync($data['tag_ids'] ?? []);
             $this->syncIngredients($recipe, $data['ingredients'] ?? []);
+
             return $recipe;
         });
 
@@ -121,7 +77,7 @@ class RecipeController extends Controller
             return response()->json(['recipe' => $recipe->load(['ingredients', 'tags:id'])]);
         }
 
-        return redirect()->route('catering.recipes.show', $recipe)->with('status', 'Recipe created');
+        return redirect()->route('catering.meal-planner')->with('status', 'Recipe created');
     }
 
     public function update(Request $request, MealRecipe $recipe)
@@ -163,7 +119,7 @@ class RecipeController extends Controller
             return response()->json(['recipe' => $recipe->fresh(['ingredients', 'tags:id'])]);
         }
 
-        return redirect()->route('catering.recipes.show', $recipe)->with('status', 'Recipe updated');
+        return redirect()->route('catering.meal-planner')->with('status', 'Recipe updated');
     }
 
     public function destroy(Request $request, MealRecipe $recipe)
@@ -176,7 +132,7 @@ class RecipeController extends Controller
             return response()->json(['deleted' => true]);
         }
 
-        return redirect()->route('catering.recipes.index')->with('status', 'Recipe archived');
+        return redirect()->route('catering.meal-planner')->with('status', 'Recipe archived');
     }
 
     private function syncIngredients(MealRecipe $recipe, array $ingredients): void

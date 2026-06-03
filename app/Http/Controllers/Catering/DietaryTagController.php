@@ -11,22 +11,18 @@ class DietaryTagController extends Controller
 {
     public function index(Request $request)
     {
+        // The standalone library page has been folded into the Meal Planner.
+        if (! $request->wantsJson()) {
+            return redirect()->route('catering.meal-planner');
+        }
+
+        // The in-planner Dietary & allergen tags manager fetches as JSON.
         $tags = MealDietaryTag::query()
             ->orderBy('kind')
             ->orderBy('label')
             ->get(['id', 'key', 'label', 'kind', 'severity', 'color', 'description']);
 
-        // The in-planner Dietary & allergen tags manager fetches as JSON.
-        if ($request->wantsJson()) {
-            return response()->json(['tags' => $tags]);
-        }
-
-        return inertia('catering/tags/index', [
-            'tags' => $tags,
-            'kindOptions' => ['dietary', 'allergen'],
-            'severityOptions' => ['info', 'warn', 'critical'],
-            'canManage' => $this->canManage(),
-        ]);
+        return response()->json(['tags' => $tags]);
     }
 
     public function store(Request $request)

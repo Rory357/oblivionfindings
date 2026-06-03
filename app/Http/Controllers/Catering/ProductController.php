@@ -21,32 +21,8 @@ class ProductController extends Controller
             ]);
         }
 
-        $query = MealProduct::query()->with('tags:id,key,label,kind,severity,color');
-
-        if ($search = $request->string('q')->toString()) {
-            $query->where('name', 'like', "%{$search}%");
-        }
-        if ($category = $request->string('category')->toString()) {
-            $query->where('category', $category);
-        }
-        if ($request->boolean('inactive')) {
-            $query->withTrashed();
-        }
-
-        $products = $query->orderBy('category')->orderBy('name')->paginate(50)->withQueryString();
-        $categories = MealProduct::query()->whereNotNull('category')->distinct()->pluck('category')->sort()->values();
-
-        return inertia('catering/products/index', [
-            'products' => $products,
-            'categories' => $categories,
-            'tags' => MealDietaryTag::orderBy('label')->get(['id', 'key', 'label', 'kind', 'severity', 'color']),
-            'filters' => [
-                'q' => $request->string('q')->toString(),
-                'category' => $request->string('category')->toString(),
-                'inactive' => $request->boolean('inactive'),
-            ],
-            'canManage' => $this->canManage(),
-        ]);
+        // The standalone library page has been folded into the Meal Planner.
+        return redirect()->route('catering.meal-planner');
     }
 
     public function store(Request $request)
@@ -59,7 +35,7 @@ class ProductController extends Controller
 
         $data['tenant_id'] = auth()->user()?->tenant_id;
         $product = MealProduct::create($data);
-        if (!empty($tagIds)) {
+        if (! empty($tagIds)) {
             $product->tags()->sync($tagIds);
         }
 
