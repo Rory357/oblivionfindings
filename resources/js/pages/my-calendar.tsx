@@ -485,7 +485,7 @@ export default function MyCalendar() {
                                     className="w-full justify-start gap-2 text-sm"
                                     asChild
                                 >
-                                    <Link href="/calendar">
+                                    <Link href="/scheduling">
                                         <Calendar className="h-4 w-4" />
                                         Team Calendar
                                     </Link>

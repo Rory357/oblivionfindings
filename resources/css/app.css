@@ -222,6 +222,20 @@
     --amberx: oklch(0.62 0.14 70);
     --amberx-bg: color-mix(in oklch, oklch(0.62 0.14 70) 14%, var(--card));
 
+    /* Site Calendar event-source palette — a fixed, distinct-hue set (NOT brand
+       tied) so the up-to-10 obligation sources stay legible against each other.
+       Per source: base (label/dot), -bg (chip fill), -ln (chip border). */
+    --src-event: oklch(52% 0.16 255);        --src-event-bg: oklch(96% 0.035 255);     --src-event-ln: oklch(87% 0.07 255);
+    --src-inspection: oklch(54% 0.14 70);    --src-inspection-bg: oklch(96% 0.05 75);  --src-inspection-ln: oklch(86% 0.09 75);
+    --src-compliance: oklch(51% 0.20 290);   --src-compliance-bg: oklch(96% 0.04 290); --src-compliance-ln: oklch(88% 0.07 290);
+    --src-credential: oklch(50% 0.17 322);   --src-credential-bg: oklch(96% 0.035 322);--src-credential-ln: oklch(88% 0.06 322);
+    --src-checklist: oklch(48% 0.13 155);    --src-checklist-bg: oklch(95% 0.05 155);  --src-checklist-ln: oklch(85% 0.08 155);
+    --src-hazard: oklch(52% 0.20 28);        --src-hazard-bg: oklch(96% 0.05 28);      --src-hazard-ln: oklch(87% 0.09 28);
+    --src-vendor: oklch(52% 0.11 200);       --src-vendor-bg: oklch(96% 0.04 200);     --src-vendor-ln: oklch(86% 0.07 200);
+    --src-meal: oklch(56% 0.15 8);           --src-meal-bg: oklch(96% 0.04 8);         --src-meal-ln: oklch(89% 0.07 8);
+    --src-damage: oklch(56% 0.15 52);        --src-damage-bg: oklch(96% 0.06 55);      --src-damage-ln: oklch(87% 0.10 55);
+    --src-emergency: oklch(48% 0.21 18);     --src-emergency-bg: oklch(95% 0.06 18);   --src-emergency-ln: oklch(86% 0.10 18);
+
     /* Brand-derived shades used by the /my-day redesign. The hero uses
        --brand-tint-deep for the "now" rule borders, and --text-faint for
        caps-uppercase microcopy (e.g. tip text below the rail). */

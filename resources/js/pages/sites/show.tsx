@@ -200,6 +200,7 @@ const DeleteContactDialog = lazy(() =>
 );
 
 const MealPlannerSubTabs = lazy(() => import('./meal-planner'));
+const SiteCalendarEmbed = lazy(() => import('./calendar/SiteCalendar'));
 
 const AddClientDialog = lazy(() =>
     import('./clients/_dialogs').then((module) => ({
@@ -2433,33 +2434,22 @@ export default function SiteShow({
 
                     {/* Calendar Tab */}
                     <TabsContent value="calendar">
-                        <Card>
-                            <CardHeader className="flex flex-row items-center justify-between">
-                                <CardTitle>Site Calendar</CardTitle>
-                                <Button asChild>
-                                    <Link href={`/sites/${site.id}/calendar`}>
-                                        View Full Calendar
-                                    </Link>
-                                </Button>
-                            </CardHeader>
-                            <CardContent>
-                                <div className="py-8 text-center text-muted-foreground">
-                                    <Calendar className="mx-auto mb-3 h-12 w-12 opacity-50" />
-                                    <p>Calendar events will appear here</p>
-                                    <Button
-                                        asChild
-                                        variant="outline"
-                                        className="mt-4"
-                                    >
-                                        <Link
-                                            href={`/sites/${site.id}/calendar`}
-                                        >
-                                            Open Calendar
-                                        </Link>
-                                    </Button>
+                        <Suspense
+                            fallback={
+                                <div className="rounded-md border p-8 text-center text-sm text-muted-foreground">
+                                    Loading calendar…
                                 </div>
-                            </CardContent>
-                        </Card>
+                            }
+                        >
+                            <SiteCalendarEmbed
+                                context="profile"
+                                scope="site"
+                                site={{ id: site.id, name: site.name, type: site.type }}
+                                canCreate={!!(canGlobal?.calendar?.create && can_edit)}
+                                canManage={!!(canGlobal?.calendar?.manage && can_edit)}
+                                canApprove={!!canGlobal?.calendar?.approve}
+                            />
+                        </Suspense>
                     </TabsContent>
 
                     {/* Checklists Tab */}

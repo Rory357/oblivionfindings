@@ -61,24 +61,31 @@ class SiteCalendarService
         Carbon $rangeStart,
         Carbon $rangeEnd
     ): array {
-        // Get exceptions for this event
+        // Exceptions keyed by occurrence date — carry both the cancel flag and any
+        // per-occurrence field overrides (single-occurrence reschedule/edit).
         $exceptions = SiteCalendarEventException::where('parent_event_id', $event->id)
             ->whereBetween('exception_date', [$rangeStart->toDateString(), $rangeEnd->toDateString()])
-            ->pluck('is_cancelled', 'exception_date')
-            ->toArray();
+            ->get()
+            ->keyBy(fn ($exception) => Carbon::parse($exception->exception_date)->toDateString());
 
         $occurrences = [];
-        
+
         // Use PHP native DatePeriod for RRULE expansion (simplified)
         // For production, use a library like `spatie/icalendar-generator` or `eluceo/ical`
         $occurrencesData = $this->calculateOccurrences($event, $rangeStart, $rangeEnd);
 
         foreach ($occurrencesData as $occurrence) {
             $date = $occurrence['date']->format('Y-m-d');
-            
-            // Skip if exception says cancelled
-            if (isset($exceptions[$date]) && $exceptions[$date]) {
+            $exception = $exceptions->get($date);
+
+            // Skip cancelled occurrences ("delete this one").
+            if ($exception && $exception->is_cancelled) {
                 continue;
+            }
+
+            // Apply "edit this occurrence" overrides (e.g. moved time).
+            if ($exception && is_array($exception->overridden_fields)) {
+                $occurrence['overrides'] = $exception->overridden_fields;
             }
 
             $occurrences[] = $this->formatOccurrence($event, $occurrence);
@@ -168,15 +175,38 @@ class SiteCalendarService
         SiteCalendarEvent $event,
         ?array $occurrence = null
     ): array {
-        $date = $occurrence['date'] ?? $event->start_at;
-        
+        $start = $occurrence['date'] ?? $event->start_at;
+        $overrides = $occurrence['overrides'] ?? [];
+
+        // Each occurrence keeps the series' duration: shift end by the same
+        // span as the master event rather than reusing the original end date.
+        $end = null;
+        if ($event->end_at) {
+            $durationSeconds = $event->end_at->getTimestamp() - $event->start_at->getTimestamp();
+            $end = $start->copy()->addSeconds($durationSeconds);
+        }
+
+        $startIso = isset($overrides['start_at'])
+            ? Carbon::parse($overrides['start_at'])->toIso8601String()
+            : $start->toIso8601String();
+        $endIso = isset($overrides['end_at'])
+            ? Carbon::parse($overrides['end_at'])->toIso8601String()
+            : $end?->toIso8601String();
+
         return [
             'id' => $event->id,
+            // occ_id keys on the ORIGINAL occurrence date so its exception row stays addressable.
+            'occ_id' => $event->id.'@'.$start->toDateString(),
+            'series_id' => $event->id,
+            'is_occurrence' => $occurrence !== null,
             'is_exception' => $occurrence !== null,
-            'title' => $event->title,
+            'title' => $overrides['title'] ?? $event->title,
+            'description' => $event->description,
             'event_type' => $event->event_type,
-            'start_at' => $date->toIso8601String(),
-            'end_at' => $event->end_at?->toIso8601String(),
+            'start_at' => $startIso,
+            'end_at' => $endIso,
+            'recurrence_rule' => $event->recurrence_rule,
+            'reminder_minutes' => $event->reminder_minutes ?? [],
             'site' => $event->site,
             'owner' => $event->owner,
             'status' => $event->status,

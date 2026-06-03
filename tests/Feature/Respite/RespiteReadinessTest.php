@@ -275,7 +275,7 @@ class RespiteReadinessTest extends TestCase
             );
 
         $calendarEvents = $this->actingAs($this->admin)
-            ->getJson(route('calendar.events', [
+            ->getJson(route('scheduling.events', [
                 'start' => now()->startOfDay()->toIso8601String(),
                 'end' => now()->addDays(7)->endOfDay()->toIso8601String(),
             ]))

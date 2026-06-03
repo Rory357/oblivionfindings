@@ -3,6 +3,7 @@
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Role;
 use App\Models\Site;
+use App\Models\SiteMealPlanEntry;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -62,4 +63,54 @@ test('global site calendar only returns sites within the users assigned site sco
             ->where('sites.0.id', $allowedSite->id)
             ->where('sites.0.name', 'Alpha House')
         );
+});
+
+test('global calendar items feed returns unified items scoped to the users sites', function () {
+    $user = siteCalendarUser('team_lead');
+
+    $allowedSite = Site::factory()->create(['name' => 'Alpha House', 'type' => 'house']);
+    $blockedSite = Site::factory()->create(['name' => 'Bravo House', 'type' => 'house']);
+
+    HrEmployeeProfile::query()->create([
+        'tenant_id' => 1,
+        'user_id' => $user->id,
+        'employee_number' => 'EMP-CALFEED-'.$user->id,
+        'work_email' => $user->email,
+        'position_title' => 'Team Lead',
+        'position_role' => 'team_lead',
+        'employment_type' => 'full_time',
+        'start_date' => now()->subMonth()->toDateString(),
+        'is_active' => true,
+        'primary_site_id' => $allowedSite->id,
+        'secondary_site_ids' => [],
+    ]);
+
+    $allowedMeal = SiteMealPlanEntry::create([
+        'site_id' => $allowedSite->id,
+        'tenant_id' => $allowedSite->tenant_id,
+        'plan_date' => now()->startOfMonth()->addDays(3)->toDateString(),
+        'meal_slot' => 'lunch',
+        'source_type' => 'ad_hoc',
+        'ad_hoc_name' => 'Allowed lunch',
+        'servings' => 4,
+    ]);
+
+    $blockedMeal = SiteMealPlanEntry::create([
+        'site_id' => $blockedSite->id,
+        'tenant_id' => $blockedSite->tenant_id,
+        'plan_date' => now()->startOfMonth()->addDays(3)->toDateString(),
+        'meal_slot' => 'lunch',
+        'source_type' => 'ad_hoc',
+        'ad_hoc_name' => 'Blocked lunch',
+        'servings' => 4,
+    ]);
+
+    $start = now()->startOfMonth()->toDateString();
+    $end = now()->endOfMonth()->toDateString();
+
+    $this->actingAs($user)
+        ->getJson("/calendar/items?start={$start}&end={$end}")
+        ->assertOk()
+        ->assertJsonFragment(['ref' => 'MEAL-'.$allowedMeal->id])
+        ->assertJsonMissing(['ref' => 'MEAL-'.$blockedMeal->id]);
 });

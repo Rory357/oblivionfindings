@@ -41,11 +41,27 @@ use App\Http\Controllers\Sites\{
 |
 */
 
+// Public per-user calendar subscribe feed (token-auth, no session). Kept OUTSIDE
+// the auth group so external calendar apps (Google/Outlook/Apple) can poll it.
+Route::get('/calendar/feed/{token}.ics', [SiteCalendarController::class, 'feed'])
+    ->name('calendar.feed')
+    ->where('token', '[A-Za-z0-9]+');
+
 Route::middleware(['auth', 'verified'])->group(function () {
 
     // Global Sites Calendar
     Route::get('/calendar', [SiteCalendarController::class, 'global'])
         ->name('sites.calendar.global')
+        ->middleware('permission:calendar.view');
+
+    // Unified events feed across all accessible sites (manual + obligations)
+    Route::get('/calendar/items', [SiteCalendarController::class, 'globalEvents'])
+        ->name('sites.calendar.global.events')
+        ->middleware('permission:calendar.view');
+
+    // Reset the personal subscribe-feed token
+    Route::post('/calendar/feed/reset', [SiteCalendarController::class, 'resetFeed'])
+        ->name('sites.calendar.feed.reset')
         ->middleware('permission:calendar.view');
 
     // Site-scoped routes
@@ -78,10 +94,16 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->middleware('permission:calendar.create');
         Route::put('/calendar/events/{event}', [SiteCalendarController::class, 'update'])
             ->name('sites.calendar.update')
-            ->middleware('permission:calendar.create');
+            ->middleware('permission:calendar.manage');
         Route::delete('/calendar/events/{event}', [SiteCalendarController::class, 'destroy'])
             ->name('sites.calendar.destroy')
-            ->middleware('permission:calendar.create');
+            ->middleware('permission:calendar.manage');
+        Route::post('/calendar/events/{event}/approve', [SiteCalendarController::class, 'approve'])
+            ->name('sites.calendar.approve')
+            ->middleware('permission:calendar.approve');
+        Route::post('/calendar/events/{event}/reject', [SiteCalendarController::class, 'reject'])
+            ->name('sites.calendar.reject')
+            ->middleware('permission:calendar.approve');
 
         Route::middleware('permission:assets.geofences.manage')->group(function () {
             Route::post('/geofence', [SiteGeofenceController::class, 'store'])

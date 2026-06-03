@@ -361,7 +361,7 @@ export default function CalendarIndex(props: Props) {
                 }
 
                 const res = await fetch(
-                    `/calendar/events?${params.toString()}`,
+                    `/scheduling/events?${params.toString()}`,
                     {
                         headers: { Accept: 'application/json' },
                         credentials: 'same-origin',
@@ -614,13 +614,13 @@ export default function CalendarIndex(props: Props) {
             };
 
             if (modalMode === 'create') {
-                await jsonRequest('/calendar/shifts', {
+                await jsonRequest('/scheduling/shifts', {
                     method: 'POST',
                     body: payload,
                 });
             } else {
                 if (!form.id) throw new Error('Missing shift id');
-                await jsonRequest(`/calendar/shifts/${form.id}`, {
+                await jsonRequest(`/scheduling/shifts/${form.id}`, {
                     method: 'PATCH',
                     body: payload,
                 });
@@ -637,7 +637,7 @@ export default function CalendarIndex(props: Props) {
 
     async function patchEventTime(id: string, start: Date, end: Date | null) {
         const endSafe = end ?? addHours(start, 1);
-        await jsonRequest(`/calendar/shifts/${id}`, {
+        await jsonRequest(`/scheduling/shifts/${id}`, {
             method: 'PATCH',
             body: {
                 starts_at: toDatetimeLocalValue(start),
@@ -673,8 +673,8 @@ export default function CalendarIndex(props: Props) {
     }
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Calendar', href: '/calendar' }]}>
-            <Head title="Calendar" />
+        <AppLayout breadcrumbs={[{ title: 'Scheduling', href: '/scheduling' }]}>
+            <Head title="Scheduling" />
 
             <div className="space-y-4 p-4">
                 <Card>
