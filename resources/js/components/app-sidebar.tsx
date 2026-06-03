@@ -691,7 +691,7 @@ function buildSitesSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
         });
     if (can?.calendar?.viewAny)
         items.push({
-            title: 'Calendars',
+            title: 'Site Calendar',
             href: '/calendar',
             icon: CalendarDays,
         });
@@ -1861,8 +1861,8 @@ function buildSystemSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
         });
     if (can?.calendar?.viewAny)
         items.push({
-            title: 'Calendar',
-            href: '/calendar',
+            title: 'Scheduling',
+            href: '/scheduling',
             icon: CalendarDays,
         });
     if (can?.timeline?.viewAny)

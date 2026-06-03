@@ -261,17 +261,18 @@ Route::middleware(['auth'])->group(function () {
         ->middleware(['permission:summaries.generate', 'throttle:ai-queries'])
         ->name('summaries.generate');
 
-    // Calendar
+    // Scheduling (staffing / shifts calendar). Relocated from /calendar, which now
+    // serves the Site Calendar roll-up (SiteCalendarController@global, routes/sites.php).
     Route::middleware('permission:calendar.viewAny')->group(function () {
-        Route::get('/calendar', [CalendarController::class, 'index'])->name('calendar.index');
-        Route::get('/calendar/events', [CalendarController::class, 'events'])->name('calendar.events');
+        Route::get('/scheduling', [CalendarController::class, 'index'])->name('scheduling.index');
+        Route::get('/scheduling/events', [CalendarController::class, 'events'])->name('scheduling.events');
 
-        // Calendar interactions (create/edit shifts inline)
-        Route::post('/calendar/shifts', [CalendarController::class, 'storeShift'])
+        // Scheduling interactions (create/edit shifts inline)
+        Route::post('/scheduling/shifts', [CalendarController::class, 'storeShift'])
             ->middleware('permission:shifts.create')
-            ->name('calendar.shifts.store');
-        Route::patch('/calendar/shifts/{shift}', [CalendarController::class, 'updateShift'])
+            ->name('scheduling.shifts.store');
+        Route::patch('/scheduling/shifts/{shift}', [CalendarController::class, 'updateShift'])
             ->middleware('permission:shifts.update')
-            ->name('calendar.shifts.update');
+            ->name('scheduling.shifts.update');
     });
 });
