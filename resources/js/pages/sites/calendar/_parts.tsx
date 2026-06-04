@@ -588,12 +588,12 @@ export function WeekView({ events, navDate }: { events: Decorated[]; navDate: Da
                 })}
             </div>
             <AllDayRow days={days} events={events} padRight={sbw} />
-            <div ref={scrollRef} data-view-scroll className="scroll-pretty relative flex-1 overflow-y-auto">
+            <div ref={scrollRef} data-view-scroll className="scroll-pretty relative flex-1 overflow-y-auto pt-3">
                 <div className="flex" style={{ height: HOURS.length * HOUR_H }}>
                     <div className="w-14 shrink-0">
                         {HOURS.map((h) => (
                             <div key={h} className="relative" style={{ height: HOUR_H }}>
-                                <span className="tnum absolute -top-2 right-2 text-[10.5px] font-medium text-muted-foreground">{(h % 12 || 12)}{h >= 12 ? 'p' : 'a'}</span>
+                                <span className="tnum absolute -top-2 right-2 text-[10.5px] font-medium text-muted-foreground">{(h % 12 || 12)}{h >= 12 ? 'pm' : 'am'}</span>
                             </div>
                         ))}
                     </div>
@@ -640,7 +640,7 @@ export function DayView({ events, navDate }: { events: Decorated[]; navDate: Dat
                 </div>
             </div>
             <AllDayRow days={[day]} events={events} padRight={sbw} />
-            <div ref={scrollRef} data-view-scroll className="scroll-pretty relative flex-1 overflow-y-auto">
+            <div ref={scrollRef} data-view-scroll className="scroll-pretty relative flex-1 overflow-y-auto pt-3">
                 <div className="flex" style={{ height: HOURS.length * HOUR_H }}>
                     <div className="w-14 shrink-0">
                         {HOURS.map((h) => (
