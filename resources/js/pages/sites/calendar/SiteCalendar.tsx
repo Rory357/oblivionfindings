@@ -664,17 +664,19 @@ export default function SiteCalendar({
             <div className="flex gap-3">
                 <div className="min-w-0 flex-1">{ViewBody}</div>
                 {context === 'page' && (
-                    <TodayRail
-                        events={visibleRailEvents}
-                        today={now}
-                        onSelect={(ev) => {
-                            hidePreview();
-                            setSelected(ev);
-                        }}
-                        onApprovals={() => setApprovalsOpen(true)}
-                        onJumpToday={() => setNavDate(new Date())}
-                        viewingToday={viewingToday}
-                    />
+                    <CalendarUIProvider value={uiValue}>
+                        <TodayRail
+                            events={visibleRailEvents}
+                            today={now}
+                            onSelect={(ev) => {
+                                hidePreview();
+                                setSelected(ev);
+                            }}
+                            onApprovals={() => setApprovalsOpen(true)}
+                            onJumpToday={() => setNavDate(new Date())}
+                            viewingToday={viewingToday}
+                        />
+                    </CalendarUIProvider>
                 )}
             </div>
             {loading && <p className="text-center text-sm text-muted-foreground">Loading…</p>}

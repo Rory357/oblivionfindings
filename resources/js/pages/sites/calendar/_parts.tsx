@@ -485,7 +485,7 @@ export function MonthView({ events, navDate }: { events: Decorated[]; navDate: D
                     <div key={d} className="px-2 py-2 text-center text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">{d}</div>
                 ))}
             </div>
-            <div className="scroll-pretty grid flex-1 grid-cols-7 overflow-y-auto" style={{ gridTemplateRows: `repeat(${rows}, minmax(94px, 1fr))` }}>
+            <div className="scroll-pretty grid flex-1 grid-cols-7 overflow-y-auto" style={{ gridTemplateRows: `repeat(${rows}, minmax(118px, 1fr))` }}>
                 {shown.map((d, i) => {
                     const inMonth = d.getMonth() === navDate.getMonth();
                     const isToday = sameDay(d, TODAY);
@@ -511,7 +511,7 @@ export function MonthView({ events, navDate }: { events: Decorated[]; navDate: D
                             onDragOver={onMove ? (e) => { e.preventDefault(); if (over !== i) setOver(i); } : undefined}
                             onDragLeave={onMove ? () => setOver((o) => (o === i ? null : o)) : undefined}
                             onDrop={onMove ? (e) => { e.preventDefault(); setOver(null); const ev = dragRef.current; dragRef.current = null; if (ev) onMove(ev, d); } : undefined}
-                            className={`group relative min-h-0 border-b border-r p-1 transition-colors last:border-r-0 ${cellBg} ${(i + 1) % 7 === 0 ? 'border-r-0' : ''}`}
+                            className={`group relative flex min-h-0 flex-col overflow-hidden border-b border-r p-1 transition-colors last:border-r-0 ${cellBg} ${(i + 1) % 7 === 0 ? 'border-r-0' : ''}`}
                         >
                             {isToday && <span className="pointer-events-none absolute inset-x-0 top-0 h-0.5 bg-primary" />}
                             <div className="mb-1 flex items-center justify-between px-0.5">
