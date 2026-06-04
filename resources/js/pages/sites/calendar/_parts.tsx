@@ -9,6 +9,7 @@ import {
     CalendarDays,
     CheckCircle2,
     CheckSquare,
+    ChevronLeft,
     ChevronRight,
     ClipboardCheck,
     ClipboardList,
@@ -104,6 +105,76 @@ export const MO = [
     'January', 'February', 'March', 'April', 'May', 'June',
     'July', 'August', 'September', 'October', 'November', 'December',
 ];
+
+/**
+ * Compact month grid for the "jump to date" picker in the banner/toolbar — lets the
+ * user navigate to any day directly instead of stepping period-by-period. Pure grid;
+ * the Popover wrapper lives in SiteCalendar (it owns periodLabel + the trigger style).
+ */
+export function MiniMonth({ selected, onSelect }: { selected: Date; onSelect: (d: Date) => void }) {
+    const [cursor, setCursor] = useState(() => startOfMonth(selected));
+    const today = new Date();
+    const gridStart = startOfWeek(startOfMonth(cursor));
+    const days = Array.from({ length: 42 }, (_, i) => addDays(gridStart, i));
+    const shiftMonth = (delta: number) => setCursor((c) => new Date(c.getFullYear(), c.getMonth() + delta, 1));
+
+    return (
+        <div className="w-60 p-1">
+            <div className="mb-1 flex items-center justify-between px-1">
+                <button
+                    type="button"
+                    onClick={() => shiftMonth(-1)}
+                    aria-label="Previous month"
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted"
+                >
+                    <ChevronLeft className="h-4 w-4" />
+                </button>
+                <span className="text-sm font-semibold">
+                    {MO[cursor.getMonth()]} {cursor.getFullYear()}
+                </span>
+                <button
+                    type="button"
+                    onClick={() => shiftMonth(1)}
+                    aria-label="Next month"
+                    className="inline-flex h-7 w-7 items-center justify-center rounded-md text-muted-foreground transition-colors hover:bg-muted"
+                >
+                    <ChevronRight className="h-4 w-4" />
+                </button>
+            </div>
+            <div className="grid grid-cols-7 gap-0.5 px-1 text-center text-[10px] font-medium uppercase text-muted-foreground">
+                {WD.map((d) => (
+                    <div key={d}>{d.slice(0, 2)}</div>
+                ))}
+            </div>
+            <div className="grid grid-cols-7 gap-0.5 p-1">
+                {days.map((d) => {
+                    const inMonth = d.getMonth() === cursor.getMonth();
+                    const isToday = sameDay(d, today);
+                    const isSelected = sameDay(d, selected);
+                    const tone = isSelected
+                        ? 'bg-primary font-semibold text-primary-foreground'
+                        : isToday
+                          ? 'font-semibold text-primary ring-1 ring-primary/40 hover:bg-muted'
+                          : inMonth
+                            ? 'text-foreground hover:bg-muted'
+                            : 'text-muted-foreground/40 hover:bg-muted';
+                    return (
+                        <button
+                            key={d.toISOString()}
+                            type="button"
+                            onClick={() => onSelect(d)}
+                            aria-current={isToday ? 'date' : undefined}
+                            aria-label={`${WD_FULL[d.getDay()]} ${d.getDate()} ${MO[d.getMonth()]} ${d.getFullYear()}`}
+                            className={`inline-flex h-8 items-center justify-center rounded-md text-xs transition-colors ${tone}`}
+                        >
+                            {d.getDate()}
+                        </button>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
 
 export function decorate(item: CalendarItem): Decorated {
     const start = parseDT(item.start) ?? new Date();
