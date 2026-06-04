@@ -80,6 +80,7 @@ import {
     SourceDot,
     StatusBadge,
     TimelineView,
+    TodayRail,
     WeekView,
     WD,
     addDays,
@@ -88,6 +89,7 @@ import {
     fmtTime,
     fmtTimeRange,
     MO,
+    sameDay,
     startOfMonth,
     startOfWeek,
     type Decorated,
@@ -210,6 +212,7 @@ export default function SiteCalendar({
     const [colorBy, setColorBy] = useState<ColorBy>('source');
     const [density, setDensity] = useState<Density>('comfortable');
     const [events, setEvents] = useState<Decorated[]>([]);
+    const [railEvents, setRailEvents] = useState<Decorated[]>([]);
     const [loading, setLoading] = useState(true);
     const [enabledSources, setEnabledSources] = useState<Set<string>>(() => new Set(sources.map((s) => s.key)));
     const [houseFilter, setHouseFilter] = useState<number | 'all'>('all');
@@ -256,6 +259,36 @@ export default function SiteCalendar({
         void fetchEvents();
     }, [fetchEvents]);
 
+    // Today-anchored window for the right-hand rail — independent of the browsed
+    // period, and reaching ~45 days back so overdue obligations surface.
+    const fetchRail = useCallback(async () => {
+        const start = addDays(new Date(), -45);
+        start.setHours(0, 0, 0, 0);
+        const end = addDays(new Date(), 30);
+        const params = new URLSearchParams({ start: start.toISOString(), end: end.toISOString() });
+        const url = scope === 'global' ? `/calendar/items?${params}` : `/sites/${site?.id}/calendar/events?${params}`;
+        try {
+            const res = await fetch(url, { headers: { Accept: 'application/json' } });
+            if (!res.ok) {
+                setRailEvents([]);
+                return;
+            }
+            const data = await res.json();
+            setRailEvents((data.events ?? []).map(decorate));
+        } catch {
+            setRailEvents([]);
+        }
+    }, [scope, site?.id]);
+
+    useEffect(() => {
+        void fetchRail();
+    }, [fetchRail]);
+
+    const refresh = useCallback(() => {
+        void fetchEvents();
+        void fetchRail();
+    }, [fetchEvents, fetchRail]);
+
     const visibleEvents = useMemo(
         () =>
             events.filter(
@@ -265,6 +298,26 @@ export default function SiteCalendar({
             ),
         [events, enabledSources, scope, houseFilter],
     );
+
+    const visibleRailEvents = useMemo(
+        () =>
+            railEvents.filter(
+                (e) =>
+                    enabledSources.has(e.source) &&
+                    (scope !== 'global' || houseFilter === 'all' || e.site?.id === houseFilter),
+            ),
+        [railEvents, enabledSources, scope, houseFilter],
+    );
+
+    const viewingToday = useMemo(() => {
+        const t = new Date();
+        if (view === 'day') return sameDay(navDate, t);
+        if (view === 'week') {
+            const ws = startOfWeek(navDate);
+            return t >= ws && t < addDays(ws, 7);
+        }
+        return navDate.getMonth() === t.getMonth() && navDate.getFullYear() === t.getFullYear();
+    }, [view, navDate]);
 
     // Hero stats — derived client-side from the events already in view. (Cross-range
     // accuracy for "To approve" / "Mine" would need backend count props; in-view is
@@ -323,10 +376,10 @@ export default function SiteCalendar({
             router.put(
                 `/sites/${ev.site.id}/calendar/events/${ev.seriesId ?? ev.id}`,
                 { start_at: toLocalInput(s), end_at: e ? toLocalInput(e) : null },
-                { preserveScroll: true, preserveState: true, onSuccess: () => void fetchEvents() },
+                { preserveScroll: true, preserveState: true, onSuccess: refresh },
             );
         },
-        [fetchEvents],
+        [refresh],
     );
 
     const openCreate = useCallback((s: CreateSeed | null = null) => {
@@ -486,7 +539,22 @@ export default function SiteCalendar({
                     </span>
                 )}
             </div>
-            {ViewBody}
+            <div className="flex gap-3">
+                <div className="min-w-0 flex-1">{ViewBody}</div>
+                {context === 'page' && (
+                    <TodayRail
+                        events={visibleRailEvents}
+                        today={new Date()}
+                        onSelect={(ev) => {
+                            hidePreview();
+                            setSelected(ev);
+                        }}
+                        onApprovals={() => setApprovalsOpen(true)}
+                        onJumpToday={() => setNavDate(new Date())}
+                        viewingToday={viewingToday}
+                    />
+                )}
+            </div>
             {loading && <p className="text-center text-sm text-muted-foreground">Loading…</p>}
         </div>
     );
@@ -729,7 +797,7 @@ export default function SiteCalendar({
                 }}
                 onChanged={() => {
                     setSelected(null);
-                    void fetchEvents();
+                    refresh();
                 }}
             />
             {(canCreate || canManage) && (
@@ -754,7 +822,7 @@ export default function SiteCalendar({
                         setCreateOpen(false);
                         setEditEvent(null);
                         setSeed(null);
-                        void fetchEvents();
+                        refresh();
                     }}
                 />
             )}
@@ -769,7 +837,7 @@ export default function SiteCalendar({
                         setApprovalsOpen(false);
                         setSelected(ev);
                     }}
-                    onChanged={() => void fetchEvents()}
+                    onChanged={refresh}
                 />
             )}
             {ctxMenu && canCreate && (

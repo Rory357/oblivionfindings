@@ -3,12 +3,16 @@
  * Ported from the prototype's cal-views.jsx; icons swapped for lucide-react and
  * shared UI state threaded via context to keep view signatures small.
  */
-import { createContext, useContext, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { Fragment, createContext, useContext, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import {
     AlertTriangle,
     CalendarDays,
+    CheckCircle2,
     CheckSquare,
+    ChevronRight,
+    ClipboardCheck,
     ClipboardList,
+    Clock,
     Dot,
     Hammer,
     KeyRound,
@@ -743,5 +747,238 @@ export function TimelineView({ events, navDate, sources }: { events: Decorated[]
                 })}
             </div>
         </div>
+    );
+}
+
+/* ---- today rail --------------------------------------------------------- */
+
+function srcLabel(key: string): string {
+    return key.charAt(0).toUpperCase() + key.slice(1);
+}
+
+function RailRow({ ev, onSelect, showDay = false }: { ev: Decorated; onSelect: (ev: Decorated) => void; showDay?: boolean }) {
+    return (
+        <button
+            onClick={() => onSelect(ev)}
+            className="flex w-full items-center gap-2.5 rounded-lg px-2 py-1.5 text-left transition-colors hover:bg-accent/40"
+        >
+            <span className="tnum w-16 shrink-0 text-[11.5px] font-medium text-muted-foreground">
+                {showDay ? `${WD[ev._start.getDay()]} ` : ''}
+                {ev.allDay ? 'All day' : fmtTime(ev._start)}
+            </span>
+            <span className="h-7 w-1 shrink-0 rounded-full" style={{ background: `var(--src-${ev.source})` }} />
+            <span className="min-w-0 flex-1">
+                <span className={`block truncate text-[12.5px] font-medium ${ev.status === 'overdue' ? 'text-status-critical' : 'text-foreground'}`}>{ev.title}</span>
+                <span className="block truncate text-[11px]" style={{ color: `var(--src-${ev.source})` }}>
+                    {ev.typeLabel || srcLabel(ev.source)}
+                </span>
+            </span>
+            {ev.owner && <Avatar person={ev.owner} size="h-6 w-6" />}
+        </button>
+    );
+}
+
+/**
+ * Right-hand context rail (xl+): today focus / happening-now-or-up-next, a
+ * "Needs attention" card (overdue + awaiting approval), and today's schedule
+ * with a live NOW marker plus an "Up next" (1–14 day) list. Driven by a
+ * today-anchored event window, independent of the browsed period.
+ */
+export function TodayRail({
+    events,
+    today,
+    onSelect,
+    onApprovals,
+    onJumpToday,
+    viewingToday,
+}: {
+    events: Decorated[];
+    today: Date;
+    onSelect: (ev: Decorated) => void;
+    onApprovals: () => void;
+    onJumpToday: () => void;
+    viewingToday: boolean;
+}) {
+    const now = today;
+    const dayStart = (d: Date) => {
+        const r = new Date(d);
+        r.setHours(0, 0, 0, 0);
+        return r;
+    };
+    const dayDiff = (d: Date) => Math.round((dayStart(d).getTime() - dayStart(now).getTime()) / 86_400_000);
+    const todayItems = events
+        .filter((e) => sameDay(e._start, now))
+        .sort((a, b) => (b.allDay ? 0 : 1) - (a.allDay ? 0 : 1) || a._start.getTime() - b._start.getTime());
+    const happening = todayItems.find((e) => !e.allDay && e._end && e._start <= now && e._end > now);
+    const nextToday = todayItems.find((e) => !e.allDay && e._start > now);
+    const focus = happening || nextToday;
+    const overdue = events.filter((e) => e.status === 'overdue').sort((a, b) => a._start.getTime() - b._start.getTime());
+    const pending = (() => {
+        const seen = new Set<string | number>();
+        return events
+            .filter((e) => e.group === 'manual' && e.approvalStatus === 'pending')
+            .filter((e) => {
+                const k = e.seriesId ?? e.id;
+                if (seen.has(k)) return false;
+                seen.add(k);
+                return true;
+            });
+    })();
+    const attention = overdue.length + pending.length;
+    const upcoming = events
+        .filter((e) => {
+            const dd = dayDiff(e._start);
+            return dd >= 1 && dd <= 14 && e.status !== 'completed' && e.status !== 'cancelled';
+        })
+        .sort((a, b) => a._start.getTime() - b._start.getTime())
+        .slice(0, 6);
+    const nowMin = now.getHours() * 60 + now.getMinutes();
+
+    return (
+        <aside className="hidden w-[330px] shrink-0 flex-col gap-3 xl:flex">
+            {/* Today header + focus */}
+            <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+                <div className="flex items-start justify-between gap-2 border-b bg-gradient-to-br from-primary/[0.07] to-transparent p-4">
+                    <div>
+                        <div className="text-[11px] font-semibold uppercase tracking-wider text-primary">{WD_FULL[now.getDay()]}</div>
+                        <div className="mt-0.5 flex items-baseline gap-2">
+                            <span className="tnum text-[34px] font-bold leading-none tracking-tight">{now.getDate()}</span>
+                            <span className="text-[15px] font-semibold text-muted-foreground">
+                                {MO[now.getMonth()]} {now.getFullYear()}
+                            </span>
+                        </div>
+                    </div>
+                    {!viewingToday && (
+                        <button
+                            onClick={onJumpToday}
+                            className="inline-flex items-center gap-1 rounded-md bg-primary/10 px-2 py-1 text-[11px] font-semibold text-primary transition-colors hover:bg-primary/15"
+                        >
+                            <CalendarDays className="h-3.5 w-3.5" /> Jump
+                        </button>
+                    )}
+                </div>
+                <div className="p-3">
+                    {focus ? (
+                        <button
+                            onClick={() => onSelect(focus)}
+                            className="flex w-full items-center gap-3 rounded-xl border p-3 text-left transition-all hover:shadow-md"
+                            style={{ borderColor: `var(--src-${focus.source}-ln)`, background: `var(--src-${focus.source}-bg)` }}
+                        >
+                            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-card" style={{ color: `var(--src-${focus.source})` }}>
+                                <SourceIcon k={focus.source} className="h-5 w-5" />
+                            </span>
+                            <span className="min-w-0 flex-1">
+                                <span className="flex items-center gap-1.5 text-[11px] font-semibold uppercase tracking-wide" style={{ color: `var(--src-${focus.source})` }}>
+                                    {happening ? (
+                                        <>
+                                            <span className="relative inline-flex h-1.5 w-1.5">
+                                                <span className="absolute inline-flex h-full w-full animate-ping rounded-full bg-current opacity-70" />
+                                                <span className="relative inline-flex h-1.5 w-1.5 rounded-full bg-current" />
+                                            </span>
+                                            Happening now
+                                        </>
+                                    ) : (
+                                        <>
+                                            <Clock className="h-3 w-3" /> Up next · {fmtTime(focus._start)}
+                                        </>
+                                    )}
+                                </span>
+                                <span className="mt-0.5 block truncate text-[13.5px] font-semibold text-foreground">{focus.title}</span>
+                                {focus.room && <span className="block truncate text-[11.5px] text-muted-foreground">{focus.room}</span>}
+                            </span>
+                        </button>
+                    ) : (
+                        <div className="flex items-center gap-2.5 rounded-xl border border-dashed p-3 text-[12.5px] text-muted-foreground">
+                            <CheckCircle2 className="h-4 w-4 text-status-success" /> No more entries scheduled today.
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            {/* Needs attention */}
+            {attention > 0 && (
+                <div className="overflow-hidden rounded-2xl border border-status-warning/30 bg-card shadow-sm">
+                    <div className="flex items-center gap-2 border-b border-status-warning/20 bg-status-warning-bg/50 px-4 py-2.5">
+                        <AlertTriangle className="h-4 w-4 text-status-warning" />
+                        <span className="text-[12px] font-semibold text-status-warning">Needs attention</span>
+                        <span className="tnum ml-auto rounded-full bg-status-warning px-1.5 py-0.5 text-[10px] font-bold text-white">{attention}</span>
+                    </div>
+                    <div className="divide-y">
+                        {overdue.slice(0, 3).map((e) => (
+                            <button
+                                key={`${e.id}-${e.start}`}
+                                onClick={() => onSelect(e)}
+                                className="flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-accent/40"
+                            >
+                                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-status-critical-bg text-status-critical">
+                                    <SourceIcon k={e.source} className="h-3.5 w-3.5" />
+                                </span>
+                                <span className="min-w-0 flex-1">
+                                    <span className="block truncate text-[12.5px] font-medium">{e.title}</span>
+                                    <span className="block text-[11px] font-medium text-status-critical">Overdue · {Math.abs(dayDiff(e._start))}d</span>
+                                </span>
+                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                            </button>
+                        ))}
+                        {pending.length > 0 && (
+                            <button onClick={onApprovals} className="flex w-full items-center gap-2.5 px-3 py-2 text-left transition-colors hover:bg-accent/40">
+                                <span className="flex h-7 w-7 shrink-0 items-center justify-center rounded-lg bg-status-warning-bg text-status-warning">
+                                    <ClipboardCheck className="h-3.5 w-3.5" />
+                                </span>
+                                <span className="min-w-0 flex-1">
+                                    <span className="block truncate text-[12.5px] font-medium">{pending.length} awaiting approval</span>
+                                    <span className="block text-[11px] text-muted-foreground">Review &amp; approve</span>
+                                </span>
+                                <ChevronRight className="h-4 w-4 text-muted-foreground" />
+                            </button>
+                        )}
+                    </div>
+                </div>
+            )}
+
+            {/* Today's schedule + up next */}
+            <div className="flex min-h-0 flex-1 flex-col overflow-hidden rounded-2xl border bg-card shadow-sm">
+                <div className="flex items-center justify-between border-b px-4 py-2.5">
+                    <span className="text-[12px] font-semibold">Today&apos;s schedule</span>
+                    <span className="tnum text-[11px] text-muted-foreground">
+                        {todayItems.length} {todayItems.length === 1 ? 'entry' : 'entries'}
+                    </span>
+                </div>
+                <div className="scroll-pretty min-h-0 flex-1 overflow-y-auto p-1.5">
+                    {todayItems.length === 0 && (
+                        <div className="flex flex-col items-center gap-2 px-3 py-8 text-center text-muted-foreground">
+                            <CalendarDays className="h-8 w-8 opacity-40" />
+                            <span className="text-[12.5px]">Nothing on today.</span>
+                        </div>
+                    )}
+                    {todayItems.map((e, i) => {
+                        const prev = todayItems[i - 1];
+                        const eMin = e._start.getHours() * 60 + e._start.getMinutes();
+                        const prevMin = prev ? prev._start.getHours() * 60 + prev._start.getMinutes() : 0;
+                        const showNow = !e.allDay && eMin > nowMin && (!prev || prev.allDay || prevMin <= nowMin);
+                        return (
+                            <Fragment key={`${e.id}-${e.start}`}>
+                                {showNow && (
+                                    <div className="my-0.5 flex items-center gap-1.5 px-2">
+                                        <span className="h-2 w-2 rounded-full bg-status-critical" />
+                                        <span className="text-[10px] font-bold uppercase tracking-wide text-status-critical">Now · {fmtTime(now)}</span>
+                                        <span className="h-px flex-1 bg-status-critical/40" />
+                                    </div>
+                                )}
+                                <RailRow ev={e} onSelect={onSelect} />
+                            </Fragment>
+                        );
+                    })}
+                    {upcoming.length > 0 && (
+                        <>
+                            <div className="mt-1 px-3 pb-1 pt-3 text-[10.5px] font-semibold uppercase tracking-wider text-muted-foreground">Up next</div>
+                            {upcoming.map((e) => (
+                                <RailRow key={`up-${e.id}-${e.start}`} ev={e} onSelect={onSelect} showDay />
+                            ))}
+                        </>
+                    )}
+                </div>
+            </div>
+        </aside>
     );
 }
