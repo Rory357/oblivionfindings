@@ -35,6 +35,7 @@ import {
     CalendarClock,
     Check,
     CheckCircle2,
+    ChevronDown,
     ChevronLeft,
     ChevronRight,
     ClipboardCheck,
@@ -44,7 +45,9 @@ import {
     Download,
     ExternalLink,
     Filter,
+    Home,
     Layers,
+    LayoutGrid,
     List,
     MapPin,
     MoreHorizontal,
@@ -54,6 +57,7 @@ import {
     Repeat,
     Rows3,
     Rss,
+    Search,
     Trash2,
     X,
 } from 'lucide-react';
@@ -624,24 +628,6 @@ export default function SiteCalendar({
             </PopoverTrigger>
             <PopoverContent align="end" className="w-72">
                 <div className="space-y-3">
-                    {scope === 'global' && sites.length > 0 && (
-                        <div>
-                            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">House</p>
-                            <select
-                                value={houseFilter === 'all' ? 'all' : String(houseFilter)}
-                                onChange={(e) => setHouseFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))}
-                                className="h-8 w-full rounded-md border border-input bg-background px-2 text-[13px]"
-                                aria-label="House"
-                            >
-                                <option value="all">All sites</option>
-                                {sites.map((s) => (
-                                    <option key={s.id} value={s.id}>
-                                        {s.name}
-                                    </option>
-                                ))}
-                            </select>
-                        </div>
-                    )}
                     <div>
                         <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Colour by</p>
                         <div className="grid grid-cols-3 gap-1">
@@ -769,17 +755,28 @@ export default function SiteCalendar({
     const attention = [overduePart, pendingPart].filter(Boolean).join(', ');
     const heroName = scope === 'global' ? 'Site Calendar' : (site?.name ?? 'Site Calendar');
     const heroDescription = `${thisMonthCount} dated ${thisMonthCount === 1 ? 'entry' : 'entries'} this period across ${scope === 'global' ? 'all sites' : heroName}${attention ? ` — ${attention} need attention.` : ' — all on track.'}`;
+    const todayLabel = new Date().toLocaleDateString('en-NZ', {
+        weekday: 'short',
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+    });
     const heroTitle = (
-        <span>
-            <span className="mb-2 flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-wider text-primary-foreground/80">
-                <span aria-hidden="true" className="relative inline-flex h-2 w-2">
-                    <span className="absolute inset-0 inline-flex h-full w-full animate-ping rounded-full bg-status-success/70" />
-                    <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success ring-2 ring-status-success/30" />
+        <div>
+            <div className="mb-2 flex flex-wrap items-center gap-2.5">
+                <span className="flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-wider text-primary-foreground/80">
+                    <span aria-hidden="true" className="relative inline-flex h-2 w-2">
+                        <span className="absolute inset-0 inline-flex h-full w-full animate-ping rounded-full bg-status-success/70" />
+                        <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success ring-2 ring-status-success/30" />
+                    </span>
+                    Live · synced just now
                 </span>
-                Live · synced just now
-            </span>
-            <span className="block">{heroName}</span>
-        </span>
+                <span className="inline-flex items-center gap-1.5 rounded-full bg-primary-foreground/20 px-2.5 py-1 text-[11px] font-semibold tnum">
+                    <CalendarDays className="h-3.5 w-3.5" /> Today · {todayLabel}
+                </span>
+            </div>
+            {sites.length > 0 ? <HouseSelector scope={scope} site={site} sites={sites} /> : <span className="block">{heroName}</span>}
+        </div>
     );
 
     const dialogs = (
@@ -906,6 +903,92 @@ export default function SiteCalendar({
             </PageLayout>
             {dialogs}
         </>
+    );
+}
+
+/* ---- house / site selector (hero title) --------------------------------- */
+
+function HouseSelector({ scope, site, sites }: { scope: 'global' | 'site'; site?: SiteLite; sites: SiteLite[] }) {
+    const [open, setOpen] = useState(false);
+    const [q, setQ] = useState('');
+    const currentId: number | 'all' = scope === 'site' && site ? site.id : 'all';
+    const currentLabel = scope === 'site' ? (site?.name ?? 'Site Calendar') : 'All sites';
+    const list = sites.filter((s) => `${s.name} ${s.type ?? ''}`.toLowerCase().includes(q.trim().toLowerCase()));
+    const go = (target: string) => {
+        setOpen(false);
+        router.visit(target);
+    };
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                <button
+                    type="button"
+                    className="group -mx-1.5 inline-flex items-center gap-2 rounded-lg px-1.5 py-0.5 text-left transition-colors hover:bg-primary-foreground/10"
+                >
+                    <span className="whitespace-nowrap">{currentLabel}</span>
+                    <span
+                        className={`flex h-6 w-6 shrink-0 items-center justify-center rounded-md bg-primary-foreground/15 transition-transform ${open ? 'rotate-180' : ''}`}
+                    >
+                        <ChevronDown className="h-4 w-4" />
+                    </span>
+                </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-[320px] p-0">
+                <div className="border-b p-2">
+                    <div className="relative">
+                        <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                        <input
+                            autoFocus
+                            value={q}
+                            onChange={(e) => setQ(e.target.value)}
+                            placeholder={`Search ${sites.length} sites…`}
+                            className="h-9 w-full rounded-md border bg-background pl-8 pr-2 text-[13px] outline-none focus:ring-2 focus:ring-ring"
+                        />
+                    </div>
+                </div>
+                <div className="max-h-[320px] overflow-y-auto p-1.5">
+                    <button
+                        type="button"
+                        onClick={() => go('/calendar')}
+                        className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors ${currentId === 'all' ? 'bg-primary/10' : 'hover:bg-accent/60'}`}
+                    >
+                        <span
+                            className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${currentId === 'all' ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
+                        >
+                            <LayoutGrid className="h-4 w-4" />
+                        </span>
+                        <span className="min-w-0 flex-1">
+                            <span className="block truncate text-[13.5px] font-semibold">All sites</span>
+                            <span className="block truncate text-[11.5px] text-muted-foreground">Every house &amp; location</span>
+                        </span>
+                        {currentId === 'all' && <Check className="h-4 w-4 text-primary" />}
+                    </button>
+                    {list.map((s) => {
+                        const active = s.id === currentId;
+                        return (
+                            <button
+                                key={s.id}
+                                type="button"
+                                onClick={() => go(`/sites/${s.id}/calendar`)}
+                                className={`flex w-full items-center gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors ${active ? 'bg-primary/10' : 'hover:bg-accent/60'}`}
+                            >
+                                <span
+                                    className={`flex h-9 w-9 shrink-0 items-center justify-center rounded-lg ${active ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground'}`}
+                                >
+                                    <Home className="h-4 w-4" />
+                                </span>
+                                <span className="min-w-0 flex-1">
+                                    <span className="block truncate text-[13.5px] font-semibold">{s.name}</span>
+                                    <span className="block truncate text-[11.5px] capitalize text-muted-foreground">{(s.type ?? '').replace(/_/g, ' ')}</span>
+                                </span>
+                                {active && <Check className="h-4 w-4 text-primary" />}
+                            </button>
+                        );
+                    })}
+                    {list.length === 0 && <div className="px-3 py-6 text-center text-[13px] text-muted-foreground">No sites match.</div>}
+                </div>
+            </PopoverContent>
+        </Popover>
     );
 }
 

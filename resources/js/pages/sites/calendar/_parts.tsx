@@ -3,7 +3,7 @@
  * Ported from the prototype's cal-views.jsx; icons swapped for lucide-react and
  * shared UI state threaded via context to keep view signatures small.
  */
-import { Fragment, createContext, useContext, useRef, useState, type CSSProperties, type ReactNode } from 'react';
+import { Fragment, createContext, useContext, useEffect, useRef, useState, type CSSProperties, type ReactNode } from 'react';
 import {
     AlertTriangle,
     CalendarDays,
@@ -240,11 +240,21 @@ function MiniChip({ ev, onDragStart }: { ev: Decorated; onDragStart?: (e: React.
     );
 }
 
-const GRID_START = 6;
-const GRID_END = 22;
+const GRID_START = 0;
+const GRID_END = 24;
 const HOUR_H = 54;
-const HOURS = Array.from({ length: GRID_END - GRID_START + 1 }, (_, i) => GRID_START + i);
+const HOURS = Array.from({ length: GRID_END - GRID_START }, (_, i) => GRID_START + i);
 const topFor = (min: number): number => ((min - GRID_START * 60) / 60) * HOUR_H;
+
+/** Scroll a time-grid to ~6am on mount / period change so the working day is in
+ *  view even though the grid now spans the full 24 hours (midnight → midnight). */
+function useGridAutoScroll(navDate: Date) {
+    const ref = useRef<HTMLDivElement | null>(null);
+    useEffect(() => {
+        if (ref.current) ref.current.scrollTop = topFor(6 * 60);
+    }, [navDate]);
+    return ref;
+}
 
 type Packed = Decorated & { _s: number; _e: number; _col: number; _cols: number };
 
@@ -522,6 +532,7 @@ export function MonthView({ events, navDate }: { events: Decorated[]; navDate: D
 
 export function WeekView({ events, navDate }: { events: Decorated[]; navDate: Date }) {
     const { onContext } = useCalUI();
+    const scrollRef = useGridAutoScroll(navDate);
     const TODAY = new Date();
     const ws = startOfWeek(navDate);
     const days = Array.from({ length: 7 }, (_, i) => addDays(ws, i));
@@ -546,7 +557,7 @@ export function WeekView({ events, navDate }: { events: Decorated[]; navDate: Da
                 })}
             </div>
             <AllDayRow days={days} events={events} />
-            <div data-view-scroll className="scroll-pretty relative flex-1 overflow-y-auto">
+            <div ref={scrollRef} data-view-scroll className="scroll-pretty relative flex-1 overflow-y-auto">
                 <div className="flex" style={{ height: HOURS.length * HOUR_H }}>
                     <div className="w-14 shrink-0">
                         {HOURS.map((h) => (
@@ -573,6 +584,7 @@ export function WeekView({ events, navDate }: { events: Decorated[]; navDate: Da
 
 export function DayView({ events, navDate }: { events: Decorated[]; navDate: Date }) {
     const { onContext } = useCalUI();
+    const scrollRef = useGridAutoScroll(navDate);
     const TODAY = new Date();
     const day = navDate;
     const dayEvents = events.filter((e) => sameDay(e._start, day));
@@ -596,7 +608,7 @@ export function DayView({ events, navDate }: { events: Decorated[]; navDate: Dat
                 </div>
             </div>
             <AllDayRow days={[day]} events={events} />
-            <div data-view-scroll className="scroll-pretty relative flex-1 overflow-y-auto">
+            <div ref={scrollRef} data-view-scroll className="scroll-pretty relative flex-1 overflow-y-auto">
                 <div className="flex" style={{ height: HOURS.length * HOUR_H }}>
                     <div className="w-14 shrink-0">
                         {HOURS.map((h) => (

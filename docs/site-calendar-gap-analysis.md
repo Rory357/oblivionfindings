@@ -22,8 +22,15 @@ prototype's hue-rotated preview default). One-line swap to `category="sites"` if
 | 5 | Approvals queue | approve/reject only inline per-event | `ApprovalsPanel` modal (bulk approve/reject) reachable from the hero overflow + "To approve" stat |
 | 6 | Colour-by / density / sources / house | bare toolbar selects | consolidated into the hero footer **Filter** popover (matches the screenshot's single Filter control); source legend chips kept below for quick toggling |
 | 7 | Profile-tab embed | toolbar lived in the page body | retains its own light toolbar (it has no hero footer); QuickAdd + hover work there too |
+| 8 | **Today rail** | absent (only a `NowLine` in Week/Day) | right-hand `xl:` aside: today focus (happening-now / up-next), a **Needs attention** card (overdue + awaiting approval → opens the approvals panel), and Today's schedule with a live **NOW** marker + an **Up next** 1–14 day list; driven by a today-anchored fetch (~45d back) independent of the browsed period |
 
 `npx tsc --noEmit` → **0 errors**; `npm run build` → **exit 0**.
+
+> **Note on live demo data:** the dev server (`oblivionfindings.com`) has sparse seed data
+> (meal obligations only; the `CalendarDemoSeeder` was never run, so no overdue/pending items).
+> The rail therefore renders its today/up-next schedule but the "Needs attention" card stays
+> hidden until there are overdue or awaiting-approval entries. The design screenshot's rich
+> "13 needs attention" reflects the prototype's mock dataset, not a code gap.
 
 ---
 
@@ -53,9 +60,9 @@ Priorities: **P1** = correctness/parity blockers · **P2** = important parity ·
 
 ### P2 — parity & higher-value features
 
-3. **Today rail** (xl-only aside): today focus / now·next, a **Needs-attention** card (overdue + awaiting
-   approval), and today's schedule + up-next. The single biggest "support worker opens a house at shift
-   start" surface; today only a `NowLine` exists in Week/Day. Today-anchored fetch (−45/+30 d).
+3. ~~**Today rail**~~ — ✅ **implemented this session** (see section A #8). Remaining rail polish: a
+   secondary today-anchored fetch already runs (−45/+30 d); a future enhancement is a "happening now"
+   auto-refresh tick so the NOW marker advances without a manual reload.
 
 4. **Create/Edit dialog is missing fields the system already stores/exports**: room, all-day toggle,
    attendees, **reminders** (VALARM is wired in `.ics` but unreachable), priority, and recurrence
