@@ -1469,10 +1469,10 @@ function CreateEventDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent style={{ maxWidth: 'min(92vw, 720px)' }}>
+            <DialogContent className="flex max-h-[90dvh] flex-col" style={{ maxWidth: 'min(92vw, 720px)' }}>
                 {open && (
                     <>
-                        <DialogHeader>
+                        <DialogHeader className="shrink-0">
                             <DialogTitle className="flex items-center gap-2">
                                 <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
                                     <CalendarPlus className="h-4 w-4" />
@@ -1484,7 +1484,8 @@ function CreateEventDialog({
                             </DialogDescription>
                         </DialogHeader>
 
-                        <form onSubmit={submit} className="space-y-4">
+                        <form onSubmit={submit} className="flex min-h-0 flex-1 flex-col">
+                            <div className="min-h-0 flex-1 space-y-4 overflow-y-auto px-0.5">
                             {/* Type tile picker — icon, label, hint + approval lock */}
                             <div>
                                 <Label className="mb-1.5 block">
@@ -1796,8 +1797,9 @@ function CreateEventDialog({
                                     {conflicts[0]?.room ? ` in ${conflicts[0].room}` : ''}.
                                 </p>
                             )}
+                            </div>
 
-                            <DialogFooter>
+                            <DialogFooter className="mt-4 shrink-0 border-t pt-4">
                                 <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>
                                     Cancel
                                 </Button>
