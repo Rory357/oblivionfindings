@@ -258,6 +258,23 @@ function useGridAutoScroll(navDate: Date) {
     return ref;
 }
 
+/** Width (px) the vertical scrollbar steals from a scroll container, so the
+ *  fixed day-header / all-day rows can reserve the same gutter and keep their
+ *  columns aligned with the scrolling time grid below. 0 with overlay scrollbars. */
+function useScrollbarWidth(ref: { current: HTMLDivElement | null }): number {
+    const [w, setW] = useState(0);
+    useEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        const measure = () => setW(el.offsetWidth - el.clientWidth);
+        measure();
+        const ro = new ResizeObserver(measure);
+        ro.observe(el);
+        return () => ro.disconnect();
+    }, [ref]);
+    return w;
+}
+
 type Packed = Decorated & { _s: number; _e: number; _col: number; _cols: number };
 
 function packDay(list: Decorated[]): Packed[] {
@@ -395,11 +412,11 @@ function TimeBlock({ ev, compact }: { ev: Packed; compact?: boolean }) {
     );
 }
 
-function AllDayRow({ days, events }: { days: Date[]; events: Decorated[] }) {
+function AllDayRow({ days, events, padRight = 0 }: { days: Date[]; events: Decorated[]; padRight?: number }) {
     const { colorBy, onSelect, onPreview, onPreviewEnd } = useCalUI();
     if (!events.some((e) => e.allDay)) return null;
     return (
-        <div className="flex border-b bg-muted/30">
+        <div className="flex border-b bg-muted/30" style={{ paddingRight: padRight }}>
             <div className="flex w-14 shrink-0 items-center justify-end pr-2 text-[10px] font-medium uppercase tracking-wide text-muted-foreground">All-day</div>
             <div className="grid flex-1" style={{ gridTemplateColumns: `repeat(${days.length}, minmax(0, 1fr))` }}>
                 {days.map((d, i) => (
@@ -546,6 +563,7 @@ export function MonthView({ events, navDate }: { events: Decorated[]; navDate: D
 export function WeekView({ events, navDate }: { events: Decorated[]; navDate: Date }) {
     const { onContext } = useCalUI();
     const scrollRef = useGridAutoScroll(navDate);
+    const sbw = useScrollbarWidth(scrollRef);
     const TODAY = new Date();
     const ws = startOfWeek(navDate);
     const days = Array.from({ length: 7 }, (_, i) => addDays(ws, i));
@@ -557,7 +575,7 @@ export function WeekView({ events, navDate }: { events: Decorated[]; navDate: Da
     };
     return (
         <div className="flex h-full flex-col overflow-hidden rounded-xl border bg-card">
-            <div className="flex border-b">
+            <div className="flex border-b" style={{ paddingRight: sbw }}>
                 <div className="w-14 shrink-0" />
                 {days.map((d, i) => {
                     const isToday = sameDay(d, TODAY);
@@ -569,7 +587,7 @@ export function WeekView({ events, navDate }: { events: Decorated[]; navDate: Da
                     );
                 })}
             </div>
-            <AllDayRow days={days} events={events} />
+            <AllDayRow days={days} events={events} padRight={sbw} />
             <div ref={scrollRef} data-view-scroll className="scroll-pretty relative flex-1 overflow-y-auto">
                 <div className="flex" style={{ height: HOURS.length * HOUR_H }}>
                     <div className="w-14 shrink-0">
@@ -598,6 +616,7 @@ export function WeekView({ events, navDate }: { events: Decorated[]; navDate: Da
 export function DayView({ events, navDate }: { events: Decorated[]; navDate: Date }) {
     const { onContext } = useCalUI();
     const scrollRef = useGridAutoScroll(navDate);
+    const sbw = useScrollbarWidth(scrollRef);
     const TODAY = new Date();
     const day = navDate;
     const dayEvents = events.filter((e) => sameDay(e._start, day));
@@ -620,7 +639,7 @@ export function DayView({ events, navDate }: { events: Decorated[]; navDate: Dat
                     <div className="text-xs text-muted-foreground">{dayEvents.length} {dayEvents.length === 1 ? 'entry' : 'entries'} scheduled</div>
                 </div>
             </div>
-            <AllDayRow days={[day]} events={events} />
+            <AllDayRow days={[day]} events={events} padRight={sbw} />
             <div ref={scrollRef} data-view-scroll className="scroll-pretty relative flex-1 overflow-y-auto">
                 <div className="flex" style={{ height: HOURS.length * HOUR_H }}>
                     <div className="w-14 shrink-0">
