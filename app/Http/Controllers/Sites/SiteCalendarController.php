@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Sites;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Sites\Concerns\ResolvesAllowedSiteTypes;
 use App\Jobs\SyncCalendarEventToResourcesJob;
+use App\Models\AppSetting;
 use App\Models\CalendarSyncMapping;
 use App\Models\Site;
 use App\Models\SiteCalendarEvent;
@@ -60,6 +61,7 @@ class SiteCalendarController extends Controller
             'canApprove' => ($user?->canDo('calendar.approve') ?? false)
                 && ($user?->can('update', $site) ?? false),
             'feedUrl' => $this->feedUrlFor($user),
+            'conflictPolicy' => $this->conflictPolicy(),
             // Authoritative cross-range hero counts for this house (the in-view
             // client derivation under-counts items outside the browsed window).
             ...$this->heroCounts([$site->id], $user?->id),
@@ -232,7 +234,11 @@ class SiteCalendarController extends Controller
             $siteIds = Site::active()->pluck('id')->all();
         }
 
-        $items = $this->aggregator->itemsForRange($siteIds, $start, $end);
+        // Never re-publish pulled external busy back out (would loop on two-way maps).
+        $items = array_values(array_filter(
+            $this->aggregator->itemsForRange($siteIds, $start, $end),
+            fn ($item) => $item->source !== 'external',
+        ));
 
         return response($this->icsFeedBuilder->build($items, 'Oblivion Findings — Site Calendar'), 200, [
             'Content-Type' => 'text/calendar; charset=utf-8',
@@ -259,6 +265,19 @@ class SiteCalendarController extends Controller
     }
 
     /**
+     * Admin "two-way" conflict policy (Settings → Calendar sync): whether pulled
+     * external busy blocks count as clashes in the create dialog. Defaults to
+     * counting them, matching {@see CalendarSyncSettingsController::DEFAULT_SETTINGS}.
+     */
+    private function conflictPolicy(): string
+    {
+        $stored = AppSetting::query()->where('key', 'sites.calendar_sync.settings')->value('value');
+        $policy = is_array($stored) ? ($stored['conflict_policy'] ?? null) : null;
+
+        return $policy === 'ignore' ? 'ignore' : 'external_busy_counts';
+    }
+
+    /**
      * Public per-house resource-calendar feed (token-authenticated, no session). The
      * mapped Google/Outlook resource calendar subscribes to this webcal URL to receive
      * the house's full schedule — manual events + obligations — honouring the mapping's
@@ -273,12 +292,16 @@ class SiteCalendarController extends Controller
         abort_unless($mapping, 404);
 
         $filters = ! empty($mapping->sources) ? ['sources' => $mapping->sources] : [];
-        $items = $this->aggregator->itemsForRange(
-            [$site->id],
-            now()->subMonth(),
-            now()->addMonths(3),
-            $filters,
-        );
+        $items = array_values(array_filter(
+            $this->aggregator->itemsForRange(
+                [$site->id],
+                now()->subMonth(),
+                now()->addMonths(3),
+                $filters,
+            ),
+            // Don't echo pulled external busy back to the resource calendar it came from.
+            fn ($item) => $item->source !== 'external',
+        ));
 
         return response($this->icsFeedBuilder->build($items, $site->name.' — Calendar'), 200, [
             'Content-Type' => 'text/calendar; charset=utf-8',
@@ -361,6 +384,7 @@ class SiteCalendarController extends Controller
             // owning site server-side (a user may approve on some sites but not all).
             'canApprove' => $user->canDo('calendar.approve'),
             'feedUrl' => $this->feedUrlFor($user),
+            'conflictPolicy' => $this->conflictPolicy(),
             // Authoritative cross-range hero counts across the resolved sites.
             ...$this->heroCounts($sites->pluck('id')->all(), $user->id),
             'filters' => [

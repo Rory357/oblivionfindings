@@ -76,7 +76,13 @@ export interface CalendarItem {
 }
 
 export type ColorBy = 'source' | 'status' | 'owner';
-export type RecurPreset = 'none' | 'DAILY' | 'WEEKLY' | 'FORTNIGHTLY' | 'MONTHLY' | 'QUARTERLY';
+export type RecurPreset =
+    | 'none'
+    | 'DAILY'
+    | 'WEEKLY'
+    | 'FORTNIGHTLY'
+    | 'MONTHLY'
+    | 'QUARTERLY';
 
 const pad = (n: number): string => String(n).padStart(2, '0');
 
@@ -87,7 +93,8 @@ export function parseDT(s: string | null | undefined): Date | null {
     return Number.isNaN(d.getTime()) ? null : d;
 }
 
-export const dateKey = (dt: Date): string => `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
+export const dateKey = (dt: Date): string =>
+    `${dt.getFullYear()}-${pad(dt.getMonth() + 1)}-${pad(dt.getDate())}`;
 
 /* ---- RRULE <-> preset --------------------------------------------------- */
 
@@ -117,11 +124,15 @@ export function presetToRule(key: RecurPreset): RecurrenceRule | null {
     }
 }
 
-export function ruleToPreset(rule: RecurrenceRule | null | undefined): RecurPreset {
+export function ruleToPreset(
+    rule: RecurrenceRule | null | undefined,
+): RecurPreset {
     if (!rule) return 'none';
     if (rule.freq === 'DAILY') return 'DAILY';
-    if (rule.freq === 'WEEKLY') return rule.interval === 2 ? 'FORTNIGHTLY' : 'WEEKLY';
-    if (rule.freq === 'MONTHLY') return rule.interval === 3 ? 'QUARTERLY' : 'MONTHLY';
+    if (rule.freq === 'WEEKLY')
+        return rule.interval === 2 ? 'FORTNIGHTLY' : 'WEEKLY';
+    if (rule.freq === 'MONTHLY')
+        return rule.interval === 3 ? 'QUARTERLY' : 'MONTHLY';
     return 'none';
 }
 
@@ -140,7 +151,9 @@ export function ruleToText(rule: RecurrenceRule | null | undefined): string {
     return s;
 }
 
-export function toRRULE(rule: RecurrenceRule | null | undefined): string | null {
+export function toRRULE(
+    rule: RecurrenceRule | null | undefined,
+): string | null {
     if (!rule) return null;
     let s = `FREQ=${rule.freq}`;
     if (rule.interval && rule.interval > 1) s += `;INTERVAL=${rule.interval}`;
@@ -161,21 +174,34 @@ export function overlaps(aS: Date, aE: Date, bS: Date, bE: Date): boolean {
 /**
  * Soft conflicts for a timed item: same-room clashes, plus vendor / room /
  * vehicle bookings that overlap in time. All-day and cancelled items never clash.
+ *
+ * When `externalBusyCounts` is set (the admin's `conflict_policy`), pulled external
+ * busy blocks (source `external`) that overlap in time also count — regardless of
+ * room — so a new entry warns against a clash on a two-way-synced resource calendar.
  */
-export function findConflicts(item: CalendarItem, all: CalendarItem[]): CalendarItem[] {
+export function findConflicts(
+    item: CalendarItem,
+    all: CalendarItem[],
+    opts: { externalBusyCounts?: boolean } = {},
+): CalendarItem[] {
     const s = parseDT(item.start);
     if (!s || item.allDay) return [];
     const e = parseDT(item.end) ?? new Date(s.getTime() + 30 * 60000);
 
     return all.filter((o) => {
-        if (o.id === item.id || (item.seriesId && o.seriesId === item.seriesId)) return false;
+        if (o.id === item.id || (item.seriesId && o.seriesId === item.seriesId))
+            return false;
         if (o.allDay || o.status === 'cancelled') return false;
         const os = parseDT(o.start);
         if (!os) return false;
         const oe = parseDT(o.end) ?? new Date(os.getTime() + 30 * 60000);
         const sameRoom = !!item.room && !!o.room && item.room === o.room;
         const bookingLike = item.source === 'vendor';
-        return overlaps(s, e, os, oe) && (sameRoom || bookingLike);
+        const externalBusy =
+            !!opts.externalBusyCounts && o.source === 'external';
+        return (
+            overlaps(s, e, os, oe) && (sameRoom || bookingLike || externalBusy)
+        );
     });
 }
 
@@ -222,18 +248,28 @@ export function itemToVEVENT(item: CalendarItem): string {
     if (rrule) lines.push(`RRULE:${rrule}`);
 
     lines.push(`SUMMARY:${escIcs(item.title)}`);
-    if (item.room) lines.push(`LOCATION:${escIcs(`${item.room} · ${siteName}`)}`);
+    if (item.room)
+        lines.push(`LOCATION:${escIcs(`${item.room} · ${siteName}`)}`);
     if (item.desc) lines.push(`DESCRIPTION:${escIcs(item.desc)}`);
 
     for (const m of item.reminders ?? []) {
-        lines.push('BEGIN:VALARM', 'ACTION:DISPLAY', 'DESCRIPTION:Reminder', `TRIGGER:-PT${m}M`, 'END:VALARM');
+        lines.push(
+            'BEGIN:VALARM',
+            'ACTION:DISPLAY',
+            'DESCRIPTION:Reminder',
+            `TRIGGER:-PT${m}M`,
+            'END:VALARM',
+        );
     }
 
     lines.push('END:VEVENT');
     return lines.join('\r\n');
 }
 
-export function buildICS(items: CalendarItem[], calName = 'Site Calendar'): string {
+export function buildICS(
+    items: CalendarItem[],
+    calName = 'Site Calendar',
+): string {
     return [
         'BEGIN:VCALENDAR',
         'VERSION:2.0',
@@ -246,8 +282,14 @@ export function buildICS(items: CalendarItem[], calName = 'Site Calendar'): stri
     ].join('\r\n');
 }
 
-export function downloadICS(items: CalendarItem[], filename = 'site-calendar.ics', calName?: string): void {
-    const blob = new Blob([buildICS(items, calName)], { type: 'text/calendar;charset=utf-8' });
+export function downloadICS(
+    items: CalendarItem[],
+    filename = 'site-calendar.ics',
+    calName?: string,
+): void {
+    const blob = new Blob([buildICS(items, calName)], {
+        type: 'text/calendar;charset=utf-8',
+    });
     const url = URL.createObjectURL(blob);
     const a = document.createElement('a');
     a.href = url;
@@ -309,7 +351,10 @@ const STATUS_TONE: Record<string, string> = {
 };
 
 /** CSS custom properties (--c label/dot, --cb chip fill, --cl chip border). */
-export function colorVars(item: CalendarItem, mode: ColorBy): React.CSSProperties {
+export function colorVars(
+    item: CalendarItem,
+    mode: ColorBy,
+): React.CSSProperties {
     if (mode === 'status') {
         const tone = STATUS_TONE[item.status] ?? 'neutral';
         const c = `var(--status-${tone})`;
