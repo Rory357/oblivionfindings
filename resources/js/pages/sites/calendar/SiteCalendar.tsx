@@ -60,6 +60,17 @@ import {
     Search,
     Trash2,
     X,
+    CalendarPlus,
+    DoorOpen,
+    FileText,
+    HardHat,
+    Leaf,
+    Lock,
+    Truck,
+    Users,
+    Wrench,
+    ZapOff,
+    type LucideIcon,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import {
@@ -171,6 +182,49 @@ const RECUR_PRESETS: RecurPreset[] = ['none', 'DAILY', 'WEEKLY', 'FORTNIGHTLY', 
 function toLocalInput(date: Date): string {
     const adjusted = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
     return adjusted.toISOString().slice(0, 16);
+}
+
+/* datetime-local string helpers for the split Date / Start / End fields. */
+const datePart = (dt: string): string => (dt || '').slice(0, 10);
+const timePart = (dt: string): string => (dt || '').slice(11, 16);
+const combine = (date: string, time: string): string => `${date}T${time || '00:00'}`;
+
+/** Maps the seeded event-type `icon` strings (config: sites.default_event_types)
+ *  to lucide components for the create-dialog type tiles. */
+const TYPE_ICONS: Record<string, LucideIcon> = {
+    calendar: CalendarDays,
+    'calendar-days': CalendarDays,
+    wrench: Wrench,
+    'map-pin': MapPin,
+    'clipboard-check': ClipboardCheck,
+    'hard-hat': HardHat,
+    leaf: Leaf,
+    'zap-off': ZapOff,
+    users: Users,
+    'door-open': DoorOpen,
+    truck: Truck,
+    'file-text': FileText,
+};
+
+/** Short descriptions for the known event-type keys (the backend doesn't send
+ *  these). Unknown keys simply render without a hint line. */
+const TYPE_HINTS: Record<string, string> = {
+    general: 'House meeting, activity, social',
+    maintenance: 'Planned upkeep — needs approval',
+    site_visit: 'Manager or external visit',
+    inspection: 'Fire, legionella, H&S walkaround',
+    contractor_visit: 'Booked trade / engineer',
+    cleaning_grounds: 'Deep clean, lawn, garden',
+    utilities_outage: 'Planned power / water outage',
+    training_meeting: 'Staff training or supervision',
+    room_booking: 'Reserve a communal space',
+    vehicle_booking: 'Reserve a site vehicle',
+    other: 'Custom entry',
+};
+
+function TypeIcon({ icon, className = 'h-4 w-4' }: { icon?: string | null; className?: string }) {
+    const C = (icon && TYPE_ICONS[icon]) || CalendarDays;
+    return <C className={className} />;
 }
 
 function viewRange(view: CalView, navDate: Date): { start: Date; end: Date } {
@@ -762,8 +816,8 @@ export default function SiteCalendar({
         year: 'numeric',
     });
     const heroTitle = (
-        <div>
-            <div className="mb-2 flex flex-wrap items-center gap-2.5">
+        <span className="block">
+            <span className="mb-2 flex flex-wrap items-center gap-2.5">
                 <span className="flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-wider text-primary-foreground/80">
                     <span aria-hidden="true" className="relative inline-flex h-2 w-2">
                         <span className="absolute inset-0 inline-flex h-full w-full animate-ping rounded-full bg-status-success/70" />
@@ -774,9 +828,9 @@ export default function SiteCalendar({
                 <span className="inline-flex items-center gap-1.5 rounded-full bg-primary-foreground/20 px-2.5 py-1 text-[11px] font-semibold tnum">
                     <CalendarDays className="h-3.5 w-3.5" /> Today · {todayLabel}
                 </span>
-            </div>
+            </span>
             {sites.length > 0 ? <HouseSelector scope={scope} site={site} sites={sites} /> : <span className="block">{heroName}</span>}
-        </div>
+        </span>
     );
 
     const dialogs = (
@@ -1265,17 +1319,22 @@ function CreateEventDialog({
                 {open && (
                     <>
                         <DialogHeader>
-                            <DialogTitle>{editEvent ? 'Edit event' : 'New calendar event'}</DialogTitle>
+                            <DialogTitle className="flex items-center gap-2">
+                                <span className="flex h-7 w-7 items-center justify-center rounded-lg bg-primary/10 text-primary">
+                                    <CalendarPlus className="h-4 w-4" />
+                                </span>
+                                {editEvent ? 'Edit calendar entry' : 'New calendar entry'}
+                            </DialogTitle>
                             <DialogDescription>
-                                {editEvent ? 'Update this calendar entry.' : 'Add a manual entry to the house calendar.'}
+                                {editEvent ? 'Update the details below.' : 'Pick an entry type, then fill in the details.'}
                             </DialogDescription>
                         </DialogHeader>
 
                         <form onSubmit={submit} className="space-y-4">
-                            {/* Type tile picker */}
+                            {/* Type tile picker — icon, label, hint + approval lock */}
                             <div>
                                 <Label className="mb-1.5 block">
-                                    Type <span className="text-status-critical">*</span>
+                                    Entry type <span className="text-status-critical">*</span>
                                 </Label>
                                 <div className="grid grid-cols-2 gap-2 sm:grid-cols-3">
                                     {eventTypes.map((t) => {
@@ -1285,11 +1344,19 @@ function CreateEventDialog({
                                                 type="button"
                                                 key={t.key}
                                                 onClick={() => form.setData('event_type', t.key)}
-                                                className={`flex items-center gap-2 rounded-lg border p-2.5 text-left text-[13px] transition-colors ${active ? 'border-primary bg-primary/10 ring-1 ring-primary' : 'hover:bg-accent/50'}`}
+                                                className={`group flex items-start gap-2 rounded-xl border bg-card/40 p-2.5 text-left transition-all hover:border-primary/50 hover:bg-card ${active ? 'border-primary bg-primary/10 ring-1 ring-primary/40' : 'border-border'}`}
                                                 aria-pressed={active}
                                             >
-                                                <span className="h-2.5 w-2.5 shrink-0 rounded-full" style={{ background: t.color }} />
-                                                <span className="truncate font-medium">{t.label}</span>
+                                                <span className="mt-0.5 shrink-0 rounded-lg p-1.5" style={{ background: `${t.color}1a`, color: t.color }}>
+                                                    <TypeIcon icon={t.icon} className="h-4 w-4" />
+                                                </span>
+                                                <span className="min-w-0">
+                                                    <span className="flex items-center gap-1 text-[13px] font-medium leading-tight">
+                                                        <span className="truncate">{t.label}</span>
+                                                        {t.requires_approval && <Lock className="h-2.5 w-2.5 shrink-0 text-muted-foreground" />}
+                                                    </span>
+                                                    {TYPE_HINTS[t.key] && <span className="mt-0.5 block truncate text-[11px] text-muted-foreground">{TYPE_HINTS[t.key]}</span>}
+                                                </span>
                                             </button>
                                         );
                                     })}
@@ -1298,9 +1365,20 @@ function CreateEventDialog({
 
                             {/* Locked site (site scope) / picker (global) */}
                             {scope === 'site' && site ? (
-                                <div className="rounded-lg border border-primary/30 bg-primary/5 p-2.5 text-[13px]">
-                                    <span className="text-muted-foreground">Site</span>{' '}
-                                    <span className="font-medium">{site.name}</span>
+                                <div className="flex items-start gap-3 rounded-xl border border-primary/40 bg-primary/10 p-3">
+                                    <span className="mt-0.5 shrink-0 rounded-lg bg-background/60 p-1.5">
+                                        <Home className="h-4 w-4 text-primary" />
+                                    </span>
+                                    <div className="min-w-0 flex-1">
+                                        <div className="flex flex-wrap items-center gap-2">
+                                            <span className="text-[13px] font-medium">{site.name}</span>
+                                            <span className="rounded-full border px-1.5 py-0.5 text-[10px] font-medium text-muted-foreground">From site</span>
+                                        </div>
+                                        <p className="mt-0.5 text-[11.5px] text-muted-foreground">
+                                            Locked to the calendar you opened.
+                                            {selectedType?.requires_approval && !editEvent ? ' This type is submitted for approval.' : ''}
+                                        </p>
+                                    </div>
                                 </div>
                             ) : (
                                 <div>
@@ -1340,19 +1418,49 @@ function CreateEventDialog({
                                 {form.errors.title && <p className="mt-1 text-sm text-status-critical">{form.errors.title}</p>}
                             </div>
 
+                            <div>
+                                <Label htmlFor="cal-date" className="mb-1.5 block">
+                                    Date <span className="text-status-critical">*</span>
+                                </Label>
+                                <Input
+                                    id="cal-date"
+                                    type="date"
+                                    value={datePart(form.data.start_at)}
+                                    onChange={(e) =>
+                                        form.setData({
+                                            ...form.data,
+                                            start_at: combine(e.target.value, timePart(form.data.start_at) || '09:00'),
+                                            end_at: form.data.end_at ? combine(e.target.value, timePart(form.data.end_at) || '10:00') : '',
+                                        })
+                                    }
+                                    required
+                                />
+                                {form.errors.start_at && <p className="mt-1 text-sm text-status-critical">{form.errors.start_at}</p>}
+                            </div>
+
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div>
                                     <Label htmlFor="cal-start" className="mb-1.5 block">
                                         Start <span className="text-status-critical">*</span>
                                     </Label>
-                                    <Input id="cal-start" type="datetime-local" value={form.data.start_at} onChange={(e) => form.setData('start_at', e.target.value)} required />
-                                    {form.errors.start_at && <p className="mt-1 text-sm text-status-critical">{form.errors.start_at}</p>}
+                                    <Input
+                                        id="cal-start"
+                                        type="time"
+                                        value={timePart(form.data.start_at)}
+                                        onChange={(e) => form.setData('start_at', combine(datePart(form.data.start_at), e.target.value))}
+                                        required
+                                    />
                                 </div>
                                 <div>
                                     <Label htmlFor="cal-end" className="mb-1.5 block">
                                         End
                                     </Label>
-                                    <Input id="cal-end" type="datetime-local" value={form.data.end_at} onChange={(e) => form.setData('end_at', e.target.value)} />
+                                    <Input
+                                        id="cal-end"
+                                        type="time"
+                                        value={form.data.end_at ? timePart(form.data.end_at) : ''}
+                                        onChange={(e) => form.setData('end_at', e.target.value ? combine(datePart(form.data.start_at), e.target.value) : '')}
+                                    />
                                     {form.errors.end_at && <p className="mt-1 text-sm text-status-critical">{form.errors.end_at}</p>}
                                 </div>
                             </div>
@@ -1400,7 +1508,13 @@ function CreateEventDialog({
                                     Cancel
                                 </Button>
                                 <Button type="submit" disabled={form.processing || !targetSite}>
-                                    {form.processing ? 'Saving…' : editEvent ? 'Save changes' : 'Create event'}
+                                    {form.processing
+                                        ? 'Saving…'
+                                        : editEvent
+                                          ? 'Save changes'
+                                          : selectedType?.requires_approval
+                                            ? 'Submit for approval'
+                                            : 'Create entry'}
                                 </Button>
                             </DialogFooter>
                         </form>

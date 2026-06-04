@@ -23,6 +23,8 @@ prototype's hue-rotated preview default). One-line swap to `category="sites"` if
 | 6 | Colour-by / density / sources / house | bare toolbar selects | consolidated into the hero footer **Filter** popover (matches the screenshot's single Filter control); source legend chips kept below for quick toggling |
 | 7 | Profile-tab embed | toolbar lived in the page body | retains its own light toolbar (it has no hero footer); QuickAdd + hover work there too |
 | 8 | **Today rail** | absent (only a `NowLine` in Week/Day) | right-hand `xl:` aside: today focus (happening-now / up-next), a **Needs attention** card (overdue + awaiting approval → opens the approvals panel), and Today's schedule with a live **NOW** marker + an **Up next** 1–14 day list; driven by a today-anchored fetch (~45d back) independent of the browsed period |
+| 9 | **Create dialog** | plain dot+label tiles, single datetime inputs | design-parity tiles (icon-in-tinted-square + label + hint + approval lock), header icon, richer "From site" locked card, split **Date / Start / End** fields, and a "Create entry / Submit for approval" button |
+| 10 | **Hero house selector** | static title, house filter buried in a popover | clickable searchable **house/site selector** as the hero title (`All sites` + every accessible house → navigates); **Today · {date}** pill restored; **Week/Day grids now span the full 24h** with auto-scroll to ~6am |
 
 `npx tsc --noEmit` → **0 errors**; `npm run build` → **exit 0**.
 
@@ -64,10 +66,15 @@ Priorities: **P1** = correctness/parity blockers · **P2** = important parity ·
    secondary today-anchored fetch already runs (−45/+30 d); a future enhancement is a "happening now"
    auto-refresh tick so the NOW marker advances without a manual reload.
 
-4. **Create/Edit dialog is missing fields the system already stores/exports**: room, all-day toggle,
-   attendees, **reminders** (VALARM is wired in `.ics` but unreachable), priority, and recurrence
-   **UNTIL/COUNT** (`recur.ts` supports them; the UI can't reach them). Mostly additive frontend +
-   `store()/update()` validation for `room`, `reminder_minutes[]`, `all_day`, `priority`, `attendee_user_ids`.
+4. **Create/Edit dialog** — ✅ visual polish done (design-parity tiles, header, locked-site card, split
+   Date/Start/End). Still missing **input fields** for things the backend is already wired for:
+   - **Owner** + **attendees** + **reminders** — `store()` already validates `owner_user_id`,
+     `attendee_user_ids[]`, `reminder_minutes[]`; they just need a **people-list prop** from the
+     controller (assignable site staff) + the pickers. Reminders are highest-value (the `.ics` VALARM
+     path is wired but unreachable). Deferred to avoid shipping a non-persisting Owner dropdown.
+   - **All-day** — needs an `all_day` column (not present today); skipped rather than faked.
+   - **Recurrence UNTIL/COUNT** — `recur.ts` supports them; the Repeats `<select>` can't reach them yet.
+   - **Room/location** — `room` is shown read-only in detail; add an input + `store()` validation.
 
 5. **Missing obligation providers (NZ supported-living value-adds):**
    - **Emergency / evacuation plan review dates** — `--src-emergency` palette exists but there is no
