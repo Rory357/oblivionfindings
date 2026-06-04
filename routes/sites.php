@@ -678,34 +678,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->name('checklists.index')
         ->middleware('permission:checklists.view');
 
-    // Checklist Templates (global management)
-    Route::get('/sites/checklists/templates', [SiteChecklistTemplateController::class, 'index'])
-        ->name('sites.checklists.templates.index')
-        ->middleware('permission:checklists.view');
-    Route::get('/sites/checklists/templates/create', [SiteChecklistTemplateController::class, 'create'])
-        ->name('sites.checklists.templates.create')
-        ->middleware('permission:checklists.manage_templates');
+    // Checklist Templates — created/edited/deleted from the in-page builder modal
+    // on /checklists (no standalone template pages; all return back()).
     Route::post('/sites/checklists/templates', [SiteChecklistTemplateController::class, 'store'])
         ->name('sites.checklists.templates.store')
-        ->middleware('permission:checklists.manage_templates');
-    Route::get('/sites/checklists/templates/{template}/edit', [SiteChecklistTemplateController::class, 'edit'])
-        ->name('sites.checklists.templates.edit')
         ->middleware('permission:checklists.manage_templates');
     Route::put('/sites/checklists/templates/{template}', [SiteChecklistTemplateController::class, 'update'])
         ->name('sites.checklists.templates.update')
         ->middleware('permission:checklists.manage_templates');
     Route::delete('/sites/checklists/templates/{template}', [SiteChecklistTemplateController::class, 'destroy'])
         ->name('sites.checklists.templates.destroy')
-        ->middleware('permission:checklists.manage_templates');
-
-    // Template Items
-    Route::post('/sites/checklists/templates/{template}/items', [SiteChecklistTemplateController::class, 'storeItem'])
-        ->name('sites.checklists.templates.items.store')
-        ->middleware('permission:checklists.manage_templates');
-    Route::put('/sites/checklists/templates/items/{item}', [SiteChecklistTemplateController::class, 'updateItem'])
-        ->name('sites.checklists.templates.items.update')
-        ->middleware('permission:checklists.manage_templates');
-    Route::delete('/sites/checklists/templates/items/{item}', [SiteChecklistTemplateController::class, 'destroyItem'])
-        ->name('sites.checklists.templates.items.destroy')
         ->middleware('permission:checklists.manage_templates');
 });

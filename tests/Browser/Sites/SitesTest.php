@@ -33,23 +33,15 @@ test('sites reports page loads', function () {
     });
 });
 
-test('sites checklists templates page loads', function () {
+test('checklists dashboard library loads', function () {
+    // Templates are now managed from the in-page builder on /checklists — the
+    // standalone /sites/checklists/templates pages were retired.
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
-            ->visit('/sites/checklists/templates')
-            ->waitForText('Template', 10)
-            ->assertSee('Template');
-    });
-});
-
-test('sites checklists templates create page loads', function () {
-    $this->browse(function (Browser $browser) {
-        $user = User::where('email', 'admin@test.com')->first();
-        $browser->loginAs($user)
-            ->visit('/sites/checklists/templates/create')
-            ->waitForText('Template', 10)
-            ->assertSee('Template');
+            ->visit('/checklists')
+            ->waitForText('Library', 10)
+            ->assertSee('Library');
     });
 });
 

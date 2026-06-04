@@ -5,6 +5,7 @@ namespace App\Models;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class SiteChecklistTemplateItem extends Model
 {
@@ -25,11 +26,17 @@ class SiteChecklistTemplateItem extends Model
     protected $casts = [
         'sort_order' => 'integer',
         'is_required' => 'boolean',
+        'failure_creates_hazard' => 'boolean',
         'response_config' => 'array',
     ];
 
     public function template(): BelongsTo
     {
         return $this->belongsTo(SiteChecklistTemplate::class, 'template_id');
+    }
+
+    public function responses(): HasMany
+    {
+        return $this->hasMany(SiteChecklistResponse::class, 'template_item_id');
     }
 }

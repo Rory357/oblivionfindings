@@ -1,4 +1,3 @@
-import { Link } from '@inertiajs/react';
 import {
     Building2,
     Camera,
@@ -46,14 +45,18 @@ function FlagChips({ t }: { t: ChecklistTemplate }) {
 }
 
 function TemplateActions({ t, templates }: { t: ChecklistTemplate; templates: ChecklistTemplate[] }) {
-    const { can } = useChecklistConfig();
+    const { can, openBuilder } = useChecklistConfig();
     return (
         <div className="flex items-center gap-1">
             {can.manageTemplates ? (
-                <Button asChild size="sm" variant="ghost" className="h-7 w-7 p-0" title="Edit template">
-                    <Link href={`/sites/checklists/templates/${t.id}/edit`}>
-                        <Pencil className="h-3.5 w-3.5" />
-                    </Link>
+                <Button
+                    size="sm"
+                    variant="ghost"
+                    className="h-7 w-7 p-0"
+                    title="Edit template"
+                    onClick={() => openBuilder(t.id)}
+                >
+                    <Pencil className="h-3.5 w-3.5" />
                 </Button>
             ) : null}
             <AssignChecklistButton templates={templates} templateId={t.id} label="Assign" variant="outline" />
@@ -193,6 +196,26 @@ export function LibraryPane({ ctx, onNewTemplate }: { ctx: PaneCtx; onNewTemplat
         </button>
     );
 
+    const knownKeys = new Set(cfg.categories.map((c) => c.key));
+    const uncategorised =
+        ctx.cat === 'all' ? templates.filter((t) => !t.category || !knownKeys.has(t.category)) : [];
+    const nothing = sections.length === 0 && uncategorised.length === 0;
+
+    const grid = (rows: ChecklistTemplate[]) =>
+        view === 'board' ? (
+            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
+                {rows.map((t) => (
+                    <TemplateCard key={t.id} t={t} templates={ctx.templates} />
+                ))}
+            </div>
+        ) : (
+            <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card shadow-sm">
+                {rows.map((t) => (
+                    <TemplateRow key={t.id} t={t} templates={ctx.templates} />
+                ))}
+            </div>
+        );
+
     return (
         <div className="space-y-5">
             <div className="flex flex-wrap items-center justify-between gap-3">
@@ -229,47 +252,57 @@ export function LibraryPane({ ctx, onNewTemplate }: { ctx: PaneCtx; onNewTemplat
                 )}
             </div>
 
-            {sections.length === 0 ? (
+            {nothing ? (
                 <div className="rounded-xl border border-border bg-card p-2 shadow-sm">
                     <Empty Icon={Sparkles} title="No templates match your filters." />
                 </div>
             ) : (
-                sections.map((c) => (
-                    <div key={c.key} className="space-y-3">
-                        <div
-                            className="flex items-center gap-3 rounded-xl border border-border p-3"
-                            style={{ background: catBgVar(c.tone) }}
-                        >
-                            <CategoryIcon category={c.key} box={40} size={20} />
-                            <div className="min-w-0 flex-1">
-                                <div className="flex items-center gap-2">
-                                    <h3 className="text-sm font-semibold" style={{ color: catColorVar(c.tone) }}>
-                                        {c.label}
-                                    </h3>
-                                    <span className="rounded-full bg-background/70 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-foreground">
-                                        {c.items.length} {c.items.length === 1 ? 'checklist' : 'checklists'}
-                                    </span>
+                <>
+                    {sections.map((c) => (
+                        <div key={c.key} className="space-y-3">
+                            <div
+                                className="flex items-center gap-3 rounded-xl border border-border p-3"
+                                style={{ background: catBgVar(c.tone) }}
+                            >
+                                <CategoryIcon category={c.key} box={40} size={20} />
+                                <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-sm font-semibold" style={{ color: catColorVar(c.tone) }}>
+                                            {c.label}
+                                        </h3>
+                                        <span className="rounded-full bg-background/70 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-foreground">
+                                            {c.items.length} {c.items.length === 1 ? 'checklist' : 'checklists'}
+                                        </span>
+                                    </div>
+                                    <p className="mt-0.5 text-xs" style={{ color: catColorVar(c.tone), opacity: 0.85 }}>
+                                        {c.blurb}
+                                    </p>
                                 </div>
-                                <p className="mt-0.5 text-xs" style={{ color: catColorVar(c.tone), opacity: 0.85 }}>
-                                    {c.blurb}
-                                </p>
                             </div>
+                            {grid(c.items)}
                         </div>
-                        {view === 'board' ? (
-                            <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-3">
-                                {c.items.map((t) => (
-                                    <TemplateCard key={t.id} t={t} templates={ctx.templates} />
-                                ))}
+                    ))}
+
+                    {uncategorised.length > 0 ? (
+                        <div className="space-y-3">
+                            <div className="flex items-center gap-3 rounded-xl border border-dashed border-border bg-muted/40 p-3">
+                                <CategoryIcon category={null} box={40} size={20} />
+                                <div className="min-w-0 flex-1">
+                                    <div className="flex items-center gap-2">
+                                        <h3 className="text-sm font-semibold text-muted-foreground">Uncategorised</h3>
+                                        <span className="rounded-full bg-background/70 px-2 py-0.5 text-[11px] font-semibold tabular-nums text-foreground">
+                                            {uncategorised.length} {uncategorised.length === 1 ? 'checklist' : 'checklists'}
+                                        </span>
+                                    </div>
+                                    <p className="mt-0.5 text-xs text-muted-foreground">
+                                        Edit a template and pick a category to file it under the right group.
+                                    </p>
+                                </div>
                             </div>
-                        ) : (
-                            <div className="divide-y divide-border overflow-hidden rounded-xl border border-border bg-card shadow-sm">
-                                {c.items.map((t) => (
-                                    <TemplateRow key={t.id} t={t} templates={ctx.templates} />
-                                ))}
-                            </div>
-                        )}
-                    </div>
-                ))
+                            {grid(uncategorised)}
+                        </div>
+                    ) : null}
+                </>
             )}
         </div>
     );

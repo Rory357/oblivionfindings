@@ -14,7 +14,7 @@ const authenticatedPages = [
     { name: 'governance-policies', path: '/governance/policies' },
     { name: 'health-clinical-events', path: '/health-clinical/events' },
     { name: 'incident-create', path: '/incidents/create' },
-    { name: 'sites-checklist-templates', path: '/sites/checklists/templates' },
+    { name: 'checklists', path: '/checklists' },
     { name: 'notifications', path: '/notifications' },
 ] as const;
 

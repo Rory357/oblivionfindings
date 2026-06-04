@@ -228,6 +228,7 @@ class ChecklistsDashboardData
             'reports' => $reports,
             'stats' => $stats,
             'runDetail' => $this->runDetail($site, $meta),
+            'templateDetail' => $this->templateDetail(),
             'can' => [
                 'view' => (bool) $user?->canDo('checklists.view'),
                 'manageTemplates' => (bool) $user?->canDo('checklists.manage_templates'),
@@ -391,6 +392,53 @@ class ChecklistsDashboardData
                 'notes' => $r->notes,
                 'photo_path' => $r->photo_path,
                 'is_failed' => (bool) $r->is_failed,
+            ])->all(),
+        ];
+    }
+
+    /**
+     * When the request carries ?template={id}, return that template's full
+     * detail (incl. items + evidence flags) so the builder modal can edit it
+     * without navigating to a separate page.
+     */
+    private function templateDetail(): ?array
+    {
+        $templateId = (int) $this->request->integer('template');
+        if ($templateId <= 0) {
+            return null;
+        }
+
+        $template = SiteChecklistTemplate::with(['items' => fn ($q) => $q->orderBy('sort_order')])
+            ->withCount('assignments')
+            ->find($templateId);
+
+        if (! $template) {
+            return null;
+        }
+
+        $settings = $template->settings ?? [];
+
+        return [
+            'id' => $template->id,
+            'key' => $template->key,
+            'name' => $template->name,
+            'description' => $template->description,
+            'category' => $template->category,
+            'applicable_to_type' => $template->applicable_to_type,
+            'frequency' => $template->frequency,
+            'is_active' => (bool) $template->is_active,
+            'requires_photo' => (bool) ($settings['requires_photo'] ?? false),
+            'requires_signature' => (bool) ($settings['requires_signature'] ?? false),
+            'assignments_count' => (int) $template->assignments_count,
+            'items' => $template->items->map(fn ($item) => [
+                'id' => $item->id,
+                'question' => $item->question,
+                'response_type' => $item->response_type,
+                'response_config' => $item->response_config,
+                'is_required' => (bool) $item->is_required,
+                'guidance' => $item->guidance,
+                'failure_creates_hazard' => (bool) $item->failure_creates_hazard,
+                'has_responses' => $item->responses()->exists(),
             ])->all(),
         ];
     }

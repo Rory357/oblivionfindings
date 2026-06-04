@@ -4,169 +4,179 @@ namespace App\Http\Controllers\Sites;
 
 use App\Http\Controllers\Controller;
 use App\Models\SiteChecklistTemplate;
-use App\Models\SiteChecklistTemplateItem;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Validation\Rule;
 
+/**
+ * Checklist templates are created/edited/deleted entirely from the in-page
+ * builder modal on /checklists (and the per-site Checklists tab) — there are no
+ * standalone template pages. Every action returns back() so the modal can close
+ * without navigating.
+ */
 class SiteChecklistTemplateController extends Controller
 {
-    public function index(Request $request)
-    {
-        $this->authorize('viewAny', SiteChecklistTemplate::class);
-
-        $templates = SiteChecklistTemplate::withCount('items')
-            ->when($request->type, fn($q) => $q->where('applicable_to_type', $request->type))
-            ->when($request->status === 'active', fn($q) => $q->active())
-            ->when($request->status === 'inactive', fn($q) => $q->where('is_active', false))
-            ->orderBy('name')
-            ->paginate(20);
-
-        return inertia('sites/checklists/templates/index', [
-            'templates' => $templates,
-            'filters' => $request->only(['type', 'status']),
-        ]);
-    }
-
-    public function create()
-    {
-        $this->authorize('create', SiteChecklistTemplate::class);
-
-        return inertia('sites/checklists/templates/create');
-    }
-
     public function store(Request $request)
     {
         $this->authorize('create', SiteChecklistTemplate::class);
 
-        $validated = $request->validate([
-            'key' => 'required|string|max:50|unique:site_checklist_templates,key',
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'applicable_to_type' => 'required|in:house,head_office,facility,all',
-            'frequency' => 'required|in:once,daily,weekly,fortnightly,monthly,quarterly',
-            'is_active' => 'boolean',
-        ]);
+        $validated = $this->validateTemplate($request, null);
 
-        $template = SiteChecklistTemplate::create($validated);
+        DB::transaction(function () use ($validated) {
+            $template = SiteChecklistTemplate::create([
+                'key' => $validated['key'],
+                'name' => $validated['name'],
+                'description' => $validated['description'] ?? null,
+                'category' => $validated['category'] ?? null,
+                'applicable_to_type' => $validated['applicable_to_type'],
+                'frequency' => $validated['frequency'],
+                'is_active' => $validated['is_active'] ?? true,
+                'settings' => $this->settingsPayload($validated),
+            ]);
 
-        return redirect()
-            ->route('sites.checklists.templates.edit', $template)
-            ->with('success', 'Checklist template created. Now add items.');
-    }
+            $this->persistItems($template, $validated['items'] ?? []);
+        });
 
-    public function edit(SiteChecklistTemplate $template)
-    {
-        $this->authorize('update', $template);
-
-        $template->load('items');
-
-        return inertia('sites/checklists/templates/edit', [
-            'template' => $template,
-        ]);
+        return redirect()->back()->with('success', 'Checklist template created.');
     }
 
     public function update(Request $request, SiteChecklistTemplate $template)
     {
         $this->authorize('update', $template);
 
-        $validated = $request->validate([
-            'name' => 'required|string|max:255',
-            'description' => 'nullable|string',
-            'applicable_to_type' => 'required|in:house,head_office,facility,all',
-            'frequency' => 'required|in:once,daily,weekly,fortnightly,monthly,quarterly',
-            'is_active' => 'boolean',
-        ]);
+        $validated = $this->validateTemplate($request, $template);
 
-        $template->update($validated);
+        DB::transaction(function () use ($template, $validated) {
+            $template->update([
+                'name' => $validated['name'],
+                'description' => $validated['description'] ?? null,
+                'category' => $validated['category'] ?? null,
+                'applicable_to_type' => $validated['applicable_to_type'],
+                'frequency' => $validated['frequency'],
+                'is_active' => $validated['is_active'] ?? true,
+                'settings' => $this->settingsPayload($validated),
+            ]);
 
-        return redirect()->back()->with('success', 'Template updated.');
+            $this->persistItems($template, $validated['items'] ?? []);
+        });
+
+        return redirect()->back()->with('success', 'Checklist template updated.');
     }
 
     public function destroy(SiteChecklistTemplate $template)
     {
         $this->authorize('delete', $template);
 
-        // Check if template has assignments
-        if ($template->assignments()->exists()) {
-            return redirect()->back()->with('error', 'Cannot delete template with active site assignments.');
+        if ($template->assignments()->where('is_active', true)->exists()) {
+            return redirect()->back()->with('error', 'Cannot delete a template with active site assignments. Remove the assignments first.');
         }
 
         $template->delete();
 
-        return redirect()
-            ->route('sites.checklists.templates.index')
-            ->with('success', 'Template deleted.');
+        return redirect()->back()->with('success', 'Checklist template deleted.');
     }
 
-    // Item management
-    public function storeItem(Request $request, SiteChecklistTemplate $template)
+    private function validateTemplate(Request $request, ?SiteChecklistTemplate $template): array
     {
-        $this->authorize('update', $template);
+        $categoryKeys = array_column(config('checklists.categories'), 'key');
 
-        $validated = $request->validate([
-            'question' => 'required|string',
-            'response_type' => 'required|in:yes_no,yes_no_na,pass_fail,numeric,text,photo',
-            'response_config' => 'nullable|array',
-            'is_required' => 'boolean',
-            'guidance' => 'nullable|string',
-            'failure_creates_hazard' => 'boolean',
+        $keyRule = $template
+            ? ['sometimes', 'string', 'max:50']
+            : ['required', 'string', 'max:50', 'regex:/^[a-z0-9_]+$/', 'unique:site_checklist_templates,key'];
+
+        return $request->validate([
+            'key' => $keyRule,
+            'name' => ['required', 'string', 'max:255'],
+            'description' => ['nullable', 'string'],
+            'category' => ['nullable', Rule::in($categoryKeys)],
+            'applicable_to_type' => ['required', 'in:house,head_office,facility,all'],
+            'frequency' => ['required', 'in:once,daily,weekly,fortnightly,monthly,quarterly,annual'],
+            'is_active' => ['boolean'],
+            'requires_photo' => ['boolean'],
+            'requires_signature' => ['boolean'],
+            'items' => ['array'],
+            'items.*.id' => ['nullable', 'integer'],
+            'items.*.question' => ['required', 'string', 'max:500'],
+            'items.*.response_type' => ['required', 'in:yes_no,yes_no_na,pass_fail,numeric,text,photo'],
+            'items.*.response_config' => ['nullable', 'array'],
+            'items.*.is_required' => ['boolean'],
+            'items.*.guidance' => ['nullable', 'string', 'max:1000'],
+            'items.*.failure_creates_hazard' => ['boolean'],
         ]);
-
-        $maxOrder = $template->items()->max('sort_order') ?? 0;
-
-        $template->items()->create([
-            ...$validated,
-            'sort_order' => $maxOrder + 1,
-        ]);
-
-        return redirect()->back()->with('success', 'Item added.');
     }
 
-    public function updateItem(Request $request, SiteChecklistTemplateItem $item)
+    private function settingsPayload(array $validated): array
     {
-        $this->authorize('update', $item->template);
-
-        $validated = $request->validate([
-            'question' => 'required|string',
-            'response_type' => 'required|in:yes_no,yes_no_na,pass_fail,numeric,text,photo',
-            'response_config' => 'nullable|array',
-            'is_required' => 'boolean',
-            'guidance' => 'nullable|string',
-            'failure_creates_hazard' => 'boolean',
-        ]);
-
-        $item->update($validated);
-
-        return redirect()->back()->with('success', 'Item updated.');
+        return [
+            'requires_photo' => (bool) ($validated['requires_photo'] ?? false),
+            'requires_signature' => (bool) ($validated['requires_signature'] ?? false),
+        ];
     }
 
-    public function destroyItem(SiteChecklistTemplateItem $item)
+    /**
+     * Sync the template's items to the submitted list: update existing rows,
+     * create new ones, and remove rows the editor dropped — but never delete an
+     * item that already has run responses (that would orphan completion data).
+     */
+    private function persistItems(SiteChecklistTemplate $template, array $items): void
     {
-        $this->authorize('update', $item->template);
+        $keep = [];
 
-        $item->delete();
+        foreach (array_values($items) as $index => $item) {
+            $payload = [
+                'tenant_id' => $template->tenant_id,
+                'sort_order' => $index,
+                'question' => $item['question'],
+                'response_type' => $item['response_type'],
+                'response_config' => $this->normaliseResponseConfig($item),
+                'is_required' => (bool) ($item['is_required'] ?? true),
+                'guidance' => $item['guidance'] ?? null,
+                'failure_creates_hazard' => (bool) ($item['failure_creates_hazard'] ?? false),
+            ];
 
-        // Reorder remaining items
-        $item->template->items()->orderBy('sort_order')->get()->each(function ($i, $idx) {
-            $i->update(['sort_order' => $idx + 1]);
-        });
+            $existing = ! empty($item['id'])
+                ? $template->items()->whereKey($item['id'])->first()
+                : null;
 
-        return redirect()->back()->with('success', 'Item removed.');
-    }
-
-    public function reorderItems(Request $request, SiteChecklistTemplate $template)
-    {
-        $this->authorize('update', $template);
-
-        $validated = $request->validate([
-            'items' => 'required|array',
-            'items.*.id' => 'required|exists:site_checklist_template_items,id',
-            'items.*.sort_order' => 'required|integer',
-        ]);
-
-        foreach ($validated['items'] as $item) {
-            $template->items()->where('id', $item['id'])->update(['sort_order' => $item['sort_order']]);
+            if ($existing) {
+                $existing->update($payload);
+                $keep[] = $existing->id;
+            } else {
+                $keep[] = $template->items()->create($payload)->id;
+            }
         }
 
-        return response()->json(['success' => true]);
+        $template->items()
+            ->whereNotIn('id', $keep ?: [0])
+            ->get()
+            ->each(function ($item) {
+                if (! $item->responses()->exists()) {
+                    $item->delete();
+                }
+            });
+    }
+
+    /**
+     * Keep only meaningful numeric config (min/max/unit); other types store null.
+     */
+    private function normaliseResponseConfig(array $item): ?array
+    {
+        if (($item['response_type'] ?? null) !== 'numeric') {
+            return null;
+        }
+
+        $cfg = $item['response_config'] ?? [];
+        $out = [];
+        if (isset($cfg['min']) && $cfg['min'] !== '' && $cfg['min'] !== null) {
+            $out['min'] = (float) $cfg['min'];
+        }
+        if (isset($cfg['max']) && $cfg['max'] !== '' && $cfg['max'] !== null) {
+            $out['max'] = (float) $cfg['max'];
+        }
+        if (! empty($cfg['unit'])) {
+            $out['unit'] = (string) $cfg['unit'];
+        }
+
+        return $out ?: null;
     }
 }

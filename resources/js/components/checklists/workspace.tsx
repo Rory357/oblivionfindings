@@ -1,4 +1,3 @@
-import { router } from '@inertiajs/react';
 import {
     BarChart3,
     CalendarDays,
@@ -23,6 +22,7 @@ import { ReportsPane } from './panes/reports';
 import { RunsPane } from './panes/runs';
 import { SchedulePane } from './panes/schedule';
 import { RunModal } from './run-modal';
+import { TemplateBuilderModal } from './template-builder';
 import type { ChecklistScope, ChecklistsData, SiteOverview } from './types';
 
 function mondayOf(today: string, offset: number): string {
@@ -60,6 +60,7 @@ export function ChecklistsWorkspace({ scope, data }: { scope: ChecklistScope; da
     const [query, setQuery] = useState('');
     const [cat, setCat] = useState('all');
     const [runId, setRunId] = useState<number | null>(null);
+    const [builderTarget, setBuilderTarget] = useState<number | 'new' | null>(null);
 
     const categoryMap = useMemo(
         () => Object.fromEntries(data.categories.map((c) => [c.key, c])),
@@ -136,6 +137,7 @@ export function ChecklistsWorkspace({ scope, data }: { scope: ChecklistScope; da
                 can: data.can,
                 scope,
                 openRun: setRunId,
+                openBuilder: setBuilderTarget,
             }}
         >
             <div className="space-y-5">
@@ -145,7 +147,7 @@ export function ChecklistsWorkspace({ scope, data }: { scope: ChecklistScope; da
                     templateCount={data.templates.length}
                     categoryCount={data.categories.length}
                     onStart={() => setTab('due')}
-                    onNewTemplate={() => router.visit('/sites/checklists/templates/create')}
+                    onNewTemplate={() => setBuilderTarget('new')}
                     footer={
                         <HeroFooter
                             week={week}
@@ -168,13 +170,16 @@ export function ChecklistsWorkspace({ scope, data }: { scope: ChecklistScope; da
                     {tab === 'due' ? <DueNowPane ctx={ctx} /> : null}
                     {tab === 'runs' ? <RunsPane ctx={ctx} /> : null}
                     {tab === 'schedule' ? <SchedulePane ctx={ctx} weekStart={weekStart} /> : null}
-                    {tab === 'library' ? <LibraryPane ctx={ctx} onNewTemplate={() => router.visit('/sites/checklists/templates/create')} /> : null}
+                    {tab === 'library' ? <LibraryPane ctx={ctx} onNewTemplate={() => setBuilderTarget('new')} /> : null}
                     {tab === 'assignments' ? <AssignmentsPane ctx={ctx} /> : null}
                     {tab === 'reports' ? <ReportsPane ctx={ctx} stats={data.stats} /> : null}
                 </div>
             </div>
 
             {runId != null ? <RunModal runId={runId} onClose={() => setRunId(null)} /> : null}
+            {builderTarget != null && data.can.manageTemplates ? (
+                <TemplateBuilderModal target={builderTarget} onClose={() => setBuilderTarget(null)} />
+            ) : null}
         </ChecklistConfigProvider>
     );
 }

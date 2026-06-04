@@ -98,6 +98,83 @@ class ChecklistsDashboardTest extends TestCase
                 ->has('runDetail.items', $template->items()->count()));
     }
 
+    public function test_admin_can_create_template_with_items_via_builder(): void
+    {
+        $key = 'builder_test_'.uniqid();
+        $payload = [
+            'key' => $key,
+            'name' => 'Builder Test Checklist',
+            'description' => 'Created via the in-page builder',
+            'category' => 'health_safety',
+            'applicable_to_type' => 'house',
+            'frequency' => 'weekly',
+            'is_active' => true,
+            'requires_photo' => true,
+            'requires_signature' => false,
+            'items' => [
+                ['question' => 'Alarms sound', 'response_type' => 'yes_no', 'is_required' => true, 'failure_creates_hazard' => true, 'response_config' => null, 'guidance' => null],
+                ['question' => 'Fridge temp', 'response_type' => 'numeric', 'is_required' => true, 'failure_creates_hazard' => true, 'response_config' => ['min' => 2, 'max' => 8, 'unit' => '°C'], 'guidance' => 'Record the reading'],
+            ],
+        ];
+
+        $this->actingAs($this->admin)->post('/sites/checklists/templates', $payload)->assertRedirect();
+
+        $template = SiteChecklistTemplate::where('key', $key)->firstOrFail();
+        $this->assertSame('health_safety', $template->category);
+        $this->assertTrue((bool) ($template->settings['requires_photo'] ?? false));
+        $this->assertSame(2, $template->items()->count());
+        $numeric = $template->items()->where('response_type', 'numeric')->firstOrFail();
+        $this->assertSame(8.0, (float) ($numeric->response_config['max'] ?? null));
+        $this->assertTrue($numeric->failure_creates_hazard);
+    }
+
+    public function test_admin_can_update_template_and_sync_items(): void
+    {
+        $template = SiteChecklistTemplate::where('key', 'quality_home_checklist')->firstOrFail();
+        $firstItem = $template->items()->orderBy('sort_order')->firstOrFail();
+
+        $this->actingAs($this->admin)->put('/sites/checklists/templates/'.$template->id, [
+            'name' => 'Renamed Quality Checklist',
+            'category' => 'property_facilities',
+            'applicable_to_type' => 'house',
+            'frequency' => 'monthly',
+            'is_active' => true,
+            'requires_photo' => true,
+            'requires_signature' => true,
+            'items' => [
+                ['id' => $firstItem->id, 'question' => 'Updated question', 'response_type' => $firstItem->response_type, 'is_required' => true, 'failure_creates_hazard' => false, 'response_config' => null, 'guidance' => null],
+                ['question' => 'A brand new item', 'response_type' => 'text', 'is_required' => false, 'failure_creates_hazard' => false, 'response_config' => null, 'guidance' => null],
+            ],
+        ])->assertRedirect();
+
+        $template->refresh();
+        $this->assertSame('Renamed Quality Checklist', $template->name);
+        $this->assertSame(2, $template->items()->count());
+        $this->assertDatabaseHas('site_checklist_template_items', ['id' => $firstItem->id, 'question' => 'Updated question']);
+    }
+
+    public function test_template_query_param_returns_template_detail(): void
+    {
+        $template = SiteChecklistTemplate::where('key', 'quality_home_checklist')->firstOrFail();
+
+        $this->actingAs($this->admin)
+            ->get('/checklists?template='.$template->id)
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->where('templateDetail.id', $template->id)
+                ->where('templateDetail.key', 'quality_home_checklist')
+                ->has('templateDetail.items', $template->items()->count()));
+    }
+
+    public function test_retired_template_pages_are_gone(): void
+    {
+        // The standalone template GET pages are retired — only the mutation
+        // endpoints (POST store, PUT/DELETE on {template}) remain on these URIs,
+        // so a GET is "method not allowed", never a rendered page.
+        $this->actingAs($this->admin)->get('/sites/checklists/templates')->assertStatus(405);
+        $this->actingAs($this->admin)->get('/sites/checklists/templates/create')->assertStatus(405);
+    }
+
     private function makeRun(Site $site, SiteChecklistTemplate $template): SiteChecklistRun
     {
         $assignment = SiteChecklistAssignment::create([

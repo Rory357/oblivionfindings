@@ -155,6 +155,32 @@ export interface RunDetail {
     responses: RunResponse[];
 }
 
+export interface TemplateDetailItem {
+    id?: number;
+    question: string;
+    response_type: ResponseType;
+    response_config: { min?: number; max?: number; unit?: string } | null;
+    is_required: boolean;
+    guidance?: string | null;
+    failure_creates_hazard: boolean;
+    has_responses?: boolean;
+}
+
+export interface TemplateDetail {
+    id: number;
+    key: string;
+    name: string;
+    description: string | null;
+    category: string | null;
+    applicable_to_type: 'house' | 'head_office' | 'facility' | 'all';
+    frequency: string;
+    is_active: boolean;
+    requires_photo: boolean;
+    requires_signature: boolean;
+    assignments_count: number;
+    items: TemplateDetailItem[];
+}
+
 export interface ChecklistCan {
     view: boolean;
     manageTemplates: boolean;
@@ -185,6 +211,7 @@ export interface ChecklistsData {
     reports: Reports;
     stats: ChecklistStats;
     runDetail: RunDetail | null;
+    templateDetail: TemplateDetail | null;
     can: ChecklistCan;
 }
 

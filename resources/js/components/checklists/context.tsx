@@ -37,6 +37,8 @@ export interface ChecklistConfig {
     scope: ChecklistScope;
     /** Open the run modal for a run id (drives a partial reload of runDetail). */
     openRun: (runId: number) => void;
+    /** Open the template builder modal — 'new' for create, or a template id to edit. */
+    openBuilder: (template: number | 'new') => void;
 }
 
 const ChecklistConfigContext = createContext<ChecklistConfig | null>(null);
