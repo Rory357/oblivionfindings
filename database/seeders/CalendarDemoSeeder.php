@@ -93,7 +93,10 @@ class CalendarDemoSeeder extends Seeder
         }
 
         $userId = 1;
-        $now = now();
+        // Author demo times in the business timezone, then store UTC so they
+        // render at the intended NZ wall-clock on the unified calendar.
+        $tz = config('app.worker_timezone', 'Pacific/Auckland');
+        $now = now($tz);
 
         $events = [
             ['event_type' => 'general', 'title' => 'Resident house meeting', 'day' => 1, 'h' => 16, 'dur' => 1, 'status' => 'approved', 'approval' => 'not_required'],
@@ -111,8 +114,8 @@ class CalendarDemoSeeder extends Seeder
                 'tenant_id' => $site->tenant_id,
                 'event_type' => $e['event_type'],
                 'title' => $e['title'],
-                'start_at' => $start,
-                'end_at' => $start->copy()->addHours($e['dur']),
+                'start_at' => $start->copy()->utc(),
+                'end_at' => $start->copy()->addHours($e['dur'])->utc(),
                 'recurrence_rule' => $e['rrule'] ?? null,
                 'created_by_user_id' => $userId,
                 'owner_user_id' => $userId,

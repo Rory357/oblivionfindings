@@ -90,21 +90,29 @@ test('a partial update reschedules without touching other fields', function () {
         ->assertRedirect();
 
     $event->refresh();
-    expect($event->start_at->format('Y-m-d H:i'))->toBe('2026-05-12 14:00');
-    expect($event->end_at->format('Y-m-d H:i'))->toBe('2026-05-12 15:00');
+    $tz = config('app.worker_timezone', 'Pacific/Auckland');
+    // The 14:00 entered is business-timezone wall-clock; it is stored as UTC.
+    expect($event->start_at->copy()->timezone($tz)->format('Y-m-d H:i'))->toBe('2026-05-12 14:00');
+    expect($event->end_at->copy()->timezone($tz)->format('Y-m-d H:i'))->toBe('2026-05-12 15:00');
+    expect($event->start_at->copy()->utc()->format('Y-m-d H:i'))->toBe('2026-05-12 02:00');
     expect($event->title)->toBe('House meeting');
 });
 
 test('a single-occurrence override moves only that occurrence', function () {
     $site = Site::factory()->create(['type' => 'house']);
+    $tz = config('app.worker_timezone', 'Pacific/Auckland');
 
+    // Seed the way the controller stores: business-tz wall-clock converted to UTC
+    // (->utc(), since Eloquent formats a Carbon in its own zone without converting).
+    // An afternoon NZ start keeps the stored UTC date on the same calendar day as
+    // the NZ date, so exception-date keying lines up.
     $event = SiteCalendarEvent::create([
         'site_id' => $site->id,
         'tenant_id' => $site->tenant_id,
         'event_type' => 'general',
         'title' => 'Weekly meeting',
-        'start_at' => Carbon::parse('2026-05-04 10:00'),
-        'end_at' => Carbon::parse('2026-05-04 11:00'),
+        'start_at' => Carbon::parse('2026-05-04 14:00', $tz)->utc(),
+        'end_at' => Carbon::parse('2026-05-04 15:00', $tz)->utc(),
         'recurrence_rule' => 'FREQ=WEEKLY',
         'created_by_user_id' => User::factory()->create()->id,
         'status' => 'approved',
@@ -116,8 +124,8 @@ test('a single-occurrence override moves only that occurrence', function () {
         'exception_date' => '2026-05-11',
         'is_cancelled' => false,
         'overridden_fields' => [
-            'start_at' => '2026-05-11T14:00:00',
-            'end_at' => '2026-05-11T15:00:00',
+            'start_at' => '2026-05-11T16:00:00',
+            'end_at' => '2026-05-11T17:00:00',
         ],
     ]);
 
@@ -128,10 +136,63 @@ test('a single-occurrence override moves only that occurrence', function () {
         Carbon::parse('2026-05-31'),
     );
 
-    $moved = collect($occurrences)->first(fn ($o) => str_starts_with((string) $o['start_at'], '2026-05-11T14:00'));
+    // The overridden occurrence reads back at its business-timezone 16:00.
+    $moved = collect($occurrences)->first(
+        fn ($o) => Carbon::parse($o['start_at'])->timezone($tz)->format('Y-m-d H:i') === '2026-05-11 16:00'
+    );
     expect($moved)->not->toBeNull();
 
-    // The un-overridden occurrences keep the series' 10:00 start.
-    $normal = collect($occurrences)->first(fn ($o) => str_starts_with((string) $o['start_at'], '2026-05-18T10:00'));
+    // The un-overridden occurrences keep the series' 14:00 NZ start.
+    $normal = collect($occurrences)->first(
+        fn ($o) => Carbon::parse($o['start_at'])->timezone($tz)->format('Y-m-d H:i') === '2026-05-18 14:00'
+    );
     expect($normal)->not->toBeNull();
+});
+
+test('creating then editing an event keeps its business-timezone time (no +12h drift)', function () {
+    $site = Site::factory()->create(['type' => 'house']);
+    $user = calendarManager($site);
+    $tz = config('app.worker_timezone', 'Pacific/Auckland');
+
+    // Create at 10:00–12:00 NZ (June is NZST, UTC+12).
+    $this->actingAs($user)
+        ->post("/sites/{$site->id}/calendar/events", [
+            'event_type' => 'general',
+            'title' => 'Morning handover',
+            'start_at' => '2026-06-05T10:00',
+            'end_at' => '2026-06-05T12:00',
+        ])
+        ->assertRedirect();
+
+    $event = SiteCalendarEvent::where('site_id', $site->id)->latest('id')->first();
+    expect($event)->not->toBeNull();
+    // Stored as the correct UTC instant, reads back as 10:00 NZ — not 10pm.
+    expect($event->start_at->copy()->timezone($tz)->format('Y-m-d H:i'))->toBe('2026-06-05 10:00');
+    expect($event->start_at->copy()->utc()->format('Y-m-d H:i'))->toBe('2026-06-04 22:00');
+
+    // The JSON feed the calendar renders from also reads 10:00 NZ.
+    $feed = $this->actingAs($user)
+        ->getJson("/sites/{$site->id}/calendar/events?start=2026-06-01T00:00:00Z&end=2026-06-30T00:00:00Z")
+        ->assertOk()
+        ->json('events');
+
+    $item = collect($feed)->firstWhere('title', 'Morning handover');
+    expect($item)->not->toBeNull();
+    expect(Carbon::parse($item['start'])->timezone($tz)->format('Y-m-d H:i'))->toBe('2026-06-05 10:00');
+
+    // Edit re-submits the pre-filled wall-clock (10:00 NZ) plus a new title —
+    // the stored instant must NOT move (the compounding-drift symptom).
+    $this->actingAs($user)
+        ->put("/sites/{$site->id}/calendar/events/{$event->id}", [
+            'event_type' => 'general',
+            'title' => 'Morning handover (updated)',
+            'start_at' => '2026-06-05T10:00',
+            'end_at' => '2026-06-05T12:00',
+        ])
+        ->assertRedirect();
+
+    $event->refresh();
+    expect($event->title)->toBe('Morning handover (updated)');
+    expect($event->start_at->copy()->timezone($tz)->format('Y-m-d H:i'))->toBe('2026-06-05 10:00');
+    expect($event->start_at->copy()->utc()->format('Y-m-d H:i'))->toBe('2026-06-04 22:00');
 });

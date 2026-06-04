@@ -130,6 +130,12 @@ const VIEWS: { key: CalView; label: string; icon: typeof CalendarDays }[] = [
 
 const RECUR_PRESETS: RecurPreset[] = ['none', 'DAILY', 'WEEKLY', 'FORTNIGHTLY', 'MONTHLY', 'QUARTERLY'];
 
+/**
+ * Format an instant as a `datetime-local` value (the viewer's local wall-clock,
+ * which for this NZ-only app is the business timezone). The backend stores true
+ * UTC and converts this wall-clock from the business timezone on write, so the
+ * create→read→edit round-trip stays drift-free — do not re-apply an offset here.
+ */
 function toLocalInput(date: Date): string {
     const adjusted = new Date(date.getTime() - date.getTimezoneOffset() * 60_000);
     return adjusted.toISOString().slice(0, 16);
