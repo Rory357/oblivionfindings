@@ -39,6 +39,8 @@ class SiteCalendarController extends Controller
                 'name' => $site->name,
                 'type' => $site->type,
             ],
+            // Full accessible-site list so the hero's house selector can switch houses.
+            'sites' => $this->resolveGlobalSites($request),
             'eventTypes' => $this->eventTypeOptions(),
             'sources' => CalendarSources::all(),
             'canCreate' => ($request->user()?->canDo('calendar.create') ?? false)
