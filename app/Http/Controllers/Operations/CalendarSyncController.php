@@ -79,9 +79,10 @@ class CalendarSyncController extends Controller
             ->where('user_id', $auth->id)
             ->findOrFail($sync);
 
+        // Only touch columns that actually exist on calendar_syncs — there is no
+        // `sync_status` column (writing it would error / be silently dropped).
         $sync->update([
             'last_synced_at' => now(),
-            'sync_status' => 'syncing',
         ]);
 
         // In a real implementation, this would dispatch a job

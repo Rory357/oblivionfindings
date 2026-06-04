@@ -2,6 +2,7 @@
 
 namespace App\Services\Sites\Calendar;
 
+use App\Models\CalendarSyncBusyBlock;
 use App\Models\CalendarSyncConnection;
 use App\Models\CalendarSyncEventLink;
 use App\Models\CalendarSyncMapping;
@@ -258,23 +259,130 @@ class CalendarSyncService
     }
 
     /**
-     * Pull external busy events for a two-way mapping. Currently fetches + counts
-     * (so the connection/permissions are exercised and logged); surfacing external
-     * busy as conflict blocks in the calendar UI is a tracked follow-up.
+     * Pull external busy events for a two-way mapping and persist them as
+     * {@see CalendarSyncBusyBlock}s (upsert by external id, prune anything that
+     * vanished from the source within the window), so the calendar can surface
+     * them as the read-only "external" source and the create dialog can count
+     * them as clashes. Returns the number of busy blocks pulled.
      */
     private function pullBusy(CalendarSyncMapping $mapping, CalendarSyncConnection $connection): int
     {
         $calendarId = (string) $mapping->external_calendar_id;
-        $from = now()->subWeek()->toIso8601String();
-        $to = now()->addMonths(3)->toIso8601String();
+        $fromC = now()->subWeek();
+        $toC = now()->addMonths(3);
+        $from = $fromC->toIso8601String();
+        $to = $toC->toIso8601String();
 
         if ($connection->provider === CalendarSyncConnection::PROVIDER_GOOGLE) {
             $events = (new GoogleCalendarService($connection))->getCalendarEvents($from, $to, $calendarId);
+            $blocks = array_map(fn (array $e) => $this->normaliseGoogleBusy($e), $events);
         } else {
             $events = (new MicrosoftGraphService($connection))->getRoomCalendarEvents($calendarId, $from, $to);
+            $blocks = array_map(fn (array $e) => $this->normaliseMicrosoftBusy($e), $events);
         }
 
-        return count($events);
+        $blocks = array_values(array_filter($blocks)); // drop cancelled / unparseable
+
+        $seen = [];
+        foreach ($blocks as $block) {
+            CalendarSyncBusyBlock::updateOrCreate(
+                [
+                    'site_id' => $mapping->site_id,
+                    'provider' => $mapping->provider,
+                    'external_event_id' => $block['external_event_id'],
+                ],
+                [
+                    'tenant_id' => $mapping->tenant_id,
+                    'title' => $block['title'],
+                    'starts_at' => $block['starts_at'],
+                    'ends_at' => $block['ends_at'],
+                    'all_day' => $block['all_day'],
+                    'is_busy' => $block['is_busy'],
+                    'synced_at' => now(),
+                ],
+            );
+            $seen[] = $block['external_event_id'];
+        }
+
+        // Prune blocks that disappeared from the source calendar within the window
+        // (when nothing came back at all, `$seen` is empty and the whole window clears).
+        CalendarSyncBusyBlock::query()
+            ->where('site_id', $mapping->site_id)
+            ->where('provider', $mapping->provider)
+            ->where('starts_at', '<', $toC)
+            ->where(function ($q) use ($fromC) {
+                $q->where('ends_at', '>', $fromC)->orWhereNull('ends_at');
+            })
+            ->when($seen !== [], fn ($q) => $q->whereNotIn('external_event_id', $seen))
+            ->delete();
+
+        return count($blocks);
+    }
+
+    /**
+     * Normalise a Google event into a busy-block row, or null for cancelled /
+     * unparseable entries.
+     *
+     * @param  array<string, mixed>  $event
+     * @return array{external_event_id:string,title:?string,starts_at:Carbon,ends_at:?Carbon,all_day:bool,is_busy:bool}|null
+     */
+    private function normaliseGoogleBusy(array $event): ?array
+    {
+        if (($event['status'] ?? '') === 'cancelled') {
+            return null;
+        }
+        $id = (string) ($event['id'] ?? '');
+        $startRaw = $event['start']['dateTime'] ?? $event['start']['date'] ?? null;
+        if ($id === '' || ! $startRaw) {
+            return null;
+        }
+
+        $allDay = isset($event['start']['date']);
+        $endRaw = $event['end']['dateTime'] ?? $event['end']['date'] ?? null;
+        $start = Carbon::parse($startRaw)->utc();
+        $end = $endRaw ? Carbon::parse($endRaw)->utc() : null;
+        // Google all-day end.date is exclusive → step back to the last inclusive instant.
+        if ($allDay && $end) {
+            $end = $end->copy()->subSecond();
+        }
+
+        return [
+            'external_event_id' => $id,
+            'title' => $event['summary'] ?? null,
+            'starts_at' => $start,
+            'ends_at' => $end,
+            'all_day' => $allDay,
+            'is_busy' => (string) ($event['transparency'] ?? 'opaque') !== 'transparent',
+        ];
+    }
+
+    /**
+     * Normalise a Microsoft Graph event into a busy-block row, or null when
+     * unparseable.
+     *
+     * @param  array<string, mixed>  $event
+     * @return array{external_event_id:string,title:?string,starts_at:Carbon,ends_at:?Carbon,all_day:bool,is_busy:bool}|null
+     */
+    private function normaliseMicrosoftBusy(array $event): ?array
+    {
+        $id = (string) ($event['id'] ?? '');
+        $startRaw = $event['start']['dateTime'] ?? null;
+        if ($id === '' || ! $startRaw) {
+            return null;
+        }
+
+        $endRaw = $event['end']['dateTime'] ?? null;
+        $start = Carbon::parse($startRaw, $event['start']['timeZone'] ?? 'UTC')->utc();
+        $end = $endRaw ? Carbon::parse($endRaw, $event['end']['timeZone'] ?? 'UTC')->utc() : null;
+
+        return [
+            'external_event_id' => $id,
+            'title' => $event['subject'] ?? null,
+            'starts_at' => $start,
+            'ends_at' => $end,
+            'all_day' => (bool) ($event['isAllDay'] ?? false),
+            'is_busy' => (string) ($event['showAs'] ?? 'busy') !== 'free',
+        ];
     }
 
     /**

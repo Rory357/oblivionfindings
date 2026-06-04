@@ -84,7 +84,7 @@ class CalendarSyncSettingsController extends Controller
         return Inertia::render('settings/calendar-sync', [
             'providers' => $providers,
             'sites' => $sites,
-            'sources' => CalendarSources::all(),
+            'sources' => CalendarSources::pushable(),
             'directions' => [
                 ['key' => CalendarSyncMapping::DIRECTION_ONE_WAY, 'label' => 'One-way (push out)'],
                 ['key' => CalendarSyncMapping::DIRECTION_TWO_WAY, 'label' => 'Two-way (push + pull busy)'],
@@ -108,7 +108,7 @@ class CalendarSyncSettingsController extends Controller
             'external_calendar_name' => ['nullable', 'string', 'max:255'],
             'sync_direction' => ['nullable', 'in:one_way,two_way'],
             'sources' => ['nullable', 'array'],
-            'sources.*' => ['string', 'in:'.implode(',', CalendarSources::keys())],
+            'sources.*' => ['string', 'in:'.implode(',', array_column(CalendarSources::pushable(), 'key'))],
             'is_active' => ['nullable', 'boolean'],
         ]);
 

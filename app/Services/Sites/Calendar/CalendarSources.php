@@ -29,7 +29,19 @@ class CalendarSources
             ['key' => 'meal',       'label' => 'Meal plan',         'short' => 'Meal',       'group' => 'auto',   'icon' => 'Utensils',      'origin' => 'Meal planner'],
             ['key' => 'damage',     'label' => 'Damage follow-up',  'short' => 'Damage',     'group' => 'auto',   'icon' => 'Hammer',        'origin' => 'Damages'],
             ['key' => 'emergency',  'label' => 'Emergency plan',    'short' => 'Emergency',  'group' => 'auto',   'icon' => 'Siren',         'origin' => 'Emergency plans'],
+            ['key' => 'external',   'label' => 'External busy',     'short' => 'External',   'group' => 'external', 'icon' => 'Lock',        'origin' => 'External calendar'],
         ];
+    }
+
+    /**
+     * Sources that can be chosen as a mapping's *push* filter (everything except the
+     * pull-only "external" busy layer).
+     *
+     * @return array<int, array{key:string,label:string,short:string,group:string,icon:string,origin:string}>
+     */
+    public static function pushable(): array
+    {
+        return array_values(array_filter(self::all(), fn (array $s) => $s['group'] !== 'external'));
     }
 
     /**

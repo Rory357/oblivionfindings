@@ -2,6 +2,7 @@
 
 namespace App\Services\Sites\Calendar;
 
+use App\Models\CalendarSyncBusyBlock;
 use App\Services\Sites\Calendar\Contracts\CalendarObligationProvider;
 use App\Services\Sites\Calendar\Providers\AssetMaintenanceObligationProvider;
 use App\Services\Sites\Calendar\Providers\ChecklistObligationProvider;
@@ -108,7 +109,55 @@ class SiteCalendarAggregator
             }
         }
 
+        // External busy blocks pulled from two-way mapped resource calendars (Part D).
+        if ($this->sourceEnabled('external', $sources)) {
+            foreach ($this->externalBusy($siteIds, $start, $end) as $item) {
+                $items[] = $item;
+            }
+        }
+
         return $items;
+    }
+
+    /**
+     * Read-only "external" busy blocks overlapping the range, normalised to
+     * {@see CalendarItem}s. Pulled from resource calendars by the two-way sync.
+     *
+     * @param  int[]  $siteIds
+     * @return CalendarItem[]
+     */
+    private function externalBusy(array $siteIds, Carbon $start, Carbon $end): array
+    {
+        $blocks = CalendarSyncBusyBlock::query()
+            ->with('site:id,name,type')
+            ->whereIn('site_id', $siteIds)
+            ->where('is_busy', true)
+            ->where('starts_at', '<', $end)
+            ->where(function ($q) use ($start) {
+                $q->where('ends_at', '>', $start)
+                    ->orWhere(function ($q2) use ($start) {
+                        $q2->whereNull('ends_at')->where('starts_at', '>=', $start);
+                    });
+            })
+            ->orderBy('starts_at')
+            ->get();
+
+        return $blocks->map(function (CalendarSyncBusyBlock $block) {
+            $site = $block->site;
+
+            return new CalendarItem(
+                id: 'external-'.$block->id,
+                source: 'external',
+                group: 'auto',
+                title: $block->title ?: 'Busy',
+                start: optional($block->starts_at)->toIso8601String(),
+                end: optional($block->ends_at)->toIso8601String(),
+                allDay: (bool) $block->all_day,
+                status: 'scheduled',
+                site: $site ? ['id' => $site->id, 'name' => $site->name, 'type' => $site->type] : null,
+                editable: false,
+            );
+        })->all();
     }
 
     /**
