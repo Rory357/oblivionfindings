@@ -59,81 +59,24 @@ test('site show page exposes credentials array with safe fields', function () {
         );
 });
 
-test('dedicated credentials page exposes the shared dialog safe fields', function () {
-    $vendor = \App\Models\SiteVendor::create([
-        'site_id' => $this->site->id,
-        'tenant_id' => $this->site->tenant_id,
-        'service_type' => 'electrician',
-        'company_name' => 'Hamilton Electrical Ltd',
-        'preferred_contact_method' => 'phone',
-        'is_active' => true,
-    ]);
-
-    SiteCredential::create([
-        'site_id' => $this->site->id,
-        'tenant_id' => $this->site->tenant_id,
-        'vendor_id' => $vendor->id,
-        'label' => 'Browser TOTP Test',
-        'username' => 'admin@example.test',
-        'url' => 'https://admin.example.test',
-        'credential_type' => 'password',
-        'encrypted_value' => \Illuminate\Support\Facades\Crypt::encryptString('secret-value'),
-        'requires_reauth' => true,
-        'is_shareable' => true,
-        'password_strength' => 4,
-        'totp_secret_encrypted' => \Illuminate\Support\Facades\Crypt::encryptString('JBSWY3DPEHPK3PXP'),
-        'last_rotated_at' => now(),
-    ]);
-
+test('retired per-site credentials page redirects to the unified vendors view', function () {
     $this->actingAs($this->admin)
         ->get("/sites/{$this->site->id}/credentials")
-        ->assertOk()
-        ->assertInertia(fn ($page) => $page
-            ->component('sites/credentials/index')
-            ->has('credentials', 1)
-            ->where('credentials.0.label', 'Browser TOTP Test')
-            ->where('credentials.0.username', 'admin@example.test')
-            ->where('credentials.0.url', 'https://admin.example.test')
-            ->where('credentials.0.vendor_id', $vendor->id)
-            ->where('credentials.0.vendor_name', 'Hamilton Electrical Ltd')
-            ->where('credentials.0.requires_reauth', true)
-            ->where('credentials.0.is_shareable', true)
-            ->where('credentials.0.password_strength', 4)
-            ->where('credentials.0.has_totp', true)
-            ->where('credentials.0.value_preview', '********')
-            ->missing('credentials.0.encrypted_value')
-            ->missing('credentials.0.totp_secret_encrypted')
-            ->missing('credentials.0.iv')
-        );
+        ->assertRedirect("/vendors?site_id={$this->site->id}&tab=credentials");
 });
 
-test('dedicated vendors page exposes manage permission flag for shared dialogs', function () {
-    \App\Models\SiteVendor::create([
-        'site_id' => $this->site->id,
-        'tenant_id' => $this->site->tenant_id,
-        'service_type' => 'electrician',
-        'company_name' => 'Hamilton Electrical Ltd',
-        'preferred_contact_method' => 'phone',
-        'is_active' => true,
-    ]);
-
+test('retired per-site vendors page redirects to the unified vendors view', function () {
     $teamLead = User::factory()->create(['role' => 'team_lead', 'approved_at' => now()]);
     $teamLead->roles()->syncWithoutDetaching([
         Role::query()->where('name', 'team_lead')->firstOrFail()->id,
     ]);
 
+    // A vendors.view-level user is still funnelled to the new page (not 403'd).
     expect($teamLead->canDo('vendors.view'))->toBeTrue();
-    expect($teamLead->canDo('vendors.manage'))->toBeFalse();
 
     $this->actingAs($teamLead)
         ->get("/sites/{$this->site->id}/vendors")
-        ->assertOk()
-        ->assertInertia(fn ($page) => $page
-            ->component('sites/vendors/index')
-            ->has('vendors', 1)
-            ->where('vendors.0.company_name', 'Hamilton Electrical Ltd')
-            ->where('canManage', false)
-        );
+        ->assertRedirect("/vendors?site_id={$this->site->id}&tab=vendors");
 });
 
 test('credential store accepts new fields, encrypts password, and writes a create audit row', function () {

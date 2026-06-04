@@ -103,6 +103,7 @@ type Props = {
         preferred?: 'yes';
         credential_type?: string;
         requires_reauth?: 'yes' | 'no';
+        tab?: 'vendors' | 'credentials';
     };
     can: {
         vendors: boolean;
@@ -169,9 +170,14 @@ export default function GlobalVendorsCredentials({
     const page = usePage<{ auth?: { user?: { name?: string } } }>();
     const firstName = firstNameFromPage(page.props.auth?.user?.name);
 
-    const [tab, setTab] = useState<'vendors' | 'credentials'>(
-        can.vendors ? 'vendors' : 'credentials',
-    );
+    const [tab, setTab] = useState<'vendors' | 'credentials'>(() => {
+        // Deep-links (e.g. the Site Calendar credential/vendor reminders) can
+        // request a starting tab via ?tab=; honour it only when the viewer can
+        // actually see that tab, otherwise fall back to the permission default.
+        if (filters.tab === 'credentials' && can.credentials) return 'credentials';
+        if (filters.tab === 'vendors' && can.vendors) return 'vendors';
+        return can.vendors ? 'vendors' : 'credentials';
+    });
     const [search, setSearch] = useState('');
     const [siteFilter, setSiteFilter] = useState<string>(
         filters.site_id ? String(filters.site_id) : 'all',

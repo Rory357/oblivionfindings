@@ -129,7 +129,9 @@ class SiteVendorController extends Controller
             'credentialTypeOptions' => $canCredentials
                 ? CredentialType::pickerOptionsForTenant($user?->organization_id)
                 : collect(),
-            'filters' => $request->only(['site_id', 'service_type', 'vendor_status', 'preferred', 'credential_type', 'requires_reauth']),
+            // 'tab' is a UI deep-link hint (e.g. from the Site Calendar
+            // credential/vendor reminders); the page whitelists it by permission.
+            'filters' => $request->only(['site_id', 'service_type', 'vendor_status', 'preferred', 'credential_type', 'requires_reauth', 'tab']),
             'can' => [
                 'vendors' => $canVendors,
                 'credentials' => $canCredentials,
@@ -227,32 +229,13 @@ class SiteVendorController extends Controller
     {
         $this->authorize('view', $site);
 
-        $vendors = SiteVendor::where('site_id', $site->id)
-            ->when($request->service_type, fn($q) => $q->where('service_type', $request->service_type))
-            ->when($request->status === 'active', fn($q) => $q->where('is_active', true))
-            ->when($request->status === 'inactive', fn($q) => $q->where('is_active', false))
-            ->orderBy('service_type')
-            ->orderBy('company_name')
-            ->get()
-            ->map(fn (SiteVendor $vendor) => $this->vendorPayload($vendor))
-            ->values();
-
-        $serviceTypes = SiteVendor::where('site_id', $site->id)
-            ->distinct()
-            ->pluck('service_type')
-            ->values();
-
-        return inertia('sites/vendors/index', [
-            'site' => [
-                'id' => $site->id,
-                'name' => $site->name,
-                'type' => $site->type,
-            ],
-            'vendors' => $vendors,
-            'serviceTypes' => $serviceTypes,
-            'filters' => $request->only(['service_type', 'status']),
-            'canManage' => $request->user()->canDo('vendors.manage'),
-        ]);
+        // The per-site vendors index has been retired in favour of the unified
+        // Vendor Directory & Access Vault (sites.vendors.global). The vendor
+        // CRUD/flags endpoints below stay live — the new page posts to them.
+        return redirect()->route('sites.vendors.global', [
+            'site_id' => $site->id,
+            'tab' => 'vendors',
+        ], 301);
     }
 
     public function store(Request $request, Site $site)

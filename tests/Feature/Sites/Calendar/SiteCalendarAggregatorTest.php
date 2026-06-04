@@ -2,7 +2,9 @@
 
 use App\Models\Site;
 use App\Models\SiteCalendarEvent;
+use App\Models\SiteCredential;
 use App\Models\SiteMealPlanEntry;
+use App\Models\SiteVendor;
 use App\Models\User;
 use App\Services\Sites\Calendar\SiteCalendarAggregator;
 use Illuminate\Foundation\Testing\RefreshDatabase;
@@ -123,4 +125,55 @@ test('aggregator can filter to a single source layer', function () {
     ));
 
     expect($mealsOnly->pluck('source')->unique()->all())->toBe(['meal']);
+});
+
+test('credential rotation reminders deep-link to the unified /vendors view, not the legacy per-site page', function () {
+    $site = Site::factory()->create(['type' => 'house']);
+
+    SiteCredential::create([
+        'site_id' => $site->id,
+        'tenant_id' => $site->tenant_id,
+        'label' => 'Alarm Panel',
+        'credential_type' => 'pin',
+        'encrypted_value' => \Illuminate\Support\Facades\Crypt::encryptString('1234'),
+        // Default rotation cadence is 90 days, so this falls due 2026-05-16.
+        'last_rotated_at' => Carbon::parse('2026-02-15'),
+    ]);
+
+    $items = collect(app(SiteCalendarAggregator::class)->itemsForRange(
+        [$site->id],
+        Carbon::parse('2026-05-01'),
+        Carbon::parse('2026-05-31'),
+    ));
+
+    $credential = $items->firstWhere('source', 'credential');
+    expect($credential)->not->toBeNull();
+    expect($credential->link)->toBe("/vendors?site_id={$site->id}&tab=credentials");
+    // Must never point back at the retired per-site index page.
+    expect($credential->link)->not->toContain("/sites/{$site->id}/credentials");
+});
+
+test('vendor insurance reminders deep-link to the unified /vendors view, not the legacy per-site page', function () {
+    $site = Site::factory()->create(['type' => 'house']);
+
+    SiteVendor::create([
+        'site_id' => $site->id,
+        'tenant_id' => $site->tenant_id,
+        'service_type' => 'electrician',
+        'company_name' => 'Hamilton Electrical Ltd',
+        'preferred_contact_method' => 'phone',
+        'is_active' => true,
+        'insurance_expiry' => Carbon::parse('2026-05-20'),
+    ]);
+
+    $items = collect(app(SiteCalendarAggregator::class)->itemsForRange(
+        [$site->id],
+        Carbon::parse('2026-05-01'),
+        Carbon::parse('2026-05-31'),
+    ));
+
+    $vendor = $items->firstWhere('source', 'vendor');
+    expect($vendor)->not->toBeNull();
+    expect($vendor->link)->toBe("/vendors?site_id={$site->id}&tab=vendors");
+    expect($vendor->link)->not->toContain("/sites/{$site->id}/vendors");
 });
