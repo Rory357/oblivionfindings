@@ -29,6 +29,7 @@ use App\Domain\Roadmap\Jobs\ScoreRoadmapInitiativesJob;
 use App\Domain\Roadmap\Jobs\SendRoadmapDigestJob;
 use App\Jobs\AutoEscalateControlRoomQueues;
 use App\Jobs\CheckControlRoomSlaBreaches;
+use App\Jobs\SyncResourceCalendarsJob;
 use App\Jobs\ChecklistDueJob;
 use App\Jobs\CheckLoneWorkerOverdueJob;
 use App\Jobs\CheckOverdueCorrectiveActionsJob;
@@ -518,3 +519,11 @@ app(Schedule::class)
     ->command('oblivion:prune-retention')
     ->timezone('Pacific/Auckland')
     ->weeklyOn(0, '03:30');
+
+// Calendar sync (Part D): push house calendar events out to mapped Google/Outlook
+// resource calendars + pull external busy for two-way mappings. Cadence default 15m.
+app(Schedule::class)
+    ->job(new SyncResourceCalendarsJob)
+    ->timezone('Pacific/Auckland')
+    ->everyFifteenMinutes()
+    ->withoutOverlapping();

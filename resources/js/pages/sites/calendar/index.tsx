@@ -15,9 +15,25 @@ interface Props {
     canManage: boolean;
     canApprove: boolean;
     feedUrl: string | null;
+    pendingApprovalCount?: number;
+    mineCount?: number;
+    overdueCount?: number;
 }
 
-export default function SiteCalendarPage({ site, sites, people, sources, eventTypes, canCreate, canManage, canApprove, feedUrl }: Props) {
+export default function SiteCalendarPage({
+    site,
+    sites,
+    people,
+    sources,
+    eventTypes,
+    canCreate,
+    canManage,
+    canApprove,
+    feedUrl,
+    pendingApprovalCount,
+    mineCount,
+    overdueCount,
+}: Props) {
     return (
         <AppLayout
             breadcrumbs={[
@@ -39,6 +55,9 @@ export default function SiteCalendarPage({ site, sites, people, sources, eventTy
                 canManage={canManage}
                 canApprove={canApprove}
                 feedUrl={feedUrl}
+                pendingApprovalCount={pendingApprovalCount}
+                mineCount={mineCount}
+                overdueCount={overdueCount}
             />
         </AppLayout>
     );

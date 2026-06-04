@@ -2,10 +2,11 @@
 
 namespace App\Models;
 
+use App\Contracts\CalendarOAuthToken;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
-class Identity extends Model
+class Identity extends Model implements CalendarOAuthToken
 {
     protected $fillable = [
         'user_id',
@@ -21,6 +22,8 @@ class Identity extends Model
     ];
 
     protected $casts = [
+        'access_token' => 'encrypted',
+        'refresh_token' => 'encrypted',
         'token_expires_at' => 'datetime',
         'scopes' => 'array',
         'raw_profile' => 'array',
@@ -54,7 +57,31 @@ class Identity extends Model
             return true;
         }
 
-        // Refresh if token expires within the next 5 minutes.
-        return $this->token_expires_at->subMinutes(5)->isPast();
+        // Refresh if token expires within the next 5 minutes. Use copy() so we don't
+        // mutate the cached Carbon attribute in place (which would drift on each call).
+        return $this->token_expires_at->copy()->subMinutes(5)->isPast();
+    }
+
+    /* ------------------------------------------------------------------
+     * CalendarOAuthToken
+     * ------------------------------------------------------------------ */
+
+    public function getAccessToken(): ?string
+    {
+        return $this->access_token;
+    }
+
+    public function getRefreshToken(): ?string
+    {
+        return $this->refresh_token;
+    }
+
+    public function storeRefreshedToken(string $accessToken, ?string $refreshToken, ?int $expiresInSeconds): void
+    {
+        $this->update([
+            'access_token' => $accessToken,
+            'refresh_token' => $refreshToken ?: $this->refresh_token,
+            'token_expires_at' => now()->addSeconds($expiresInSeconds ?? 3600),
+        ]);
     }
 }
