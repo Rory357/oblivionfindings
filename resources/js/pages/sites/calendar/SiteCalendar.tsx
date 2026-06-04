@@ -94,6 +94,7 @@ import {
     Avatar,
     CalendarUIProvider,
     DayView,
+    MiniMonth,
     MonthView,
     SourceDot,
     StatusBadge,
@@ -280,6 +281,50 @@ function periodLabel(view: CalView, navDate: Date): string {
         return `${s.getDate()} ${MO[s.getMonth()].slice(0, 3)} – ${e.getDate()} ${MO[e.getMonth()].slice(0, 3)} ${e.getFullYear()}`;
     }
     return `${MO[navDate.getMonth()]} ${navDate.getFullYear()}`;
+}
+
+/**
+ * Clickable period label that opens a mini-month so the user can jump straight to any
+ * date instead of stepping period-by-period. `dark` styles it for the onDark hero band;
+ * the light variant is used by the profile-embed toolbar.
+ */
+function JumpToDate({
+    view,
+    navDate,
+    onPick,
+    dark = false,
+}: {
+    view: CalView;
+    navDate: Date;
+    onPick: (d: Date) => void;
+    dark?: boolean;
+}) {
+    const [open, setOpen] = useState(false);
+    const cls = dark
+        ? 'tnum inline-flex items-center gap-1.5 rounded-md border border-primary-foreground/35 bg-primary-foreground/20 px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary-foreground/30'
+        : 'tnum inline-flex min-w-[150px] items-center gap-1.5 rounded-md px-2 py-1 text-sm font-semibold transition-colors hover:bg-muted';
+
+    return (
+        <Popover open={open} onOpenChange={setOpen}>
+            <PopoverTrigger asChild>
+                {/* eslint-disable-next-line no-restricted-syntax -- calendar jump trigger; not a shadcn Button. */}
+                <button type="button" aria-label="Jump to date" className={cls}>
+                    <CalendarDays className="h-3.5 w-3.5" />
+                    {periodLabel(view, navDate)}
+                    <ChevronDown className="h-3 w-3 opacity-70" />
+                </button>
+            </PopoverTrigger>
+            <PopoverContent align="start" className="w-auto p-0">
+                <MiniMonth
+                    selected={navDate}
+                    onSelect={(d) => {
+                        onPick(d);
+                        setOpen(false);
+                    }}
+                />
+            </PopoverContent>
+        </Popover>
+    );
 }
 
 export default function SiteCalendar({
@@ -576,7 +621,7 @@ export default function SiteCalendar({
                     <ChevronRight className="h-4 w-4" />
                 </Button>
             </div>
-            <span className="tnum min-w-[150px] px-1 text-sm font-semibold">{periodLabel(view, navDate)}</span>
+            <JumpToDate view={view} navDate={navDate} onPick={setNavDate} />
 
             <div className="ml-auto flex flex-wrap items-center gap-2">
                 {scope === 'global' && sites.length > 0 && (
@@ -889,10 +934,7 @@ export default function SiteCalendar({
                     <ChevronLeft className="h-3.5 w-3.5" />
                     <span className="hidden sm:inline">Prev</span>
                 </button>
-                <span className="tnum inline-flex items-center gap-1.5 rounded-md border border-primary-foreground/35 bg-primary-foreground/20 px-3 py-1.5 text-xs font-semibold text-primary-foreground">
-                    <CalendarDays className="h-3.5 w-3.5" />
-                    {periodLabel(view, navDate)}
-                </span>
+                <JumpToDate view={view} navDate={navDate} onPick={setNavDate} dark />
                 {/* eslint-disable-next-line no-restricted-syntax -- segmented stepper on dark hero; not a shadcn Button. */}
                 <button
                     type="button"

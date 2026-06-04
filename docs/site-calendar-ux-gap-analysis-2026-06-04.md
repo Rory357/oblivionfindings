@@ -86,7 +86,7 @@ stay mouse-only and `aria-hidden`).
 | G-20 | S | Detail dialog missing the relative-date pill ("in N days / N days ago") + priority pill + source-origin card | `SiteCalendar.tsx:1220-1281` |
 | G-21 | S | Subscribe dialog missing the 3-provider instruction grid + "treat URL like a password" warning | `SiteCalendar.tsx:1855-1901` |
 | G-22 | S | Agenda empty-state copy is ambiguous when all sources are filtered off vs genuinely empty | `_parts.tsx:682-685` |
-| G-23 | S | Hero footer period label is a `<span>`, not a clickable mini-month jump-to-date | `SiteCalendar.tsx:877` |
+| ~~G-23~~ ✅ | S | ~~Hero footer period label is a `<span>`, not a clickable mini-month jump-to-date~~ **Done 2026-06-05:** `JumpToDate` popover + `MiniMonth` grid on both the hero band and the profile toolbar; clicking a day sets `navDate`. | `SiteCalendar.tsx`, `_parts.tsx` |
 | G-24 | S | No timezone indicator (NZT) anywhere; `parseDT` (`recur.ts:84`) trusts `new Date(s)` for naive strings | `SiteCalendar.tsx`, `recur.ts:84` |
 | G-25 | S | `--src-vendor` / `--src-asset` (~52% L, low chroma) are borderline <4.5:1 on white at 11-12px (contrast) | `app.css:234-235` |
 | G-26 | S | Decorative colour dots/bars not `aria-hidden`; source on/off conveyed by opacity only | `_parts.tsx:194-196`, `SiteCalendar.tsx:638-651` |
