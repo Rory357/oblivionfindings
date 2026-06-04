@@ -17,6 +17,7 @@ class SiteChecklistTemplate extends Model
         'key',
         'name',
         'description',
+        'category',
         'applicable_to_type',
         'frequency',
         'custom_rrule',

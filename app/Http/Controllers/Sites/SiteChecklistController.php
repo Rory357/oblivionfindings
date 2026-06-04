@@ -9,6 +9,7 @@ use App\Models\SiteChecklistRun;
 use App\Models\SiteChecklistResponse;
 use App\Models\SiteChecklistTemplate;
 use App\Models\SiteChecklistTemplateItem;
+use App\Support\ChecklistsDashboardData;
 use App\Support\SiteRecommendedChecklists;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -19,33 +20,18 @@ class SiteChecklistController extends Controller
     {
         $this->authorize('view', $site);
 
-        $assignments = SiteChecklistAssignment::where('site_id', $site->id)
-            ->with(['template', 'assignedTo:id,name'])
-            ->where('is_active', true)
-            ->get();
-
-        $templates = SiteChecklistTemplate::active()
-            ->forType($site->type)
-            ->withCount('items')
-            ->get()
-            ->map(fn ($t) => [
-                'id' => $t->id,
-                'name' => $t->name,
-                'description' => $t->description,
-                'frequency' => $t->frequency,
-                'items_count' => $t->items_count,
-            ]);
-
-        return inertia('sites/checklists/index', [
-            'site' => [
-                'id' => $site->id,
-                'name' => $site->name,
-                'type' => $site->type,
+        return inertia('sites/checklists/index', array_merge(
+            (new ChecklistsDashboardData($request))->forSite($site),
+            [
+                'site' => [
+                    'id' => $site->id,
+                    'name' => $site->name,
+                    'type' => $site->type,
+                ],
+                'backHref' => "/sites/{$site->id}",
+                'recommendedChecklists' => SiteRecommendedChecklists::forType($site->type),
             ],
-            'assignments' => $assignments,
-            'templates' => $templates,
-            'recommendedChecklists' => SiteRecommendedChecklists::forType($site->type),
-        ]);
+        ));
     }
 
     public function runs(Request $request, Site $site)
@@ -147,6 +133,13 @@ class SiteChecklistController extends Controller
         ]);
 
         $this->bulkUpsertResponses($run, $validated['responses']);
+
+        // Answering a scheduled run marks it in progress (also covers the run
+        // modal's save path, which never calls startRun explicitly).
+        if ($run->status === 'scheduled') {
+            $run->update(['status' => 'in_progress', 'started_at' => $run->started_at ?? now()]);
+        }
+
         $run->calculateCompletion();
 
         return redirect()->back();
