@@ -53,7 +53,10 @@ class CredentialReminderProvider extends ObligationProvider
                 status: $due->lt(Carbon::today()) ? 'overdue' : 'scheduled',
                 ref: 'CRED-'.$credential->id,
                 site: $this->siteArray($credential->site),
-                link: "/sites/{$credential->site_id}/credentials",
+                // Unified Vendor Directory & Access Vault (sites.vendors.global),
+                // pre-filtered to this site and opened on the Credentials tab —
+                // not the legacy per-site /sites/{id}/credentials index.
+                link: "/vendors?site_id={$credential->site_id}&tab=credentials",
             );
         }
 

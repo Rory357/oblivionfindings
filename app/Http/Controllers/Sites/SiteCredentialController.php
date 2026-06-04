@@ -25,64 +25,14 @@ class SiteCredentialController extends Controller
     {
         $this->authorize('view', $site);
 
-        $credentials = SiteCredential::where('site_id', $site->id)
-            ->with('vendor:id,company_name,service_type')
-            ->orderBy('label')
-            ->get()
-            ->map(fn($c) => [
-                'id' => $c->id,
-                'label' => $c->label,
-                'username' => $c->username,
-                'url' => $c->url,
-                'credential_type' => $c->credential_type,
-                'vendor_id' => $c->vendor_id,
-                'vendor_name' => $c->vendor?->company_name,
-                'notes' => $c->notes,
-                'last_rotated_at' => $c->last_rotated_at?->toDateTimeString(),
-                'requires_reauth' => (bool) $c->requires_reauth,
-                'is_shareable' => (bool) $c->is_shareable,
-                'password_strength' => $c->password_strength,
-                'has_totp' => $c->hasTotp(),
-                'created_at' => $c->created_at->toDateTimeString(),
-                // Never send encrypted_value in list view
-                'value_preview' => '********',
-            ]);
-
-        // Single audit entry per page load (not per credential)
-        if ($credentials->isNotEmpty()) {
-            SiteCredentialAuditLog::create([
-                'credential_id' => $credentials->first()['id'],
-                'tenant_id' => $site->tenant_id,
-                'user_id' => $request->user()->id,
-                'action' => 'view_list',
-                'ip_address' => $request->ip(),
-                'user_agent' => $request->userAgent(),
-                'created_at' => now(),
-            ]);
-        }
-
-        $vendors = SiteVendor::where('site_id', $site->id)
-            ->orderBy('company_name')
-            ->get(['id', 'site_id', 'company_name', 'service_type'])
-            ->map(fn (SiteVendor $vendor) => [
-                'id' => $vendor->id,
-                'site_id' => $vendor->site_id,
-                'company_name' => $vendor->company_name,
-                'service_type' => $vendor->service_type,
-            ]);
-
-        return inertia('sites/credentials/index', [
-            'site' => [
-                'id' => $site->id,
-                'name' => $site->name,
-                'type' => $site->type,
-            ],
-            'credentials' => $credentials,
-            'vendors' => $vendors,
-            'credentialTypeOptions' => CredentialType::pickerOptionsForTenant($site->tenant_id),
-            'canReveal' => $request->user()->canDo('credentials.reveal'),
-            'canManage' => $request->user()->canDo('credentials.manage'),
-        ]);
+        // The per-site credentials index has been retired in favour of the
+        // unified Vendor Directory & Access Vault (sites.vendors.global). The
+        // reveal/rotate/reauth/audit/store endpoints below stay live — the new
+        // page posts to them — but the list view now lives at /vendors.
+        return redirect()->route('sites.vendors.global', [
+            'site_id' => $site->id,
+            'tab' => 'credentials',
+        ], 301);
     }
 
     public function store(Request $request, Site $site)

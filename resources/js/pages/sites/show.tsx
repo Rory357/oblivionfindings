@@ -2862,7 +2862,7 @@ export default function SiteShow({
                                             </CardTitle>
                                             {canGlobal?.vendors?.view && (
                                                 <Link
-                                                    href={`/sites/${site.id}/vendors`}
+                                                    href={`/vendors?site_id=${site.id}&tab=vendors`}
                                                     className="text-xs text-muted-foreground hover:text-foreground hover:underline"
                                                 >
                                                     Manage vendors →
@@ -2981,7 +2981,7 @@ export default function SiteShow({
                                             </CardTitle>
                                             {canGlobal?.credentials?.view && (
                                                 <Link
-                                                    href={`/sites/${site.id}/credentials`}
+                                                    href={`/vendors?site_id=${site.id}&tab=credentials`}
                                                     className="text-xs text-muted-foreground hover:text-foreground hover:underline"
                                                 >
                                                     Manage credentials →

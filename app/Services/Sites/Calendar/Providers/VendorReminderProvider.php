@@ -40,7 +40,10 @@ class VendorReminderProvider extends ObligationProvider
                 status: $vendor->insurance_expiry->lt(Carbon::today()) ? 'overdue' : 'scheduled',
                 ref: 'VEN-'.$vendor->id,
                 site: $this->siteArray($vendor->site),
-                link: "/sites/{$vendor->site_id}/vendors",
+                // Unified Vendor Directory & Access Vault (sites.vendors.global),
+                // pre-filtered to this site and opened on the Vendors tab —
+                // not the legacy per-site /sites/{id}/vendors index.
+                link: "/vendors?site_id={$vendor->site_id}&tab=vendors",
             ))
             ->all();
     }

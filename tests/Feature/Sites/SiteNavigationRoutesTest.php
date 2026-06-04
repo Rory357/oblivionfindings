@@ -175,6 +175,7 @@ test('/vendors for a credential-only user: sends credentials, empty vendors, can
             ->has('vendors', 0)
             ->has('credentials', 1)
             ->where('credentials.0.label', 'Door Code')
+            ->missing('credentials.0.encrypted_value')
             ->where('can.vendors', false)
             ->where('can.credentials', true)
             ->has('serviceTypes', 0)

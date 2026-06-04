@@ -353,18 +353,6 @@ test('global audit feed excludes routine view_list rows', function () {
     expect($logs->pluck('action'))->toContain('reveal');
 });
 
-test('per-site credentials page exposes the site vendor list for the linked-vendor picker', function () {
-    gvcVendor($this->site, ['company_name' => 'Hamilton Electrical Ltd']);
-
-    $this->actingAs($this->admin)
-        ->get("/sites/{$this->site->id}/credentials")
-        ->assertOk()
-        ->assertInertia(fn ($page) => $page
-            ->component('sites/credentials/index')
-            ->has('vendors', 1)
-            ->where('vendors.0.company_name', 'Hamilton Electrical Ltd'));
-});
-
 test('manage-less user cannot toggle flags, rotate, or change reauth', function () {
     $vendor = gvcVendor($this->site);
     $credential = gvcCredential($this->site);

@@ -40,7 +40,7 @@ export default function CredentialAudit({ site, credential, logs }: Props) {
             breadcrumbs={[
                 { title: 'Sites', href: '/sites' },
                 { title: site.name, href: `/sites/${site.id}` },
-                { title: 'Credentials', href: `/sites/${site.id}/credentials` },
+                { title: 'Credentials', href: `/vendors?site_id=${site.id}&tab=credentials` },
                 { title: 'Audit', href: '#' },
             ]}
         >
@@ -50,7 +50,7 @@ export default function CredentialAudit({ site, credential, logs }: Props) {
                 hero={
                     <PageHero
                         variant="compact"
-                        backHref={`/sites/${site.id}/credentials`}
+                        backHref={`/vendors?site_id=${site.id}&tab=credentials`}
                         title="Credential Audit"
                         description={credential.label}
                     />
