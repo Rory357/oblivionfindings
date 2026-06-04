@@ -17,28 +17,47 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { Link, router, useForm } from '@inertiajs/react';
+import {
+    DropdownMenu,
+    DropdownMenuContent,
+    DropdownMenuItem,
+    DropdownMenuLabel,
+    DropdownMenuSeparator,
+    DropdownMenuTrigger,
+} from '@/components/ui/dropdown-menu';
+import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import type { SharedData } from '@/types';
+import { Link, router, useForm, usePage } from '@inertiajs/react';
+import { createPortal } from 'react-dom';
 import {
     CalendarDays,
     CalendarRange,
     CalendarClock,
     Check,
+    CheckCircle2,
     ChevronLeft,
     ChevronRight,
+    ClipboardCheck,
+    Clock,
     Columns3,
     Copy,
     Download,
     ExternalLink,
+    Filter,
+    Layers,
     List,
+    MapPin,
+    MoreHorizontal,
     Pencil,
     Plus,
     RefreshCw,
+    Repeat,
     Rows3,
     Rss,
     Trash2,
     X,
 } from 'lucide-react';
-import { useCallback, useEffect, useMemo, useState, type FormEvent } from 'react';
+import { useCallback, useEffect, useMemo, useRef, useState, type FormEvent } from 'react';
 import {
     downloadICS,
     findConflicts,
@@ -58,11 +77,15 @@ import {
     CalendarUIProvider,
     DayView,
     MonthView,
+    SourceDot,
     StatusBadge,
     TimelineView,
     WeekView,
+    WD,
     addDays,
     decorate,
+    endOfMonth,
+    fmtTime,
     fmtTimeRange,
     MO,
     startOfMonth,
@@ -97,6 +120,9 @@ export interface SiteCalendarProps {
 }
 
 type CalView = 'month' | 'week' | 'day' | 'agenda' | 'timeline';
+
+/** Seed for the create dialog when opened from the right-click QuickAdd menu. */
+type CreateSeed = { date: Date; hour?: number; eventType?: string };
 
 /** Fallback source taxonomy (mirrors CalendarSources::all()) for embeds that
  *  don't receive server props (e.g. the Site Profile Calendar tab). */
@@ -190,7 +216,15 @@ export default function SiteCalendar({
     const [selected, setSelected] = useState<Decorated | null>(null);
     const [createOpen, setCreateOpen] = useState(false);
     const [editEvent, setEditEvent] = useState<Decorated | null>(null);
+    const [seed, setSeed] = useState<CreateSeed | null>(null);
     const [subscribeOpen, setSubscribeOpen] = useState(false);
+    const [approvalsOpen, setApprovalsOpen] = useState(false);
+    const [ctxMenu, setCtxMenu] = useState<{ x: number; y: number; date: Date; hour?: number } | null>(null);
+    const [preview, setPreview] = useState<{ ev: Decorated; rect: DOMRect } | null>(null);
+    const previewTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+
+    const page = usePage<SharedData>();
+    const currentUserId = page.props.auth?.user?.id ?? null;
 
     const srcByKey = useMemo(() => Object.fromEntries(sources.map((s) => [s.key, s])) as Record<string, SourceDef>, [sources]);
     const eventTypeByKey = useMemo(() => Object.fromEntries(eventTypes.map((t) => [t.key, t])), [eventTypes]);
@@ -232,7 +266,29 @@ export default function SiteCalendar({
         [events, enabledSources, scope, houseFilter],
     );
 
+    // Hero stats — derived client-side from the events already in view. (Cross-range
+    // accuracy for "To approve" / "Mine" would need backend count props; in-view is
+    // correct for the browsed window and needs no backend change.)
     const overdueCount = useMemo(() => visibleEvents.filter((e) => e.status === 'overdue').length, [visibleEvents]);
+    const thisMonthCount = useMemo(() => {
+        const ms = startOfMonth(navDate);
+        const me = endOfMonth(navDate);
+        me.setHours(23, 59, 59, 999);
+        return visibleEvents.filter((e) => e._start >= ms && e._start <= me).length;
+    }, [visibleEvents, navDate]);
+    const pendingApprovals = useMemo(
+        () => visibleEvents.filter((e) => e.group === 'manual' && e.approvalStatus === 'pending'),
+        [visibleEvents],
+    );
+    const toApproveCount = pendingApprovals.length;
+    const mineCount = useMemo(
+        () => (currentUserId == null ? 0 : visibleEvents.filter((e) => e.owner?.id === currentUserId).length),
+        [visibleEvents, currentUserId],
+    );
+    const doneCount = useMemo(
+        () => visibleEvents.filter((e) => e.status === 'completed' || e.status === 'approved').length,
+        [visibleEvents],
+    );
 
     const step = (dir: 1 | -1) => {
         setNavDate((d) => {
@@ -273,16 +329,44 @@ export default function SiteCalendar({
         [fetchEvents],
     );
 
+    const openCreate = useCallback((s: CreateSeed | null = null) => {
+        setEditEvent(null);
+        setSeed(s);
+        setCreateOpen(true);
+    }, []);
+
+    const showPreview = useCallback((ev: Decorated, el: HTMLElement) => {
+        if (previewTimer.current) clearTimeout(previewTimer.current);
+        const rect = el.getBoundingClientRect();
+        previewTimer.current = setTimeout(() => setPreview({ ev, rect }), 320);
+    }, []);
+    const hidePreview = useCallback(() => {
+        if (previewTimer.current) clearTimeout(previewTimer.current);
+        setPreview(null);
+    }, []);
+
     const uiValue = useMemo(
         () => ({
             colorBy,
             density,
             srcByKey,
-            onSelect: (ev: Decorated) => setSelected(ev),
-            onCreateAt: canCreate ? () => setCreateOpen(true) : undefined,
+            onSelect: (ev: Decorated) => {
+                hidePreview();
+                setSelected(ev);
+            },
+            onCreateAt: canCreate ? (d: Date, hour?: number) => openCreate({ date: d, hour }) : undefined,
+            onContext: canCreate
+                ? (e: React.MouseEvent, d: Date, hour?: number) => {
+                      e.preventDefault();
+                      hidePreview();
+                      setCtxMenu({ x: e.clientX, y: e.clientY, date: d, hour });
+                  }
+                : undefined,
+            onPreview: showPreview,
+            onPreviewEnd: hidePreview,
             onMove: canManage ? reschedule : undefined,
         }),
-        [colorBy, density, srcByKey, canCreate, canManage, reschedule],
+        [colorBy, density, srcByKey, canCreate, canManage, reschedule, openCreate, showPreview, hidePreview],
     );
 
     const ViewBody = (
@@ -394,18 +478,241 @@ export default function SiteCalendar({
 
     const content = (
         <div className="space-y-3">
-            {toolbar}
-            {legend}
+            <div className="flex flex-wrap items-center justify-between gap-2">
+                {legend}
+                {canCreate && (
+                    <span className="hidden items-center gap-1.5 rounded-full bg-muted px-2.5 py-1 text-[11.5px] font-medium text-muted-foreground md:inline-flex">
+                        Right-click to add · drag to reschedule
+                    </span>
+                )}
+            </div>
             {ViewBody}
             {loading && <p className="text-center text-sm text-muted-foreground">Loading…</p>}
         </div>
     );
 
-    const heroActions = canCreate ? (
-        <Button variant="secondary" size="sm" onClick={() => setCreateOpen(true)}>
-            <Plus className="mr-1 h-4 w-4" /> New event
-        </Button>
-    ) : undefined;
+    const allSourcesOn = enabledSources.size === sources.length;
+
+    // Brand/--primary onDark actions, matching the Rostering banner.
+    const heroActions = (
+        <>
+            {canCreate && (
+                <Button
+                    size="sm"
+                    className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                    onClick={() => openCreate()}
+                >
+                    <Plus className="mr-1 h-4 w-4" /> New entry
+                </Button>
+            )}
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button
+                        size="icon"
+                        variant="outline"
+                        aria-label="More options"
+                        className="border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10"
+                    >
+                        <MoreHorizontal className="h-4 w-4" />
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-60">
+                    <DropdownMenuItem onSelect={() => setSubscribeOpen(true)}>
+                        <Rss className="mr-2 h-4 w-4" /> Add to your calendar
+                    </DropdownMenuItem>
+                    <DropdownMenuItem onSelect={() => downloadICS(visibleEvents, 'site-calendar.ics')}>
+                        <Download className="mr-2 h-4 w-4" /> Export this period (.ics)
+                    </DropdownMenuItem>
+                    {canApprove && (
+                        <>
+                            <DropdownMenuSeparator />
+                            <DropdownMenuLabel>Admin</DropdownMenuLabel>
+                            <DropdownMenuItem onSelect={() => setApprovalsOpen(true)}>
+                                <ClipboardCheck className="mr-2 h-4 w-4" /> Review approvals
+                                {toApproveCount > 0 ? ` (${toApproveCount})` : ''}
+                            </DropdownMenuItem>
+                        </>
+                    )}
+                </DropdownMenuContent>
+            </DropdownMenu>
+        </>
+    );
+
+    const filterPopover = (
+        <Popover>
+            <PopoverTrigger asChild>
+                <Button
+                    size="sm"
+                    variant="outline"
+                    className="border-primary-foreground/20 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+                >
+                    <Filter className="mr-1 h-3.5 w-3.5" /> Filter
+                    {!allSourcesOn && (
+                        <span className="ml-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-primary-foreground px-1 text-[10px] font-bold text-primary tnum">
+                            {enabledSources.size}
+                        </span>
+                    )}
+                </Button>
+            </PopoverTrigger>
+            <PopoverContent align="end" className="w-72">
+                <div className="space-y-3">
+                    {scope === 'global' && sites.length > 0 && (
+                        <div>
+                            <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">House</p>
+                            <select
+                                value={houseFilter === 'all' ? 'all' : String(houseFilter)}
+                                onChange={(e) => setHouseFilter(e.target.value === 'all' ? 'all' : Number(e.target.value))}
+                                className="h-8 w-full rounded-md border border-input bg-background px-2 text-[13px]"
+                                aria-label="House"
+                            >
+                                <option value="all">All sites</option>
+                                {sites.map((s) => (
+                                    <option key={s.id} value={s.id}>
+                                        {s.name}
+                                    </option>
+                                ))}
+                            </select>
+                        </div>
+                    )}
+                    <div>
+                        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Colour by</p>
+                        <div className="grid grid-cols-3 gap-1">
+                            {(['source', 'status', 'owner'] as ColorBy[]).map((c) => (
+                                <button
+                                    key={c}
+                                    onClick={() => setColorBy(c)}
+                                    className={`rounded-md px-2 py-1.5 text-[12px] font-medium capitalize transition-colors ${colorBy === c ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent'}`}
+                                >
+                                    {c}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    <div>
+                        <p className="mb-1.5 text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Density</p>
+                        <div className="grid grid-cols-2 gap-1">
+                            {(['comfortable', 'compact'] as Density[]).map((d) => (
+                                <button
+                                    key={d}
+                                    onClick={() => setDensity(d)}
+                                    className={`rounded-md px-2 py-1.5 text-[12px] font-medium capitalize transition-colors ${density === d ? 'bg-primary text-primary-foreground' : 'bg-muted text-muted-foreground hover:bg-accent'}`}
+                                >
+                                    {d}
+                                </button>
+                            ))}
+                        </div>
+                    </div>
+                    <div>
+                        <div className="mb-1.5 flex items-center justify-between">
+                            <p className="text-[11px] font-semibold uppercase tracking-wider text-muted-foreground">Sources</p>
+                            <button
+                                onClick={() => setEnabledSources(allSourcesOn ? new Set() : new Set(sources.map((s) => s.key)))}
+                                className="text-[11px] font-medium text-primary hover:underline"
+                            >
+                                {allSourcesOn ? 'Clear all' : 'Select all'}
+                            </button>
+                        </div>
+                        <div className="max-h-44 space-y-0.5 overflow-y-auto">
+                            {sources.map((s) => {
+                                const on = enabledSources.has(s.key);
+                                return (
+                                    <button
+                                        key={s.key}
+                                        onClick={() => toggleSource(s.key)}
+                                        className="flex w-full items-center gap-2 rounded-md px-1.5 py-1 text-left text-[13px] transition-colors hover:bg-accent/50"
+                                    >
+                                        <span
+                                            className={`flex h-4 w-4 items-center justify-center rounded border ${on ? 'border-transparent' : 'border-border'}`}
+                                            style={on ? { background: `var(--src-${s.key})` } : undefined}
+                                        >
+                                            {on && <Check className="h-3 w-3 text-primary-foreground" strokeWidth={3} />}
+                                        </span>
+                                        <SourceDot k={s.key} />
+                                        <span className="flex-1 truncate">{s.label}</span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                    </div>
+                </div>
+            </PopoverContent>
+        </Popover>
+    );
+
+    const heroFooter = (
+        <div className="flex flex-col items-stretch gap-2 py-3 lg:flex-row lg:items-center lg:justify-between">
+            <div className="flex flex-wrap items-center gap-1.5">
+                {/* eslint-disable-next-line no-restricted-syntax -- segmented stepper on dark hero; not a shadcn Button. */}
+                <button
+                    type="button"
+                    onClick={() => step(-1)}
+                    aria-label="Previous period"
+                    className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary-foreground/20"
+                >
+                    <ChevronLeft className="h-3.5 w-3.5" />
+                    <span className="hidden sm:inline">Prev</span>
+                </button>
+                <span className="tnum inline-flex items-center gap-1.5 rounded-md border border-primary-foreground/35 bg-primary-foreground/20 px-3 py-1.5 text-xs font-semibold text-primary-foreground">
+                    <CalendarDays className="h-3.5 w-3.5" />
+                    {periodLabel(view, navDate)}
+                </span>
+                {/* eslint-disable-next-line no-restricted-syntax -- segmented stepper on dark hero; not a shadcn Button. */}
+                <button
+                    type="button"
+                    onClick={() => step(1)}
+                    aria-label="Next period"
+                    className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary-foreground/20"
+                >
+                    <span className="hidden sm:inline">Next</span>
+                    <ChevronRight className="h-3.5 w-3.5" />
+                </button>
+                {/* eslint-disable-next-line no-restricted-syntax -- segmented stepper on dark hero; not a shadcn Button. */}
+                <button
+                    type="button"
+                    onClick={() => setNavDate(new Date())}
+                    className="ml-0.5 inline-flex items-center gap-1 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary-foreground/20"
+                >
+                    Today
+                </button>
+            </div>
+
+            <div className="flex flex-wrap items-center gap-2 lg:justify-end">
+                <div className="flex items-center rounded-md border border-primary-foreground/20 bg-primary-foreground/10 p-0.5">
+                    {VIEWS.map((v) => (
+                        // eslint-disable-next-line no-restricted-syntax -- segmented onDark view switch; not a shadcn Button.
+                        <button
+                            key={v.key}
+                            onClick={() => setView(v.key)}
+                            title={v.label}
+                            className={`inline-flex items-center gap-1.5 rounded px-2.5 py-1 text-xs font-semibold transition-colors ${view === v.key ? 'bg-primary-foreground text-primary' : 'text-primary-foreground/80 hover:bg-primary-foreground/15'}`}
+                        >
+                            <v.icon className="h-3.5 w-3.5" />
+                            <span className="hidden lg:inline">{v.label}</span>
+                        </button>
+                    ))}
+                </div>
+                {filterPopover}
+            </div>
+        </div>
+    );
+
+    const overduePart = overdueCount ? `${overdueCount} overdue` : '';
+    const pendingPart = toApproveCount ? `${toApproveCount} awaiting approval` : '';
+    const attention = [overduePart, pendingPart].filter(Boolean).join(', ');
+    const heroName = scope === 'global' ? 'Site Calendar' : (site?.name ?? 'Site Calendar');
+    const heroDescription = `${thisMonthCount} dated ${thisMonthCount === 1 ? 'entry' : 'entries'} this period across ${scope === 'global' ? 'all sites' : heroName}${attention ? ` — ${attention} need attention.` : ' — all on track.'}`;
+    const heroTitle = (
+        <span>
+            <span className="mb-2 flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-wider text-primary-foreground/80">
+                <span aria-hidden="true" className="relative inline-flex h-2 w-2">
+                    <span className="absolute inset-0 inline-flex h-full w-full animate-ping rounded-full bg-status-success/70" />
+                    <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success ring-2 ring-status-success/30" />
+                </span>
+                Live · synced just now
+            </span>
+            <span className="block">{heroName}</span>
+        </span>
+    );
 
     const dialogs = (
         <>
@@ -430,7 +737,10 @@ export default function SiteCalendar({
                     open={createOpen}
                     onOpenChange={(o) => {
                         setCreateOpen(o);
-                        if (!o) setEditEvent(null);
+                        if (!o) {
+                            setEditEvent(null);
+                            setSeed(null);
+                        }
                     }}
                     scope={scope}
                     sites={sites}
@@ -438,21 +748,56 @@ export default function SiteCalendar({
                     site={site}
                     eventTypes={eventTypes}
                     editEvent={editEvent}
+                    seed={seed}
                     existingEvents={events}
                     onSaved={() => {
                         setCreateOpen(false);
                         setEditEvent(null);
+                        setSeed(null);
                         void fetchEvents();
                     }}
                 />
             )}
             <SubscribeDialog open={subscribeOpen} onOpenChange={setSubscribeOpen} feedUrl={feedUrl} />
+            {canApprove && (
+                <ApprovalsPanel
+                    open={approvalsOpen}
+                    onOpenChange={setApprovalsOpen}
+                    items={pendingApprovals}
+                    eventTypeByKey={eventTypeByKey}
+                    onOpenEvent={(ev) => {
+                        setApprovalsOpen(false);
+                        setSelected(ev);
+                    }}
+                    onChanged={() => void fetchEvents()}
+                />
+            )}
+            {ctxMenu && canCreate && (
+                <QuickAddMenu
+                    ctx={ctxMenu}
+                    eventTypes={eventTypes}
+                    siteName={scope === 'site' ? site?.name : sites.find((s) => s.id === createSiteId)?.name}
+                    onPick={(typeKey) => {
+                        openCreate({ date: ctxMenu.date, hour: ctxMenu.hour, eventType: typeKey });
+                        setCtxMenu(null);
+                    }}
+                    onForm={() => {
+                        openCreate({ date: ctxMenu.date, hour: ctxMenu.hour });
+                        setCtxMenu(null);
+                    }}
+                    onClose={() => setCtxMenu(null)}
+                />
+            )}
+            {preview && !selected && !createOpen && !subscribeOpen && !approvalsOpen && !ctxMenu && (
+                <EventHoverCard ev={preview.ev} rect={preview.rect} srcByKey={srcByKey} eventTypeByKey={eventTypeByKey} />
+            )}
         </>
     );
 
     if (context === 'profile') {
         return (
             <div className="space-y-3">
+                {toolbar}
                 {content}
                 {dialogs}
             </div>
@@ -464,15 +809,28 @@ export default function SiteCalendar({
             <PageLayout
                 hero={
                     <PageHero
+                        category="ops"
                         icon={CalendarDays}
-                        title="Site Calendar"
-                        description={scope === 'global' ? 'All sites — obligations & events' : (site?.name ?? '')}
                         backHref={scope === 'site' && site ? `/sites/${site.id}` : undefined}
+                        backLabel="Sites"
+                        title={heroTitle}
+                        description={heroDescription}
+                        meta={[
+                            {
+                                icon: CalendarDays,
+                                label: `${periodLabel(view, navDate)} · ${VIEWS.find((v) => v.key === view)?.label ?? ''} view`,
+                            },
+                            { icon: Layers, label: `${enabledSources.size} of ${sources.length} sources shown` },
+                            { icon: CheckCircle2, label: `${doneCount} done / approved` },
+                        ]}
                         stats={[
-                            { label: 'In view', value: visibleEvents.length },
-                            { label: 'Overdue', value: overdueCount },
+                            { label: 'This month', value: thisMonthCount },
+                            { label: 'Overdue', value: overdueCount, tone: overdueCount > 0 ? 'critical' : undefined },
+                            { label: 'To approve', value: toApproveCount, tone: toApproveCount > 0 ? 'warning' : undefined },
+                            { label: 'Mine', value: mineCount },
                         ]}
                         actions={heroActions}
+                        footer={heroFooter}
                     />
                 }
             >
@@ -642,6 +1000,7 @@ function CreateEventDialog({
     site,
     eventTypes,
     editEvent,
+    seed,
     existingEvents,
     onSaved,
 }: {
@@ -653,6 +1012,7 @@ function CreateEventDialog({
     site?: SiteLite;
     eventTypes: EventTypeOption[];
     editEvent?: Decorated | null;
+    seed?: CreateSeed | null;
     existingEvents: Decorated[];
     onSaved: () => void;
 }) {
@@ -683,12 +1043,16 @@ function CreateEventDialog({
         } else {
             setTargetSite(defaultSiteId);
             setPreset('none');
-            const start = new Date();
-            start.setMinutes(0, 0, 0);
-            start.setHours(start.getHours() + 1);
+            const start = seed?.date ? new Date(seed.date) : new Date();
+            if (seed?.hour != null) {
+                start.setHours(seed.hour, 0, 0, 0);
+            } else {
+                start.setMinutes(0, 0, 0);
+                start.setHours(start.getHours() + 1);
+            }
             const end = new Date(start.getTime() + 60 * 60_000);
             form.setData({
-                event_type: eventTypes[0]?.key ?? 'general',
+                event_type: seed?.eventType ?? eventTypes[0]?.key ?? 'general',
                 title: '',
                 description: '',
                 start_at: toLocalInput(start),
@@ -698,7 +1062,7 @@ function CreateEventDialog({
         }
         form.clearErrors();
         // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [open, editEvent, defaultSiteId]);
+    }, [open, editEvent, defaultSiteId, seed]);
 
     const selectedType = eventTypes.find((t) => t.key === form.data.event_type);
 
@@ -961,6 +1325,267 @@ function SubscribeDialog({
                         <Button size="sm" onClick={generate} disabled={form.processing}>
                             <Rss className="mr-1 h-3.5 w-3.5" /> Generate subscribe link
                         </Button>
+                    </div>
+                )}
+
+                <DialogFooter>
+                    <Button variant="outline" onClick={() => onOpenChange(false)}>
+                        Close
+                    </Button>
+                </DialogFooter>
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+/* ---- right-click quick-add menu ----------------------------------------- */
+
+function QuickAddMenu({
+    ctx,
+    eventTypes,
+    siteName,
+    onPick,
+    onForm,
+    onClose,
+}: {
+    ctx: { x: number; y: number; date: Date; hour?: number };
+    eventTypes: EventTypeOption[];
+    siteName?: string;
+    onPick: (eventType: string) => void;
+    onForm: () => void;
+    onClose: () => void;
+}) {
+    const ref = useRef<HTMLDivElement | null>(null);
+    const [pos, setPos] = useState({ top: ctx.y, left: ctx.x });
+
+    useEffect(() => {
+        const el = ref.current;
+        if (!el) return;
+        const r = el.getBoundingClientRect();
+        let left = ctx.x;
+        let top = ctx.y;
+        if (left + r.width + 8 > window.innerWidth) left = window.innerWidth - r.width - 8;
+        if (top + r.height + 8 > window.innerHeight) top = window.innerHeight - r.height - 8;
+        setPos({ top: Math.max(8, top), left: Math.max(8, left) });
+    }, [ctx]);
+
+    useEffect(() => {
+        const onDown = (e: MouseEvent) => {
+            if (!ref.current?.contains(e.target as Node)) onClose();
+        };
+        const onKey = (e: KeyboardEvent) => {
+            if (e.key === 'Escape') onClose();
+        };
+        window.addEventListener('mousedown', onDown);
+        window.addEventListener('keydown', onKey);
+        return () => {
+            window.removeEventListener('mousedown', onDown);
+            window.removeEventListener('keydown', onKey);
+        };
+    }, [onClose]);
+
+    const hourDate = ctx.hour != null ? new Date(ctx.date) : null;
+    if (hourDate && ctx.hour != null) hourDate.setHours(ctx.hour, 0, 0, 0);
+    const where = `${siteName ? `to ${siteName} · ` : ''}${WD[ctx.date.getDay()]} ${ctx.date.getDate()} ${MO[ctx.date.getMonth()].slice(0, 3)}${hourDate ? ` · ${fmtTime(hourDate)}` : ''}`;
+
+    return createPortal(
+        <div
+            ref={ref}
+            role="menu"
+            style={{ top: pos.top, left: pos.left }}
+            className="fixed z-[60] w-[286px] rounded-xl border bg-popover p-1.5 text-popover-foreground shadow-2xl"
+        >
+            <div className="mb-1 flex items-center gap-2 border-b px-2 py-1.5">
+                <span className="flex items-center gap-1 rounded bg-primary/10 px-1.5 py-0.5 text-[10px] font-bold uppercase tracking-wider text-primary">
+                    <Plus className="h-3 w-3" /> Add
+                </span>
+                <span className="truncate text-[11px] text-muted-foreground">{where}</span>
+            </div>
+            <ul className="max-h-[260px] space-y-px overflow-y-auto">
+                {eventTypes.map((t) => (
+                    <li key={t.key}>
+                        <button
+                            role="menuitem"
+                            onClick={() => onPick(t.key)}
+                            className="grid w-full grid-cols-[26px_1fr_auto] items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[12.5px] transition-colors hover:bg-accent"
+                        >
+                            <span
+                                className="inline-flex h-[26px] w-[26px] items-center justify-center rounded-md"
+                                style={{ background: `${t.color}1a` }}
+                            >
+                                <span className="h-2.5 w-2.5 rounded-full" style={{ background: t.color }} />
+                            </span>
+                            <span className="min-w-0 truncate font-medium text-foreground">{t.label}</span>
+                            {t.requires_approval && (
+                                <span className="rounded border border-status-warning/30 bg-status-warning-bg px-1 py-0.5 text-[9px] font-semibold uppercase tracking-wide text-status-warning">
+                                    Approval
+                                </span>
+                            )}
+                        </button>
+                    </li>
+                ))}
+            </ul>
+            <div className="my-1 h-px bg-border/60" />
+            <button
+                onClick={onForm}
+                className="flex w-full items-center gap-2.5 rounded-md px-2 py-1.5 text-left text-[12.5px] text-muted-foreground transition-colors hover:bg-accent"
+            >
+                <span className="inline-flex h-[26px] w-[26px] items-center justify-center rounded-md bg-muted">
+                    <Pencil className="h-3.5 w-3.5" />
+                </span>
+                Open full form…
+            </button>
+        </div>,
+        document.body,
+    );
+}
+
+/* ---- hover preview card ------------------------------------------------- */
+
+function EventHoverCard({
+    ev,
+    rect,
+    srcByKey,
+    eventTypeByKey,
+}: {
+    ev: Decorated;
+    rect: DOMRect;
+    srcByKey: Record<string, SourceDef>;
+    eventTypeByKey: Record<string, EventTypeOption>;
+}) {
+    const W = 282;
+    let left = rect.right + 10;
+    if (left + W > window.innerWidth - 8) left = rect.left - W - 10;
+    if (left < 8) left = 8;
+    const top = Math.max(10, Math.min(rect.top - 4, window.innerHeight - 240));
+    const src = srcByKey[ev.source];
+    const typeLabel = ev.eventType ? (eventTypeByKey[ev.eventType]?.label ?? ev.eventType) : (src?.label ?? ev.source);
+    const when = ev.allDay ? 'All day' : fmtTimeRange(ev._start, ev._end);
+
+    return createPortal(
+        <div
+            className="pointer-events-none fixed z-[65] w-[282px] overflow-hidden rounded-xl border bg-popover text-popover-foreground shadow-2xl"
+            style={{ top, left }}
+        >
+            <div className="h-1 w-full" style={{ background: `var(--src-${ev.source})` }} />
+            <div className="space-y-2 p-3">
+                <div className="flex items-center gap-1.5 text-[11px] font-medium" style={{ color: `var(--src-${ev.source})` }}>
+                    <SourceDot k={ev.source} />
+                    {typeLabel}
+                    {ev.ref && <span className="tnum text-muted-foreground">· {ev.ref}</span>}
+                </div>
+                <p className="text-[14px] font-semibold leading-tight text-foreground">{ev.title}</p>
+                <StatusBadge status={ev.status} />
+                <dl className="space-y-1 text-[12px] text-muted-foreground">
+                    <div className="flex items-center gap-1.5">
+                        <Clock className="h-3.5 w-3.5 shrink-0" />
+                        <span>
+                            {ev._start.toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' })} · {when}
+                        </span>
+                    </div>
+                    {ev.room && (
+                        <div className="flex items-center gap-1.5">
+                            <MapPin className="h-3.5 w-3.5 shrink-0" />
+                            <span className="truncate">{ev.room}</span>
+                        </div>
+                    )}
+                    {ev.owner && (
+                        <div className="flex items-center gap-1.5">
+                            <Avatar person={ev.owner} size="h-4 w-4" />
+                            <span className="truncate">{ev.owner.name}</span>
+                        </div>
+                    )}
+                    {ev.recurrence && (
+                        <div className="flex items-center gap-1.5">
+                            <Repeat className="h-3.5 w-3.5 shrink-0" />
+                            <span className="truncate">{ruleToText(ev.recurrence)}</span>
+                        </div>
+                    )}
+                </dl>
+                {ev.desc && <p className="line-clamp-2 text-[12px] text-foreground/80">{ev.desc}</p>}
+                <p className="border-t pt-1.5 text-[10.5px] text-muted-foreground/70">
+                    Click to open · {ev.group === 'manual' ? 'Manual entry' : 'Auto-synced obligation'}
+                </p>
+            </div>
+        </div>,
+        document.body,
+    );
+}
+
+/* ---- approvals panel ---------------------------------------------------- */
+
+function ApprovalsPanel({
+    open,
+    onOpenChange,
+    items,
+    eventTypeByKey,
+    onOpenEvent,
+    onChanged,
+}: {
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    items: Decorated[];
+    eventTypeByKey: Record<string, EventTypeOption>;
+    onOpenEvent: (ev: Decorated) => void;
+    onChanged: () => void;
+}) {
+    const form = useForm({});
+    const act = (ev: Decorated, action: 'approve' | 'reject') => {
+        if (!ev.site) return;
+        form.post(`/sites/${ev.site.id}/calendar/events/${ev.seriesId ?? ev.id}/${action}`, {
+            preserveScroll: true,
+            onSuccess: onChanged,
+        });
+    };
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent style={{ maxWidth: 'min(92vw, 560px)' }}>
+                <DialogHeader>
+                    <DialogTitle className="flex items-center gap-2">
+                        <span className="flex h-8 w-8 items-center justify-center rounded-xl bg-status-warning-bg text-status-warning">
+                            <ClipboardCheck className="h-4 w-4" />
+                        </span>
+                        Awaiting approval
+                    </DialogTitle>
+                    <DialogDescription>
+                        {items.length === 0
+                            ? 'Nothing needs review right now.'
+                            : `${items.length} ${items.length === 1 ? 'entry needs' : 'entries need'} review.`}
+                    </DialogDescription>
+                </DialogHeader>
+
+                {items.length === 0 ? (
+                    <div className="flex flex-col items-center gap-2 py-10 text-muted-foreground">
+                        <CheckCircle2 className="h-10 w-10 opacity-40" />
+                        <p className="text-sm">You&apos;re all caught up.</p>
+                    </div>
+                ) : (
+                    <div className="max-h-[60vh] space-y-2 overflow-y-auto">
+                        {items.map((ev) => {
+                            const typeLabel = ev.eventType ? (eventTypeByKey[ev.eventType]?.label ?? ev.eventType) : null;
+                            return (
+                                <div key={`${ev.id}-${ev.start}`} className="flex items-center gap-3 rounded-lg border bg-card/40 p-2.5">
+                                    <span className="h-9 w-1.5 shrink-0 rounded-full" style={{ background: `var(--src-${ev.source})` }} />
+                                    <button onClick={() => onOpenEvent(ev)} className="min-w-0 flex-1 text-left">
+                                        <span className="block truncate text-sm font-medium">{ev.title}</span>
+                                        <span className="block truncate text-[12px] text-muted-foreground">
+                                            {ev._start.toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' })}
+                                            {!ev.allDay && ` · ${fmtTime(ev._start)}`}
+                                            {typeLabel && ` · ${typeLabel}`}
+                                        </span>
+                                    </button>
+                                    {ev.owner && <Avatar person={ev.owner} size="h-6 w-6" />}
+                                    <div className="flex shrink-0 items-center gap-1.5">
+                                        <Button variant="outline" size="xs" disabled={form.processing} onClick={() => act(ev, 'reject')}>
+                                            <X className="mr-1 h-3.5 w-3.5" /> Reject
+                                        </Button>
+                                        <Button size="xs" disabled={form.processing} onClick={() => act(ev, 'approve')}>
+                                            <Check className="mr-1 h-3.5 w-3.5" /> Approve
+                                        </Button>
+                                    </div>
+                                </div>
+                            );
+                        })}
                     </div>
                 )}
 
