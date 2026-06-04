@@ -26,6 +26,7 @@ import {
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
 import { Popover, PopoverContent, PopoverTrigger } from '@/components/ui/popover';
+import { Switch } from '@/components/ui/switch';
 import type { SharedData } from '@/types';
 import { Link, router, useForm, usePage } from '@inertiajs/react';
 import { createPortal } from 'react-dom';
@@ -113,6 +114,7 @@ import {
 } from './_parts';
 
 type SiteLite = { id: number; name: string; type: string };
+export type Person = { id: number; name: string };
 
 export interface EventTypeOption {
     key: string;
@@ -128,6 +130,7 @@ export interface SiteCalendarProps {
     scope: 'global' | 'site';
     site?: SiteLite;
     sites?: SiteLite[];
+    people?: Person[];
     sources?: SourceDef[];
     eventTypes?: EventTypeOption[];
     canCreate: boolean;
@@ -222,6 +225,15 @@ const TYPE_HINTS: Record<string, string> = {
     other: 'Custom entry',
 };
 
+/** Reminder presets (minutes before the entry) for the create dialog. */
+const REMINDER_PRESETS: { minutes: number; label: string }[] = [
+    { minutes: 0, label: 'At time' },
+    { minutes: 10, label: '10 min' },
+    { minutes: 30, label: '30 min' },
+    { minutes: 60, label: '1 hour' },
+    { minutes: 1440, label: '1 day' },
+];
+
 function TypeIcon({ icon, className = 'h-4 w-4' }: { icon?: string | null; className?: string }) {
     const C = (icon && TYPE_ICONS[icon]) || CalendarDays;
     return <C className={className} />;
@@ -258,6 +270,7 @@ export default function SiteCalendar({
     scope,
     site,
     sites = [],
+    people = [],
     sources = DEFAULT_SOURCES,
     eventTypes = DEFAULT_EVENT_TYPES,
     canCreate,
@@ -863,6 +876,7 @@ export default function SiteCalendar({
                     }}
                     scope={scope}
                     sites={sites}
+                    people={people}
                     defaultSiteId={createSiteId}
                     site={site}
                     eventTypes={eventTypes}
@@ -1201,6 +1215,7 @@ function CreateEventDialog({
     onOpenChange,
     scope,
     sites,
+    people,
     defaultSiteId,
     site,
     eventTypes,
@@ -1213,6 +1228,7 @@ function CreateEventDialog({
     onOpenChange: (open: boolean) => void;
     scope: 'global' | 'site';
     sites: SiteLite[];
+    people: Person[];
     defaultSiteId?: number;
     site?: SiteLite;
     eventTypes: EventTypeOption[];
@@ -1229,6 +1245,10 @@ function CreateEventDialog({
         description: '',
         start_at: '',
         end_at: '',
+        all_day: false,
+        owner_user_id: null as number | null,
+        attendee_user_ids: [] as number[],
+        reminder_minutes: [] as number[],
         recurrence_rule: '' as string,
     });
 
@@ -1243,6 +1263,10 @@ function CreateEventDialog({
                 description: editEvent.desc ?? '',
                 start_at: toLocalInput(editEvent._start),
                 end_at: editEvent._end ? toLocalInput(editEvent._end) : '',
+                all_day: !!editEvent.allDay,
+                owner_user_id: editEvent.owner?.id ?? null,
+                attendee_user_ids: editEvent.attendeeIds ?? [],
+                reminder_minutes: editEvent.reminders ?? [],
                 recurrence_rule: '',
             });
         } else {
@@ -1262,6 +1286,10 @@ function CreateEventDialog({
                 description: '',
                 start_at: toLocalInput(start),
                 end_at: toLocalInput(end),
+                all_day: false,
+                owner_user_id: null,
+                attendee_user_ids: [],
+                reminder_minutes: [],
                 recurrence_rule: '',
             });
         }
@@ -1282,7 +1310,7 @@ function CreateEventDialog({
             title: form.data.title || 'New event',
             start: form.data.start_at,
             end: form.data.end_at || null,
-            allDay: false,
+            allDay: form.data.all_day,
             status: 'scheduled',
             owner: null,
             room: editEvent?.room ?? null,
@@ -1292,13 +1320,17 @@ function CreateEventDialog({
             editable: true,
         };
         return findConflicts(draft, existingEvents);
-    }, [form.data.start_at, form.data.end_at, form.data.title, editEvent, existingEvents]);
+    }, [form.data.start_at, form.data.end_at, form.data.title, form.data.all_day, editEvent, existingEvents]);
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
         if (!targetSite) return;
         const rule = presetToRule(preset);
-        form.transform((data) => ({ ...data, recurrence_rule: rule ? (toRRULE(rule) ?? '') : '' }));
+        form.transform((data) => ({
+            ...data,
+            recurrence_rule: rule ? (toRRULE(rule) ?? '') : '',
+            end_at: data.all_day ? '' : data.end_at,
+        }));
         const opts = {
             preserveScroll: true,
             onSuccess: () => {
@@ -1438,31 +1470,57 @@ function CreateEventDialog({
                                 {form.errors.start_at && <p className="mt-1 text-sm text-status-critical">{form.errors.start_at}</p>}
                             </div>
 
-                            <div className="grid gap-4 sm:grid-cols-2">
-                                <div>
-                                    <Label htmlFor="cal-start" className="mb-1.5 block">
-                                        Start <span className="text-status-critical">*</span>
-                                    </Label>
-                                    <Input
-                                        id="cal-start"
-                                        type="time"
-                                        value={timePart(form.data.start_at)}
-                                        onChange={(e) => form.setData('start_at', combine(datePart(form.data.start_at), e.target.value))}
-                                        required
-                                    />
+                            <label className="flex items-center gap-2.5 text-sm font-medium">
+                                <Switch checked={form.data.all_day} onCheckedChange={(v) => form.setData('all_day', v)} />
+                                All-day entry
+                            </label>
+
+                            {!form.data.all_day && (
+                                <div className="grid gap-4 sm:grid-cols-2">
+                                    <div>
+                                        <Label htmlFor="cal-start" className="mb-1.5 block">
+                                            Start <span className="text-status-critical">*</span>
+                                        </Label>
+                                        <Input
+                                            id="cal-start"
+                                            type="time"
+                                            value={timePart(form.data.start_at)}
+                                            onChange={(e) => form.setData('start_at', combine(datePart(form.data.start_at), e.target.value))}
+                                            required
+                                        />
+                                    </div>
+                                    <div>
+                                        <Label htmlFor="cal-end" className="mb-1.5 block">
+                                            End
+                                        </Label>
+                                        <Input
+                                            id="cal-end"
+                                            type="time"
+                                            value={form.data.end_at ? timePart(form.data.end_at) : ''}
+                                            onChange={(e) => form.setData('end_at', e.target.value ? combine(datePart(form.data.start_at), e.target.value) : '')}
+                                        />
+                                        {form.errors.end_at && <p className="mt-1 text-sm text-status-critical">{form.errors.end_at}</p>}
+                                    </div>
                                 </div>
-                                <div>
-                                    <Label htmlFor="cal-end" className="mb-1.5 block">
-                                        End
-                                    </Label>
-                                    <Input
-                                        id="cal-end"
-                                        type="time"
-                                        value={form.data.end_at ? timePart(form.data.end_at) : ''}
-                                        onChange={(e) => form.setData('end_at', e.target.value ? combine(datePart(form.data.start_at), e.target.value) : '')}
-                                    />
-                                    {form.errors.end_at && <p className="mt-1 text-sm text-status-critical">{form.errors.end_at}</p>}
-                                </div>
+                            )}
+
+                            <div>
+                                <Label htmlFor="cal-owner" className="mb-1.5 block">
+                                    Owner
+                                </Label>
+                                <select
+                                    id="cal-owner"
+                                    value={form.data.owner_user_id ?? ''}
+                                    onChange={(e) => form.setData('owner_user_id', e.target.value ? Number(e.target.value) : null)}
+                                    className="w-full rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                >
+                                    <option value="">Unassigned</option>
+                                    {people.map((p) => (
+                                        <option key={p.id} value={p.id}>
+                                            {p.name}
+                                        </option>
+                                    ))}
+                                </select>
                             </div>
 
                             <div>
@@ -1481,6 +1539,60 @@ function CreateEventDialog({
                                         </option>
                                     ))}
                                 </select>
+                            </div>
+
+                            {people.length > 0 && (
+                                <div>
+                                    <Label className="mb-1.5 block">Attendees</Label>
+                                    <div className="flex max-h-28 flex-wrap gap-1.5 overflow-y-auto rounded-md border border-input bg-background/40 p-2">
+                                        {people.map((p) => {
+                                            const on = form.data.attendee_user_ids.includes(p.id);
+                                            return (
+                                                <button
+                                                    key={p.id}
+                                                    type="button"
+                                                    onClick={() =>
+                                                        form.setData(
+                                                            'attendee_user_ids',
+                                                            on
+                                                                ? form.data.attendee_user_ids.filter((id) => id !== p.id)
+                                                                : [...form.data.attendee_user_ids, p.id],
+                                                        )
+                                                    }
+                                                    className={`rounded-full border px-2.5 py-1 text-[12px] font-medium transition-colors ${on ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-accent'}`}
+                                                >
+                                                    {p.name}
+                                                </button>
+                                            );
+                                        })}
+                                    </div>
+                                </div>
+                            )}
+
+                            <div>
+                                <Label className="mb-1.5 block">Reminders</Label>
+                                <div className="flex flex-wrap gap-1.5">
+                                    {REMINDER_PRESETS.map((r) => {
+                                        const on = form.data.reminder_minutes.includes(r.minutes);
+                                        return (
+                                            <button
+                                                key={r.minutes}
+                                                type="button"
+                                                onClick={() =>
+                                                    form.setData(
+                                                        'reminder_minutes',
+                                                        on
+                                                            ? form.data.reminder_minutes.filter((m) => m !== r.minutes)
+                                                            : [...form.data.reminder_minutes, r.minutes].sort((a, b) => a - b),
+                                                    )
+                                                }
+                                                className={`rounded-full border px-2.5 py-1 text-[12px] font-medium transition-colors ${on ? 'border-primary bg-primary/10 text-primary' : 'border-border text-muted-foreground hover:bg-accent'}`}
+                                            >
+                                                {r.label}
+                                            </button>
+                                        );
+                                    })}
+                                </div>
                             </div>
 
                             <div>
