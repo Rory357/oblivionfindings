@@ -60,6 +60,7 @@ import {
     Rows3,
     Rss,
     Search,
+    Settings2,
     Trash2,
     X,
     CalendarPlus,
@@ -318,6 +319,12 @@ export default function SiteCalendar({
 
     const page = usePage<SharedData>();
     const currentUserId = page.props.auth?.user?.id ?? null;
+    // Admins who manage integrations get a deep-link to the resource-calendar sync
+    // settings (Settings → Calendar sync). Staff never see connection management here.
+    const canManageIntegrations = Boolean(
+        (page.props.auth as { can?: { integrations?: { manageTenantSecrets?: boolean } } } | undefined)?.can?.integrations
+            ?.manageTenantSecrets,
+    );
     // Ticks every minute so the rail's NOW marker + "happening now / up next"
     // advance live without a manual reload.
     const now = useNow();
@@ -764,14 +771,21 @@ export default function SiteCalendar({
                     <DropdownMenuItem onSelect={() => downloadICS(visibleEvents, 'site-calendar.ics')}>
                         <Download className="mr-2 h-4 w-4" /> Export this period (.ics)
                     </DropdownMenuItem>
-                    {canApprove && (
+                    {(canApprove || canManageIntegrations) && (
                         <>
                             <DropdownMenuSeparator />
                             <DropdownMenuLabel>Admin</DropdownMenuLabel>
-                            <DropdownMenuItem onSelect={() => setApprovalsOpen(true)}>
-                                <ClipboardCheck className="mr-2 h-4 w-4" /> Review approvals
-                                {toApproveCount > 0 ? ` (${toApproveCount})` : ''}
-                            </DropdownMenuItem>
+                            {canApprove && (
+                                <DropdownMenuItem onSelect={() => setApprovalsOpen(true)}>
+                                    <ClipboardCheck className="mr-2 h-4 w-4" /> Review approvals
+                                    {toApproveCount > 0 ? ` (${toApproveCount})` : ''}
+                                </DropdownMenuItem>
+                            )}
+                            {canManageIntegrations && (
+                                <DropdownMenuItem onSelect={() => router.visit('/settings/calendar-sync')}>
+                                    <Settings2 className="mr-2 h-4 w-4" /> Calendar sync settings
+                                </DropdownMenuItem>
+                            )}
                         </>
                     )}
                 </DropdownMenuContent>

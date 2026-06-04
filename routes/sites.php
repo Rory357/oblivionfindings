@@ -44,7 +44,15 @@ use App\Http\Controllers\Sites\{
 // Public per-user calendar subscribe feed (token-auth, no session). Kept OUTSIDE
 // the auth group so external calendar apps (Google/Outlook/Apple) can poll it.
 Route::get('/calendar/feed/{token}.ics', [SiteCalendarController::class, 'feed'])
+    ->middleware('throttle:60,1')
     ->name('calendar.feed')
+    ->where('token', '[A-Za-z0-9]+');
+
+// Public per-house resource-calendar feed (token-auth). The mapped Google/Outlook
+// resource calendar subscribes to this webcal URL; managed in Settings → Calendar sync.
+Route::get('/calendar/site/{site}/feed/{token}.ics', [SiteCalendarController::class, 'houseFeed'])
+    ->middleware('throttle:60,1')
+    ->name('calendar.house-feed')
     ->where('token', '[A-Za-z0-9]+');
 
 Route::middleware(['auth', 'verified'])->group(function () {

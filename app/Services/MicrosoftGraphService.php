@@ -2,54 +2,56 @@
 
 namespace App\Services;
 
-use App\Models\Identity;
+use App\Contracts\CalendarOAuthToken;
 use Illuminate\Support\Facades\Http;
 use Illuminate\Support\Facades\Log;
 
 class MicrosoftGraphService
 {
-    protected Identity $identity;
-
-    public function __construct(Identity $identity)
-    {
-        $this->identity = $identity;
-    }
+    public function __construct(protected CalendarOAuthToken $token) {}
 
     protected function client()
     {
-        if ($this->identity->needsRefresh()) {
+        if ($this->token->needsRefresh()) {
             $this->refreshAccessToken();
         }
 
-        return Http::withToken($this->identity->access_token)
+        return Http::withToken((string) $this->token->getAccessToken())
             ->baseUrl('https://graph.microsoft.com/v1.0');
     }
 
     protected function refreshAccessToken(): void
     {
+        $refreshToken = $this->token->getRefreshToken();
+        if (! $refreshToken) {
+            return;
+        }
+
         $response = Http::asForm()->post(
             'https://login.microsoftonline.com/' . config('services.microsoft.tenant') . '/oauth2/v2.0/token',
             [
                 'client_id' => config('services.microsoft.client_id'),
                 'client_secret' => config('services.microsoft.client_secret'),
                 'grant_type' => 'refresh_token',
-                'refresh_token' => $this->identity->refresh_token,
-                'scope' => 'https://graph.microsoft.com/.default',
+                'refresh_token' => $refreshToken,
+                'scope' => 'https://graph.microsoft.com/.default offline_access',
             ]
         );
 
         if ($response->successful()) {
-            $this->identity->update([
-                'access_token' => $response->json('access_token'),
-                'refresh_token' => $response->json('refresh_token', $this->identity->refresh_token),
-                'token_expires_at' => now()->addSeconds($response->json('expires_in', 3600)),
-            ]);
+            $this->token->storeRefreshedToken(
+                (string) $response->json('access_token'),
+                $response->json('refresh_token'),
+                (int) $response->json('expires_in', 3600),
+            );
         } else {
-            Log::warning('Microsoft token refresh failed', ['user_id' => $this->identity->user_id]);
+            Log::warning('Microsoft token refresh failed', ['status' => $response->status()]);
         }
     }
 
-    // Calendar methods
+    // ------------------------------------------------------------------
+    // Personal calendar (/me) — used by the per-user "add to my calendar".
+    // ------------------------------------------------------------------
 
     public function getCalendarEvents(string $from, string $to): array
     {
@@ -79,6 +81,71 @@ class MicrosoftGraphService
     public function deleteCalendarEvent(string $eventId): bool
     {
         return $this->client()->delete("/me/events/{$eventId}")->successful();
+    }
+
+    // ------------------------------------------------------------------
+    // Resource / room mailboxes — used by admin house calendar sync.
+    // The connected account must have delegated access to the room mailbox.
+    // ------------------------------------------------------------------
+
+    /**
+     * List the org's room/resource mailboxes (requires Place.Read.All).
+     *
+     * @return array<int, array{id:string,name:string,email:string}>
+     */
+    public function listRooms(): array
+    {
+        $response = $this->client()->get('/places/microsoft.graph.room', [
+            '$top' => 250,
+        ]);
+
+        if (! $response->successful()) {
+            return [];
+        }
+
+        return collect($response->json('value', []))
+            ->map(fn (array $room) => [
+                'id' => (string) ($room['emailAddress'] ?? $room['id'] ?? ''),
+                'name' => (string) ($room['displayName'] ?? $room['emailAddress'] ?? ''),
+                'email' => (string) ($room['emailAddress'] ?? ''),
+            ])
+            ->filter(fn ($room) => $room['id'] !== '')
+            ->values()
+            ->all();
+    }
+
+    public function getRoomCalendarEvents(string $roomUpn, string $from, string $to): array
+    {
+        $response = $this->client()->get('/users/'.rawurlencode($roomUpn).'/calendarView', [
+            'startDateTime' => $from,
+            'endDateTime' => $to,
+            '$select' => 'id,subject,start,end,location,isAllDay,showAs',
+            '$top' => 250,
+            '$orderby' => 'start/dateTime',
+        ]);
+
+        return $response->successful() ? $response->json('value', []) : [];
+    }
+
+    public function createRoomEvent(string $roomUpn, array $data): ?array
+    {
+        $response = $this->client()->post('/users/'.rawurlencode($roomUpn).'/events', $data);
+
+        return $response->successful() ? $response->json() : null;
+    }
+
+    public function updateRoomEvent(string $roomUpn, string $eventId, array $data): bool
+    {
+        return $this->client()
+            ->patch('/users/'.rawurlencode($roomUpn).'/events/'.rawurlencode($eventId), $data)
+            ->successful();
+    }
+
+    public function deleteRoomEvent(string $roomUpn, string $eventId): bool
+    {
+        return $this->client()
+            ->delete('/users/'.rawurlencode($roomUpn).'/events/'.rawurlencode($eventId))
+            ->successful();
     }
 
     // Mail methods

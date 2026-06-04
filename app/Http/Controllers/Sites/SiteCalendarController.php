@@ -4,10 +4,13 @@ namespace App\Http\Controllers\Sites;
 
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Sites\Concerns\ResolvesAllowedSiteTypes;
+use App\Jobs\SyncCalendarEventToResourcesJob;
+use App\Models\CalendarSyncMapping;
 use App\Models\Site;
 use App\Models\SiteCalendarEvent;
 use App\Models\User;
 use App\Services\Sites\Calendar\CalendarSources;
+use App\Services\Sites\Calendar\CalendarSyncService;
 use App\Services\Sites\Calendar\IcsFeedBuilder;
 use App\Services\Sites\Calendar\SiteCalendarAggregator;
 use App\Services\Sites\SiteCalendarService;
@@ -25,6 +28,7 @@ class SiteCalendarController extends Controller
         private SiteCalendarService $calendarService,
         private SiteCalendarAggregator $aggregator,
         private IcsFeedBuilder $icsFeedBuilder,
+        private CalendarSyncService $calendarSync,
     ) {}
 
     public function index(Request $request, Site $site)
@@ -125,6 +129,8 @@ class SiteCalendarController extends Controller
             'approval_status' => $this->requiresApproval($validated['event_type']) ? 'pending' : 'not_required',
         ]);
 
+        $this->syncEventToResources($event);
+
         return redirect()->back()->with('success', 'Event created.');
     }
 
@@ -162,6 +168,8 @@ class SiteCalendarController extends Controller
 
         $event->update($validated);
 
+        $this->syncEventToResources($event);
+
         return redirect()->back()->with('success', 'Event updated.');
     }
 
@@ -176,6 +184,8 @@ class SiteCalendarController extends Controller
             'approved_by_user_id' => $request->user()->id,
             'approved_at' => now(),
         ]);
+
+        $this->syncEventToResources($event);
 
         return redirect()->back()->with('success', 'Event approved.');
     }
@@ -196,6 +206,11 @@ class SiteCalendarController extends Controller
             'approved_by_user_id' => $request->user()->id,
             'approved_at' => now(),
         ]);
+
+        // A rejected event must not remain on a resource calendar. Retract directly
+        // (off the existing push links) rather than via the active-mapping-gated
+        // dispatch, so it still clears if the mapping was since deactivated.
+        $this->calendarSync->deleteEvent($event);
 
         return redirect()->back()->with('success', 'Event rejected.');
     }
@@ -243,10 +258,58 @@ class SiteCalendarController extends Controller
         return $token ? url("/calendar/feed/{$token}.ics") : null;
     }
 
+    /**
+     * Public per-house resource-calendar feed (token-authenticated, no session). The
+     * mapped Google/Outlook resource calendar subscribes to this webcal URL to receive
+     * the house's full schedule — manual events + obligations — honouring the mapping's
+     * configured source filter. Tokens are managed in Settings → Calendar sync.
+     */
+    public function houseFeed(Request $request, Site $site, string $token)
+    {
+        $mapping = CalendarSyncMapping::query()
+            ->where('site_id', $site->id)
+            ->where('ical_feed_token', $token)
+            ->first();
+        abort_unless($mapping, 404);
+
+        $filters = ! empty($mapping->sources) ? ['sources' => $mapping->sources] : [];
+        $items = $this->aggregator->itemsForRange(
+            [$site->id],
+            now()->subMonth(),
+            now()->addMonths(3),
+            $filters,
+        );
+
+        return response($this->icsFeedBuilder->build($items, $site->name.' — Calendar'), 200, [
+            'Content-Type' => 'text/calendar; charset=utf-8',
+            'Content-Disposition' => 'inline; filename="house-'.$site->id.'-calendar.ics"',
+        ]);
+    }
+
+    /**
+     * Push a manual event to its house's mapped resource calendars (async), but only
+     * when sync is actually configured for the site — avoids dispatching no-op jobs.
+     */
+    private function syncEventToResources(SiteCalendarEvent $event): void
+    {
+        $configured = CalendarSyncMapping::query()
+            ->where('site_id', $event->site_id)
+            ->where('is_active', true)
+            ->exists();
+
+        if ($configured) {
+            SyncCalendarEventToResourcesJob::dispatch($event->id);
+        }
+    }
+
     public function destroy(Request $request, Site $site, SiteCalendarEvent $event)
     {
         $this->authorize('update', $site);
         abort_unless($event->site_id === $site->id, 404);
+
+        // Retract from any mapped resource calendars while the idempotency links
+        // still exist (they cascade-delete with the event). Best-effort + guarded.
+        $this->calendarSync->deleteEvent($event);
 
         $event->delete();
 

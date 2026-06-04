@@ -14,9 +14,24 @@ interface Props {
     canManage: boolean;
     canApprove: boolean;
     feedUrl: string | null;
+    pendingApprovalCount?: number;
+    mineCount?: number;
+    overdueCount?: number;
 }
 
-export default function CalendarGlobal({ sites, people, sources, eventTypes, canCreate, canManage, canApprove, feedUrl }: Props) {
+export default function CalendarGlobal({
+    sites,
+    people,
+    sources,
+    eventTypes,
+    canCreate,
+    canManage,
+    canApprove,
+    feedUrl,
+    pendingApprovalCount,
+    mineCount,
+    overdueCount,
+}: Props) {
     return (
         <AppLayout breadcrumbs={[{ title: 'Calendar', href: '/calendar' }]}>
             <Head title="Site Calendar" />
@@ -31,6 +46,9 @@ export default function CalendarGlobal({ sites, people, sources, eventTypes, can
                 canManage={canManage}
                 canApprove={canApprove}
                 feedUrl={feedUrl}
+                pendingApprovalCount={pendingApprovalCount}
+                mineCount={mineCount}
+                overdueCount={overdueCount}
             />
         </AppLayout>
     );

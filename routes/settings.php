@@ -15,6 +15,8 @@ use App\Http\Controllers\Settings\NotificationPreferencesController;
 use App\Http\Controllers\Settings\NotificationEscalationsController;
 use App\Http\Controllers\Settings\ModuleSettingsController;
 use App\Http\Controllers\Settings\ApiSettingsController;
+use App\Http\Controllers\Settings\CalendarSyncOAuthController;
+use App\Http\Controllers\Settings\CalendarSyncSettingsController;
 use App\Http\Controllers\Settings\DataSettingsController;
 use App\Http\Controllers\Settings\EmailSettingsController;
 use App\Http\Controllers\Settings\NotificationTemplateController;
@@ -298,6 +300,31 @@ Route::middleware('auth')->group(function () {
     Route::get('settings/audit-logs/export', [AuditLogSettingsController::class, 'export'])
         ->middleware('permission:audit.viewAny|settings.access.manage')
         ->name('settings.audit_logs.export');
+
+    // Calendar sync (admin): connect Google Workspace / Microsoft 365 and map each
+    // house to a resource calendar. Gated on the existing integrations-manage permission.
+    Route::middleware('permission:integrations.manage_tenant_secrets')->group(function () {
+        Route::get('settings/calendar-sync', [CalendarSyncSettingsController::class, 'index'])
+            ->name('settings.calendar-sync');
+        Route::put('settings/calendar-sync/mapping', [CalendarSyncSettingsController::class, 'updateMapping'])
+            ->name('settings.calendar-sync.mapping');
+        Route::put('settings/calendar-sync/settings', [CalendarSyncSettingsController::class, 'updateGlobal'])
+            ->name('settings.calendar-sync.settings');
+        Route::get('settings/calendar-sync/resources/{provider}', [CalendarSyncSettingsController::class, 'resources'])
+            ->name('settings.calendar-sync.resources');
+        Route::post('settings/calendar-sync/sync-now', [CalendarSyncSettingsController::class, 'syncNow'])
+            ->name('settings.calendar-sync.sync-now');
+        Route::post('settings/calendar-sync/mapping/{mapping}/reset-feed', [CalendarSyncSettingsController::class, 'resetFeed'])
+            ->name('settings.calendar-sync.reset-feed');
+
+        // Admin OAuth connect/callback/disconnect for the org calendar connection.
+        Route::get('settings/calendar-sync/connect/{provider}', [CalendarSyncOAuthController::class, 'redirect'])
+            ->name('settings.calendar-sync.connect');
+        Route::get('settings/calendar-sync/callback/{provider}', [CalendarSyncOAuthController::class, 'callback'])
+            ->name('settings.calendar-sync.callback');
+        Route::delete('settings/calendar-sync/connect/{provider}', [CalendarSyncOAuthController::class, 'disconnect'])
+            ->name('settings.calendar-sync.disconnect');
+    });
 
     // Hardware integrations now live in Security & Devices. Microsoft and Google stay in Auth/SSO.
     Route::redirect('settings/integrations', '/security-devices/integrations', 301)
