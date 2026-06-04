@@ -97,6 +97,10 @@ class SiteCalendarController extends Controller
             'reminder_minutes' => 'nullable|array',
         ]);
 
+        // The datetime-local inputs are business-timezone wall-clock; persist UTC.
+        $validated['start_at'] = $this->toUtcFromWorker($validated['start_at']);
+        $validated['end_at'] = $this->toUtcFromWorker($validated['end_at'] ?? null);
+
         $event = SiteCalendarEvent::create([
             ...$validated,
             'site_id' => $site->id,
@@ -126,6 +130,15 @@ class SiteCalendarController extends Controller
             'reminder_minutes' => 'sometimes|nullable|array',
             'status' => 'sometimes|required|in:draft,pending,approved,completed,cancelled',
         ]);
+
+        // Times arrive as business-timezone wall-clock; store UTC. Only convert the
+        // keys actually present — drag/resize updates send just start/end.
+        if (array_key_exists('start_at', $validated)) {
+            $validated['start_at'] = $this->toUtcFromWorker($validated['start_at']);
+        }
+        if (array_key_exists('end_at', $validated)) {
+            $validated['end_at'] = $this->toUtcFromWorker($validated['end_at']);
+        }
 
         $event->update($validated);
 
@@ -385,5 +398,28 @@ class SiteCalendarController extends Controller
     private function siteAccess(): UserSiteAccessService
     {
         return app(UserSiteAccessService::class);
+    }
+
+    /**
+     * Business timezone calendar times are authored and displayed in (NZ).
+     * Storage stays UTC — we convert at this read/write boundary.
+     */
+    private function workerTimezone(): string
+    {
+        return (string) config('app.worker_timezone', 'Pacific/Auckland');
+    }
+
+    /**
+     * Interpret a `datetime-local` wall-clock string (no offset) as business-
+     * timezone local time and return the equivalent UTC instant. Null/empty
+     * passes through so nullable end times stay null.
+     */
+    private function toUtcFromWorker(?string $value): ?Carbon
+    {
+        if ($value === null || $value === '') {
+            return null;
+        }
+
+        return Carbon::parse($value, $this->workerTimezone())->utc();
     }
 }

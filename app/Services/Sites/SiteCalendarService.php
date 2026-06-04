@@ -186,11 +186,16 @@ class SiteCalendarService
             $end = $start->copy()->addSeconds($durationSeconds);
         }
 
+        // Override times are stored verbatim as business-timezone wall-clock
+        // (a datetime-local string); parse them in that zone before emitting UTC.
+        // Series occurrences already derive from the UTC start column, so they
+        // need no conversion.
+        $tz = (string) config('app.worker_timezone', 'Pacific/Auckland');
         $startIso = isset($overrides['start_at'])
-            ? Carbon::parse($overrides['start_at'])->toIso8601String()
+            ? Carbon::parse($overrides['start_at'], $tz)->utc()->toIso8601String()
             : $start->toIso8601String();
         $endIso = isset($overrides['end_at'])
-            ? Carbon::parse($overrides['end_at'])->toIso8601String()
+            ? Carbon::parse($overrides['end_at'], $tz)->utc()->toIso8601String()
             : $end?->toIso8601String();
 
         return [

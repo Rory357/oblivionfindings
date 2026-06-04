@@ -50,7 +50,12 @@ class MealPlanObligationProvider extends ObligationProvider
             ->get()
             ->map(function (SiteMealPlanEntry $entry) {
                 $time = self::SLOT_TIMES[$entry->meal_slot] ?? '12:00';
-                $startAt = $entry->plan_date->copy()->setTimeFromTimeString($time);
+                // Slot times are business-timezone wall-clock (breakfast 08:00 NZ);
+                // build them in that zone and emit the UTC instant the feed renders.
+                $startAt = Carbon::parse(
+                    $entry->plan_date->toDateString().' '.$time,
+                    config('app.worker_timezone', 'Pacific/Auckland'),
+                )->utc();
                 $slotLabel = self::SLOT_LABELS[$entry->meal_slot] ?? ucfirst((string) $entry->meal_slot);
 
                 return new CalendarItem(

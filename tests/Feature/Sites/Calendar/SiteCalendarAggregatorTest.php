@@ -63,6 +63,27 @@ test('aggregator unions manual events with auto-derived obligations', function (
     expect($meal->ref)->toBe('MEAL-'.SiteMealPlanEntry::first()->id);
 });
 
+test('meal obligations surface at their business-timezone slot time (8am, not 8pm)', function () {
+    $tz = config('app.worker_timezone', 'Pacific/Auckland');
+    $site = Site::factory()->create(['type' => 'house']);
+
+    makeMeal($site, '2026-06-05', 'breakfast', 'Porridge & fruit');
+
+    $items = collect(app(SiteCalendarAggregator::class)->itemsForRange(
+        [$site->id],
+        Carbon::parse('2026-06-01'),
+        Carbon::parse('2026-06-30'),
+    ));
+
+    $meal = $items->firstWhere('source', 'meal');
+    expect($meal)->not->toBeNull();
+    // The 08:00 breakfast slot must read as 8am in NZ — the +12h bug showed 8pm.
+    expect(Carbon::parse($meal->start)->timezone($tz)->format('Y-m-d H:i'))->toBe('2026-06-05 08:00');
+    expect(Carbon::parse($meal->end)->timezone($tz)->format('Y-m-d H:i'))->toBe('2026-06-05 09:00');
+    // Stored/emitted as a true UTC instant (08:00 NZST → 20:00 UTC the day before).
+    expect(Carbon::parse($meal->start)->utc()->format('Y-m-d H:i'))->toBe('2026-06-04 20:00');
+});
+
 test('aggregator excludes rows from sites outside the requested set', function () {
     $wanted = Site::factory()->create(['type' => 'house']);
     $other = Site::factory()->create(['type' => 'house']);
