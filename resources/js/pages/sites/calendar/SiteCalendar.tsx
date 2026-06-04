@@ -137,6 +137,11 @@ export interface SiteCalendarProps {
     canManage?: boolean;
     canApprove?: boolean;
     feedUrl?: string | null;
+    /** Authoritative cross-range hero counts (page contexts only; the profile
+     *  embed receives none and falls back to the in-view derivation). */
+    pendingApprovalCount?: number;
+    mineCount?: number;
+    overdueCount?: number;
 }
 
 type CalView = 'month' | 'week' | 'day' | 'agenda' | 'timeline';
@@ -277,6 +282,9 @@ export default function SiteCalendar({
     canManage = false,
     canApprove = false,
     feedUrl,
+    pendingApprovalCount: pendingApprovalCountProp,
+    mineCount: mineCountProp,
+    overdueCount: overdueCountProp,
 }: SiteCalendarProps) {
     const [view, setView] = useState<CalView>('month');
     const [navDate, setNavDate] = useState(() => new Date());
@@ -390,25 +398,40 @@ export default function SiteCalendar({
         return navDate.getMonth() === t.getMonth() && navDate.getFullYear() === t.getFullYear();
     }, [view, navDate]);
 
-    // Hero stats — derived client-side from the events already in view. (Cross-range
-    // accuracy for "To approve" / "Mine" would need backend count props; in-view is
-    // correct for the browsed window and needs no backend change.)
-    const overdueCount = useMemo(() => visibleEvents.filter((e) => e.status === 'overdue').length, [visibleEvents]);
+    // Hero stats. "This month" and "Done" are inherently period stats, so they stay
+    // in-view. "Overdue" / "To approve" / "Mine" prefer the authoritative server
+    // counts (which see the whole accessible range), falling back to the in-view
+    // derivation for embeds with no props — or whenever the user narrows the view by
+    // house/source, so the stat keeps tracking what's on screen.
+    const narrowed = houseFilter !== 'all' || enabledSources.size !== sources.length;
+
+    const overdueDerived = useMemo(() => visibleEvents.filter((e) => e.status === 'overdue').length, [visibleEvents]);
+    const overdueCount = !narrowed && overdueCountProp != null ? overdueCountProp : overdueDerived;
+
     const thisMonthCount = useMemo(() => {
         const ms = startOfMonth(navDate);
         const me = endOfMonth(navDate);
         me.setHours(23, 59, 59, 999);
         return visibleEvents.filter((e) => e._start >= ms && e._start <= me).length;
     }, [visibleEvents, navDate]);
+
     const pendingApprovals = useMemo(
         () => visibleEvents.filter((e) => e.group === 'manual' && e.approvalStatus === 'pending'),
         [visibleEvents],
     );
-    const toApproveCount = pendingApprovals.length;
-    const mineCount = useMemo(
-        () => (currentUserId == null ? 0 : visibleEvents.filter((e) => e.owner?.id === currentUserId).length),
+    const toApproveCount = !narrowed && pendingApprovalCountProp != null ? pendingApprovalCountProp : pendingApprovals.length;
+
+    const mineDerived = useMemo(
+        () =>
+            currentUserId == null
+                ? 0
+                : visibleEvents.filter(
+                      (e) => e.owner?.id === currentUserId || (e.attendeeIds?.includes(currentUserId) ?? false),
+                  ).length,
         [visibleEvents, currentUserId],
     );
+    const mineCount = !narrowed && mineCountProp != null ? mineCountProp : mineDerived;
+
     const doneCount = useMemo(
         () => visibleEvents.filter((e) => e.status === 'completed' || e.status === 'approved').length,
         [visibleEvents],

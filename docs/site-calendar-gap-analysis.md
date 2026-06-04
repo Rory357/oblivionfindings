@@ -9,6 +9,12 @@ Branding decision (confirmed with user): the hero uses **brand `--primary` (purp
 to match the Rostering banner — *not* the Sites green in the prototype screenshot (which was only the
 prototype's hue-rotated preview default). One-line swap to `category="sites"` if ever wanted.
 
+> **Status update (2026-06-04):** both **P1** blockers are now **closed** (backend) — a targeted
+> calendar-permissions backfill seeder + approve/reject gate reconciliation, and authoritative
+> cross-range hero counts. `npx tsc --noEmit` → 0 errors, `npm run build` → exit 0, and **17 calendar
+> feature tests pass** (3 new in `SiteCalendarHeroCountsTest`). Details inline under section B/P1; files
+> in section C. Remaining work is **P2/P3** only.
+
 ---
 
 ## A. What this session implemented (chrome parity — done, build-verified)
@@ -36,29 +42,50 @@ prototype's hue-rotated preview default). One-line swap to `category="sites"` if
 
 ---
 
-## B. Remaining functional gaps (not yet built)
+## B. Functional gaps (P1 closed this session · P2/P3 remaining)
 
 Priorities: **P1** = correctness/parity blockers · **P2** = important parity · **P3** = polish / value-add.
 
-### P1 — should land before calling this "done"
+### P1 — ✅ closed this session (backend; `tsc` 0, `build` 0, 17 calendar tests green)
 
-1. **`calendar.*` permissions are seeded-not-migrated → live server 403s.**
-   The six `calendar.*` permissions live in `RbacSeeder`, not a migration, and deploys skip seeders.
-   Admin / super-admin roles carry only `calendar.viewAny` — **not** `view/create/manage/approve`
-   (no super-admin bypass in `canDo`). On oblivionfindings.com the global page, items feed and
-   feed-reset gate on `calendar.view` and **403 for admins**. Also `approve()/reject()` double-gate on
-   the permission **and** the site update policy, but `canApprove` checks only the permission.
-   → Add `calendar.view/create/manage/approve` to admin/super-admin in `RbacSeeder` and run a targeted
-   `*PermissionsSeeder --force` post-deploy. Reconcile the approve/reject policy-vs-permission gate.
-   *(This is the most likely reason the page looks empty / blocked on the live demo.)*
+1. ~~**`calendar.*` permissions are seeded-not-migrated → live server 403s.**~~ — ✅ **fixed with a
+   targeted backfill seeder + approve/reject gate reconciliation.**
+   *Correction to the original note:* the `admin` role is **not** limited to `calendar.viewAny` in code —
+   `RbacSeeder` syncs **every** permission to `admin`
+   (`$admin->permissions()->sync(Permission::pluck('id'))`), so admins gain
+   `calendar.view/create/manage/approve` **once the seeder runs**. The live-server 403s are therefore
+   purely operational: deploys skip seeders, so on oblivionfindings.com the seeder never re-ran after the
+   newer `calendar.view/create/manage/approve/manage_recurring` rows were added to `RbacSeeder` — those
+   permission rows + admin's grants never reached the live DB (the standard seeded-not-migrated deploy gap).
+   → Added **`database/seeders/SeedCalendarPermissionsSeeder`** — idempotent `firstOrCreate` + additive
+   `attach` of the diff onto `admin` (mirrors `SeedHrPermissionsSeeder`, never `sync`-wipes other grants)
+   — and wired it into `DatabaseSeeder` after `OperationsPermissionsSeeder`. **Post-deploy fix:**
+   `php artisan db:seed --class=SeedCalendarPermissionsSeeder --force`. (The complete multi-role fix —
+   `team_lead`, `maintenance_coordinator`, `health_safety_officer` — remains a re-run of `RbacSeeder`;
+   the demo signs in as `admin`, which this covers.)
+   **Approve/reject gate reconciled:** `approve()/reject()` enforce the route `permission:calendar.approve`
+   **and** the controller `authorize('update', $site)` policy, but the page's `canApprove` prop checked
+   *only* the permission — so the button showed then 403'd on click. `index()` now computes
+   `canApprove = canDo('calendar.approve') && can('update', $site)` (mirroring `canCreate/canManage`).
+   `global()` stays a coarse `canDo('calendar.approve')` **by design** — there's no single site at page
+   level, and per-event approval still authorises the owning site server-side.
 
-2. **Hero stats are in-view only; "To approve" and "Mine" can under-count.**
-   Counts are derived client-side from the fetched window. `Mine` cannot see attendee-only events
-   (the `CalendarItem` DTO serialises `owner` but not `attendee_user_ids`), and items overdue from a
-   prior month (outside the view) are invisible.
-   → Add `pendingApprovalCount` / `mineCount` / cross-range `overdueCount` props to
-   `SiteCalendarController::index()/global()`, scoped to accessible sites; optionally add
-   `attendees:[{id,name}]` to `CalendarItem`. Frontend prefers the prop, falls back to the derivation.
+2. ~~**Hero stats are in-view only; "To approve" and "Mine" can under-count.**~~ — ✅ **authoritative
+   cross-range backend counts added.**
+   New `SiteCalendarController::heroCounts(siteIds, userId)` returns, scoped to the page's accessible
+   sites: **`pendingApprovalCount`** (manual events `approval_status='pending'`), **`mineCount`** (manual
+   events I **own or attend** — the attendee leg via `whereJsonContains('attendee_user_ids', …)`, which the
+   in-view derivation missed), and **`overdueCount`** (a cross-range aggregator scan over a bounded
+   **12-month look-back**, limited to the six overdue-capable sources —
+   inspection/compliance/checklist/hazard/vendor/credential; manual events, meals and damages never carry
+   an `overdue` status, so they're skipped to keep it cheap). Passed by `index()` (this house) and
+   `global()` (all resolved sites). Attendees already round-trip as `CalendarItem.attendeeIds`, so **no DTO
+   change was needed**.
+   Frontend (`SiteCalendar.tsx`) **prefers the props** but **falls back to the in-view derivation** for the
+   profile embed (no props) **and whenever the user narrows by house/source**, so the stat keeps tracking
+   what's on screen; the derived `mineCount` now also counts `attendeeIds`. Covered by
+   `tests/Feature/Sites/Calendar/SiteCalendarHeroCountsTest.php` (pending/mine/overdue values, accessible-site
+   isolation, and the `canApprove` view-vs-update gate).
 
 ### P2 — parity & higher-value features
 
@@ -104,9 +131,26 @@ Priorities: **P1** = correctness/parity blockers · **P2** = important parity ·
 
 ---
 
-## C. Files touched this session
+## C. Files touched
+
+**Chrome-parity session (frontend):**
 - `resources/js/pages/sites/calendar/SiteCalendar.tsx` — hero rebuild, footer band, QuickAddMenu,
   EventHoverCard, ApprovalsPanel, Filter popover, seed-threaded create dialog, hero stat derivations.
   (No changes needed to `_parts.tsx` — its `onContext/onPreview` plumbing was already complete;
   only the parent handlers were missing. No changes to `page-hero.tsx` — its `footer`/`meta`/`stats`
   props already supported the design.)
+
+**P1 closeout (this session, backend + frontend):**
+- `app/Http/Controllers/Sites/SiteCalendarController.php` — `canApprove` now double-gates on
+  `can('update', $site)` in `index()`; new `heroCounts()` helper + `OVERDUE_SOURCES` const; `index()`
+  and `global()` pass `pendingApprovalCount` / `mineCount` / `overdueCount`.
+- `database/seeders/SeedCalendarPermissionsSeeder.php` — **new**; idempotent backfill of the six
+  `calendar.*` permissions onto `admin` (post-deploy live-server fix).
+- `database/seeders/DatabaseSeeder.php` — calls `SeedCalendarPermissionsSeeder` after
+  `OperationsPermissionsSeeder`.
+- `resources/js/pages/sites/calendar/SiteCalendar.tsx` — prefer the authoritative count props (fall back
+  to in-view derivation for the profile embed or when narrowed by house/source); derived `mineCount` now
+  counts `attendeeIds` too.
+- `tests/Feature/Sites/Calendar/SiteCalendarHeroCountsTest.php` — **new**; pending/mine/overdue counts,
+  accessible-site isolation, and the `canApprove` view-vs-update gate.
+  *(No `CalendarItem` DTO change — attendees already serialise as `attendeeIds`.)*

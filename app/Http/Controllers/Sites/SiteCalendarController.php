@@ -31,6 +31,8 @@ class SiteCalendarController extends Controller
     {
         $this->authorize('view', $site);
 
+        $user = $request->user();
+
         return inertia('sites/calendar/index', [
             'context' => 'page',
             'scope' => 'site',
@@ -45,12 +47,18 @@ class SiteCalendarController extends Controller
             'people' => User::query()->staff()->orderBy('name')->get(['id', 'name']),
             'eventTypes' => $this->eventTypeOptions(),
             'sources' => CalendarSources::all(),
-            'canCreate' => ($request->user()?->canDo('calendar.create') ?? false)
-                && ($request->user()?->can('update', $site) ?? false),
-            'canManage' => ($request->user()?->canDo('calendar.manage') ?? false)
-                && ($request->user()?->can('update', $site) ?? false),
-            'canApprove' => $request->user()?->canDo('calendar.approve') ?? false,
-            'feedUrl' => $this->feedUrlFor($request->user()),
+            'canCreate' => ($user?->canDo('calendar.create') ?? false)
+                && ($user?->can('update', $site) ?? false),
+            'canManage' => ($user?->canDo('calendar.manage') ?? false)
+                && ($user?->can('update', $site) ?? false),
+            // Approve/reject also enforce the site update policy server-side, so the
+            // button must mirror both gates — otherwise it shows then 403s on click.
+            'canApprove' => ($user?->canDo('calendar.approve') ?? false)
+                && ($user?->can('update', $site) ?? false),
+            'feedUrl' => $this->feedUrlFor($user),
+            // Authoritative cross-range hero counts for this house (the in-view
+            // client derivation under-counts items outside the browsed window).
+            ...$this->heroCounts([$site->id], $user?->id),
         ]);
     }
 
@@ -284,8 +292,12 @@ class SiteCalendarController extends Controller
             'sources' => CalendarSources::all(),
             'canCreate' => $user->canDo('calendar.create'),
             'canManage' => $user->canDo('calendar.manage'),
+            // Coarse page-level gate; per-event approve/reject still authorise the
+            // owning site server-side (a user may approve on some sites but not all).
             'canApprove' => $user->canDo('calendar.approve'),
             'feedUrl' => $this->feedUrlFor($user),
+            // Authoritative cross-range hero counts across the resolved sites.
+            ...$this->heroCounts($sites->pluck('id')->all(), $user->id),
             'filters' => [
                 'site_ids' => is_array($siteIds) ? $siteIds : [],
                 'site_type' => $request->input('site_type'),
@@ -364,6 +376,60 @@ class SiteCalendarController extends Controller
             'sources' => is_array($sources) ? $sources : ($sources !== null ? [$sources] : null),
             'event_types' => is_array($eventTypes) ? $eventTypes : ($eventTypes !== null ? [$eventTypes] : null),
             'user_id' => $request->boolean('my_events_only') ? $request->user()?->id : null,
+        ];
+    }
+
+    /**
+     * Obligation sources that can carry an 'overdue' status (a past, not-done due
+     * date). Manual events, meal plans and damage follow-ups never do, so the
+     * cross-range overdue scan skips them to stay cheap.
+     */
+    private const OVERDUE_SOURCES = ['inspection', 'compliance', 'checklist', 'hazard', 'vendor', 'credential'];
+
+    /**
+     * Authoritative hero counts for the given sites, independent of the browsed
+     * period — so "To approve", "Mine" and "Overdue" don't under-count items
+     * outside the current view. The frontend prefers these over its in-view
+     * derivation (and falls back to it for embeds that receive no props).
+     *
+     * @param  int[]  $siteIds
+     * @return array{pendingApprovalCount: int, mineCount: int, overdueCount: int}
+     */
+    private function heroCounts(array $siteIds, ?int $userId): array
+    {
+        if ($siteIds === []) {
+            return ['pendingApprovalCount' => 0, 'mineCount' => 0, 'overdueCount' => 0];
+        }
+
+        $pendingApprovalCount = SiteCalendarEvent::query()
+            ->whereIn('site_id', $siteIds)
+            ->pendingApproval()
+            ->count();
+
+        // "Mine" = manual events I own or attend; the attendee leg is what the
+        // in-view derivation can't reliably see.
+        $mineCount = $userId === null ? 0 : SiteCalendarEvent::query()
+            ->whereIn('site_id', $siteIds)
+            ->where(function ($q) use ($userId) {
+                $q->where('owner_user_id', $userId)
+                    ->orWhereJsonContains('attendee_user_ids', $userId);
+            })
+            ->count();
+
+        // Overdue obligations are emitted at their original (past) due date, so we
+        // look back a bounded window rather than only the browsed period.
+        $overdue = $this->aggregator->itemsForRange(
+            $siteIds,
+            now()->subMonths(12)->startOfMonth(),
+            now(),
+            ['sources' => self::OVERDUE_SOURCES],
+        );
+        $overdueCount = count(array_filter($overdue, fn ($item) => $item->status === 'overdue'));
+
+        return [
+            'pendingApprovalCount' => $pendingApprovalCount,
+            'mineCount' => $mineCount,
+            'overdueCount' => $overdueCount,
         ];
     }
 
