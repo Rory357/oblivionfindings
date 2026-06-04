@@ -31,6 +31,7 @@ import type { SharedData } from '@/types';
 import { Link, router, useForm, usePage } from '@inertiajs/react';
 import { createPortal } from 'react-dom';
 import {
+    Bell,
     CalendarDays,
     CalendarRange,
     CalendarClock,
@@ -99,6 +100,7 @@ import {
     TodayRail,
     WeekView,
     WD,
+    useNow,
     addDays,
     decorate,
     endOfMonth,
@@ -137,6 +139,11 @@ export interface SiteCalendarProps {
     canManage?: boolean;
     canApprove?: boolean;
     feedUrl?: string | null;
+    /** Authoritative cross-range hero counts (page contexts only; the profile
+     *  embed receives none and falls back to the in-view derivation). */
+    pendingApprovalCount?: number;
+    mineCount?: number;
+    overdueCount?: number;
 }
 
 type CalView = 'month' | 'week' | 'day' | 'agenda' | 'timeline';
@@ -154,8 +161,10 @@ const DEFAULT_SOURCES: SourceDef[] = [
     { key: 'checklist', label: 'Checklist run', short: 'Checklist', group: 'auto', icon: 'CheckSquare', origin: 'Checklists' },
     { key: 'hazard', label: 'Hazard review', short: 'Hazard', group: 'auto', icon: 'AlertTriangle', origin: 'Hazard register' },
     { key: 'vendor', label: 'Vendor / insurance', short: 'Vendor', group: 'auto', icon: 'Wrench', origin: 'Vendors' },
+    { key: 'asset', label: 'Fleet / asset', short: 'Asset', group: 'auto', icon: 'Truck', origin: 'Assets register' },
     { key: 'meal', label: 'Meal plan', short: 'Meal', group: 'auto', icon: 'Utensils', origin: 'Meal planner' },
     { key: 'damage', label: 'Damage follow-up', short: 'Damage', group: 'auto', icon: 'Hammer', origin: 'Damages' },
+    { key: 'emergency', label: 'Emergency plan', short: 'Emergency', group: 'auto', icon: 'Siren', origin: 'Emergency plans' },
 ];
 
 const DEFAULT_EVENT_TYPES: EventTypeOption[] = [
@@ -191,6 +200,13 @@ function toLocalInput(date: Date): string {
 const datePart = (dt: string): string => (dt || '').slice(0, 10);
 const timePart = (dt: string): string => (dt || '').slice(11, 16);
 const combine = (date: string, time: string): string => `${date}T${time || '00:00'}`;
+
+/** Normalise an RRULE UNTIL ("20260131T000000Z" or ISO) to a `YYYY-MM-DD` input value. */
+const untilToDateInput = (u?: string | null): string => {
+    if (!u) return '';
+    const m = u.match(/^(\d{4})-?(\d{2})-?(\d{2})/);
+    return m ? `${m[1]}-${m[2]}-${m[3]}` : '';
+};
 
 /** Maps the seeded event-type `icon` strings (config: sites.default_event_types)
  *  to lucide components for the create-dialog type tiles. */
@@ -277,6 +293,9 @@ export default function SiteCalendar({
     canManage = false,
     canApprove = false,
     feedUrl,
+    pendingApprovalCount: pendingApprovalCountProp,
+    mineCount: mineCountProp,
+    overdueCount: overdueCountProp,
 }: SiteCalendarProps) {
     const [view, setView] = useState<CalView>('month');
     const [navDate, setNavDate] = useState(() => new Date());
@@ -299,6 +318,12 @@ export default function SiteCalendar({
 
     const page = usePage<SharedData>();
     const currentUserId = page.props.auth?.user?.id ?? null;
+    // Ticks every minute so the rail's NOW marker + "happening now / up next"
+    // advance live without a manual reload.
+    const now = useNow();
+    // Page contexts pass feedUrl explicitly; the profile-tab embed doesn't, so fall
+    // back to the shared per-user subscribe URL.
+    const effectiveFeedUrl = feedUrl ?? page.props.calendarFeedUrl ?? null;
 
     const srcByKey = useMemo(() => Object.fromEntries(sources.map((s) => [s.key, s])) as Record<string, SourceDef>, [sources]);
     const eventTypeByKey = useMemo(() => Object.fromEntries(eventTypes.map((t) => [t.key, t])), [eventTypes]);
@@ -390,29 +415,55 @@ export default function SiteCalendar({
         return navDate.getMonth() === t.getMonth() && navDate.getFullYear() === t.getFullYear();
     }, [view, navDate]);
 
-    // Hero stats — derived client-side from the events already in view. (Cross-range
-    // accuracy for "To approve" / "Mine" would need backend count props; in-view is
-    // correct for the browsed window and needs no backend change.)
-    const overdueCount = useMemo(() => visibleEvents.filter((e) => e.status === 'overdue').length, [visibleEvents]);
+    // Hero stats. "This month" and "Done" are inherently period stats, so they stay
+    // in-view. "Overdue" / "To approve" / "Mine" prefer the authoritative server
+    // counts (which see the whole accessible range), falling back to the in-view
+    // derivation for embeds with no props — or whenever the user narrows the view by
+    // house/source, so the stat keeps tracking what's on screen.
+    const narrowed = houseFilter !== 'all' || enabledSources.size !== sources.length;
+
+    const overdueDerived = useMemo(() => visibleEvents.filter((e) => e.status === 'overdue').length, [visibleEvents]);
+    const overdueCount = !narrowed && overdueCountProp != null ? overdueCountProp : overdueDerived;
+
     const thisMonthCount = useMemo(() => {
         const ms = startOfMonth(navDate);
         const me = endOfMonth(navDate);
         me.setHours(23, 59, 59, 999);
         return visibleEvents.filter((e) => e._start >= ms && e._start <= me).length;
     }, [visibleEvents, navDate]);
+
     const pendingApprovals = useMemo(
         () => visibleEvents.filter((e) => e.group === 'manual' && e.approvalStatus === 'pending'),
         [visibleEvents],
     );
-    const toApproveCount = pendingApprovals.length;
-    const mineCount = useMemo(
-        () => (currentUserId == null ? 0 : visibleEvents.filter((e) => e.owner?.id === currentUserId).length),
+    const toApproveCount = !narrowed && pendingApprovalCountProp != null ? pendingApprovalCountProp : pendingApprovals.length;
+
+    const mineDerived = useMemo(
+        () =>
+            currentUserId == null
+                ? 0
+                : visibleEvents.filter(
+                      (e) => e.owner?.id === currentUserId || (e.attendeeIds?.includes(currentUserId) ?? false),
+                  ).length,
         [visibleEvents, currentUserId],
     );
+    const mineCount = !narrowed && mineCountProp != null ? mineCountProp : mineDerived;
+
     const doneCount = useMemo(
         () => visibleEvents.filter((e) => e.status === 'completed' || e.status === 'approved').length,
         [visibleEvents],
     );
+
+    // Notifications bell — entries coming up in the next 7 days (today-anchored rail
+    // feed) plus, for approvers, the pending-approval count.
+    const upcoming = useMemo(() => {
+        const horizon = addDays(now, 7);
+        return visibleRailEvents
+            .filter((e) => e._start >= now && e._start <= horizon && e.status !== 'cancelled')
+            .sort((a, b) => a._start.getTime() - b._start.getTime())
+            .slice(0, 8);
+    }, [visibleRailEvents, now]);
+    const notifyCount = upcoming.length + (canApprove ? toApproveCount : 0);
 
     const step = (dir: 1 | -1) => {
         setNavDate((d) => {
@@ -615,7 +666,7 @@ export default function SiteCalendar({
                 {context === 'page' && (
                     <TodayRail
                         events={visibleRailEvents}
-                        today={new Date()}
+                        today={now}
                         onSelect={(ev) => {
                             hidePreview();
                             setSelected(ev);
@@ -644,6 +695,55 @@ export default function SiteCalendar({
                     <Plus className="mr-1 h-4 w-4" /> New entry
                 </Button>
             )}
+            <DropdownMenu>
+                <DropdownMenuTrigger asChild>
+                    <Button
+                        size="icon"
+                        variant="outline"
+                        aria-label={`Notifications${notifyCount ? ` (${notifyCount})` : ''}`}
+                        className="relative border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10"
+                    >
+                        <Bell className="h-4 w-4" />
+                        {notifyCount > 0 && (
+                            <span className="absolute -right-1 -top-1 flex h-4 min-w-4 items-center justify-center rounded-full bg-status-critical px-1 text-[10px] font-semibold text-white">
+                                {notifyCount > 9 ? '9+' : notifyCount}
+                            </span>
+                        )}
+                    </Button>
+                </DropdownMenuTrigger>
+                <DropdownMenuContent align="end" className="w-72">
+                    <DropdownMenuLabel>Notifications</DropdownMenuLabel>
+                    {canApprove && toApproveCount > 0 && (
+                        <DropdownMenuItem onSelect={() => setApprovalsOpen(true)}>
+                            <ClipboardCheck className="mr-2 h-4 w-4 text-status-warning" />
+                            {toApproveCount} awaiting approval
+                        </DropdownMenuItem>
+                    )}
+                    <DropdownMenuSeparator />
+                    <DropdownMenuLabel className="text-[11px] font-normal text-muted-foreground">
+                        Upcoming · next 7 days
+                    </DropdownMenuLabel>
+                    {upcoming.length === 0 ? (
+                        <div className="px-2 py-3 text-center text-[13px] text-muted-foreground">
+                            Nothing in the next 7 days.
+                        </div>
+                    ) : (
+                        upcoming.map((e) => (
+                            <DropdownMenuItem
+                                key={e.id}
+                                onSelect={() => setSelected(e)}
+                                className="flex-col items-start gap-0.5"
+                            >
+                                <span className="w-full truncate text-[13px] font-medium">{e.title}</span>
+                                <span className="text-[11px] text-muted-foreground">
+                                    {e._start.toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' })}
+                                    {!e.allDay ? ` · ${fmtTime(e._start)}` : ''}
+                                </span>
+                            </DropdownMenuItem>
+                        ))
+                    )}
+                </DropdownMenuContent>
+            </DropdownMenu>
             <DropdownMenu>
                 <DropdownMenuTrigger asChild>
                     <Button
@@ -891,7 +991,7 @@ export default function SiteCalendar({
                     }}
                 />
             )}
-            <SubscribeDialog open={subscribeOpen} onOpenChange={setSubscribeOpen} feedUrl={feedUrl} />
+            <SubscribeDialog open={subscribeOpen} onOpenChange={setSubscribeOpen} feedUrl={effectiveFeedUrl} />
             {canApprove && (
                 <ApprovalsPanel
                     open={approvalsOpen}
@@ -1239,10 +1339,18 @@ function CreateEventDialog({
 }) {
     const [targetSite, setTargetSite] = useState<number | undefined>(defaultSiteId);
     const [preset, setPreset] = useState<RecurPreset>('none');
+    // Recurrence end condition — recur.ts supports UNTIL/COUNT; the Repeats select
+    // only picks the frequency, so the "Ends" control layers the end on top.
+    const [recurEnd, setRecurEnd] = useState<{ mode: 'never' | 'until' | 'count'; until: string; count: number }>({
+        mode: 'never',
+        until: '',
+        count: 10,
+    });
     const form = useForm({
         event_type: eventTypes[0]?.key ?? 'general',
         title: '',
         description: '',
+        room: '',
         start_at: '',
         end_at: '',
         all_day: false,
@@ -1256,11 +1364,18 @@ function CreateEventDialog({
         if (!open) return;
         if (editEvent) {
             setTargetSite(editEvent.site?.id ?? defaultSiteId);
-            setPreset(ruleToPreset(editEvent.recurrence ?? null));
+            const rule = editEvent.recurrence ?? null;
+            setPreset(ruleToPreset(rule));
+            setRecurEnd({
+                mode: rule?.until ? 'until' : rule?.count ? 'count' : 'never',
+                until: untilToDateInput(rule?.until),
+                count: rule?.count ?? 10,
+            });
             form.setData({
                 event_type: editEvent.eventType ?? eventTypes[0]?.key ?? 'general',
                 title: editEvent.title,
                 description: editEvent.desc ?? '',
+                room: editEvent.room ?? '',
                 start_at: toLocalInput(editEvent._start),
                 end_at: editEvent._end ? toLocalInput(editEvent._end) : '',
                 all_day: !!editEvent.allDay,
@@ -1272,6 +1387,7 @@ function CreateEventDialog({
         } else {
             setTargetSite(defaultSiteId);
             setPreset('none');
+            setRecurEnd({ mode: 'never', until: '', count: 10 });
             const start = seed?.date ? new Date(seed.date) : new Date();
             if (seed?.hour != null) {
                 start.setHours(seed.hour, 0, 0, 0);
@@ -1284,6 +1400,7 @@ function CreateEventDialog({
                 event_type: seed?.eventType ?? eventTypes[0]?.key ?? 'general',
                 title: '',
                 description: '',
+                room: '',
                 start_at: toLocalInput(start),
                 end_at: toLocalInput(end),
                 all_day: false,
@@ -1313,19 +1430,24 @@ function CreateEventDialog({
             allDay: form.data.all_day,
             status: 'scheduled',
             owner: null,
-            room: editEvent?.room ?? null,
+            room: form.data.room || null,
             ref: null,
             site: editEvent?.site ?? null,
             link: null,
             editable: true,
         };
         return findConflicts(draft, existingEvents);
-    }, [form.data.start_at, form.data.end_at, form.data.title, form.data.all_day, editEvent, existingEvents]);
+    }, [form.data.start_at, form.data.end_at, form.data.title, form.data.all_day, form.data.room, editEvent, existingEvents]);
 
     const submit = (e: FormEvent) => {
         e.preventDefault();
         if (!targetSite) return;
         const rule = presetToRule(preset);
+        if (rule && recurEnd.mode === 'until' && recurEnd.until) {
+            rule.until = recurEnd.until;
+        } else if (rule && recurEnd.mode === 'count' && recurEnd.count > 0) {
+            rule.count = recurEnd.count;
+        }
         form.transform((data) => ({
             ...data,
             recurrence_rule: rule ? (toRRULE(rule) ?? '') : '',
@@ -1539,6 +1661,66 @@ function CreateEventDialog({
                                         </option>
                                     ))}
                                 </select>
+                            </div>
+
+                            {preset !== 'none' && (
+                                <div>
+                                    <Label htmlFor="cal-recur-end" className="mb-1.5 block">
+                                        Ends
+                                    </Label>
+                                    <div className="flex flex-wrap items-center gap-2">
+                                        <select
+                                            id="cal-recur-end"
+                                            value={recurEnd.mode}
+                                            onChange={(e) =>
+                                                setRecurEnd((s) => ({ ...s, mode: e.target.value as 'never' | 'until' | 'count' }))
+                                            }
+                                            className="rounded-md border border-input bg-background px-3 py-2 text-sm"
+                                        >
+                                            <option value="never">Never</option>
+                                            <option value="until">On date</option>
+                                            <option value="count">After…</option>
+                                        </select>
+                                        {recurEnd.mode === 'until' && (
+                                            <Input
+                                                type="date"
+                                                aria-label="Repeat until date"
+                                                value={recurEnd.until}
+                                                min={datePart(form.data.start_at)}
+                                                onChange={(e) => setRecurEnd((s) => ({ ...s, until: e.target.value }))}
+                                                className="flex-1"
+                                            />
+                                        )}
+                                        {recurEnd.mode === 'count' && (
+                                            <div className="flex flex-1 items-center gap-2">
+                                                <Input
+                                                    type="number"
+                                                    min={1}
+                                                    max={365}
+                                                    aria-label="Number of occurrences"
+                                                    value={recurEnd.count}
+                                                    onChange={(e) =>
+                                                        setRecurEnd((s) => ({ ...s, count: Math.max(1, Number(e.target.value) || 1) }))
+                                                    }
+                                                    className="w-20"
+                                                />
+                                                <span className="text-sm text-muted-foreground">occurrences</span>
+                                            </div>
+                                        )}
+                                    </div>
+                                </div>
+                            )}
+
+                            <div>
+                                <Label htmlFor="cal-room" className="mb-1.5 block">
+                                    Room / location <span className="font-normal text-muted-foreground">(optional)</span>
+                                </Label>
+                                <Input
+                                    id="cal-room"
+                                    value={form.data.room}
+                                    onChange={(e) => form.setData('room', e.target.value)}
+                                    placeholder="e.g. Lounge, Vehicle 2, Meeting room"
+                                />
                             </div>
 
                             {people.length > 0 && (

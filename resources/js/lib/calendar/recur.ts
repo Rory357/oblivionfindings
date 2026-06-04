@@ -17,6 +17,7 @@ export type CalendarSourceKey =
     | 'checklist'
     | 'hazard'
     | 'vendor'
+    | 'asset'
     | 'meal'
     | 'damage'
     | 'emergency';

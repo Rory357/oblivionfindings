@@ -196,3 +196,55 @@ test('creating then editing an event keeps its business-timezone time (no +12h d
     expect($event->start_at->copy()->timezone($tz)->format('Y-m-d H:i'))->toBe('2026-06-05 10:00');
     expect($event->start_at->copy()->utc()->format('Y-m-d H:i'))->toBe('2026-06-04 22:00');
 });
+
+test('a manual event persists and round-trips its room/location', function () {
+    $site = Site::factory()->create(['type' => 'house']);
+    $user = calendarManager($site);
+
+    $this->actingAs($user)
+        ->post("/sites/{$site->id}/calendar/events", [
+            'event_type' => 'general',
+            'title' => 'Lounge games',
+            'room' => 'Main Lounge',
+            'start_at' => '2026-06-10T14:00',
+            'end_at' => '2026-06-10T15:00',
+        ])
+        ->assertRedirect();
+
+    $event = SiteCalendarEvent::where('site_id', $site->id)->latest('id')->first();
+    expect($event->room)->toBe('Main Lounge');
+
+    // The room reaches the rendered feed (formatOccurrence → CalendarItem).
+    $feed = $this->actingAs($user)
+        ->getJson("/sites/{$site->id}/calendar/events?start=2026-06-01T00:00:00Z&end=2026-06-30T00:00:00Z")
+        ->assertOk()
+        ->json('events');
+
+    $item = collect($feed)->firstWhere('title', 'Lounge games');
+    expect($item['room'])->toBe('Main Lounge');
+});
+
+test('a recurring event can carry an UNTIL end date in its rule', function () {
+    $site = Site::factory()->create(['type' => 'house']);
+    $user = calendarManager($site);
+
+    $this->actingAs($user)
+        ->post("/sites/{$site->id}/calendar/events", [
+            'event_type' => 'general',
+            'title' => 'Weekly catch-up',
+            'start_at' => '2026-06-01T09:00',
+            'end_at' => '2026-06-01T09:30',
+            'recurrence_rule' => 'FREQ=WEEKLY;UNTIL=20260630T000000Z',
+        ])
+        ->assertRedirect();
+
+    $event = SiteCalendarEvent::where('site_id', $site->id)->latest('id')->first();
+    expect($event->recurrence_rule)->toContain('UNTIL=20260630T000000Z');
+
+    // Expansion stops at the UNTIL bound — no July occurrences.
+    $july = $this->actingAs($user)
+        ->getJson("/sites/{$site->id}/calendar/events?start=2026-07-01T00:00:00Z&end=2026-07-31T00:00:00Z")
+        ->assertOk()
+        ->json('events');
+    expect(collect($july)->where('title', 'Weekly catch-up'))->toBeEmpty();
+});

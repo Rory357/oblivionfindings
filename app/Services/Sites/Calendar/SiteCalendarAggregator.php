@@ -3,10 +3,12 @@
 namespace App\Services\Sites\Calendar;
 
 use App\Services\Sites\Calendar\Contracts\CalendarObligationProvider;
+use App\Services\Sites\Calendar\Providers\AssetMaintenanceObligationProvider;
 use App\Services\Sites\Calendar\Providers\ChecklistObligationProvider;
 use App\Services\Sites\Calendar\Providers\ComplianceObligationProvider;
 use App\Services\Sites\Calendar\Providers\CredentialReminderProvider;
 use App\Services\Sites\Calendar\Providers\DamageObligationProvider;
+use App\Services\Sites\Calendar\Providers\EmergencyPlanObligationProvider;
 use App\Services\Sites\Calendar\Providers\HazardObligationProvider;
 use App\Services\Sites\Calendar\Providers\InspectionObligationProvider;
 use App\Services\Sites\Calendar\Providers\MealPlanObligationProvider;
@@ -59,6 +61,8 @@ class SiteCalendarAggregator
             new MealPlanObligationProvider(),
             new VendorReminderProvider(),
             new CredentialReminderProvider(),
+            new AssetMaintenanceObligationProvider(),
+            new EmergencyPlanObligationProvider(),
         ];
     }
 
@@ -150,6 +154,7 @@ class SiteCalendarAggregator
             allDay: (bool) ($occ['all_day'] ?? false),
             status: $status,
             owner: $owner ? ['id' => $owner->id, 'name' => $owner->name] : null,
+            room: $occ['room'] ?? null,
             site: $site ? ['id' => $site->id, 'name' => $site->name, 'type' => $site->type] : null,
             link: isset($site) ? "/sites/{$site->id}/calendar" : null,
             editable: true,

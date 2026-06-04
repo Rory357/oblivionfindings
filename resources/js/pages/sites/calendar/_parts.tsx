@@ -21,6 +21,7 @@ import {
     Repeat,
     ShieldCheck,
     Siren,
+    Truck,
     Utensils,
     Wrench,
     type LucideIcon,
@@ -54,6 +55,7 @@ const ICONS: Record<string, LucideIcon> = {
     CheckSquare,
     AlertTriangle,
     Wrench,
+    Truck,
     Utensils,
     Hammer,
     Siren,
@@ -425,8 +427,19 @@ function AllDayRow({ days, events }: { days: Date[]; events: Decorated[] }) {
     );
 }
 
+/** A Date that re-renders on an interval (default 60s) so live "now" markers
+ *  (the week/day NowLine, the rail's NOW) advance without a manual reload. */
+export function useNow(intervalMs = 60_000): Date {
+    const [now, setNow] = useState(() => new Date());
+    useEffect(() => {
+        const id = setInterval(() => setNow(new Date()), intervalMs);
+        return () => clearInterval(id);
+    }, [intervalMs]);
+    return now;
+}
+
 function NowLine({ day }: { day: Date }) {
-    const now = new Date();
+    const now = useNow();
     if (!sameDay(day, now)) return null;
     const m = minutes(now);
     if (m < GRID_START * 60 || m > GRID_END * 60) return null;
