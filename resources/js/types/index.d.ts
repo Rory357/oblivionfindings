@@ -117,6 +117,8 @@ export interface SharedData {
     quote: { message: string; author: string };
     auth: Auth;
     sidebarOpen: boolean;
+    /** Per-user calendar subscribe (.ics) URL; null until the user generates a token. */
+    calendarFeedUrl?: string | null;
     [key: string]: unknown;
 }
 

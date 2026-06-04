@@ -34,6 +34,8 @@ class SiteVendor extends Model
         'qualifications_notes',
         'insurance_verified',
         'insurance_expiry',
+        'contract_renewal_date',
+        'next_visit_date',
         'insurance_provider',
         'insurance_policy_number',
         'site_specific_hs_plan',
@@ -49,6 +51,8 @@ class SiteVendor extends Model
         'qualifications_verified' => 'boolean',
         'insurance_verified' => 'boolean',
         'insurance_expiry' => 'date',
+        'contract_renewal_date' => 'date',
+        'next_visit_date' => 'date',
         'hs_last_reviewed_at' => 'date',
     ];
 

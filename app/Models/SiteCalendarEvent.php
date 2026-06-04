@@ -21,6 +21,7 @@ class SiteCalendarEvent extends Model
         'event_type',
         'title',
         'description',
+        'room',
         'start_at',
         'end_at',
         'all_day',

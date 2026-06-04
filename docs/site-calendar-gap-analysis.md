@@ -9,11 +9,14 @@ Branding decision (confirmed with user): the hero uses **brand `--primary` (purp
 to match the Rostering banner — *not* the Sites green in the prototype screenshot (which was only the
 prototype's hue-rotated preview default). One-line swap to `category="sites"` if ever wanted.
 
-> **Status update (2026-06-04):** both **P1** blockers are now **closed** (backend) — a targeted
-> calendar-permissions backfill seeder + approve/reject gate reconciliation, and authoritative
-> cross-range hero counts. `npx tsc --noEmit` → 0 errors, `npm run build` → exit 0, and **17 calendar
-> feature tests pass** (3 new in `SiteCalendarHeroCountsTest`). Details inline under section B/P1; files
-> in section C. Remaining work is **P2/P3** only.
+> **Status update (2026-06-04):** **all P1, P2 and P3 gaps are now implemented** — only the
+> by-design Deferred admin-OAuth sync remains. Beyond the P1 permissions-seeder + hero-count work,
+> this adds recurrence **UNTIL/COUNT** (now honoured by the server-side expander, not just `.ics`) +
+> a **Room/location** field, a live-ticking rail **NOW** marker, **two new obligation providers**
+> (Fleet/asset + Emergency plan → the source palette is now fully wired), never-rotated **credential**
+> reminders, **vendor** contract-renewal / next-visit reminders, a shared **Subscribe** URL for the
+> profile embed, and a hero **notifications bell**. `npx tsc --noEmit` → 0 errors, `npm run build` →
+> exit 0, and **24 calendar feature tests pass**. Per-gap detail inline; files in section C.
 
 ---
 
@@ -87,42 +90,54 @@ Priorities: **P1** = correctness/parity blockers · **P2** = important parity ·
    `tests/Feature/Sites/Calendar/SiteCalendarHeroCountsTest.php` (pending/mine/overdue values, accessible-site
    isolation, and the `canApprove` view-vs-update gate).
 
-### P2 — parity & higher-value features
+### P2 — ✅ complete this session
 
-3. ~~**Today rail**~~ — ✅ **implemented this session** (see section A #8). Remaining rail polish: a
-   secondary today-anchored fetch already runs (−45/+30 d); a future enhancement is a "happening now"
-   auto-refresh tick so the NOW marker advances without a manual reload.
+3. ~~**Today rail**~~ — ✅ implemented earlier (see section A #8); **✅ the "happening now"
+   auto-refresh tick is now done too** — a `useNow()` hook (`_parts.tsx`) re-renders every 60 s, so the
+   Week/Day `NowLine` and the rail's NOW / "happening now / up next" advance live without a reload.
 
-4. **Create/Edit dialog** — ✅ visual polish done (design-parity tiles, header, locked-site card, split
-   Date/Start/End) **and ✅ Owner / Attendees / Reminders / All-day now wired end-to-end**:
-   - **Owner** dropdown + **Attendees** chip multi-select — controller passes a `people` list
-     (`User::staff()`); `store()/update()` persist `owner_user_id` + `attendee_user_ids[]`. Attendee
-     IDs round-trip via a new `CalendarItem.attendeeIds` so edit pre-selects them.
-   - **Reminders** preset chips (At time / 10m / 30m / 1h / 1d) → `reminder_minutes[]` (drives the
-     existing `.ics` VALARM path).
-   - **All-day** toggle → new `all_day` column (migration `2026_06_04_120000`), hides the time inputs,
-     and renders in the views' all-day row.
-   - Still open: **Recurrence UNTIL/COUNT** (`recur.ts` supports them; the Repeats `<select>` can't reach
-     them yet) and a **Room/location** input (`room` is read-only in detail today).
+4. ~~**Create/Edit dialog**~~ — ✅ tiles/header/locked-site/split-date + Owner/Attendees/Reminders/All-day
+   were done earlier; **✅ the two remaining items are now done**:
+   - **Recurrence UNTIL/COUNT** — the dialog has an **Ends** control (Never / On date / After N) that
+     layers `until`/`count` onto the frequency preset. Crucially the **server-side expander now honours
+     UNTIL and COUNT** (`SiteCalendarService::calculateOccurrences` — previously they only reached the
+     `.ics`), so the grid stops at the bound. (Covered by a workflow test asserting no post-UNTIL
+     occurrences.)
+   - **Room/location** — new nullable `room` column (migration `2026_06_04_130000`) + fillable +
+     `store()/update()` validation; threaded through `formatOccurrence` → `CalendarItem.room` so it
+     renders in detail/cards, feeds same-room conflict detection and the `.ics` LOCATION. A "Room /
+     location" input was added to the dialog. (Round-trip test added.)
 
-5. **Missing obligation providers (NZ supported-living value-adds):**
-   - **Emergency / evacuation plan review dates** — `--src-emergency` palette exists but there is no
-     `SiteEmergencyPlan` model/provider. A core supported-living obligation that never surfaces.
-   - **Fleet / asset maintenance** — `SiteCalendarEvent` has `fleet_vehicle_id` / `asset_id` columns but no
-     provider, so vehicle WOF/rego/service and asset calibration aren't auto-pulled.
-   (8 of 9 declared sources are wired today.)
+5. ~~**Missing obligation providers**~~ — ✅ **both new providers shipped; all declared sources now
+   wired** (the source palette went from 9 → 11):
+   - **Emergency / evacuation plan review dates** — new `SiteEmergencyPlan` model + migration
+     (`2026_06_04_130200`) + `EmergencyPlanObligationProvider` (`emergency` source, the pre-provisioned
+     `--src-emergency` palette token). Surfaces each active plan's `next_review_at` (explicit, else
+     `last_reviewed_at + review_interval_months`). `SiteEmergencyPlanSeeder` seeds demo plans.
+   - **Fleet / asset maintenance** — new `AssetMaintenanceObligationProvider` (`asset` source + new
+     `--src-asset` token) reading the Asset register's WOF / registration / CoF / inspection /
+     maintenance / warranty dates (skips disposed/retired). Both registered in
+     `SiteCalendarAggregator` + `CalendarSources` + the frontend `DEFAULT_SOURCES`, and added to the
+     controller's `OVERDUE_SOURCES`. (Provider tests added.)
 
-### P3 — polish
+### P3 — ✅ complete this session
 
-6. **Credential reminders never fire for never-rotated credentials** — `CredentialReminder` only fires when
-   `last_rotated_at` is non-null; the most-likely-forgotten credentials get no reminder. Fall back to
-   `created_at + cadence`.
-7. **Vendor reminders cover only `insurance_expiry`** — no contract-renewal / next-visit columns.
-8. **Profile embed Subscribe** opens in "generate" mode (no `feedUrl` passed from `show.tsx`); pass it through.
-9. **`ViewOptionsMenu` / `NotificationsMenu`** — colour/density now live in the Filter popover; a dedicated
-   notifications bell (7-day reminders + pending count) is still absent.
-10. **Hero height** — the taller 4-stat hero + footer may push the `h-[calc(100vh-22rem)]` calendar surface;
-    verify on dev and bump the offset if it double-scrolls.
+6. ~~**Credential reminders never fire for never-rotated credentials**~~ — ✅ `CredentialReminderProvider`
+   now falls back to **`created_at + cadence`** when `last_rotated_at` is null (titled "first rotation
+   due"), so the most-likely-forgotten credentials surface. (Provider test added.)
+7. ~~**Vendor reminders cover only `insurance_expiry`**~~ — ✅ new nullable `contract_renewal_date` +
+   `next_visit_date` columns (migration `2026_06_04_130100`); `VendorReminderProvider` now emits
+   insurance / contract-renewal (overdue-able) + next-visit (a forward booking, never "overdue").
+8. ~~**Profile embed Subscribe**~~ — ✅ a shared `calendarFeedUrl` Inertia prop (`HandleInertiaRequests`)
+   is now emitted for every request; `SiteCalendar` falls back to it when the `feedUrl` page-prop is
+   absent, so the profile-tab Subscribe shows the real link instead of "generate" mode.
+9. ~~**`NotificationsMenu`**~~ — ✅ a hero **notifications bell** (with a count badge) now lists upcoming
+   entries in the next 7 days (click → detail) plus, for approvers, the pending-approval count
+   (click → approvals panel). Colour/density remain in the Filter popover.
+10. ~~**Hero height**~~ — ✅ assessed: no change needed. The 4-stat hero + footer was already shipped and
+    live-verified on dev without double-scroll (see `docs/site-calendar-testing.md`); this session adds
+    no hero height (the bell sits in the existing actions row, and the recurrence/Room inputs are in the
+    dialog).
 
 ### Deferred (by design)
 - **Admin OAuth resource-calendar sync** (Settings → Integrations → Calendar sync, Part D): connect
@@ -154,3 +169,26 @@ Priorities: **P1** = correctness/parity blockers · **P2** = important parity ·
 - `tests/Feature/Sites/Calendar/SiteCalendarHeroCountsTest.php` — **new**; pending/mine/overdue counts,
   accessible-site isolation, and the `canApprove` view-vs-update gate.
   *(No `CalendarItem` DTO change — attendees already serialise as `attendeeIds`.)*
+
+**P2/P3 completion (this session):**
+- **New obligation providers** — `app/Services/Sites/Calendar/Providers/AssetMaintenanceObligationProvider.php`,
+  `…/EmergencyPlanObligationProvider.php`; both registered in `SiteCalendarAggregator`.
+- **Reminder coverage** — `…/Providers/CredentialReminderProvider.php` (never-rotated → `created_at`
+  fallback), `…/Providers/VendorReminderProvider.php` (contract-renewal + next-visit).
+- **Models** — `app/Models/SiteEmergencyPlan.php` (**new**); `SiteCalendarEvent` (+`room` fillable);
+  `SiteVendor` (+`contract_renewal_date`/`next_visit_date`).
+- **Migrations** — `2026_06_04_130000_add_room_to_site_calendar_events_table`,
+  `2026_06_04_130100_add_reminder_dates_to_site_vendors_table`,
+  `2026_06_04_130200_create_site_emergency_plans_table`.
+- **Recurrence/Room/feed** — `app/Services/Sites/SiteCalendarService.php` (expander honours UNTIL/COUNT;
+  `room` in `formatOccurrence`); `SiteCalendarController` (`room` validation + `OVERDUE_SOURCES` += asset,
+  emergency); `app/Services/Sites/Calendar/CalendarSources.php` (+asset, +emergency).
+- **Subscribe** — `app/Http/Middleware/HandleInertiaRequests.php` (shared `calendarFeedUrl`);
+  `resources/js/types/index.d.ts` (`SharedData.calendarFeedUrl`).
+- **Frontend** — `resources/js/pages/sites/calendar/SiteCalendar.tsx` (Ends control + Room input,
+  notifications bell, `useNow` tick, Subscribe fallback, new source defaults); `…/_parts.tsx`
+  (`useNow` hook, `Truck` icon); `resources/js/lib/calendar/recur.ts` (`asset` source key);
+  `resources/css/app.css` (`--src-asset` token).
+- **Seeders** — `database/seeders/SiteEmergencyPlanSeeder.php` (**new**, wired into `DatabaseSeeder`).
+- **Tests** — `tests/Feature/Sites/Calendar/SiteCalendarObligationProvidersTest.php` (**new**; asset,
+  emergency, credential-fallback, vendor); `SiteCalendarWorkflowTest.php` (+room round-trip, +UNTIL bound).

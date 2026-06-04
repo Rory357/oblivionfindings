@@ -92,6 +92,13 @@ class HandleInertiaRequests extends Middleware
             'name' => config('app.name'),
             'quote' => ['message' => trim($message), 'author' => trim($author)],
 
+            // Per-user calendar subscribe (.ics) URL, shared so any calendar surface
+            // — including the Site profile Calendar tab embed — can offer Subscribe
+            // without each controller re-deriving it.
+            'calendarFeedUrl' => $user && $user->calendar_feed_token
+                ? url('/calendar/feed/'.$user->calendar_feed_token.'.ics')
+                : null,
+
             'auth' => [
                 'user' => $user ? [
                     'id' => $user->id,

@@ -100,6 +100,7 @@ class SiteCalendarController extends Controller
             'event_type' => 'required|string|max:50',
             'title' => 'required|string|max:255',
             'description' => 'nullable|string',
+            'room' => 'nullable|string|max:120',
             'start_at' => 'required|date',
             'end_at' => 'nullable|date|after:start_at',
             'recurrence_rule' => 'nullable|string',
@@ -137,6 +138,7 @@ class SiteCalendarController extends Controller
             'event_type' => 'sometimes|required|string|max:50',
             'title' => 'sometimes|required|string|max:255',
             'description' => 'sometimes|nullable|string',
+            'room' => 'sometimes|nullable|string|max:120',
             'start_at' => 'sometimes|required|date',
             'end_at' => 'sometimes|nullable|date|after:start_at',
             'owner_user_id' => 'sometimes|nullable|exists:users,id',
@@ -384,7 +386,7 @@ class SiteCalendarController extends Controller
      * date). Manual events, meal plans and damage follow-ups never do, so the
      * cross-range overdue scan skips them to stay cheap.
      */
-    private const OVERDUE_SOURCES = ['inspection', 'compliance', 'checklist', 'hazard', 'vendor', 'credential'];
+    private const OVERDUE_SOURCES = ['inspection', 'compliance', 'checklist', 'hazard', 'vendor', 'credential', 'asset', 'emergency'];
 
     /**
      * Authoritative hero counts for the given sites, independent of the browsed

@@ -7,9 +7,11 @@ use App\Services\Sites\Calendar\CalendarItem;
 use Illuminate\Support\Carbon;
 
 /**
- * Credentials carry no explicit expiry, so a rotation-due date is derived from
- * last_rotated_at + a configurable cadence (sites.calendar.credential_rotation_days,
- * default 90). Never-rotated credentials are skipped to avoid noise.
+ * Credentials carry no explicit expiry, so a rotation-due date is derived from a
+ * base date + a configurable cadence (sites.calendar.credential_rotation_days,
+ * default 90). The base is last_rotated_at when present, else created_at — so
+ * never-rotated credentials (the most likely to be forgotten) still surface a
+ * first-rotation obligation instead of being silently skipped.
  */
 class CredentialReminderProvider extends ObligationProvider
 {
@@ -33,12 +35,18 @@ class CredentialReminderProvider extends ObligationProvider
 
         $credentials = SiteCredential::query()
             ->whereIn('site_id', $siteIds)
-            ->whereNotNull('last_rotated_at')
             ->with('site:id,name,type')
             ->get();
 
         foreach ($credentials as $credential) {
-            $due = $credential->last_rotated_at->copy()->addDays($cadenceDays);
+            // Fall back to created_at for never-rotated credentials.
+            $base = $credential->last_rotated_at ?? $credential->created_at;
+            if (! $base) {
+                continue;
+            }
+
+            $neverRotated = $credential->last_rotated_at === null;
+            $due = $base->copy()->addDays($cadenceDays);
             if (! $this->inRange($due, $start, $end)) {
                 continue;
             }
@@ -47,7 +55,7 @@ class CredentialReminderProvider extends ObligationProvider
                 id: "credential-{$credential->id}",
                 source: 'credential',
                 group: 'auto',
-                title: ($credential->label ?: 'Credential').' — rotation due',
+                title: ($credential->label ?: 'Credential').' — '.($neverRotated ? 'first rotation due' : 'rotation due'),
                 start: $this->isoDate($due),
                 allDay: true,
                 status: $due->lt(Carbon::today()) ? 'overdue' : 'scheduled',

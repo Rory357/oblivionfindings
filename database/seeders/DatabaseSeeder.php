@@ -31,6 +31,7 @@ class DatabaseSeeder extends Seeder
         $this->call(SystemDocumentsAndNotesSeeder::class);
         $this->call(SafeguardingSeeder::class);
         $this->call(SitesModuleSeeder::class);
+        $this->call(SiteEmergencyPlanSeeder::class);
         $this->call(MedicationWorkflowDemoSeeder::class);
         $this->call(MedicationDashboardDemoSeeder::class);
 

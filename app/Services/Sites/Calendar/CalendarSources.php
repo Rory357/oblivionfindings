@@ -25,8 +25,10 @@ class CalendarSources
             ['key' => 'checklist',  'label' => 'Checklist run',     'short' => 'Checklist',  'group' => 'auto',   'icon' => 'CheckSquare',   'origin' => 'Checklists'],
             ['key' => 'hazard',     'label' => 'Hazard review',     'short' => 'Hazard',     'group' => 'auto',   'icon' => 'AlertTriangle', 'origin' => 'Hazard register'],
             ['key' => 'vendor',     'label' => 'Vendor / insurance','short' => 'Vendor',     'group' => 'auto',   'icon' => 'Wrench',        'origin' => 'Vendors'],
+            ['key' => 'asset',      'label' => 'Fleet / asset',     'short' => 'Asset',      'group' => 'auto',   'icon' => 'Truck',         'origin' => 'Assets register'],
             ['key' => 'meal',       'label' => 'Meal plan',         'short' => 'Meal',       'group' => 'auto',   'icon' => 'Utensils',      'origin' => 'Meal planner'],
             ['key' => 'damage',     'label' => 'Damage follow-up',  'short' => 'Damage',     'group' => 'auto',   'icon' => 'Hammer',        'origin' => 'Damages'],
+            ['key' => 'emergency',  'label' => 'Emergency plan',    'short' => 'Emergency',  'group' => 'auto',   'icon' => 'Siren',         'origin' => 'Emergency plans'],
         ];
     }
 

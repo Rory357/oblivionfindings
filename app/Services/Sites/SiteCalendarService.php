@@ -102,45 +102,46 @@ class SiteCalendarService
         Carbon $rangeStart,
         Carbon $rangeEnd
     ): array {
-        $occurrences = [];
+        $rrule = (string) $event->recurrence_rule;
         $start = $event->start_at->copy();
-        
-        // Parse simple RRULE patterns
-        if (str_contains($event->recurrence_rule, 'FREQ=DAILY')) {
-            $interval = $this->extractInterval($event->recurrence_rule) ?: 1;
-            $current = $start->copy();
-            
-            while ($current <= $rangeEnd) {
-                if ($current >= $rangeStart) {
-                    $occurrences[] = ['date' => $current->copy()];
-                }
-                $current->addDays($interval);
+        $interval = $this->extractInterval($rrule) ?: 1;
+
+        // Map the frequency to its step. Unknown / non-recurring rules emit a
+        // single occurrence.
+        $step = match (true) {
+            str_contains($rrule, 'FREQ=DAILY') => fn (Carbon $c) => $c->addDays($interval),
+            str_contains($rrule, 'FREQ=WEEKLY') => fn (Carbon $c) => $c->addWeeks($interval),
+            str_contains($rrule, 'FREQ=MONTHLY') => fn (Carbon $c) => $c->addMonths($interval),
+            default => null,
+        };
+
+        if (! $step) {
+            return ($start >= $rangeStart && $start <= $rangeEnd) ? [['date' => $start]] : [];
+        }
+
+        // Honour the series' end condition: UNTIL (inclusive instant) and COUNT
+        // (total occurrences from the series start, in- and out-of-range alike).
+        $until = $this->extractUntil($rrule);
+        $maxCount = $this->extractCount($rrule);
+
+        $occurrences = [];
+        $current = $start->copy();
+        $emitted = 0;
+        $guard = 0;
+
+        while ($current <= $rangeEnd && $guard++ < 5000) {
+            if ($until && $current->gt($until)) {
+                break;
             }
-        } elseif (str_contains($event->recurrence_rule, 'FREQ=WEEKLY')) {
-            $interval = $this->extractInterval($event->recurrence_rule) ?: 1;
-            $current = $start->copy();
-            
-            while ($current <= $rangeEnd) {
-                if ($current >= $rangeStart) {
-                    $occurrences[] = ['date' => $current->copy()];
-                }
-                $current->addWeeks($interval);
+            if ($maxCount !== null && $emitted >= $maxCount) {
+                break;
             }
-        } elseif (str_contains($event->recurrence_rule, 'FREQ=MONTHLY')) {
-            $interval = $this->extractInterval($event->recurrence_rule) ?: 1;
-            $current = $start->copy();
-            
-            while ($current <= $rangeEnd) {
-                if ($current >= $rangeStart) {
-                    $occurrences[] = ['date' => $current->copy()];
-                }
-                $current->addMonths($interval);
+
+            if ($current >= $rangeStart) {
+                $occurrences[] = ['date' => $current->copy()];
             }
-        } else {
-            // Single occurrence fallback
-            if ($start >= $rangeStart && $start <= $rangeEnd) {
-                $occurrences[] = ['date' => $start];
-            }
+            $emitted++;
+            $step($current);
         }
 
         return $occurrences;
@@ -150,6 +151,24 @@ class SiteCalendarService
     {
         if (preg_match('/INTERVAL=(\d+)/', $rrule, $matches)) {
             return (int) $matches[1];
+        }
+        return null;
+    }
+
+    /** RRULE UNTIL ("YYYYMMDD" or "YYYYMMDDTHHMMSSZ") as a UTC instant. */
+    private function extractUntil(string $rrule): ?Carbon
+    {
+        if (preg_match('/UNTIL=(\d{8})(?:T(\d{6})Z?)?/', $rrule, $m)) {
+            return Carbon::createFromFormat('YmdHis', $m[1].($m[2] ?? '000000'), 'UTC');
+        }
+        return null;
+    }
+
+    /** RRULE COUNT — total number of occurrences in the series. */
+    private function extractCount(string $rrule): ?int
+    {
+        if (preg_match('/COUNT=(\d+)/', $rrule, $m)) {
+            return (int) $m[1];
         }
         return null;
     }
@@ -207,6 +226,7 @@ class SiteCalendarService
             'is_exception' => $occurrence !== null,
             'title' => $overrides['title'] ?? $event->title,
             'description' => $event->description,
+            'room' => $event->room,
             'event_type' => $event->event_type,
             'start_at' => $startIso,
             'end_at' => $endIso,
