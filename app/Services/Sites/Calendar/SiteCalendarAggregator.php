@@ -158,6 +158,7 @@ class SiteCalendarAggregator
             desc: $occ['description'] ?? null,
             recurrence: $this->parseRrule($occ['recurrence_rule'] ?? null),
             reminders: $occ['reminder_minutes'] ?? [],
+            attendeeIds: array_map('intval', $occ['attendee_user_ids'] ?? []),
             seriesId: $occ['series_id'] ?? ($occ['id'] ?? null),
             isOccurrence: (bool) ($occ['is_occurrence'] ?? false),
         );

@@ -69,6 +69,7 @@ export interface CalendarItem {
     priority?: string | null;
     recurrence?: RecurrenceRule | null;
     reminders?: number[];
+    attendeeIds?: number[];
     seriesId?: number | null;
     isOccurrence?: boolean;
 }

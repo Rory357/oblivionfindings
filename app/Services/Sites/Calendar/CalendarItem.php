@@ -45,6 +45,7 @@ class CalendarItem
         public ?string $priority = null,
         public ?array $recurrence = null,
         public array $reminders = [],
+        public array $attendeeIds = [],
         public ?int $seriesId = null,
         public bool $isOccurrence = false,
     ) {}
@@ -72,6 +73,7 @@ class CalendarItem
             'priority' => $this->priority,
             'recurrence' => $this->recurrence,
             'reminders' => $this->reminders,
+            'attendeeIds' => $this->attendeeIds,
             'seriesId' => $this->seriesId,
             'isOccurrence' => $this->isOccurrence,
         ];

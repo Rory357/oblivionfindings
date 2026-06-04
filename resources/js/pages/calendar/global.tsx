@@ -7,6 +7,7 @@ type SiteLite = { id: number; name: string; type: string };
 
 interface Props {
     sites: SiteLite[];
+    people?: { id: number; name: string }[];
     sources: SourceDef[];
     eventTypes: EventTypeOption[];
     canCreate: boolean;
@@ -15,7 +16,7 @@ interface Props {
     feedUrl: string | null;
 }
 
-export default function CalendarGlobal({ sites, sources, eventTypes, canCreate, canManage, canApprove, feedUrl }: Props) {
+export default function CalendarGlobal({ sites, people, sources, eventTypes, canCreate, canManage, canApprove, feedUrl }: Props) {
     return (
         <AppLayout breadcrumbs={[{ title: 'Calendar', href: '/calendar' }]}>
             <Head title="Site Calendar" />
@@ -23,6 +24,7 @@ export default function CalendarGlobal({ sites, sources, eventTypes, canCreate, 
                 context="page"
                 scope="global"
                 sites={sites}
+                people={people}
                 sources={sources}
                 eventTypes={eventTypes}
                 canCreate={canCreate}

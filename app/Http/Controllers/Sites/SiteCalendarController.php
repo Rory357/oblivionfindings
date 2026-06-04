@@ -41,6 +41,8 @@ class SiteCalendarController extends Controller
             ],
             // Full accessible-site list so the hero's house selector can switch houses.
             'sites' => $this->resolveGlobalSites($request),
+            // Assignable staff for the create dialog's owner + attendee pickers.
+            'people' => User::query()->staff()->orderBy('name')->get(['id', 'name']),
             'eventTypes' => $this->eventTypeOptions(),
             'sources' => CalendarSources::all(),
             'canCreate' => ($request->user()?->canDo('calendar.create') ?? false)
@@ -97,6 +99,8 @@ class SiteCalendarController extends Controller
             'attendee_user_ids' => 'nullable|array',
             'attendee_user_ids.*' => 'exists:users,id',
             'reminder_minutes' => 'nullable|array',
+            'reminder_minutes.*' => 'integer',
+            'all_day' => 'boolean',
         ]);
 
         // The datetime-local inputs are business-timezone wall-clock; persist UTC.
@@ -128,8 +132,12 @@ class SiteCalendarController extends Controller
             'start_at' => 'sometimes|required|date',
             'end_at' => 'sometimes|nullable|date|after:start_at',
             'owner_user_id' => 'sometimes|nullable|exists:users,id',
+            'attendee_user_ids' => 'sometimes|nullable|array',
+            'attendee_user_ids.*' => 'exists:users,id',
             'recurrence_rule' => 'sometimes|nullable|string',
             'reminder_minutes' => 'sometimes|nullable|array',
+            'reminder_minutes.*' => 'integer',
+            'all_day' => 'sometimes|boolean',
             'status' => 'sometimes|required|in:draft,pending,approved,completed,cancelled',
         ]);
 
@@ -271,6 +279,7 @@ class SiteCalendarController extends Controller
             'context' => 'page',
             'scope' => 'global',
             'sites' => $sites,
+            'people' => User::query()->staff()->orderBy('name')->get(['id', 'name']),
             'eventTypes' => $this->eventTypeOptions(),
             'sources' => CalendarSources::all(),
             'canCreate' => $user->canDo('calendar.create'),

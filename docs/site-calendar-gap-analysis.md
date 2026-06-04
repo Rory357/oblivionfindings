@@ -67,14 +67,16 @@ Priorities: **P1** = correctness/parity blockers · **P2** = important parity ·
    auto-refresh tick so the NOW marker advances without a manual reload.
 
 4. **Create/Edit dialog** — ✅ visual polish done (design-parity tiles, header, locked-site card, split
-   Date/Start/End). Still missing **input fields** for things the backend is already wired for:
-   - **Owner** + **attendees** + **reminders** — `store()` already validates `owner_user_id`,
-     `attendee_user_ids[]`, `reminder_minutes[]`; they just need a **people-list prop** from the
-     controller (assignable site staff) + the pickers. Reminders are highest-value (the `.ics` VALARM
-     path is wired but unreachable). Deferred to avoid shipping a non-persisting Owner dropdown.
-   - **All-day** — needs an `all_day` column (not present today); skipped rather than faked.
-   - **Recurrence UNTIL/COUNT** — `recur.ts` supports them; the Repeats `<select>` can't reach them yet.
-   - **Room/location** — `room` is shown read-only in detail; add an input + `store()` validation.
+   Date/Start/End) **and ✅ Owner / Attendees / Reminders / All-day now wired end-to-end**:
+   - **Owner** dropdown + **Attendees** chip multi-select — controller passes a `people` list
+     (`User::staff()`); `store()/update()` persist `owner_user_id` + `attendee_user_ids[]`. Attendee
+     IDs round-trip via a new `CalendarItem.attendeeIds` so edit pre-selects them.
+   - **Reminders** preset chips (At time / 10m / 30m / 1h / 1d) → `reminder_minutes[]` (drives the
+     existing `.ics` VALARM path).
+   - **All-day** toggle → new `all_day` column (migration `2026_06_04_120000`), hides the time inputs,
+     and renders in the views' all-day row.
+   - Still open: **Recurrence UNTIL/COUNT** (`recur.ts` supports them; the Repeats `<select>` can't reach
+     them yet) and a **Room/location** input (`room` is read-only in detail today).
 
 5. **Missing obligation providers (NZ supported-living value-adds):**
    - **Emergency / evacuation plan review dates** — `--src-emergency` palette exists but there is no
