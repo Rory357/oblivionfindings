@@ -77,6 +77,19 @@ const RESPONSE_TYPES: { value: ResponseType; label: string }[] = [
 const FREQUENCIES = ['once', 'daily', 'weekly', 'fortnightly', 'monthly', 'quarterly', 'annual'];
 const APPLIES_TO = ['all', 'house', 'head_office', 'facility'];
 
+const DEFAULTS: BuilderForm = {
+    key: '',
+    name: '',
+    description: '',
+    category: '',
+    applicable_to_type: 'all',
+    frequency: 'weekly',
+    is_active: true,
+    requires_photo: false,
+    requires_signature: false,
+    items: [],
+};
+
 function slugify(s: string): string {
     return s
         .toLowerCase()
@@ -96,50 +109,50 @@ function blankItem(): ItemDraft {
     };
 }
 
-const DEFAULTS: BuilderForm = {
-    key: '',
-    name: '',
-    description: '',
-    category: '',
-    applicable_to_type: 'all',
-    frequency: 'weekly',
-    is_active: true,
-    requires_photo: false,
-    requires_signature: false,
-    items: [],
-};
+function detailToForm(detail: TemplateDetail): BuilderForm {
+    return {
+        key: detail.key,
+        name: detail.name,
+        description: detail.description ?? '',
+        category: detail.category ?? '',
+        applicable_to_type: detail.applicable_to_type,
+        frequency: detail.frequency,
+        is_active: detail.is_active,
+        requires_photo: detail.requires_photo,
+        requires_signature: detail.requires_signature,
+        items: detail.items.map((it) => ({
+            id: it.id,
+            question: it.question,
+            response_type: it.response_type,
+            response_config: {
+                min: it.response_config?.min != null ? String(it.response_config.min) : '',
+                max: it.response_config?.max != null ? String(it.response_config.max) : '',
+                unit: it.response_config?.unit ?? '',
+            },
+            is_required: it.is_required,
+            guidance: it.guidance ?? '',
+            failure_creates_hazard: it.failure_creates_hazard,
+            has_responses: it.has_responses,
+        })),
+    };
+}
 
 function FieldError({ message }: { message?: string }) {
     if (!message) return null;
     return <p className="mt-1 text-xs text-status-critical">{message}</p>;
 }
 
+/**
+ * Shell: handles loading the template detail for edit (partial reload), then
+ * mounts the body with the resolved initial values so useForm is seeded once —
+ * controlled <Select>s reflect the value from first render.
+ */
 export function TemplateBuilderModal({ target, onClose }: { target: 'new' | number; onClose: () => void }) {
-    return (
-        <Dialog open onOpenChange={(open) => !open && onClose()}>
-            <DialogContent
-                className="max-h-[90vh] overflow-y-auto"
-                style={{ maxWidth: 'min(92vw, 1100px)', width: 'min(92vw, 1100px)' }}
-            >
-                <TemplateBuilderBody target={target} onClose={onClose} />
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-function TemplateBuilderBody({ target, onClose }: { target: 'new' | number; onClose: () => void }) {
-    const cfg = useChecklistConfig();
     const page = usePage();
     const detail = (page.props as { templateDetail?: TemplateDetail | null }).templateDetail ?? null;
     const isEdit = target !== 'new';
     const ready = !isEdit || (detail !== null && detail.id === target);
 
-    const form = useForm<BuilderForm>({ ...DEFAULTS });
-    const seeded = useRef(false);
-    const keyEdited = useRef(false);
-    const [confirmDelete, setConfirmDelete] = useState(false);
-
-    // Pull the template detail (incl. items) for edit, without leaving the page.
     useEffect(() => {
         if (isEdit) {
             router.reload({ only: ['templateDetail'], data: { template: target }, preserveState: true, preserveScroll: true });
@@ -147,38 +160,47 @@ function TemplateBuilderBody({ target, onClose }: { target: 'new' | number; onCl
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [target]);
 
-    // Seed the form once the matching detail arrives.
-    useEffect(() => {
-        if (!isEdit || !ready || !detail || seeded.current) return;
-        seeded.current = true;
-        keyEdited.current = true;
-        form.setData({
-            key: detail.key,
-            name: detail.name,
-            description: detail.description ?? '',
-            category: detail.category ?? '',
-            applicable_to_type: detail.applicable_to_type,
-            frequency: detail.frequency,
-            is_active: detail.is_active,
-            requires_photo: detail.requires_photo,
-            requires_signature: detail.requires_signature,
-            items: detail.items.map((it) => ({
-                id: it.id,
-                question: it.question,
-                response_type: it.response_type,
-                response_config: {
-                    min: it.response_config?.min != null ? String(it.response_config.min) : '',
-                    max: it.response_config?.max != null ? String(it.response_config.max) : '',
-                    unit: it.response_config?.unit ?? '',
-                },
-                is_required: it.is_required,
-                guidance: it.guidance ?? '',
-                failure_creates_hazard: it.failure_creates_hazard,
-                has_responses: it.has_responses,
-            })),
-        });
-        // eslint-disable-next-line react-hooks/exhaustive-deps
-    }, [ready, detail]);
+    return (
+        <Dialog open onOpenChange={(open) => !open && onClose()}>
+            <DialogContent
+                className="max-h-[90vh] overflow-y-auto"
+                style={{ maxWidth: 'min(92vw, 1100px)', width: 'min(92vw, 1100px)' }}
+            >
+                {!ready ? (
+                    <div className="flex h-64 flex-col items-center justify-center gap-3 text-muted-foreground">
+                        <Loader2 className="h-6 w-6 animate-spin" />
+                        <span className="text-sm">Loading template…</span>
+                    </div>
+                ) : (
+                    <TemplateBuilderBody
+                        key={isEdit ? `edit-${target}` : 'new'}
+                        templateId={isEdit ? (target as number) : null}
+                        initial={isEdit && detail ? detailToForm(detail) : DEFAULTS}
+                        assignmentsCount={isEdit && detail ? detail.assignments_count : 0}
+                        onClose={onClose}
+                    />
+                )}
+            </DialogContent>
+        </Dialog>
+    );
+}
+
+function TemplateBuilderBody({
+    templateId,
+    initial,
+    assignmentsCount,
+    onClose,
+}: {
+    templateId: number | null;
+    initial: BuilderForm;
+    assignmentsCount: number;
+    onClose: () => void;
+}) {
+    const cfg = useChecklistConfig();
+    const isEdit = templateId !== null;
+    const form = useForm<BuilderForm>(initial);
+    const keyEdited = useRef(isEdit); // key is locked in edit; don't auto-slug over it
+    const [confirmDelete, setConfirmDelete] = useState(false);
 
     const items = form.data.items;
     const setItems = (next: ItemDraft[]) => form.setData('items', next);
@@ -223,27 +245,18 @@ function TemplateBuilderBody({ target, onClose }: { target: 'new' | number; onCl
         }));
         const opts = { preserveScroll: true, preserveState: true, onSuccess: onClose };
         if (isEdit) {
-            form.put(`/sites/checklists/templates/${target}`, opts);
+            form.put(`/sites/checklists/templates/${templateId}`, opts);
         } else {
             form.post('/sites/checklists/templates', opts);
         }
     };
 
     const remove = () => {
-        router.delete(`/sites/checklists/templates/${target}`, { preserveScroll: true, onSuccess: onClose });
+        router.delete(`/sites/checklists/templates/${templateId}`, { preserveScroll: true, onSuccess: onClose });
     };
 
     const itemError = Object.keys(form.errors).find((k) => k.startsWith('items.'));
-    const canDelete = isEdit && detail != null && detail.assignments_count === 0;
-
-    if (isEdit && !ready) {
-        return (
-            <div className="flex h-64 flex-col items-center justify-center gap-3 text-muted-foreground">
-                <Loader2 className="h-6 w-6 animate-spin" />
-                <span className="text-sm">Loading template…</span>
-            </div>
-        );
-    }
+    const canDelete = isEdit && assignmentsCount === 0;
 
     return (
         <form onSubmit={submit}>
@@ -260,7 +273,7 @@ function TemplateBuilderBody({ target, onClose }: { target: 'new' | number; onCl
             <div className="mt-3 space-y-5">
                 {/* Details */}
                 <div className="grid gap-3 sm:grid-cols-2">
-                    <div className="sm:col-span-1">
+                    <div>
                         <Label>
                             Name <span className="text-status-critical">*</span>
                         </Label>
@@ -271,7 +284,7 @@ function TemplateBuilderBody({ target, onClose }: { target: 'new' | number; onCl
                         />
                         <FieldError message={form.errors.name} />
                     </div>
-                    <div className="sm:col-span-1">
+                    <div>
                         <Label>
                             Key <span className="text-status-critical">*</span>
                         </Label>
