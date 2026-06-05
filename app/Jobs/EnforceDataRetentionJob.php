@@ -2,6 +2,7 @@
 
 namespace App\Jobs;
 
+use App\Domain\Finance\Jobs\PruneFinanceAuditExportsJob;
 use App\Models\DataRetentionPolicy;
 use App\Models\LegalHold;
 use App\Services\AuditLogger;
@@ -20,6 +21,8 @@ class EnforceDataRetentionJob implements ShouldQueue
 
     public function handle(): void
     {
+        app(PruneFinanceAuditExportsJob::class)->handle();
+
         $policies = DataRetentionPolicy::where('active', true)->get();
 
         foreach ($policies as $policy) {

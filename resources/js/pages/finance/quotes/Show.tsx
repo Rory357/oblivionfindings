@@ -65,13 +65,13 @@ export default function QuoteShow({ quote }: Props) {
     const currentStepIndex = STATUS_STEPS.indexOf(quote.status);
 
     const handleAction = (action: string) => {
-        router.post(`/operations/quotes/${quote.id}/${action}`, {}, { preserveScroll: true });
+        router.post(`/finance/quotes/${quote.id}/${action}`, {}, { preserveScroll: true });
     };
 
     return (
         <AppLayout>
             <Head title={quote.title} />
-            <PageHero variant="compact" title={quote.title} description={clientDisplay} backHref="/operations/quotes" />
+            <PageHero variant="compact" title={quote.title} description={clientDisplay} backHref="/finance/quotes" />
             <PageShell>
                 {/* Header */}
                 <div className="flex flex-wrap items-center gap-2">
@@ -85,7 +85,7 @@ export default function QuoteShow({ quote }: Props) {
                         {quote.status === 'draft' && (
                             <>
                                 <Button asChild size="sm" variant="outline">
-                                    <Link href={`/operations/quotes/${quote.id}/edit`}><Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit</Link>
+                                    <Link href={`/finance/quotes/${quote.id}/edit`}><Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit</Link>
                                 </Button>
                                 <Button size="sm" onClick={() => handleAction('send')}>
                                     <Send className="mr-1.5 h-3.5 w-3.5" /> Send

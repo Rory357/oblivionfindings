@@ -74,13 +74,13 @@ class OperationsInvoiceFinInvoiceTest extends TestCase
         $this->assertSame('invoiced', $entry->refresh()->status);
     }
 
-    public function test_operations_invoice_store_creates_fin_invoice_from_page_payload(): void
+    public function test_finance_invoice_store_creates_fin_invoice_from_operations_billing_payload(): void
     {
         $user = User::factory()->create([
             'organization_id' => 1,
             'approved_at' => now(),
         ]);
-        $this->grantPermissions($user, ['invoices.create']);
+        $this->grantPermissions($user, ['finance.ar.manage']);
 
         $client = Client::factory()->create([
             'organization_id' => 1,
@@ -88,7 +88,7 @@ class OperationsInvoiceFinInvoiceTest extends TestCase
             'last_name' => 'Rangi',
         ]);
 
-        $response = $this->actingAs($user)->post('/operations/invoices', [
+        $response = $this->actingAs($user)->post('/finance/invoices', [
             'client_id' => $client->id,
             'funding_body' => 'ACC',
             'issue_date' => '2026-05-02',
@@ -108,7 +108,7 @@ class OperationsInvoiceFinInvoiceTest extends TestCase
 
         $invoice = FinInvoice::firstOrFail();
 
-        $response->assertRedirect(route('operations.invoices.show', $invoice));
+        $response->assertRedirect(route('finance.invoices.show', $invoice));
         $this->assertDatabaseCount('invoices', 0);
         $this->assertDatabaseHas('fin_invoices', [
             'id' => $invoice->id,

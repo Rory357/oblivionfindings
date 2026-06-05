@@ -76,7 +76,7 @@ export default function BillingIndex({ stats = {} as any, entries = { data: [], 
     const s = stats ?? { billed_this_month: 0, outstanding: 0, paid_this_month: 0, pending_count: 0 };
 
     const updateFilters = (key: string, value: string | null) => {
-        router.get('/operations/billing', { ...filters, [key]: value }, { preserveState: true, replace: true });
+        router.get('/finance/billing', { ...filters, [key]: value }, { preserveState: true, replace: true });
     };
 
     return (
@@ -99,7 +99,7 @@ export default function BillingIndex({ stats = {} as any, entries = { data: [], 
                     <OpsStatCard label="Billed This Month" value={formatCurrency(s.billed_this_month)} icon={DollarSign} color="indigo" />
                     <OpsStatCard label="Outstanding" value={formatCurrency(s.outstanding)} icon={Receipt} color="amber" />
                     <OpsStatCard label="Paid This Month" value={formatCurrency(s.paid_this_month)} icon={DollarSign} color="emerald" />
-                    <OpsStatCard label="Pending Entries" value={s.pending_count} icon={FileText} color="blue" href="/operations/billing?status=pending" />
+                    <OpsStatCard label="Pending Entries" value={s.pending_count} icon={FileText} color="blue" href="/finance/billing?status=pending" />
                 </div>
 
                 {/* Charts + Filters */}
@@ -136,7 +136,7 @@ export default function BillingIndex({ stats = {} as any, entries = { data: [], 
                         <CardHeader className="flex flex-row items-center justify-between pb-2">
                             <CardTitle className="text-sm font-medium">Billing Entries</CardTitle>
                             <Button asChild variant="ghost" size="sm" className="h-7 text-xs">
-                                <Link href="/operations/invoices">
+                                <Link href="/finance/invoices">
                                     Invoices <ArrowRight className="ml-1 h-3 w-3" />
                                 </Link>
                             </Button>

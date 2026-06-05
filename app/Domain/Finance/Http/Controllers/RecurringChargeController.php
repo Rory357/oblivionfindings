@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Operations;
+namespace App\Domain\Finance\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\Client;
@@ -12,7 +12,7 @@ class RecurringChargeController extends Controller
 {
     public function index(Request $request)
     {
-        $auth = $this->authorizeBilling($request, ['recurring_charges.viewAny']);
+        $auth = $this->authorizeFinance($request, 'finance.ar.view');
 
         $filters = $request->validate([
             'q' => ['nullable', 'string'],
@@ -60,7 +60,7 @@ class RecurringChargeController extends Controller
                 ] : null,
             ]);
 
-        return inertia('operations/recurring-charges/Index', [
+        return inertia('finance/recurring-charges/Index', [
             'charges' => $charges,
             'filters' => $filters,
             'stats' => [
@@ -83,17 +83,17 @@ class RecurringChargeController extends Controller
 
     public function create(Request $request)
     {
-        $auth = $this->authorizeBilling($request, ['recurring_charges.create']);
+        $auth = $this->authorizeFinance($request, 'finance.ar.manage');
         $clients = $this->clientOptions($auth->organization_id);
 
-        return inertia('operations/recurring-charges/Create', [
+        return inertia('finance/recurring-charges/Create', [
             'clients' => $clients,
         ]);
     }
 
     public function store(Request $request)
     {
-        $auth = $this->authorizeBilling($request, ['recurring_charges.create']);
+        $auth = $this->authorizeFinance($request, 'finance.ar.manage');
 
         $data = $request->validate([
             'client_id' => ['required', 'integer', 'exists:clients,id'],
@@ -118,12 +118,12 @@ class RecurringChargeController extends Controller
             'created_by' => $auth->id,
         ]);
 
-        return redirect()->route('operations.recurring_charges.index')->with('success', 'Recurring charge created.');
+        return redirect()->route('finance.recurring_charges.index')->with('success', 'Recurring charge created.');
     }
 
     public function edit(Request $request, $charge)
     {
-        $auth = $this->authorizeBilling($request, ['recurring_charges.edit']);
+        $auth = $this->authorizeFinance($request, 'finance.ar.manage');
 
         $charge = RecurringCharge::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -132,7 +132,7 @@ class RecurringChargeController extends Controller
 
         $clients = $this->clientOptions($auth->organization_id);
 
-        return inertia('operations/recurring-charges/Edit', [
+        return inertia('finance/recurring-charges/Edit', [
             'charge' => [
                 'id' => $charge->id,
                 'client_id' => $charge->client_id,
@@ -148,7 +148,7 @@ class RecurringChargeController extends Controller
 
     public function update(Request $request, $charge)
     {
-        $auth = $this->authorizeBilling($request, ['recurring_charges.edit']);
+        $auth = $this->authorizeFinance($request, 'finance.ar.manage');
 
         $charge = RecurringCharge::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -175,12 +175,12 @@ class RecurringChargeController extends Controller
 
         $charge->update($data);
 
-        return redirect()->route('operations.recurring_charges.index')->with('success', 'Recurring charge updated.');
+        return redirect()->route('finance.recurring_charges.index')->with('success', 'Recurring charge updated.');
     }
 
     public function destroy(Request $request, $charge)
     {
-        $auth = $this->authorizeBilling($request, ['recurring_charges.delete']);
+        $auth = $this->authorizeFinance($request, 'finance.ar.manage');
 
         $charge = RecurringCharge::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -191,15 +191,11 @@ class RecurringChargeController extends Controller
         return redirect()->back()->with('success', 'Recurring charge deleted.');
     }
 
-    private function authorizeBilling(Request $request, array $fallbackPermissions = [])
+    private function authorizeFinance(Request $request, string $permission)
     {
         $user = $request->user();
-        $permissions = array_merge(['billing.viewAny'], $fallbackPermissions);
 
-        abort_unless(
-            $user && collect($permissions)->contains(fn (string $permission) => $user->canDo($permission)),
-            403,
-        );
+        abort_unless($user && $user->canDo($permission), 403);
 
         return $user;
     }

@@ -34,7 +34,7 @@ class InvoiceStatusNotification extends Notification
                 $this->invoice->invoice_number,
                 number_format($this->invoice->total_amount, 2)
             ))
-            ->action('View Invoice', url("/operations/invoices/{$this->invoice->id}"))
+            ->action('View Invoice', url("/finance/invoices/{$this->invoice->id}"))
             ->line('Please review and take any necessary action.');
     }
 

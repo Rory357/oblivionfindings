@@ -424,12 +424,7 @@ function buildIconNavItems({
         !!can?.care_plans?.viewAny ||
         !!can?.service_agreements?.viewAny ||
         !!can?.client_funds?.manage ||
-        !!can?.billing?.viewAny ||
-        !!can?.invoices?.viewAny ||
         !!can?.funding?.viewAny ||
-        !!can?.price_books?.viewAny ||
-        !!can?.quotes?.viewAny ||
-        !!can?.recurring_charges?.viewAny ||
         !!can?.mileage?.viewAny ||
         !!can?.mileage?.viewOwn ||
         !!can?.messages?.viewAny ||
@@ -609,7 +604,9 @@ function buildIconNavItems({
     if (
         can?.finance?.dashboard ||
         can?.finance?.ledger?.view ||
-        can?.finance?.ap?.view
+        can?.finance?.ap?.view ||
+        can?.finance?.ar?.view ||
+        can?.finance?.ar?.manage
     ) {
         items.push({
             id: 'finance',
@@ -841,6 +838,12 @@ function buildOperationsSubPanelGroups({
             href: '/operations/review-queue',
             icon: AlertTriangle,
         });
+    if (can?.funding?.viewAny)
+        clientMgmt.push({
+            title: 'Funding',
+            href: '/operations/funding',
+            icon: PieChart,
+        });
     if (can?.client_funds?.manage)
         clientMgmt.push({
             title: `${clientLabel} Funds`,
@@ -849,53 +852,6 @@ function buildOperationsSubPanelGroups({
         });
     if (clientMgmt.length > 0)
         groups.push({ label: `${clientLabel} Management`, items: clientMgmt });
-
-    // Time & Billing
-    const timeBilling: NavItem[] = [];
-    if (can?.billing?.viewAny)
-        timeBilling.push({
-            title: 'Billing',
-            href: '/operations/billing',
-            icon: DollarSign,
-        });
-    if (can?.invoices?.viewAny)
-        timeBilling.push({
-            title: 'Invoices',
-            href: '/operations/invoices',
-            icon: Receipt,
-        });
-    if (can?.funding?.viewAny)
-        timeBilling.push({
-            title: 'Funding',
-            href: '/operations/funding',
-            icon: PieChart,
-        });
-    if (can?.price_books?.viewAny)
-        timeBilling.push({
-            title: 'Price Books',
-            href: '/operations/price-books',
-            icon: BookOpen,
-        });
-    if (can?.quotes?.viewAny)
-        timeBilling.push({
-            title: 'Quotes',
-            href: '/operations/quotes',
-            icon: FileText,
-        });
-    if (can?.recurring_charges?.viewAny)
-        timeBilling.push({
-            title: 'Recurring Charges',
-            href: '/operations/recurring-charges',
-            icon: Receipt,
-        });
-    if (can?.mileage?.viewAny || can?.mileage?.viewOwn)
-        timeBilling.push({
-            title: 'Mileage',
-            href: '/operations/mileage',
-            icon: Route,
-        });
-    if (timeBilling.length > 0)
-        groups.push({ label: 'Time & Billing', items: timeBilling });
 
     // Communications
     const comms: NavItem[] = [];
@@ -922,6 +878,12 @@ function buildOperationsSubPanelGroups({
 
     // Tools
     const tools: NavItem[] = [];
+    if (can?.mileage?.viewAny || can?.mileage?.viewOwn)
+        tools.push({
+            title: 'Mileage',
+            href: '/operations/mileage',
+            icon: Route,
+        });
     if (can?.custom_forms?.viewAny)
         tools.push({
             title: 'Custom Forms',
@@ -1682,6 +1644,11 @@ function buildFinanceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     const ar: NavItem[] = [];
     if (can?.finance?.ar?.view) {
         ar.push({
+            title: 'Billing',
+            href: '/finance/billing',
+            icon: DollarSign,
+        });
+        ar.push({
             title: 'Receivables',
             href: '/finance/receivables',
             icon: DollarSign,
@@ -1690,6 +1657,21 @@ function buildFinanceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             title: 'Invoices',
             href: '/finance/invoices',
             icon: FileText,
+        });
+        ar.push({
+            title: 'Price Books',
+            href: '/finance/price-books',
+            icon: BookOpen,
+        });
+        ar.push({
+            title: 'Quotes',
+            href: '/finance/quotes',
+            icon: FileText,
+        });
+        ar.push({
+            title: 'Recurring Charges',
+            href: '/finance/recurring-charges',
+            icon: Receipt,
         });
     }
 

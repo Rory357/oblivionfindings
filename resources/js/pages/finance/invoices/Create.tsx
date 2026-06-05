@@ -33,29 +33,54 @@ interface Bill {
     vendor?: { id: number; name: string } | null;
 }
 
+interface Client {
+    id: number;
+    first_name: string;
+    last_name: string;
+}
+
+interface BillingEntry {
+    id: number;
+    service_date: string | null;
+    hours: string | number | null;
+    rate: string | number | null;
+    amount: string | number;
+    rate_type?: string | null;
+    notes?: string | null;
+    client?: Client | null;
+}
+
 interface LineItem {
+    billing_entry_id: string;
     description: string;
     quantity: string;
     unit_price: string;
     tax_rate_id: string;
     account_id: string;
+    service_date: string;
+    category: string;
 }
 
 interface Props extends PageProps {
     accounts: Account[];
     taxRates: TaxRate[];
     bills: Bill[];
+    clients?: Client[];
+    billingEntries?: BillingEntry[];
 }
 
 const formatCurrency = (amount: number) =>
     new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' }).format(amount);
 
 const emptyLine = (): LineItem => ({
+    billing_entry_id: '',
     description: '',
     quantity: '1',
     unit_price: '0',
     tax_rate_id: '',
     account_id: '',
+    service_date: '',
+    category: '',
 });
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -64,9 +89,20 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'New Invoice', href: '/finance/invoices/create' },
 ];
 
-export default function InvoiceCreate({ auth, accounts, taxRates, bills }: Props) {
+const clientName = (client: Client) => `${client.first_name} ${client.last_name}`.trim();
+
+const billingEntryLabel = (entry: BillingEntry) => {
+    const client = entry.client ? clientName(entry.client) : 'No client';
+    const date = entry.service_date ?? 'No date';
+
+    return `${date} - ${client} - ${formatCurrency(Number(entry.amount) || 0)}`;
+};
+
+export default function InvoiceCreate({ auth, accounts, taxRates, bills, clients = [], billingEntries = [] }: Props) {
     const { data, setData, post, processing, errors } = useForm<{
         invoice_number: string;
+        client_id: string;
+        funding_body: string;
         invoice_date: string;
         due_date: string;
         client_name: string;
@@ -81,6 +117,8 @@ export default function InvoiceCreate({ auth, accounts, taxRates, bills }: Props
         lines: LineItem[];
     }>({
         invoice_number: '',
+        client_id: '',
+        funding_body: '',
         invoice_date: new Date().toISOString().split('T')[0],
         due_date: '',
         client_name: '',
@@ -107,6 +145,43 @@ export default function InvoiceCreate({ auth, accounts, taxRates, bills }: Props
     const updateLine = (index: number, field: keyof LineItem, value: string) => {
         const updated = [...data.lines];
         updated[index] = { ...updated[index], [field]: value };
+        setData('lines', updated);
+    };
+
+    const updateClient = (value: string) => {
+        const selectedValue = value === 'none' ? '' : value;
+        setData('client_id', selectedValue);
+
+        const selected = clients.find((client) => client.id === Number(selectedValue));
+        if (selected && !data.client_name) {
+            setData('client_name', clientName(selected));
+        }
+    };
+
+    const applyBillingEntryToLine = (index: number, value: string) => {
+        if (value === 'none') {
+            updateLine(index, 'billing_entry_id', '');
+            return;
+        }
+
+        const entry = billingEntries.find((billingEntry) => billingEntry.id === Number(value));
+        if (!entry) return;
+
+        const updated = [...data.lines];
+        const line = updated[index];
+        const amount = Number(entry.amount) || 0;
+        const hours = Number(entry.hours) || 0;
+        const rate = Number(entry.rate) || 0;
+
+        updated[index] = {
+            ...line,
+            billing_entry_id: String(entry.id),
+            description: line.description || entry.notes || `Billing entry ${entry.id}`,
+            quantity: hours > 0 ? String(hours) : line.quantity,
+            unit_price: rate > 0 ? String(rate) : String(amount),
+            service_date: entry.service_date ?? line.service_date,
+            category: entry.rate_type ?? line.category,
+        };
         setData('lines', updated);
     };
 
@@ -200,6 +275,33 @@ export default function InvoiceCreate({ auth, accounts, taxRates, bills }: Props
                         <CardContent>
                             <div className="grid grid-cols-1 md:grid-cols-2 gap-4">
                                 <div>
+                                    <Label htmlFor="client_id">Client</Label>
+                                    <Select value={data.client_id || 'none'} onValueChange={updateClient}>
+                                        <SelectTrigger id="client_id">
+                                            <SelectValue placeholder="Select client" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="none">No linked client</SelectItem>
+                                            {clients.map((client) => (
+                                                <SelectItem key={client.id} value={String(client.id)}>
+                                                    {clientName(client)}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    {errors.client_id && <p className="text-sm text-destructive mt-1">{errors.client_id}</p>}
+                                </div>
+                                <div>
+                                    <Label htmlFor="funding_body">Funding Body</Label>
+                                    <Input
+                                        id="funding_body"
+                                        value={data.funding_body}
+                                        onChange={(e) => setData('funding_body', e.target.value)}
+                                        placeholder="ACC, MSD, private, or other funder"
+                                    />
+                                    {errors.funding_body && <p className="text-sm text-destructive mt-1">{errors.funding_body}</p>}
+                                </div>
+                                <div>
                                     <Label htmlFor="client_name">Client Name *</Label>
                                     <Input
                                         id="client_name"
@@ -249,6 +351,7 @@ export default function InvoiceCreate({ auth, accounts, taxRates, bills }: Props
                                 <Table>
                                     <TableHeader>
                                         <TableRow>
+                                            <TableHead className="min-w-[220px]">Billing Entry</TableHead>
                                             <TableHead className="min-w-[200px]">Description</TableHead>
                                             <TableHead className="w-24">Qty</TableHead>
                                             <TableHead className="w-32">Unit Price</TableHead>
@@ -262,6 +365,27 @@ export default function InvoiceCreate({ auth, accounts, taxRates, bills }: Props
                                     <TableBody>
                                         {data.lines.map((line, index) => (
                                             <TableRow key={index}>
+                                                <TableCell>
+                                                    <Select
+                                                        value={line.billing_entry_id || 'none'}
+                                                        onValueChange={(v) => applyBillingEntryToLine(index, v)}
+                                                    >
+                                                        <SelectTrigger className="min-w-[200px]">
+                                                            <SelectValue placeholder="Optional" />
+                                                        </SelectTrigger>
+                                                        <SelectContent>
+                                                            <SelectItem value="none">None</SelectItem>
+                                                            {billingEntries.map((entry) => (
+                                                                <SelectItem key={entry.id} value={String(entry.id)}>
+                                                                    {billingEntryLabel(entry)}
+                                                                </SelectItem>
+                                                            ))}
+                                                        </SelectContent>
+                                                    </Select>
+                                                    {errors[`lines.${index}.billing_entry_id` as keyof typeof errors] && (
+                                                        <p className="text-xs text-destructive">{errors[`lines.${index}.billing_entry_id` as keyof typeof errors]}</p>
+                                                    )}
+                                                </TableCell>
                                                 <TableCell>
                                                     <Input
                                                         value={line.description}

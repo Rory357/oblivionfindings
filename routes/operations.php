@@ -23,7 +23,6 @@ use App\Http\Controllers\CoverageGapController;
 use App\Http\Controllers\CoverageReservationController;
 use App\Http\Controllers\MedicationAdministrationCorrectionController;
 use App\Http\Controllers\Operations\ActivityFeedController;
-use App\Http\Controllers\Operations\BillingController;
 use App\Http\Controllers\Operations\CalendarSyncController;
 use App\Http\Controllers\Operations\CareNoteTemplateController;
 // New Operations controllers
@@ -45,16 +44,12 @@ use App\Http\Controllers\Operations\FundingClaimController;
 use App\Http\Controllers\Operations\FundingController;
 use App\Http\Controllers\Operations\GeofenceController;
 use App\Http\Controllers\Operations\HandoverController;
-use App\Http\Controllers\Operations\InvoiceController;
 use App\Http\Controllers\Operations\JobBoardController;
 use App\Http\Controllers\Operations\MessageController;
 use App\Http\Controllers\Operations\MileageClaimController;
 use App\Http\Controllers\Operations\OpsNotificationController;
-use App\Http\Controllers\Operations\PriceBookController;
 use App\Http\Controllers\Operations\ProgressNoteController;
 use App\Http\Controllers\Operations\QualificationMatchController;
-use App\Http\Controllers\Operations\QuoteController;
-use App\Http\Controllers\Operations\RecurringChargeController;
 use App\Http\Controllers\Operations\ReportController;
 use App\Http\Controllers\Operations\RosterSuggestionController;
 use App\Http\Controllers\Operations\RosterTemplateController;
@@ -75,7 +70,7 @@ use Illuminate\Support\Facades\Route;
  * Operations Module Routes
  *
  * Centralises client management, shifts, rostering, timesheets,
- * care plans, billing, invoicing, funding, and messaging.
+ * care plans, funding, and messaging.
  */
 Route::middleware(['auth'])->prefix('operations')->group(function () {
 
@@ -934,39 +929,6 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         ->name('operations.timesheets.return');
 
     // -------------------------------------------------------------------------
-    // Billing (NEW)
-    // -------------------------------------------------------------------------
-
-    Route::middleware('permission:billing.viewAny')->group(function () {
-        Route::get('/billing', [BillingController::class, 'index'])->name('operations.billing.index');
-        Route::get('/billing/entries', [BillingController::class, 'entries'])->name('operations.billing.entries');
-    });
-
-    // -------------------------------------------------------------------------
-    // Invoices (NEW)
-    // -------------------------------------------------------------------------
-
-    Route::middleware('permission:invoices.create')->group(function () {
-        Route::get('/invoices/create', [InvoiceController::class, 'create'])->name('operations.invoices.create');
-        Route::post('/invoices', [InvoiceController::class, 'store'])->name('operations.invoices.store');
-    });
-
-    Route::middleware('permission:invoices.viewAny')->group(function () {
-        Route::get('/invoices', [InvoiceController::class, 'index'])->name('operations.invoices.index');
-        Route::get('/invoices/{invoice}', [InvoiceController::class, 'show'])->name('operations.invoices.show');
-    });
-
-    Route::post('/invoices/{invoice}/send', [InvoiceController::class, 'send'])
-        ->middleware('permission:invoices.send')
-        ->name('operations.invoices.send');
-    Route::patch('/invoices/{invoice}/mark-paid', [InvoiceController::class, 'markPaid'])
-        ->middleware('permission:invoices.update')
-        ->name('operations.invoices.mark_paid');
-    Route::patch('/invoices/{invoice}/void', [InvoiceController::class, 'void'])
-        ->middleware('permission:invoices.void')
-        ->name('operations.invoices.void');
-
-    // -------------------------------------------------------------------------
     // Funding (NEW)
     // -------------------------------------------------------------------------
 
@@ -1018,47 +980,6 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         Route::get('/reports/shifts', [ShiftReportController::class, 'index'])->name('operations.reports.shifts.index');
         Route::get('/reports/shifts/export', [ShiftReportController::class, 'export'])->name('operations.reports.shifts.export');
         Route::get('/reports/{type}', [ReportController::class, 'show'])->name('operations.reports.show');
-    });
-
-    // -------------------------------------------------------------------------
-    // Price Books (Phase 7)
-    // -------------------------------------------------------------------------
-
-    Route::middleware('permission:price_books.create')->group(function () {
-        Route::get('/price-books/create', [PriceBookController::class, 'create'])->name('operations.price_books.create');
-        Route::post('/price-books', [PriceBookController::class, 'store'])->name('operations.price_books.store');
-    });
-    Route::middleware('permission:price_books.viewAny')->group(function () {
-        Route::get('/price-books', [PriceBookController::class, 'index'])->name('operations.price_books.index');
-        Route::get('/price-books/{priceBook}', [PriceBookController::class, 'show'])->name('operations.price_books.show');
-    });
-    Route::middleware('permission:price_books.update')->group(function () {
-        Route::get('/price-books/{priceBook}/edit', [PriceBookController::class, 'edit'])->name('operations.price_books.edit');
-        Route::put('/price-books/{priceBook}', [PriceBookController::class, 'update'])->name('operations.price_books.update');
-        // Price book items
-        Route::post('/price-books/{priceBook}/items', [PriceBookController::class, 'storeItem'])->name('operations.price_books.items.store');
-        Route::put('/price-books/{priceBook}/items/{item}', [PriceBookController::class, 'updateItem'])->name('operations.price_books.items.update');
-        Route::delete('/price-books/{priceBook}/items/{item}', [PriceBookController::class, 'destroyItem'])->name('operations.price_books.items.destroy');
-    });
-
-    // -------------------------------------------------------------------------
-    // Quotes / Proposals (Phase 7)
-    // -------------------------------------------------------------------------
-
-    Route::middleware('permission:quotes.create')->group(function () {
-        Route::get('/quotes/create', [QuoteController::class, 'create'])->name('operations.quotes.create');
-        Route::post('/quotes', [QuoteController::class, 'store'])->name('operations.quotes.store');
-    });
-    Route::middleware('permission:quotes.viewAny')->group(function () {
-        Route::get('/quotes', [QuoteController::class, 'index'])->name('operations.quotes.index');
-        Route::get('/quotes/{quote}', [QuoteController::class, 'show'])->name('operations.quotes.show');
-    });
-    Route::middleware('permission:quotes.update')->group(function () {
-        Route::get('/quotes/{quote}/edit', [QuoteController::class, 'edit'])->name('operations.quotes.edit');
-        Route::put('/quotes/{quote}', [QuoteController::class, 'update'])->name('operations.quotes.update');
-        Route::post('/quotes/{quote}/send', [QuoteController::class, 'send'])->name('operations.quotes.send');
-        Route::post('/quotes/{quote}/accept', [QuoteController::class, 'accept'])->name('operations.quotes.accept');
-        Route::post('/quotes/{quote}/convert', [QuoteController::class, 'convertToAgreement'])->name('operations.quotes.convert');
     });
 
     // -------------------------------------------------------------------------
@@ -1185,19 +1106,6 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     Route::post('/mileage/{claim}/approve', [MileageClaimController::class, 'approve'])
         ->middleware('permission:mileage.approve')
         ->name('operations.mileage.approve');
-
-    // -------------------------------------------------------------------------
-    // Recurring Charges (Phase 9)
-    // -------------------------------------------------------------------------
-
-    Route::middleware('permission:billing.viewAny')->group(function () {
-        Route::get('/recurring-charges', [RecurringChargeController::class, 'index'])->name('operations.recurring_charges.index');
-        Route::get('/recurring-charges/create', [RecurringChargeController::class, 'create'])->name('operations.recurring_charges.create');
-        Route::post('/recurring-charges', [RecurringChargeController::class, 'store'])->name('operations.recurring_charges.store');
-        Route::get('/recurring-charges/{charge}/edit', [RecurringChargeController::class, 'edit'])->name('operations.recurring_charges.edit');
-        Route::put('/recurring-charges/{charge}', [RecurringChargeController::class, 'update'])->name('operations.recurring_charges.update');
-        Route::delete('/recurring-charges/{charge}', [RecurringChargeController::class, 'destroy'])->name('operations.recurring_charges.destroy');
-    });
 
     // -------------------------------------------------------------------------
     // Qualification Matching (Phase 10)

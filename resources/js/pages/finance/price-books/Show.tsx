@@ -63,7 +63,7 @@ export default function PriceBookShow({ price_book }: Props) {
 
     const handleAddItem = (e: React.FormEvent) => {
         e.preventDefault();
-        itemForm.post(`/operations/price-books/${price_book.id}/items`, {
+        itemForm.post(`/finance/price-books/${price_book.id}/items`, {
             preserveScroll: true,
             onSuccess: () => {
                 itemForm.reset();
@@ -77,7 +77,7 @@ export default function PriceBookShow({ price_book }: Props) {
     return (
         <AppLayout>
             <Head title={price_book.name} />
-            <PageHero variant="compact" title={price_book.name} description={price_book.description ?? ''} backHref="/operations/price-books" />
+            <PageHero variant="compact" title={price_book.name} description={price_book.description ?? ''} backHref="/finance/price-books" />
             <PageShell>
                 {/* Header info */}
                 <div className="flex flex-wrap items-center gap-2">
@@ -90,7 +90,7 @@ export default function PriceBookShow({ price_book }: Props) {
                     )}
                     <div className="ml-auto flex gap-1">
                         <Button asChild size="sm" variant="outline">
-                            <Link href={`/operations/price-books/${price_book.id}/edit`}>
+                            <Link href={`/finance/price-books/${price_book.id}/edit`}>
                                 <Pencil className="mr-1.5 h-3.5 w-3.5" /> Edit
                             </Link>
                         </Button>

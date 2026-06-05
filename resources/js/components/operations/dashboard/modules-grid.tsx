@@ -66,7 +66,7 @@ export function ModulesGrid({
         },
         {
             title: 'Invoices & billing',
-            href: '/operations/billing',
+            href: '/finance/billing',
             icon: Receipt,
             badge: { text: `${billingMtd} MTD`, tone: 'muted' },
             description: 'Run charges · approve · export to Xero',

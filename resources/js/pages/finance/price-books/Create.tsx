@@ -8,35 +8,24 @@ import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
 
-type Props = {
-    price_book: {
-        id: number;
-        name: string;
-        description: string | null;
-        is_default: boolean;
-        effective_from: string | null;
-        effective_to: string | null;
-    };
-};
-
-export default function PriceBookEdit({ price_book }: Props) {
-    const { data, setData, put, processing, errors } = useForm({
-        name: price_book.name,
-        description: price_book.description ?? '',
-        is_default: price_book.is_default,
-        effective_from: price_book.effective_from ?? '',
-        effective_to: price_book.effective_to ?? '',
+export default function PriceBookCreate() {
+    const { data, setData, post, processing, errors } = useForm({
+        name: '',
+        description: '',
+        is_default: false,
+        effective_from: '',
+        effective_to: '',
     });
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        put(`/operations/price-books/${price_book.id}`);
+        post('/finance/price-books');
     };
 
     return (
         <AppLayout>
-            <Head title={`Edit: ${price_book.name}`} />
-            <PageHero variant="compact" title={`Edit: ${price_book.name}`} backHref={`/operations/price-books/${price_book.id}`} />
+            <Head title="Create Price Book" />
+            <PageHero variant="compact" title="Create Price Book" description="Create a new price book for service rates." backHref="/finance/price-books" />
             <PageShell>
                 <form onSubmit={handleSubmit}>
                     <Card>
@@ -85,8 +74,8 @@ export default function PriceBookEdit({ price_book }: Props) {
                         </CardContent>
                     </Card>
                     <div className="mt-4 flex items-center justify-end gap-2">
-                        <Button type="button" variant="outline" onClick={() => router.get(`/operations/price-books/${price_book.id}`)}>Cancel</Button>
-                        <Button type="submit" disabled={processing}>Save Changes</Button>
+                        <Button type="button" variant="outline" onClick={() => router.get('/finance/price-books')}>Cancel</Button>
+                        <Button type="submit" disabled={processing}>Create Price Book</Button>
                     </div>
                 </form>
             </PageShell>
