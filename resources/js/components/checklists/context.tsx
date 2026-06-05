@@ -16,6 +16,7 @@ import type {
 export interface PaneCtx {
     runs: ChecklistRun[]; // active: scheduled + in_progress (overdue derived)
     history: ChecklistRun[]; // completed
+    skippedRuns: ChecklistRun[];
     assignments: ChecklistAssignment[];
     templates: ChecklistTemplate[];
     sites: SiteOverview[]; // org: all sites; site mode: the single site
@@ -51,7 +52,9 @@ export const ChecklistConfigProvider = ChecklistConfigContext.Provider;
 export function useChecklistConfig(): ChecklistConfig {
     const value = useContext(ChecklistConfigContext);
     if (!value) {
-        throw new Error('useChecklistConfig must be used within <ChecklistConfigProvider>');
+        throw new Error(
+            'useChecklistConfig must be used within <ChecklistConfigProvider>',
+        );
     }
     return value;
 }

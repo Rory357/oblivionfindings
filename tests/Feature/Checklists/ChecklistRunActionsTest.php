@@ -7,9 +7,11 @@ use App\Models\Site;
 use App\Models\SiteChecklistAssignment;
 use App\Models\SiteChecklistRun;
 use App\Models\SiteChecklistTemplate;
+use App\Models\SiteChecklistTemplateItem;
 use App\Models\SiteDamage;
 use App\Models\SiteHazard;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -31,7 +33,7 @@ class ChecklistRunActionsTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
@@ -88,6 +90,13 @@ class ChecklistRunActionsTest extends TestCase
             ->assertRedirect();
 
         $this->assertSame('skipped', $run->fresh()->status);
+
+        $this->actingAs($this->admin)
+            ->get("/sites/{$this->site->id}/checklists")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('skippedRuns', 1)
+                ->where('skippedRuns.0.id', $run->id));
     }
 
     public function test_skip_requires_run_permission(): void
@@ -97,6 +106,36 @@ class ChecklistRunActionsTest extends TestCase
         $this->actingAs($this->supportWorker)
             ->post("/checklists/runs/{$run->id}/skip")
             ->assertForbidden();
+    }
+
+    public function test_admin_can_restore_a_skipped_run_to_scheduled(): void
+    {
+        $run = $this->makeRun();
+        $run->update(['status' => 'skipped']);
+
+        $this->actingAs($this->admin)
+            ->post("/checklists/runs/{$run->id}/restore")
+            ->assertRedirect();
+
+        $this->assertSame('scheduled', $run->fresh()->status);
+
+        $this->actingAs($this->admin)
+            ->get("/sites/{$this->site->id}/checklists")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('skippedRuns', 0));
+    }
+
+    public function test_restore_requires_schedule_permission(): void
+    {
+        $run = $this->makeRun();
+        $run->update(['status' => 'skipped']);
+
+        $this->actingAs($this->supportWorker)
+            ->post("/checklists/runs/{$run->id}/restore")
+            ->assertForbidden();
+
+        $this->assertSame('skipped', $run->fresh()->status);
     }
 
     public function test_failed_flagged_items_raise_hazard_and_damage(): void
@@ -189,7 +228,7 @@ class ChecklistRunActionsTest extends TestCase
         ]);
     }
 
-    /** @return array{0: SiteChecklistRun, 1: \App\Models\SiteChecklistTemplateItem, 2: \App\Models\SiteChecklistTemplateItem} */
+    /** @return array{0: SiteChecklistRun, 1: SiteChecklistTemplateItem, 2: SiteChecklistTemplateItem} */
     private function makeRunWithFlaggedItems(): array
     {
         $template = SiteChecklistTemplate::create([

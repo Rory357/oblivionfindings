@@ -13,6 +13,7 @@ use App\Services\ShiftConflictService;
 use App\Services\ShiftCoverageService;
 use App\Services\ShiftStateGuardService;
 use App\Services\ShiftTimelineService;
+use App\Services\Sites\SiteChecklistScheduler;
 use App\Support\ShiftTaskSupport;
 use Illuminate\Http\Request;
 use Illuminate\Support\Arr;
@@ -330,6 +331,8 @@ class CalendarController extends Controller
                     'status' => $data['status'],
                     'created_by' => $auth->id,
                 ]);
+
+                app(SiteChecklistScheduler::class)->ensureRunsForShiftLocalDay($shift);
 
                 ShiftTaskSupport::createForShift($shift, $data['tasks'] ?? []);
 

@@ -2,9 +2,9 @@
 
 namespace Tests\Feature;
 
+use App\Models\AuditLog;
 use App\Models\Role;
 use App\Models\Site;
-use App\Models\AuditLog;
 use App\Models\SiteChecklistAssignment;
 use App\Models\SiteChecklistResponse;
 use App\Models\SiteChecklistRun;
@@ -16,6 +16,7 @@ use App\Models\SiteVendor;
 use App\Models\User;
 use App\Services\Sites\SiteChecklistScheduler;
 use App\Services\Sites\SiteCredentialEncryptionService;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
@@ -30,7 +31,7 @@ class SitesModuleIntegrationTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $this->admin = User::factory()->create([
             'role' => 'admin',
@@ -127,12 +128,12 @@ class SitesModuleIntegrationTest extends TestCase
             );
     }
 
-    public function test_checklist_run_detail_page_contract_is_valid(): void
+    public function test_legacy_checklist_run_pages_redirect_to_unified_workspace(): void
     {
         $site = Site::factory()->create(['type' => 'house']);
 
         $template = SiteChecklistTemplate::create([
-            'key' => 'house_quality_' . uniqid(),
+            'key' => 'house_quality_'.uniqid(),
             'name' => 'House Quality Checklist',
             'applicable_to_type' => 'house',
             'frequency' => 'monthly',
@@ -173,14 +174,11 @@ class SitesModuleIntegrationTest extends TestCase
 
         $this->actingAs($this->admin)
             ->get("/checklists/runs/{$run->id}")
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('sites/checklists/runs/[id]')
-                ->where('site.id', $site->id)
-                ->where('template.id', $template->id)
-                ->has('items', 1)
-                ->has('responses', 1)
-            );
+            ->assertRedirect("/sites/{$site->id}/checklists?run={$run->id}");
+
+        $this->actingAs($this->admin)
+            ->get("/sites/{$site->id}/checklists/runs")
+            ->assertRedirect("/sites/{$site->id}/checklists");
     }
 
     public function test_checklist_run_can_complete_without_recursive_observer_updates(): void
@@ -189,7 +187,7 @@ class SitesModuleIntegrationTest extends TestCase
 
         $template = SiteChecklistTemplate::create([
             'tenant_id' => $site->tenant_id,
-            'key' => 'house_quality_' . uniqid(),
+            'key' => 'house_quality_'.uniqid(),
             'name' => 'House Quality Checklist',
             'applicable_to_type' => 'house',
             'frequency' => 'monthly',
@@ -275,7 +273,7 @@ class SitesModuleIntegrationTest extends TestCase
 
         $template = SiteChecklistTemplate::create([
             'tenant_id' => $site->tenant_id,
-            'key' => 'house_quality_' . uniqid(),
+            'key' => 'house_quality_'.uniqid(),
             'name' => 'House Quality Checklist',
             'applicable_to_type' => 'house',
             'frequency' => 'daily',
@@ -302,7 +300,7 @@ class SitesModuleIntegrationTest extends TestCase
 
         $this->actingAs($this->admin)
             ->post("/sites/{$site->id}/checklists/assignments/{$assignment->id}/run")
-            ->assertRedirect(route('sites.checklists.showRun', $run->id));
+            ->assertRedirect("/sites/{$site->id}/checklists?run={$run->id}");
 
         $run->refresh();
 
@@ -316,7 +314,7 @@ class SitesModuleIntegrationTest extends TestCase
 
         $template = SiteChecklistTemplate::create([
             'tenant_id' => $site->tenant_id,
-            'key' => 'house_quality_' . uniqid(),
+            'key' => 'house_quality_'.uniqid(),
             'name' => 'House Quality Checklist',
             'applicable_to_type' => 'house',
             'frequency' => 'daily',

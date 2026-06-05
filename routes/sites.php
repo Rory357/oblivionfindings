@@ -1,35 +1,35 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
 use App\Http\Controllers\SiteController;
-use App\Http\Controllers\Sites\{
-    ChecklistsDashboardController,
-    CredentialTypeController,
-    HouseLedgerController,
-    SiteCalendarController,
-    SiteComplianceController,
-    SiteHazardController,
-    SiteChecklistController,
-    SiteChecklistTemplateController,
-    SiteVendorController,
-    SiteCredentialController,
-    SiteDamageController,
-    SiteHardwareController,
-    SiteIntegrationController,
-    SiteInspectionController,
-    SiteGeofenceController,
-    SiteReportingController,
-    SiteRoomController,
-    SiteResourceController,
-    SiteZoneController,
-    SiteTypePlanController,
-    SiteTypePlanPinController,
-    SiteEmergencyPlanController,
-    SiteMealPlanController,
-    SiteMealWeekTemplateController,
-    SiteMealInventoryController,
-    SiteMealShoppingListController
-};
+use App\Http\Controllers\Sites\ChecklistsDashboardController;
+use App\Http\Controllers\Sites\CredentialTypeController;
+use App\Http\Controllers\Sites\HouseLedgerController;
+use App\Http\Controllers\Sites\SiteCalendarController;
+use App\Http\Controllers\Sites\SiteChecklistController;
+use App\Http\Controllers\Sites\SiteChecklistTemplateController;
+use App\Http\Controllers\Sites\SiteComplianceController;
+use App\Http\Controllers\Sites\SiteCredentialController;
+use App\Http\Controllers\Sites\SiteDamageController;
+use App\Http\Controllers\Sites\SiteEmergencyPlanController;
+use App\Http\Controllers\Sites\SiteGeofenceController;
+use App\Http\Controllers\Sites\SiteHardwareController;
+use App\Http\Controllers\Sites\SiteHazardController;
+use App\Http\Controllers\Sites\SiteInspectionController;
+use App\Http\Controllers\Sites\SiteIntegrationController;
+use App\Http\Controllers\Sites\SiteMealInventoryController;
+use App\Http\Controllers\Sites\SiteMealPlanController;
+use App\Http\Controllers\Sites\SiteMealShoppingListController;
+use App\Http\Controllers\Sites\SiteMealWeekTemplateController;
+use App\Http\Controllers\Sites\SiteReportingController;
+use App\Http\Controllers\Sites\SiteResourceController;
+use App\Http\Controllers\Sites\SiteRoomController;
+use App\Http\Controllers\Sites\SiteTypePlanController;
+use App\Http\Controllers\Sites\SiteTypePlanPinController;
+use App\Http\Controllers\Sites\SiteVendorController;
+use App\Http\Controllers\Sites\SiteZoneController;
+use App\Models\Site;
+use App\Models\SiteChecklistRun;
+use Illuminate\Support\Facades\Route;
 
 /*
 |--------------------------------------------------------------------------
@@ -73,7 +73,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
 
     // Site-scoped routes
     Route::prefix('sites/{site}')->middleware('permission:sites.viewAny')->group(function () {
-        
+
         // House ledger
         Route::get('/ledger', [HouseLedgerController::class, 'index'])
             ->name('sites.ledger.index');
@@ -90,7 +90,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/ledger/reconcile', [HouseLedgerController::class, 'reconcile'])
             ->name('sites.ledger.reconcile')
             ->middleware('permission:sites.ledger.manage');
-        
+
         // Calendar
         Route::get('/calendar', [SiteCalendarController::class, 'index'])
             ->name('sites.calendar.index');
@@ -122,7 +122,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
                 ->whereNumber('geofence')
                 ->name('sites.geofence.destroy');
         });
-        
+
         // Hazards
         Route::get('/hazards', [SiteHazardController::class, 'index'])
             ->name('sites.hazards.index');
@@ -132,11 +132,11 @@ Route::middleware(['auth', 'verified'])->group(function () {
         Route::post('/hazards', [SiteHazardController::class, 'store'])
             ->name('sites.hazards.store')
             ->middleware('permission:hazards.create');
-        
+
         // Checklists
         Route::get('/checklists', [SiteChecklistController::class, 'index'])
             ->name('sites.checklists.index');
-        Route::get('/checklists/runs', [SiteChecklistController::class, 'runs'])
+        Route::get('/checklists/runs', fn (Site $site) => redirect()->route('sites.checklists.index', $site->id))
             ->name('sites.checklists.runs');
         Route::post('/checklists/assign', [SiteChecklistController::class, 'assignChecklist'])
             ->name('sites.checklists.assign')
@@ -152,7 +152,7 @@ Route::middleware(['auth', 'verified'])->group(function () {
         // damage-reporting path are folded into the unified Checklists page
         // (a failed flagged item now spawns a SiteDamage). Keep the URL as a
         // redirect so existing bookmarks land on the new per-site workspace.
-        Route::get('/house-checklists', fn (\App\Models\Site $site) => redirect()->route('sites.checklists.index', $site->id))
+        Route::get('/house-checklists', fn (Site $site) => redirect()->route('sites.checklists.index', $site->id))
             ->name('sites.house-checklists.index');
 
         // Vendors
@@ -460,12 +460,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('permission:hazards.close');
 
     // Checklist run routes
-    Route::get('/checklists/runs/{run}', [SiteChecklistController::class, 'showRun'])
+    Route::get('/checklists/runs/{run}', fn (SiteChecklistRun $run) => redirect("/sites/{$run->site_id}/checklists?run={$run->id}"))
         ->name('sites.checklists.showRun')
         ->middleware('permission:checklists.view');
-    Route::post('/checklists/runs/{run}/start', [SiteChecklistController::class, 'startRun'])
-        ->name('sites.checklists.startRun')
-        ->middleware('permission:checklists.run');
     Route::post('/checklists/runs/{run}/complete', [SiteChecklistController::class, 'completeRun'])
         ->name('sites.checklists.completeRun')
         ->middleware('permission:checklists.run');
@@ -481,6 +478,9 @@ Route::middleware(['auth', 'verified'])->group(function () {
     Route::post('/checklists/runs/{run}/skip', [SiteChecklistController::class, 'skipRun'])
         ->name('sites.checklists.skipRun')
         ->middleware('permission:checklists.run');
+    Route::post('/checklists/runs/{run}/restore', [SiteChecklistController::class, 'restoreRun'])
+        ->name('sites.checklists.restoreRun')
+        ->middleware('permission:checklists.schedule');
 
     // Calendar exceptions
     Route::post('/calendar/events/{event}/exception', [SiteCalendarController::class, 'createException'])

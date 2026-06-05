@@ -140,6 +140,28 @@ class ChecklistsDashboardData
                 'assignee' => $run->completedBy?->name ?? 'Unassigned',
             ])->values();
 
+        // ---- Skipped runs (restorable history) ------------------------------
+        $skippedRuns = SiteChecklistRun::query()
+            ->where('status', 'skipped')
+            ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
+            ->with(['site:id,name,type', 'template:id,name,frequency', 'assignedTo:id,name', 'assignment.assignedTo:id,name'])
+            ->orderByDesc('updated_at')
+            ->limit(40)
+            ->get()
+            ->map(fn ($run) => [
+                'id' => $run->id,
+                'status' => 'skipped',
+                'scheduled_date' => $run->scheduled_date?->toDateString(),
+                'started_at' => $run->started_at?->toDateTimeString(),
+                'pct' => (int) round((float) $run->completion_percentage),
+                'completion_percentage' => (float) $run->completion_percentage,
+                'is_overdue' => false,
+                'site' => $run->site ? ['id' => $run->site->id, 'name' => $run->site->name, 'type' => $run->site->type] : null,
+                'template' => $tplOut($run->template),
+                'assigned_to_id' => $run->assigned_to_user_id,
+                'assignee' => $run->assignedTo?->name ?? $run->assignment?->assignedTo?->name ?? 'Unassigned',
+            ])->values();
+
         // ---- Assignments (active) --------------------------------------------
         $assignments = SiteChecklistAssignment::query()
             ->where('is_active', true)
@@ -225,6 +247,7 @@ class ChecklistsDashboardData
             'templates' => $templates,
             'activeRuns' => $activeRuns,
             'recentRuns' => $recentRuns,
+            'skippedRuns' => $skippedRuns,
             'assignments' => $assignments,
             'assignableUsers' => $this->assignableUsers($user),
             'sitesOverview' => $sitesOverview,
@@ -249,6 +272,7 @@ class ChecklistsDashboardData
     {
         return User::query()
             ->when($user, fn ($q) => $q->where('organization_id', $user->organization_id))
+            ->whereNotNull('approved_at')
             ->orderBy('name')
             ->limit(500)
             ->get(['id', 'name'])

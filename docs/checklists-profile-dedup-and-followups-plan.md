@@ -362,3 +362,51 @@ accounts. Org-scoping is already correct — no cross-tenant leak.
 ≈L366–416 / `templateDetail` ≈L423–464 (still used by the two dedicated routes);
 run-action endpoints all `back()` (`saveResponse`/`completeRun`/`rescheduleRun`/
 `reassignRun`/`skipRun`).
+
+---
+
+## 10. Codex implementation notes - 2026-06-05
+
+### Implemented scope
+- Replaced the embedded full `ChecklistsWorkspace` on `sites/show.tsx` with a compact site-profile summary card fed by `SiteController::buildSiteChecklistsSummary()`.
+- `SiteController@show` no longer builds or returns the full `checklistsData`, `runDetail`, or `templateDetail` payload for the site profile. It returns a permission-shaped `checklistsSummary` instead, and avoids leaking summary data when the viewer cannot access checklists.
+- Added skipped-run support to the shared checklists workspace contract:
+  - `ChecklistsDashboardData` now returns `skippedRuns`.
+  - The Runs tab includes skipped runs and exposes them for restore.
+  - The run context menu hides schedule/run actions for skipped runs and shows `Restore to scheduled`.
+  - The context menu is portaled to `document.body` to avoid fixed-position drift inside transformed cards.
+- Added `POST /checklists/runs/{run}/restore` with `checklists.schedule` middleware.
+- Retired the orphaned standalone run pages:
+  - Deleted `resources/js/pages/sites/checklists/runs.tsx`.
+  - Deleted `resources/js/pages/sites/checklists/runs/[id].tsx`.
+  - `GET /checklists/runs/{run}` now redirects to `/sites/{site}/checklists?run={run}`.
+  - `GET /sites/{site}/checklists/runs` now redirects to `/sites/{site}/checklists`.
+  - Removed the dead `runs`, `showRun`, and `startRun` controller methods.
+- Updated `createRun()` so it deep-links into the unified workspace modal via `?run=`.
+- The workspace now reads `?run=` on mount with an SSR-safe `typeof window` guard.
+- Filtered checklist assignable users to approved users.
+
+### Shift auto-run implementation
+- Added `SiteChecklistScheduler::ensureRunsForShiftLocalDay(Shift $shift)`.
+- The scheduler creates due checklist runs for the shift site and local shift start day, using `config('app.worker_timezone', 'Pacific/Auckland')`.
+- Duplicate protection is per `assignment_id` + local `scheduled_date` using `firstOrCreate`.
+- New runs inherit the shift assignee when present, otherwise the assignment assignee.
+- Wired the scheduler into these shift creation paths:
+  - `ShiftController@store`
+  - `ShiftController@duplicate`
+  - `CalendarController@storeShift`
+  - `ShiftSeriesController@store`
+- No schema changes or migrations were added.
+
+### Verification
+- `vendor\bin\pint.bat app/Http/Controllers/SiteController.php app/Http/Controllers/CalendarController.php app/Http/Controllers/ShiftSeriesController.php app/Http/Controllers/ShiftController.php tests/Feature/ShiftControllerTest.php` - passed.
+- `php artisan test tests/Feature/ShiftControllerTest.php` - passed, 33 tests / 147 assertions.
+- `php artisan test tests/Feature/SiteControllerTest.php --filter site_show_uses_compact_checklists_summary_not_full_workspace_payload` - passed, 1 test / 17 assertions.
+- `php artisan test tests/Feature/Checklists/ChecklistsDashboardTest.php tests/Feature/Checklists/ChecklistRunActionsTest.php` - passed, 20 tests / 153 assertions.
+- `php artisan test tests/Feature/SitesModuleIntegrationTest.php --filter legacy_checklist_run_pages_redirect_to_unified_workspace` - passed, 1 test / 4 assertions.
+- `php artisan test tests/Feature/SitesModuleIntegrationTest.php --filter create_run_reuses_existing_unfinished_run` - passed, 1 test / 4 assertions.
+- `git diff --check` - passed.
+- `php artisan wayfinder:generate` - required before frontend type checks in this worktree; generated helpers are ignored by git.
+- `npm run types` - passed after Wayfinder generation.
+- `npm run build` - passed.
+- `npx vite build --ssr` - passed.

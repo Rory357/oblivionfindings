@@ -38,6 +38,7 @@ use App\Services\ShiftReplacementService;
 use App\Services\ShiftStaffEligibilityService;
 use App\Services\ShiftStateGuardService;
 use App\Services\ShiftTimelineService;
+use App\Services\Sites\SiteChecklistScheduler;
 use App\Services\UserSiteAccessService;
 use App\Support\ClientSafetyPayload;
 use App\Support\ShiftTaskSupport;
@@ -954,6 +955,8 @@ class ShiftController extends Controller
                     'created_by' => $auth->id,
                 ]);
 
+                app(SiteChecklistScheduler::class)->ensureRunsForShiftLocalDay($shift);
+
                 ShiftTaskSupport::createForShift($shift, $data['tasks'] ?? []);
 
                 app(CoverageReservationService::class)->fulfill($reservation, $shift);
@@ -1080,6 +1083,8 @@ class ShiftController extends Controller
                 'created_by' => $auth->id,
             ]);
             $copy->save();
+
+            app(SiteChecklistScheduler::class)->ensureRunsForShiftLocalDay($copy);
 
             $shift->tasks()
                 ->orderBy('sort_order')

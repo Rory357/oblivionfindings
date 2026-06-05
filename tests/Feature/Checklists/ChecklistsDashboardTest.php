@@ -8,6 +8,8 @@ use App\Models\SiteChecklistAssignment;
 use App\Models\SiteChecklistRun;
 use App\Models\SiteChecklistTemplate;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
+use Database\Seeders\SitesModuleSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -23,8 +25,8 @@ class ChecklistsDashboardTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
-        $this->seed(\Database\Seeders\SitesModuleSeeder::class);
+        $this->seed(RbacSeeder::class);
+        $this->seed(SitesModuleSeeder::class);
 
         $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
@@ -49,6 +51,7 @@ class ChecklistsDashboardTest extends TestCase
                 ->has('categories', 9)
                 ->has('templates')
                 ->has('activeRuns')
+                ->has('skippedRuns')
                 ->has('reports.trend', 8)
                 ->has('reports.complianceByCategory', 9)
                 ->has('stats.onTrack')
@@ -81,6 +84,27 @@ class ChecklistsDashboardTest extends TestCase
                 ->has('categories', 9)
                 ->has('activeRuns', 1)
                 ->where('activeRuns.0.site.id', $siteA->id));
+    }
+
+    public function test_per_site_dashboard_surfaces_skipped_runs_for_restore(): void
+    {
+        $siteA = Site::factory()->create(['type' => 'house']);
+        $siteB = Site::factory()->create(['type' => 'house']);
+        $template = SiteChecklistTemplate::where('key', 'quality_home_checklist')->firstOrFail();
+
+        $runA = $this->makeRun($siteA, $template);
+        $runB = $this->makeRun($siteB, $template);
+        $runA->update(['status' => 'skipped']);
+        $runB->update(['status' => 'skipped']);
+
+        $this->actingAs($this->admin)
+            ->get("/sites/{$siteA->id}/checklists")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('skippedRuns', 1)
+                ->where('skippedRuns.0.id', $runA->id)
+                ->where('skippedRuns.0.status', 'skipped')
+                ->where('skippedRuns.0.site.id', $siteA->id));
     }
 
     public function test_run_query_param_returns_run_detail(): void

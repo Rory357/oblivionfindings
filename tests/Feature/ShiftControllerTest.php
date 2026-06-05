@@ -14,6 +14,9 @@ use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\ShiftTask;
 use App\Models\Site;
+use App\Models\SiteChecklistAssignment;
+use App\Models\SiteChecklistRun;
+use App\Models\SiteChecklistTemplate;
 use App\Models\SiteCoverageRequirement;
 use App\Models\User;
 use App\Services\ShiftSignalService;
@@ -439,6 +442,23 @@ class ShiftControllerTest extends TestCase
             'reminder_sent_at' => Carbon::parse('2026-05-05 09:35:00', 'Pacific/Auckland')->utc(),
             'sort_order' => 0,
         ]);
+        $template = SiteChecklistTemplate::create([
+            'tenant_id' => $this->site->tenant_id,
+            'key' => 'duplicate_shift_check_'.uniqid(),
+            'name' => 'Duplicate Shift Check',
+            'applicable_to_type' => 'house',
+            'frequency' => 'daily',
+            'is_active' => true,
+        ]);
+        $assignment = SiteChecklistAssignment::create([
+            'site_id' => $this->site->id,
+            'tenant_id' => $this->site->tenant_id,
+            'template_id' => $template->id,
+            'frequency' => 'daily',
+            'assigned_to_user_id' => $this->admin->id,
+            'start_date' => '2026-05-01',
+            'is_active' => true,
+        ]);
 
         $this->actingAs($this->admin)
             ->post(route('operations.shifts.duplicate', $source), [
@@ -464,6 +484,13 @@ class ShiftControllerTest extends TestCase
             'scheduled_time' => '09:30',
             'reminder_sent_at' => null,
             'sort_order' => 0,
+        ]);
+        $this->assertDatabaseHas('site_checklist_runs', [
+            'assignment_id' => $assignment->id,
+            'site_id' => $this->site->id,
+            'scheduled_date' => '2026-05-06',
+            'assigned_to_user_id' => $this->admin->id,
+            'status' => 'scheduled',
         ]);
     }
 
@@ -626,6 +653,104 @@ class ShiftControllerTest extends TestCase
             'label' => 'Task 1',
             'shift_id' => $shift->id,
             'scheduled_time' => '10:15',
+        ]);
+    }
+
+    public function test_store_schedules_due_site_checklist_runs_for_shift_local_day_without_duplicates(): void
+    {
+        config(['app.worker_timezone' => 'Pacific/Auckland']);
+
+        $dueTemplate = SiteChecklistTemplate::create([
+            'tenant_id' => $this->site->tenant_id,
+            'key' => 'shift_due_'.uniqid(),
+            'name' => 'Shift Due Checklist',
+            'applicable_to_type' => 'house',
+            'frequency' => 'weekly',
+            'is_active' => true,
+        ]);
+        $existingTemplate = SiteChecklistTemplate::create([
+            'tenant_id' => $this->site->tenant_id,
+            'key' => 'shift_existing_'.uniqid(),
+            'name' => 'Shift Existing Checklist',
+            'applicable_to_type' => 'house',
+            'frequency' => 'daily',
+            'is_active' => true,
+        ]);
+        $notDueTemplate = SiteChecklistTemplate::create([
+            'tenant_id' => $this->site->tenant_id,
+            'key' => 'shift_not_due_'.uniqid(),
+            'name' => 'Shift Not Due Checklist',
+            'applicable_to_type' => 'house',
+            'frequency' => 'fortnightly',
+            'is_active' => true,
+        ]);
+
+        $dueAssignment = SiteChecklistAssignment::create([
+            'site_id' => $this->site->id,
+            'tenant_id' => $this->site->tenant_id,
+            'template_id' => $dueTemplate->id,
+            'frequency' => 'weekly',
+            'assigned_to_user_id' => $this->admin->id,
+            'start_date' => '2026-06-01',
+            'is_active' => true,
+        ]);
+        $existingAssignment = SiteChecklistAssignment::create([
+            'site_id' => $this->site->id,
+            'tenant_id' => $this->site->tenant_id,
+            'template_id' => $existingTemplate->id,
+            'frequency' => 'daily',
+            'start_date' => '2026-06-01',
+            'is_active' => true,
+        ]);
+        $notDueAssignment = SiteChecklistAssignment::create([
+            'site_id' => $this->site->id,
+            'tenant_id' => $this->site->tenant_id,
+            'template_id' => $notDueTemplate->id,
+            'frequency' => 'fortnightly',
+            'start_date' => '2026-06-01',
+            'is_active' => true,
+        ]);
+
+        SiteChecklistRun::create([
+            'assignment_id' => $existingAssignment->id,
+            'site_id' => $this->site->id,
+            'tenant_id' => $this->site->tenant_id,
+            'template_id' => $existingTemplate->id,
+            'scheduled_date' => '2026-06-08',
+            'status' => 'scheduled',
+        ]);
+
+        $response = $this->actingAs($this->admin)
+            ->post(route('operations.shifts.store'), [
+                'client_id' => $this->client->id,
+                'service_context_id' => $this->serviceContext->id,
+                'user_id' => $this->staff->id,
+                'starts_at' => Carbon::parse('2026-06-08 23:30:00', 'Pacific/Auckland')->utc()->format('Y-m-d H:i:s'),
+                'ends_at' => Carbon::parse('2026-06-09 03:30:00', 'Pacific/Auckland')->utc()->format('Y-m-d H:i:s'),
+                'status' => 'scheduled',
+            ]);
+
+        $response->assertSessionHasNoErrors();
+        $response->assertRedirect('/operations/shifts');
+
+        $this->assertDatabaseHas('site_checklist_runs', [
+            'assignment_id' => $dueAssignment->id,
+            'site_id' => $this->site->id,
+            'tenant_id' => $this->site->tenant_id,
+            'template_id' => $dueTemplate->id,
+            'scheduled_date' => '2026-06-08',
+            'assigned_to_user_id' => $this->staff->id,
+            'status' => 'scheduled',
+        ]);
+        $this->assertSame(
+            1,
+            SiteChecklistRun::where('assignment_id', $existingAssignment->id)
+                ->whereDate('scheduled_date', '2026-06-08')
+                ->count()
+        );
+        $this->assertDatabaseMissing('site_checklist_runs', [
+            'assignment_id' => $notDueAssignment->id,
+            'scheduled_date' => '2026-06-08',
         ]);
     }
 
