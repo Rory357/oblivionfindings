@@ -4,7 +4,7 @@
  */
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Check, Eye, Flag, Inbox, Plus } from 'lucide-react';
+import { Check, Eye, Flag, Inbox, Plus, X } from 'lucide-react';
 import { useState } from 'react';
 import { respiteActions } from '../actions';
 import { Avatar, relTime, StatusBadge, UrgencyBadge, urgencyAccent } from '../shared';
@@ -31,11 +31,13 @@ export function ReferralsPane({
     can,
     onView,
     onNew,
+    onDecline,
 }: {
     referrals: RespiteReferralRow[];
     can: RespiteCan;
     onView: (row: RespiteReferralRow) => void;
     onNew: () => void;
+    onDecline: (row: RespiteReferralRow) => void;
 }) {
     const [q, setQ] = useState('');
     const [status, setStatus] = useState('all');
@@ -91,7 +93,7 @@ export function ReferralsPane({
             ) : (
                 <div className="grid gap-2.5">
                     {rows.map((r) => (
-                        <ReferralCard key={r.id} r={r} can={can} onView={onView} />
+                        <ReferralCard key={r.id} r={r} can={can} onView={onView} onDecline={onDecline} />
                     ))}
                     {rows.length === 0 ? <Empty icon={Inbox} title="No referrals match" sub="Try clearing a filter." /> : null}
                 </div>
@@ -104,10 +106,12 @@ function ReferralCard({
     r,
     can,
     onView,
+    onDecline,
 }: {
     r: RespiteReferralRow;
     can: RespiteCan;
     onView: (row: RespiteReferralRow) => void;
+    onDecline: (row: RespiteReferralRow) => void;
 }) {
     return (
         <div className={cn('overflow-hidden rounded-[14px] border border-l-[3px] border-border bg-card transition-shadow hover:shadow-sm', urgencyAccent(r.urgency))}>
@@ -141,6 +145,11 @@ function ReferralCard({
                     {can.update && r.status === 'triaged' ? (
                         <Button size="sm" className="bg-status-success text-white hover:bg-status-success/90" onClick={() => respiteActions.acceptReferral(r.id)}>
                             <Check className="h-3.5 w-3.5" /> Accept
+                        </Button>
+                    ) : null}
+                    {can.update && (r.status === 'received' || r.status === 'triaged') ? (
+                        <Button size="sm" variant="ghost" className="text-status-critical hover:bg-status-critical-bg" onClick={() => onDecline(r)}>
+                            <X className="h-3.5 w-3.5" /> Decline
                         </Button>
                     ) : null}
                     <Button size="sm" variant="outline" onClick={() => onView(r)}>

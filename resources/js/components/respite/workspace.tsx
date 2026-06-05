@@ -11,7 +11,7 @@ import {
 } from '@/components/page';
 import { TabStrip, type RosterTabItem } from '@/components/rostering/tab-strip';
 import { Button } from '@/components/ui/button';
-import { usePage } from '@inertiajs/react';
+import { router, usePage } from '@inertiajs/react';
 import {
     BedDouble,
     CalendarCheck,
@@ -29,6 +29,7 @@ import {
 import { useCallback, useEffect, useState } from 'react';
 import { RespiteDetailModal, type RespiteDetail } from './detail-modal';
 import { OnboardModal } from './modals/onboard';
+import { ReasonDialog } from './modals/reason-dialog';
 import { ReferralIntakeModal } from './modals/referral-intake';
 import { BookingsPane } from './panes/bookings';
 import { CalendarPane } from './panes/calendar';
@@ -38,6 +39,29 @@ import { RequestsPane } from './panes/requests';
 import { StaysPane } from './panes/stays';
 import { TasksPane } from './panes/tasks';
 import { RESPITE_TABS, type RespiteCan, type RespiteRequestRow, type RespiteTab, type RespiteWorkspaceData } from './types';
+
+type ReasonKind = 'decline' | 'reject' | 'discharge';
+
+const REASON_CONFIG: Record<ReasonKind, { title: string; label: string; placeholder: string; confirmLabel: string }> = {
+    decline: {
+        title: 'Decline referral',
+        label: 'Reason for declining',
+        placeholder: 'Why is this referral being declined?',
+        confirmLabel: 'Decline referral',
+    },
+    reject: {
+        title: 'Reject request',
+        label: 'Decision notes',
+        placeholder: 'Why is this request being rejected?',
+        confirmLabel: 'Reject request',
+    },
+    discharge: {
+        title: 'Discharge stay',
+        label: 'Discharge summary',
+        placeholder: 'Summarise the stay and any follow-up…',
+        confirmLabel: 'Discharge stay',
+    },
+};
 
 function readTab(): RespiteTab {
     if (typeof window === 'undefined') return 'overview';
@@ -53,6 +77,7 @@ export function RespiteWorkspace({ data, can }: { data: RespiteWorkspaceData; ca
     const [detail, setDetail] = useState<RespiteDetail | null>(null);
     const [intakeOpen, setIntakeOpen] = useState(false);
     const [onboardReq, setOnboardReq] = useState<RespiteRequestRow | null>(null);
+    const [reasonAction, setReasonAction] = useState<{ kind: ReasonKind; id: number; client: string } | null>(null);
 
     useEffect(() => {
         const onPop = () => setTab(readTab());
@@ -66,6 +91,15 @@ export function RespiteWorkspace({ data, can }: { data: RespiteWorkspaceData; ca
         url.searchParams.set('tab', next);
         window.history.replaceState(null, '', url);
     }, []);
+
+    const runReason = (reason: string, done: () => void) => {
+        if (!reasonAction) return;
+        const { kind, id } = reasonAction;
+        const opts = { preserveScroll: true, onSuccess: () => setReasonAction(null), onFinish: done } as const;
+        if (kind === 'decline') router.put(`/respite/referrals/${id}`, { status: 'declined', triage_notes: reason }, opts);
+        else if (kind === 'reject') router.put(`/respite/requests/${id}`, { status: 'rejected', decision_notes: reason }, opts);
+        else router.post(`/respite/stays/${id}/discharge`, { discharge_summary: reason }, opts);
+    };
 
     const stats = data.stats;
     const openTasks = data.tasks.filter(
@@ -135,6 +169,7 @@ export function RespiteWorkspace({ data, can }: { data: RespiteWorkspaceData; ca
                         can={can}
                         onView={(row) => setDetail({ kind: 'referral', row })}
                         onNew={() => setIntakeOpen(true)}
+                        onDecline={(row) => setReasonAction({ kind: 'decline', id: row.id, client: row.client })}
                     />
                 )}
                 {tab === 'requests' && (
@@ -143,13 +178,21 @@ export function RespiteWorkspace({ data, can }: { data: RespiteWorkspaceData; ca
                         can={can}
                         onView={(row) => setDetail({ kind: 'request', row })}
                         onOnboard={(row) => setOnboardReq(row)}
+                        onReject={(row) => setReasonAction({ kind: 'reject', id: row.id, client: row.client })}
                     />
                 )}
                 {tab === 'bookings' && (
                     <BookingsPane bookings={data.bookings} can={can} onView={(row) => setDetail({ kind: 'booking', row })} />
                 )}
                 {tab === 'calendar' && <CalendarPane bookings={data.bookings} homes={data.homes} />}
-                {tab === 'stays' && <StaysPane stays={data.stays} can={can} onView={(row) => setDetail({ kind: 'stay', row })} />}
+                {tab === 'stays' && (
+                    <StaysPane
+                        stays={data.stays}
+                        can={can}
+                        onView={(row) => setDetail({ kind: 'stay', row })}
+                        onDischarge={(row) => setReasonAction({ kind: 'discharge', id: row.id, client: row.client })}
+                    />
+                )}
                 {tab === 'tasks' && <TasksPane tasks={data.tasks} can={can} />}
             </div>
 
@@ -161,6 +204,18 @@ export function RespiteWorkspace({ data, can }: { data: RespiteWorkspaceData; ca
                 homes={data.homes}
             />
             <OnboardModal request={onboardReq} onClose={() => setOnboardReq(null)} />
+            {reasonAction ? (
+                <ReasonDialog
+                    open
+                    onClose={() => setReasonAction(null)}
+                    title={REASON_CONFIG[reasonAction.kind].title}
+                    description={`For ${reasonAction.client}.`}
+                    label={REASON_CONFIG[reasonAction.kind].label}
+                    placeholder={REASON_CONFIG[reasonAction.kind].placeholder}
+                    confirmLabel={REASON_CONFIG[reasonAction.kind].confirmLabel}
+                    onConfirm={runReason}
+                />
+            ) : null}
         </div>
     );
 }

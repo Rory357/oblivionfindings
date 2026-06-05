@@ -4,7 +4,7 @@
  */
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { CalendarDays, Eye, Home, LogIn, MapPin } from 'lucide-react';
+import { CalendarDays, Eye, Home, LogIn, LogOut, MapPin } from 'lucide-react';
 import { useState } from 'react';
 import { respiteActions } from '../actions';
 import { Avatar, fmtDate, StatusBadge } from '../shared';
@@ -25,10 +25,12 @@ export function StaysPane({
     stays,
     can,
     onView,
+    onDischarge,
 }: {
     stays: RespiteStayRow[];
     can: RespiteCan;
     onView: (row: RespiteStayRow) => void;
+    onDischarge: (row: RespiteStayRow) => void;
 }) {
     const [scope, setScope] = useState<'live' | 'completed' | 'all'>('live');
 
@@ -55,7 +57,7 @@ export function StaysPane({
 
             <div className="grid gap-2.5">
                 {rows.map((s) => (
-                    <StayCard key={s.id} s={s} can={can} onView={onView} />
+                    <StayCard key={s.id} s={s} can={can} onView={onView} onDischarge={onDischarge} />
                 ))}
                 {rows.length === 0 ? <Empty icon={Home} title="No stays here" /> : null}
             </div>
@@ -63,7 +65,17 @@ export function StaysPane({
     );
 }
 
-function StayCard({ s, can, onView }: { s: RespiteStayRow; can: RespiteCan; onView: (row: RespiteStayRow) => void }) {
+function StayCard({
+    s,
+    can,
+    onView,
+    onDischarge,
+}: {
+    s: RespiteStayRow;
+    can: RespiteCan;
+    onView: (row: RespiteStayRow) => void;
+    onDischarge: (row: RespiteStayRow) => void;
+}) {
     const prog = s.live ? dayProgress(s) : null;
     return (
         <div className="rounded-[14px] border border-border bg-card p-4 transition-shadow hover:shadow-sm">
@@ -101,6 +113,11 @@ function StayCard({ s, can, onView }: { s: RespiteStayRow; can: RespiteCan; onVi
                     {can.staysManage && s.status === 'admitted' ? (
                         <Button size="sm" onClick={() => respiteActions.checkInStay(s.id)}>
                             <LogIn className="h-3.5 w-3.5" /> Check in
+                        </Button>
+                    ) : null}
+                    {can.staysManage && s.live ? (
+                        <Button size="sm" variant="outline" className="text-status-critical" onClick={() => onDischarge(s)}>
+                            <LogOut className="h-3.5 w-3.5" /> Discharge
                         </Button>
                     ) : null}
                     <Button size="sm" variant="outline" onClick={() => onView(s)}>

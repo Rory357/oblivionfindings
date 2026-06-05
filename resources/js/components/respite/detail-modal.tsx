@@ -10,6 +10,8 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { Link } from '@inertiajs/react';
+import { ExternalLink } from 'lucide-react';
 import { Avatar, fmtDate, fmtRange, StatusBadge, UrgencyBadge } from './shared';
 import type {
     RespiteBookingRow,
@@ -111,6 +113,16 @@ export function RespiteDetailModal({ detail, onClose }: { detail: RespiteDetail 
                                 </div>
                             ))}
                         </dl>
+                        {row.clientId ? (
+                            <div className="flex justify-end border-t border-border pt-3">
+                                <Link
+                                    href={`/operations/clients/${row.clientId}`}
+                                    className="inline-flex items-center gap-1.5 text-sm font-semibold text-primary hover:underline"
+                                >
+                                    Open client profile <ExternalLink className="h-3.5 w-3.5" />
+                                </Link>
+                            </div>
+                        ) : null}
                     </>
                 ) : null}
             </DialogContent>

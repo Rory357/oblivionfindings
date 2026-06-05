@@ -3,7 +3,7 @@
  * filter, inline approve (creates the booking), and a read-only detail pop-up.
  */
 import { Button } from '@/components/ui/button';
-import { CalendarDays, CheckCircle2, ClipboardCheck, Eye, UserPlus } from 'lucide-react';
+import { CalendarDays, CheckCircle2, ClipboardCheck, Eye, UserPlus, X } from 'lucide-react';
 import { useState } from 'react';
 import { respiteActions } from '../actions';
 import { Avatar, fmtRange, Pill, StatusBadge } from '../shared';
@@ -26,11 +26,13 @@ export function RequestsPane({
     can,
     onView,
     onOnboard,
+    onReject,
 }: {
     requests: RespiteRequestRow[];
     can: RespiteCan;
     onView: (row: RespiteRequestRow) => void;
     onOnboard: (row: RespiteRequestRow) => void;
+    onReject: (row: RespiteRequestRow) => void;
 }) {
     const [q, setQ] = useState('');
     const [status, setStatus] = useState('all');
@@ -67,7 +69,7 @@ export function RequestsPane({
             ) : (
                 <div className="grid gap-2.5">
                     {rows.map((r) => (
-                        <RequestCard key={r.id} r={r} can={can} onView={onView} onOnboard={onOnboard} />
+                        <RequestCard key={r.id} r={r} can={can} onView={onView} onOnboard={onOnboard} onReject={onReject} />
                     ))}
                     {rows.length === 0 ? <Empty icon={ClipboardCheck} title="No requests match" sub="Try a different status." /> : null}
                 </div>
@@ -81,11 +83,13 @@ function RequestCard({
     can,
     onView,
     onOnboard,
+    onReject,
 }: {
     r: RespiteRequestRow;
     can: RespiteCan;
     onView: (row: RespiteRequestRow) => void;
     onOnboard: (row: RespiteRequestRow) => void;
+    onReject: (row: RespiteRequestRow) => void;
 }) {
     return (
         <div className="rounded-[14px] border border-border bg-card p-4 transition-shadow hover:shadow-sm">
@@ -121,6 +125,11 @@ function RequestCard({
                     {can.bookingsManage && r.status === 'approved' && r.bookingId && !r.onboarded ? (
                         <Button size="sm" onClick={() => onOnboard(r)}>
                             <UserPlus className="h-3.5 w-3.5" /> Onboard
+                        </Button>
+                    ) : null}
+                    {can.update && needsReview(r.status) ? (
+                        <Button size="sm" variant="ghost" className="text-status-critical hover:bg-status-critical-bg" onClick={() => onReject(r)}>
+                            <X className="h-3.5 w-3.5" /> Decline
                         </Button>
                     ) : null}
                     <Button size="sm" variant="outline" onClick={() => onView(r)}>
