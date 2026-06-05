@@ -10,7 +10,9 @@ import {
     Search,
     X,
 } from 'lucide-react';
+import { useRef, useState } from 'react';
 
+import { WeekPicker } from '@/components/rostering/week-picker';
 import { cn } from '@/lib/utils';
 
 import { catColorVar } from './category';
@@ -31,7 +33,9 @@ export function HeroFooter({
     week,
     onPrevWeek,
     onNextWeek,
-    onToday,
+    selectedWeekStart,
+    today,
+    onJumpToWeek,
     query,
     onQuery,
     cat,
@@ -41,7 +45,9 @@ export function HeroFooter({
     week: WeekInfo;
     onPrevWeek: () => void;
     onNextWeek: () => void;
-    onToday: () => void;
+    selectedWeekStart: Date;
+    today: Date;
+    onJumpToWeek: (weekStart: Date) => void;
     query: string;
     onQuery: (v: string) => void;
     cat: string;
@@ -50,6 +56,8 @@ export function HeroFooter({
 }) {
     const { categories, scope, typeLabels } = useChecklistConfig();
     const site = scope.mode === 'site' ? scope.site : null;
+    const weekBtnRef = useRef<HTMLButtonElement>(null);
+    const [pickerOpen, setPickerOpen] = useState(false);
 
     const catOptions: DropdownOption[] = [
         { value: 'all', label: 'All categories' },
@@ -81,8 +89,11 @@ export function HeroFooter({
                         <span className="hidden sm:inline">{week.prevLabel}</span>
                     </button>
                     <button
+                        ref={weekBtnRef}
                         type="button"
-                        onClick={onToday}
+                        onClick={() => setPickerOpen((v) => !v)}
+                        aria-haspopup="dialog"
+                        aria-expanded={pickerOpen}
                         className="inline-flex items-center gap-1.5 rounded-md border border-primary-foreground/35 bg-primary-foreground/20 px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary-foreground/30"
                     >
                         <CalendarRange className="h-3.5 w-3.5" />
@@ -100,6 +111,19 @@ export function HeroFooter({
                         <span className="hidden sm:inline">{week.nextLabel}</span>
                         <ChevronRight className="h-3.5 w-3.5" />
                     </button>
+                    {pickerOpen ? (
+                        <WeekPicker
+                            selectedWeekStart={selectedWeekStart}
+                            anchorRef={weekBtnRef}
+                            today={today}
+                            showContextMenu={false}
+                            onSelect={(weekStart) => {
+                                onJumpToWeek(weekStart);
+                                setPickerOpen(false);
+                            }}
+                            onClose={() => setPickerOpen(false)}
+                        />
+                    ) : null}
                 </div>
 
                 {/* Search + category + scope */}

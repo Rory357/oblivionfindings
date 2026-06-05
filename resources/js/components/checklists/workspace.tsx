@@ -10,6 +10,7 @@ import {
 import { useMemo, useState } from 'react';
 
 import { TabStrip, type RosterTabItem } from '@/components/rostering/tab-strip';
+import { startOfWeek } from '@/components/rostering/week-picker';
 
 import { ChecklistConfigProvider, type PaneCtx } from './context';
 import { ChecklistHero } from './hero';
@@ -98,6 +99,13 @@ export function ChecklistsWorkspace({ scope, data }: { scope: ChecklistScope; da
     const week = useMemo(() => weekInfo(data.today, weekOffset), [data.today, weekOffset]);
     const weekStart = useMemo(() => mondayOf(data.today, weekOffset), [data.today, weekOffset]);
 
+    const jumpToWeek = (target: Date) => {
+        const todayMonday = startOfWeek(new Date(`${data.today}T00:00:00`));
+        const targetMonday = startOfWeek(target);
+        const offset = Math.round((targetMonday.getTime() - todayMonday.getTime()) / (7 * 86_400_000));
+        setWeekOffset(offset);
+    };
+
     const tabs: RosterTabItem[] = [
         { id: 'overview', label: 'Overview', icon: LayoutDashboard, tone: 'primary' },
         {
@@ -153,7 +161,9 @@ export function ChecklistsWorkspace({ scope, data }: { scope: ChecklistScope; da
                             week={week}
                             onPrevWeek={() => setWeekOffset((o) => o - 1)}
                             onNextWeek={() => setWeekOffset((o) => o + 1)}
-                            onToday={() => setWeekOffset(0)}
+                            selectedWeekStart={new Date(`${weekStart}T00:00:00`)}
+                            today={new Date(`${data.today}T00:00:00`)}
+                            onJumpToWeek={jumpToWeek}
                             query={query}
                             onQuery={setQuery}
                             cat={cat}
