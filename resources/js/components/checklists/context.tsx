@@ -1,6 +1,7 @@
 import { createContext, useContext } from 'react';
 
 import type {
+    AssignableUser,
     Category,
     ChecklistAssignment,
     ChecklistCan,
@@ -35,6 +36,8 @@ export interface ChecklistConfig {
     today: string;
     can: ChecklistCan;
     scope: ChecklistScope;
+    /** Org staff selectable as a run assignee (the Schedule "Reassign" action). */
+    assignableUsers: AssignableUser[];
     /** Open the run modal for a run id (drives a partial reload of runDetail). */
     openRun: (runId: number) => void;
     /** Open the template builder modal — 'new' for create, or a template id to edit. */

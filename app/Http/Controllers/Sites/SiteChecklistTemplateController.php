@@ -102,6 +102,7 @@ class SiteChecklistTemplateController extends Controller
             'items.*.is_required' => ['boolean'],
             'items.*.guidance' => ['nullable', 'string', 'max:1000'],
             'items.*.failure_creates_hazard' => ['boolean'],
+            'items.*.failure_creates_damage' => ['boolean'],
         ]);
     }
 
@@ -132,6 +133,7 @@ class SiteChecklistTemplateController extends Controller
                 'is_required' => (bool) ($item['is_required'] ?? true),
                 'guidance' => $item['guidance'] ?? null,
                 'failure_creates_hazard' => (bool) ($item['failure_creates_hazard'] ?? false),
+                'failure_creates_damage' => (bool) ($item['failure_creates_damage'] ?? false),
             ];
 
             $existing = ! empty($item['id'])

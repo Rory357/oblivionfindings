@@ -108,6 +108,8 @@ import {
     EditLocationDialog,
     EditSafetyDialog,
 } from './_overview-dialogs';
+import { ChecklistsWorkspace } from '@/components/checklists/workspace';
+import type { ChecklistsData } from '@/components/checklists/types';
 import { ConfirmAction } from './_confirm-action';
 import SiteOverviewMapCard from './_overview-map-card';
 import { SiteReadinessPanel, type SiteReadiness } from './_readiness-panel';
@@ -254,16 +256,6 @@ const UnassignRoomDialog = lazy(() =>
     })),
 );
 
-const StartRunDialog = lazy(() =>
-    import('@/pages/checklists/_dialogs').then((module) => ({
-        default: module.StartRunDialog,
-    })),
-);
-const CreateTemplateDialog = lazy(() =>
-    import('@/pages/checklists/_dialogs').then((module) => ({
-        default: module.CreateTemplateDialog,
-    })),
-);
 
 function LazyDialog({ children }: { children: ReactNode }) {
     return <Suspense fallback={null}>{children}</Suspense>;
@@ -516,47 +508,6 @@ type CoverageRequirement = {
     service_context?: { id: number; name: string; type?: string | null } | null;
 };
 
-type ChecklistsSummary = {
-    stats: {
-        active_assignments: number;
-        scheduled: number;
-        in_progress: number;
-        overdue: number;
-        completed_30d: number;
-    };
-    assignments: Array<{
-        id: number;
-        frequency: string;
-        start_date: string | null;
-        template: {
-            id: number;
-            name: string;
-            description?: string | null;
-            frequency?: string | null;
-        } | null;
-        assigned_to: { id: number; name: string } | null;
-    }>;
-    recentRuns: Array<{
-        id: number;
-        status: 'scheduled' | 'in_progress' | 'completed' | 'overdue' | 'skipped';
-        scheduled_date: string | null;
-        completed_at: string | null;
-        completion_percentage: number;
-        items_passed: number;
-        items_failed: number;
-        is_overdue: boolean;
-        template: { id: number; name: string } | null;
-        completed_by: { id: number; name: string } | null;
-    }>;
-    availableTemplates: Array<{
-        id: number;
-        name: string;
-        description?: string | null;
-        frequency: string;
-        items_count: number;
-    }>;
-    can: { view: boolean; schedule: boolean; run: boolean };
-};
 
 type SiteFleetData = {
     vehicles: Array<{
@@ -651,7 +602,7 @@ type Props = {
     can_edit: boolean;
     can?: { createAsset?: boolean };
     fleet?: SiteFleetData;
-    checklistsSummary?: ChecklistsSummary;
+    checklistsData?: ChecklistsData;
     siteNotes?: Array<{
         id: number;
         body: string;
@@ -880,536 +831,6 @@ function MiniOccupancyStat({ label, value }: { label: string; value: number }) {
     );
 }
 
-function SiteChecklistsTab({
-    siteId,
-    summary,
-}: {
-    siteId: number;
-    summary?: ChecklistsSummary;
-}) {
-    const [assignOpen, setAssignOpen] = useState(false);
-    const [createTemplateOpen, setCreateTemplateOpen] = useState(false);
-    const [runDialog, setRunDialog] = useState<{
-        assignmentId: number | null;
-        templateName: string | null;
-        frequencyLabel: string | null;
-    }>({ assignmentId: null, templateName: null, frequencyLabel: null });
-    const assignForm = useForm({ template_id: '', frequency: 'monthly' });
-
-    if (!summary) {
-        return (
-            <Card>
-                <CardContent className="py-12 text-center text-sm text-muted-foreground">
-                    Loading…
-                </CardContent>
-            </Card>
-        );
-    }
-
-    const { stats, assignments, recentRuns, availableTemplates, can } = summary;
-    const assignedIds = new Set(
-        assignments.map((a) => a.template?.id).filter(Boolean) as number[],
-    );
-    const unassignedTemplates = availableTemplates.filter(
-        (t) => !assignedIds.has(t.id),
-    );
-
-    const frequencyLabels: Record<string, string> = {
-        once: 'One-time',
-        daily: 'Daily',
-        weekly: 'Weekly',
-        fortnightly: 'Fortnightly',
-        monthly: 'Monthly',
-        quarterly: 'Quarterly',
-    };
-
-    const handleAssign = (e: React.FormEvent) => {
-        e.preventDefault();
-        assignForm.post(`/sites/${siteId}/checklists/assign`, {
-            preserveScroll: true,
-            onSuccess: () => {
-                setAssignOpen(false);
-                assignForm.reset();
-            },
-        });
-    };
-
-    const openStartRun = (a: ChecklistsSummary['assignments'][number]) => {
-        setRunDialog({
-            assignmentId: a.id,
-            templateName: a.template?.name ?? 'Untitled',
-            frequencyLabel:
-                frequencyLabels[a.frequency] ?? a.frequency ?? null,
-        });
-    };
-
-    const closeStartRun = () =>
-        setRunDialog({
-            assignmentId: null,
-            templateName: null,
-            frequencyLabel: null,
-        });
-
-    const formatDate = (v: string | null) =>
-        v
-            ? new Date(v).toLocaleDateString(undefined, {
-                  month: 'short',
-                  day: 'numeric',
-                  year: 'numeric',
-              })
-            : '—';
-
-    const statCards = [
-        {
-            label: 'Active',
-            value: stats.active_assignments,
-            tone: 'text-foreground',
-            icon: ClipboardCheck,
-        },
-        {
-            label: 'Scheduled',
-            value: stats.scheduled,
-            tone: 'text-foreground',
-            icon: Calendar,
-        },
-        {
-            label: 'In Progress',
-            value: stats.in_progress,
-            tone: 'text-amber-600 dark:text-amber-400',
-            icon: Clock,
-        },
-        {
-            label: 'Overdue',
-            value: stats.overdue,
-            tone:
-                stats.overdue > 0
-                    ? 'text-rose-600 dark:text-rose-400'
-                    : 'text-foreground',
-            icon: AlertTriangle,
-        },
-        {
-            label: 'Completed (30d)',
-            value: stats.completed_30d,
-            tone: 'text-emerald-600 dark:text-emerald-400',
-            icon: Award,
-        },
-    ];
-
-    return (
-        <div className="space-y-4">
-            {/* Stat strip */}
-            <div className="grid grid-cols-2 gap-3 lg:grid-cols-5">
-                {statCards.map((s) => {
-                    const Icon = s.icon;
-                    return (
-                        <Card key={s.label}>
-                            <CardContent className="flex items-center justify-between p-3">
-                                <div>
-                                    <p className="text-xs font-medium uppercase tracking-wide text-muted-foreground">
-                                        {s.label}
-                                    </p>
-                                    <p
-                                        className={`mt-1 text-2xl font-semibold tabular-nums ${s.tone}`}
-                                    >
-                                        {s.value}
-                                    </p>
-                                </div>
-                                <span className="rounded-lg border bg-background/60 p-2">
-                                    <Icon
-                                        className={`h-4 w-4 ${s.tone}`}
-                                    />
-                                </span>
-                            </CardContent>
-                        </Card>
-                    );
-                })}
-            </div>
-
-            {/* Side-by-side: Assignments | Recent runs */}
-            <div className="grid gap-4 lg:grid-cols-2">
-                {/* Assigned checklists */}
-                <Card>
-                    <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-3">
-                        <div>
-                            <CardTitle className="text-base">
-                                Assigned checklists
-                            </CardTitle>
-                            <p className="mt-0.5 text-xs text-muted-foreground">
-                                Templates active for this site
-                            </p>
-                        </div>
-                        {can.schedule && (
-                            <Dialog
-                                open={assignOpen}
-                                onOpenChange={setAssignOpen}
-                            >
-                                <DialogTrigger asChild>
-                                    <Button size="sm">
-                                        <Plus className="mr-1 h-4 w-4" />
-                                        Assign template
-                                    </Button>
-                                </DialogTrigger>
-                                <DialogContent>
-                                    <DialogHeader>
-                                        <DialogTitle>
-                                            Assign checklist template
-                                        </DialogTitle>
-                                    </DialogHeader>
-                                    <form
-                                        onSubmit={handleAssign}
-                                        className="space-y-4"
-                                    >
-                                        <div>
-                                            <Label>Template</Label>
-                                            {unassignedTemplates.length === 0 ? (
-                                                <p className="mt-1 text-sm text-muted-foreground">
-                                                    All applicable templates
-                                                    are already assigned.{' '}
-                                                    <button
-                                                        type="button"
-                                                        className="text-primary hover:underline"
-                                                        onClick={() => {
-                                                            setAssignOpen(
-                                                                false,
-                                                            );
-                                                            setCreateTemplateOpen(
-                                                                true,
-                                                            );
-                                                        }}
-                                                    >
-                                                        Create a new template
-                                                    </button>
-                                                </p>
-                                            ) : (
-                                                <Select
-                                                    value={
-                                                        assignForm.data
-                                                            .template_id ||
-                                                        undefined
-                                                    }
-                                                    onValueChange={(v) =>
-                                                        assignForm.setData(
-                                                            'template_id',
-                                                            v,
-                                                        )
-                                                    }
-                                                >
-                                                    <SelectTrigger className="mt-1">
-                                                        <SelectValue placeholder="Choose template…" />
-                                                    </SelectTrigger>
-                                                    <SelectContent>
-                                                        {unassignedTemplates.map(
-                                                            (t) => (
-                                                                <SelectItem
-                                                                    key={t.id}
-                                                                    value={String(
-                                                                        t.id,
-                                                                    )}
-                                                                >
-                                                                    {t.name} (
-                                                                    {
-                                                                        t.items_count
-                                                                    }{' '}
-                                                                    items)
-                                                                </SelectItem>
-                                                            ),
-                                                        )}
-                                                    </SelectContent>
-                                                </Select>
-                                            )}
-                                        </div>
-                                        <div>
-                                            <Label>Frequency</Label>
-                                            <Select
-                                                value={assignForm.data.frequency}
-                                                onValueChange={(v) =>
-                                                    assignForm.setData(
-                                                        'frequency',
-                                                        v,
-                                                    )
-                                                }
-                                            >
-                                                <SelectTrigger className="mt-1">
-                                                    <SelectValue />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="once">
-                                                        One-time
-                                                    </SelectItem>
-                                                    <SelectItem value="daily">
-                                                        Daily
-                                                    </SelectItem>
-                                                    <SelectItem value="weekly">
-                                                        Weekly
-                                                    </SelectItem>
-                                                    <SelectItem value="fortnightly">
-                                                        Fortnightly
-                                                    </SelectItem>
-                                                    <SelectItem value="monthly">
-                                                        Monthly
-                                                    </SelectItem>
-                                                    <SelectItem value="quarterly">
-                                                        Quarterly
-                                                    </SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                        <div className="flex justify-end gap-2 pt-2">
-                                            <Button
-                                                type="button"
-                                                variant="outline"
-                                                onClick={() =>
-                                                    setAssignOpen(false)
-                                                }
-                                            >
-                                                Cancel
-                                            </Button>
-                                            <Button
-                                                type="submit"
-                                                disabled={
-                                                    assignForm.processing ||
-                                                    !assignForm.data.template_id
-                                                }
-                                            >
-                                                Assign
-                                            </Button>
-                                        </div>
-                                    </form>
-                                </DialogContent>
-                            </Dialog>
-                        )}
-                    </CardHeader>
-                    <CardContent>
-                        {assignments.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-10 text-center">
-                                <div className="rounded-full bg-muted/40 p-3">
-                                    <ClipboardCheck className="h-6 w-6 text-muted-foreground" />
-                                </div>
-                                <p className="mt-3 text-sm font-medium">
-                                    No checklists assigned yet
-                                </p>
-                                <p className="mt-1 max-w-xs text-xs text-muted-foreground">
-                                    {availableTemplates.length === 0
-                                        ? 'No templates are available for this site type. Create one to get started.'
-                                        : 'Assign a template to start tracking checklists.'}
-                                </p>
-                                <div className="mt-4 flex gap-2">
-                                    {can.schedule &&
-                                        availableTemplates.length > 0 && (
-                                            <Button
-                                                size="sm"
-                                                onClick={() =>
-                                                    setAssignOpen(true)
-                                                }
-                                            >
-                                                <Plus className="mr-1 h-4 w-4" />
-                                                Assign template
-                                            </Button>
-                                        )}
-                                    {can.schedule && (
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            onClick={() =>
-                                                setCreateTemplateOpen(true)
-                                            }
-                                        >
-                                            <Plus className="mr-1 h-4 w-4" />
-                                            Create template
-                                        </Button>
-                                    )}
-                                </div>
-                            </div>
-                        ) : (
-                            <div className="space-y-2">
-                                {assignments.map((a) => (
-                                    <div
-                                        key={a.id}
-                                        className="group flex items-center gap-3 rounded-xl border bg-card/40 p-3 transition-all hover:border-primary/40 hover:bg-card hover:shadow-sm"
-                                    >
-                                        <span className="shrink-0 rounded-lg border bg-background/60 p-2">
-                                            <ClipboardCheck className="h-4 w-4 text-primary" />
-                                        </span>
-                                        <div className="min-w-0 flex-1">
-                                            <div className="flex items-center gap-2">
-                                                <p className="truncate text-sm font-medium">
-                                                    {a.template?.name ??
-                                                        'Untitled'}
-                                                </p>
-                                                <Badge
-                                                    variant="outline"
-                                                    className="text-[10px]"
-                                                >
-                                                    {frequencyLabels[
-                                                        a.frequency
-                                                    ] ?? a.frequency}
-                                                </Badge>
-                                            </div>
-                                            {a.template?.description && (
-                                                <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                                                    {a.template.description}
-                                                </p>
-                                            )}
-                                            {a.assigned_to && (
-                                                <p className="mt-0.5 text-xs text-muted-foreground">
-                                                    Assigned to{' '}
-                                                    {a.assigned_to.name}
-                                                </p>
-                                            )}
-                                        </div>
-                                        {can.run && (
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                onClick={() => openStartRun(a)}
-                                            >
-                                                <Clock className="mr-1 h-3.5 w-3.5" />
-                                                Start run
-                                            </Button>
-                                        )}
-                                    </div>
-                                ))}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-
-                {/* Recent runs */}
-                <Card>
-                    <CardHeader className="flex flex-row items-start justify-between space-y-0 pb-3">
-                        <div>
-                            <CardTitle className="text-base">
-                                Recent runs
-                            </CardTitle>
-                            <p className="mt-0.5 text-xs text-muted-foreground">
-                                Latest scheduled and completed runs
-                            </p>
-                        </div>
-                        <Button asChild variant="outline" size="sm">
-                            <Link href={`/sites/${siteId}/checklists/runs`}>
-                                View all
-                            </Link>
-                        </Button>
-                    </CardHeader>
-                    <CardContent>
-                        {recentRuns.length === 0 ? (
-                            <div className="flex flex-col items-center justify-center rounded-xl border border-dashed py-10 text-center">
-                                <div className="rounded-full bg-muted/40 p-3">
-                                    <Clock className="h-6 w-6 text-muted-foreground" />
-                                </div>
-                                <p className="mt-3 text-sm font-medium">
-                                    No runs recorded yet
-                                </p>
-                                <p className="mt-1 max-w-xs text-xs text-muted-foreground">
-                                    Once you start a run, it will show up here.
-                                </p>
-                            </div>
-                        ) : (
-                            <div className="space-y-2">
-                                {recentRuns.map((r) => {
-                                    const failed = r.items_failed > 0;
-                                    const isDone = r.status === 'completed';
-                                    const tone = r.is_overdue
-                                        ? 'text-rose-600 dark:text-rose-400'
-                                        : isDone && failed
-                                          ? 'text-amber-600 dark:text-amber-400'
-                                          : isDone
-                                            ? 'text-emerald-600 dark:text-emerald-400'
-                                            : 'text-muted-foreground';
-                                    const label = r.is_overdue
-                                        ? 'Overdue'
-                                        : isDone
-                                          ? 'Completed'
-                                          : r.status === 'in_progress'
-                                            ? 'In progress'
-                                            : 'Scheduled';
-                                    return (
-                                        <Link
-                                            key={r.id}
-                                            href={`/checklists/runs/${r.id}`}
-                                            className="group flex items-center gap-3 rounded-xl border bg-card/40 p-3 transition-all hover:border-primary/40 hover:bg-card hover:shadow-sm"
-                                        >
-                                            <span className="shrink-0 rounded-lg border bg-background/60 p-2">
-                                                <Clock
-                                                    className={`h-4 w-4 ${tone}`}
-                                                />
-                                            </span>
-                                            <div className="min-w-0 flex-1">
-                                                <p className="truncate text-sm font-medium">
-                                                    {r.template?.name ??
-                                                        'Untitled'}
-                                                </p>
-                                                <p className="mt-0.5 truncate text-xs text-muted-foreground">
-                                                    {label} ·{' '}
-                                                    {formatDate(
-                                                        isDone
-                                                            ? r.completed_at
-                                                            : r.scheduled_date,
-                                                    )}
-                                                    {r.completed_by && (
-                                                        <>
-                                                            {' '}
-                                                            ·{' '}
-                                                            {
-                                                                r.completed_by
-                                                                    .name
-                                                            }
-                                                        </>
-                                                    )}
-                                                </p>
-                                            </div>
-                                            <span
-                                                className={`shrink-0 text-xs tabular-nums ${tone}`}
-                                            >
-                                                {isDone
-                                                    ? `${r.items_passed}/${r.items_passed + r.items_failed}`
-                                                    : `${Math.round(r.completion_percentage)}%`}
-                                            </span>
-                                        </Link>
-                                    );
-                                })}
-                            </div>
-                        )}
-                    </CardContent>
-                </Card>
-            </div>
-
-            <div className="flex flex-wrap justify-end gap-2">
-                <Button asChild variant="outline" size="sm">
-                    <Link href="/checklists">Open global dashboard</Link>
-                </Button>
-                <Button asChild size="sm">
-                    <Link href={`/sites/${siteId}/checklists`}>
-                        Open full checklists page
-                    </Link>
-                </Button>
-            </div>
-
-            {runDialog.assignmentId !== null && (
-                <LazyDialog>
-                    <StartRunDialog
-                        siteId={siteId}
-                        isOpen
-                        onClose={closeStartRun}
-                        assignmentId={runDialog.assignmentId}
-                        templateName={runDialog.templateName}
-                        frequencyLabel={runDialog.frequencyLabel}
-                    />
-                </LazyDialog>
-            )}
-
-            {createTemplateOpen && (
-                <LazyDialog>
-                    <CreateTemplateDialog
-                        isOpen
-                        onClose={() => setCreateTemplateOpen(false)}
-                    />
-                </LazyDialog>
-            )}
-        </div>
-    );
-}
-
 export default function SiteShow({
     site,
     clients,
@@ -1437,7 +858,7 @@ export default function SiteShow({
     can_edit,
     can: assetCan,
     fleet,
-    checklistsSummary,
+    checklistsData,
     siteNotes = [],
     geofences = [],
 }: Props) {
@@ -2452,12 +1873,24 @@ export default function SiteShow({
                         </Suspense>
                     </TabsContent>
 
-                    {/* Checklists Tab */}
+                    {/* Checklists Tab — embeds the shared ChecklistsWorkspace scoped to this site */}
                     <TabsContent value="checklists">
-                        <SiteChecklistsTab
-                            siteId={site.id}
-                            summary={checklistsSummary}
-                        />
+                        {checklistsData ? (
+                            <ChecklistsWorkspace
+                                scope={{
+                                    mode: 'site',
+                                    site: { id: site.id, name: site.name, type: site.type },
+                                    backHref: `/sites/${site.id}`,
+                                }}
+                                data={checklistsData}
+                            />
+                        ) : (
+                            <Card>
+                                <CardContent className="py-12 text-center text-sm text-muted-foreground">
+                                    Loading…
+                                </CardContent>
+                            </Card>
+                        )}
                     </TabsContent>
 
                     {/* Hazards Tab */}

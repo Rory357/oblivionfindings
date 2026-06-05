@@ -19,6 +19,7 @@ class SiteChecklistResponse extends Model
         'photo_path',
         'is_failed',
         'created_hazard_id',
+        'created_damage_id',
     ];
 
     protected $casts = [

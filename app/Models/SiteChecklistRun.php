@@ -22,6 +22,7 @@ class SiteChecklistRun extends Model
         'started_at',
         'completed_at',
         'completed_by_user_id',
+        'assigned_to_user_id',
         'status',
         'completion_percentage',
         'items_passed',
@@ -58,6 +59,11 @@ class SiteChecklistRun extends Model
     public function completedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'completed_by_user_id');
+    }
+
+    public function assignedTo(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'assigned_to_user_id');
     }
 
     public function responses(): HasMany

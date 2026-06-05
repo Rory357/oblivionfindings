@@ -252,7 +252,9 @@ class SitesModuleIntegrationTest extends TestCase
                 'overall_notes' => 'Completed during test.',
                 'signature_name' => $this->admin->name,
             ])
-            ->assertRedirect(route('sites.checklists.index', $site->id));
+            // completeRun now redirects back() (modal-coherent) instead of a
+            // hard-coded per-site index route.
+            ->assertRedirect();
 
         $run->refresh();
 

@@ -143,6 +143,7 @@ export function ChecklistsWorkspace({ scope, data }: { scope: ChecklistScope; da
                 today: data.today,
                 can: data.can,
                 scope,
+                assignableUsers: data.assignableUsers ?? [],
                 openRun: setRunId,
                 openBuilder: setBuilderTarget,
             }}

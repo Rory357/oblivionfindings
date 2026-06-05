@@ -78,6 +78,12 @@ export interface ChecklistRun {
     site: SiteRef | null;
     template: TemplateRef | null;
     assignee: string;
+    assigned_to_id?: number | null;
+}
+
+export interface AssignableUser {
+    id: number;
+    name: string;
 }
 
 export interface ChecklistAssignment {
@@ -133,6 +139,7 @@ export interface RunItemDef {
     is_required: boolean;
     guidance?: string | null;
     failure_creates_hazard: boolean;
+    failure_creates_damage: boolean;
 }
 
 export interface RunResponse {
@@ -163,6 +170,7 @@ export interface TemplateDetailItem {
     is_required: boolean;
     guidance?: string | null;
     failure_creates_hazard: boolean;
+    failure_creates_damage: boolean;
     has_responses?: boolean;
 }
 
@@ -207,6 +215,7 @@ export interface ChecklistsData {
     activeRuns: ChecklistRun[];
     recentRuns: ChecklistRun[];
     assignments: ChecklistAssignment[];
+    assignableUsers: AssignableUser[];
     sitesOverview: SiteOverview[];
     reports: Reports;
     stats: ChecklistStats;

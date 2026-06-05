@@ -7,6 +7,7 @@ import {
     Loader2,
     Minus,
     TriangleAlert,
+    Wrench,
     X,
 } from 'lucide-react';
 import { useEffect, useMemo, useState } from 'react';
@@ -75,6 +76,7 @@ export function RunModal({ runId, onClose }: { runId: number; onClose: () => voi
     const pct = items.length ? Math.round((answered / items.length) * 100) : 0;
     const failed = items.filter((it) => isFail(it, resp[it.id]?.value));
     const hazardItems = failed.filter((it) => it.failure_creates_hazard);
+    const damageItems = failed.filter((it) => it.failure_creates_damage);
     const requiredItems = items.filter((it) => it.is_required);
     const requiredDone = requiredItems.every((it) => isAnswered(resp[it.id]?.value));
 
@@ -96,6 +98,7 @@ export function RunModal({ runId, onClose }: { runId: number; onClose: () => voi
                     notes: resp[it.id]?.notes || null,
                     is_failed: isFail(it, resp[it.id]?.value),
                     create_hazard: isFail(it, resp[it.id]?.value) && it.failure_creates_hazard,
+                    create_damage: isFail(it, resp[it.id]?.value) && it.failure_creates_damage,
                 })),
         [items, resp],
     );
@@ -169,11 +172,22 @@ export function RunModal({ runId, onClose }: { runId: number; onClose: () => voi
                                     {answered}/{items.length} · {pct}%
                                 </span>
                             </div>
-                            {hazardItems.length > 0 ? (
-                                <div className="flex items-center gap-2 border-t border-border bg-status-critical-bg px-5 py-2 text-xs font-medium text-status-critical">
-                                    <TriangleAlert className="h-3.5 w-3.5" />
-                                    {hazardItems.length} failed check{hazardItems.length === 1 ? '' : 's'} will raise a hazard on{' '}
-                                    {runDetail!.site.name}
+                            {hazardItems.length > 0 || damageItems.length > 0 ? (
+                                <div className="space-y-1 border-t border-border bg-status-critical-bg px-5 py-2 text-xs font-medium text-status-critical">
+                                    {hazardItems.length > 0 ? (
+                                        <div className="flex items-center gap-2">
+                                            <TriangleAlert className="h-3.5 w-3.5 shrink-0" />
+                                            {hazardItems.length} failed check{hazardItems.length === 1 ? '' : 's'} will raise a hazard on{' '}
+                                            {runDetail!.site.name}
+                                        </div>
+                                    ) : null}
+                                    {damageItems.length > 0 ? (
+                                        <div className="flex items-center gap-2">
+                                            <Wrench className="h-3.5 w-3.5 shrink-0" />
+                                            {damageItems.length} failed check{damageItems.length === 1 ? '' : 's'} will log a damage report on{' '}
+                                            {runDetail!.site.name}
+                                        </div>
+                                    ) : null}
                                 </div>
                             ) : null}
                         </div>
@@ -287,6 +301,11 @@ function RunItem({
                         {item.failure_creates_hazard ? (
                             <span title="Failure raises a hazard" className="mt-0.5 shrink-0 text-status-critical">
                                 <TriangleAlert className="h-3 w-3" />
+                            </span>
+                        ) : null}
+                        {item.failure_creates_damage ? (
+                            <span title="Failure logs a damage report" className="mt-0.5 shrink-0 text-status-warning">
+                                <Wrench className="h-3 w-3" />
                             </span>
                         ) : null}
                     </div>

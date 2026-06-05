@@ -21,12 +21,14 @@ class SiteChecklistTemplateItem extends Model
         'is_required',
         'guidance',
         'failure_creates_hazard',
+        'failure_creates_damage',
     ];
 
     protected $casts = [
         'sort_order' => 'integer',
         'is_required' => 'boolean',
         'failure_creates_hazard' => 'boolean',
+        'failure_creates_damage' => 'boolean',
         'response_config' => 'array',
     ];
 

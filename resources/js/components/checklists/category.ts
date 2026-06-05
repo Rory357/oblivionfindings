@@ -7,6 +7,7 @@ import {
     CheckCircle2,
     type LucideIcon,
     PlayCircle,
+    SkipForward,
 } from 'lucide-react';
 
 import type { ChecklistRun } from './types';
@@ -62,7 +63,7 @@ export function relDay(s: string | null | undefined, today: string): string {
     return `in ${d}d`;
 }
 
-export type StatusTone = 'success' | 'critical' | 'warning' | 'info';
+export type StatusTone = 'success' | 'critical' | 'warning' | 'info' | 'neutral';
 
 export interface RunStatusMeta {
     tone: StatusTone;
@@ -74,11 +75,13 @@ export function runStatusMeta(
     run: Pick<ChecklistRun, 'status' | 'scheduled_date'>,
     today: string,
 ): RunStatusMeta {
-    const overdue =
-        run.scheduled_date != null && run.scheduled_date < today && run.status !== 'completed';
     if (run.status === 'completed') {
         return { tone: 'success', Icon: CheckCircle2, label: 'Completed' };
     }
+    if (run.status === 'skipped') {
+        return { tone: 'neutral', Icon: SkipForward, label: 'Skipped' };
+    }
+    const overdue = run.scheduled_date != null && run.scheduled_date < today;
     if (overdue) {
         return { tone: 'critical', Icon: AlertTriangle, label: 'Overdue' };
     }

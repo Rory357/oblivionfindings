@@ -5,6 +5,7 @@ import { cn } from '@/lib/utils';
 
 import { catColorVar, initials, relDay, runStatusMeta } from './category';
 import { freqLabel, useChecklistConfig } from './context';
+import { useRunContextMenu } from './context-menu';
 import { CategoryIcon, Progress, StatusBadge } from './primitives';
 import type { ChecklistRun } from './types';
 
@@ -18,6 +19,7 @@ function actionFor(run: ChecklistRun, canRun: boolean) {
 export function RunListRow({ run }: { run: ChecklistRun }) {
     const cfg = useChecklistConfig();
     const { categoryMap, today, can, openRun } = cfg;
+    const menu = useRunContextMenu();
     const meta = runStatusMeta(run, today);
     const StatusIcon = meta.Icon;
     const started = run.status === 'in_progress';
@@ -28,7 +30,10 @@ export function RunListRow({ run }: { run: ChecklistRun }) {
     const ActionIcon = action.Icon;
 
     return (
-        <div className="group flex items-center gap-3 px-3.5 py-3 transition-colors hover:bg-accent/40">
+        <div
+            className="group flex items-center gap-3 px-3.5 py-3 transition-colors hover:bg-accent/40"
+            onContextMenu={menu.open(run)}
+        >
             <span className="h-9 w-1 shrink-0 rounded-full" style={{ background: catColorVar(tone) }} />
             <CategoryIcon category={cat} box={36} size={18} className="hidden sm:flex" />
             <div className="min-w-0 flex-1">
@@ -77,6 +82,7 @@ export function RunListRow({ run }: { run: ChecklistRun }) {
                 <ActionIcon className="h-3.5 w-3.5" />
                 {action.label}
             </Button>
+            {menu.element}
         </div>
     );
 }
@@ -84,6 +90,7 @@ export function RunListRow({ run }: { run: ChecklistRun }) {
 export function WorklistCard({ run }: { run: ChecklistRun }) {
     const cfg = useChecklistConfig();
     const { today, can, openRun } = cfg;
+    const menu = useRunContextMenu();
     const meta = runStatusMeta(run, today);
     const StatusIcon = meta.Icon;
     const started = run.status === 'in_progress';
@@ -92,7 +99,10 @@ export function WorklistCard({ run }: { run: ChecklistRun }) {
     const ActionIcon = action.Icon;
 
     return (
-        <div className="flex flex-col rounded-xl border border-border bg-card p-3.5 shadow-sm transition hover:border-primary/40 hover:shadow-sm">
+        <div
+            className="flex flex-col rounded-xl border border-border bg-card p-3.5 shadow-sm transition hover:border-primary/40 hover:shadow-sm"
+            onContextMenu={menu.open(run)}
+        >
             <div className="flex items-start gap-3">
                 <CategoryIcon category={run.template?.category ?? null} box={38} size={19} />
                 <div className="min-w-0 flex-1">
@@ -150,6 +160,7 @@ export function WorklistCard({ run }: { run: ChecklistRun }) {
                     </Button>
                 </div>
             </div>
+            {menu.element}
         </div>
     );
 }

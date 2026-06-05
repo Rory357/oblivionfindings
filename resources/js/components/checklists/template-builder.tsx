@@ -11,6 +11,7 @@ import {
     Plus,
     Trash2,
     TriangleAlert,
+    Wrench,
 } from 'lucide-react';
 import { useEffect, useRef, useState } from 'react';
 
@@ -49,6 +50,7 @@ interface ItemDraft {
     is_required: boolean;
     guidance: string;
     failure_creates_hazard: boolean;
+    failure_creates_damage: boolean;
     has_responses?: boolean;
 }
 
@@ -106,6 +108,7 @@ function blankItem(): ItemDraft {
         is_required: true,
         guidance: '',
         failure_creates_hazard: false,
+        failure_creates_damage: false,
     };
 }
 
@@ -132,6 +135,7 @@ function detailToForm(detail: TemplateDetail): BuilderForm {
             is_required: it.is_required,
             guidance: it.guidance ?? '',
             failure_creates_hazard: it.failure_creates_hazard,
+            failure_creates_damage: it.failure_creates_damage,
             has_responses: it.has_responses,
         })),
     };
@@ -241,6 +245,7 @@ function TemplateBuilderBody({
                 is_required: it.is_required,
                 guidance: it.guidance || null,
                 failure_creates_hazard: it.failure_creates_hazard,
+                failure_creates_damage: it.failure_creates_damage,
             })),
         }));
         const opts = { preserveScroll: true, preserveState: true, onSuccess: onClose };
@@ -592,6 +597,16 @@ function ItemRow({
                             <span className="flex items-center gap-1">
                                 <TriangleAlert className="h-3 w-3 text-status-critical" />
                                 Raises hazard
+                            </span>
+                        </label>
+                        <label className="flex cursor-pointer items-center gap-1.5 text-xs">
+                            <Switch
+                                checked={item.failure_creates_damage}
+                                onCheckedChange={(v) => onChange({ failure_creates_damage: v })}
+                            />
+                            <span className="flex items-center gap-1">
+                                <Wrench className="h-3 w-3 text-status-warning" />
+                                Logs damage
                             </span>
                         </label>
                     </div>

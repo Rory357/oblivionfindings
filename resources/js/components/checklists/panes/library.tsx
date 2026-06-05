@@ -1,7 +1,9 @@
 import {
     Building2,
     Camera,
+    LayoutGrid,
     ListChecks,
+    type LucideIcon,
     Pencil,
     PenLine,
     RefreshCw,
@@ -17,6 +19,7 @@ import { cn } from '@/lib/utils';
 import { AssignChecklistButton } from '../assign-checklist';
 import { catBgVar, catColorVar } from '../category';
 import { freqLabel, typeLabel, useChecklistConfig, type PaneCtx } from '../context';
+import { categoryIcon } from '../icons';
 import { CategoryIcon, Dropdown, Empty, StatusBadge, ViewToggle, type ChecklistView } from '../primitives';
 import type { ChecklistTemplate } from '../types';
 
@@ -156,7 +159,19 @@ export function LibraryPane({ ctx, onNewTemplate }: { ctx: PaneCtx; onNewTemplat
     const [view, setView] = useState<ChecklistView>('board');
     const q = ctx.query.toLowerCase();
 
-    const templates = ctx.templates.filter((t) => {
+    // Per-site Library only shows templates that apply to this site type (plus
+    // the universal "all" ones); the org dashboard shows the whole catalog.
+    const siteType =
+        cfg.scope.mode === 'site'
+            ? cfg.scope.site.type === 'residential'
+                ? 'house'
+                : cfg.scope.site.type
+            : null;
+    const scopedTemplates = siteType
+        ? ctx.templates.filter((t) => t.applicable_to_type === 'all' || t.applicable_to_type === siteType)
+        : ctx.templates;
+
+    const templates = scopedTemplates.filter((t) => {
         const catLabel = t.category ? cfg.categoryMap[t.category]?.label ?? '' : '';
         const matchQ =
             !q ||
@@ -178,7 +193,15 @@ export function LibraryPane({ ctx, onNewTemplate }: { ctx: PaneCtx; onNewTemplat
         ...Object.entries(cfg.freqLabels).map(([value, label]) => ({ value, label })),
     ];
 
-    const chip = (key: string, label: string, active: boolean, count: number, onClick: () => void, dot?: string): ReactNode => (
+    const chip = (
+        key: string,
+        label: string,
+        active: boolean,
+        count: number,
+        onClick: () => void,
+        Icon: LucideIcon,
+        dot?: string,
+    ): ReactNode => (
         <button
             key={key}
             type="button"
@@ -191,6 +214,7 @@ export function LibraryPane({ ctx, onNewTemplate }: { ctx: PaneCtx; onNewTemplat
             )}
             style={active && dot ? { background: dot } : active ? { background: 'var(--primary)' } : undefined}
         >
+            <Icon className="h-3.5 w-3.5 shrink-0" style={!active && dot ? { color: dot } : undefined} />
             {label}
             <span className={cn('rounded px-1 text-[10px] tabular-nums', active ? 'bg-white/20' : 'bg-muted')}>{count}</span>
         </button>
@@ -224,7 +248,7 @@ export function LibraryPane({ ctx, onNewTemplate }: { ctx: PaneCtx; onNewTemplat
                     <span className="text-sm text-muted-foreground">
                         {q
                             ? `${templates.length} results for “${ctx.query}”`
-                            : `${templates.length} of ${ctx.templates.length} templates`}
+                            : `${templates.length} of ${scopedTemplates.length} templates`}
                     </span>
                 </div>
                 <div className="flex items-center gap-2">
@@ -239,14 +263,15 @@ export function LibraryPane({ ctx, onNewTemplate }: { ctx: PaneCtx; onNewTemplat
             </div>
 
             <div className="flex items-center gap-1.5 overflow-x-auto pb-1">
-                {chip('all', 'All', ctx.cat === 'all', ctx.templates.length, () => ctx.setCat('all'))}
+                {chip('all', 'All', ctx.cat === 'all', scopedTemplates.length, () => ctx.setCat('all'), LayoutGrid)}
                 {cfg.categories.map((c) =>
                     chip(
                         c.key,
                         c.label,
                         ctx.cat === c.key,
-                        ctx.templates.filter((t) => t.category === c.key).length,
+                        scopedTemplates.filter((t) => t.category === c.key).length,
                         () => ctx.setCat(c.key),
+                        categoryIcon(c.icon),
                         catColorVar(c.tone),
                     ),
                 )}

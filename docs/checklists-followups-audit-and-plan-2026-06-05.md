@@ -10,16 +10,34 @@ Everything needed to implement the follow-ups is in this file. Read §1–§2 fi
 
 ## 0. TL;DR — what to build
 
-1. **Icons** ❌ — Library category chips render no icon; add the category icon.
-2. **Schedule right-click** ❌ — add a floating context menu to run chips/cards
-   (Start/Continue · View · Reschedule · Reassign · Skip) + the **3 missing
-   backend endpoints** (reschedule/reassign/skip).
-3. **Site-profile Checklists tab** 🟡 — replace the old `SiteChecklistsTab` UI
-   with the new unified workspace (chosen: **embed `ChecklistsWorkspace
-   scope="site"`**; lighter fallback = modernise the summary's dialogs).
-4. **Retire house-checklists** 🟡 — redirect the legacy `/sites/{site}/house-checklists`
-   to the new per-site page; fold its unique damage-reporting into the run modal.
-5. Re-run the seeder on the remote (it's not currently applied — see §2).
+> **✅ IMPLEMENTED 2026-06-05** (working tree, tsc + build + feature tests green;
+> not yet committed/deployed). Per-issue notes below; remaining work is the
+> **server migrate + re-seed** and **remote UI verification** (§8) — neither can
+> be done locally (Herd web PHP 8.3.29 < vendor's 8.4.1 → `.test` 500s).
+
+1. **Icons** ✅ — Library category chips + the "All" chip now render the category
+   glyph (`panes/library.tsx` `chip()` takes an `Icon`; `categoryIcon(c.icon)` /
+   `LayoutGrid`, tinted by tone when inactive).
+2. **Schedule right-click** ✅ — new `components/checklists/context-menu.tsx`
+   (`useRunContextMenu`) wired onto Schedule chips + run cards: Start/Continue,
+   Reschedule (date popover), Reassign (searchable staff list), Skip. Backed by
+   the **3 new endpoints** + per-run `assigned_to_user_id` + `skipped` status meta.
+3. **Site-profile Checklists tab** ✅ — embedded `ChecklistsWorkspace scope="site"`
+   (chosen approach). `SiteController@show` builds `checklistsData` **eagerly**
+   (lazy `Inertia::optional` would be dropped by the `back()` reloads every run
+   action does) + surfaces top-level `runDetail`/`templateDetail`. Old
+   `SiteChecklistsTab` + `pages/checklists/_dialogs.tsx` deleted; `completeRun`
+   now `back()` for modal coherence.
+4. **Retire house-checklists** ✅ — GET redirects to the per-site page; controller
+   + page + write routes deleted. Damage-reporting folded in via a new
+   `failure_creates_damage` item flag → `SiteDamage` (FK'd to the run).
+5. **Hazard gap (found during the audit, not in the original plan)** ✅ — the run
+   modal advertised "failed checks raise a hazard" but the controller never
+   created one (`create_hazard` was validated and ignored). `saveResponse` /
+   `completeRun` now spawn `SiteHazard` **and** `SiteDamage` for flagged failures,
+   idempotently via `responses.created_hazard_id` / `created_damage_id`.
+6. **Re-run the seeder on the remote** ⚠️ — still required (see §2); also run the
+   two new migrations (`migrate --force`).
 
 Architectural choices already approved by the user: **embed the new workspace**
 in the site profile (modernise-only is the fallback), **right-click on the

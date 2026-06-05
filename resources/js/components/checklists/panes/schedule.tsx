@@ -3,6 +3,7 @@ import { cn } from '@/lib/utils';
 
 import { catColorVar } from '../category';
 import { useChecklistConfig, type PaneCtx } from '../context';
+import { useRunContextMenu } from '../context-menu';
 import type { ChecklistRun } from '../types';
 
 // Local-date math only — toISOString() would shift the day back in NZ (UTC+12/13).
@@ -12,6 +13,7 @@ function addDays(iso: string, n: number): string {
 
 export function SchedulePane({ ctx, weekStart }: { ctx: PaneCtx; weekStart: string }) {
     const { categoryMap, openRun } = useChecklistConfig();
+    const menu = useRunContextMenu();
     const today = ctx.today;
     const days = Array.from({ length: 7 }, (_, i) => addDays(weekStart, i));
     const weekEnd = days[6];
@@ -70,6 +72,7 @@ export function SchedulePane({ ctx, weekStart }: { ctx: PaneCtx; weekStart: stri
                                             key={`${r.id}-${ds}`}
                                             type="button"
                                             onClick={() => openRun(r.id)}
+                                            onContextMenu={menu.open(r)}
                                             className="block w-full rounded-md border-l-2 bg-card px-2 py-1.5 text-left shadow-sm transition hover:bg-accent/40"
                                             style={{ borderLeftColor: catColorVar(tone) }}
                                         >
@@ -95,6 +98,7 @@ export function SchedulePane({ ctx, weekStart }: { ctx: PaneCtx; weekStart: stri
                     );
                 })}
             </div>
+            {menu.element}
         </div>
     );
 }

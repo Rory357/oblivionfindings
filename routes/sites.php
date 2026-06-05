@@ -6,7 +6,6 @@ use App\Http\Controllers\Sites\{
     ChecklistsDashboardController,
     CredentialTypeController,
     HouseLedgerController,
-    HouseChecklistController,
     SiteCalendarController,
     SiteComplianceController,
     SiteHazardController,
@@ -149,17 +148,12 @@ Route::middleware(['auth', 'verified'])->group(function () {
             ->name('sites.checklists.createRun')
             ->middleware('permission:checklists.run');
 
-        Route::get('/house-checklists', [HouseChecklistController::class, 'index'])
+        // Legacy house-checklists retired — its templates/runs and the unique
+        // damage-reporting path are folded into the unified Checklists page
+        // (a failed flagged item now spawns a SiteDamage). Keep the URL as a
+        // redirect so existing bookmarks land on the new per-site workspace.
+        Route::get('/house-checklists', fn (\App\Models\Site $site) => redirect()->route('sites.checklists.index', $site->id))
             ->name('sites.house-checklists.index');
-        Route::post('/house-checklists/templates', [HouseChecklistController::class, 'storeTemplate'])
-            ->name('sites.house-checklists.templates.store')
-            ->middleware('permission:checklists.manage_templates');
-        Route::post('/house-checklists/{template}/start', [HouseChecklistController::class, 'startRun'])
-            ->name('sites.house-checklists.start')
-            ->middleware('permission:checklists.run');
-        Route::post('/house-checklists/runs/{run}/complete', [HouseChecklistController::class, 'completeRun'])
-            ->name('sites.house-checklists.runs.complete')
-            ->middleware('permission:checklists.run');
 
         // Vendors
         Route::get('/vendors', [SiteVendorController::class, 'index'])
@@ -477,6 +471,15 @@ Route::middleware(['auth', 'verified'])->group(function () {
         ->middleware('permission:checklists.run');
     Route::post('/checklists/runs/{run}/responses', [SiteChecklistController::class, 'saveResponse'])
         ->name('sites.checklists.response')
+        ->middleware('permission:checklists.run');
+    Route::patch('/checklists/runs/{run}/schedule', [SiteChecklistController::class, 'rescheduleRun'])
+        ->name('sites.checklists.rescheduleRun')
+        ->middleware('permission:checklists.schedule');
+    Route::patch('/checklists/runs/{run}/assign', [SiteChecklistController::class, 'reassignRun'])
+        ->name('sites.checklists.reassignRun')
+        ->middleware('permission:checklists.schedule');
+    Route::post('/checklists/runs/{run}/skip', [SiteChecklistController::class, 'skipRun'])
+        ->name('sites.checklists.skipRun')
         ->middleware('permission:checklists.run');
 
     // Calendar exceptions

@@ -7,6 +7,7 @@ use App\Models\SiteChecklistAssignment;
 use App\Models\SiteChecklistResponse;
 use App\Models\SiteChecklistRun;
 use App\Models\SiteChecklistTemplate;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -99,7 +100,7 @@ class ChecklistsDashboardData
         $activeRuns = SiteChecklistRun::query()
             ->whereIn('status', ['scheduled', 'in_progress'])
             ->when($siteId, fn ($q) => $q->where('site_id', $siteId))
-            ->with(['site:id,name,type', 'template:id,name,frequency', 'assignment.assignedTo:id,name'])
+            ->with(['site:id,name,type', 'template:id,name,frequency', 'assignedTo:id,name', 'assignment.assignedTo:id,name'])
             ->orderBy('scheduled_date')
             ->limit(200)
             ->get()
@@ -113,7 +114,8 @@ class ChecklistsDashboardData
                 'is_overdue' => $run->scheduled_date && $run->scheduled_date->lt($today),
                 'site' => $run->site ? ['id' => $run->site->id, 'name' => $run->site->name, 'type' => $run->site->type] : null,
                 'template' => $tplOut($run->template),
-                'assignee' => $run->assignment?->assignedTo?->name ?? 'Unassigned',
+                'assigned_to_id' => $run->assigned_to_user_id,
+                'assignee' => $run->assignedTo?->name ?? $run->assignment?->assignedTo?->name ?? 'Unassigned',
             ])->values();
 
         // ---- Recent completed runs (history) ---------------------------------
@@ -224,6 +226,7 @@ class ChecklistsDashboardData
             'activeRuns' => $activeRuns,
             'recentRuns' => $recentRuns,
             'assignments' => $assignments,
+            'assignableUsers' => $this->assignableUsers($user),
             'sitesOverview' => $sitesOverview,
             'reports' => $reports,
             'stats' => $stats,
@@ -236,6 +239,21 @@ class ChecklistsDashboardData
                 'run' => (bool) $user?->canDo('checklists.run'),
             ],
         ];
+    }
+
+    /**
+     * Org users selectable as a run assignee (the Schedule "Reassign" picker).
+     * Scoped to the viewer's organisation so we never leak cross-tenant staff.
+     */
+    private function assignableUsers(?User $user): array
+    {
+        return User::query()
+            ->when($user, fn ($q) => $q->where('organization_id', $user->organization_id))
+            ->orderBy('name')
+            ->limit(500)
+            ->get(['id', 'name'])
+            ->map(fn ($u) => ['id' => $u->id, 'name' => $u->name])
+            ->all();
     }
 
     /**
@@ -385,6 +403,7 @@ class ChecklistsDashboardData
                 'is_required' => (bool) $item->is_required,
                 'guidance' => $item->guidance,
                 'failure_creates_hazard' => (bool) $item->failure_creates_hazard,
+                'failure_creates_damage' => (bool) $item->failure_creates_damage,
             ])->all(),
             'responses' => $run->responses->map(fn ($r) => [
                 'template_item_id' => $r->template_item_id,
@@ -438,6 +457,7 @@ class ChecklistsDashboardData
                 'is_required' => (bool) $item->is_required,
                 'guidance' => $item->guidance,
                 'failure_creates_hazard' => (bool) $item->failure_creates_hazard,
+                'failure_creates_damage' => (bool) $item->failure_creates_damage,
                 'has_responses' => $item->responses()->exists(),
             ])->all(),
         ];

@@ -32,9 +32,20 @@ export function ReportsPane({ ctx, stats }: { ctx: PaneCtx; stats: HeroStats }) 
     const maxDone = Math.max(...r.trend.map((t) => t.done), 1);
     const completedWk = r.trend[r.trend.length - 1]?.done ?? 0;
     const hazardsRaised = r.topFailures.reduce((s, f) => s + f.hazards, 0);
+    const hasActivity =
+        r.trend.some((t) => t.done > 0 || t.overdue > 0) ||
+        r.topFailures.length > 0 ||
+        stats.overdue > 0 ||
+        stats.dueToday > 0;
 
     return (
         <div className="space-y-4">
+            {!hasActivity ? (
+                <div className="rounded-xl border border-dashed border-border bg-muted/30 px-5 py-4 text-sm text-muted-foreground">
+                    No completed or overdue runs yet — these reports fill in as checklists are run. Until then the
+                    figures below show the baseline (100% on-track, nothing outstanding).
+                </div>
+            ) : null}
             <div className="grid gap-4 lg:grid-cols-3">
                 <div className="rounded-xl border border-border bg-card shadow-sm lg:col-span-2">
                     <div className="border-b border-border px-5 py-3.5">
