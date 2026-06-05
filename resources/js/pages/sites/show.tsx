@@ -37,6 +37,7 @@ import {
     Activity,
     AlertCircle,
     AlertTriangle,
+    ArrowRight,
     Award,
     BedDouble,
     Building2,
@@ -108,8 +109,6 @@ import {
     EditLocationDialog,
     EditSafetyDialog,
 } from './_overview-dialogs';
-import { ChecklistsWorkspace } from '@/components/checklists/workspace';
-import type { ChecklistsData } from '@/components/checklists/types';
 import { ConfirmAction } from './_confirm-action';
 import SiteOverviewMapCard from './_overview-map-card';
 import { SiteReadinessPanel, type SiteReadiness } from './_readiness-panel';
@@ -366,6 +365,30 @@ type ClientsSummary = {
     safeguarding: number;
 };
 type ChecklistItem = { key: string; label: string; done: boolean };
+type SiteChecklistsSummaryStats = {
+    active_assignments: number;
+    scheduled: number;
+    in_progress: number;
+    overdue: number;
+    completed_30d: number;
+    on_track: number;
+};
+type SiteChecklistsSummaryRun = {
+    id: number;
+    template_name: string;
+    scheduled_date: string | null;
+    completed_at?: string | null;
+    status: string;
+    is_overdue?: boolean;
+};
+type SiteChecklistsSummary = {
+    stats: SiteChecklistsSummaryStats;
+    assignments: Array<{ id: number; template_name: string; frequency: string }>;
+    recentRuns: SiteChecklistsSummaryRun[];
+    dueSoon: SiteChecklistsSummaryRun[];
+    availableTemplates: Array<{ id: number; name: string; frequency: string; items_count: number }>;
+    can: { view: boolean; schedule: boolean; run: boolean };
+};
 type Occupancy = {
     label: string;
     noun: string;
@@ -602,7 +625,7 @@ type Props = {
     can_edit: boolean;
     can?: { createAsset?: boolean };
     fleet?: SiteFleetData;
-    checklistsData?: ChecklistsData;
+    checklistsSummary?: SiteChecklistsSummary;
     siteNotes?: Array<{
         id: number;
         body: string;
@@ -831,6 +854,175 @@ function MiniOccupancyStat({ label, value }: { label: string; value: number }) {
     );
 }
 
+function checklistDateLabel(value?: string | null): string {
+    if (!value) return 'No date';
+
+    return new Date(`${value}T00:00:00`).toLocaleDateString('en-NZ', {
+        day: 'numeric',
+        month: 'short',
+    });
+}
+
+function checklistStatusClass(status: string, overdue?: boolean): string {
+    if (overdue) return 'border-status-critical/30 bg-status-critical-bg text-status-critical';
+    if (status === 'completed') return 'border-status-success/30 bg-status-success-bg text-status-success';
+    if (status === 'in_progress') return 'border-status-warning/30 bg-status-warning-bg text-status-warning';
+    if (status === 'skipped') return 'border-border bg-muted text-muted-foreground';
+    return 'border-status-info/30 bg-status-info-bg text-status-info';
+}
+
+function SiteChecklistKpi({ label, value }: { label: string; value: string | number }) {
+    return (
+        <div className="rounded-md border border-border/70 bg-muted/20 px-3 py-2">
+            <p className="text-xs text-muted-foreground">{label}</p>
+            <p className="mt-1 text-lg font-semibold">{value}</p>
+        </div>
+    );
+}
+
+function SiteChecklistRunRow({
+    run,
+    siteId,
+}: {
+    run: SiteChecklistsSummaryRun;
+    siteId: number;
+}) {
+    return (
+        <Link
+            href={`/sites/${siteId}/checklists`}
+            className="flex min-h-12 items-center justify-between gap-3 rounded-md border border-border/60 px-3 py-2 transition-colors hover:bg-muted/40"
+        >
+            <div className="min-w-0">
+                <p className="truncate text-sm font-medium">{run.template_name}</p>
+                <p className="text-xs text-muted-foreground">{checklistDateLabel(run.scheduled_date)}</p>
+            </div>
+            <span
+                className={`shrink-0 rounded-full border px-2 py-0.5 text-xs font-medium ${checklistStatusClass(
+                    run.status,
+                    run.is_overdue,
+                )}`}
+            >
+                {run.is_overdue ? 'Overdue' : run.status.replace('_', ' ')}
+            </span>
+        </Link>
+    );
+}
+
+function SiteChecklistsSummaryCard({
+    summary,
+    siteId,
+}: {
+    summary?: SiteChecklistsSummary;
+    siteId: number;
+}) {
+    const fullHref = `/sites/${siteId}/checklists`;
+
+    if (!summary) {
+        return (
+            <Card>
+                <CardContent className="py-12 text-center text-sm text-muted-foreground">
+                    Loading…
+                </CardContent>
+            </Card>
+        );
+    }
+
+    if (!summary.can.view) {
+        return (
+            <Card>
+                <CardContent className="py-8 text-center text-sm text-muted-foreground">
+                    You do not have access to checklists for this site.
+                </CardContent>
+            </Card>
+        );
+    }
+
+    const empty =
+        summary.assignments.length === 0 &&
+        summary.dueSoon.length === 0 &&
+        summary.recentRuns.length === 0;
+
+    return (
+        <Card>
+            <CardHeader className="gap-3 sm:flex-row sm:items-center sm:justify-between">
+                <div>
+                    <CardTitle>Checklists</CardTitle>
+                    <p className="mt-1 text-sm text-muted-foreground">
+                        Assigned site checks and the next runs due.
+                    </p>
+                </div>
+                <Button asChild>
+                    <Link href={fullHref}>
+                        Open full checklists page
+                        <ArrowRight className="ml-2 h-4 w-4" />
+                    </Link>
+                </Button>
+            </CardHeader>
+            <CardContent className="space-y-5">
+                <div className="grid gap-2 sm:grid-cols-3 lg:grid-cols-6">
+                    <SiteChecklistKpi label="Active" value={summary.stats.active_assignments} />
+                    <SiteChecklistKpi label="Scheduled" value={summary.stats.scheduled} />
+                    <SiteChecklistKpi label="In progress" value={summary.stats.in_progress} />
+                    <SiteChecklistKpi label="Overdue" value={summary.stats.overdue} />
+                    <SiteChecklistKpi label="Completed 30d" value={summary.stats.completed_30d} />
+                    <SiteChecklistKpi label="On-track" value={`${summary.stats.on_track}%`} />
+                </div>
+
+                {empty ? (
+                    <div className="rounded-md border border-dashed border-border p-6 text-center">
+                        <ClipboardCheck className="mx-auto mb-2 h-8 w-8 text-muted-foreground" />
+                        <p className="font-medium">No checklists assigned yet</p>
+                        <p className="mt-1 text-sm text-muted-foreground">
+                            Open the full page to assign checklists for this site.
+                        </p>
+                        <Button asChild className="mt-4" variant="outline">
+                            <Link href={fullHref}>Open full checklists page</Link>
+                        </Button>
+                    </div>
+                ) : (
+                    <div className="grid gap-4 lg:grid-cols-2">
+                        <section className="space-y-2">
+                            <div className="flex items-center justify-between">
+                                <h4 className="text-sm font-semibold">Due / overdue</h4>
+                                <span className="text-xs text-muted-foreground">{summary.dueSoon.length} shown</span>
+                            </div>
+                            {summary.dueSoon.length ? (
+                                <div className="space-y-2">
+                                    {summary.dueSoon.map((run) => (
+                                        <SiteChecklistRunRow key={run.id} run={run} siteId={siteId} />
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="rounded-md border border-border/60 p-4 text-sm text-muted-foreground">
+                                    No checklist runs are due right now.
+                                </div>
+                            )}
+                        </section>
+
+                        <section className="space-y-2">
+                            <div className="flex items-center justify-between">
+                                <h4 className="text-sm font-semibold">Recent runs</h4>
+                                <span className="text-xs text-muted-foreground">{summary.recentRuns.length} shown</span>
+                            </div>
+                            {summary.recentRuns.length ? (
+                                <div className="space-y-2">
+                                    {summary.recentRuns.map((run) => (
+                                        <SiteChecklistRunRow key={run.id} run={run} siteId={siteId} />
+                                    ))}
+                                </div>
+                            ) : (
+                                <div className="rounded-md border border-border/60 p-4 text-sm text-muted-foreground">
+                                    No checklist runs have been recorded yet.
+                                </div>
+                            )}
+                        </section>
+                    </div>
+                )}
+            </CardContent>
+        </Card>
+    );
+}
+
 export default function SiteShow({
     site,
     clients,
@@ -858,7 +1050,7 @@ export default function SiteShow({
     can_edit,
     can: assetCan,
     fleet,
-    checklistsData,
+    checklistsSummary,
     siteNotes = [],
     geofences = [],
 }: Props) {
@@ -1873,24 +2065,9 @@ export default function SiteShow({
                         </Suspense>
                     </TabsContent>
 
-                    {/* Checklists Tab — embeds the shared ChecklistsWorkspace scoped to this site */}
+                    {/* Checklists Tab */}
                     <TabsContent value="checklists">
-                        {checklistsData ? (
-                            <ChecklistsWorkspace
-                                scope={{
-                                    mode: 'site',
-                                    site: { id: site.id, name: site.name, type: site.type },
-                                    backHref: `/sites/${site.id}`,
-                                }}
-                                data={checklistsData}
-                            />
-                        ) : (
-                            <Card>
-                                <CardContent className="py-12 text-center text-sm text-muted-foreground">
-                                    Loading…
-                                </CardContent>
-                            </Card>
-                        )}
+                        <SiteChecklistsSummaryCard summary={checklistsSummary} siteId={site.id} />
                     </TabsContent>
 
                     {/* Hazards Tab */}

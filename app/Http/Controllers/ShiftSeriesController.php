@@ -17,6 +17,7 @@ use App\Services\ShiftCoverageService;
 use App\Services\ShiftReplacementService;
 use App\Services\ShiftStateGuardService;
 use App\Services\ShiftTimelineService;
+use App\Services\Sites\SiteChecklistScheduler;
 use App\Support\ShiftTaskSupport;
 use Carbon\Carbon;
 use Carbon\CarbonImmutable;
@@ -492,6 +493,8 @@ class ShiftSeriesController extends Controller
                         'coverage_roles' => $data['coverage_roles'] ?? null,
                         'created_by' => $auth->id,
                     ]);
+
+                    app(SiteChecklistScheduler::class)->ensureRunsForShiftLocalDay($shift);
 
                     foreach ($tasks as $t) {
                         ShiftTask::create([

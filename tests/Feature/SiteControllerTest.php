@@ -6,9 +6,13 @@ use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Models\Asset;
 use App\Models\Role;
 use App\Models\Site;
+use App\Models\SiteChecklistAssignment;
+use App\Models\SiteChecklistRun;
+use App\Models\SiteChecklistTemplate;
 use App\Models\SiteDocument;
 use App\Models\SiteDocumentFolder;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Http\UploadedFile;
 use Illuminate\Support\Facades\Storage;
@@ -28,7 +32,7 @@ class SiteControllerTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
@@ -346,6 +350,47 @@ class SiteControllerTest extends TestCase
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->has('checklist', 12)
+            );
+    }
+
+    public function test_site_show_uses_compact_checklists_summary_not_full_workspace_payload(): void
+    {
+        $site = Site::factory()->create(['type' => 'house']);
+        $template = SiteChecklistTemplate::create([
+            'tenant_id' => $site->tenant_id,
+            'key' => 'profile_summary_'.uniqid(),
+            'name' => 'Profile Summary Checklist',
+            'applicable_to_type' => 'house',
+            'frequency' => 'daily',
+            'is_active' => true,
+        ]);
+        $assignment = SiteChecklistAssignment::create([
+            'tenant_id' => $site->tenant_id,
+            'site_id' => $site->id,
+            'template_id' => $template->id,
+            'frequency' => 'daily',
+            'start_date' => now()->subDay()->toDateString(),
+            'is_active' => true,
+        ]);
+        SiteChecklistRun::create([
+            'tenant_id' => $site->tenant_id,
+            'assignment_id' => $assignment->id,
+            'site_id' => $site->id,
+            'template_id' => $template->id,
+            'scheduled_date' => now()->toDateString(),
+            'status' => 'scheduled',
+        ]);
+
+        $this->actingAs($this->admin)
+            ->get("/sites/{$site->id}")
+            ->assertOk()
+            ->assertInertia(fn ($page) => $page
+                ->has('checklistsSummary.stats')
+                ->has('checklistsSummary.dueSoon', 1)
+                ->where('checklistsSummary.dueSoon.0.template_name', 'Profile Summary Checklist')
+                ->missing('checklistsData')
+                ->missing('runDetail')
+                ->missing('templateDetail')
             );
     }
 

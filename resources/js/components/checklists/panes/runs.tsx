@@ -12,6 +12,7 @@ const STATUS_OPTIONS = [
     { value: 'scheduled', label: 'Scheduled' },
     { value: 'in_progress', label: 'In progress' },
     { value: 'completed', label: 'Completed' },
+    { value: 'skipped', label: 'Skipped' },
 ];
 
 export function RunsPane({ ctx }: { ctx: PaneCtx }) {
@@ -20,7 +21,11 @@ export function RunsPane({ ctx }: { ctx: PaneCtx }) {
     const q = ctx.query.toLowerCase();
     const today = ctx.today;
 
-    const all: ChecklistRun[] = [...ctx.runs, ...ctx.history];
+    const all: ChecklistRun[] = [
+        ...ctx.runs,
+        ...ctx.history,
+        ...ctx.skippedRuns,
+    ];
     const filtered = all.filter((r) => {
         const meta = runStatusMeta(r, today);
         const matchQ =
@@ -32,6 +37,7 @@ export function RunsPane({ ctx }: { ctx: PaneCtx }) {
             status === 'all' ||
             (status === 'overdue' && meta.label === 'Overdue') ||
             (status === 'completed' && r.status === 'completed') ||
+            (status === 'skipped' && r.status === 'skipped') ||
             (status === 'scheduled' && meta.label === 'Scheduled') ||
             (status === 'in_progress' && meta.label === 'In progress');
         return matchQ && matchCat && matchS;
@@ -43,11 +49,17 @@ export function RunsPane({ ctx }: { ctx: PaneCtx }) {
                 <div>
                     <h3 className="text-base font-semibold">All runs</h3>
                     <p className="text-sm text-muted-foreground">
-                        {filtered.length} runs · scheduled, in-progress, overdue &amp; completed
+                        {filtered.length} runs · scheduled, in-progress,
+                        overdue, completed &amp; skipped
                     </p>
                 </div>
                 <div className="flex flex-wrap items-center gap-2">
-                    <Dropdown value={status} onChange={setStatus} options={STATUS_OPTIONS} className="w-40" />
+                    <Dropdown
+                        value={status}
+                        onChange={setStatus}
+                        options={STATUS_OPTIONS}
+                        className="w-40"
+                    />
                     <ViewToggle value={view} onChange={setView} />
                 </div>
             </div>

@@ -2,6 +2,7 @@
 
 namespace App\Services\Sites;
 
+use App\Models\Shift;
 use App\Models\SiteChecklistAssignment;
 use App\Models\SiteChecklistRun;
 use Carbon\Carbon;
@@ -9,6 +10,53 @@ use Illuminate\Support\Facades\DB;
 
 class SiteChecklistScheduler
 {
+    public function ensureRunsForShiftLocalDay(Shift $shift): int
+    {
+        if (! $shift->site_id || ! $shift->starts_at) {
+            return 0;
+        }
+
+        $timezone = (string) config('app.worker_timezone', 'Pacific/Auckland');
+        $scheduledDate = $shift->starts_at->copy()->timezone($timezone)->startOfDay();
+        $dateString = $scheduledDate->toDateString();
+        $created = 0;
+
+        SiteChecklistAssignment::query()
+            ->where('site_id', $shift->site_id)
+            ->where('is_active', true)
+            ->where('start_date', '<=', $dateString)
+            ->where(function ($query) use ($dateString) {
+                $query->whereNull('end_date')
+                    ->orWhere('end_date', '>=', $dateString);
+            })
+            ->get()
+            ->each(function (SiteChecklistAssignment $assignment) use ($shift, $scheduledDate, $dateString, &$created): void {
+                if (! $this->isDueOnDate($assignment, $scheduledDate)) {
+                    return;
+                }
+
+                $run = SiteChecklistRun::firstOrCreate(
+                    [
+                        'assignment_id' => $assignment->id,
+                        'scheduled_date' => $dateString,
+                    ],
+                    [
+                        'site_id' => $assignment->site_id,
+                        'tenant_id' => $assignment->tenant_id,
+                        'template_id' => $assignment->template_id,
+                        'assigned_to_user_id' => $shift->user_id ?: $assignment->assigned_to_user_id,
+                        'status' => 'scheduled',
+                    ],
+                );
+
+                if ($run->wasRecentlyCreated) {
+                    $created++;
+                }
+            });
+
+        return $created;
+    }
+
     /**
      * Generate upcoming runs for all active assignments
      */
@@ -19,9 +67,9 @@ class SiteChecklistScheduler
 
         SiteChecklistAssignment::with(['template', 'site'])
             ->where('is_active', true)
-            ->where(function ($q) use ($endDate) {
+            ->where(function ($q) {
                 $q->whereNull('end_date')
-                  ->orWhere('end_date', '>=', now());
+                    ->orWhere('end_date', '>=', now());
             })
             ->chunk(100, function ($assignments) use ($endDate, &$count) {
                 DB::transaction(function () use ($assignments, $endDate, &$count) {
@@ -50,13 +98,13 @@ class SiteChecklistScheduler
         // Get already scheduled dates
         $scheduledDates = SiteChecklistRun::where('assignment_id', $assignment->id)
             ->pluck('scheduled_date')
-            ->map(fn($d) => $d->format('Y-m-d'))
+            ->map(fn ($d) => $d->format('Y-m-d'))
             ->toArray();
 
         $currentDate = Carbon::parse($startDate);
 
         while ($currentDate <= $endDate) {
-            if (!in_array($currentDate->format('Y-m-d'), $scheduledDates)) {
+            if (! in_array($currentDate->format('Y-m-d'), $scheduledDates)) {
                 SiteChecklistRun::create([
                     'assignment_id' => $assignment->id,
                     'site_id' => $assignment->site_id,
@@ -65,6 +113,7 @@ class SiteChecklistScheduler
                     'scheduled_date' => $currentDate->copy(),
                     'status' => 'scheduled',
                 ]);
+
                 return 1;
             }
 
@@ -88,6 +137,35 @@ class SiteChecklistScheduler
             'quarterly' => $date->copy()->addMonths(3),
             default => $date->copy()->addMonth(),
         };
+    }
+
+    private function isDueOnDate(SiteChecklistAssignment $assignment, Carbon $date): bool
+    {
+        $startDate = Carbon::parse($assignment->start_date)->startOfDay();
+        $targetDate = $date->copy()->startOfDay();
+
+        if ($targetDate->lt($startDate)) {
+            return false;
+        }
+
+        if ($assignment->end_date && $targetDate->gt(Carbon::parse($assignment->end_date)->startOfDay())) {
+            return false;
+        }
+
+        if ($assignment->frequency === 'custom') {
+            return false;
+        }
+
+        if ($assignment->frequency === 'once') {
+            return $targetDate->isSameDay($startDate);
+        }
+
+        $currentDate = $startDate->copy();
+        while ($currentDate->lt($targetDate)) {
+            $currentDate = $this->advanceDate($currentDate, $assignment->frequency);
+        }
+
+        return $currentDate->isSameDay($targetDate);
     }
 
     /**

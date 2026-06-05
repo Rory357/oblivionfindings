@@ -214,6 +214,7 @@ export interface ChecklistsData {
     templates: ChecklistTemplate[];
     activeRuns: ChecklistRun[];
     recentRuns: ChecklistRun[];
+    skippedRuns: ChecklistRun[];
     assignments: ChecklistAssignment[];
     assignableUsers: AssignableUser[];
     sitesOverview: SiteOverview[];

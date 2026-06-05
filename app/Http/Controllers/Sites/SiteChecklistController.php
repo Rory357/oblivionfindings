@@ -5,9 +5,8 @@ namespace App\Http\Controllers\Sites;
 use App\Http\Controllers\Controller;
 use App\Models\Site;
 use App\Models\SiteChecklistAssignment;
-use App\Models\SiteChecklistRun;
 use App\Models\SiteChecklistResponse;
-use App\Models\SiteChecklistTemplate;
+use App\Models\SiteChecklistRun;
 use App\Models\SiteChecklistTemplateItem;
 use App\Models\SiteDamage;
 use App\Models\SiteHazard;
@@ -35,87 +34,6 @@ class SiteChecklistController extends Controller
                 'recommendedChecklists' => SiteRecommendedChecklists::forType($site->type),
             ],
         ));
-    }
-
-    public function runs(Request $request, Site $site)
-    {
-        $this->authorize('view', $site);
-
-        $runs = SiteChecklistRun::where('site_id', $site->id)
-            ->with(['template', 'completedBy:id,name'])
-            ->when($request->status, fn($q) => $q->where('status', $request->status))
-            ->orderByDesc('scheduled_date')
-            ->paginate(20);
-
-        return inertia('sites/checklists/runs', [
-            'site' => [
-                'id' => $site->id,
-                'name' => $site->name,
-            ],
-            'runs' => $runs,
-            'filters' => $request->only(['status']),
-        ]);
-    }
-
-    public function showRun(SiteChecklistRun $run)
-    {
-        $this->authorize('view', $run->site);
-
-        $run->load([
-            'site:id,name,type',
-            'template.items',
-            'responses.templateItem',
-            'completedBy:id,name',
-        ]);
-
-        return inertia('sites/checklists/runs/[id]', [
-            'site' => [
-                'id' => $run->site->id,
-                'name' => $run->site->name,
-            ],
-            'template' => [
-                'id' => $run->template->id,
-                'name' => $run->template->name,
-            ],
-            'run' => [
-                'id' => $run->id,
-                'scheduled_date' => $run->scheduled_date?->toDateString(),
-                'status' => $run->status,
-                'completion_percentage' => (float) $run->completion_percentage,
-            ],
-            'items' => $run->template->items
-                ->sortBy('sort_order')
-                ->values()
-                ->map(fn ($item) => [
-                    'id' => $item->id,
-                    'question' => $item->question,
-                    'response_type' => $item->response_type,
-                    'response_config' => $item->response_config,
-                    'is_required' => $item->is_required,
-                    'guidance' => $item->guidance,
-                    'failure_creates_hazard' => (bool) $item->failure_creates_hazard,
-                ]),
-            'responses' => $run->responses->map(fn ($response) => [
-                'id' => $response->id,
-                'template_item_id' => $response->template_item_id,
-                'response_value' => $response->response_value,
-                'notes' => $response->notes,
-                'photo_path' => $response->photo_path,
-                'is_failed' => (bool) $response->is_failed,
-            ]),
-        ]);
-    }
-
-    public function startRun(Request $request, SiteChecklistRun $run)
-    {
-        $this->authorize('update', $run->site);
-
-        $run->update([
-            'status' => 'in_progress',
-            'started_at' => $run->started_at ?? now(),
-        ]);
-
-        return redirect()->route('sites.checklists.showRun', $run->id);
     }
 
     public function saveResponse(Request $request, SiteChecklistRun $run)
@@ -239,6 +157,20 @@ class SiteChecklistController extends Controller
         return redirect()->back()->with('success', 'Checklist run skipped.');
     }
 
+    /**
+     * Restore a skipped run back into the scheduled worklist.
+     */
+    public function restoreRun(Request $request, SiteChecklistRun $run)
+    {
+        $this->authorize('update', $run->site);
+
+        if ($run->status === 'skipped') {
+            $run->update(['status' => 'scheduled']);
+        }
+
+        return redirect()->back()->with('success', 'Checklist run restored.');
+    }
+
     private function extendChecklistExecutionWindow(): void
     {
         $currentLimit = (int) ini_get('max_execution_time');
@@ -270,7 +202,7 @@ class SiteChecklistController extends Controller
         $rows = [];
         foreach ($responses as $r) {
             $itemId = (int) ($r['template_item_id'] ?? 0);
-            if (!isset($validIdSet[$itemId])) {
+            if (! isset($validIdSet[$itemId])) {
                 continue;
             }
             $rows[] = [
@@ -431,7 +363,7 @@ class SiteChecklistController extends Controller
             }
 
             return redirect()
-                ->route('sites.checklists.showRun', $existing->id)
+                ->to("/sites/{$site->id}/checklists?run={$existing->id}")
                 ->with('success', 'Resumed in-progress checklist run.');
         }
 
@@ -446,7 +378,7 @@ class SiteChecklistController extends Controller
         ]);
 
         return redirect()
-            ->route('sites.checklists.showRun', $run->id)
+            ->to("/sites/{$site->id}/checklists?run={$run->id}")
             ->with('success', 'New checklist run started.');
     }
 }
