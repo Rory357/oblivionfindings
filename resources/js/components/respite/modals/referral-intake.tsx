@@ -13,11 +13,10 @@ import { cn } from '@/lib/utils';
 import { useForm } from '@inertiajs/react';
 import { ArrowLeft, ArrowRight, Check, Inbox, X, Zap } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
-import type { ClientOption, RespiteHome } from '../types';
+import type { ClientOption, FundingOption, RespiteHome } from '../types';
 
 const STEPS = ['Client', 'Referrer', 'Respite need', 'Funding & review'];
 const REFERRER_TYPES = ['DHB', 'NGO', 'GP', 'NASC', 'Family'];
-const FUNDING_SOURCES = ['Whaikaha', 'NASC-allocated', 'ACC', 'Te Whatu Ora', 'Private', 'Other'];
 
 interface IntakeForm {
     mode: 'new' | 'existing';
@@ -62,11 +61,13 @@ export function ReferralIntakeModal({
     onClose,
     clients,
     homes,
+    fundingSources,
 }: {
     open: boolean;
     onClose: () => void;
     clients: ClientOption[];
     homes: RespiteHome[];
+    fundingSources: FundingOption[];
 }) {
     const form = useForm<IntakeForm>({ ...BLANK });
     const { data, setData, processing, errors } = form;
@@ -101,9 +102,10 @@ export function ReferralIntakeModal({
                 referral_reason: d.referral_reason,
                 urgency: d.urgency,
                 risk_level: d.urgency === 'crisis' ? 'high' : d.urgency === 'urgent' ? 'medium' : null,
+                funding_source: d.funding_source || null,
+                funding_reference: d.funding_ref || null,
             };
             if (d.mode === 'existing') {
-                if (d.funding_source) triage.push(`Funding: ${d.funding_source}${d.funding_ref ? `-${d.funding_ref}` : ''}`);
                 return { ...base, client_id: d.client_id, triage_notes: triage.join('\n') || null };
             }
             return {
@@ -114,8 +116,6 @@ export function ReferralIntakeModal({
                     date_of_birth: d.date_of_birth || null,
                     nhi_number: d.nhi_number || null,
                     site_id: d.site_id || null,
-                    funding_type: d.funding_source || null,
-                    funding_notes: d.funding_ref || null,
                 },
                 triage_notes: triage.join('\n') || null,
             };
@@ -152,7 +152,7 @@ export function ReferralIntakeModal({
                     {step === 0 && <ClientStep data={data} setData={setData} clients={clients} homes={homes} err={errors} />}
                     {step === 1 && <ReferrerStep data={data} setData={setData} err={errors} />}
                     {step === 2 && <NeedStep data={data} setData={setData} err={errors} />}
-                    {step === 3 && <ReviewStep data={data} setData={setData} />}
+                    {step === 3 && <ReviewStep data={data} setData={setData} fundingSources={fundingSources} />}
                 </div>
 
                 <div className="flex items-center justify-between gap-3 border-t border-border bg-muted/40 p-4">
@@ -421,7 +421,7 @@ function NeedStep({ data, setData, err }: { data: IntakeForm; setData: SetData; 
     );
 }
 
-function ReviewStep({ data, setData }: { data: IntakeForm; setData: SetData }) {
+function ReviewStep({ data, setData, fundingSources }: { data: IntakeForm; setData: SetData; fundingSources: FundingOption[] }) {
     const rows: [string, string][] = [
         ['Client', data.mode === 'existing' ? (data.client_id ? 'Existing client' : '—') : `${data.first_name} ${data.last_name}`.trim() || '—'],
         ['Referrer', `${data.referrer_name || '—'} · ${data.referrer_type}`],
@@ -435,7 +435,7 @@ function ReviewStep({ data, setData }: { data: IntakeForm; setData: SetData }) {
                     <Segmented
                         value={data.funding_source}
                         onChange={(v) => setData('funding_source', v)}
-                        options={FUNDING_SOURCES.map((f) => ({ value: f, label: f }))}
+                        options={fundingSources}
                     />
                 </Field>
                 <Field label="Funding reference" hint="optional">

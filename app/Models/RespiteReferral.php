@@ -18,6 +18,8 @@ class RespiteReferral extends Model
         'referrer_name',
         'referrer_contact',
         'referral_reason',
+        'funding_source',
+        'funding_reference',
         'urgency',
         'status',
         'received_at',

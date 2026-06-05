@@ -11,6 +11,7 @@ use App\Models\RespiteStay;
 use App\Models\RespiteTask;
 use App\Models\ServiceContext;
 use App\Models\Site;
+use App\Support\Respite\RespiteFundingSource;
 use Illuminate\Support\Carbon;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -99,6 +100,7 @@ class RespiteWorkspaceController extends Controller
                 ->orderBy('last_name')->orderBy('first_name')
                 ->get(['id', 'first_name', 'last_name']),
             'serviceContexts' => ServiceContext::query()->orderBy('name')->get(['id', 'name']),
+            'fundingSources' => RespiteFundingSource::options(),
         ]);
     }
 
@@ -178,6 +180,7 @@ class RespiteWorkspaceController extends Controller
             'received' => optional($r->received_at)->toIso8601String(),
             'reason' => $r->referral_reason,
             'riskLevel' => $r->risk_level,
+            'funding' => RespiteFundingSource::label($r->funding_source),
             'site' => $client?->site?->name,
             'triageNotes' => $r->triage_notes,
         ];

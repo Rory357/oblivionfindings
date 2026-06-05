@@ -202,6 +202,7 @@ export function RespiteWorkspace({ data, can }: { data: RespiteWorkspaceData; ca
                 onClose={() => setIntakeOpen(false)}
                 clients={data.clients}
                 homes={data.homes}
+                fundingSources={data.fundingSources}
             />
             <OnboardModal request={onboardReq} onClose={() => setOnboardReq(null)} />
             {reasonAction ? (

@@ -25,6 +25,7 @@ export interface RespiteReferralRow {
     received: string | null;
     reason: string | null;
     riskLevel: string | null;
+    funding: string | null;
     site: string | null;
     triageNotes: string | null;
 }
@@ -122,6 +123,12 @@ export interface RespiteWorkspaceData {
     stats: RespiteStats;
     clients: ClientOption[];
     serviceContexts: { id: number; name: string }[];
+    fundingSources: FundingOption[];
+}
+
+export interface FundingOption {
+    value: string;
+    label: string;
 }
 
 export interface RespiteCan {

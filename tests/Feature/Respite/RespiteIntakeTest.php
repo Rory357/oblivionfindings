@@ -21,19 +21,20 @@ test('intake creates a lightweight client and a referral from new_client fields'
                 'first_name' => 'Aroha',
                 'last_name' => 'Ngata',
                 'nhi_number' => 'ABC1234',
-                'funding_type' => 'Whaikaha',
             ],
             'referrer_name' => 'Te Whatu Ora — Waitematā',
             'referrer_type' => 'DHB',
             'referral_reason' => 'Carer hospitalised — emergency cover needed within 24h',
             'urgency' => 'crisis',
             'risk_level' => 'high',
+            'funding_source' => 'whaikaha',
+            'funding_reference' => 'WK-44213',
         ])
         ->assertRedirect();
 
     $client = Client::where('first_name', 'Aroha')->where('last_name', 'Ngata')->first();
     expect($client)->not->toBeNull();
-    expect($client->funding_type)->toBe('Whaikaha');
+    expect($client->funding_type)->toBe('Whaikaha'); // label derived from the typed source
     expect($client->status)->toBe('active');
 
     $referral = RespiteReferral::where('client_id', $client->id)->first();
@@ -41,6 +42,20 @@ test('intake creates a lightweight client and a referral from new_client fields'
     expect($referral->status)->toBe('received');
     expect($referral->urgency)->toBe('crisis');
     expect($referral->risk_level)->toBe('high');
+    expect($referral->funding_source)->toBe('whaikaha');
+    expect($referral->funding_reference)->toBe('WK-44213');
+});
+
+test('intake rejects a funding source outside the NZ list', function () {
+    $this->actingAs($this->admin)
+        ->post('/respite/referrals', [
+            'new_client' => ['first_name' => 'Test'],
+            'referrer_name' => 'GP',
+            'referral_reason' => 'Respite',
+            'urgency' => 'planned',
+            'funding_source' => 'ndis', // Australian — not in the NZ list
+        ])
+        ->assertSessionHasErrors('funding_source');
 });
 
 test('intake links an existing client without creating a duplicate', function () {

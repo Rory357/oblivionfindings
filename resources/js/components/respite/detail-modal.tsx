@@ -45,6 +45,7 @@ function buildRows(detail: RespiteDetail): Row[] {
             ['Contact', r.contact ?? '—'],
             ['Reason', r.reason ?? '—'],
             ['Risk level', r.riskLevel ?? '—'],
+            ['Funding', r.funding ?? '—'],
             ['Preferred home', r.site ?? 'No preference'],
             ['Received', fmtDate(r.received)],
             ['Triage notes', r.triageNotes ?? '—'],

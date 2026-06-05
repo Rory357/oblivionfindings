@@ -133,6 +133,7 @@ function ReferralCard({
                     {r.reason ? <p className="mt-2 text-[13px] leading-snug">{r.reason}</p> : null}
                     <div className="mt-2 flex flex-wrap gap-x-4 gap-y-1 text-xs text-muted-foreground">
                         {r.referrer ? <span>{r.referrer}{r.referrerType ? ` · ${r.referrerType}` : ''}</span> : null}
+                        {r.funding ? <span>{r.funding}</span> : null}
                         {r.site ? <span>{r.site}</span> : null}
                     </div>
                 </div>

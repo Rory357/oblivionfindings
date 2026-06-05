@@ -6,8 +6,10 @@ use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\RespiteReferral;
 use App\Events\Respite\RespiteEvent;
+use App\Support\Respite\RespiteFundingSource;
 use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Validation\Rule;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -64,31 +66,38 @@ class RespiteReferralController extends Controller
             'new_client.date_of_birth' => 'nullable|date',
             'new_client.nhi_number' => 'nullable|string|max:20',
             'new_client.site_id' => 'nullable|exists:sites,id',
-            'new_client.funding_type' => 'nullable|string|max:255',
-            'new_client.funding_notes' => 'nullable|string',
             'referrer_type' => 'nullable|string|max:255',
             'referrer_name' => 'required|string|max:255',
             'referrer_contact' => 'nullable|string|max:255',
             'referral_reason' => 'required|string',
             'urgency' => 'required|in:planned,urgent,crisis',
+            'funding_source' => ['nullable', Rule::in(RespiteFundingSource::keys())],
+            'funding_reference' => 'nullable|string|max:255',
             'received_at' => 'nullable|date',
             'triage_notes' => 'nullable|string',
             'risk_level' => 'nullable|in:low,medium,high,critical',
         ]);
+
+        $fundingSource = $validated['funding_source'] ?? null;
+        $fundingReference = $validated['funding_reference'] ?? null;
 
         if (! empty($validated['client_id'])) {
             $client = Client::findOrFail($validated['client_id']);
             $this->authorize('view', $client);
         } else {
             $nc = $validated['new_client'] ?? [];
+            // NB: NHI duplicate-detection isn't done here — nhi_number is an
+            // encrypted column, so it can't be matched by a plaintext query.
+            // Proper dedup needs a deterministic nhi_hash column on clients
+            // (tracked in the NZ gap analysis).
             $client = Client::create([
                 'first_name' => $nc['first_name'],
                 'last_name' => $nc['last_name'] ?? '',
                 'date_of_birth' => $nc['date_of_birth'] ?? null,
                 'nhi_number' => $nc['nhi_number'] ?? null,
                 'site_id' => $nc['site_id'] ?? null,
-                'funding_type' => $nc['funding_type'] ?? null,
-                'funding_notes' => $nc['funding_notes'] ?? null,
+                'funding_type' => RespiteFundingSource::label($fundingSource),
+                'funding_notes' => $fundingReference,
                 'status' => 'active',
             ]);
         }
@@ -100,6 +109,8 @@ class RespiteReferralController extends Controller
             'referrer_contact' => $validated['referrer_contact'] ?? null,
             'referral_reason' => $validated['referral_reason'],
             'urgency' => $validated['urgency'],
+            'funding_source' => $fundingSource,
+            'funding_reference' => $fundingReference,
             'received_at' => $validated['received_at'] ?? now(),
             'triage_notes' => $validated['triage_notes'] ?? null,
             'risk_level' => $validated['risk_level'] ?? null,
