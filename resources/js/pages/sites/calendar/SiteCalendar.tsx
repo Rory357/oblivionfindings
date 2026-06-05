@@ -270,6 +270,14 @@ const DEFAULT_SOURCES: SourceDef[] = [
         origin: 'Emergency plans',
     },
     {
+        key: 'respite',
+        label: 'Respite booking',
+        short: 'Respite',
+        group: 'auto',
+        icon: 'BedDouble',
+        origin: 'Respite',
+    },
+    {
         key: 'external',
         label: 'External busy',
         short: 'External',

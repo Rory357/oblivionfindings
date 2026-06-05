@@ -54,8 +54,19 @@ class RespiteReferralController extends Controller
     public function store(Request $request): RedirectResponse
     {
         $validated = $request->validate([
-            'client_id' => 'required|exists:clients,id',
-            'referrer_type' => 'nullable|string',
+            // Either link an existing client...
+            'client_id' => 'nullable|exists:clients,id',
+            // ...or capture a new person (a lightweight shell the onboarding
+            // wizard completes later). first_name is the only hard requirement.
+            'new_client' => 'nullable|array',
+            'new_client.first_name' => 'required_without:client_id|string|max:255',
+            'new_client.last_name' => 'nullable|string|max:255',
+            'new_client.date_of_birth' => 'nullable|date',
+            'new_client.nhi_number' => 'nullable|string|max:20',
+            'new_client.site_id' => 'nullable|exists:sites,id',
+            'new_client.funding_type' => 'nullable|string|max:255',
+            'new_client.funding_notes' => 'nullable|string',
+            'referrer_type' => 'nullable|string|max:255',
             'referrer_name' => 'required|string|max:255',
             'referrer_contact' => 'nullable|string|max:255',
             'referral_reason' => 'required|string',
@@ -65,13 +76,35 @@ class RespiteReferralController extends Controller
             'risk_level' => 'nullable|in:low,medium,high,critical',
         ]);
 
-        $client = Client::findOrFail($validated['client_id']);
-        $this->authorize('view', $client);
+        if (! empty($validated['client_id'])) {
+            $client = Client::findOrFail($validated['client_id']);
+            $this->authorize('view', $client);
+        } else {
+            $nc = $validated['new_client'] ?? [];
+            $client = Client::create([
+                'first_name' => $nc['first_name'],
+                'last_name' => $nc['last_name'] ?? '',
+                'date_of_birth' => $nc['date_of_birth'] ?? null,
+                'nhi_number' => $nc['nhi_number'] ?? null,
+                'site_id' => $nc['site_id'] ?? null,
+                'funding_type' => $nc['funding_type'] ?? null,
+                'funding_notes' => $nc['funding_notes'] ?? null,
+                'status' => 'active',
+            ]);
+        }
 
-        $validated['received_at'] = $validated['received_at'] ?? now();
-        $validated['created_by'] = auth()->id();
-
-        $referral = RespiteReferral::create($validated);
+        $referral = RespiteReferral::create([
+            'client_id' => $client->id,
+            'referrer_type' => $validated['referrer_type'] ?? null,
+            'referrer_name' => $validated['referrer_name'],
+            'referrer_contact' => $validated['referrer_contact'] ?? null,
+            'referral_reason' => $validated['referral_reason'],
+            'urgency' => $validated['urgency'],
+            'received_at' => $validated['received_at'] ?? now(),
+            'triage_notes' => $validated['triage_notes'] ?? null,
+            'risk_level' => $validated['risk_level'] ?? null,
+            'created_by' => auth()->id(),
+        ]);
 
         event(new RespiteEvent('respite.referral.created', [
             'id' => $referral->id,
@@ -79,9 +112,7 @@ class RespiteReferralController extends Controller
             'status' => $referral->status,
         ]));
 
-        return redirect()
-            ->route('respite.referrals.show', $referral)
-            ->with('success', 'Respite referral created.');
+        return back()->with('success', 'Respite referral created.');
     }
 
     public function show(RespiteReferral $referral): Response

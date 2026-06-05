@@ -727,28 +727,14 @@ function buildSitesSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
 
     const groups: SubPanelGroup[] = [{ label: 'Sites & Locations', items }];
 
-    // Respite (moved from Operations — site-based stays)
+    // Respite is now a single tabbed workspace at /respite — Referrals, Booking
+    // Requests, Approved Bookings, Calendar, Stays (plus Tasks/records) are tabs,
+    // not separate pages. The startsWith match keeps it lit on every /respite/* sub-route.
     if (can?.respite?.viewAny) {
-        const respiteItems: NavItem[] = [
-            { title: 'Referrals', href: '/respite', icon: Users },
-            {
-                title: 'Booking Requests',
-                href: '/respite/requests',
-                icon: CalendarDays,
-            },
-            {
-                title: 'Approved Bookings',
-                href: '/respite/bookings',
-                icon: ClipboardCheck,
-            },
-            {
-                title: 'Calendar',
-                href: '/respite/calendar',
-                icon: CalendarDays,
-            },
-            { title: 'Stays', href: '/respite/stays', icon: Home },
-        ];
-        groups.push({ label: 'Respite', items: respiteItems });
+        groups.push({
+            label: 'Respite',
+            items: [{ title: 'Respite', href: '/respite', icon: Home }],
+        });
     }
 
     return groups;

@@ -536,6 +536,8 @@ class HandleInertiaRequests extends Middleware
                 'proceduresManage' => $user->canDo('respite.procedures.manage'),
                 'calendarView' => $user->canDo('respite.calendar.view'),
                 'evidenceView' => $user->canDo('respite.evidence.view'),
+                'tasksView' => $user->canDo('respite.tasks.view'),
+                'tasksManage' => $user->canDo('respite.tasks.manage'),
             ],
 
             'consents' => [

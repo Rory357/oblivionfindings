@@ -6,7 +6,7 @@ use App\Http\Controllers\Respite\RespiteBookingRequestController;
 use App\Http\Controllers\Respite\RespiteBookingController;
 use App\Http\Controllers\Respite\RespiteStayController;
 use App\Http\Controllers\Respite\RespiteResourceAllocationController;
-use App\Http\Controllers\Respite\RespiteCalendarController;
+use App\Http\Controllers\Respite\RespiteWorkspaceController;
 use App\Http\Controllers\Respite\RespiteProcedureTemplateController;
 use App\Http\Controllers\Respite\RespiteHandoverNoteController;
 use App\Http\Controllers\Respite\RespiteCommunicationLogController;
@@ -18,11 +18,17 @@ use App\Http\Controllers\Respite\RespiteRiskPlanActivationController;
 
 Route::middleware(['auth'])->group(function () {
     Route::middleware('permission:respite.viewAny')->group(function () {
-        Route::get('/respite', [RespiteReferralController::class, 'index'])->name('respite.index');
-        Route::get('/respite/calendar', [RespiteCalendarController::class, 'index'])
-            ->middleware('permission:respite.calendar.view')
-            ->name('respite.calendar');
+        // The single tabbed workspace (Overview / Referrals / Requests / Bookings / Calendar / Stays).
+        Route::get('/respite', [RespiteWorkspaceController::class, 'index'])->name('respite.index');
     });
+
+    // Legacy index routes now redirect into the workspace tabs so old links/bookmarks
+    // survive. GET-only (a closure, not Route::redirect which registers ANY) so they
+    // never shadow the POST store routes that share these URIs.
+    Route::get('/respite/calendar', fn () => redirect('/respite?tab=calendar'))->name('respite.calendar');
+    Route::get('/respite/requests', fn () => redirect('/respite?tab=requests'))->name('respite.requests.index');
+    Route::get('/respite/bookings', fn () => redirect('/respite?tab=bookings'))->name('respite.bookings.index');
+    Route::get('/respite/stays', fn () => redirect('/respite?tab=stays'))->name('respite.stays.index');
 
     // Referrals
     Route::middleware('permission:respite.create')->group(function () {
@@ -41,9 +47,7 @@ Route::middleware(['auth'])->group(function () {
         Route::get('/respite/requests/create', [RespiteBookingRequestController::class, 'create'])->name('respite.requests.create');
         Route::post('/respite/requests', [RespiteBookingRequestController::class, 'store'])->name('respite.requests.store');
     });
-    Route::get('/respite/requests', [RespiteBookingRequestController::class, 'index'])
-        ->middleware('permission:respite.viewAny')
-        ->name('respite.requests.index');
+    // index handled by the workspace; legacy /respite/requests redirects above.
     Route::get('/respite/requests/{request}', [RespiteBookingRequestController::class, 'show'])
         ->middleware('permission:respite.viewAny')
         ->name('respite.requests.show');
@@ -56,7 +60,7 @@ Route::middleware(['auth'])->group(function () {
 
     // Bookings
     Route::middleware('permission:respite.bookings.manage')->group(function () {
-        Route::get('/respite/bookings', [RespiteBookingController::class, 'index'])->name('respite.bookings.index');
+        // index handled by the workspace; legacy /respite/bookings redirects above.
         Route::get('/respite/bookings/create', [RespiteBookingController::class, 'create'])->name('respite.bookings.create');
         Route::post('/respite/bookings', [RespiteBookingController::class, 'store'])->name('respite.bookings.store');
         Route::post('/respite/bookings/{booking}/confirm', [RespiteBookingController::class, 'confirm'])->name('respite.bookings.confirm');
@@ -68,10 +72,7 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('permission:respite.update')
         ->name('respite.bookings.update');
 
-    // Stays
-    Route::get('/respite/stays', [RespiteStayController::class, 'index'])
-        ->middleware('permission:respite.viewAny')
-        ->name('respite.stays.index');
+    // Stays — index handled by the workspace; legacy /respite/stays redirects above.
     Route::middleware('permission:respite.stays.manage')->group(function () {
         Route::post('/respite/stays', [RespiteStayController::class, 'store'])->name('respite.stays.store');
         Route::post('/respite/stays/{stay}/check-in', [RespiteStayController::class, 'checkIn'])->name('respite.stays.checkin');

@@ -11,6 +11,7 @@ import {
 } from '@/lib/calendar/recur';
 import {
     AlertTriangle,
+    BedDouble,
     CalendarDays,
     CheckCircle2,
     CheckSquare,
@@ -75,6 +76,7 @@ const ICONS: Record<string, LucideIcon> = {
     Utensils,
     Hammer,
     Siren,
+    BedDouble,
     Repeat,
     MapPin,
     Plus,

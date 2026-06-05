@@ -20,6 +20,7 @@ class RespiteBooking extends Model
         'end_at',
         'status',
         'assigned_coordinator_id',
+        'location_id',
         'cancellation_reason',
         'approvals',
         'created_by',
@@ -45,6 +46,15 @@ class RespiteBooking extends Model
     public function coordinator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_coordinator_id');
+    }
+
+    /**
+     * The home/site this respite bed sits in. Often null today (approve() doesn't
+     * set it), so consumers fall back to the client's home site_id.
+     */
+    public function location(): BelongsTo
+    {
+        return $this->belongsTo(Site::class, 'location_id');
     }
 
     public function stays(): HasMany
