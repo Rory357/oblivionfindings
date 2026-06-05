@@ -323,9 +323,23 @@ The page reads `props.active_shift` (≈L149) and already has modal-state patter
 - `npx vite build --ssr resources/js/ssr.tsx`
 
 **Deploy / remote verification:**
-- Pending after merge to `main` and push: run
-  `php artisan db:seed --class=RbacSeeder --force` on the server.
-- Pending after webhook build: verify in Chrome on `https://oblivionfindings.com`.
+- `main` deployed to `https://oblivionfindings.com` at merge commit `2d1c0e41`.
+- Server RBAC reseed completed with
+  `php artisan db:seed --class=RbacSeeder --force`; Support Worker now has
+  `checklists.run,checklists.view` and not checklist management permissions.
+- Chrome/admin verification:
+  `/sites/9004?run=3` showed the profile Checklists tab with the compact embedded
+  header, no duplicated full-page hero, and allowed a smoke run to be completed while
+  staying on `/sites/9004`.
+- Chrome/admin verification:
+  `/checklists` and `/sites/9004/checklists` still showed the full checklist workspace
+  hero rather than the embedded "Open full checklists page" header.
+- Chrome/support-worker verification:
+  `/my-day` for a temporary worker on shift `9429` at Harbour Respite showed
+  "Checklists due this shift"; smoke run `4` opened in the inline modal, completed,
+  showed the completion toast, and dropped from the due card without leaving `/my-day`.
+- Temporary smoke records were cleaned up after verification:
+  worker, shift `9429`, template `47`, assignment `3`, and runs `3`/`4`.
 
 ---
 
