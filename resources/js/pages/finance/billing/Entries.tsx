@@ -67,7 +67,7 @@ export default function BillingEntriesPage({
     const rows = entries?.data ?? [];
 
     const updateFilters = (key: string, value: string | null) => {
-        router.get('/operations/billing/entries', {
+        router.get('/finance/billing/entries', {
             ...filters,
             [key]: value,
         }, {
@@ -82,7 +82,7 @@ export default function BillingEntriesPage({
             <PageHero variant="compact"
                 title="Billing Entries"
                 description="Review generated billing rows by client, service date, and status."
-                backHref="/operations/billing"
+                backHref="/finance/billing"
             />
             <PageShell>
                 <div className="grid gap-2 md:grid-cols-4">
@@ -196,7 +196,7 @@ export default function BillingEntriesPage({
                                         size="sm"
                                         variant="outline"
                                         onClick={() =>
-                                            router.get('/operations/billing', {
+                                            router.get('/finance/billing', {
                                                 status: entry.status,
                                             })
                                         }

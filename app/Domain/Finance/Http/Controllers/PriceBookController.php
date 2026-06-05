@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Operations;
+namespace App\Domain\Finance\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\PriceBook;
@@ -12,7 +12,7 @@ class PriceBookController extends Controller
     public function index(Request $request)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('price_books.viewAny'), 403);
+        abort_unless($auth && $auth->canDo('finance.ar.view'), 403);
 
         $data = $request->validate([
             'active' => ['nullable', 'boolean'],
@@ -26,7 +26,7 @@ class PriceBookController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        return inertia('operations/price-books/Index', [
+        return inertia('finance/price-books/Index', [
             'price_books' => $priceBooks,
             'filters' => $request->only(['active']),
         ]);
@@ -35,14 +35,14 @@ class PriceBookController extends Controller
     public function show(Request $request, $priceBook)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('price_books.view'), 403);
+        abort_unless($auth && $auth->canDo('finance.ar.view'), 403);
 
         $priceBook = PriceBook::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with(['items' => fn ($q) => $q->orderBy('name')])
             ->findOrFail($priceBook);
 
-        return inertia('operations/price-books/Show', [
+        return inertia('finance/price-books/Show', [
             'priceBook' => $priceBook,
         ]);
     }
@@ -50,15 +50,15 @@ class PriceBookController extends Controller
     public function create(Request $request)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('price_books.create'), 403);
+        abort_unless($auth && $auth->canDo('finance.ar.manage'), 403);
 
-        return inertia('operations/price-books/Create');
+        return inertia('finance/price-books/Create');
     }
 
     public function store(Request $request)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('price_books.create'), 403);
+        abort_unless($auth && $auth->canDo('finance.ar.manage'), 403);
 
         $data = $request->validate([
             'name' => ['required', 'string', 'max:255'],
@@ -83,14 +83,14 @@ class PriceBookController extends Controller
     public function edit(Request $request, $priceBook)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('price_books.edit'), 403);
+        abort_unless($auth && $auth->canDo('finance.ar.manage'), 403);
 
         $priceBook = PriceBook::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with(['items' => fn ($q) => $q->orderBy('name')])
             ->findOrFail($priceBook);
 
-        return inertia('operations/price-books/Edit', [
+        return inertia('finance/price-books/Edit', [
             'priceBook' => $priceBook,
         ]);
     }
@@ -98,7 +98,7 @@ class PriceBookController extends Controller
     public function update(Request $request, $priceBook)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('price_books.edit'), 403);
+        abort_unless($auth && $auth->canDo('finance.ar.manage'), 403);
 
         $priceBook = PriceBook::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -120,7 +120,7 @@ class PriceBookController extends Controller
     public function storeItem(Request $request, $priceBook)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('price_books.edit'), 403);
+        abort_unless($auth && $auth->canDo('finance.ar.manage'), 403);
 
         $priceBook = PriceBook::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -142,7 +142,7 @@ class PriceBookController extends Controller
     public function updateItem(Request $request, $priceBook, $item)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('price_books.edit'), 403);
+        abort_unless($auth && $auth->canDo('finance.ar.manage'), 403);
 
         PriceBook::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -166,7 +166,7 @@ class PriceBookController extends Controller
     public function destroyItem(Request $request, $priceBook, $item)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('price_books.edit'), 403);
+        abort_unless($auth && $auth->canDo('finance.ar.manage'), 403);
 
         PriceBook::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))

@@ -13,9 +13,13 @@ use App\Domain\Finance\Models\FinTaxRate;
 use App\Domain\Finance\Services\FinInvoiceJournalService;
 use App\Domain\Finance\Services\InvoicePdfService;
 use App\Http\Controllers\Controller;
+use App\Models\BillingEntry;
+use App\Models\Client;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Schema;
 use Illuminate\Support\Facades\Storage;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 
 class InvoiceController extends Controller
@@ -38,6 +42,19 @@ class InvoiceController extends Controller
                     ->orWhere('client_name', 'like', "%{$search}%")
                     ->orWhere('client_email', 'like', "%{$search}%");
             });
+        }
+
+        if ($request->filled('q')) {
+            $search = $request->input('q');
+            $query->where(function ($q) use ($search) {
+                $q->where('invoice_number', 'like', "%{$search}%")
+                    ->orWhere('client_name', 'like', "%{$search}%")
+                    ->orWhere('funding_body', 'like', "%{$search}%");
+            });
+        }
+
+        if ($request->filled('client_id')) {
+            $query->where('client_id', $request->integer('client_id'));
         }
 
         if ($request->filled('date_from')) {
@@ -87,10 +104,22 @@ class InvoiceController extends Controller
             ->limit(50)
             ->get(['id', 'bill_number', 'vendor_id', 'total_amount']);
 
+        $clients = $this->clientOptions($orgId);
+
+        $billingEntries = BillingEntry::query()
+            ->where('organization_id', $orgId)
+            ->whereIn('status', ['pending', 'approved'])
+            ->with(['client:id,first_name,last_name'])
+            ->orderByDesc('service_date')
+            ->limit(250)
+            ->get();
+
         return Inertia::render('finance/invoices/Create', [
             'accounts' => $accounts,
             'taxRates' => $taxRates,
             'bills' => $bills,
+            'clients' => $clients,
+            'billingEntries' => $billingEntries,
         ]);
     }
 
@@ -99,8 +128,39 @@ class InvoiceController extends Controller
         $validated = $request->validated();
 
         $orgId = $request->user()->organization_id;
+        $isOperationsPayload = $request->has('line_items')
+            || $request->has('items')
+            || $request->has('issue_date')
+            || $request->has('payment_terms');
+        $client = ! empty($validated['client_id'])
+            ? Client::query()
+                ->when(
+                    $orgId && Schema::hasColumn('clients', 'organization_id'),
+                    fn ($query) => $query->where('organization_id', $orgId),
+                )
+                ->findOrFail($validated['client_id'])
+            : null;
 
-        $invoice = DB::transaction(function () use ($validated, $orgId, $request) {
+        $billingEntryIds = collect($validated['lines'])
+            ->pluck('billing_entry_id')
+            ->filter()
+            ->unique()
+            ->values();
+
+        if ($billingEntryIds->isNotEmpty()) {
+            $scopedCount = BillingEntry::query()
+                ->where('organization_id', $orgId)
+                ->whereIn('id', $billingEntryIds)
+                ->count();
+
+            if ($scopedCount !== $billingEntryIds->count()) {
+                throw ValidationException::withMessages([
+                    'lines' => 'One or more billing entries are not available for this organisation.',
+                ]);
+            }
+        }
+
+        $invoice = DB::transaction(function () use ($validated, $orgId, $request, $client, $billingEntryIds, $isOperationsPayload) {
             // Auto-generate invoice number if not provided
             $invoiceNumber = $validated['invoice_number'] ?? $this->generateInvoiceNumber($orgId);
 
@@ -130,12 +190,15 @@ class InvoiceController extends Controller
                 $lineTotal = bcadd($lineSubtotal, $taxAmount, 2);
 
                 $lines[] = [
+                    'billing_entry_id' => $lineData['billing_entry_id'] ?? null,
                     'description' => $lineData['description'],
                     'quantity' => $qty,
                     'unit_price' => $price,
                     'tax_rate_id' => $taxRateId,
                     'tax_amount' => $taxAmount,
                     'line_total' => $lineTotal,
+                    'service_date' => $lineData['service_date'] ?? null,
+                    'category' => $lineData['category'] ?? null,
                     'sort_order' => $index,
                     'account_id' => $lineData['account_id'] ?? null,
                 ];
@@ -146,13 +209,16 @@ class InvoiceController extends Controller
 
             $invoice = FinInvoice::create([
                 'organization_id' => $orgId,
+                'client_id' => $client?->id,
                 'invoice_number' => $invoiceNumber,
                 'invoice_date' => $validated['invoice_date'],
                 'due_date' => $validated['due_date'],
-                'client_name' => $validated['client_name'],
-                'client_email' => $validated['client_email'] ?? null,
-                'client_address' => $validated['client_address'] ?? null,
+                'client_name' => $validated['client_name'] ?? $client?->full_name ?? $validated['funding_body'],
+                'client_email' => $validated['client_email'] ?? $client?->email,
+                'client_address' => $validated['client_address'] ?? $this->formatClientAddress($client),
+                'funding_body' => $validated['funding_body'] ?? null,
                 'bill_id' => $validated['bill_id'] ?? null,
+                'source' => $isOperationsPayload || $billingEntryIds->isNotEmpty() ? 'operations' : null,
                 'subtotal' => $subtotal,
                 'tax_amount' => $taxTotal,
                 'total_amount' => bcadd($subtotal, $taxTotal, 2),
@@ -167,6 +233,13 @@ class InvoiceController extends Controller
 
             foreach ($lines as $line) {
                 $invoice->lines()->create($line);
+            }
+
+            if ($billingEntryIds->isNotEmpty()) {
+                BillingEntry::query()
+                    ->where('organization_id', $orgId)
+                    ->whereIn('id', $billingEntryIds)
+                    ->update(['status' => 'invoiced']);
             }
 
             return $invoice;
@@ -422,5 +495,32 @@ class InvoiceController extends Controller
         }
 
         return 'INV-'.str_pad($next, 5, '0', STR_PAD_LEFT);
+    }
+
+    private function clientOptions(?int $orgId)
+    {
+        return Client::query()
+            ->when(
+                $orgId && Schema::hasColumn('clients', 'organization_id'),
+                fn ($query) => $query->where('organization_id', $orgId),
+            )
+            ->orderBy('first_name')
+            ->orderBy('last_name')
+            ->get(['id', 'first_name', 'last_name']);
+    }
+
+    private function formatClientAddress(?Client $client): ?string
+    {
+        if (! $client) {
+            return null;
+        }
+
+        return collect([
+            $client->address_line_1,
+            $client->address_line_2,
+            $client->suburb,
+            $client->city,
+            $client->postcode,
+        ])->filter()->implode(', ') ?: null;
     }
 }

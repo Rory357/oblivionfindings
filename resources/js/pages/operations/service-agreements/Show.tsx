@@ -1223,7 +1223,7 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
                                 <p className="mt-2 text-xs text-muted-foreground">View related invoices for this client.</p>
                                 <div className="mt-3">
                                     <Button asChild size="sm" variant="outline" className="h-7 text-xs">
-                                        <Link href={`/operations/invoices?client_id=${ag.client_id ?? ag.client?.id}`}>
+                                        <Link href={`/finance/invoices?client_id=${ag.client_id ?? ag.client?.id}`}>
                                             <ExternalLink className="mr-1 h-3 w-3" /> View Invoices
                                         </Link>
                                     </Button>

@@ -186,11 +186,11 @@ test('operations shift notes page loads', function () {
     });
 });
 
-test('operations billing page loads', function () {
+test('finance billing page loads', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
-            ->visit('/operations/billing')
+            ->visit('/finance/billing')
             ->waitForText('Billing', 10)
             ->assertSee('Billing');
     });
@@ -216,41 +216,41 @@ test('operations funding claims page loads', function () {
     });
 });
 
-test('operations invoices page loads', function () {
+test('finance invoices page loads', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
-            ->visit('/operations/invoices')
+            ->visit('/finance/invoices')
             ->waitForText('Invoice', 10)
             ->assertSee('Invoice');
     });
 });
 
-test('operations quotes page loads', function () {
+test('finance quotes page loads', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
-            ->visit('/operations/quotes')
+            ->visit('/finance/quotes')
             ->waitForText('Quote', 10)
             ->assertSee('Quote');
     });
 });
 
-test('operations price books page loads', function () {
+test('finance price books page loads', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
-            ->visit('/operations/price-books')
+            ->visit('/finance/price-books')
             ->waitForText('Price Book', 10)
             ->assertSee('Price Book');
     });
 });
 
-test('operations recurring charges page loads', function () {
+test('finance recurring charges page loads', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
-            ->visit('/operations/recurring-charges')
+            ->visit('/finance/recurring-charges')
             ->waitForText('Recurring', 10)
             ->assertSee('Recurring');
     });
@@ -406,13 +406,13 @@ test('operations activity page loads', function () {
     });
 });
 
-test('operations billing entries page loads', function () {
+test('finance billing entries page loads', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
-            ->visit('/operations/billing/entries')
+            ->visit('/finance/billing/entries')
             ->waitForText('Entr', 10)
-            ->assertPathIs('/operations/billing/entries');
+            ->assertPathIs('/finance/billing/entries');
     });
 });
 
@@ -456,13 +456,13 @@ test('operations geofences create page loads', function () {
     });
 });
 
-test('operations invoices create page loads', function () {
+test('finance invoices create page loads', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
-            ->visit('/operations/invoices/create')
+            ->visit('/finance/invoices/create')
             ->waitForText('Invoice', 10)
-            ->assertPathIs('/operations/invoices/create');
+            ->assertPathIs('/finance/invoices/create');
     });
 });
 
@@ -496,33 +496,33 @@ test('operations onboarding create page loads', function () {
     });
 });
 
-test('operations price books create page loads', function () {
+test('finance price books create page loads', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
-            ->visit('/operations/price-books/create')
+            ->visit('/finance/price-books/create')
             ->waitForText('Price Book', 10)
-            ->assertPathIs('/operations/price-books/create');
+            ->assertPathIs('/finance/price-books/create');
     });
 });
 
-test('operations quotes create page loads', function () {
+test('finance quotes create page loads', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
-            ->visit('/operations/quotes/create')
+            ->visit('/finance/quotes/create')
             ->waitForText('Quote', 10)
-            ->assertPathIs('/operations/quotes/create');
+            ->assertPathIs('/finance/quotes/create');
     });
 });
 
-test('operations recurring charges create page loads', function () {
+test('finance recurring charges create page loads', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
-            ->visit('/operations/recurring-charges/create')
+            ->visit('/finance/recurring-charges/create')
             ->waitForText('Recurring', 10)
-            ->assertPathIs('/operations/recurring-charges/create');
+            ->assertPathIs('/finance/recurring-charges/create');
     });
 });
 

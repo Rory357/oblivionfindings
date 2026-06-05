@@ -2,7 +2,7 @@
 
 Last updated: 2026-05-03
 
-This inventory covers `tests/Browser/Operations/OperationsTest.php`. The file is a broad admin route-smoke suite: each test logs in as `admin@test.com`, visits one operations URL, waits for a page-specific word, then asserts either that text or the final path. It is not being deleted in this workstream.
+This inventory covers `tests/Browser/Operations/OperationsTest.php`. The file is a broad admin route-smoke suite: each test logs in as `admin@test.com`, visits one Operations or moved Finance URL, waits for a page-specific word, then asserts either that text or the final path. It is not being deleted in this workstream.
 
 Canonical e2e coverage for new operations work is Playwright. Dusk rows marked "partial" still need either a focused Playwright spec or an explicitly named PHP feature/routing test before the Dusk row can be retired.
 
@@ -26,13 +26,13 @@ Canonical e2e coverage for new operations work is Playwright. Dusk rows marked "
 | operations rostering templates create page loads | `/operations/rostering/templates/create` | Waits/sees `Template` | Partial: template apply is covered by Playwright; template creation remains Dusk-only. |
 | operations progress notes page loads | `/operations/progress-notes` | Waits/sees `Progress Note` | Partial: no direct Playwright parity confirmed. |
 | operations shift notes page loads | `/operations/shift-notes` | Waits/sees `Shift Note` | Partial: shift-detail Notes tab is covered by `tests/e2e/operations-shifts-detail.spec.ts`; standalone shift-notes route smoke remains Dusk-only. |
-| operations billing page loads | `/operations/billing` | Waits/sees `Billing` | Partial: no direct Playwright parity confirmed. |
+| finance billing page loads | `/finance/billing` | Waits/sees `Billing` | Partial: no direct Playwright parity confirmed. |
 | operations funding page loads | `/operations/funding` | Waits/sees `Funding` | Partial: no direct Playwright parity confirmed. |
 | operations funding claims page loads | `/operations/funding/claims` | Waits/sees `Claim` | Partial: no direct Playwright parity confirmed. |
-| operations invoices page loads | `/operations/invoices` | Waits/sees `Invoice` | Partial: no direct Playwright parity confirmed. |
-| operations quotes page loads | `/operations/quotes` | Waits/sees `Quote` | Partial: no direct Playwright parity confirmed. |
-| operations price books page loads | `/operations/price-books` | Waits/sees `Price Book` | Partial: no direct Playwright parity confirmed. |
-| operations recurring charges page loads | `/operations/recurring-charges` | Waits/sees `Recurring` | Partial: no direct Playwright parity confirmed. |
+| finance invoices page loads | `/finance/invoices` | Waits/sees `Invoice` | Partial: no direct Playwright parity confirmed. |
+| finance quotes page loads | `/finance/quotes` | Waits/sees `Quote` | Partial: no direct Playwright parity confirmed. |
+| finance price books page loads | `/finance/price-books` | Waits/sees `Price Book` | Partial: no direct Playwright parity confirmed. |
+| finance recurring charges page loads | `/finance/recurring-charges` | Waits/sees `Recurring` | Partial: no direct Playwright parity confirmed. |
 | operations job board page loads | `/operations/job-board` | Waits/sees `Job` | Partial: `tests/e2e/job-board-readiness.spec.ts` covers job board readiness, but this exact route smoke is not a retirement signal by itself. |
 | operations messages page loads | `/operations/messages` | Waits/sees `Message` | Partial: no direct Playwright parity confirmed. |
 | operations notifications page loads | `/operations/notifications` | Waits/sees `Notification` | Partial: no direct Playwright parity confirmed. |
@@ -49,19 +49,19 @@ Canonical e2e coverage for new operations work is Playwright. Dusk rows marked "
 | operations payroll export page loads | `/operations/payroll-export` | Waits/sees `Payroll` | Partial: no direct Playwright parity confirmed. |
 | operations qualifications page loads | `/operations/qualifications` | Waits/sees `Qualification` | Partial: no direct Playwright parity confirmed. |
 | operations activity page loads | `/operations/activity` | Waits `Activit`, asserts path | Partial: no direct Playwright parity confirmed. |
-| operations billing entries page loads | `/operations/billing/entries` | Waits `Entr`, asserts path | Partial: no direct Playwright parity confirmed. |
+| finance billing entries page loads | `/finance/billing/entries` | Waits `Entr`, asserts path | Partial: no direct Playwright parity confirmed. |
 | operations calendar sync create page loads | `/operations/calendar-sync/create` | Waits `Calendar`, asserts path | Partial: no direct Playwright parity confirmed. |
 | operations client funds page loads | `/operations/client-funds` | Waits `Fund`, asserts path | Partial: no direct Playwright parity confirmed. |
 | operations client funds create page loads | `/operations/client-funds/create` | Waits `Fund`, asserts path | Partial: no direct Playwright parity confirmed. |
 | operations geofences create page loads | `/operations/geofences/create` | Waits `Geofence`, asserts path | Partial: no direct Playwright parity confirmed. |
-| operations invoices create page loads | `/operations/invoices/create` | Waits `Invoice`, asserts path | Partial: no direct Playwright parity confirmed. |
+| finance invoices create page loads | `/finance/invoices/create` | Waits `Invoice`, asserts path | Partial: no direct Playwright parity confirmed. |
 | operations mileage create page loads | `/operations/mileage/create` | Waits `Mileage`, asserts path | Partial: no direct Playwright parity confirmed. |
 | operations note templates create page loads | `/operations/note-templates/create` | Waits `Note Template`, asserts path | Partial: no direct Playwright parity confirmed. |
 | operations onboarding create page loads | `/operations/onboarding/create` | Waits `Onboarding`, asserts path | Partial: no direct Playwright parity confirmed. |
 | operations payroll export create page loads | `/operations/payroll-export/create` | Waits `Payroll`, asserts path | Partial: no direct Playwright parity confirmed. |
-| operations price books create page loads | `/operations/price-books/create` | Waits `Price Book`, asserts path | Partial: no direct Playwright parity confirmed. |
-| operations quotes create page loads | `/operations/quotes/create` | Waits `Quote`, asserts path | Partial: no direct Playwright parity confirmed. |
-| operations recurring charges create page loads | `/operations/recurring-charges/create` | Waits `Recurring`, asserts path | Partial: no direct Playwright parity confirmed. |
+| finance price books create page loads | `/finance/price-books/create` | Waits `Price Book`, asserts path | Partial: no direct Playwright parity confirmed. |
+| finance quotes create page loads | `/finance/quotes/create` | Waits `Quote`, asserts path | Partial: no direct Playwright parity confirmed. |
+| finance recurring charges create page loads | `/finance/recurring-charges/create` | Waits `Recurring`, asserts path | Partial: no direct Playwright parity confirmed. |
 | operations reports page loads | `/operations/reports` | Waits `Report`, asserts path | Covered by `tests/e2e/operations-reports.spec.ts` for reports navigation. |
 | operations rostering conflicts page loads | `/operations/rostering/conflicts` | Waits `Conflict`, asserts path | Covered by `tests/e2e/operations-rostering-conflicts.spec.ts`. |
 | operations timesheets approvals page loads | `/operations/timesheets/approvals` | Waits `Approval`, asserts path | Partial: approval behavior is backend-covered; manager approval route smoke remains Dusk-only. |

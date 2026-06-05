@@ -25,28 +25,7 @@ type PriceBookItem = {
     rate: number;
 };
 
-type ExistingLineItem = {
-    id: number;
-    description: string;
-    quantity: number;
-    unit: string;
-    unit_price: number;
-    amount: number;
-};
-
 type Props = {
-    quote: {
-        id: number;
-        title: string;
-        client_id: number | null;
-        client_name: string | null;
-        client_email: string | null;
-        client_phone: string | null;
-        valid_until: string | null;
-        notes: string | null;
-        terms: string | null;
-        line_items: ExistingLineItem[];
-    };
     clients: Array<{ id: number; first_name: string; last_name: string }>;
     price_book_items: PriceBookItem[];
 };
@@ -62,27 +41,20 @@ function formatCurrency(n: number): string {
     return new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD', minimumFractionDigits: 2 }).format(n);
 }
 
-export default function QuoteEdit({ quote, clients, price_book_items }: Props) {
-    const initialLineItems: LineItem[] = quote.line_items.map((li) => ({
-        description: li.description,
-        quantity: String(li.quantity),
-        unit: li.unit,
-        unit_price: String(li.unit_price),
-    }));
+export default function QuoteCreate({ clients, price_book_items }: Props) {
+    const [lineItems, setLineItems] = useState<LineItem[]>([
+        { description: '', quantity: '1', unit: 'hour', unit_price: '' },
+    ]);
 
-    const [lineItems, setLineItems] = useState<LineItem[]>(
-        initialLineItems.length > 0 ? initialLineItems : [{ description: '', quantity: '1', unit: 'hour', unit_price: '' }],
-    );
-
-    const { data, setData, put, processing, errors } = useForm({
-        client_id: quote.client_id != null ? String(quote.client_id) : '',
-        client_name: quote.client_name ?? '',
-        client_email: quote.client_email ?? '',
-        client_phone: quote.client_phone ?? '',
-        title: quote.title,
-        valid_until: quote.valid_until ?? '',
-        notes: quote.notes ?? '',
-        terms: quote.terms ?? '',
+    const { data, setData, post, processing, errors } = useForm({
+        client_id: '',
+        client_name: '',
+        client_email: '',
+        client_phone: '',
+        title: '',
+        valid_until: '',
+        notes: '',
+        terms: '',
         line_items: lineItems,
     });
 
@@ -128,13 +100,13 @@ export default function QuoteEdit({ quote, clients, price_book_items }: Props) {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        put(`/operations/quotes/${quote.id}`);
+        post('/finance/quotes');
     };
 
     return (
         <AppLayout>
-            <Head title={`Edit: ${quote.title}`} />
-            <PageHero variant="compact" title={`Edit: ${quote.title}`} backHref={`/operations/quotes/${quote.id}`} />
+            <Head title="Create Quote" />
+            <PageHero variant="compact" title="Create Quote" description="Create a new quote for a client or prospect." backHref="/finance/quotes" />
             <PageShell>
                 <form onSubmit={handleSubmit}>
                     {/* Client Details */}
@@ -211,6 +183,7 @@ export default function QuoteEdit({ quote, clients, price_book_items }: Props) {
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-2">
+                                {/* Header */}
                                 <div className="grid grid-cols-12 gap-2 text-[10px] font-medium uppercase tracking-wider text-muted-foreground">
                                     <div className="col-span-4">Description</div>
                                     <div className="col-span-2">Qty</div>
@@ -307,8 +280,8 @@ export default function QuoteEdit({ quote, clients, price_book_items }: Props) {
                     </Card>
 
                     <div className="mt-4 flex items-center justify-end gap-2">
-                        <Button type="button" variant="outline" onClick={() => router.get(`/operations/quotes/${quote.id}`)}>Cancel</Button>
-                        <Button type="submit" disabled={processing}>Save Changes</Button>
+                        <Button type="button" variant="outline" onClick={() => router.get('/finance/quotes')}>Cancel</Button>
+                        <Button type="submit" disabled={processing}>Create Quote</Button>
                     </div>
                 </form>
             </PageShell>

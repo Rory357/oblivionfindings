@@ -8,6 +8,7 @@ use App\Domain\Finance\Http\Controllers\BankFeedController;
 use App\Domain\Finance\Http\Controllers\BankReconciliationController;
 use App\Domain\Finance\Http\Controllers\BankTransactionController;
 use App\Domain\Finance\Http\Controllers\BillController;
+use App\Domain\Finance\Http\Controllers\BillingController;
 use App\Domain\Finance\Http\Controllers\BudgetActualsController;
 use App\Domain\Finance\Http\Controllers\BudgetForecastApiController;
 use App\Domain\Finance\Http\Controllers\CashFlowForecastController;
@@ -37,7 +38,10 @@ use App\Domain\Finance\Http\Controllers\PaymentAllocationController;
 use App\Domain\Finance\Http\Controllers\PaymentMatchController;
 use App\Domain\Finance\Http\Controllers\PaymentRunController;
 use App\Domain\Finance\Http\Controllers\PettyCashController;
+use App\Domain\Finance\Http\Controllers\PriceBookController;
 use App\Domain\Finance\Http\Controllers\PurchaseOrderController;
+use App\Domain\Finance\Http\Controllers\QuoteController;
+use App\Domain\Finance\Http\Controllers\RecurringChargeController;
 use App\Domain\Finance\Http\Controllers\SiteFinancialDashboardController;
 use App\Domain\Finance\Http\Controllers\SitesFinancialOverviewController;
 use App\Domain\Finance\Http\Controllers\VendorController;
@@ -275,6 +279,58 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     Route::post('/receivables/allocate', [AccountsReceivableController::class, 'allocate'])
         ->name('receivables.allocate')
         ->middleware('permission:finance.ar.manage');
+
+    // ── Billing ────────────────────────────────────────────────────────
+    Route::middleware('permission:finance.ar.view')->group(function () {
+        Route::get('/billing', [BillingController::class, 'index'])->name('billing.index');
+        Route::get('/billing/entries', [BillingController::class, 'entries'])->name('billing.entries');
+    });
+
+    // ── Price Books ────────────────────────────────────────────────────
+    Route::middleware('permission:finance.ar.manage')->group(function () {
+        Route::get('/price-books/create', [PriceBookController::class, 'create'])->name('price_books.create');
+        Route::post('/price-books', [PriceBookController::class, 'store'])->name('price_books.store');
+    });
+    Route::middleware('permission:finance.ar.view')->group(function () {
+        Route::get('/price-books', [PriceBookController::class, 'index'])->name('price_books.index');
+        Route::get('/price-books/{priceBook}', [PriceBookController::class, 'show'])->name('price_books.show');
+    });
+    Route::middleware('permission:finance.ar.manage')->group(function () {
+        Route::get('/price-books/{priceBook}/edit', [PriceBookController::class, 'edit'])->name('price_books.edit');
+        Route::put('/price-books/{priceBook}', [PriceBookController::class, 'update'])->name('price_books.update');
+        Route::post('/price-books/{priceBook}/items', [PriceBookController::class, 'storeItem'])->name('price_books.items.store');
+        Route::put('/price-books/{priceBook}/items/{item}', [PriceBookController::class, 'updateItem'])->name('price_books.items.update');
+        Route::delete('/price-books/{priceBook}/items/{item}', [PriceBookController::class, 'destroyItem'])->name('price_books.items.destroy');
+    });
+
+    // ── Quotes ─────────────────────────────────────────────────────────
+    Route::middleware('permission:finance.ar.manage')->group(function () {
+        Route::get('/quotes/create', [QuoteController::class, 'create'])->name('quotes.create');
+        Route::post('/quotes', [QuoteController::class, 'store'])->name('quotes.store');
+    });
+    Route::middleware('permission:finance.ar.view')->group(function () {
+        Route::get('/quotes', [QuoteController::class, 'index'])->name('quotes.index');
+        Route::get('/quotes/{quote}', [QuoteController::class, 'show'])->name('quotes.show');
+    });
+    Route::middleware('permission:finance.ar.manage')->group(function () {
+        Route::get('/quotes/{quote}/edit', [QuoteController::class, 'edit'])->name('quotes.edit');
+        Route::put('/quotes/{quote}', [QuoteController::class, 'update'])->name('quotes.update');
+        Route::post('/quotes/{quote}/send', [QuoteController::class, 'send'])->name('quotes.send');
+        Route::post('/quotes/{quote}/accept', [QuoteController::class, 'accept'])->name('quotes.accept');
+        Route::post('/quotes/{quote}/convert', [QuoteController::class, 'convertToAgreement'])->name('quotes.convert');
+    });
+
+    // ── Recurring Charges ──────────────────────────────────────────────
+    Route::get('/recurring-charges', [RecurringChargeController::class, 'index'])
+        ->name('recurring_charges.index')
+        ->middleware('permission:finance.ar.view');
+    Route::middleware('permission:finance.ar.manage')->group(function () {
+        Route::get('/recurring-charges/create', [RecurringChargeController::class, 'create'])->name('recurring_charges.create');
+        Route::post('/recurring-charges', [RecurringChargeController::class, 'store'])->name('recurring_charges.store');
+        Route::get('/recurring-charges/{charge}/edit', [RecurringChargeController::class, 'edit'])->name('recurring_charges.edit');
+        Route::put('/recurring-charges/{charge}', [RecurringChargeController::class, 'update'])->name('recurring_charges.update');
+        Route::delete('/recurring-charges/{charge}', [RecurringChargeController::class, 'destroy'])->name('recurring_charges.destroy');
+    });
 
     // ── Bank Accounts ───────────────────────────────────────────────────
     Route::get('/bank-accounts', [BankAccountController::class, 'index'])

@@ -15,37 +15,27 @@ import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
 
 type Props = {
-    charge: {
-        id: number;
-        client_id: number | null;
-        description: string;
-        amount: string;
-        frequency: string;
-        next_charge_date: string | null;
-        is_active: boolean;
-    };
     clients: Array<{ id: number; first_name: string; last_name: string }>;
 };
 
-export default function RecurringChargeEdit({ charge, clients }: Props) {
-    const { data, setData, put, processing, errors } = useForm({
-        client_id: charge.client_id ? String(charge.client_id) : '',
-        description: charge.description ?? '',
-        amount: charge.amount ?? '',
-        frequency: charge.frequency ?? 'monthly',
-        next_charge_date: charge.next_charge_date ?? '',
-        is_active: charge.is_active,
+export default function RecurringChargeCreate({ clients }: Props) {
+    const { data, setData, post, processing, errors } = useForm({
+        client_id: '',
+        description: '',
+        amount: '',
+        frequency: 'monthly',
+        next_charge_date: '',
     });
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        put(`/operations/recurring-charges/${charge.id}`);
+        post('/finance/recurring-charges');
     };
 
     return (
         <AppLayout>
-            <Head title="Edit Recurring Charge" />
-            <PageHero variant="compact" title="Edit Recurring Charge" description="Update an existing recurring billing charge." backHref="/operations/recurring-charges" />
+            <Head title="Create Recurring Charge" />
+            <PageHero variant="compact" title="Create Recurring Charge" description="Set up a new recurring billing charge for a client." backHref="/finance/recurring-charges" />
             <PageShell>
                 <form onSubmit={handleSubmit}>
                     <Card>
@@ -56,14 +46,14 @@ export default function RecurringChargeEdit({ charge, clients }: Props) {
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div className="space-y-1.5">
                                     <Label htmlFor="client_id">Client *</Label>
-                                    <Select value={data.client_id} onValueChange={(value) => setData('client_id', value)}>
+                                    <Select value={data.client_id} onValueChange={(v) => setData('client_id', v)}>
                                         <SelectTrigger id="client_id">
                                             <SelectValue placeholder="Select client" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            {clients.map((client) => (
-                                                <SelectItem key={client.id} value={String(client.id)}>
-                                                    {client.first_name} {client.last_name}
+                                            {clients.map((c) => (
+                                                <SelectItem key={c.id} value={String(c.id)}>
+                                                    {c.first_name} {c.last_name}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
@@ -72,7 +62,7 @@ export default function RecurringChargeEdit({ charge, clients }: Props) {
                                 </div>
                                 <div className="space-y-1.5">
                                     <Label htmlFor="frequency">Frequency *</Label>
-                                    <Select value={data.frequency} onValueChange={(value) => setData('frequency', value)}>
+                                    <Select value={data.frequency} onValueChange={(v) => setData('frequency', v)}>
                                         <SelectTrigger id="frequency">
                                             <SelectValue />
                                         </SelectTrigger>
@@ -94,6 +84,7 @@ export default function RecurringChargeEdit({ charge, clients }: Props) {
                                     id="description"
                                     value={data.description}
                                     onChange={(e) => setData('description', e.target.value)}
+                                    placeholder="e.g. Weekly community access transport"
                                 />
                                 {errors.description && <p className="text-xs text-destructive">{errors.description}</p>}
                             </div>
@@ -104,10 +95,11 @@ export default function RecurringChargeEdit({ charge, clients }: Props) {
                                     <Input
                                         id="amount"
                                         type="number"
-                                        min="0"
                                         step="0.01"
+                                        min="0"
                                         value={data.amount}
                                         onChange={(e) => setData('amount', e.target.value)}
+                                        placeholder="0.00"
                                     />
                                     {errors.amount && <p className="text-xs text-destructive">{errors.amount}</p>}
                                 </div>
@@ -126,11 +118,11 @@ export default function RecurringChargeEdit({ charge, clients }: Props) {
                     </Card>
 
                     <div className="mt-4 flex items-center justify-end gap-2">
-                        <Button type="button" variant="outline" onClick={() => router.get('/operations/recurring-charges')}>
+                        <Button type="button" variant="outline" onClick={() => router.get('/finance/recurring-charges')}>
                             Cancel
                         </Button>
                         <Button type="submit" disabled={processing}>
-                            Save Changes
+                            Create Charge
                         </Button>
                     </div>
                 </form>

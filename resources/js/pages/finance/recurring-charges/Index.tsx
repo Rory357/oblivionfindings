@@ -14,27 +14,25 @@ import {
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { ArrowRightLeft, Calculator, CheckCircle2, Clock, Eye, FileText, Pencil, Plus, Search, Send } from 'lucide-react';
+import { CalendarDays, DollarSign, Eye, Pencil, Plus, RefreshCw, Search } from 'lucide-react';
 
 const ANY = '__ANY__';
 
 const nzd = new Intl.NumberFormat('en-NZ', { style: 'currency', currency: 'NZD' });
 
-type Quote = {
+type RecurringCharge = {
     id: number;
-    reference: string;
-    status: string;
-    total_amount: number;
-    valid_until: string | null;
-    created_at: string;
+    name: string;
+    amount: number;
+    frequency: string;
+    is_active: boolean;
+    next_charge_date: string | null;
     client: { id: number; first_name: string; last_name: string } | null;
-    creator: { id: number; name: string } | null;
-    items_count: number;
 };
 
 type Props = {
-    quotes: {
-        data: Quote[];
+    charges: {
+        data: RecurringCharge[];
         links: any[];
         current_page: number;
         last_page: number;
@@ -45,19 +43,18 @@ type Props = {
         status?: string;
     };
     stats: {
-        total: number;
-        pending: number;
-        accepted: number;
-        converted: number;
+        active: number;
+        monthly_total: number;
+        next_due: number;
     };
 };
 
-const STATUS_VARIANTS: Record<string, 'default' | 'secondary' | 'destructive' | 'outline'> = {
-    draft: 'outline',
-    sent: 'secondary',
-    accepted: 'default',
-    declined: 'destructive',
-    converted: 'default',
+const FREQUENCY_LABELS: Record<string, string> = {
+    weekly: 'Weekly',
+    fortnightly: 'Fortnightly',
+    monthly: 'Monthly',
+    quarterly: 'Quarterly',
+    annually: 'Annually',
 };
 
 function formatDate(d: string | null): string {
@@ -65,32 +62,30 @@ function formatDate(d: string | null): string {
     return new Date(d).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
 }
 
-export default function QuotesIndex({ quotes = { data: [], links: [], current_page: 1, last_page: 1, total: 0 }, filters = {} as any, stats = {} as any }: Props) {
+export default function RecurringChargesIndex({ charges = { data: [], links: [], current_page: 1, last_page: 1, total: 0 }, filters = {} as any, stats = {} as any }: Props) {
     const updateFilters = (key: string, value: string | null) => {
-        router.get('/operations/quotes', { ...filters, [key]: value }, { preserveState: true, replace: true });
+        router.get('/finance/recurring-charges', { ...filters, [key]: value }, { preserveState: true, replace: true });
     };
 
     return (
         <AppLayout>
-            <Head title="Quotes" />
+            <Head title="Recurring Charges" />
             <PageHero
-                icon={Calculator}
-                title="Quotes"
-                description="Create and manage service quotes for clients."
+                icon={RefreshCw}
+                title="Recurring Charges"
+                description="Manage recurring billing charges for clients."
                 stats={[
-                    { label: 'Total', value: stats?.total ?? 0 },
-                    { label: 'Pending', value: stats?.pending ?? 0 },
-                    { label: 'Accepted', value: stats?.accepted ?? 0 },
-                    { label: 'Converted', value: stats?.converted ?? 0 },
+                    { label: 'Active', value: stats?.active ?? 0 },
+                    { label: 'Monthly total', value: nzd.format(stats?.monthly_total ?? 0) },
+                    { label: 'Next due', value: stats?.next_due ?? 0 },
                 ]}
             />
             <PageShell>
                 {/* Stats */}
-                <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                    <OpsStatCard label="Total Quotes" value={stats?.total ?? 0} icon={FileText} color="indigo" />
-                    <OpsStatCard label="Pending" value={stats?.pending ?? 0} icon={Clock} color="amber" />
-                    <OpsStatCard label="Accepted" value={stats?.accepted ?? 0} icon={CheckCircle2} color="emerald" />
-                    <OpsStatCard label="Converted" value={stats?.converted ?? 0} icon={ArrowRightLeft} color="blue" />
+                <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                    <OpsStatCard label="Active Charges" value={stats?.active ?? 0} icon={RefreshCw} color="indigo" />
+                    <OpsStatCard label="Monthly Total" value={nzd.format(stats?.monthly_total ?? 0)} icon={DollarSign} color="emerald" />
+                    <OpsStatCard label="Next Charges Due" value={stats?.next_due ?? 0} icon={CalendarDays} color="amber" />
                 </div>
 
                 {/* Filters */}
@@ -98,7 +93,7 @@ export default function QuotesIndex({ quotes = { data: [], links: [], current_pa
                     <div className="relative flex-1">
                         <Search className="absolute left-2.5 top-2.5 h-3.5 w-3.5 text-muted-foreground" />
                         <Input
-                            placeholder="Search quotes..."
+                            placeholder="Search recurring charges..."
                             className="h-9 pl-8 text-sm"
                             defaultValue={filters?.q ?? ''}
                             onChange={(e) => updateFilters('q', e.target.value || null)}
@@ -110,79 +105,73 @@ export default function QuotesIndex({ quotes = { data: [], links: [], current_pa
                         </SelectTrigger>
                         <SelectContent>
                             <SelectItem value={ANY}>All Status</SelectItem>
-                            <SelectItem value="draft">Draft</SelectItem>
-                            <SelectItem value="sent">Sent</SelectItem>
-                            <SelectItem value="accepted">Accepted</SelectItem>
-                            <SelectItem value="declined">Declined</SelectItem>
-                            <SelectItem value="converted">Converted</SelectItem>
+                            <SelectItem value="active">Active</SelectItem>
+                            <SelectItem value="inactive">Inactive</SelectItem>
                         </SelectContent>
                     </Select>
                     <Button asChild size="sm">
-                        <Link href="/operations/quotes/create">
+                        <Link href="/finance/recurring-charges/create">
                             <Plus className="mr-1.5 h-3.5 w-3.5" />
-                            New Quote
+                            New Charge
                         </Link>
                     </Button>
                 </div>
 
                 {/* List */}
                 <div className="mt-4 space-y-2">
-                    {(quotes?.data ?? []).length === 0 && (
+                    {(charges?.data ?? []).length === 0 && (
                         <Card>
                             <CardContent className="flex flex-col items-center justify-center py-16">
-                                <FileText className="mb-4 h-12 w-12 text-muted-foreground/30" />
-                                <h2 className="text-lg font-semibold text-muted-foreground">No Quotes Found</h2>
-                                <p className="mt-1 text-sm text-muted-foreground/80">Create your first quote to get started.</p>
+                                <RefreshCw className="mb-4 h-12 w-12 text-muted-foreground/30" />
+                                <h2 className="text-lg font-semibold text-muted-foreground">No Recurring Charges</h2>
+                                <p className="mt-1 text-sm text-muted-foreground/80">Create your first recurring charge to get started.</p>
                                 <Button asChild size="sm" className="mt-4">
-                                    <Link href="/operations/quotes/create">Create Quote</Link>
+                                    <Link href="/finance/recurring-charges/create">Create Charge</Link>
                                 </Button>
                             </CardContent>
                         </Card>
                     )}
-                    {(quotes?.data ?? []).map((quote) => (
-                        <Card key={quote.id} className="transition-all hover:border-border hover:shadow-sm">
+                    {(charges?.data ?? []).map((charge) => (
+                        <Card key={charge.id} className="transition-all hover:border-border hover:shadow-sm">
                             <CardContent className="flex items-center gap-4 p-4">
                                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary dark:bg-primary/40 dark:text-primary/70">
-                                    <FileText className="h-5 w-5" />
+                                    <RefreshCw className="h-5 w-5" />
                                 </div>
                                 <div className="min-w-0 flex-1">
                                     <div className="flex items-center gap-2">
-                                        <Link href={`/operations/quotes/${quote.id}`} className="text-sm font-semibold hover:underline">
-                                            {quote.reference}
+                                        <Link href={`/finance/recurring-charges/${charge.id}/edit`} className="text-sm font-semibold hover:underline">
+                                            {charge.name}
                                         </Link>
-                                        <Badge variant={STATUS_VARIANTS[quote.status] ?? 'outline'} className="h-4 px-1.5 text-[9px] capitalize">
-                                            {quote.status}
+                                        <Badge variant={charge.is_active ? 'default' : 'secondary'} className="h-4 px-1.5 text-[9px]">
+                                            {charge.is_active ? 'Active' : 'Inactive'}
                                         </Badge>
-                                        <span className="text-sm font-semibold text-status-success dark:text-status-success">
-                                            {nzd.format(quote.total_amount)}
-                                        </span>
+                                        <Badge variant="outline" className="h-4 px-1.5 text-[9px]">
+                                            {FREQUENCY_LABELS[charge.frequency] ?? charge.frequency}
+                                        </Badge>
                                     </div>
                                     <div className="mt-0.5 flex items-center gap-3 text-xs text-muted-foreground">
-                                        {quote.client && (
-                                            <span>{quote.client.first_name} {quote.client.last_name}</span>
+                                        {charge.client && (
+                                            <span>{charge.client.first_name} {charge.client.last_name}</span>
                                         )}
-                                        <span>{quote.items_count} items</span>
-                                        {quote.valid_until && (
-                                            <span className={new Date(quote.valid_until) < new Date() ? 'font-medium text-status-critical' : ''}>
-                                                Valid until: {formatDate(quote.valid_until)}
+                                        <span className="font-semibold tabular-nums text-status-success dark:text-status-success">
+                                            {nzd.format(charge.amount)}
+                                        </span>
+                                        {charge.next_charge_date && (
+                                            <span className="flex items-center gap-1">
+                                                <CalendarDays className="h-3 w-3" />
+                                                Next: {formatDate(charge.next_charge_date)}
                                             </span>
                                         )}
-                                        <span>Created: {formatDate(quote.created_at)}</span>
                                     </div>
                                 </div>
                                 <div className="flex shrink-0 gap-1">
-                                    {quote.status === 'draft' && (
-                                        <Button size="sm" variant="ghost" className="h-7 px-2 text-xs">
-                                            <Send className="mr-1 h-3 w-3" /> Send
-                                        </Button>
-                                    )}
                                     <Button asChild size="sm" variant="ghost" className="h-7 w-7 p-0">
-                                        <Link href={`/operations/quotes/${quote.id}`}>
+                                        <Link href={`/finance/recurring-charges/${charge.id}/edit`}>
                                             <Eye className="h-3.5 w-3.5" />
                                         </Link>
                                     </Button>
                                     <Button asChild size="sm" variant="ghost" className="h-7 w-7 p-0">
-                                        <Link href={`/operations/quotes/${quote.id}/edit`}>
+                                        <Link href={`/finance/recurring-charges/${charge.id}/edit`}>
                                             <Pencil className="h-3.5 w-3.5" />
                                         </Link>
                                     </Button>
@@ -193,9 +182,9 @@ export default function QuotesIndex({ quotes = { data: [], links: [], current_pa
                 </div>
 
                 {/* Pagination */}
-                {(quotes?.last_page ?? 1) > 1 && (
+                {(charges?.last_page ?? 1) > 1 && (
                     <div className="mt-4 flex items-center justify-center gap-1">
-                        {(quotes?.links ?? []).map((link: any, i: number) => (
+                        {(charges?.links ?? []).map((link: any, i: number) => (
                             <Button
                                 key={i}
                                 size="sm"

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Operations;
+namespace App\Domain\Finance\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\Client;
@@ -14,7 +14,7 @@ class QuoteController extends Controller
     public function index(Request $request)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('quotes.viewAny'), 403);
+        abort_unless($auth && $auth->canDo('finance.ar.view'), 403);
 
         $data = $request->validate([
             'status' => ['nullable', 'string', 'in:draft,sent,accepted,declined,expired,converted'],
@@ -28,7 +28,7 @@ class QuoteController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        return inertia('operations/quotes/Index', [
+        return inertia('finance/quotes/Index', [
             'quotes' => $quotes,
             'filters' => $request->only(['status']),
         ]);
@@ -37,14 +37,14 @@ class QuoteController extends Controller
     public function show(Request $request, $quote)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('quotes.view'), 403);
+        abort_unless($auth && $auth->canDo('finance.ar.view'), 403);
 
         $quote = Quote::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->with(['client:id,first_name,last_name', 'lineItems'])
             ->findOrFail($quote);
 
-        return inertia('operations/quotes/Show', [
+        return inertia('finance/quotes/Show', [
             'quote' => $quote,
         ]);
     }
@@ -52,7 +52,7 @@ class QuoteController extends Controller
     public function create(Request $request)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('quotes.create'), 403);
+        abort_unless($auth && $auth->canDo('finance.ar.manage'), 403);
 
         $clients = Client::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -66,7 +66,7 @@ class QuoteController extends Controller
             ->orderBy('name')
             ->get();
 
-        return inertia('operations/quotes/Create', [
+        return inertia('finance/quotes/Create', [
             'clients' => $clients,
             'priceBooks' => $priceBooks,
         ]);
@@ -75,7 +75,7 @@ class QuoteController extends Controller
     public function store(Request $request)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('quotes.create'), 403);
+        abort_unless($auth && $auth->canDo('finance.ar.manage'), 403);
 
         $data = $request->validate([
             'client_id' => ['required', 'integer', 'exists:clients,id'],
@@ -121,7 +121,7 @@ class QuoteController extends Controller
     public function edit(Request $request, $quote)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('quotes.edit'), 403);
+        abort_unless($auth && $auth->canDo('finance.ar.manage'), 403);
 
         $quote = Quote::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -140,7 +140,7 @@ class QuoteController extends Controller
             ->orderBy('name')
             ->get();
 
-        return inertia('operations/quotes/Edit', [
+        return inertia('finance/quotes/Edit', [
             'quote' => $quote,
             'clients' => $clients,
             'priceBooks' => $priceBooks,
@@ -150,7 +150,7 @@ class QuoteController extends Controller
     public function update(Request $request, $quote)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('quotes.edit'), 403);
+        abort_unless($auth && $auth->canDo('finance.ar.manage'), 403);
 
         $quote = Quote::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -172,7 +172,7 @@ class QuoteController extends Controller
     public function send(Request $request, $quote)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('quotes.edit'), 403);
+        abort_unless($auth && $auth->canDo('finance.ar.manage'), 403);
 
         $quote = Quote::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -189,7 +189,7 @@ class QuoteController extends Controller
     public function accept(Request $request, $quote)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('quotes.edit'), 403);
+        abort_unless($auth && $auth->canDo('finance.ar.manage'), 403);
 
         $quote = Quote::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -206,7 +206,7 @@ class QuoteController extends Controller
     public function convertToAgreement(Request $request, $quote)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('quotes.edit'), 403);
+        abort_unless($auth && $auth->canDo('finance.ar.manage'), 403);
 
         $quote = Quote::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))

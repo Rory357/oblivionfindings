@@ -3,6 +3,47 @@ import { describe, expect, it } from 'vitest';
 import { buildNavSearchCatalog, isIconActive } from './app-sidebar';
 
 describe('app sidebar workforce navigation', () => {
+    it('moves billing navigation into Finance and leaves funding with client management', () => {
+        const catalog = buildNavSearchCatalog({
+            can: {
+                clients: { viewAny: true },
+                funding: { viewAny: true },
+                finance: {
+                    dashboard: true,
+                    ar: { view: true, manage: true },
+                },
+            },
+        });
+
+        const operationsItems = catalog.filter((item) => item.section === 'Operations');
+        const financeItems = catalog.filter((item) => item.section === 'Finance');
+
+        expect(operationsItems).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({
+                    label: 'Funding',
+                    href: '/operations/funding',
+                    group: 'Client Management',
+                }),
+            ]),
+        );
+
+        expect(operationsItems.map((item) => item.group)).not.toContain('Time & Billing');
+        expect(operationsItems.map((item) => item.label)).not.toEqual(
+            expect.arrayContaining(['Billing', 'Invoices', 'Price Books', 'Quotes', 'Recurring Charges']),
+        );
+
+        expect(financeItems).toEqual(
+            expect.arrayContaining([
+                expect.objectContaining({ label: 'Billing', href: '/finance/billing' }),
+                expect.objectContaining({ label: 'Invoices', href: '/finance/invoices' }),
+                expect.objectContaining({ label: 'Price Books', href: '/finance/price-books' }),
+                expect.objectContaining({ label: 'Quotes', href: '/finance/quotes' }),
+                expect.objectContaining({ label: 'Recurring Charges', href: '/finance/recurring-charges' }),
+            ]),
+        );
+    });
+
     it('groups roster and time navigation under Workforce instead of Operations', () => {
         const catalog = buildNavSearchCatalog({
             can: {

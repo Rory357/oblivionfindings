@@ -55,7 +55,7 @@ function formatDate(d: string | null): string {
 
 export default function PriceBooksIndex({ price_books = { data: [], links: [], current_page: 1, last_page: 1, total: 0 }, filters = {} as any, stats = {} as any }: Props) {
     const updateFilters = (key: string, value: string | null) => {
-        router.get('/operations/price-books', { ...filters, [key]: value }, { preserveState: true, replace: true });
+        router.get('/finance/price-books', { ...filters, [key]: value }, { preserveState: true, replace: true });
     };
 
     return (
@@ -101,7 +101,7 @@ export default function PriceBooksIndex({ price_books = { data: [], links: [], c
                         </SelectContent>
                     </Select>
                     <Button asChild size="sm">
-                        <Link href="/operations/price-books/create">
+                        <Link href="/finance/price-books/create">
                             <Plus className="mr-1.5 h-3.5 w-3.5" />
                             New Price Book
                         </Link>
@@ -117,7 +117,7 @@ export default function PriceBooksIndex({ price_books = { data: [], links: [], c
                                 <h2 className="text-lg font-semibold text-muted-foreground">No Price Books Found</h2>
                                 <p className="mt-1 text-sm text-muted-foreground/80">Create your first price book to get started.</p>
                                 <Button asChild size="sm" className="mt-4">
-                                    <Link href="/operations/price-books/create">Create Price Book</Link>
+                                    <Link href="/finance/price-books/create">Create Price Book</Link>
                                 </Button>
                             </CardContent>
                         </Card>
@@ -130,7 +130,7 @@ export default function PriceBooksIndex({ price_books = { data: [], links: [], c
                                 </div>
                                 <div className="min-w-0 flex-1">
                                     <div className="flex items-center gap-2">
-                                        <Link href={`/operations/price-books/${book.id}`} className="text-sm font-semibold hover:underline">
+                                        <Link href={`/finance/price-books/${book.id}`} className="text-sm font-semibold hover:underline">
                                             {book.name}
                                         </Link>
                                         <Badge variant={book.is_active ? 'default' : 'secondary'} className="h-4 px-1.5 text-[9px]">
@@ -155,12 +155,12 @@ export default function PriceBooksIndex({ price_books = { data: [], links: [], c
                                 </div>
                                 <div className="flex shrink-0 gap-1">
                                     <Button asChild size="sm" variant="ghost" className="h-7 w-7 p-0">
-                                        <Link href={`/operations/price-books/${book.id}`}>
+                                        <Link href={`/finance/price-books/${book.id}`}>
                                             <Eye className="h-3.5 w-3.5" />
                                         </Link>
                                     </Button>
                                     <Button asChild size="sm" variant="ghost" className="h-7 w-7 p-0">
-                                        <Link href={`/operations/price-books/${book.id}/edit`}>
+                                        <Link href={`/finance/price-books/${book.id}/edit`}>
                                             <Pencil className="h-3.5 w-3.5" />
                                         </Link>
                                     </Button>

@@ -1,6 +1,6 @@
 <?php
 
-namespace App\Http\Controllers\Operations;
+namespace App\Domain\Finance\Http\Controllers;
 
 use App\Http\Controllers\Controller;
 use App\Models\BillingEntry;
@@ -12,7 +12,7 @@ class BillingController extends Controller
     public function index(Request $request)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('billing.viewAny'), 403);
+        abort_unless($auth && $auth->canDo('finance.ar.view'), 403);
 
         $orgId = $auth->organization_id;
         $now = now();
@@ -66,7 +66,7 @@ class BillingController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        return inertia('operations/billing/Index', [
+        return inertia('finance/billing/Index', [
             'stats' => [
                 'billed_this_month' => (float) $totalBilledThisMonth,
                 'outstanding' => (float) $outstanding,
@@ -82,7 +82,7 @@ class BillingController extends Controller
     public function entries(Request $request)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('billing.viewAny'), 403);
+        abort_unless($auth && $auth->canDo('finance.ar.view'), 403);
 
         $data = $request->validate([
             'client_id' => ['nullable', 'integer', 'exists:clients,id'],
@@ -107,7 +107,7 @@ class BillingController extends Controller
             ->orderBy('first_name')
             ->get(['id', 'first_name', 'last_name']);
 
-        return inertia('operations/billing/Entries', [
+        return inertia('finance/billing/Entries', [
             'entries' => $entries,
             'clients' => $clients,
             'filters' => $request->only(['client_id', 'status', 'date_from', 'date_to']),
