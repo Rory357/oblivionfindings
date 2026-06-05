@@ -1,12 +1,13 @@
+import { addDaysWP, ymd } from '@/components/rostering/week-picker';
+import { cn } from '@/lib/utils';
+
 import { catColorVar } from '../category';
 import { useChecklistConfig, type PaneCtx } from '../context';
 import type { ChecklistRun } from '../types';
-import { cn } from '@/lib/utils';
 
+// Local-date math only — toISOString() would shift the day back in NZ (UTC+12/13).
 function addDays(iso: string, n: number): string {
-    const d = new Date(`${iso}T00:00:00`);
-    d.setDate(d.getDate() + n);
-    return d.toISOString().slice(0, 10);
+    return ymd(addDaysWP(new Date(`${iso}T00:00:00`), n));
 }
 
 export function SchedulePane({ ctx, weekStart }: { ctx: PaneCtx; weekStart: string }) {

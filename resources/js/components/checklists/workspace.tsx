@@ -10,7 +10,7 @@ import {
 import { useMemo, useState } from 'react';
 
 import { TabStrip, type RosterTabItem } from '@/components/rostering/tab-strip';
-import { startOfWeek } from '@/components/rostering/week-picker';
+import { addDaysWP, startOfWeek, ymd } from '@/components/rostering/week-picker';
 
 import { ChecklistConfigProvider, type PaneCtx } from './context';
 import { ChecklistHero } from './hero';
@@ -27,10 +27,9 @@ import { TemplateBuilderModal } from './template-builder';
 import type { ChecklistScope, ChecklistsData, SiteOverview } from './types';
 
 function mondayOf(today: string, offset: number): string {
-    const d = new Date(`${today}T00:00:00`);
-    const dow = (d.getDay() + 6) % 7; // 0 = Monday
-    d.setDate(d.getDate() - dow + offset * 7);
-    return d.toISOString().slice(0, 10);
+    // Local-date math only (ymd uses getFullYear/Month/Date) — never toISOString,
+    // which converts to UTC and shifts the day back in NZ (UTC+12/13).
+    return ymd(addDaysWP(startOfWeek(new Date(`${today}T00:00:00`)), offset * 7));
 }
 
 function weekInfo(today: string, offset: number): WeekInfo {
