@@ -59,7 +59,7 @@ class BankFeedService
                 $imported++;
             }
 
-            $durationMs = (int) now()->diffInMilliseconds($startTime);
+            $durationMs = (int) round($startTime->diffInMilliseconds(now()));
 
             $status = $fetched > 0 && $skipped > 0 && $imported > 0 ? 'partial' : 'success';
 
@@ -89,7 +89,7 @@ class BankFeedService
 
             return $log;
         } catch (\Throwable $e) {
-            $durationMs = (int) now()->diffInMilliseconds($startTime);
+            $durationMs = (int) round($startTime->diffInMilliseconds(now()));
 
             $log = $feed->logs()->create([
                 'synced_at' => now(),
