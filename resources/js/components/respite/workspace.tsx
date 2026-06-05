@@ -22,7 +22,6 @@ import {
     Inbox,
     LayoutDashboard,
     ListChecks,
-    NotebookText,
     Plus,
     Users,
     Zap,
@@ -34,7 +33,6 @@ import { ReferralIntakeModal } from './modals/referral-intake';
 import { BookingsPane } from './panes/bookings';
 import { CalendarPane } from './panes/calendar';
 import { OverviewPane } from './panes/overview';
-import { RecordsPane } from './panes/records';
 import { ReferralsPane } from './panes/referrals';
 import { RequestsPane } from './panes/requests';
 import { StaysPane } from './panes/stays';
@@ -103,7 +101,6 @@ export function RespiteWorkspace({ data, can }: { data: RespiteWorkspaceData; ca
         { id: 'calendar', label: 'Calendar', icon: CalendarDays, tone: 'info' },
         { id: 'stays', label: 'Stays', icon: Home, tone: 'success', badge: stats.inHouse || undefined },
         { id: 'tasks', label: 'Tasks', icon: ListChecks, tone: 'violet', badge: openTasks || undefined },
-        { id: 'records', label: 'Records', icon: NotebookText, tone: 'info' },
     ];
 
     return (
@@ -154,7 +151,6 @@ export function RespiteWorkspace({ data, can }: { data: RespiteWorkspaceData; ca
                 {tab === 'calendar' && <CalendarPane bookings={data.bookings} homes={data.homes} />}
                 {tab === 'stays' && <StaysPane stays={data.stays} can={can} onView={(row) => setDetail({ kind: 'stay', row })} />}
                 {tab === 'tasks' && <TasksPane tasks={data.tasks} can={can} />}
-                {tab === 'records' && <RecordsPane records={data.records} />}
             </div>
 
             <RespiteDetailModal detail={detail} onClose={() => setDetail(null)} />

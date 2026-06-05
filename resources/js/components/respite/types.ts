@@ -95,20 +95,6 @@ export interface RespiteTaskRow {
     requiresApproval: boolean;
 }
 
-export type RespiteRecordType = 'daily_note' | 'handover' | 'comms' | 'evidence' | 'risk_plan';
-
-export interface RespiteRecordRow {
-    id: number;
-    type: RespiteRecordType;
-    typeLabel: string;
-    title: string;
-    subtitle: string | null;
-    date: string | null;
-    status: string | null;
-    client: string | null;
-    stayId: number | null;
-}
-
 export interface RespiteStats {
     newReferrals: number;
     toTriage: number;
@@ -132,7 +118,6 @@ export interface RespiteWorkspaceData {
     bookings: RespiteBookingRow[];
     stays: RespiteStayRow[];
     tasks: RespiteTaskRow[];
-    records: RespiteRecordRow[];
     homes: RespiteHome[];
     stats: RespiteStats;
     clients: ClientOption[];
@@ -162,8 +147,7 @@ export type RespiteTab =
     | 'bookings'
     | 'calendar'
     | 'stays'
-    | 'tasks'
-    | 'records';
+    | 'tasks';
 
 export const RESPITE_TABS: RespiteTab[] = [
     'overview',
@@ -173,5 +157,4 @@ export const RESPITE_TABS: RespiteTab[] = [
     'calendar',
     'stays',
     'tasks',
-    'records',
 ];
