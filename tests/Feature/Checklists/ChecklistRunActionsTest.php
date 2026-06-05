@@ -65,6 +65,18 @@ class ChecklistRunActionsTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_reassign_requires_schedule_permission(): void
+    {
+        $run = $this->makeRun();
+        $assignee = User::factory()->create(['approved_at' => now()]);
+
+        $this->actingAs($this->supportWorker)
+            ->patch("/checklists/runs/{$run->id}/assign", ['assigned_to_user_id' => $assignee->id])
+            ->assertForbidden();
+
+        $this->assertNull($run->fresh()->assigned_to_user_id);
+    }
+
     public function test_admin_can_reassign_a_run_and_clear_it(): void
     {
         $run = $this->makeRun();
@@ -99,7 +111,7 @@ class ChecklistRunActionsTest extends TestCase
                 ->where('skippedRuns.0.id', $run->id));
     }
 
-    public function test_skip_requires_run_permission(): void
+    public function test_skip_remains_manager_only_for_support_worker(): void
     {
         $run = $this->makeRun();
 
@@ -136,6 +148,48 @@ class ChecklistRunActionsTest extends TestCase
             ->assertForbidden();
 
         $this->assertSame('skipped', $run->fresh()->status);
+    }
+
+    public function test_support_worker_can_save_and_complete_a_site_run(): void
+    {
+        [$run, $hazardItem] = $this->makeRunWithFlaggedItems();
+        $payload = [
+            ['template_item_id' => $hazardItem->id, 'response_value' => 'yes', 'is_failed' => false],
+        ];
+
+        $this->actingAs($this->supportWorker)
+            ->post("/checklists/runs/{$run->id}/responses", ['responses' => $payload])
+            ->assertRedirect();
+
+        $this->assertSame('in_progress', $run->fresh()->status);
+
+        $this->actingAs($this->supportWorker)
+            ->post("/checklists/runs/{$run->id}/complete", [
+                'responses' => $payload,
+                'signature_name' => 'Support Worker',
+            ])
+            ->assertRedirect();
+
+        $run->refresh();
+        $this->assertSame('completed', $run->status);
+        $this->assertSame($this->supportWorker->id, $run->completed_by_user_id);
+    }
+
+    public function test_completion_requires_run_permission(): void
+    {
+        [$run, $hazardItem] = $this->makeRunWithFlaggedItems();
+        $viewerWithoutChecklistRun = User::factory()->create(['approved_at' => now()]);
+
+        $this->actingAs($viewerWithoutChecklistRun)
+            ->post("/checklists/runs/{$run->id}/complete", [
+                'responses' => [
+                    ['template_item_id' => $hazardItem->id, 'response_value' => 'yes', 'is_failed' => false],
+                ],
+                'signature_name' => 'No Permission',
+            ])
+            ->assertForbidden();
+
+        $this->assertSame('in_progress', $run->fresh()->status);
     }
 
     public function test_failed_flagged_items_raise_hazard_and_damage(): void

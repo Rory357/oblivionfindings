@@ -17,6 +17,7 @@ import {
 } from '@/components/rostering/week-picker';
 
 import { ChecklistConfigProvider, type PaneCtx } from './context';
+import { ChecklistsEmbeddedHeader } from './embedded-header';
 import { ChecklistHero } from './hero';
 import { HeroFooter, type WeekInfo } from './hero-footer';
 import { AssignmentsPane } from './panes/assignments';
@@ -68,9 +69,11 @@ function weekInfo(today: string, offset: number): WeekInfo {
 export function ChecklistsWorkspace({
     scope,
     data,
+    embedded = false,
 }: {
     scope: ChecklistScope;
     data: ChecklistsData;
+    embedded?: boolean;
 }) {
     const [tab, setTab] = useState('overview');
     const [weekOffset, setWeekOffset] = useState(0);
@@ -204,33 +207,57 @@ export function ChecklistsWorkspace({
             }}
         >
             <div className="space-y-5">
-                <ChecklistHero
-                    stats={data.stats}
-                    siteCount={
-                        scope.mode === 'org' ? data.sitesOverview.length : 1
-                    }
-                    templateCount={data.templates.length}
-                    categoryCount={data.categories.length}
-                    onStart={() => setTab('due')}
-                    onNewTemplate={() => setBuilderTarget('new')}
-                    footer={
-                        <HeroFooter
-                            week={week}
-                            onPrevWeek={() => setWeekOffset((o) => o - 1)}
-                            onNextWeek={() => setWeekOffset((o) => o + 1)}
-                            selectedWeekStart={
-                                new Date(`${weekStart}T00:00:00`)
-                            }
-                            today={new Date(`${data.today}T00:00:00`)}
-                            onJumpToWeek={jumpToWeek}
-                            query={query}
-                            onQuery={setQuery}
-                            cat={cat}
-                            onCat={setCat}
-                            sites={data.sitesOverview}
-                        />
-                    }
-                />
+                {embedded ? (
+                    <ChecklistsEmbeddedHeader
+                        stats={data.stats}
+                        site={scope.mode === 'site' ? scope.site : null}
+                        fullHref={
+                            scope.mode === 'site'
+                                ? `/sites/${scope.site.id}/checklists`
+                                : '/checklists'
+                        }
+                        week={week}
+                        onPrevWeek={() => setWeekOffset((o) => o - 1)}
+                        onNextWeek={() => setWeekOffset((o) => o + 1)}
+                        selectedWeekStart={new Date(`${weekStart}T00:00:00`)}
+                        today={new Date(`${data.today}T00:00:00`)}
+                        onJumpToWeek={jumpToWeek}
+                        query={query}
+                        onQuery={setQuery}
+                        cat={cat}
+                        onCat={setCat}
+                        onStart={() => setTab('due')}
+                        onNewTemplate={() => setBuilderTarget('new')}
+                    />
+                ) : (
+                    <ChecklistHero
+                        stats={data.stats}
+                        siteCount={
+                            scope.mode === 'org' ? data.sitesOverview.length : 1
+                        }
+                        templateCount={data.templates.length}
+                        categoryCount={data.categories.length}
+                        onStart={() => setTab('due')}
+                        onNewTemplate={() => setBuilderTarget('new')}
+                        footer={
+                            <HeroFooter
+                                week={week}
+                                onPrevWeek={() => setWeekOffset((o) => o - 1)}
+                                onNextWeek={() => setWeekOffset((o) => o + 1)}
+                                selectedWeekStart={
+                                    new Date(`${weekStart}T00:00:00`)
+                                }
+                                today={new Date(`${data.today}T00:00:00`)}
+                                onJumpToWeek={jumpToWeek}
+                                query={query}
+                                onQuery={setQuery}
+                                cat={cat}
+                                onCat={setCat}
+                                sites={data.sitesOverview}
+                            />
+                        }
+                    />
+                )}
 
                 <TabStrip value={tab} onChange={setTab} items={tabs} />
 

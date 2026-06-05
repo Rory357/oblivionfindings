@@ -39,7 +39,7 @@ class SiteChecklistController extends Controller
     public function saveResponse(Request $request, SiteChecklistRun $run)
     {
         $this->extendChecklistExecutionWindow();
-        $this->authorize('update', $run->site);
+        $this->authorize('view', $run->site);
 
         $validated = $request->validate([
             'responses' => 'required|array|min:1',
@@ -71,7 +71,7 @@ class SiteChecklistController extends Controller
     public function completeRun(Request $request, SiteChecklistRun $run)
     {
         $this->extendChecklistExecutionWindow();
-        $this->authorize('update', $run->site);
+        $this->authorize('view', $run->site);
 
         // If already completed, short-circuit so duplicate submits (page reloads,
         // double-clicks, retries after a previous timeout) don't redo all the work.

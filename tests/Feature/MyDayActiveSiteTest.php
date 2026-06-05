@@ -2,10 +2,16 @@
 
 use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Models\Client;
+use App\Models\Role;
 use App\Models\Shift;
 use App\Models\Site;
+use App\Models\SiteChecklistAssignment;
+use App\Models\SiteChecklistRun;
+use App\Models\SiteChecklistTemplate;
+use App\Models\SiteChecklistTemplateItem;
 use App\Models\User;
 use App\Support\ResidentHue;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Support\Carbon;
 use Inertia\Testing\AssertableInertia as Assert;
 
@@ -108,6 +114,67 @@ it('uses the open attendance session shift as the active site shift after the UT
         );
 });
 
+it('exposes active shift site checklists and clears them after completion', function () {
+    $this->seed(RbacSeeder::class);
+
+    $worker = User::factory()->frontlineWorker()->create();
+    $worker->roles()->attach(Role::query()->where('name', 'support_worker')->firstOrFail());
+
+    $site = Site::factory()->create(['name' => 'Rimu House', 'type' => 'house']);
+    $client = Client::factory()->create([
+        'site_id' => $site->id,
+        'first_name' => 'Margaret',
+        'last_name' => 'Hewitt',
+    ]);
+
+    $start = Carbon::now('Pacific/Auckland')->setTime(9, 0);
+    Shift::factory()
+        ->assignedToday($worker, $start)
+        ->inProgress()
+        ->create([
+            'client_id' => $client->id,
+            'site_id' => $site->id,
+        ]);
+
+    [$run, $item] = makeMyDayChecklistRun($site);
+
+    $this->actingAs($worker)
+        ->get("/my-day?run={$run->id}")
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('my-day/index')
+            ->where('active_shift.site.id', $site->id)
+            ->has('shiftChecklists', 1)
+            ->where('shiftChecklists.0.id', $run->id)
+            ->where('shiftChecklists.0.template.name', 'Shift Daily Checks')
+            ->where('shiftChecklists.0.is_overdue', false)
+            ->where('checklistConfig.can.view', true)
+            ->where('checklistConfig.can.run', true)
+            ->where('runDetail.id', $run->id)
+            ->has('runDetail.items', 1)
+        );
+
+    $this->from('/my-day')
+        ->actingAs($worker)
+        ->post("/checklists/runs/{$run->id}/complete", [
+            'responses' => [
+                ['template_item_id' => $item->id, 'response_value' => 'yes', 'is_failed' => false],
+            ],
+            'signature_name' => 'Support Worker',
+        ])
+        ->assertRedirect('/my-day');
+
+    expect($run->fresh()->status)->toBe('completed');
+
+    $this->actingAs($worker)
+        ->get('/my-day')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('my-day/index')
+            ->has('shiftChecklists', 0)
+        );
+});
+
 it('returns null active_shift.site when the worker is not on a site shift', function () {
     $worker = User::factory()->frontlineWorker()->create();
 
@@ -154,3 +221,44 @@ it('hue helper matches the TS implementation byte-for-byte for known inputs', fu
     expect(ResidentHue::initials('Aroha', 'Lee'))->toBe('AL');
     expect(ResidentHue::initials(null, null))->toBe('');
 });
+
+function makeMyDayChecklistRun(Site $site): array
+{
+    $template = SiteChecklistTemplate::create([
+        'tenant_id' => $site->tenant_id,
+        'key' => 'my_day_shift_'.uniqid(),
+        'name' => 'Shift Daily Checks',
+        'category' => 'quality',
+        'applicable_to_type' => 'house',
+        'frequency' => 'daily',
+        'is_active' => true,
+    ]);
+
+    $item = SiteChecklistTemplateItem::create([
+        'template_id' => $template->id,
+        'question' => 'Kitchen reset complete?',
+        'response_type' => 'yes_no',
+        'is_required' => true,
+        'sort_order' => 1,
+    ]);
+
+    $assignment = SiteChecklistAssignment::create([
+        'tenant_id' => $site->tenant_id,
+        'site_id' => $site->id,
+        'template_id' => $template->id,
+        'frequency' => 'daily',
+        'start_date' => now()->toDateString(),
+        'is_active' => true,
+    ]);
+
+    $run = SiteChecklistRun::create([
+        'tenant_id' => $site->tenant_id,
+        'assignment_id' => $assignment->id,
+        'site_id' => $site->id,
+        'template_id' => $template->id,
+        'scheduled_date' => now('Pacific/Auckland')->toDateString(),
+        'status' => 'scheduled',
+    ]);
+
+    return [$run, $item];
+}

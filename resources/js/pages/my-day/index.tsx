@@ -2,13 +2,19 @@ import { Head, router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
     Calendar,
+    CheckCircle2,
+    ClipboardCheck,
     FileText,
     Home,
     Users,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 
+import { ChecklistConfigProvider } from '@/components/checklists/context';
+import { CategoryIcon, StatusBadge } from '@/components/checklists/primitives';
+import { RunModal } from '@/components/checklists/run-modal';
 import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import EndOfShiftChecklist, {
     type EndOfShiftBlocker,
 } from '@/components/end-of-shift-checklist';
@@ -45,6 +51,7 @@ import type {
     MyDayShiftTask,
     MyDayTaskFollowup,
     MyDayTimesheet,
+    ShiftChecklistRun,
 } from './lib/types';
 
 /* -------------------------------------------------------------------------- */
@@ -129,6 +136,9 @@ export default function MyDay() {
     // Vitals & obs picker flow.
     const [vitalsOpen, setVitalsOpen] = useState(false);
 
+    // Site checklist run modal launched from the active shift.
+    const [activeChecklistRun, setActiveChecklistRun] = useState<number | null>(null);
+
     // Per-client timesheet review popup.
     const [timesheetUnderReview, setTimesheetUnderReview] =
         useState<MyDayTimesheet | null>(null);
@@ -148,6 +158,8 @@ export default function MyDay() {
 
     const activeShift = props.active_shift;
     const site: MyDayActiveSite | null = activeShift?.site ?? null;
+    const shiftChecklists = props.shiftChecklists ?? [];
+    const canRunShiftChecklists = !!props.checklistConfig?.can.run;
     const residents: MyDayResident[] = useMemo(() => site?.residents ?? [], [site]);
     const singleResident: MyDayResident | null = useMemo(() => {
         if (residents.length === 1) return residents[0];
@@ -291,6 +303,40 @@ export default function MyDay() {
         () => (props.shifts ?? []).map((s) => s.starts_at.slice(0, 10)),
         [props.shifts],
     );
+    const checklistProviderValue = useMemo(() => {
+        if (!props.checklistConfig || !site) return null;
+
+        return {
+            categories: props.checklistConfig.categories,
+            categoryMap: Object.fromEntries(
+                props.checklistConfig.categories.map((category) => [
+                    category.key,
+                    category,
+                ]),
+            ),
+            freqLabels: props.checklistConfig.frequencyLabels,
+            typeLabels: props.checklistConfig.typeLabels,
+            today: props.checklistConfig.today,
+            can: {
+                view: props.checklistConfig.can.view,
+                run: props.checklistConfig.can.run,
+                schedule: false,
+                manageTemplates: false,
+            },
+            scope: {
+                mode: 'site' as const,
+                site: {
+                    id: site.id,
+                    name: site.name,
+                    type: site.type,
+                },
+                backHref: '/my-day',
+            },
+            assignableUsers: [],
+            openRun: setActiveChecklistRun,
+            openBuilder: () => {},
+        };
+    }, [props.checklistConfig, site]);
 
     // ──────────────────────────────────────────────────────────────────────
     // Mutations
@@ -611,6 +657,15 @@ export default function MyDay() {
                 />
 
                 <aside className="flex flex-col gap-4">
+                    {activeShift && canRunShiftChecklists && shiftChecklists.length > 0 && checklistProviderValue ? (
+                        <ChecklistConfigProvider value={checklistProviderValue}>
+                            <ShiftChecklistsCard
+                                runs={shiftChecklists}
+                                onOpen={setActiveChecklistRun}
+                            />
+                        </ChecklistConfigProvider>
+                    ) : null}
+
                     <DigestPanel
                         tab={digestTab}
                         onTabChange={setDigestTab}
@@ -702,7 +757,76 @@ export default function MyDay() {
                     />
                 </>
             ) : null}
+
+            {activeChecklistRun != null && checklistProviderValue ? (
+                <ChecklistConfigProvider value={checklistProviderValue}>
+                    <RunModal
+                        runId={activeChecklistRun}
+                        onClose={() => setActiveChecklistRun(null)}
+                    />
+                </ChecklistConfigProvider>
+            ) : null}
         </AppLayout>
+    );
+}
+
+function ShiftChecklistsCard({
+    runs,
+    onOpen,
+}: {
+    runs: ShiftChecklistRun[];
+    onOpen: (runId: number) => void;
+}) {
+    return (
+        <Card>
+            <CardHeader className="flex flex-row items-center justify-between gap-3 space-y-0 pb-3">
+                <CardTitle className="flex items-center gap-2 text-base">
+                    <ClipboardCheck className="h-4 w-4 text-primary" />
+                    Checklists due this shift
+                </CardTitle>
+                <StatusBadge tone="warning">{runs.length}</StatusBadge>
+            </CardHeader>
+            <CardContent className="space-y-2">
+                {runs.map((run) => (
+                    <ShiftChecklistRow key={run.id} run={run} onOpen={onOpen} />
+                ))}
+            </CardContent>
+        </Card>
+    );
+}
+
+function ShiftChecklistRow({
+    run,
+    onOpen,
+}: {
+    run: ShiftChecklistRun;
+    onOpen: (runId: number) => void;
+}) {
+    const status = run.is_overdue
+        ? { label: 'Overdue', tone: 'critical' as const }
+        : run.status === 'in_progress'
+          ? { label: 'In progress', tone: 'warning' as const }
+          : { label: 'Due', tone: 'warning' as const };
+
+    return (
+        <div className="flex items-center gap-3 rounded-lg border bg-card p-3">
+            <CategoryIcon category={run.template?.category ?? null} box={36} size={18} />
+            <div className="min-w-0 flex-1">
+                <div className="flex flex-wrap items-center gap-2">
+                    <p className="truncate text-sm font-medium">
+                        {run.template?.name ?? 'Checklist'}
+                    </p>
+                    <StatusBadge tone={status.tone}>{status.label}</StatusBadge>
+                </div>
+                <p className="mt-0.5 text-xs text-muted-foreground">
+                    {run.pct}% complete
+                </p>
+            </div>
+            <Button type="button" size="sm" onClick={() => onOpen(run.id)}>
+                <CheckCircle2 className="h-4 w-4" />
+                {run.status === 'in_progress' ? 'Continue' : 'Complete'}
+            </Button>
+        </div>
     );
 }
 

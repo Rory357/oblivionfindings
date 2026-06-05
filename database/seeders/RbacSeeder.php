@@ -660,6 +660,7 @@ class RbacSeeder extends Seeder
             // global links and resident popovers (sites.viewAny gates /sites,
             // /sites/{id}, and the site-scoped care + house ledger reads).
             'sites.viewAny',
+            'checklists.view', 'checklists.run',
             'respite.viewAny', 'respite.calendar.view', 'respite.procedures.run',
             'respite.tasks.view', 'respite.tasks.manage',
             'respite.handovers.view', 'respite.handovers.manage',

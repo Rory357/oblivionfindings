@@ -39,6 +39,7 @@ use App\Services\Sites\HouseLedgerService;
 use App\Services\Sites\SiteReadinessService;
 use App\Services\Sites\SiteTypePlanService;
 use App\Services\UserSiteAccessService;
+use App\Support\ChecklistsDashboardData;
 use App\Support\NzRegions;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -391,6 +392,10 @@ class SiteController extends Controller
             default => [],
         };
 
+        // Eager because checklist run actions redirect back() to this page, and
+        // the embedded workspace must refresh without optional-prop gaps.
+        $checklistsData = (new ChecklistsDashboardData($request))->forSite($site);
+
         return inertia('sites/show', [
             'site' => [
                 'id' => $site->id,
@@ -678,7 +683,9 @@ class SiteController extends Controller
                 ]),
             'coveragePreview' => app(ShiftCoverageService::class)
                 ->buildSiteSummaries(now()->startOfWeek(), now()->addWeek()->endOfWeek(), $site->id),
-            'checklistsSummary' => $this->buildSiteChecklistsSummary($site, $user),
+            'checklistsData' => $checklistsData,
+            'runDetail' => $checklistsData['runDetail'],
+            'templateDetail' => $checklistsData['templateDetail'],
             'can' => [
                 'createAsset' => (bool) ($user && $user->canDo('assets.create')),
             ],
@@ -1153,157 +1160,6 @@ class SiteController extends Controller
         ]);
 
         return $folder;
-    }
-
-    private function buildSiteChecklistsSummary(Site $site, ?User $user): array
-    {
-        $today = now()->toDateString();
-        $can = [
-            'view' => (bool) $user?->canDo('checklists.view'),
-            'schedule' => (bool) $user?->canDo('checklists.schedule'),
-            'run' => (bool) $user?->canDo('checklists.run'),
-        ];
-
-        if (! $can['view']) {
-            return [
-                'stats' => [
-                    'active_assignments' => 0,
-                    'scheduled' => 0,
-                    'in_progress' => 0,
-                    'overdue' => 0,
-                    'completed_30d' => 0,
-                    'on_track' => 100,
-                ],
-                'assignments' => [],
-                'recentRuns' => [],
-                'dueSoon' => [],
-                'availableTemplates' => [],
-                'can' => $can,
-            ];
-        }
-
-        $assignments = SiteChecklistAssignment::query()
-            ->where('site_id', $site->id)
-            ->where('is_active', true)
-            ->with(['template:id,name,frequency,description', 'assignedTo:id,name'])
-            ->orderByDesc('start_date')
-            ->limit(8)
-            ->get()
-            ->map(fn ($assignment) => [
-                'id' => $assignment->id,
-                'frequency' => $assignment->frequency,
-                'start_date' => $assignment->start_date?->toDateString(),
-                'template_name' => $assignment->template?->name ?? 'Checklist',
-                'template' => $assignment->template ? [
-                    'id' => $assignment->template->id,
-                    'name' => $assignment->template->name,
-                    'description' => $assignment->template->description,
-                    'frequency' => $assignment->template->frequency,
-                ] : null,
-                'assigned_to' => $assignment->assignedTo?->only(['id', 'name']),
-            ])
-            ->values()
-            ->all();
-
-        $recentRuns = SiteChecklistRun::query()
-            ->where('site_id', $site->id)
-            ->with(['template:id,name', 'completedBy:id,name'])
-            ->orderByDesc('updated_at')
-            ->limit(5)
-            ->get()
-            ->map(fn ($run) => [
-                'id' => $run->id,
-                'status' => $run->status,
-                'scheduled_date' => $run->scheduled_date?->toDateString(),
-                'completed_at' => $run->completed_at?->toDateTimeString(),
-                'completion_percentage' => (float) $run->completion_percentage,
-                'items_passed' => (int) $run->items_passed,
-                'items_failed' => (int) $run->items_failed,
-                'is_overdue' => $run->scheduled_date
-                    && $run->scheduled_date->lt($today)
-                    && in_array($run->status, ['scheduled', 'in_progress'], true),
-                'template_name' => $run->template?->name ?? 'Checklist',
-                'template' => $run->template ? [
-                    'id' => $run->template->id,
-                    'name' => $run->template->name,
-                ] : null,
-                'completed_by' => $run->completedBy?->only(['id', 'name']),
-            ])
-            ->values()
-            ->all();
-
-        $dueSoon = SiteChecklistRun::query()
-            ->where('site_id', $site->id)
-            ->whereIn('status', ['scheduled', 'in_progress'])
-            ->with('template:id,name')
-            ->orderBy('scheduled_date')
-            ->limit(5)
-            ->get()
-            ->map(fn ($run) => [
-                'id' => $run->id,
-                'template_name' => $run->template?->name ?? 'Checklist',
-                'scheduled_date' => $run->scheduled_date?->toDateString(),
-                'status' => $run->status,
-                'is_overdue' => $run->scheduled_date
-                    && $run->scheduled_date->lt($today)
-                    && $run->status !== 'completed',
-            ])
-            ->values()
-            ->all();
-
-        $availableTemplates = SiteChecklistTemplate::active()
-            ->forType($site->type)
-            ->withCount('items')
-            ->orderBy('name')
-            ->limit(8)
-            ->get()
-            ->map(fn ($template) => [
-                'id' => $template->id,
-                'name' => $template->name,
-                'description' => $template->description,
-                'frequency' => $template->frequency,
-                'items_count' => (int) $template->items_count,
-            ])
-            ->values()
-            ->all();
-
-        $completed30 = SiteChecklistRun::query()
-            ->where('site_id', $site->id)
-            ->where('status', 'completed')
-            ->where('completed_at', '>=', now()->subDays(30))
-            ->count();
-        $overdue = SiteChecklistRun::query()
-            ->where('site_id', $site->id)
-            ->where('scheduled_date', '<', $today)
-            ->whereIn('status', ['scheduled', 'in_progress'])
-            ->count();
-
-        return [
-            'stats' => [
-                'active_assignments' => SiteChecklistAssignment::query()
-                    ->where('site_id', $site->id)
-                    ->where('is_active', true)
-                    ->count(),
-                'scheduled' => SiteChecklistRun::query()
-                    ->where('site_id', $site->id)
-                    ->where('status', 'scheduled')
-                    ->count(),
-                'in_progress' => SiteChecklistRun::query()
-                    ->where('site_id', $site->id)
-                    ->where('status', 'in_progress')
-                    ->count(),
-                'overdue' => $overdue,
-                'completed_30d' => $completed30,
-                'on_track' => ($completed30 + $overdue) === 0
-                    ? 100
-                    : (int) round($completed30 * 100 / ($completed30 + $overdue)),
-            ],
-            'assignments' => $assignments,
-            'recentRuns' => $recentRuns,
-            'dueSoon' => $dueSoon,
-            'availableTemplates' => $availableTemplates,
-            'can' => $can,
-        ];
     }
 
     public function edit(Site $site)
