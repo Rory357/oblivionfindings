@@ -6,7 +6,12 @@ use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\RespiteBooking;
 use App\Models\RespiteBookingRequest;
+use App\Models\RespiteCommunicationLog;
+use App\Models\RespiteDailyNote;
+use App\Models\RespiteEvidencePack;
+use App\Models\RespiteHandoverNote;
 use App\Models\RespiteReferral;
+use App\Models\RespiteRiskPlanActivation;
 use App\Models\RespiteStay;
 use App\Models\RespiteTask;
 use App\Models\ServiceContext;
@@ -93,6 +98,7 @@ class RespiteWorkspaceController extends Controller
             'stays' => $stays,
             'homes' => $this->homes(),
             'tasks' => auth()->user()?->canDo('respite.tasks.view') ? $this->tasks() : [],
+            'records' => $this->records(),
             'stats' => $this->stats(),
             // Lookup data for the create / onboard pop-ups.
             'clients' => Client::query()
@@ -140,6 +146,137 @@ class RespiteWorkspaceController extends Controller
                 'requiresApproval' => (bool) $t->requires_approval,
             ])
             ->values();
+    }
+
+    /**
+     * Unified stay-scoped records for the Records tab — daily notes, handovers,
+     * comms logs, evidence packs and risk-plan activations, each included only
+     * if the user can view that type, then merged and sorted most-recent-first.
+     */
+    private function records()
+    {
+        $user = auth()->user();
+        $records = collect();
+
+        if ($user?->canDo('respite.daily-notes.view')) {
+            $records = $records->concat(
+                RespiteDailyNote::query()
+                    ->with('client:id,first_name,last_name')
+                    ->orderByDesc('note_date')->limit(60)->get()
+                    ->map(fn (RespiteDailyNote $n) => [
+                        'id' => $n->id,
+                        'type' => 'daily_note',
+                        'typeLabel' => 'Daily note',
+                        'title' => 'Daily note · '.$this->humanise($n->shift_period),
+                        'subtitle' => $this->snippet($n->observations ?: $n->concerns),
+                        'date' => optional($n->note_date)->toIso8601String(),
+                        'status' => $n->incident_occurred ? 'incident' : null,
+                        'client' => $this->clientNameFrom($n->client),
+                        'stayId' => $n->stay_id,
+                    ]),
+            );
+        }
+
+        if ($user?->canDo('respite.handovers.view')) {
+            $records = $records->concat(
+                RespiteHandoverNote::query()
+                    ->with(['stay:id,client_id', 'stay.client:id,first_name,last_name'])
+                    ->latest()->limit(60)->get()
+                    ->map(fn (RespiteHandoverNote $h) => [
+                        'id' => $h->id,
+                        'type' => 'handover',
+                        'typeLabel' => 'Handover',
+                        'title' => 'Handover · '.$this->humanise($h->handover_type),
+                        'subtitle' => $this->snippet($h->notes),
+                        'date' => optional($h->created_at)->toIso8601String(),
+                        'status' => $h->acknowledged_at ? 'acknowledged' : 'pending',
+                        'client' => $this->clientNameFrom($h->stay?->client),
+                        'stayId' => $h->stay_id,
+                    ]),
+            );
+        }
+
+        if ($user?->canDo('respite.communications.view')) {
+            $records = $records->concat(
+                RespiteCommunicationLog::query()
+                    ->with(['stay:id,client_id', 'stay.client:id,first_name,last_name'])
+                    ->latest('occurred_at')->limit(60)->get()
+                    ->map(fn (RespiteCommunicationLog $c) => [
+                        'id' => $c->id,
+                        'type' => 'comms',
+                        'typeLabel' => 'Comms',
+                        'title' => $this->humanise($c->channel).' contact',
+                        'subtitle' => $this->snippet($c->summary),
+                        'date' => optional($c->occurred_at)->toIso8601String(),
+                        'status' => null,
+                        'client' => $this->clientNameFrom($c->stay?->client),
+                        'stayId' => $c->stay_id,
+                    ]),
+            );
+        }
+
+        if ($user?->canDo('respite.evidence.view')) {
+            $records = $records->concat(
+                RespiteEvidencePack::query()
+                    ->with(['stay:id,client_id', 'stay.client:id,first_name,last_name'])
+                    ->latest()->limit(60)->get()
+                    ->map(fn (RespiteEvidencePack $e) => [
+                        'id' => $e->id,
+                        'type' => 'evidence',
+                        'typeLabel' => 'Evidence',
+                        'title' => 'Evidence pack',
+                        'subtitle' => $this->snippet($e->summary),
+                        'date' => optional($e->created_at)->toIso8601String(),
+                        'status' => $e->status,
+                        'client' => $this->clientNameFrom($e->stay?->client),
+                        'stayId' => $e->stay_id,
+                    ]),
+            );
+        }
+
+        if ($user?->canDo('respite.risk-plans.view')) {
+            $records = $records->concat(
+                RespiteRiskPlanActivation::query()
+                    ->with('client:id,first_name,last_name')
+                    ->latest()->limit(60)->get()
+                    ->map(fn (RespiteRiskPlanActivation $r) => [
+                        'id' => $r->id,
+                        'type' => 'risk_plan',
+                        'typeLabel' => 'Risk plan',
+                        'title' => $r->plan_name ?: $this->humanise($r->plan_type).' plan',
+                        'subtitle' => $this->humanise($r->plan_type),
+                        'date' => optional($r->created_at)->toIso8601String(),
+                        'status' => $r->status,
+                        'client' => $this->clientNameFrom($r->client),
+                        'stayId' => $r->stay_id,
+                    ]),
+            );
+        }
+
+        return $records->sortByDesc('date')->take(self::LIST_CAP)->values();
+    }
+
+    private function clientNameFrom(?Client $client): ?string
+    {
+        if (! $client) {
+            return null;
+        }
+
+        return trim(($client->first_name ?? '').' '.($client->last_name ?? '')) ?: null;
+    }
+
+    private function snippet(?string $text): ?string
+    {
+        if (! $text) {
+            return null;
+        }
+
+        return mb_strlen($text) > 90 ? mb_substr($text, 0, 90).'…' : $text;
+    }
+
+    private function humanise(?string $value): string
+    {
+        return ucfirst(str_replace('_', ' ', (string) $value));
     }
 
     /** Headline counts for the hero + tab badges. */

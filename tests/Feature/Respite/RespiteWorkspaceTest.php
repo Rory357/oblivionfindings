@@ -3,7 +3,9 @@
 use App\Models\Client;
 use App\Models\RespiteBooking;
 use App\Models\RespiteBookingRequest;
+use App\Models\RespiteDailyNote;
 use App\Models\RespiteReferral;
+use App\Models\RespiteStay;
 use App\Models\RespiteTask;
 use App\Models\Role;
 use App\Models\User;
@@ -47,6 +49,20 @@ test('the respite workspace renders one payload with pipeline lists, homes and c
 
     RespiteTask::factory()->create(['title' => 'Set up eMAR', 'status' => 'pending']);
 
+    $stay = RespiteStay::create([
+        'booking_id' => $booking->id,
+        'client_id' => $client->id,
+        'status' => 'active',
+        'actual_start' => now(),
+    ]);
+    RespiteDailyNote::create([
+        'stay_id' => $stay->id,
+        'client_id' => $client->id,
+        'note_date' => now(),
+        'shift_period' => 'morning',
+        'observations' => 'Settled well overnight',
+    ]);
+
     $this->actingAs($this->admin)
         ->get('/respite')
         ->assertOk()
@@ -58,9 +74,11 @@ test('the respite workspace renders one payload with pipeline lists, homes and c
                 ->has('bookings')
                 ->has('stays')
                 ->has('tasks', 1)
+                ->has('records', 1)
                 ->has('homes')
                 ->has('stats')
                 ->where('tasks.0.title', 'Set up eMAR')
+                ->where('records.0.type', 'daily_note')
                 ->where('requests.0.bookingId', $booking->id)
                 ->where('requests.0.onboarded', false),
         );

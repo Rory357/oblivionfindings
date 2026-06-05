@@ -16,7 +16,8 @@ class RespiteDailyNoteFactory extends Factory
             'stay_id' => 1,
             'client_id' => Client::factory(),
             'note_date' => fake()->date(),
-            'content' => fake()->paragraph(),
+            'shift_period' => fake()->randomElement(['morning', 'afternoon', 'evening', 'night']),
+            'observations' => fake()->paragraph(),
         ];
     }
 }
