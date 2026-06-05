@@ -253,7 +253,10 @@ class ChecklistsDashboardData
             'sitesOverview' => $sitesOverview,
             'reports' => $reports,
             'stats' => $stats,
-            'runDetail' => $this->runDetail($site, $meta),
+            'runDetail' => RunDetailPresenter::for(
+                $this->request->integer('run'),
+                $site?->id,
+            ),
             'templateDetail' => $this->templateDetail(),
             'can' => [
                 'view' => (bool) $user?->canDo('checklists.view'),
@@ -380,63 +383,6 @@ class ChecklistsDashboardData
             ->groupBy('t.category')
             ->pluck(DB::raw('count(*)'), 't.category')
             ->all();
-    }
-
-    /**
-     * When the request carries ?run={id} and the run is in scope, return its
-     * full detail (items + existing responses) so the run modal can render
-     * without navigating away.
-     */
-    private function runDetail(?Site $site, array $meta): ?array
-    {
-        $runId = (int) $this->request->integer('run');
-        if ($runId <= 0) {
-            return null;
-        }
-
-        $run = SiteChecklistRun::query()
-            ->when($site, fn ($q) => $q->where('site_id', $site->id))
-            ->with(['site:id,name,type', 'template:id,name,frequency', 'template.items', 'responses'])
-            ->find($runId);
-
-        if (! $run || ! $run->template) {
-            return null;
-        }
-
-        $m = $meta[$run->template->id] ?? ['category' => $run->template->category ?? null, 'flags' => ['hazard' => false, 'photo' => false, 'sign' => false]];
-
-        return [
-            'id' => $run->id,
-            'status' => $run->status,
-            'scheduled_date' => $run->scheduled_date?->toDateString(),
-            'completion_percentage' => (float) $run->completion_percentage,
-            'overall_notes' => $run->overall_notes,
-            'site' => ['id' => $run->site->id, 'name' => $run->site->name, 'type' => $run->site->type],
-            'template' => [
-                'id' => $run->template->id,
-                'name' => $run->template->name,
-                'frequency' => $run->template->frequency,
-                'category' => $m['category'],
-                'flags' => $m['flags'],
-            ],
-            'items' => $run->template->items->sortBy('sort_order')->values()->map(fn ($item) => [
-                'id' => $item->id,
-                'question' => $item->question,
-                'response_type' => $item->response_type,
-                'response_config' => $item->response_config,
-                'is_required' => (bool) $item->is_required,
-                'guidance' => $item->guidance,
-                'failure_creates_hazard' => (bool) $item->failure_creates_hazard,
-                'failure_creates_damage' => (bool) $item->failure_creates_damage,
-            ])->all(),
-            'responses' => $run->responses->map(fn ($r) => [
-                'template_item_id' => $r->template_item_id,
-                'response_value' => $r->response_value,
-                'notes' => $r->notes,
-                'photo_path' => $r->photo_path,
-                'is_failed' => (bool) $r->is_failed,
-            ])->all(),
-        ];
     }
 
     /**

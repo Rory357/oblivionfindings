@@ -18,12 +18,14 @@ use App\Models\Shift;
 use App\Models\ShiftHandover;
 use App\Models\ShiftOpenPosition;
 use App\Models\Site;
+use App\Models\SiteChecklistRun;
 use App\Models\Timesheet;
 use App\Models\User;
 use App\Services\GuidedRoundService;
 use App\Services\ShiftHandoverService;
 use App\Support\EmarUrl;
 use App\Support\ResidentHue;
+use App\Support\RunDetailPresenter;
 use App\Support\ShiftTaskSupport;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
@@ -131,6 +133,9 @@ class MyTasksController extends Controller
                 ['site' => $activeSitePayload]
             )
             : null;
+        $activeShiftSiteId = $activeShift?->site_id ? (int) $activeShift->site_id : null;
+        $workerToday = $workerNow->toDateString();
+        $shiftChecklists = $this->buildShiftChecklists($activeShiftSiteId, $workerToday);
 
         return Inertia::render('my-day/index', [
             'today' => $todayFormatted,
@@ -148,6 +153,9 @@ class MyTasksController extends Controller
             'clock' => $clock,
             'active_round' => $activeRound,
             'active_shift' => $activeShiftCard,
+            'shiftChecklists' => $shiftChecklists,
+            'checklistConfig' => $this->buildChecklistConfig($user, $workerToday),
+            'runDetail' => RunDetailPresenter::for($request->integer('run'), $activeShiftSiteId),
             'next_shift_briefing' => $nextShiftBriefing,
             'previous_shift' => $previousShift,
             // Per-worker observation capabilities, used by the Vitals & obs
@@ -161,6 +169,53 @@ class MyTasksController extends Controller
             // terminology overrides (client.singular, etc.).
             'my_day_labels' => Lang::get('my-day'),
         ]);
+    }
+
+    private function buildShiftChecklists(?int $siteId, string $today): array
+    {
+        if (! $siteId) {
+            return [];
+        }
+
+        return SiteChecklistRun::query()
+            ->where('site_id', $siteId)
+            ->whereIn('status', ['scheduled', 'in_progress'])
+            ->whereDate('scheduled_date', '<=', $today)
+            ->with(['template:id,name,frequency,category'])
+            ->orderBy('scheduled_date')
+            ->limit(50)
+            ->get()
+            ->map(fn (SiteChecklistRun $run) => [
+                'id' => $run->id,
+                'status' => $run->status,
+                'scheduled_date' => $run->scheduled_date?->toDateString(),
+                'is_overdue' => $run->scheduled_date
+                    ? $run->scheduled_date->toDateString() < $today
+                    : false,
+                'pct' => (int) round((float) $run->completion_percentage),
+                'template' => $run->template ? [
+                    'id' => $run->template->id,
+                    'name' => $run->template->name,
+                    'frequency' => $run->template->frequency,
+                    'category' => $run->template->category,
+                ] : null,
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function buildChecklistConfig(User $user, string $today): array
+    {
+        return [
+            'categories' => config('checklists.categories'),
+            'frequencyLabels' => config('checklists.frequency_labels'),
+            'typeLabels' => config('checklists.type_labels'),
+            'today' => $today,
+            'can' => [
+                'view' => (bool) $user->canDo('checklists.view'),
+                'run' => (bool) $user->canDo('checklists.run'),
+            ],
+        ];
     }
 
     /**

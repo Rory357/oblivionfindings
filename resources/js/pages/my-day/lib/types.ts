@@ -6,6 +6,8 @@
  * in sync when the server payload changes.
  */
 
+import type { Category, RunDetail } from '@/components/checklists/types';
+
 export interface MyDayResident {
     id: number;
     first_name: string;
@@ -293,6 +295,31 @@ export interface MyDayPreShiftBriefing {
     incoming_handover?: { summary?: string } | null;
 }
 
+export interface ShiftChecklistRun {
+    id: number;
+    status: 'scheduled' | 'in_progress';
+    scheduled_date: string | null;
+    is_overdue: boolean;
+    pct: number;
+    template: {
+        id: number;
+        name: string;
+        frequency?: string | null;
+        category?: string | null;
+    } | null;
+}
+
+export interface MyDayChecklistConfig {
+    categories: Category[];
+    frequencyLabels: Record<string, string>;
+    typeLabels: Record<string, string>;
+    today: string;
+    can: {
+        view: boolean;
+        run: boolean;
+    };
+}
+
 export interface MyDayPageProps {
     today: string;
     today_iso?: string;
@@ -314,6 +341,9 @@ export interface MyDayPageProps {
     is_manager: boolean;
     clock?: MyDayClockState;
     active_shift?: (MyDayShift & { site?: MyDayActiveSite | null }) | null;
+    shiftChecklists?: ShiftChecklistRun[];
+    checklistConfig?: MyDayChecklistConfig;
+    runDetail?: RunDetail | null;
     next_shift_briefing?: MyDayPreShiftBriefing | null;
     previous_shift?: MyDayShift | null;
     handover?: MyDayHandover | null;

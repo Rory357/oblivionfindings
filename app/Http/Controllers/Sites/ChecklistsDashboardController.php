@@ -10,7 +10,13 @@ class ChecklistsDashboardController extends Controller
 {
     public function index(Request $request)
     {
-        abort_unless($request->user()?->canDo('checklists.view'), 403);
+        $user = $request->user();
+
+        abort_unless(
+            $user?->canDo('checklists.view')
+                && ($user->canDo('checklists.schedule') || $user->canDo('checklists.manage_templates')),
+            403,
+        );
 
         return inertia('checklists/index', (new ChecklistsDashboardData($request))->forOrg());
     }

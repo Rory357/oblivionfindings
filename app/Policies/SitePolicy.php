@@ -10,7 +10,8 @@ class SitePolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->canDo('sites.viewAny');
+        return $user->canDo('sites.viewAny')
+            && ($user->hasRole('admin', 'provider_manager', 'coordinator') || ! $user->hasRole('support_worker'));
     }
 
     public function view(User $user, Site $site): bool

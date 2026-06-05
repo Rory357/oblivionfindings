@@ -59,8 +59,13 @@ class ChecklistsDashboardTest extends TestCase
                 ->where('runDetail', null));
     }
 
-    public function test_org_dashboard_requires_view_permission(): void
+    public function test_org_dashboard_requires_management_permission(): void
     {
+        $this->assertTrue($this->supportWorker->canDo('checklists.view'));
+        $this->assertTrue($this->supportWorker->canDo('checklists.run'));
+        $this->assertFalse($this->supportWorker->canDo('checklists.schedule'));
+        $this->assertFalse($this->supportWorker->canDo('checklists.manage_templates'));
+
         $this->actingAs($this->supportWorker)
             ->get('/checklists')
             ->assertForbidden();

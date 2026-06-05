@@ -285,6 +285,50 @@ The page reads `props.active_shift` (≈L149) and already has modal-state patter
 
 ---
 
+## Implementation status (Codex, 2026-06-05)
+
+**PR 1 - Profile functional tab:** Done in this branch.
+- `SiteController@show` now builds eager `checklistsData`, `runDetail`, and
+  `templateDetail` via `ChecklistsDashboardData::forSite(...)`.
+- The old read-only `checklistsSummary` profile payload and profile summary card were
+  removed.
+- `sites/show.tsx` now embeds `ChecklistsWorkspace` in the Checklists tab with
+  `embedded` mode.
+- `workspace.tsx` keeps the full-page hero for `/checklists` and
+  `/sites/{site}/checklists`, and renders the new light `embedded-header.tsx` only for
+  embedded profile use.
+
+**PR 2 - Checklists on the shift:** Done in this branch.
+- Support Worker RBAC now includes `checklists.view` and `checklists.run` only.
+- `saveResponse` and `completeRun` authorize site `view`, while management actions still
+  require site `update` plus their existing route permissions.
+- `RunDetailPresenter` now supplies the shared `runDetail` shape for both dashboard
+  workspaces and My Day.
+- `MyTasksController` exposes eager `shiftChecklists`, `checklistConfig`, and scoped
+  `runDetail` for the active shift site.
+- My Day renders a "Checklists due this shift" card and opens the shared `RunModal`
+  inline inside a minimal checklist provider.
+- While verifying, the broader filters exposed two adjacent permission leaks from the
+  new worker read permissions; `/checklists` now requires checklist management
+  capability, and `/sites` index remains blocked for support workers while assigned site
+  profile reads continue through `SitePolicy::view`.
+
+**Local verification completed:**
+- `php artisan test --filter=SiteControllerTest`
+- `php artisan test --filter=ChecklistsDashboardTest`
+- `php artisan test --filter=ChecklistRunActionsTest`
+- `php artisan test tests/Feature/MyDayActiveSiteTest.php --filter="exposes active shift site checklists"`
+- `npx tsc --noEmit`
+- `npm run build`
+- `npx vite build --ssr resources/js/ssr.tsx`
+
+**Deploy / remote verification:**
+- Pending after merge to `main` and push: run
+  `php artisan db:seed --class=RbacSeeder --force` on the server.
+- Pending after webhook build: verify in Chrome on `https://oblivionfindings.com`.
+
+---
+
 ## §Z. Out of scope (flag to owner)
 - Optional hardening for PR 2: schedule `generateUpcomingRuns` nightly (so runs exist on
   no-shift days) and/or move `ensureRunsForShiftLocalDay` to a queued job (keep shift

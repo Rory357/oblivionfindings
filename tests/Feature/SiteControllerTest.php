@@ -353,7 +353,7 @@ class SiteControllerTest extends TestCase
             );
     }
 
-    public function test_site_show_uses_compact_checklists_summary_not_full_workspace_payload(): void
+    public function test_site_show_exposes_functional_checklists_workspace_payload(): void
     {
         $site = Site::factory()->create(['type' => 'house']);
         $template = SiteChecklistTemplate::create([
@@ -385,12 +385,12 @@ class SiteControllerTest extends TestCase
             ->get("/sites/{$site->id}")
             ->assertOk()
             ->assertInertia(fn ($page) => $page
-                ->has('checklistsSummary.stats')
-                ->has('checklistsSummary.dueSoon', 1)
-                ->where('checklistsSummary.dueSoon.0.template_name', 'Profile Summary Checklist')
-                ->missing('checklistsData')
-                ->missing('runDetail')
-                ->missing('templateDetail')
+                ->has('checklistsData.stats')
+                ->has('checklistsData.activeRuns', 1)
+                ->where('checklistsData.activeRuns.0.template.name', 'Profile Summary Checklist')
+                ->has('runDetail')
+                ->has('templateDetail')
+                ->missing('checklistsSummary')
             );
     }
 
