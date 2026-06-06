@@ -8,7 +8,7 @@
 import { cn } from '@/lib/utils';
 import { CalendarDays, Sparkles } from 'lucide-react';
 import { useState } from 'react';
-import { PaneHead, FilterChip } from '../pane-kit';
+import { FilterChip, PaneHead } from '../pane-kit';
 import type { RespiteBookingRow, RespiteHome } from '../types';
 
 const DAY_W = 32;
@@ -16,7 +16,20 @@ const LABEL_W = 150;
 const DAYS_SHOWN = 42;
 const LANE_H = 30;
 
-const MONTHS = ['Jan', 'Feb', 'Mar', 'Apr', 'May', 'Jun', 'Jul', 'Aug', 'Sep', 'Oct', 'Nov', 'Dec'];
+const MONTHS = [
+    'Jan',
+    'Feb',
+    'Mar',
+    'Apr',
+    'May',
+    'Jun',
+    'Jul',
+    'Aug',
+    'Sep',
+    'Oct',
+    'Nov',
+    'Dec',
+];
 const DOW = ['S', 'M', 'T', 'W', 'T', 'F', 'S'];
 
 function startOfDay(d: Date): Date {
@@ -31,7 +44,10 @@ function dayIndex(iso: string | null, base: Date): number | null {
 
 type PlacedBar = RespiteBookingRow & { s: number; e: number; lane: number };
 
-function packLanes(bars: Omit<PlacedBar, 'lane'>[]): { placed: PlacedBar[]; lanes: number } {
+function packLanes(bars: Omit<PlacedBar, 'lane'>[]): {
+    placed: PlacedBar[];
+    lanes: number;
+} {
     const laneEnds: number[] = [];
     const placed = bars
         .slice()
@@ -45,7 +61,13 @@ function packLanes(bars: Omit<PlacedBar, 'lane'>[]): { placed: PlacedBar[]; lane
     return { placed, lanes: Math.max(1, laneEnds.length) };
 }
 
-export function CalendarPane({ bookings, homes }: { bookings: RespiteBookingRow[]; homes: RespiteHome[] }) {
+export function CalendarPane({
+    bookings,
+    homes,
+}: {
+    bookings: RespiteBookingRow[];
+    homes: RespiteHome[];
+}) {
     const [scope, setScope] = useState('all');
 
     const today = startOfDay(new Date());
@@ -59,7 +81,9 @@ export function CalendarPane({ bookings, homes }: { bookings: RespiteBookingRow[
     });
     const todayIdx = dayIndex(today.toISOString(), base);
 
-    const homeRows = (homes.length ? homes : inferHomes(bookings)).filter((h) => scope === 'all' || scope === h.name);
+    const homeRows = (homes.length ? homes : inferHomes(bookings)).filter(
+        (h) => scope === 'all' || scope === h.name,
+    );
 
     // month spans for the header
     const months: { label: string; span: number }[] = [];
@@ -72,13 +96,24 @@ export function CalendarPane({ bookings, homes }: { bookings: RespiteBookingRow[
 
     return (
         <div>
-            <PaneHead icon={CalendarDays} title="Calendar" count="Occupancy · 6 weeks">
-                <FilterChip active={scope === 'all'} onClick={() => setScope('all')}>
+            <PaneHead
+                icon={CalendarDays}
+                title="Calendar"
+                count="Occupancy · 6 weeks"
+            >
+                <FilterChip
+                    active={scope === 'all'}
+                    onClick={() => setScope('all')}
+                >
                     All homes
                 </FilterChip>
                 {homeRows.length || scope !== 'all'
                     ? (homes.length ? homes : inferHomes(bookings)).map((h) => (
-                          <FilterChip key={h.id} active={scope === h.name} onClick={() => setScope(h.name)}>
+                          <FilterChip
+                              key={h.id}
+                              active={scope === h.name}
+                              onClick={() => setScope(h.name)}
+                          >
                               {h.name}
                           </FilterChip>
                       ))
@@ -87,10 +122,12 @@ export function CalendarPane({ bookings, homes }: { bookings: RespiteBookingRow[
 
             <div className="mb-3.5 flex flex-wrap items-center gap-4 text-xs text-muted-foreground">
                 <span className="inline-flex items-center gap-1.5">
-                    <span className="h-2.5 w-3.5 rounded-sm bg-status-success" /> In-house stay
+                    <span className="h-2.5 w-3.5 rounded-sm bg-status-success" />{' '}
+                    In-house stay
                 </span>
                 <span className="inline-flex items-center gap-1.5">
-                    <span className="h-2.5 w-3.5 rounded-sm bg-primary" /> Confirmed booking
+                    <span className="h-2.5 w-3.5 rounded-sm bg-primary" />{' '}
+                    Confirmed booking
                 </span>
                 <span className="inline-flex items-center gap-1.5">
                     <span className="h-3 w-0.5 bg-status-critical" /> Today
@@ -103,7 +140,10 @@ export function CalendarPane({ bookings, homes }: { bookings: RespiteBookingRow[
                         {/* month + day header */}
                         <div className="sticky top-0 z-[2] border-b border-border bg-card">
                             <div className="flex">
-                                <div className="shrink-0 border-r border-border" style={{ width: LABEL_W }} />
+                                <div
+                                    className="shrink-0 border-r border-border"
+                                    style={{ width: LABEL_W }}
+                                />
                                 {months.map((m, i) => (
                                     <div
                                         key={i}
@@ -115,11 +155,15 @@ export function CalendarPane({ bookings, homes }: { bookings: RespiteBookingRow[
                                 ))}
                             </div>
                             <div className="flex">
-                                <div className="flex shrink-0 items-center border-r border-border px-3 text-[11px] font-semibold text-muted-foreground" style={{ width: LABEL_W }}>
+                                <div
+                                    className="flex shrink-0 items-center border-r border-border px-3 text-[11px] font-semibold text-muted-foreground"
+                                    style={{ width: LABEL_W }}
+                                >
                                     Home
                                 </div>
                                 {days.map((d, i) => {
-                                    const weekend = d.getDay() === 0 || d.getDay() === 6;
+                                    const weekend =
+                                        d.getDay() === 0 || d.getDay() === 6;
                                     const isToday = i === todayIdx;
                                     return (
                                         <div
@@ -127,12 +171,16 @@ export function CalendarPane({ bookings, homes }: { bookings: RespiteBookingRow[
                                             className={cn(
                                                 'py-1 text-center text-[10px]',
                                                 weekend && 'bg-muted/50',
-                                                isToday ? 'font-bold text-status-critical' : 'text-muted-foreground',
+                                                isToday
+                                                    ? 'font-bold text-status-critical'
+                                                    : 'text-muted-foreground',
                                             )}
                                             style={{ width: DAY_W }}
                                         >
                                             <div>{DOW[d.getDay()]}</div>
-                                            <div className="text-[11px] tabular-nums">{d.getDate()}</div>
+                                            <div className="text-[11px] tabular-nums">
+                                                {d.getDate()}
+                                            </div>
                                         </div>
                                     );
                                 })}
@@ -141,10 +189,20 @@ export function CalendarPane({ bookings, homes }: { bookings: RespiteBookingRow[
 
                         {/* home rows */}
                         {homeRows.map((home, hi) => (
-                            <HomeRow key={home.id} home={home} bookings={bookings} base={base} days={days} todayIdx={todayIdx} first={hi === 0} />
+                            <HomeRow
+                                key={home.id}
+                                home={home}
+                                bookings={bookings}
+                                base={base}
+                                days={days}
+                                todayIdx={todayIdx}
+                                first={hi === 0}
+                            />
                         ))}
                         {homeRows.length === 0 ? (
-                            <div className="px-4 py-10 text-center text-sm text-muted-foreground">No respite homes configured.</div>
+                            <div className="px-4 py-10 text-center text-sm text-muted-foreground">
+                                No respite homes configured.
+                            </div>
                         ) : null}
                     </div>
                 </div>
@@ -152,7 +210,8 @@ export function CalendarPane({ bookings, homes }: { bookings: RespiteBookingRow[
 
             <p className="mt-3 flex items-center gap-1.5 text-xs text-muted-foreground">
                 <Sparkles className="h-3.5 w-3.5 text-primary" />
-                Bars show room occupancy. Overlapping bars in a home flag a capacity clash to resolve.
+                Bars show room occupancy. Overlapping bars in a home flag a
+                capacity clash to resolve.
             </p>
         </div>
     );
@@ -191,33 +250,54 @@ function HomeRow({
 
     return (
         <div className={cn('flex', !first && 'border-t border-border')}>
-            <div className="flex shrink-0 flex-col justify-center border-r border-border p-3" style={{ width: LABEL_W }}>
+            <div
+                className="flex shrink-0 flex-col justify-center border-r border-border p-3"
+                style={{ width: LABEL_W }}
+            >
                 <div className="text-[13px] font-bold">{home.name}</div>
-                <div className="text-[11px] text-muted-foreground">{home.capacity || '—'} respite beds</div>
+                <div className="text-[11px] text-muted-foreground">
+                    {home.capacity || '—'} respite beds
+                </div>
             </div>
-            <div className="relative" style={{ height: rowH, width: days.length * DAY_W }}>
+            <div
+                className="relative"
+                style={{ height: rowH, width: days.length * DAY_W }}
+            >
                 {days.map((d, i) => {
                     const weekend = d.getDay() === 0 || d.getDay() === 6;
                     return (
                         <div
                             key={i}
-                            className={cn('absolute top-0 h-full border-r border-border/50', weekend && 'bg-muted/40')}
+                            className={cn(
+                                'absolute top-0 h-full border-r border-border/50',
+                                weekend && 'bg-muted/40',
+                            )}
                             style={{ left: i * DAY_W, width: DAY_W }}
                         />
                     );
                 })}
                 {todayIdx != null && todayIdx >= 0 && todayIdx < days.length ? (
-                    <div className="absolute top-0 z-[1] h-full w-0.5 bg-status-critical" style={{ left: todayIdx * DAY_W + DAY_W / 2 }} />
+                    <div
+                        className="absolute top-0 z-[1] h-full w-0.5 bg-status-critical"
+                        style={{ left: todayIdx * DAY_W + DAY_W / 2 }}
+                    />
                 ) : null}
                 {placed.map((b) => (
                     <div
                         key={b.id}
                         title={`${b.client} · ${b.ref}`}
                         className={cn(
-                            'absolute z-[1] flex items-center overflow-hidden whitespace-nowrap rounded-md px-2 text-[11.5px] font-semibold text-white shadow-sm',
-                            b.status === 'in_progress' ? 'bg-status-success' : 'bg-primary',
+                            'absolute z-[1] flex items-center overflow-hidden rounded-md px-2 text-[11.5px] font-semibold whitespace-nowrap text-white shadow-sm',
+                            b.status === 'in_progress'
+                                ? 'bg-status-success'
+                                : 'bg-primary',
                         )}
-                        style={{ left: b.s * DAY_W + 3, top: b.lane * LANE_H + 8, width: (b.e - b.s + 1) * DAY_W - 6, height: LANE_H - 8 }}
+                        style={{
+                            left: b.s * DAY_W + 3,
+                            top: b.lane * LANE_H + 8,
+                            width: (b.e - b.s + 1) * DAY_W - 6,
+                            height: LANE_H - 8,
+                        }}
                     >
                         {b.client}
                     </div>
@@ -229,6 +309,15 @@ function HomeRow({
 
 /** Fallback "homes" derived from the bookings when no respite-capable sites are configured. */
 function inferHomes(bookings: RespiteBookingRow[]): RespiteHome[] {
-    const names = Array.from(new Set(bookings.map((b) => b.site).filter((s): s is string => !!s)));
-    return names.map((name, i) => ({ id: -(i + 1), name, capacity: 0 }));
+    const names = Array.from(
+        new Set(bookings.map((b) => b.site).filter((s): s is string => !!s)),
+    );
+    return names.map((name, i) => ({
+        id: -(i + 1),
+        name,
+        capacity: 0,
+        occupied: 0,
+        available: null,
+        full: false,
+    }));
 }

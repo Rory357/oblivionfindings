@@ -40,10 +40,9 @@ const Privacy: React.FC = () => {
                             "Services").
                         </p>
                         <p className="mt-4 leading-relaxed text-muted-foreground">
-                            We are registered with the Information
-                            Commissioner's Office (ICO) and comply with the UK
-                            General Data Protection Regulation (UK GDPR) and the
-                            Data Protection Act 2018.
+                            We are registered with the Office of the Privacy
+                            Commissioner (OPC) and comply with the Privacy Act 2020
+                            and the Health Information Privacy Code 2020.
                         </p>
                     </section>
 
@@ -152,7 +151,7 @@ const Privacy: React.FC = () => {
                             <li>
                                 <strong>Legal Obligation:</strong> Processing
                                 necessary to comply with our legal obligations
-                                (e.g., CQC requirements).
+                                (e.g., HealthCERT and Ngā Paerewa requirements).
                             </li>
                             <li>
                                 <strong>Legitimate Interests:</strong>{' '}
@@ -197,7 +196,7 @@ const Privacy: React.FC = () => {
                         </ul>
                         <p className="mt-4 leading-relaxed text-muted-foreground">
                             All third-party service providers are bound by data
-                            processing agreements that ensure they meet UK GDPR
+                            processing agreements that ensure they meet Privacy Act 2020
                             standards.
                         </p>
                     </section>
@@ -222,7 +221,7 @@ const Privacy: React.FC = () => {
                                 Regular security audits and penetration testing
                             </li>
                             <li>
-                                UK-based data centres with ISO 27001
+                                NZ-based data centres with ISO 27001
                                 certification
                             </li>
                             <li>
@@ -263,7 +262,7 @@ const Privacy: React.FC = () => {
                             8. Your Rights
                         </h2>
                         <p className="mt-4 leading-relaxed text-muted-foreground">
-                            Under UK GDPR, you have the following rights:
+                            Under Privacy Act 2020, you have the following rights:
                         </p>
                         <ul className="mt-2 list-inside list-disc space-y-2 text-muted-foreground">
                             <li>
@@ -351,7 +350,7 @@ const Privacy: React.FC = () => {
                         </ul>
                         <p className="mt-4 leading-relaxed text-muted-foreground">
                             You also have the right to complain to the
-                            Information Commissioner's Office (ICO) if you
+                            Office of the Privacy Commissioner (OPC) if you
                             believe we have not handled your data properly.
                         </p>
                     </section>

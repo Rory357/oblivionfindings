@@ -84,16 +84,16 @@ export default function DataSubjectRequests({ filters, requests, stats }: Props)
 
     return (
         <AppLayout breadcrumbs={[
-            { title: 'Privacy & GDPR', href: '/privacy/dashboard' },
-            { title: 'Data Subject Requests', href: '/privacy/requests' }
+            { title: 'Privacy', href: '/privacy/dashboard' },
+            { title: 'Privacy Requests', href: '/privacy/requests' }
         ]}>
-            <Head title="Data Subject Requests" />
+            <Head title="Privacy Requests" />
 
             <div className="flex flex-col gap-6 p-6">
                 {/* Hero Header */}
                 <PageHero
-                    title="Data Subject Requests"
-                    description="GDPR Article 15-22 compliance — 30-day response deadline"
+                    title="Privacy Requests"
+                    description="Privacy Act 2020 IPP 6/7 access and correction — 20 working-day response target"
                     icon={<FileText className="h-7 w-7 text-white" />}
                     stats={stats ? [
                         { label: 'Open', value: stats.open },
@@ -241,7 +241,7 @@ export default function DataSubjectRequests({ filters, requests, stats }: Props)
                     })}
                     {!requests.data.length && (
                         <div className="py-8 text-center text-sm text-muted-foreground">
-                            No data subject requests found.
+                            No privacy requests found.
                         </div>
                     )}
                 </div>

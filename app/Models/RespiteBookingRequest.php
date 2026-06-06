@@ -10,7 +10,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class RespiteBookingRequest extends Model
 {
-    use HasFactory, SoftDeletes, AuditableChanges;
+    use AuditableChanges, HasFactory, SoftDeletes;
 
     protected $fillable = [
         'referral_id',
@@ -19,9 +19,20 @@ class RespiteBookingRequest extends Model
         'requested_start',
         'requested_end',
         'requirements',
+        'intake_snapshot',
         'preference_notes',
+        'funding_source',
         'funding_reference',
+        'service_agreement_id',
+        'funding_status',
+        'funding_approved_ref',
+        'funding_approved_at',
         'status',
+        'waitlist_position',
+        'priority',
+        'expected_availability_date',
+        'is_emergency',
+        'fast_tracked',
         'decision_notes',
         'approved_by_user_id',
         'approved_at',
@@ -33,7 +44,12 @@ class RespiteBookingRequest extends Model
         'requested_start' => 'datetime',
         'requested_end' => 'datetime',
         'requirements' => 'array',
+        'intake_snapshot' => 'array',
+        'funding_approved_at' => 'datetime',
         'approved_at' => 'datetime',
+        'expected_availability_date' => 'date',
+        'is_emergency' => 'boolean',
+        'fast_tracked' => 'boolean',
     ];
 
     public function referral(): BelongsTo
@@ -49,6 +65,11 @@ class RespiteBookingRequest extends Model
     public function serviceContext(): BelongsTo
     {
         return $this->belongsTo(ServiceContext::class, 'service_context_id');
+    }
+
+    public function serviceAgreement(): BelongsTo
+    {
+        return $this->belongsTo(ServiceAgreement::class, 'service_agreement_id');
     }
 
     public function approvedBy(): BelongsTo

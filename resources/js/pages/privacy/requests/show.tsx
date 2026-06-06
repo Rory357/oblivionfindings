@@ -88,8 +88,8 @@ export default function ShowDataSubjectRequest({ request: dsr, staff }: Props) {
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Privacy & GDPR', href: '/privacy/dashboard' },
-                { title: 'Data Subject Requests', href: '/privacy/requests' },
+                { title: 'Privacy', href: '/privacy/dashboard' },
+                { title: 'Privacy Requests', href: '/privacy/requests' },
                 {
                     title: dsr.reference_number,
                     href: `/privacy/requests/${dsr.id}`,

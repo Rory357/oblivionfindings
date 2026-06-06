@@ -43,7 +43,7 @@ class FleetManagementSeeder extends Seeder
                 'category' => 'essential',
                 'description' => 'Consent for vehicle location tracking.',
                 'purpose' => 'Enable fleet vehicle GPS tracking.',
-                'legal_basis' => 'GDPR Art 6(1)(a)',
+                'legal_basis' => 'Privacy Act 2020 IPP basis',
                 'version' => 1,
                 'active' => true,
             ]);

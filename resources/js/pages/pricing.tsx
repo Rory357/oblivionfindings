@@ -92,7 +92,7 @@ const Pricing: React.FC = () => {
         },
         {
             question: 'Is my data secure?',
-            answer: "Absolutely. We use bank-grade encryption, GDPR-compliant data handling, and UK-based servers. We're registered with the ICO and undergo regular security audits. Your data is never sold or shared.",
+            answer: "Absolutely. We use bank-grade encryption, Privacy Act 2020-aligned data handling, and NZ-hosted infrastructure. We're registered with the OPC and undergo regular security audits. Your data is never sold or shared.",
         },
         {
             question: 'What support do you offer?',

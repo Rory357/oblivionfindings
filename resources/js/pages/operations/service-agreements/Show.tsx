@@ -522,7 +522,7 @@ function LineItemDialog({
                             <Input id="li-category" value={form.data.category} onChange={(e) => form.setData('category', e.target.value)} placeholder="e.g. Core Support" />
                         </div>
                         <div>
-                            <Label htmlFor="li-ndis">NDIS Line Item Code</Label>
+                            <Label htmlFor="li-ndis">Funding / Contract Reference</Label>
                             <Input id="li-ndis" value={form.data.ndis_line_item_code} onChange={(e) => form.setData('ndis_line_item_code', e.target.value)} placeholder="Optional" />
                         </div>
                     </div>

@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { AlertTriangle, CheckCircle } from 'lucide-react';
 
-type DPIA = {
+type PIA = {
     id: number;
     assessment_name: string;
     project_or_process: string;
@@ -29,7 +29,7 @@ type DPIA = {
 };
 
 type Props = {
-    dpia: DPIA;
+    dpia: PIA;
 };
 
 const formatDate = (value?: string | null) => {
@@ -57,7 +57,7 @@ const renderList = (items?: string[] | null) => {
     );
 };
 
-export default function ShowDPIA({ dpia }: Props) {
+export default function ShowPIA({ dpia }: Props) {
     const { auth } = usePage().props as any;
     const can = auth?.can?.privacy ?? {};
     const riskLabels: Record<string, string> = {
@@ -69,7 +69,7 @@ export default function ShowDPIA({ dpia }: Props) {
     const outcomeLabels: Record<string, string> = {
         approved: 'approved',
         approved_with_conditions: 'approved with conditions',
-        requires_dpo_review: 'requires DPO review',
+        requires_dpo_review: 'requires Privacy Officer review',
         rejected: 'rejected',
     };
 
@@ -77,11 +77,11 @@ export default function ShowDPIA({ dpia }: Props) {
 
     return (
         <AppLayout breadcrumbs={[
-            { title: 'Privacy & GDPR', href: '/privacy/dashboard' },
+            { title: 'Privacy', href: '/privacy/dashboard' },
             { title: 'Impact Assessments', href: '/privacy/dpia' },
             { title: dpia.assessment_name, href: `/privacy/dpia/${dpia.id}` },
         ]}>
-            <Head title={`DPIA - ${dpia.assessment_name}`} />
+            <Head title={`PIA - ${dpia.assessment_name}`} />
 
             <PageLayout
                 hero={
@@ -176,7 +176,7 @@ export default function ShowDPIA({ dpia }: Props) {
                     </Card>
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Data Subjects</CardTitle>
+                            <CardTitle className="text-base">People affected</CardTitle>
                         </CardHeader>
                         <CardContent>{renderList(dpia.data_subjects)}</CardContent>
                     </Card>
@@ -207,7 +207,7 @@ export default function ShowDPIA({ dpia }: Props) {
                                 <Button
                                     size="sm"
                                     onClick={() => {
-                                        if (confirm('Approve this DPIA?')) {
+                                        if (confirm('Approve this PIA?')) {
                                             router.post(`/privacy/dpia/${dpia.id}/approve`);
                                         }
                                     }}
@@ -229,7 +229,7 @@ export default function ShowDPIA({ dpia }: Props) {
                                 }}
                             >
                                 <AlertTriangle className="mr-1 h-4 w-4" />
-                                Request DPO Review
+                                Request Privacy Officer Review
                             </Button>
                         </CardContent>
                     </Card>

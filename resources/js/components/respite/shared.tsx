@@ -46,10 +46,13 @@ export const STATUS_META: Record<string, StatusMeta> = {
     in_progress: { label: 'In house', tone: 'info' },
     completed: { label: 'Completed', tone: 'neutral' },
     cancelled: { label: 'Cancelled', tone: 'neutral' },
+    no_show: { label: 'No show', tone: 'critical' },
+    on_hold_pending_funding: { label: 'Funding hold', tone: 'warning' },
     // stay
     admitted: { label: 'Arriving', tone: 'info' },
     active: { label: 'In house', tone: 'success' },
     extended: { label: 'Extended', tone: 'warning' },
+    on_leave: { label: 'On leave', tone: 'warning' },
     discharged: { label: 'Discharged', tone: 'neutral' },
 };
 
@@ -60,7 +63,12 @@ export const URGENCY_META: Record<Urgency, StatusMeta> = {
 };
 
 export function statusMeta(status: string | null | undefined): StatusMeta {
-    return (status && STATUS_META[status]) || { label: status ?? '—', tone: 'neutral' };
+    return (
+        (status && STATUS_META[status]) || {
+            label: status ?? '—',
+            tone: 'neutral',
+        }
+    );
 }
 
 export function Pill({
@@ -77,18 +85,28 @@ export function Pill({
     return (
         <span
             className={cn(
-                'inline-flex items-center gap-1.5 whitespace-nowrap rounded-full px-2.5 py-0.5 text-[11px] font-semibold leading-tight',
+                'inline-flex items-center gap-1.5 rounded-full px-2.5 py-0.5 text-[11px] leading-tight font-semibold whitespace-nowrap',
                 TONE_CLASSES[tone],
                 className,
             )}
         >
-            {dot ? <span className={cn('h-1.5 w-1.5 rounded-full', TONE_DOT[tone])} /> : null}
+            {dot ? (
+                <span
+                    className={cn('h-1.5 w-1.5 rounded-full', TONE_DOT[tone])}
+                />
+            ) : null}
             {children}
         </span>
     );
 }
 
-export function StatusBadge({ status, dot = true }: { status: string; dot?: boolean }) {
+export function StatusBadge({
+    status,
+    dot = true,
+}: {
+    status: string;
+    dot?: boolean;
+}) {
     const m = statusMeta(status);
     return (
         <Pill tone={m.tone} dot={dot}>
@@ -119,7 +137,13 @@ export function initials(name: string): string {
         .join('');
 }
 
-export function Avatar({ name, className }: { name: string; className?: string }) {
+export function Avatar({
+    name,
+    className,
+}: {
+    name: string;
+    className?: string;
+}) {
     return (
         <span
             className={cn(
@@ -142,7 +166,10 @@ export function fmtDate(iso: string | null | undefined): string {
     return d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' });
 }
 
-export function fmtRange(a: string | null | undefined, b: string | null | undefined): string {
+export function fmtRange(
+    a: string | null | undefined,
+    b: string | null | undefined,
+): string {
     return `${fmtDate(a)} → ${fmtDate(b)}`;
 }
 
@@ -157,7 +184,10 @@ export function relTime(iso: string | null | undefined): string {
 }
 
 /** Whole nights between two ISO dates, if both present. */
-export function nightsBetween(a: string | null | undefined, b: string | null | undefined): number | null {
+export function nightsBetween(
+    a: string | null | undefined,
+    b: string | null | undefined,
+): number | null {
     if (!a || !b) return null;
     const start = new Date(a).getTime();
     const end = new Date(b).getTime();

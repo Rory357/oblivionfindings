@@ -2,13 +2,18 @@
 
 namespace App\Http\Controllers\Respite;
 
-use App\Http\Controllers\Controller;
-use App\Models\RespiteBooking;
-use App\Models\RespiteStay;
+use App\Domain\Governance\Models\NotifiableIncident;
 use App\Events\Respite\RespiteEvent;
+use App\Http\Controllers\Controller;
+use App\Models\ClientIncident;
+use App\Models\ClientMedication;
+use App\Models\RespiteBooking;
+use App\Models\RespiteMedicationReconciliation;
+use App\Models\RespiteStay;
+use App\Models\RestraintEvent;
 use App\Services\Respite\RespiteShiftSync;
-use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -81,8 +86,14 @@ class RespiteStayController extends Controller
 
     public function checkIn(RespiteStay $stay): RedirectResponse
     {
+        $validated = request()->validate([
+            'med_rec_override_reason' => 'nullable|string|max:500',
+        ]);
+
         $stay->loadMissing('client');
         $this->authorize('view', $stay->client);
+
+        $this->guardAdmissionMedicationReconciliation($stay, $validated['med_rec_override_reason'] ?? null);
 
         $stay->update([
             'status' => 'active',
@@ -140,19 +151,36 @@ class RespiteStayController extends Controller
     {
         $stay->loadMissing('client');
         $this->authorize('view', $stay->client);
+        $alreadyDischarged = $stay->status === 'discharged' && $stay->actual_end !== null;
 
         $validated = $request->validate([
             'discharge_summary' => 'required|string',
+            'discharge_reason' => 'nullable|in:planned,early_by_family,clinical,incident,transferred_to_hospital',
+            'discharge_medication_reconciliation' => 'nullable|array',
+            'discharge_medication_reconciliation.medicines_returned_to' => 'nullable|string|max:255',
+            'discharge_medication_reconciliation.count' => 'nullable|integer|min:0',
+            'discharge_medication_reconciliation.received_by' => 'nullable|string|max:255',
+            'discharge_medication_reconciliation.gp_pharmacy_handover_sent' => 'nullable|boolean',
+            'discharge_medication_reconciliation.whanau_briefing_acknowledged' => 'nullable|boolean',
         ]);
+
+        $this->guardDischargeMedicationReconciliation($stay, $validated['discharge_medication_reconciliation'] ?? null);
+        $this->guardDischargeCompliance($stay);
 
         $stay->update([
             'status' => 'discharged',
             'actual_end' => now(),
             'discharge_summary' => $validated['discharge_summary'],
+            'discharge_reason' => $validated['discharge_reason'] ?? 'planned',
+            'discharge_medication_reconciliation' => $validated['discharge_medication_reconciliation'] ?? $stay->discharge_medication_reconciliation,
             'updated_by' => auth()->id(),
         ]);
 
         app(RespiteShiftSync::class)->dischargeStay($stay, $validated['discharge_summary'], $stay->actual_end, auth()->id());
+
+        if (! $alreadyDischarged) {
+            $this->postFundingConsumption($stay->fresh('booking.serviceAgreement'));
+        }
 
         event(new RespiteEvent('respite.stay.discharged', [
             'id' => $stay->id,
@@ -161,5 +189,239 @@ class RespiteStayController extends Controller
         ]));
 
         return back()->with('success', 'Stay discharged.');
+    }
+
+    public function recordRestraint(Request $request, RespiteStay $stay): RedirectResponse
+    {
+        $stay->loadMissing('client', 'booking');
+        $this->authorize('view', $stay->client);
+
+        $validated = $request->validate([
+            'behaviour_support_plan_id' => 'nullable|exists:behaviour_support_plans,id',
+            'started_at' => 'required|date',
+            'ended_at' => 'nullable|date|after_or_equal:started_at',
+            'duration_minutes' => 'nullable|integer|min:0',
+            'restraint_type' => 'required|string|max:255',
+            'severity' => 'required|in:low,medium,high,critical',
+            'trigger_description' => 'required|string',
+            'de_escalation_attempted' => 'required|string',
+            'restraint_description' => 'required|string',
+            'staff_involved' => 'nullable|array',
+            'person_response' => 'nullable|string',
+            'post_incident_support' => 'nullable|string',
+            'injury_occurred' => 'nullable|boolean',
+            'injury_details' => 'nullable|string',
+            'within_support_plan' => 'nullable|boolean',
+            'deviation_reason' => 'nullable|string',
+            'authorised_by' => 'nullable|exists:users,id',
+            'related_incident_id' => 'nullable|exists:client_incidents,id',
+        ]);
+
+        $started = Carbon::parse($validated['started_at']);
+        $ended = isset($validated['ended_at']) ? Carbon::parse($validated['ended_at']) : null;
+
+        $event = RestraintEvent::create([
+            ...$validated,
+            'stay_id' => $stay->id,
+            'client_id' => $stay->client_id,
+            'site_id' => $stay->booking?->location_id ?: $stay->client?->site_id,
+            'duration_minutes' => $validated['duration_minutes'] ?? ($ended ? $started->diffInMinutes($ended) : null),
+            'injury_occurred' => (bool) ($validated['injury_occurred'] ?? false),
+            'within_support_plan' => (bool) ($validated['within_support_plan'] ?? true),
+            'created_by' => auth()->id(),
+        ]);
+
+        event(new RespiteEvent('respite.stay.restraint_recorded', [
+            'id' => $event->id,
+            'stay_id' => $stay->id,
+            'client_id' => $stay->client_id,
+        ]));
+
+        return back()->with('success', 'Restraint event recorded.');
+    }
+
+    public function recordIncident(Request $request, RespiteStay $stay): RedirectResponse
+    {
+        $stay->loadMissing('client');
+        $this->authorize('view', $stay->client);
+
+        $validated = $request->validate([
+            'type' => 'required|string|max:255',
+            'severity' => 'required|in:low,medium,high,critical',
+            'title' => 'required|string|max:255',
+            'description' => 'required|string',
+            'occurred_at' => 'nullable|date',
+            'immediate_action_taken' => 'nullable|string',
+            'witnesses' => 'nullable|string',
+            'is_notifiable' => 'nullable|boolean',
+            'notification_authority' => 'nullable|in:worksafe,health_nz,privacy_commissioner,charities_services',
+            'incident_type' => 'nullable|in:death,serious_harm,serious_injury,health_safety,privacy_breach',
+        ]);
+
+        $incident = ClientIncident::create([
+            'client_id' => $stay->client_id,
+            'reported_by' => auth()->id(),
+            'respite_stay_id' => $stay->id,
+            'type' => $validated['type'],
+            'severity' => $validated['severity'],
+            'status' => 'submitted',
+            'submitted_at' => now(),
+            'occurred_at' => $validated['occurred_at'] ?? now(),
+            'title' => $validated['title'],
+            'description' => $validated['description'],
+            'requires_followup' => in_array($validated['severity'], ['high', 'critical'], true),
+            'immediate_action_taken' => $validated['immediate_action_taken'] ?? null,
+            'witnesses' => $validated['witnesses'] ?? null,
+            'is_notifiable' => (bool) ($validated['is_notifiable'] ?? false),
+            'metadata' => [
+                'source' => 'respite_stay',
+                'stay_id' => $stay->id,
+            ],
+        ]);
+
+        if ($incident->is_notifiable) {
+            NotifiableIncident::create([
+                'incident_type' => $validated['incident_type'] ?? 'health_safety',
+                'notification_authority' => $validated['notification_authority'] ?? 'health_nz',
+                'title' => $validated['title'],
+                'description' => $validated['description'],
+                'related_incident_id' => $incident->id,
+                'severity' => $validated['severity'],
+                'status' => 'pending',
+                'occurred_at' => $incident->occurred_at,
+                'discovered_at' => now(),
+                'notification_deadline' => now()->addDay(),
+                'submitted_by' => auth()->id(),
+                'evidence' => [
+                    ['type' => 'respite_stay', 'id' => $stay->id],
+                ],
+            ]);
+        }
+
+        event(new RespiteEvent('respite.stay.incident_recorded', [
+            'id' => $incident->id,
+            'stay_id' => $stay->id,
+            'client_id' => $stay->client_id,
+        ]));
+
+        return back()->with('success', 'Incident recorded.');
+    }
+
+    private function postFundingConsumption(?RespiteStay $stay): void
+    {
+        $booking = $stay?->booking;
+        $agreement = $booking?->serviceAgreement;
+
+        if (! $booking || ! $agreement) {
+            return;
+        }
+
+        $start = $stay->actual_start ?: $booking->start_at;
+        $end = $stay->actual_end ?: now();
+
+        if (! $start || ! $end) {
+            return;
+        }
+
+        $nights = max(1, Carbon::parse($start)->startOfDay()->diffInDays(Carbon::parse($end)->startOfDay()));
+        $hours = $nights * 24;
+        $budget = 0.0;
+
+        if ((float) $agreement->daily_rate > 0) {
+            $budget = $nights * (float) $agreement->daily_rate;
+        } elseif ((float) $agreement->hourly_rate > 0) {
+            $budget = $hours * (float) $agreement->hourly_rate;
+        }
+
+        $agreement->forceFill([
+            'hours_used' => (float) ($agreement->hours_used ?? 0) + $hours,
+            'budget_used' => (float) ($agreement->budget_used ?? 0) + $budget,
+        ])->save();
+    }
+
+    private function guardAdmissionMedicationReconciliation(RespiteStay $stay, ?string $overrideReason): void
+    {
+        if (! $this->clientHasActiveMedications($stay->client_id)) {
+            return;
+        }
+
+        $hasCompletedAdmissionMedRec = $stay->medicationReconciliations()
+            ->where('type', 'admission')
+            ->where('status', 'completed')
+            ->exists();
+
+        if ($hasCompletedAdmissionMedRec) {
+            $stay->booking?->update([
+                'medications_reconciled' => true,
+                'medications_reconciled_at' => now(),
+                'medications_reconciled_by' => auth()->id(),
+            ]);
+
+            return;
+        }
+
+        if (blank($overrideReason)) {
+            throw ValidationException::withMessages([
+                'medication_reconciliation' => 'Complete admission medication reconciliation or record an override reason before check-in.',
+            ]);
+        }
+
+        RespiteMedicationReconciliation::updateOrCreate(
+            ['stay_id' => $stay->id, 'type' => 'admission'],
+            [
+                'status' => 'overridden',
+                'override_reason' => $overrideReason,
+                'reconciled_by_user_id' => auth()->id(),
+                'reconciled_at' => now(),
+                'updated_by' => auth()->id(),
+                'created_by' => auth()->id(),
+            ]
+        );
+    }
+
+    private function guardDischargeMedicationReconciliation(RespiteStay $stay, ?array $medRec): void
+    {
+        if (! $this->clientHasActiveMedications($stay->client_id)) {
+            return;
+        }
+
+        if (! empty($medRec) && ! empty($medRec['medicines_returned_to']) && array_key_exists('count', $medRec)) {
+            return;
+        }
+
+        throw ValidationException::withMessages([
+            'discharge_medication_reconciliation' => 'Complete discharge medication reconciliation before transferring care back to whanau or another provider.',
+        ]);
+    }
+
+    private function guardDischargeCompliance(RespiteStay $stay): void
+    {
+        $unreviewedRestraints = $stay->restraintEvents()
+            ->whereNull('reviewed_at')
+            ->exists();
+
+        $openIncidents = $stay->incidents()
+            ->whereNotIn('status', ['reviewed', 'closed'])
+            ->exists();
+
+        $incidentIds = $stay->incidents()->pluck('id');
+        $pendingNotifiables = $incidentIds->isNotEmpty()
+            && NotifiableIncident::whereIn('related_incident_id', $incidentIds)
+                ->where('status', 'pending')
+                ->exists();
+
+        if ($unreviewedRestraints || $openIncidents || $pendingNotifiables) {
+            throw ValidationException::withMessages([
+                'compliance' => 'Resolve open incidents, unreviewed restraint, and pending notifiable-event notifications before discharge.',
+            ]);
+        }
+    }
+
+    private function clientHasActiveMedications(int $clientId): bool
+    {
+        return ClientMedication::query()
+            ->where('client_id', $clientId)
+            ->active()
+            ->exists();
     }
 }

@@ -9,6 +9,45 @@ export interface RespiteHome {
     id: number;
     name: string;
     capacity: number;
+    occupied: number;
+    available: number | null;
+    full: boolean;
+}
+
+export type FundingStatus =
+    | 'not_required'
+    | 'pending_approval'
+    | 'approved'
+    | 'declined'
+    | 'expired';
+
+export interface ServiceAgreementSummary {
+    id: number;
+    title: string | null;
+    referenceNumber: string | null;
+    status: string | null;
+    endsAt: string | null;
+    signedAt: string | null;
+    signedDate: string | null;
+    reviewDueDate: string | null;
+    budgetRemaining: number;
+    hoursRemaining: number;
+}
+
+export interface ReadinessSegment {
+    key: string;
+    label: string;
+    status: 'complete' | 'pending' | 'attention';
+    complete: boolean;
+    message: string | null;
+}
+
+export interface CriticalAlert {
+    type: 'allergy' | 'medication_alert' | 'safeguarding';
+    label: string;
+    detail: string | null;
+    severity: string;
+    requiresAcknowledgement: boolean;
 }
 
 export interface RespiteReferralRow {
@@ -28,6 +67,15 @@ export interface RespiteReferralRow {
     funding: string | null;
     site: string | null;
     triageNotes: string | null;
+    isMaori: boolean;
+    iwi: string | null;
+    hapu: string | null;
+    marae: string | null;
+    interpreterRequired: boolean;
+    interpreterLanguage: string | null;
+    interpreterArranged: boolean;
+    carerStrainLevel: string | null;
+    carerBreakdown: boolean;
 }
 
 export interface RespiteRequestRow {
@@ -42,6 +90,17 @@ export interface RespiteRequestRow {
     end: string | null;
     nights: number | null;
     funding: string | null;
+    fundingSource: string | null;
+    fundingReference: string | null;
+    fundingStatus: FundingStatus;
+    serviceAgreement: ServiceAgreementSummary | null;
+    priority: string | null;
+    waitlistPosition: number | null;
+    expectedAvailabilityDate: string | null;
+    isEmergency: boolean;
+    fastTracked: boolean;
+    carer: Record<string, unknown> | null;
+    cultural: Record<string, unknown> | null;
     site: string | null;
     serviceContext: string | null;
     reviewer: string | null;
@@ -64,7 +123,21 @@ export interface RespiteBookingRow {
     nights: number | null;
     site: string | null;
     coordinator: string | null;
+    funding: string | null;
+    fundingSource: string | null;
+    fundingReference: string | null;
+    fundingStatus: FundingStatus;
+    serviceAgreement: ServiceAgreementSummary | null;
+    agreementStatus: string | null;
+    consentAuthority: string | null;
+    culturalSnapshot: Record<string, unknown> | null;
+    interpreterArranged: boolean;
+    copaymentAmount: number | null;
+    copaymentStatus: string | null;
+    recurrenceRule: string | null;
+    criticalAlerts: CriticalAlert[];
     readiness: number;
+    readinessSegments: ReadinessSegment[];
     hasStay: boolean;
 }
 
@@ -80,6 +153,12 @@ export interface RespiteStayRow {
     actualStart: string | null;
     actualEnd: string | null;
     plannedEnd: string | null;
+    dischargeReason: string | null;
+    unreviewedRestraints: number;
+    openIncidents: number;
+    criticalAlerts: CriticalAlert[];
+    requiresAdmissionMedRec: boolean;
+    admissionMedRecStatus: string | null;
 }
 
 export interface RespiteTaskRow {
@@ -100,11 +179,16 @@ export interface RespiteStats {
     newReferrals: number;
     toTriage: number;
     crisisOpen: number;
+    carerCrisisAttention: number;
     awaitingReview: number;
+    waitlisted: number;
     confirmedUpcoming: number;
     inHouse: number;
     bedsTotal: number;
     bedsOccupied: number;
+    fullHomes: number;
+    fundingAttention: number;
+    complianceAttention: number;
 }
 
 export interface ClientOption {

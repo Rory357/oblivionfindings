@@ -45,7 +45,7 @@ class FleetDemoSeeder extends Seeder
                 'category' => 'essential',
                 'description' => 'Tracking consent for fleet vehicles.',
                 'purpose' => 'Enable vehicle tracking.',
-                'legal_basis' => 'GDPR Art 6',
+                'legal_basis' => 'Privacy Act 2020 IPP basis',
                 'version' => 1,
                 'active' => true,
             ]);

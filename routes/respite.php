@@ -1,20 +1,20 @@
 <?php
 
-use Illuminate\Support\Facades\Route;
-use App\Http\Controllers\Respite\RespiteReferralController;
-use App\Http\Controllers\Respite\RespiteBookingRequestController;
 use App\Http\Controllers\Respite\RespiteBookingController;
-use App\Http\Controllers\Respite\RespiteStayController;
-use App\Http\Controllers\Respite\RespiteResourceAllocationController;
-use App\Http\Controllers\Respite\RespiteWorkspaceController;
-use App\Http\Controllers\Respite\RespiteProcedureTemplateController;
-use App\Http\Controllers\Respite\RespiteHandoverNoteController;
+use App\Http\Controllers\Respite\RespiteBookingRequestController;
 use App\Http\Controllers\Respite\RespiteCommunicationLogController;
-use App\Http\Controllers\Respite\RespiteEvidencePackController;
-use App\Http\Controllers\Respite\RespiteProcedureRunController;
-use App\Http\Controllers\Respite\RespiteTaskController;
 use App\Http\Controllers\Respite\RespiteDailyNoteController;
+use App\Http\Controllers\Respite\RespiteEvidencePackController;
+use App\Http\Controllers\Respite\RespiteHandoverNoteController;
+use App\Http\Controllers\Respite\RespiteProcedureRunController;
+use App\Http\Controllers\Respite\RespiteProcedureTemplateController;
+use App\Http\Controllers\Respite\RespiteReferralController;
+use App\Http\Controllers\Respite\RespiteResourceAllocationController;
 use App\Http\Controllers\Respite\RespiteRiskPlanActivationController;
+use App\Http\Controllers\Respite\RespiteStayController;
+use App\Http\Controllers\Respite\RespiteTaskController;
+use App\Http\Controllers\Respite\RespiteWorkspaceController;
+use Illuminate\Support\Facades\Route;
 
 Route::middleware(['auth'])->group(function () {
     Route::middleware('permission:respite.viewAny')->group(function () {
@@ -57,6 +57,9 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/respite/requests/{request}/approve', [RespiteBookingRequestController::class, 'approve'])
         ->middleware('permission:respite.bookings.manage')
         ->name('respite.requests.approve');
+    Route::post('/respite/requests/{request}/promote', [RespiteBookingRequestController::class, 'promote'])
+        ->middleware('permission:respite.bookings.manage')
+        ->name('respite.requests.promote');
 
     // Bookings
     Route::middleware('permission:respite.bookings.manage')->group(function () {
@@ -78,6 +81,8 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/respite/stays/{stay}/check-in', [RespiteStayController::class, 'checkIn'])->name('respite.stays.checkin');
         Route::post('/respite/stays/{stay}/extend', [RespiteStayController::class, 'extend'])->name('respite.stays.extend');
         Route::post('/respite/stays/{stay}/discharge', [RespiteStayController::class, 'discharge'])->name('respite.stays.discharge');
+        Route::post('/respite/stays/{stay}/restraints', [RespiteStayController::class, 'recordRestraint'])->name('respite.stays.restraints.store');
+        Route::post('/respite/stays/{stay}/incidents', [RespiteStayController::class, 'recordIncident'])->name('respite.stays.incidents.store');
     });
     Route::get('/respite/stays/{stay}', [RespiteStayController::class, 'show'])
         ->middleware('permission:respite.viewAny')

@@ -80,7 +80,7 @@ export default function ClientFundCreate({ clients }: Props) {
                                     id="funding_source"
                                     value={data.funding_source}
                                     onChange={(e) => setData('funding_source', e.target.value)}
-                                    placeholder="e.g. Ministry of Health, ACC, NASC"
+                                    placeholder="e.g. Te Whatu Ora, ACC, NASC"
                                 />
                             </div>
 

@@ -2,13 +2,13 @@
 
 namespace App\Http\Controllers\Respite;
 
+use App\Events\Respite\RespiteEvent;
 use App\Http\Controllers\Controller;
+use App\Models\RespiteAuditLog;
 use App\Models\RespiteDailyNote;
 use App\Models\RespiteStay;
-use App\Models\RespiteAuditLog;
-use App\Events\Respite\RespiteEvent;
-use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -67,6 +67,10 @@ class RespiteDailyNoteController extends Controller
             'appetite' => 'nullable|in:none,minimal,fair,good,excellent',
             'sleep_quality' => 'nullable|in:very_poor,poor,fair,good,excellent',
             'engagement' => 'nullable|in:none,minimal,moderate,good,excellent',
+            'taha_wairua' => 'nullable|in:very_low,low,neutral,good,excellent',
+            'taha_whanau' => 'nullable|in:very_low,low,neutral,good,excellent',
+            'whanau_contact' => 'nullable|string|max:2000',
+            'cultural_support_provided' => 'nullable|string|max:2000',
             'mobility' => 'nullable|in:bedbound,limited,assisted,independent',
             'activities' => 'nullable|string|max:2000',
             'observations' => 'nullable|string|max:5000',
@@ -98,7 +102,7 @@ class RespiteDailyNoteController extends Controller
             'id' => $note->id,
             'stay_id' => $note->stay_id,
             'client_id' => $note->client_id,
-            'has_concerns' => !empty($note->concerns),
+            'has_concerns' => ! empty($note->concerns),
             'has_incident' => $note->incident_occurred,
         ]));
 
@@ -132,7 +136,7 @@ class RespiteDailyNoteController extends Controller
     {
         $oldValues = $dailyNote->only([
             'mood', 'appetite', 'sleep_quality', 'engagement', 'mobility',
-            'concerns', 'incident_occurred', 'sensitive_flag'
+            'concerns', 'incident_occurred', 'sensitive_flag',
         ]);
 
         $validated = $request->validate([
@@ -140,6 +144,10 @@ class RespiteDailyNoteController extends Controller
             'appetite' => 'nullable|in:none,minimal,fair,good,excellent',
             'sleep_quality' => 'nullable|in:very_poor,poor,fair,good,excellent',
             'engagement' => 'nullable|in:none,minimal,moderate,good,excellent',
+            'taha_wairua' => 'nullable|in:very_low,low,neutral,good,excellent',
+            'taha_whanau' => 'nullable|in:very_low,low,neutral,good,excellent',
+            'whanau_contact' => 'nullable|string|max:2000',
+            'cultural_support_provided' => 'nullable|string|max:2000',
             'mobility' => 'nullable|in:bedbound,limited,assisted,independent',
             'activities' => 'nullable|string|max:2000',
             'observations' => 'nullable|string|max:5000',

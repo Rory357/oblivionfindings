@@ -17,7 +17,7 @@ class PrivacyDashboardController extends Controller
     {
         abort_unless($request->user()?->canDo('privacy.viewRequests'), 403);
 
-        // Data Subject Requests stats
+        // Privacy Requests stats
         $dsrStats = [
             'total' => DataSubjectRequest::count(),
             'pending' => DataSubjectRequest::whereIn('status', ['received', 'under_review', 'identity_verification', 'in_progress'])->count(),

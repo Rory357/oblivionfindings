@@ -426,13 +426,13 @@ class RbacSeeder extends Seeder
             ['key' => 'consents.withdraw', 'description' => 'Process consent withdrawal', 'group' => 'consents', 'module' => 'Compliance'],
             ['key' => 'consents.request', 'description' => 'Request consent via family portal', 'group' => 'consents', 'module' => 'Compliance'],
 
-            // Data Privacy & GDPR
-            ['key' => 'privacy.viewRequests', 'description' => 'View data subject requests', 'group' => 'privacy', 'module' => 'Compliance'],
-            ['key' => 'privacy.processRequests', 'description' => 'Process GDPR requests', 'group' => 'privacy', 'module' => 'Compliance'],
+            // Data Privacy
+            ['key' => 'privacy.viewRequests', 'description' => 'View privacy requests', 'group' => 'privacy', 'module' => 'Compliance'],
+            ['key' => 'privacy.processRequests', 'description' => 'Process Privacy Act 2020 requests', 'group' => 'privacy', 'module' => 'Compliance'],
             ['key' => 'privacy.manageRetention', 'description' => 'Manage data retention policies', 'group' => 'privacy', 'module' => 'Compliance'],
             ['key' => 'privacy.manageLegalHolds', 'description' => 'Manage legal holds', 'group' => 'privacy', 'module' => 'Compliance'],
             ['key' => 'privacy.reportBreaches', 'description' => 'Report data breaches', 'group' => 'privacy', 'module' => 'Compliance'],
-            ['key' => 'privacy.conductDPIA', 'description' => 'Conduct DPIAs', 'group' => 'privacy', 'module' => 'Compliance'],
+            ['key' => 'privacy.conductDPIA', 'description' => 'Conduct PIAs', 'group' => 'privacy', 'module' => 'Compliance'],
 
             // Hazards
             ['key' => 'hazards.view', 'description' => 'View hazards', 'group' => 'hazards', 'module' => 'Compliance'],

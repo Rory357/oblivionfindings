@@ -226,11 +226,13 @@ export default function ServiceAgreementEdit({ agreement, clients }: Props) {
     const showApprovalSection = agreement.status === 'draft' || agreement.status === 'pending_approval';
 
     const AGREEMENT_TYPES: Record<string, string> = {
-        ndis: 'NDIS',
+        whaikaha: 'Whaikaha',
+        carer_support: 'Carer Support',
+        nasc: 'NASC-allocated',
+        egl_if: 'EGL / Individualised Funding',
+        te_whatu_ora: 'Te Whatu Ora',
         msd: 'MSD — Ministry of Social Development',
-        dss: 'DSS — Disability Support Services',
         acc: 'ACC — Accident Compensation',
-        dhb: 'Health NZ / Te Whatu Ora',
         oranga_tamariki: 'Oranga Tamariki',
         private: 'Private / Self-Funded',
         charitable: 'Charitable Trust / NGO',
@@ -282,7 +284,7 @@ export default function ServiceAgreementEdit({ agreement, clients }: Props) {
                                         <Input
                                             value={data.title}
                                             onChange={(e) => setData('title', e.target.value)}
-                                            placeholder="e.g. DSS Residential Support 2026"
+                                            placeholder="e.g. Whaikaha Residential Support 2026"
                                         />
                                         {errors.title && <p className="text-xs text-destructive">{errors.title}</p>}
                                     </div>
@@ -459,7 +461,7 @@ export default function ServiceAgreementEdit({ agreement, clients }: Props) {
                                 icon={Landmark}
                                 iconBg="bg-primary/10 text-primary"
                                 title="NZ Funding Details"
-                                description="Whaikaha / DSS funding type and service level details."
+                                description="Whaikaha, NASC, ACC or private funding type and service level details."
                             />
                             <div className="space-y-4">
                                 <div className="grid gap-4 sm:grid-cols-2">

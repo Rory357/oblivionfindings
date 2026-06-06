@@ -20,6 +20,10 @@ class RespiteDailyNote extends Model
         'appetite',
         'sleep_quality',
         'engagement',
+        'taha_wairua',
+        'taha_whanau',
+        'whanau_contact',
+        'cultural_support_provided',
         'mobility',
         'activities',
         'observations',
@@ -45,22 +49,33 @@ class RespiteDailyNote extends Model
 
     // Shift periods
     public const SHIFT_MORNING = 'morning';
+
     public const SHIFT_AFTERNOON = 'afternoon';
+
     public const SHIFT_EVENING = 'evening';
+
     public const SHIFT_NIGHT = 'night';
+
     public const SHIFT_ALL_DAY = 'all_day';
 
     // Wellbeing levels
     public const LEVEL_VERY_LOW = 'very_low';
+
     public const LEVEL_LOW = 'low';
+
     public const LEVEL_NEUTRAL = 'neutral';
+
     public const LEVEL_GOOD = 'good';
+
     public const LEVEL_EXCELLENT = 'excellent';
 
     // Mobility levels
     public const MOBILITY_BEDBOUND = 'bedbound';
+
     public const MOBILITY_LIMITED = 'limited';
+
     public const MOBILITY_ASSISTED = 'assisted';
+
     public const MOBILITY_INDEPENDENT = 'independent';
 
     public function stay(): BelongsTo
@@ -132,7 +147,7 @@ class RespiteDailyNote extends Model
     // Helper methods
     public function hasConcerns(): bool
     {
-        return !empty($this->concerns);
+        return ! empty($this->concerns);
     }
 
     public function hasIncident(): bool
@@ -168,6 +183,12 @@ class RespiteDailyNote extends Model
         }
         if ($this->engagement) {
             $scores[] = $levels[$this->engagement] ?? 3;
+        }
+        if ($this->taha_wairua) {
+            $scores[] = $levels[$this->taha_wairua] ?? 3;
+        }
+        if ($this->taha_whanau) {
+            $scores[] = $levels[$this->taha_whanau] ?? 3;
         }
 
         if (empty($scores)) {

@@ -9,7 +9,7 @@ import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@
 import { Head, useForm } from '@inertiajs/react';
 import { Activity } from 'lucide-react';
 
-type DPIA = {
+type PIA = {
     id: number;
     assessment_name: string;
     project_or_process: string;
@@ -28,7 +28,7 @@ type DPIA = {
 };
 
 type Props = {
-    dpia: DPIA;
+    dpia: PIA;
     staff: Array<{ id: number; name: string }>;
 };
 
@@ -42,7 +42,7 @@ const parseList = (value: string) => {
     return items.length ? items : null;
 };
 
-export default function EditDPIA({ dpia, staff: _staff }: Props) {
+export default function EditPIA({ dpia, staff: _staff }: Props) {
     const form = useForm({
         assessment_name: dpia.assessment_name || '',
         project_or_process: dpia.project_or_process || '',
@@ -80,18 +80,18 @@ export default function EditDPIA({ dpia, staff: _staff }: Props) {
 
     return (
         <AppLayout breadcrumbs={[
-            { title: 'Privacy & GDPR', href: '/privacy/dashboard' },
+            { title: 'Privacy', href: '/privacy/dashboard' },
             { title: 'Impact Assessments', href: '/privacy/dpia' },
             { title: dpia.assessment_name, href: `/privacy/dpia/${dpia.id}/edit` },
         ]}>
-            <Head title={`Edit DPIA - ${dpia.assessment_name}`} />
+            <Head title={`Edit PIA - ${dpia.assessment_name}`} />
 
             <PageLayout
                 hero={
                     <PageHero
                         variant="compact"
                         backHref="/privacy/dpia"
-                        title="Edit DPIA"
+                        title="Edit PIA"
                         description={`Outcome: ${dpia.outcome ? dpia.outcome.replace(/_/g, ' ') : 'Pending review'}`}
                     />
                 }
@@ -172,7 +172,7 @@ export default function EditDPIA({ dpia, staff: _staff }: Props) {
                                     {errors.personal_data_types && <p className="text-xs text-status-critical">{errors.personal_data_types}</p>}
                                 </div>
                                 <div className="space-y-2">
-                                    <Label>Data Subjects</Label>
+                                    <Label>People affected</Label>
                                     <Textarea
                                         value={data.data_subjects}
                                         onChange={(e) => setData('data_subjects', e.target.value)}

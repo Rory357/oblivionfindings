@@ -7,7 +7,6 @@ use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\SoftDeletes;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Validation\Rule;
 
 class Client extends Model
 {
@@ -19,6 +18,7 @@ class Client extends Model
         'user_id',
         'organization_id',
         'nhi_number',
+        'nhi_hash',
         'site_id',
         'service_context_id',
         'first_name',
@@ -42,6 +42,9 @@ class Client extends Model
         'transport_needs',
         'transport_notes',
         'ethnicity',
+        'iwi',
+        'hapu',
+        'marae',
         'languages',
         'preferred_pronouns',
         'religion',
@@ -54,6 +57,7 @@ class Client extends Model
         'sensory_needs',
         'cognitive_needs',
         'dietary_requirements',
+        'cultural_dietary_needs',
         'sleep_preferences',
         'service_start_date',
         'key_worker_id',
@@ -216,6 +220,11 @@ class Client extends Model
         return $this->hasMany(MedicationAllergy::class);
     }
 
+    public function safeguardingAlerts()
+    {
+        return $this->morphMany(SafeguardingAlert::class, 'alertable');
+    }
+
     public function documents()
     {
         return $this->hasMany(ClientDocument::class);
@@ -271,7 +280,7 @@ class Client extends Model
      */
     public function scopeByNhi($query, string $nhi)
     {
-        return $query->where('nhi_number', strtoupper($nhi));
+        return $query->where('nhi_hash', self::nhiHash($nhi));
     }
 
     /**
@@ -282,23 +291,46 @@ class Client extends Model
         return preg_match('/^[A-Z]{3}\d{4}$/i', $nhi) === 1;
     }
 
+    public static function normaliseNhi(?string $nhi): ?string
+    {
+        $normalised = strtoupper(preg_replace('/\s+/', '', (string) $nhi));
+
+        return $normalised !== '' ? $normalised : null;
+    }
+
+    public static function nhiHash(?string $nhi): ?string
+    {
+        $normalised = self::normaliseNhi($nhi);
+
+        return $normalised ? hash('sha256', $normalised) : null;
+    }
+
     /**
      * Validation rules for NHI number.
      */
     public static function nhiValidationRules(?int $ignoreClientId = null): array
     {
-        $unique = Rule::unique('clients', 'nhi_number');
-
-        if ($ignoreClientId !== null) {
-            $unique = $unique->ignore($ignoreClientId);
-        }
-
         return [
             'nullable',
             'string',
             'max:10',
             'regex:/^[A-Z]{3}\d{4}$/i',
-            $unique,
+            function (string $attribute, mixed $value, \Closure $fail) use ($ignoreClientId): void {
+                $hash = self::nhiHash((string) $value);
+
+                if (! $hash) {
+                    return;
+                }
+
+                $exists = self::query()
+                    ->where('nhi_hash', $hash)
+                    ->when($ignoreClientId !== null, fn ($query) => $query->whereKeyNot($ignoreClientId))
+                    ->exists();
+
+                if ($exists) {
+                    $fail('The NHI number is already attached to another client.');
+                }
+            },
         ];
     }
 
@@ -307,10 +339,13 @@ class Client extends Model
         static::saving(function (Client $client) {
             $raw = $client->nhi_number;
             if ($raw) {
-                $upper = strtoupper($raw);
+                $upper = self::normaliseNhi($raw);
                 if ($upper !== $raw) {
                     $client->nhi_number = $upper;
                 }
+                $client->nhi_hash = self::nhiHash($upper);
+            } else {
+                $client->nhi_hash = null;
             }
         });
     }

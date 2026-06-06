@@ -121,7 +121,7 @@
             </div>
 
             <p>In the meantime, feel free to explore our website to learn more about our features 
-            and how we're helping supported living providers across the UK.</p>
+            and how we're helping supported living providers across New Zealand.</p>
 
             <center>
                 <a href="{{ config('app.url') }}/features" class="cta-button">Explore Features</a>

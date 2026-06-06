@@ -24,12 +24,12 @@ type Props = {
     };
 };
 
-export default function DPIAIndex({ filters, dpias, stats }: Props) {
+export default function PIAIndex({ filters, dpias, stats }: Props) {
     const ANY = '__any__';
     const OUTCOME_LABELS: Record<string, string> = {
         approved: 'approved',
         approved_with_conditions: 'approved with conditions',
-        requires_dpo_review: 'requires DPO review',
+        requires_dpo_review: 'requires Privacy Officer review',
         rejected: 'rejected',
     };
     const RISK_LABELS: Record<string, string> = {
@@ -85,7 +85,7 @@ export default function DPIAIndex({ filters, dpias, stats }: Props) {
 
     return (
         <AppLayout breadcrumbs={[
-            { title: 'Privacy & GDPR', href: '/privacy/dashboard' },
+            { title: 'Privacy', href: '/privacy/dashboard' },
             { title: 'Impact Assessments', href: '/privacy/dpia' }
         ]}>
             <Head title="Data Protection Impact Assessments" />
@@ -94,7 +94,7 @@ export default function DPIAIndex({ filters, dpias, stats }: Props) {
                 {/* Hero Header */}
                 <PageHero
                     title="Data Protection Impact Assessments"
-                    description="GDPR Article 35 — Assess risks of data processing activities"
+                    description="Privacy Impact Assessment — assess privacy risks before processing changes"
                     icon={<Activity className="h-7 w-7 text-white" />}
                     stats={stats ? [
                         { label: 'Total', value: stats.total },
@@ -144,7 +144,7 @@ export default function DPIAIndex({ filters, dpias, stats }: Props) {
                                     <SelectItem value={ANY}>Any</SelectItem>
                                     <SelectItem value="approved">Approved</SelectItem>
                                     <SelectItem value="approved_with_conditions">Approved with Conditions</SelectItem>
-                                    <SelectItem value="requires_dpo_review">Requires DPO Review</SelectItem>
+                                    <SelectItem value="requires_dpo_review">Requires Privacy Officer Review</SelectItem>
                                     <SelectItem value="rejected">Rejected</SelectItem>
                                 </SelectContent>
                             </Select>

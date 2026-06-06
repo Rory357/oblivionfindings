@@ -572,7 +572,7 @@ const Features: React.FC = () => {
                             <ul className="mt-6 space-y-3">
                                 {[
                                     'Accounting and payroll systems',
-                                    'DHB and NASC portals',
+                                    'Te Whatu Ora and NASC portals',
                                     'Pharmacy systems',
                                     'Communication tools (Teams, Slack)',
                                     'Business intelligence platforms',

@@ -32,7 +32,7 @@ export default function DataRetentionPolicies({ filters, policies, stats }: Prop
 
     return (
         <AppLayout breadcrumbs={[
-            { title: 'Privacy & GDPR', href: '/privacy/dashboard' },
+            { title: 'Privacy', href: '/privacy/dashboard' },
             { title: 'Data Retention Policies', href: '/privacy/retention' }
         ]}>
             <Head title="Data Retention Policies" />

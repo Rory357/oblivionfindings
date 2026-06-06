@@ -75,7 +75,7 @@ export default function EditLegalHold({ hold }: Props) {
 
     return (
         <AppLayout breadcrumbs={[
-            { title: 'Privacy & GDPR', href: '/privacy/dashboard' },
+            { title: 'Privacy', href: '/privacy/dashboard' },
             { title: 'Legal Holds', href: '/privacy/legal-holds' },
             { title: hold.hold_reference, href: `/privacy/legal-holds/${hold.id}/edit` },
         ]}>

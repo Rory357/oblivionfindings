@@ -23,7 +23,7 @@ test('intake creates a lightweight client and a referral from new_client fields'
                 'nhi_number' => 'ABC1234',
             ],
             'referrer_name' => 'Te Whatu Ora — Waitematā',
-            'referrer_type' => 'DHB',
+            'referrer_type' => 'Te Whatu Ora',
             'referral_reason' => 'Carer hospitalised — emergency cover needed within 24h',
             'urgency' => 'crisis',
             'risk_level' => 'high',

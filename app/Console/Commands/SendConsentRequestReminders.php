@@ -8,14 +8,14 @@ use Illuminate\Console\Command;
 
 /**
  * Sends a one-off reminder to recipients of pending ConsentRequest rows
- * whose expires_at falls within the 24-72h reminder window. Idempotent —
+ * whose expires_at falls between one and three days away. Idempotent —
  * skips rows whose audit_trail already contains a reminder_sent event.
  */
 class SendConsentRequestReminders extends Command
 {
     protected $signature = 'consent-requests:send-reminders';
 
-    protected $description = 'Send reminders for pending consent requests expiring in 24-72 hours.';
+    protected $description = 'Send reminders for pending consent requests expiring in one to three days.';
 
     public function handle(ConsentRequestService $service): int
     {

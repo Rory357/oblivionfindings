@@ -46,13 +46,13 @@ return new class extends Migration
             $table->index(['model_type', 'active']);
         });
 
-        // Data subject requests (GDPR)
+        // Data subject requests (Privacy Act 2020)
         Schema::create('data_subject_requests', function (Blueprint $table) {
             $table->id();
             $table->string('reference_number')->unique();
 
             $table->enum('request_type', [
-                'access', // Right to access (Article 15)
+                'access', // Right to access (IPP 6)
                 'rectification', // Right to rectification (Article 16)
                 'erasure', // Right to erasure/be forgotten (Article 17)
                 'restriction', // Right to restriction of processing (Article 18)
@@ -89,7 +89,7 @@ return new class extends Migration
             ])->default('received');
 
             $table->timestamp('received_at');
-            $table->date('due_date'); // 30 days from receipt (GDPR requirement)
+            $table->date('due_date'); // 30 days from receipt (Privacy Act 2020 requirement)
             $table->boolean('extension_requested')->default(false);
             $table->date('extended_due_date')->nullable();
             $table->text('extension_reason')->nullable();
@@ -189,7 +189,7 @@ return new class extends Migration
             $table->index(['status', 'review_date']);
         });
 
-        // Anonymization log (for GDPR compliance)
+        // Anonymization log (for Privacy Act 2020 compliance)
         Schema::create('anonymization_logs', function (Blueprint $table) {
             $table->id();
 
@@ -214,7 +214,7 @@ return new class extends Migration
             $table->index('anonymized_at');
         });
 
-        // Data breach log (GDPR Article 33)
+        // Data breach log (Privacy Act 2020 notifiable breach)
         Schema::create('data_breach_logs', function (Blueprint $table) {
             $table->id();
             $table->string('breach_reference')->unique();

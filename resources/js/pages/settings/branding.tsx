@@ -912,7 +912,7 @@ export default function BrandingPage(props: Props) {
                                             <div className="space-y-1">
                                                 <p className="text-sm text-muted-foreground">
                                                     32x32px recommended. PNG,
-                                                    ICO, or SVG.
+                                                    OPC, or SVG.
                                                 </p>
                                                 {form.data.favicon && (
                                                     <p className="text-xs font-medium text-primary">

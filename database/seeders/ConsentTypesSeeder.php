@@ -125,9 +125,9 @@ class ConsentTypesSeeder extends Seeder
                 'active' => true,
             ],
             [
-                'name' => 'Data Processing (GDPR)',
+                'name' => 'Data Processing (Privacy Act 2020)',
                 'category' => 'data_protection',
-                'description' => 'Consent to process personal data in accordance with GDPR regulations for care delivery and service improvement.',
+                'description' => 'Consent to process personal data in accordance with Privacy Act 2020 regulations for care delivery and service improvement.',
                 'purpose' => 'To lawfully process personal data for care provision, safety monitoring, and regulatory compliance.',
                 'legal_basis' => 'consent',
                 'is_mandatory' => true,

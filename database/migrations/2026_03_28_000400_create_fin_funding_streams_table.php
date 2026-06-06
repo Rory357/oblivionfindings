@@ -13,7 +13,17 @@ return new class extends Migration
             $table->unsignedBigInteger('organization_id')->index();
             $table->string('code', 20);
             $table->string('name');
-            $table->enum('funder_type', ['whaikaha', 'acc', 'nasc', 'private_pay', 'moh', 'other']);
+            $table->enum('funder_type', [
+                'whaikaha',
+                'carer_support',
+                'nasc',
+                'egl_if',
+                'acc',
+                'te_whatu_ora',
+                'msd',
+                'private',
+                'other',
+            ]);
             $table->string('contact_name')->nullable();
             $table->string('contact_email')->nullable();
             $table->unsignedBigInteger('default_revenue_account_id')->nullable();

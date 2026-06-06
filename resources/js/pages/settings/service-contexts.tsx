@@ -149,7 +149,7 @@ const CATEGORY_COLOURS: Record<
     },
 };
 
-const CATEGORY_ICONS: Record<
+const CATEGORY_OPCNS: Record<
     string,
     React.ComponentType<{ className?: string }>
 > = {
@@ -676,7 +676,7 @@ export default function ServiceContextsPage(props: Props) {
                                                         e.target.value,
                                                     )
                                                 }
-                                                placeholder="e.g. Whaikaha, DSS"
+                                                placeholder="e.g. Whaikaha, Whaikaha"
                                             />
                                         </div>
                                         <div className="space-y-2">
@@ -820,7 +820,7 @@ export default function ServiceContextsPage(props: Props) {
                                 const colours =
                                     CATEGORY_COLOURS[cat] ??
                                     CATEGORY_COLOURS['Flexible / Other'];
-                                const IconComp = CATEGORY_ICONS[cat] ?? Puzzle;
+                                const IconComp = CATEGORY_OPCNS[cat] ?? Puzzle;
 
                                 return (
                                     <div

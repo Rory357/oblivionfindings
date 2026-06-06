@@ -8,7 +8,6 @@ import {
     AlertTriangle,
     Calendar,
     CheckCircle,
-    Clock,
     Shield,
     User,
 } from 'lucide-react';
@@ -45,7 +44,7 @@ export default function ShowDataBreach({ breach }: Props) {
 
     const formatDate = (dateString: string) => {
         if (!dateString) return 'N/A';
-        return new Date(dateString).toLocaleDateString('en-GB', {
+        return new Date(dateString).toLocaleDateString('en-NZ', {
             day: '2-digit',
             month: 'short',
             year: 'numeric',
@@ -54,28 +53,14 @@ export default function ShowDataBreach({ breach }: Props) {
         });
     };
 
-    const hoursFromDiscovery = () => {
-        const discovered = new Date(breach.discovered_at);
-        const now = new Date();
-        return Math.floor(
-            (now.getTime() - discovered.getTime()) / (1000 * 60 * 60),
-        );
-    };
-
-    const hours = hoursFromDiscovery();
-    const icoDeadlineApproaching =
+    const authorityNotificationPending =
         breach.requires_authority_notification &&
-        !breach.authority_notified_at &&
-        hours < 72;
-    const icoDeadlinePassed =
-        breach.requires_authority_notification &&
-        !breach.authority_notified_at &&
-        hours >= 72;
+        !breach.authority_notified_at;
 
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Privacy & GDPR', href: '/privacy/dashboard' },
+                { title: 'Privacy', href: '/privacy/dashboard' },
                 { title: 'Data Breaches', href: '/privacy/breaches' },
                 {
                     title: breach.breach_reference,
@@ -101,23 +86,13 @@ export default function ShowDataBreach({ breach }: Props) {
                             >
                                 {statusLabels[breach.status] ?? breach.status}
                             </Badge>
-                            {icoDeadlinePassed && (
+                            {authorityNotificationPending && (
                                 <Badge
                                     variant="outline"
                                     className="border-status-critical/30 bg-status-critical-bg text-status-critical"
                                 >
                                     <AlertTriangle className="mr-1 h-3 w-3" />
-                                    ICO deadline exceeded ({hours}h since discovery)
-                                </Badge>
-                            )}
-                            {icoDeadlineApproaching && (
-                                <Badge
-                                    variant="outline"
-                                    className="border-status-warning/30 bg-status-warning-bg text-status-warning"
-                                    data-test="privacy-breach-ico-countdown"
-                                >
-                                    <Clock className="mr-1 h-3 w-3" />
-                                    {72 - hours}h until ICO deadline
+                                    OPC notification pending
                                 </Badge>
                             )}
                             {breach.authority_notified_at && (
@@ -126,7 +101,7 @@ export default function ShowDataBreach({ breach }: Props) {
                                     className="border-status-success/30 bg-status-success-bg text-status-success"
                                 >
                                     <CheckCircle className="mr-1 h-3 w-3" />
-                                    ICO Notified
+                                    OPC Notified
                                 </Badge>
                             )}
                             {breach.subjects_notified_at && (
@@ -172,7 +147,7 @@ export default function ShowDataBreach({ breach }: Props) {
                             {breach.authority_notified_at && (
                                 <div>
                                     <span className="text-xs text-muted-foreground">
-                                        ICO Notified
+                                        OPC Notified
                                     </span>
                                     <p className="font-medium">
                                         {formatDate(
@@ -234,7 +209,7 @@ export default function ShowDataBreach({ breach }: Props) {
                             </div>
                             <div>
                                 <span className="text-xs text-muted-foreground">
-                                    ICO Notification Required
+                                    OPC Notification Required
                                 </span>
                                 <p className="font-medium">
                                     {breach.requires_authority_notification
@@ -319,7 +294,7 @@ export default function ShowDataBreach({ breach }: Props) {
                                         data-test="privacy-breach-notify-ico"
                                         onClick={() => {
                                             const reference = prompt(
-                                                'Enter ICO reference number (if available):',
+                                                'Enter OPC reference number (if available):',
                                             );
                                             router.post(
                                                 `/privacy/breaches/${breach.id}/notify-ico`,
@@ -330,7 +305,7 @@ export default function ShowDataBreach({ breach }: Props) {
                                             );
                                         }}
                                     >
-                                        Record ICO Notification
+                                        Record OPC Notification
                                     </Button>
                                 )}
                             {breach.requires_subject_notification &&

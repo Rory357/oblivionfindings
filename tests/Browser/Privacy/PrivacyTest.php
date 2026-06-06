@@ -73,23 +73,23 @@ test('privacy retention create page loads', function () {
     });
 });
 
-test('privacy DPIA page loads', function () {
+test('privacy PIA page loads', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/privacy/dpia')
-            ->waitForText('DPIA', 10)
-            ->assertSee('DPIA');
+            ->waitForText('PIA', 10)
+            ->assertSee('PIA');
     });
 });
 
-test('privacy DPIA create page loads', function () {
+test('privacy PIA create page loads', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
             ->visit('/privacy/dpia/create')
-            ->waitForText('DPIA', 10)
-            ->assertSee('DPIA');
+            ->waitForText('PIA', 10)
+            ->assertSee('PIA');
     });
 });
 

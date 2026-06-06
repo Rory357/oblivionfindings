@@ -55,20 +55,20 @@ export default function PrivacyDashboard({
     };
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Privacy & GDPR', href: '/privacy/dashboard' }]}>
-            <Head title="Privacy & GDPR Dashboard" />
+        <AppLayout breadcrumbs={[{ title: 'Privacy', href: '/privacy/dashboard' }]}>
+            <Head title="Privacy Dashboard" />
 
             <div className="flex flex-col gap-6 p-6">
                 {/* Hero Header */}
                 <PageHero
-                    title="Privacy & GDPR Dashboard"
+                    title="Privacy Dashboard"
                     description="Data protection compliance overview and management"
                     icon={<Shield className="h-7 w-7 text-white" />}
                     stats={[
                         { label: 'Pending DSRs', value: dsrStats.pending },
                         { label: 'Open Breaches', value: breachStats.open },
                         { label: 'Active Holds', value: activeHolds },
-                        { label: 'Pending DPIAs', value: dpiaStats.pending_review },
+                        { label: 'Pending PIAs', value: dpiaStats.pending_review },
                     ]}
                 />
 
@@ -79,7 +79,7 @@ export default function PrivacyDashboard({
                             <CardHeader className="pb-2">
                                 <CardTitle className="flex items-center gap-2 text-sm font-medium">
                                     <FileText className="h-4 w-4 text-status-info" />
-                                    Data Subject Requests
+                                    Privacy Requests
                                 </CardTitle>
                             </CardHeader>
                             <CardContent>
@@ -109,7 +109,7 @@ export default function PrivacyDashboard({
                                 {breachStats.requiring_notification > 0 && (
                                     <div className="mt-2 flex items-center gap-1 text-xs text-status-warning">
                                         <Clock className="h-3 w-3" />
-                                        {breachStats.requiring_notification} requiring ICO notification
+                                        {breachStats.requiring_notification} requiring OPC notification
                                     </div>
                                 )}
                             </CardContent>
@@ -160,7 +160,7 @@ export default function PrivacyDashboard({
                         <CardHeader>
                             <CardTitle className="flex items-center gap-2 text-base">
                                 <Shield className="h-5 w-5 text-status-info" />
-                                Data Subject Request Statistics
+                                Privacy Request Statistics
                             </CardTitle>
                         </CardHeader>
                         <CardContent>

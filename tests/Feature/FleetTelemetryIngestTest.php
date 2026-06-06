@@ -129,7 +129,7 @@ class FleetTelemetryIngestTest extends TestCase
             'category' => 'essential',
             'description' => 'Tracking consent',
             'purpose' => 'Fleet tracking',
-            'legal_basis' => 'GDPR Art 6',
+            'legal_basis' => 'Privacy Act 2020 IPP basis',
             'version' => 1,
             'active' => true,
         ]);
@@ -138,7 +138,7 @@ class FleetTelemetryIngestTest extends TestCase
             'version' => 1,
             'description' => 'Fleet tracking v1',
             'purpose' => 'Fleet tracking',
-            'legal_basis' => 'GDPR Art 6',
+            'legal_basis' => 'Privacy Act 2020 IPP basis',
             'effective_from' => now()->subDay(),
         ]);
         $consent = ClientConsent::create([
@@ -206,7 +206,7 @@ class FleetTelemetryIngestTest extends TestCase
             'category' => 'essential',
             'description' => 'Tracking consent',
             'purpose' => 'Fleet tracking',
-            'legal_basis' => 'GDPR Art 6',
+            'legal_basis' => 'Privacy Act 2020 IPP basis',
             'version' => 1,
             'active' => true,
         ]);
@@ -215,7 +215,7 @@ class FleetTelemetryIngestTest extends TestCase
             'version' => 1,
             'description' => 'Fleet tracking v1',
             'purpose' => 'Fleet tracking',
-            'legal_basis' => 'GDPR Art 6',
+            'legal_basis' => 'Privacy Act 2020 IPP basis',
             'effective_from' => now()->subDay(),
         ]);
         $consent = ClientConsent::create([
@@ -361,7 +361,7 @@ class FleetTelemetryIngestTest extends TestCase
             'category' => 'essential',
             'description' => 'Tracking consent',
             'purpose' => 'Fleet tracking',
-            'legal_basis' => 'GDPR Art 6',
+            'legal_basis' => 'Privacy Act 2020 IPP basis',
             'version' => 1,
             'active' => true,
         ]);
@@ -370,7 +370,7 @@ class FleetTelemetryIngestTest extends TestCase
             'version' => 1,
             'description' => 'Fleet tracking v1',
             'purpose' => 'Fleet tracking',
-            'legal_basis' => 'GDPR Art 6',
+            'legal_basis' => 'Privacy Act 2020 IPP basis',
             'effective_from' => now()->subDay(),
         ]);
         $consent = ClientConsent::create([

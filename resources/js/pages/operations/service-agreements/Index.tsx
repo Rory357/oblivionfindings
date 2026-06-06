@@ -76,14 +76,15 @@ const STATUS_VARIANTS: Record<string, 'default' | 'secondary' | 'destructive' | 
 };
 
 const TYPE_LABELS: Record<string, string> = {
-    ndis: 'NDIS',
+    whaikaha: 'Whaikaha',
+    carer_support: 'Carer Support',
+    nasc: 'NASC',
+    egl_if: 'EGL / IF',
+    te_whatu_ora: 'Te Whatu Ora',
     msd: 'MSD',
-    dss: 'DSS',
     acc: 'ACC',
-    dhb: 'Health NZ',
     oranga_tamariki: 'Oranga Tamariki',
     private: 'Private',
-    whaikaha: 'Whaikaha',
     charitable: 'Charitable',
     other: 'Other',
 };

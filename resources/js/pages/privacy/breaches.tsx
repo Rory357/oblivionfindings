@@ -69,7 +69,7 @@ export default function DataBreaches({ filters, breaches, stats }: Props) {
 
     return (
         <AppLayout breadcrumbs={[
-            { title: 'Privacy & GDPR', href: '/privacy/dashboard' },
+            { title: 'Privacy', href: '/privacy/dashboard' },
             { title: 'Data Breaches', href: '/privacy/breaches' }
         ]}>
             <Head title="Data Breaches" />
@@ -78,12 +78,12 @@ export default function DataBreaches({ filters, breaches, stats }: Props) {
                 {/* Hero Header */}
                 <PageHero
                     title="Data Breach Management"
-                    description="GDPR Article 33 — 72 hour ICO notification requirement"
+                    description="Privacy Act 2020 notifiable breach — notify the OPC as soon as practicable"
                     icon={<Shield className="h-7 w-7 text-white" />}
                     stats={stats ? [
                         { label: 'Total', value: stats.total },
                         { label: 'Open', value: stats.open },
-                        { label: 'ICO Required', value: stats.requiring_notification },
+                        { label: 'OPC Required', value: stats.requiring_notification },
                         { label: 'Resolved (30d)', value: stats.resolved_30_days },
                     ] : undefined}
                     actions={
@@ -134,7 +134,7 @@ export default function DataBreaches({ filters, breaches, stats }: Props) {
                         </div>
 
                         <div>
-                            <Label className="text-xs text-muted-foreground">ICO Notification</Label>
+                            <Label className="text-xs text-muted-foreground">OPC Notification</Label>
                             <Select
                                 value={filters.requires_notification ?? ANY}
                                 onValueChange={(v) => onFilter({ requires_notification: v === ANY ? null : v })}
@@ -169,12 +169,12 @@ export default function DataBreaches({ filters, breaches, stats }: Props) {
                                                 {breach.requires_authority_notification && !breach.authority_notified_at && (
                                                     <Badge variant="outline" className="border-status-critical/30 bg-status-critical-bg text-status-critical">
                                                         <Clock className="mr-1 h-3 w-3" />
-                                                        ICO notification required
+                                                        OPC notification required
                                                     </Badge>
                                                 )}
                                                 {breach.authority_notified_at && (
                                                     <Badge variant="outline" className="border-status-success/30 bg-status-success-bg text-status-success">
-                                                        ICO notified
+                                                        OPC notified
                                                     </Badge>
                                                 )}
                                             </div>

@@ -11,7 +11,7 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class RespiteBooking extends Model
 {
-    use HasFactory, SoftDeletes, AuditableChanges;
+    use AuditableChanges, HasFactory, SoftDeletes;
 
     protected $fillable = [
         'booking_request_id',
@@ -19,10 +19,33 @@ class RespiteBooking extends Model
         'start_at',
         'end_at',
         'status',
+        'funding_source',
+        'funding_reference',
+        'service_agreement_id',
+        'funding_status',
+        'agreement_status',
+        'consent_authority',
+        'consent_authority_name',
+        'consent_authority_contact',
+        'consent_authority_evidence',
+        'family_portal_consent_bound_at',
+        'family_portal_consent_bound_by',
+        'funding_approved_ref',
+        'funding_approved_at',
         'assigned_coordinator_id',
         'location_id',
         'cancellation_reason',
+        'cancellation_source',
+        'cancellation_notice_hours',
         'approvals',
+        'readiness_override_reason',
+        'capacity_override_reason',
+        'cultural_snapshot',
+        'interpreter_arranged',
+        'copayment_amount',
+        'copayment_status',
+        'recurrence_rule',
+        'funding_expiry_acknowledged_at',
         'created_by',
         'updated_by',
     ];
@@ -30,7 +53,20 @@ class RespiteBooking extends Model
     protected $casts = [
         'start_at' => 'datetime',
         'end_at' => 'datetime',
+        'funding_approved_at' => 'datetime',
+        'consent_authority_evidence' => 'array',
+        'family_portal_consent_bound_at' => 'datetime',
         'approvals' => 'array',
+        'cultural_snapshot' => 'array',
+        'interpreter_arranged' => 'boolean',
+        'copayment_amount' => 'decimal:2',
+        'funding_expiry_acknowledged_at' => 'datetime',
+        'eligibility_checks' => 'array',
+        'consent_records' => 'array',
+        'funding_verification' => 'array',
+        'pre_arrival_checklist' => 'array',
+        'medications_reconciled' => 'boolean',
+        'medications_reconciled_at' => 'datetime',
     ];
 
     public function request(): BelongsTo
@@ -46,6 +82,11 @@ class RespiteBooking extends Model
     public function coordinator(): BelongsTo
     {
         return $this->belongsTo(User::class, 'assigned_coordinator_id');
+    }
+
+    public function serviceAgreement(): BelongsTo
+    {
+        return $this->belongsTo(ServiceAgreement::class, 'service_agreement_id');
     }
 
     /**
@@ -70,5 +111,111 @@ class RespiteBooking extends Model
     public function shift()
     {
         return $this->hasOne(Shift::class, 'respite_booking_id');
+    }
+
+    /**
+     * Typed pre-stay readiness contract for the workspace ring and detail views.
+     *
+     * @return array{score:int,ready:bool,segments:array<int,array{key:string,label:string,status:string,complete:bool,message:string|null}>}
+     */
+    public function readiness(): array
+    {
+        $segments = [
+            $this->fundingReadinessSegment(),
+            $this->readinessSegment(
+                'eligibility',
+                'Eligibility checked',
+                ! empty($this->eligibility_checks),
+                'Confirm eligibility and placement checks.'
+            ),
+            $this->agreementReadinessSegment(),
+            $this->readinessSegment(
+                'consent',
+                'Consent recorded',
+                ! empty($this->consent_records) || filled($this->consent_authority),
+                'Record who may legally consent under PPPR / HDC Right 7.'
+            ),
+            $this->interpreterReadinessSegment(),
+            $this->readinessSegment(
+                'pre_arrival',
+                'Pre-arrival checklist',
+                ! empty($this->pre_arrival_checklist),
+                'Complete the receiving-home pre-arrival checklist.'
+            ),
+            $this->readinessSegment(
+                'medication_reconciliation',
+                'Medicines reconciled',
+                (bool) $this->medications_reconciled,
+                'Complete admission medication reconciliation where required.'
+            ),
+        ];
+
+        $complete = collect($segments)->where('complete', true)->count();
+
+        return [
+            'score' => (int) round($complete / count($segments) * 100),
+            'ready' => $complete === count($segments),
+            'segments' => $segments,
+        ];
+    }
+
+    private function fundingReadinessSegment(): array
+    {
+        $status = $this->funding_status ?: ($this->funding_source ? 'pending_approval' : 'not_required');
+        $complete = in_array($status, ['approved', 'not_required'], true);
+
+        return [
+            'key' => 'funding',
+            'label' => 'Funding approved',
+            'status' => $complete ? 'complete' : 'attention',
+            'complete' => $complete,
+            'message' => match ($status) {
+                'approved' => $this->funding_approved_ref
+                    ? 'Approved: '.$this->funding_approved_ref
+                    : 'Funding approval recorded.',
+                'not_required' => 'No funder approval required.',
+                'declined' => 'Funding has been declined.',
+                'expired' => 'Funding approval has expired.',
+                default => 'Funding approval is still pending.',
+            },
+        ];
+    }
+
+    private function agreementReadinessSegment(): array
+    {
+        $signed = in_array($this->agreement_status, ['signed', 'waived'], true)
+            || (bool) $this->serviceAgreement?->signed_at
+            || (bool) $this->serviceAgreement?->signed_date;
+
+        return $this->readinessSegment(
+            'service_agreement',
+            'Placement agreement signed',
+            $signed,
+            'Send and capture the signed placement agreement.'
+        );
+    }
+
+    private function interpreterReadinessSegment(): array
+    {
+        $snapshot = $this->cultural_snapshot ?? [];
+        $required = (bool) ($snapshot['interpreter_required'] ?? false);
+
+        return $this->readinessSegment(
+            'interpreter',
+            'Interpreter arranged',
+            ! $required || (bool) $this->interpreter_arranged,
+            'Arrange the requested interpreter before arrival.'
+        );
+    }
+
+    private function readinessSegment(string $key, string $label, bool $complete, string $message): array
+    {
+        return [
+            'key' => $key,
+            'label' => $label,
+            'status' => $complete ? 'complete' : 'pending',
+            'complete' => $complete,
+            'message' => $complete ? null : $message,
+        ];
     }
 }

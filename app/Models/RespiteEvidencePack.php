@@ -10,22 +10,40 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class RespiteEvidencePack extends Model
 {
-    use HasFactory, SoftDeletes, AuditableChanges;
+    use AuditableChanges, HasFactory, SoftDeletes;
 
     protected $fillable = [
         'stay_id',
+        'booking_id',
         'status',
+        'pack_type',
         'summary',
         'items',
+        'included_documents',
+        'included_incidents',
+        'included_medications',
+        'included_daily_notes',
+        'included_handovers',
+        'coordinator_notes',
+        'family_feedback',
         'sealed_at',
         'sealed_by_user_id',
+        'exported',
+        'exported_at',
         'created_by',
         'updated_by',
     ];
 
     protected $casts = [
         'items' => 'array',
+        'included_documents' => 'array',
+        'included_incidents' => 'array',
+        'included_medications' => 'array',
+        'included_daily_notes' => 'array',
+        'included_handovers' => 'array',
         'sealed_at' => 'datetime',
+        'exported' => 'boolean',
+        'exported_at' => 'datetime',
     ];
 
     public function stay(): BelongsTo

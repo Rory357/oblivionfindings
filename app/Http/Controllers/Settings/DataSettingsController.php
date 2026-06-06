@@ -84,7 +84,7 @@ class DataSettingsController extends Controller
         'nz' => ['label' => 'New Zealand', 'flag' => 'NZ'],
         'au' => ['label' => 'Australia', 'flag' => 'AU'],
         'us' => ['label' => 'USA', 'flag' => 'US'],
-        'uk' => ['label' => 'UK', 'flag' => 'UK'],
+        'uk' => ['label' => 'Other overseas', 'flag' => 'OT'],
         'other' => ['label' => 'Other', 'flag' => 'OT'],
     ];
 
