@@ -38,12 +38,26 @@ class RespiteBooking extends Model
         'cancellation_source',
         'cancellation_notice_hours',
         'approvals',
+        'eligibility_checks',
+        'consent_records',
+        'funding_verification',
+        'pre_arrival_checklist',
+        'medications_reconciled',
+        'medications_reconciled_at',
+        'medications_reconciled_by',
         'readiness_override_reason',
         'capacity_override_reason',
         'cultural_snapshot',
         'cultural_placement_check',
         'setting_restriction',
         'interpreter_arranged',
+        'code_of_rights_provided',
+        'consent_to_respite',
+        'consent_capacity_basis',
+        'advocate_offered',
+        'rights_format_provided',
+        'rights_recorded_by',
+        'rights_recorded_at',
         'copayment_amount',
         'copayment_basis',
         'private_pay_portion',
@@ -65,6 +79,10 @@ class RespiteBooking extends Model
         'cultural_snapshot' => 'array',
         'cultural_placement_check' => 'array',
         'interpreter_arranged' => 'boolean',
+        'code_of_rights_provided' => 'boolean',
+        'consent_to_respite' => 'boolean',
+        'advocate_offered' => 'boolean',
+        'rights_recorded_at' => 'datetime',
         'copayment_amount' => 'decimal:2',
         'private_pay_portion' => 'decimal:2',
         'funding_expiry_acknowledged_at' => 'datetime',
@@ -136,12 +154,8 @@ class RespiteBooking extends Model
                 'Confirm eligibility and placement checks.'
             ),
             $this->agreementReadinessSegment(),
-            $this->readinessSegment(
-                'consent',
-                'Consent recorded',
-                ! empty($this->consent_records) || filled($this->consent_authority),
-                'Record who may legally consent under PPPR / HDC Right 7.'
-            ),
+            $this->consentAuthorityReadinessSegment(),
+            $this->rightsReadinessSegment(),
             $this->interpreterReadinessSegment(),
             $this->culturalPlacementReadinessSegment(),
             $this->settingRestrictionReadinessSegment(),
@@ -202,6 +216,58 @@ class RespiteBooking extends Model
             $signed,
             'Send and capture the signed placement agreement.'
         );
+    }
+
+    private function consentAuthorityReadinessSegment(): array
+    {
+        $clientLacksCapacity = $this->clientLacksCapacity();
+        $welfareAuthorityRecorded = in_array($this->consent_authority, [
+            'activated_epoa_welfare',
+            'welfare_guardian',
+            'parent_guardian',
+        ], true);
+        $complete = $clientLacksCapacity
+            ? $welfareAuthorityRecorded
+            : (! empty($this->consent_records) || filled($this->consent_authority));
+
+        return $this->readinessSegment(
+            'consent',
+            $clientLacksCapacity ? 'Welfare authority recorded' : 'Consent authority recorded',
+            $complete,
+            $clientLacksCapacity
+                ? 'Record an activated EPOA welfare, welfare guardian or parent/guardian before confirming.'
+                : 'Record who may legally consent under PPPR / HDC Right 7.'
+        );
+    }
+
+    private function rightsReadinessSegment(): array
+    {
+        $complete = $this->code_of_rights_provided === true
+            && $this->consent_to_respite === true
+            && $this->advocate_offered !== null
+            && filled($this->consent_capacity_basis)
+            && filled($this->rights_format_provided)
+            && filled($this->rights_recorded_at);
+
+        return $this->readinessSegment(
+            'consent_rights',
+            'Rights and respite consent captured',
+            $complete,
+            'Record HDC Code of Rights, informed respite consent, capacity basis and advocate offer.'
+        );
+    }
+
+    private function clientLacksCapacity(): bool
+    {
+        return ClientConsent::query()
+            ->where('client_id', $this->client_id)
+            ->where('capacity_assessed', true)
+            ->where('capacity_outcome', 'lacks_capacity')
+            ->where(function ($query) {
+                $query->whereNull('expires_at')
+                    ->orWhere('expires_at', '>', now());
+            })
+            ->exists();
     }
 
     private function interpreterReadinessSegment(): array

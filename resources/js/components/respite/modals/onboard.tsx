@@ -7,21 +7,53 @@
  */
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { router } from '@inertiajs/react';
 import { CalendarCheck, CheckCircle2, Sparkles } from 'lucide-react';
-import { useState, type ReactNode } from 'react';
+import { useEffect, useState, type ReactNode } from 'react';
 import { Avatar, fmtRange } from '../shared';
 import type { RespiteRequestRow } from '../types';
 
 export function OnboardModal({ request, onClose }: { request: RespiteRequestRow | null; onClose: () => void }) {
     const [processing, setProcessing] = useState(false);
+    const [authority, setAuthority] = useState('self');
+    const [authorityName, setAuthorityName] = useState('');
+    const [authorityContact, setAuthorityContact] = useState('');
+    const [capacityBasis, setCapacityBasis] = useState('has_capacity');
+    const [formatProvided, setFormatProvided] = useState('written');
+    const [codeProvided, setCodeProvided] = useState(false);
+    const [consentToRespite, setConsentToRespite] = useState(false);
+    const [advocateOffered, setAdvocateOffered] = useState(true);
+
+    useEffect(() => {
+        if (!request) return;
+        setProcessing(false);
+        setAuthority('self');
+        setAuthorityName('');
+        setAuthorityContact('');
+        setCapacityBasis('has_capacity');
+        setFormatProvided('written');
+        setCodeProvided(false);
+        setConsentToRespite(false);
+        setAdvocateOffered(true);
+    }, [request]);
 
     const submit = () => {
-        if (!request?.bookingId) return;
+        if (!request?.bookingId || !codeProvided || !consentToRespite) return;
         setProcessing(true);
         router.post(
             `/respite/bookings/${request.bookingId}/confirm`,
-            {},
+            {
+                consent_authority: authority,
+                consent_authority_name: authorityName || null,
+                consent_authority_contact: authorityContact || null,
+                code_of_rights_provided: codeProvided,
+                consent_to_respite: consentToRespite,
+                consent_capacity_basis: capacityBasis,
+                advocate_offered: advocateOffered,
+                rights_format_provided: formatProvided,
+            },
             {
                 preserveScroll: true,
                 onSuccess: () => onClose(),
@@ -74,6 +106,85 @@ export function OnboardModal({ request, onClose }: { request: RespiteRequestRow 
                             ))}
                         </dl>
 
+                        <div className="grid gap-3 rounded-xl border border-border p-3.5">
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                <div className="grid gap-1.5">
+                                    <Label htmlFor="onboard-authority">Who consents</Label>
+                                    <select
+                                        id="onboard-authority"
+                                        className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                                        value={authority}
+                                        onChange={(event) => setAuthority(event.target.value)}
+                                    >
+                                        <option value="self">Self</option>
+                                        <option value="activated_epoa_welfare">Activated EPOA welfare</option>
+                                        <option value="welfare_guardian">Welfare guardian</option>
+                                        <option value="parent_guardian">Parent / guardian</option>
+                                        <option value="other">Other authority</option>
+                                    </select>
+                                </div>
+                                <div className="grid gap-1.5">
+                                    <Label htmlFor="onboard-capacity">Capacity basis</Label>
+                                    <select
+                                        id="onboard-capacity"
+                                        className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                                        value={capacityBasis}
+                                        onChange={(event) => setCapacityBasis(event.target.value)}
+                                    >
+                                        <option value="has_capacity">Has capacity</option>
+                                        <option value="supported_decision_making">Supported decision-making</option>
+                                        <option value="substitute_decision">Substitute decision-maker</option>
+                                        <option value="best_interests">Best interests decision</option>
+                                        <option value="not_recorded">Not recorded</option>
+                                    </select>
+                                </div>
+                                <div className="grid gap-1.5">
+                                    <Label htmlFor="onboard-authority-name">Authority name</Label>
+                                    <Input
+                                        id="onboard-authority-name"
+                                        value={authorityName}
+                                        onChange={(event) => setAuthorityName(event.target.value)}
+                                    />
+                                </div>
+                                <div className="grid gap-1.5">
+                                    <Label htmlFor="onboard-authority-contact">Authority contact</Label>
+                                    <Input
+                                        id="onboard-authority-contact"
+                                        value={authorityContact}
+                                        onChange={(event) => setAuthorityContact(event.target.value)}
+                                    />
+                                </div>
+                                <div className="grid gap-1.5 sm:col-span-2">
+                                    <Label htmlFor="onboard-format">Rights format</Label>
+                                    <select
+                                        id="onboard-format"
+                                        className="h-9 rounded-md border border-input bg-background px-3 text-sm"
+                                        value={formatProvided}
+                                        onChange={(event) => setFormatProvided(event.target.value)}
+                                    >
+                                        <option value="written">Written</option>
+                                        <option value="easy_read">Easy read</option>
+                                        <option value="verbal">Verbal</option>
+                                        <option value="te_reo">Te reo Maori</option>
+                                        <option value="translated">Translated</option>
+                                        <option value="other">Other</option>
+                                    </select>
+                                </div>
+                            </div>
+                            <label className="flex items-center gap-2 text-sm">
+                                <input type="checkbox" checked={codeProvided} onChange={(event) => setCodeProvided(event.target.checked)} />
+                                HDC Code of Rights provided
+                            </label>
+                            <label className="flex items-center gap-2 text-sm">
+                                <input type="checkbox" checked={consentToRespite} onChange={(event) => setConsentToRespite(event.target.checked)} />
+                                Informed consent to respite recorded
+                            </label>
+                            <label className="flex items-center gap-2 text-sm">
+                                <input type="checkbox" checked={advocateOffered} onChange={(event) => setAdvocateOffered(event.target.checked)} />
+                                Advocacy support offered
+                            </label>
+                        </div>
+
                         <div className="flex items-start gap-2 rounded-[10px] bg-status-success-bg p-3 text-[12.5px] text-status-success">
                             <CalendarCheck className="mt-0.5 h-4 w-4 shrink-0" />
                             <span>On confirm, the booking appears in Approved Bookings and the Calendar, ready to check in as a stay.</span>
@@ -83,7 +194,7 @@ export function OnboardModal({ request, onClose }: { request: RespiteRequestRow 
                             <Button variant="outline" onClick={onClose}>
                                 Cancel
                             </Button>
-                            <Button onClick={submit} disabled={processing || !request.bookingId}>
+                            <Button onClick={submit} disabled={processing || !request.bookingId || !codeProvided || !consentToRespite}>
                                 <CheckCircle2 className="h-4 w-4" /> Confirm booking &amp; onboard
                             </Button>
                         </div>

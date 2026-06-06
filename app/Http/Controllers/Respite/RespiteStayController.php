@@ -5,10 +5,13 @@ namespace App\Http\Controllers\Respite;
 use App\Domain\Governance\Models\NotifiableIncident;
 use App\Events\Respite\RespiteEvent;
 use App\Http\Controllers\Controller;
+use App\Models\BehaviourSupportPlan;
 use App\Models\ClientIncident;
 use App\Models\ClientMedication;
 use App\Models\DataBreachLog;
+use App\Models\MedicationAllergy;
 use App\Models\RespiteBooking;
+use App\Models\RespiteComplaint;
 use App\Models\RespiteMedicationReconciliation;
 use App\Models\RespiteStay;
 use App\Models\RestraintEvent;
@@ -89,11 +92,15 @@ class RespiteStayController extends Controller
     {
         $validated = request()->validate([
             'med_rec_override_reason' => 'nullable|string|max:500',
+            'anaphylaxis_acknowledged' => 'nullable|boolean',
+            'epipen_location' => 'nullable|string|max:500',
+            'anaphylaxis_escalation_note' => 'nullable|string|max:1000',
         ]);
 
         $stay->loadMissing('client');
         $this->authorize('view', $stay->client);
 
+        $this->guardAnaphylaxisAcknowledgement($stay, $validated);
         $this->guardAdmissionMedicationReconciliation($stay, $validated['med_rec_override_reason'] ?? null);
 
         $stay->update([
@@ -201,6 +208,7 @@ class RespiteStayController extends Controller
             'discharge_medication_reconciliation.medicines_returned_to' => 'nullable|string|max:255',
             'discharge_medication_reconciliation.count' => 'nullable|integer|min:0',
             'discharge_medication_reconciliation.received_by' => 'nullable|string|max:255',
+            'discharge_medication_reconciliation.changed_during_stay' => 'nullable|boolean',
             'discharge_medication_reconciliation.gp_pharmacy_handover_sent' => 'nullable|boolean',
             'discharge_medication_reconciliation.whanau_briefing_acknowledged' => 'nullable|boolean',
         ]);
@@ -232,6 +240,58 @@ class RespiteStayController extends Controller
         return back()->with('success', 'Stay discharged.');
     }
 
+    public function storeMedicationReconciliation(Request $request, RespiteStay $stay): RedirectResponse
+    {
+        $stay->loadMissing('client', 'booking');
+        $this->authorize('view', $stay->client);
+
+        $validated = $request->validate([
+            'type' => 'nullable|in:admission,discharge',
+            'status' => 'required|in:not_started,in_progress,completed,overridden',
+            'source' => 'nullable|string|max:255',
+            'count_received' => 'nullable|integer|min:0',
+            'discrepancies' => 'nullable|array',
+            'first_dose_due_at' => 'nullable|date',
+            'override_reason' => 'nullable|string|max:1000',
+        ]);
+
+        $type = $validated['type'] ?? 'admission';
+
+        $reconciliation = RespiteMedicationReconciliation::updateOrCreate(
+            ['stay_id' => $stay->id, 'type' => $type],
+            [
+                'status' => $validated['status'],
+                'source' => $validated['source'] ?? null,
+                'count_received' => $validated['count_received'] ?? null,
+                'discrepancies' => $validated['discrepancies'] ?? null,
+                'first_dose_due_at' => $validated['first_dose_due_at'] ?? null,
+                'override_reason' => $validated['override_reason'] ?? null,
+                'reconciled_by_user_id' => auth()->id(),
+                'reconciled_at' => in_array($validated['status'], ['completed', 'overridden'], true) ? now() : null,
+                'updated_by' => auth()->id(),
+                'created_by' => auth()->id(),
+            ]
+        );
+
+        if ($type === 'admission' && $reconciliation->status === 'completed') {
+            $stay->booking?->update([
+                'medications_reconciled' => true,
+                'medications_reconciled_at' => $reconciliation->reconciled_at ?? now(),
+                'medications_reconciled_by' => auth()->id(),
+            ]);
+        }
+
+        event(new RespiteEvent('respite.stay.medication_reconciliation_recorded', [
+            'id' => $reconciliation->id,
+            'stay_id' => $stay->id,
+            'client_id' => $stay->client_id,
+            'type' => $type,
+            'status' => $reconciliation->status,
+        ]));
+
+        return back()->with('success', 'Medication reconciliation recorded.');
+    }
+
     public function recordRestraint(Request $request, RespiteStay $stay): RedirectResponse
     {
         $stay->loadMissing('client', 'booking');
@@ -260,15 +320,22 @@ class RespiteStayController extends Controller
 
         $started = Carbon::parse($validated['started_at']);
         $ended = isset($validated['ended_at']) ? Carbon::parse($validated['ended_at']) : null;
+        $withinSupportPlan = (bool) ($validated['within_support_plan'] ?? true);
+        $behaviourSupportPlanId = $validated['behaviour_support_plan_id'] ?? null;
+
+        if ($withinSupportPlan && ! $behaviourSupportPlanId) {
+            $behaviourSupportPlanId = $this->activeBehaviourSupportPlanId($stay);
+        }
 
         $event = RestraintEvent::create([
             ...$validated,
+            'behaviour_support_plan_id' => $behaviourSupportPlanId,
             'stay_id' => $stay->id,
             'client_id' => $stay->client_id,
             'site_id' => $stay->booking?->location_id ?: $stay->client?->site_id,
             'duration_minutes' => $validated['duration_minutes'] ?? ($ended ? $started->diffInMinutes($ended) : null),
             'injury_occurred' => (bool) ($validated['injury_occurred'] ?? false),
-            'within_support_plan' => (bool) ($validated['within_support_plan'] ?? true),
+            'within_support_plan' => $withinSupportPlan,
             'created_by' => auth()->id(),
         ]);
 
@@ -367,6 +434,39 @@ class RespiteStayController extends Controller
         return back()->with('success', 'Incident recorded.');
     }
 
+    public function recordComplaint(Request $request, RespiteStay $stay): RedirectResponse
+    {
+        $stay->loadMissing('client');
+        $this->authorize('view', $stay->client);
+
+        $validated = $request->validate([
+            'source' => 'required|in:client,whanau,staff,advocate,external,other',
+            'received_at' => 'required|date',
+            'nature' => 'required|string|max:255',
+            'details' => 'nullable|string|max:5000',
+            'acknowledged_at' => 'nullable|date',
+            'resolution' => 'nullable|string|max:5000',
+            'escalated_to_hdc' => 'nullable|in:no,offered,requested,submitted',
+            'status' => 'nullable|in:open,acknowledged,resolved,escalated',
+        ]);
+
+        $complaint = RespiteComplaint::create([
+            ...$validated,
+            'stay_id' => $stay->id,
+            'client_id' => $stay->client_id,
+            'status' => $validated['status'] ?? (isset($validated['resolution']) ? 'resolved' : 'open'),
+            'created_by' => auth()->id(),
+        ]);
+
+        event(new RespiteEvent('respite.stay.complaint_recorded', [
+            'id' => $complaint->id,
+            'stay_id' => $stay->id,
+            'client_id' => $stay->client_id,
+        ]));
+
+        return back()->with('success', 'Complaint recorded.');
+    }
+
     private function postFundingConsumption(?RespiteStay $stay): void
     {
         $booking = $stay?->booking;
@@ -413,6 +513,62 @@ class RespiteStayController extends Controller
             '0',
             STR_PAD_LEFT
         );
+    }
+
+    /**
+     * @param  array<string,mixed>  $validated
+     */
+    private function guardAnaphylaxisAcknowledgement(RespiteStay $stay, array $validated): void
+    {
+        $allergies = MedicationAllergy::query()
+            ->where('client_id', $stay->client_id)
+            ->where('severity', 'life_threatening')
+            ->get(['id', 'allergen', 'reaction', 'severity']);
+
+        if ($allergies->isEmpty()) {
+            return;
+        }
+
+        if (! (bool) ($validated['anaphylaxis_acknowledged'] ?? false)) {
+            throw ValidationException::withMessages([
+                'anaphylaxis_acknowledgement' => 'Acknowledge life-threatening allergy controls, EpiPen location and escalation plan before check-in.',
+            ]);
+        }
+
+        if (blank($validated['epipen_location'] ?? null)) {
+            throw ValidationException::withMessages([
+                'epipen_location' => 'Record where the EpiPen or emergency medication is stored before check-in.',
+            ]);
+        }
+
+        if (blank($validated['anaphylaxis_escalation_note'] ?? null)) {
+            throw ValidationException::withMessages([
+                'anaphylaxis_escalation_note' => 'Record the escalation plan for a life-threatening allergy before check-in.',
+            ]);
+        }
+
+        $riskScreen = $stay->admission_risk_screen ?? [];
+        $riskScreen['anaphylaxis_acknowledgement'] = [
+            'acknowledged' => true,
+            'epipen_location' => $validated['epipen_location'],
+            'escalation_note' => $validated['anaphylaxis_escalation_note'],
+            'allergies' => $allergies
+                ->map(fn (MedicationAllergy $allergy) => [
+                    'id' => $allergy->id,
+                    'allergen' => $allergy->allergen,
+                    'reaction' => $allergy->reaction,
+                    'severity' => $allergy->severity,
+                ])
+                ->values()
+                ->all(),
+            'recorded_by' => auth()->id(),
+            'recorded_at' => now()->toIso8601String(),
+        ];
+
+        $stay->forceFill([
+            'admission_risk_screen' => $riskScreen,
+            'updated_by' => auth()->id(),
+        ])->save();
     }
 
     private function guardAdmissionMedicationReconciliation(RespiteStay $stay, ?string $overrideReason): void
@@ -499,5 +655,15 @@ class RespiteStayController extends Controller
             ->where('client_id', $clientId)
             ->active()
             ->exists();
+    }
+
+    private function activeBehaviourSupportPlanId(RespiteStay $stay): ?int
+    {
+        return BehaviourSupportPlan::query()
+            ->where('client_id', $stay->client_id)
+            ->where('status', 'active')
+            ->orderByRaw('review_date is null')
+            ->orderBy('review_date')
+            ->value('id');
     }
 }

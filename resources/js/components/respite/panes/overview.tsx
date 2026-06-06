@@ -154,7 +154,28 @@ export function OverviewPane({
             tone: 'critical',
             icon: ShieldAlert,
             title: 'Compliance attention',
-            sub: `${stats.complianceAttention} restraint, incident or notification item${stats.complianceAttention === 1 ? '' : 's'}`,
+            sub: [
+                stats.compliance.notifiablePastDeadline
+                    ? `${stats.compliance.notifiablePastDeadline} overdue notifiable`
+                    : null,
+                stats.compliance.notifiableDueSoon
+                    ? `${stats.compliance.notifiableDueSoon} near deadline`
+                    : null,
+                stats.compliance.restraintsAwaitingReview
+                    ? `${stats.compliance.restraintsAwaitingReview} restraint review`
+                    : null,
+                stats.compliance.bspAwaitingLink
+                    ? `${stats.compliance.bspAwaitingLink} BSP link`
+                    : null,
+                stats.compliance.missingConsentRights
+                    ? `${stats.compliance.missingConsentRights} consent / rights`
+                    : null,
+                stats.compliance.openComplaints
+                    ? `${stats.compliance.openComplaints} complaint`
+                    : null,
+            ]
+                .filter(Boolean)
+                .join(' · '),
             tab: 'stays',
         });
     if (stats.waitlisted > 0)
@@ -318,6 +339,9 @@ export function OverviewPane({
                                             <span className="font-semibold">
                                                 {h.name}
                                             </span>
+                                            {h.full ? (
+                                                <Pill tone="warning">Full</Pill>
+                                            ) : null}
                                             <span className="text-muted-foreground tabular-nums">
                                                 {used}/{h.capacity || '—'} beds
                                             </span>

@@ -29,9 +29,18 @@ import {
 import { useCallback, useEffect, useState } from 'react';
 import { respiteActions } from './actions';
 import { RespiteDetailModal, type RespiteDetail } from './detail-modal';
+import { ConfirmBookingModal } from './modals/booking-confirm';
 import { OnboardModal } from './modals/onboard';
 import { ReasonDialog } from './modals/reason-dialog';
 import { ReferralIntakeModal } from './modals/referral-intake';
+import {
+    CheckInModal,
+    ComplaintModal,
+    DischargeModal,
+    IncidentModal,
+    MedicationReconciliationModal,
+    RestraintModal,
+} from './modals/stay-actions';
 import { BookingsPane } from './panes/bookings';
 import { CalendarPane } from './panes/calendar';
 import { OverviewPane } from './panes/overview';
@@ -42,7 +51,9 @@ import { TasksPane } from './panes/tasks';
 import {
     RESPITE_TABS,
     type RespiteCan,
+    type RespiteBookingRow,
     type RespiteRequestRow,
+    type RespiteStayRow,
     type RespiteTab,
     type RespiteWorkspaceData,
 } from './types';
@@ -50,10 +61,7 @@ import {
 type ReasonKind =
     | 'decline'
     | 'reject'
-    | 'discharge'
-    | 'fundingOverride'
-    | 'checkInOverride'
-    | 'confirmOverride';
+    | 'fundingOverride';
 
 const REASON_CONFIG: Record<
     ReasonKind,
@@ -71,32 +79,12 @@ const REASON_CONFIG: Record<
         placeholder: 'Why is this request being rejected?',
         confirmLabel: 'Reject request',
     },
-    discharge: {
-        title: 'Discharge stay',
-        label: 'Discharge summary',
-        placeholder: 'Summarise the stay and any follow-up…',
-        confirmLabel: 'Discharge stay',
-    },
     fundingOverride: {
         title: 'Approve while funding is pending',
         label: 'Funding override reason',
         placeholder:
             'Why is this booking safe to approve before funding is verified?',
         confirmLabel: 'Approve request',
-    },
-    checkInOverride: {
-        title: 'Check in before med-rec is complete',
-        label: 'Medication reconciliation override reason',
-        placeholder:
-            'Why is it safe to check in before admission medication reconciliation is completed?',
-        confirmLabel: 'Check in',
-    },
-    confirmOverride: {
-        title: 'Confirm before readiness is complete',
-        label: 'Readiness override reason',
-        placeholder:
-            'Why is this booking safe to confirm before all readiness checks are complete?',
-        confirmLabel: 'Confirm booking',
     },
 };
 
@@ -125,6 +113,19 @@ export function RespiteWorkspace({
     const [onboardReq, setOnboardReq] = useState<RespiteRequestRow | null>(
         null,
     );
+    const [confirmBooking, setConfirmBooking] =
+        useState<RespiteBookingRow | null>(null);
+    const [checkInStay, setCheckInStay] = useState<RespiteStayRow | null>(null);
+    const [medRecStay, setMedRecStay] = useState<RespiteStayRow | null>(null);
+    const [restraintStay, setRestraintStay] =
+        useState<RespiteStayRow | null>(null);
+    const [incidentStay, setIncidentStay] = useState<RespiteStayRow | null>(
+        null,
+    );
+    const [dischargeStay, setDischargeStay] =
+        useState<RespiteStayRow | null>(null);
+    const [complaintStay, setComplaintStay] =
+        useState<RespiteStayRow | null>(null);
     const [reasonAction, setReasonAction] = useState<{
         kind: ReasonKind;
         id: number;
@@ -168,24 +169,6 @@ export function RespiteWorkspace({
             router.post(
                 `/respite/requests/${id}/approve`,
                 { funding_override_reason: reason },
-                opts,
-            );
-        else if (kind === 'checkInOverride')
-            router.post(
-                `/respite/stays/${id}/check-in`,
-                { med_rec_override_reason: reason },
-                opts,
-            );
-        else if (kind === 'confirmOverride')
-            router.post(
-                `/respite/bookings/${id}/confirm`,
-                { readiness_override_reason: reason },
-                opts,
-            );
-        else
-            router.post(
-                `/respite/stays/${id}/discharge`,
-                { discharge_summary: reason },
                 opts,
             );
     };
@@ -367,18 +350,7 @@ export function RespiteWorkspace({
                         bookings={data.bookings}
                         can={can}
                         onView={(row) => setDetail({ kind: 'booking', row })}
-                        onConfirm={(row) => {
-                            if (row.readiness < 100) {
-                                setReasonAction({
-                                    kind: 'confirmOverride',
-                                    id: row.id,
-                                    client: row.client,
-                                });
-                                return;
-                            }
-
-                            respiteActions.confirmBooking(row.id);
-                        }}
+                        onConfirm={(row) => setConfirmBooking(row)}
                     />
                 )}
                 {tab === 'calendar' && (
@@ -389,28 +361,12 @@ export function RespiteWorkspace({
                         stays={data.stays}
                         can={can}
                         onView={(row) => setDetail({ kind: 'stay', row })}
-                        onCheckIn={(row) => {
-                            if (
-                                row.requiresAdmissionMedRec &&
-                                row.admissionMedRecStatus !== 'completed'
-                            ) {
-                                setReasonAction({
-                                    kind: 'checkInOverride',
-                                    id: row.id,
-                                    client: row.client,
-                                });
-                                return;
-                            }
-
-                            respiteActions.checkInStay(row.id);
-                        }}
-                        onDischarge={(row) =>
-                            setReasonAction({
-                                kind: 'discharge',
-                                id: row.id,
-                                client: row.client,
-                            })
-                        }
+                        onCheckIn={(row) => setCheckInStay(row)}
+                        onReconcile={(row) => setMedRecStay(row)}
+                        onRecordRestraint={(row) => setRestraintStay(row)}
+                        onLogIncident={(row) => setIncidentStay(row)}
+                        onDischarge={(row) => setDischargeStay(row)}
+                        onLogComplaint={(row) => setComplaintStay(row)}
                     />
                 )}
                 {tab === 'tasks' && <TasksPane tasks={data.tasks} can={can} />}
@@ -431,6 +387,35 @@ export function RespiteWorkspace({
                 request={onboardReq}
                 onClose={() => setOnboardReq(null)}
             />
+            <ConfirmBookingModal
+                booking={confirmBooking}
+                serviceAgreements={data.serviceAgreements}
+                onClose={() => setConfirmBooking(null)}
+            />
+            <CheckInModal
+                stay={checkInStay}
+                onClose={() => setCheckInStay(null)}
+            />
+            <MedicationReconciliationModal
+                stay={medRecStay}
+                onClose={() => setMedRecStay(null)}
+            />
+            <RestraintModal
+                stay={restraintStay}
+                onClose={() => setRestraintStay(null)}
+            />
+            <IncidentModal
+                stay={incidentStay}
+                onClose={() => setIncidentStay(null)}
+            />
+            <DischargeModal
+                stay={dischargeStay}
+                onClose={() => setDischargeStay(null)}
+            />
+            <ComplaintModal
+                stay={complaintStay}
+                onClose={() => setComplaintStay(null)}
+            />
             {reasonAction ? (
                 <ReasonDialog
                     open
@@ -441,11 +426,7 @@ export function RespiteWorkspace({
                     placeholder={REASON_CONFIG[reasonAction.kind].placeholder}
                     confirmLabel={REASON_CONFIG[reasonAction.kind].confirmLabel}
                     destructive={
-                        ![
-                            'fundingOverride',
-                            'checkInOverride',
-                            'confirmOverride',
-                        ].includes(reasonAction.kind)
+                        !['fundingOverride'].includes(reasonAction.kind)
                     }
                     onConfirm={runReason}
                 />

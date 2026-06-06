@@ -1,6 +1,9 @@
 <?php
 
 use App\Models\Client;
+use App\Models\ClientConsent;
+use App\Models\ConsentType;
+use App\Models\RespiteEvidencePack;
 use App\Models\RespiteBooking;
 use App\Models\RespiteBookingRequest;
 use App\Models\RespiteReferral;
@@ -218,4 +221,106 @@ test('booking readiness gates cultural placement and restrictive setting evidenc
 
     expect($readiness['cultural_placement']['complete'])->toBeTrue();
     expect($readiness['setting_restriction']['complete'])->toBeTrue();
+});
+
+test('lacks capacity clients require a welfare consent authority before booking confirmation', function () {
+    $client = Client::factory()->create();
+    $consentType = ConsentType::factory()->create([
+        'requires_capacity_assessment' => true,
+    ]);
+    ClientConsent::create([
+        'client_id' => $client->id,
+        'consent_type_id' => $consentType->id,
+        'status' => 'given',
+        'given_at' => now(),
+        'given_by_relationship' => 'welfare_guardian',
+        'given_method' => 'written',
+        'capacity_assessed' => true,
+        'capacity_outcome' => 'lacks_capacity',
+        'capacity_assessor_id' => $this->admin->id,
+        'capacity_assessed_at' => now(),
+        'best_interests_decision' => true,
+        'best_interests_decision_maker_id' => $this->admin->id,
+        'best_interests_decision_at' => now(),
+        'created_by' => $this->admin->id,
+    ]);
+    $booking = RespiteBooking::factory()->create([
+        'client_id' => $client->id,
+        'status' => 'pending',
+    ]);
+    $booking->forceFill([
+        'funding_status' => 'approved',
+        'agreement_status' => 'waived',
+        'consent_authority' => 'self',
+        'eligibility_checks' => ['eligible' => true],
+        'pre_arrival_checklist' => ['receiving_home_ready' => true],
+        'medications_reconciled' => true,
+    ])->save();
+
+    $this->actingAs($this->admin)
+        ->post(route('respite.bookings.confirm', $booking))
+        ->assertSessionHasErrors('readiness');
+
+    expect($booking->fresh()->status)->toBe('pending');
+
+    $booking->forceFill([
+        'consent_authority' => 'welfare_guardian',
+        'consent_authority_name' => 'Moana Rangi',
+        'consent_authority_contact' => '021000000',
+        'code_of_rights_provided' => true,
+        'consent_to_respite' => true,
+        'consent_capacity_basis' => 'substitute_decision',
+        'advocate_offered' => true,
+        'rights_format_provided' => 'written',
+        'rights_recorded_by' => $this->admin->id,
+        'rights_recorded_at' => now(),
+    ])->save();
+
+    $this->actingAs($this->admin)
+        ->post(route('respite.bookings.confirm', $booking))
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    expect($booking->fresh()->status)->toBe('confirmed');
+});
+
+test('rights and informed consent are a readiness segment and a required evidence manifest item', function () {
+    $client = Client::factory()->create();
+    $booking = RespiteBooking::factory()->create([
+        'client_id' => $client->id,
+        'status' => 'pending',
+    ]);
+    $booking->forceFill([
+        'funding_status' => 'approved',
+        'agreement_status' => 'waived',
+        'consent_authority' => 'self',
+        'eligibility_checks' => ['eligible' => true],
+        'pre_arrival_checklist' => ['receiving_home_ready' => true],
+        'medications_reconciled' => true,
+    ])->save();
+
+    $segments = collect($booking->fresh()->readiness()['segments'])->keyBy('key');
+
+    expect($segments)->toHaveKey('consent_rights');
+    expect($segments['consent_rights']['complete'])->toBeFalse();
+
+    $stay = \App\Models\RespiteStay::create([
+        'booking_id' => $booking->id,
+        'client_id' => $client->id,
+        'status' => 'active',
+        'actual_start' => now()->subDay(),
+        'created_by' => $this->admin->id,
+    ]);
+
+    $this->actingAs($this->admin)
+        ->post(route('respite.evidence-packs.store'), [
+            'stay_id' => $stay->id,
+            'summary' => 'Consent evidence pack.',
+        ])
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    $manifest = collect(RespiteEvidencePack::firstOrFail()->items)->keyBy('type');
+
+    expect($manifest['consent_rights']['complete'])->toBeFalse();
 });

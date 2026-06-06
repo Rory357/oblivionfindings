@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Respite;
 
 use App\Events\Respite\RespiteEvent;
 use App\Http\Controllers\Controller;
+use App\Models\ClientIncident;
 use App\Models\RespiteAuditLog;
 use App\Models\RespiteDailyNote;
 use App\Models\RespiteStay;
@@ -87,6 +88,7 @@ class RespiteDailyNoteController extends Controller
         $validated['created_by'] = auth()->id();
 
         $note = RespiteDailyNote::create($validated);
+        $this->createIncidentFromNoteWhenNeeded($note);
 
         RespiteAuditLog::log(
             $note,
@@ -163,6 +165,7 @@ class RespiteDailyNoteController extends Controller
 
         $validated['updated_by'] = auth()->id();
         $dailyNote->update($validated);
+        $this->createIncidentFromNoteWhenNeeded($dailyNote->fresh());
 
         RespiteAuditLog::log(
             $dailyNote,
@@ -285,5 +288,36 @@ class RespiteDailyNoteController extends Controller
             'assisted' => 'Assisted Mobility',
             'independent' => 'Independent',
         ];
+    }
+
+    private function createIncidentFromNoteWhenNeeded(RespiteDailyNote $note): void
+    {
+        if (! $note->incident_occurred || $note->linked_incident_id) {
+            return;
+        }
+
+        $incident = ClientIncident::create([
+            'client_id' => $note->client_id,
+            'reported_by' => auth()->id(),
+            'respite_stay_id' => $note->stay_id,
+            'type' => 'daily_note',
+            'severity' => $note->sensitive_flag ? 'medium' : 'low',
+            'status' => 'submitted',
+            'submitted_at' => now(),
+            'occurred_at' => $note->note_date,
+            'title' => 'Daily note incident flag',
+            'description' => $note->concerns ?: $note->observations ?: 'Incident was flagged from a respite daily note.',
+            'requires_followup' => (bool) $note->sensitive_flag,
+            'metadata' => [
+                'source' => 'respite_daily_note',
+                'daily_note_id' => $note->id,
+                'stay_id' => $note->stay_id,
+            ],
+        ]);
+
+        $note->forceFill([
+            'linked_incident_id' => $incident->id,
+            'updated_by' => auth()->id(),
+        ])->save();
     }
 }

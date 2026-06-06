@@ -288,6 +288,13 @@ class RespiteNzWorkflowCompletionTest extends TestCase
         $booking->update([
             'consent_authority' => 'self',
             'agreement_status' => 'signed',
+            'code_of_rights_provided' => true,
+            'consent_to_respite' => true,
+            'consent_capacity_basis' => 'has_capacity',
+            'advocate_offered' => true,
+            'rights_format_provided' => 'written',
+            'rights_recorded_by' => $this->admin->id,
+            'rights_recorded_at' => now(),
         ]);
 
         $this->actingAs($this->admin)

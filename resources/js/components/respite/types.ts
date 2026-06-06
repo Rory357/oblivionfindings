@@ -137,6 +137,14 @@ export interface RespiteBookingRow {
     serviceAgreement: ServiceAgreementSummary | null;
     agreementStatus: string | null;
     consentAuthority: string | null;
+    consentAuthorityName: string | null;
+    consentAuthorityContact: string | null;
+    codeOfRightsProvided: boolean;
+    consentToRespite: boolean;
+    consentCapacityBasis: string | null;
+    advocateOffered: boolean | null;
+    rightsFormatProvided: string | null;
+    rightsRecordedAt: string | null;
     culturalSnapshot: Record<string, unknown> | null;
     culturalPlacementCheck: Record<string, unknown> | null;
     settingRestriction: string | null;
@@ -171,6 +179,7 @@ export interface RespiteStayRow {
     bedHoldUntil: string | null;
     unreviewedRestraints: number;
     openIncidents: number;
+    openComplaints: number;
     criticalAlerts: CriticalAlert[];
     requiresAdmissionMedRec: boolean;
     admissionMedRecStatus: string | null;
@@ -204,6 +213,14 @@ export interface RespiteStats {
     fullHomes: number;
     fundingAttention: number;
     complianceAttention: number;
+    compliance: {
+        notifiablePastDeadline: number;
+        notifiableDueSoon: number;
+        restraintsAwaitingReview: number;
+        bspAwaitingLink: number;
+        missingConsentRights: number;
+        openComplaints: number;
+    };
 }
 
 export interface ClientOption {
@@ -222,6 +239,7 @@ export interface RespiteWorkspaceData {
     stats: RespiteStats;
     clients: ClientOption[];
     serviceContexts: { id: number; name: string }[];
+    serviceAgreements: (ServiceAgreementSummary & { clientId: number })[];
     fundingSources: FundingOption[];
 }
 

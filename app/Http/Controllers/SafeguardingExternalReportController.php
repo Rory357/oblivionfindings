@@ -18,7 +18,7 @@ class SafeguardingExternalReportController extends Controller
         $this->authorize('reportExternal', $concern);
 
         $validated = $request->validate([
-            'authority_type' => 'required|in:police,health_nz,worksafe,privacy_commissioner,hdc,oranga_tamariki,other',
+            'authority_type' => 'required|in:police,health_nz,whaikaha,worksafe,privacy_commissioner,hdc,oranga_tamariki,other',
             'authority_name' => 'required|string',
             'authority_contact' => 'nullable|string',
             'reported_at' => 'required|date',

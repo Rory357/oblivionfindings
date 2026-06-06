@@ -103,6 +103,11 @@ class RespiteStay extends Model
         return $this->hasMany(ClientIncident::class, 'respite_stay_id');
     }
 
+    public function complaints(): HasMany
+    {
+        return $this->hasMany(RespiteComplaint::class, 'stay_id');
+    }
+
     public function createdByUser(): BelongsTo
     {
         return $this->belongsTo(User::class, 'created_by');

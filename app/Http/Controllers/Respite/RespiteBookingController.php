@@ -71,6 +71,11 @@ class RespiteBookingController extends Controller
             'consent_authority_name' => 'nullable|string|max:255',
             'consent_authority_contact' => 'nullable|string|max:255',
             'consent_authority_evidence' => 'nullable|array',
+            'code_of_rights_provided' => 'nullable|boolean',
+            'consent_to_respite' => 'nullable|boolean',
+            'consent_capacity_basis' => 'nullable|in:has_capacity,supported_decision_making,substitute_decision,best_interests,not_recorded',
+            'advocate_offered' => 'nullable|boolean',
+            'rights_format_provided' => 'nullable|in:written,easy_read,verbal,te_reo,translated,other',
             'cultural_snapshot' => 'nullable|array',
             'cultural_placement_check' => 'nullable|array',
             'setting_restriction' => 'nullable|in:none,locked_unit,enhanced_observation,restricted_leave,other',
@@ -115,6 +120,10 @@ class RespiteBookingController extends Controller
         }
 
         $validated['agreement_status'] = $validated['agreement_status'] ?? $this->agreementStatusFor($validated['service_agreement_id'] ?? null);
+        if ($this->containsRightsCapture($validated)) {
+            $validated['rights_recorded_by'] = auth()->id();
+            $validated['rights_recorded_at'] = now();
+        }
 
         $validated['status'] = 'pending';
         $validated['created_by'] = auth()->id();
@@ -172,6 +181,11 @@ class RespiteBookingController extends Controller
             'consent_authority_name' => 'nullable|string|max:255',
             'consent_authority_contact' => 'nullable|string|max:255',
             'consent_authority_evidence' => 'nullable|array',
+            'code_of_rights_provided' => 'nullable|boolean',
+            'consent_to_respite' => 'nullable|boolean',
+            'consent_capacity_basis' => 'nullable|in:has_capacity,supported_decision_making,substitute_decision,best_interests,not_recorded',
+            'advocate_offered' => 'nullable|boolean',
+            'rights_format_provided' => 'nullable|in:written,easy_read,verbal,te_reo,translated,other',
             'cultural_snapshot' => 'nullable|array',
             'cultural_placement_check' => 'nullable|array',
             'setting_restriction' => 'nullable|in:none,locked_unit,enhanced_observation,restricted_leave,other',
@@ -188,6 +202,10 @@ class RespiteBookingController extends Controller
 
         if (($validated['funding_status'] ?? null) === 'approved' && empty($validated['funding_approved_at'])) {
             $validated['funding_approved_at'] = now();
+        }
+        if ($this->containsRightsCapture($validated)) {
+            $validated['rights_recorded_by'] = auth()->id();
+            $validated['rights_recorded_at'] = now();
         }
 
         $this->assertServiceAgreementForClient($validated['service_agreement_id'] ?? null, $booking->client_id);
@@ -214,8 +232,19 @@ class RespiteBookingController extends Controller
         $validated = request()->validate([
             'capacity_override_reason' => 'nullable|string|max:500',
             'readiness_override_reason' => 'nullable|string|max:500',
+            'service_agreement_id' => 'nullable|exists:service_agreements,id',
+            'consent_authority' => 'nullable|in:self,activated_epoa_welfare,welfare_guardian,parent_guardian,other',
+            'consent_authority_name' => 'nullable|string|max:255',
+            'consent_authority_contact' => 'nullable|string|max:255',
+            'consent_authority_evidence' => 'nullable|array',
+            'code_of_rights_provided' => 'nullable|boolean',
+            'consent_to_respite' => 'nullable|boolean',
+            'consent_capacity_basis' => 'nullable|in:has_capacity,supported_decision_making,substitute_decision,best_interests,not_recorded',
+            'advocate_offered' => 'nullable|boolean',
+            'rights_format_provided' => 'nullable|in:written,easy_read,verbal,te_reo,translated,other',
         ]);
 
+        $this->captureConfirmReadinessInputs($booking, $validated);
         $this->assertCapacityForBooking($booking, $validated['capacity_override_reason'] ?? null);
         $this->assertReadinessForBooking($booking, $validated['readiness_override_reason'] ?? null);
 
@@ -252,6 +281,65 @@ class RespiteBookingController extends Controller
         ]));
 
         return back()->with('success', 'Booking confirmed.');
+    }
+
+    /**
+     * @param  array<string,mixed>  $validated
+     */
+    private function captureConfirmReadinessInputs(RespiteBooking $booking, array $validated): void
+    {
+        $fields = [
+            'service_agreement_id',
+            'consent_authority',
+            'consent_authority_name',
+            'consent_authority_contact',
+            'consent_authority_evidence',
+            'code_of_rights_provided',
+            'consent_to_respite',
+            'consent_capacity_basis',
+            'advocate_offered',
+            'rights_format_provided',
+        ];
+        $updates = [];
+
+        foreach ($fields as $field) {
+            if (array_key_exists($field, $validated)) {
+                $updates[$field] = $validated[$field];
+            }
+        }
+
+        if ($updates === []) {
+            return;
+        }
+
+        $this->assertServiceAgreementForClient($updates['service_agreement_id'] ?? $booking->service_agreement_id, $booking->client_id);
+
+        if (array_key_exists('service_agreement_id', $updates) && ! array_key_exists('agreement_status', $updates)) {
+            $updates['agreement_status'] = $this->agreementStatusFor($updates['service_agreement_id']);
+        }
+
+        if ($this->containsRightsCapture($updates)) {
+            $updates['rights_recorded_by'] = auth()->id();
+            $updates['rights_recorded_at'] = now();
+        }
+
+        $updates['updated_by'] = auth()->id();
+        $booking->update($updates);
+        $booking->refresh();
+    }
+
+    /**
+     * @param  array<string,mixed>  $updates
+     */
+    private function containsRightsCapture(array $updates): bool
+    {
+        foreach (['code_of_rights_provided', 'consent_to_respite', 'consent_capacity_basis', 'advocate_offered', 'rights_format_provided'] as $field) {
+            if (array_key_exists($field, $updates)) {
+                return true;
+            }
+        }
+
+        return false;
     }
 
     private function assertCapacityForBooking(RespiteBooking $booking, ?string $overrideReason): void

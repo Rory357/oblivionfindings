@@ -82,8 +82,10 @@ Route::middleware(['auth'])->group(function () {
         Route::post('/respite/stays/{stay}/extend', [RespiteStayController::class, 'extend'])->name('respite.stays.extend');
         Route::post('/respite/stays/{stay}/bed-hold', [RespiteStayController::class, 'recordBedHold'])->name('respite.stays.bed-hold');
         Route::post('/respite/stays/{stay}/discharge', [RespiteStayController::class, 'discharge'])->name('respite.stays.discharge');
+        Route::post('/respite/stays/{stay}/medication-reconciliation', [RespiteStayController::class, 'storeMedicationReconciliation'])->name('respite.stays.medication-reconciliation.store');
         Route::post('/respite/stays/{stay}/restraints', [RespiteStayController::class, 'recordRestraint'])->name('respite.stays.restraints.store');
         Route::post('/respite/stays/{stay}/incidents', [RespiteStayController::class, 'recordIncident'])->name('respite.stays.incidents.store');
+        Route::post('/respite/stays/{stay}/complaints', [RespiteStayController::class, 'recordComplaint'])->name('respite.stays.complaints.store');
     });
     Route::get('/respite/stays/{stay}', [RespiteStayController::class, 'show'])
         ->middleware('permission:respite.viewAny')

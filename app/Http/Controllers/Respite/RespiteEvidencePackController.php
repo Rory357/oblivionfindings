@@ -6,6 +6,7 @@ use App\Domain\Governance\Models\NotifiableIncident;
 use App\Events\Respite\RespiteEvent;
 use App\Http\Controllers\Controller;
 use App\Models\ClientMedication;
+use App\Models\MedicationAllergy;
 use App\Models\RespiteAuditLog;
 use App\Models\RespiteEvidencePack;
 use App\Models\RespiteStay;
@@ -55,7 +56,7 @@ class RespiteEvidencePackController extends Controller
             'summary' => 'nullable|string|max:5000',
         ]);
 
-        $stay = RespiteStay::with(['booking.serviceAgreement', 'handovers', 'communications', 'dailyNotes', 'medicationReconciliations', 'restraintEvents', 'incidents'])
+        $stay = RespiteStay::with(['booking.serviceAgreement', 'handovers', 'communications', 'dailyNotes', 'medicationReconciliations', 'restraintEvents', 'incidents', 'complaints'])
             ->findOrFail($validated['stay_id']);
 
         $validated['booking_id'] = $stay->booking_id;
@@ -294,13 +295,27 @@ class RespiteEvidencePackController extends Controller
             RespiteAuditLog::CATEGORY_EVIDENCE
         );
 
-        // TODO: Implement PDF export
-        return back()->with('info', 'Export functionality coming soon.');
+        $manifest = $this->buildManifestForPack($evidencePack);
+        $payload = [
+            'pack_id' => $evidencePack->id,
+            'stay_id' => $evidencePack->stay_id,
+            'booking_id' => $evidencePack->booking_id,
+            'status' => $evidencePack->status,
+            'sealed_at' => optional($evidencePack->sealed_at)->toIso8601String(),
+            'summary' => $evidencePack->summary,
+            'manifest' => $manifest,
+        ];
+
+        return response()->streamDownload(function () use ($payload) {
+            echo json_encode($payload, JSON_PRETTY_PRINT | JSON_UNESCAPED_SLASHES);
+        }, "respite-evidence-pack-{$evidencePack->id}.json", [
+            'Content-Type' => 'application/json',
+        ]);
     }
 
     private function buildManifestForPack(RespiteEvidencePack $pack): array
     {
-        $pack->loadMissing(['stay.booking.serviceAgreement', 'stay.handovers', 'stay.communications', 'stay.dailyNotes', 'stay.medicationReconciliations', 'stay.restraintEvents', 'stay.incidents']);
+        $pack->loadMissing(['stay.booking.serviceAgreement', 'stay.handovers', 'stay.communications', 'stay.dailyNotes', 'stay.medicationReconciliations', 'stay.restraintEvents', 'stay.incidents', 'stay.complaints']);
 
         return $this->buildManifest($pack->stay);
     }
@@ -310,7 +325,7 @@ class RespiteEvidencePackController extends Controller
      */
     private function buildManifest(RespiteStay $stay): array
     {
-        $stay->loadMissing(['booking.serviceAgreement', 'handovers', 'communications', 'dailyNotes', 'medicationReconciliations', 'restraintEvents', 'incidents']);
+        $stay->loadMissing(['booking.serviceAgreement', 'handovers', 'communications', 'dailyNotes', 'medicationReconciliations', 'restraintEvents', 'incidents', 'complaints']);
         $booking = $stay->booking;
         $incidentIds = $stay->incidents->pluck('id');
         $pendingNotifiables = $incidentIds->isNotEmpty()
@@ -324,7 +339,23 @@ class RespiteEvidencePackController extends Controller
         $agreementSigned = in_array($booking?->agreement_status, ['signed', 'waived'], true)
             || (bool) $booking?->serviceAgreement?->signed_at
             || (bool) $booking?->serviceAgreement?->signed_date;
-        $consentComplete = (bool) $booking?->consent_authority && $agreementSigned;
+        $rightsComplete = $booking !== null
+            && $booking->code_of_rights_provided === true
+            && $booking->consent_to_respite === true
+            && $booking->advocate_offered !== null
+            && filled($booking->consent_capacity_basis)
+            && filled($booking->rights_format_provided)
+            && filled($booking->rights_recorded_at);
+        $consentComplete = (bool) $booking?->consent_authority && $agreementSigned && $rightsComplete;
+        $lifeThreateningAllergies = MedicationAllergy::query()
+            ->where('client_id', $stay->client_id)
+            ->where('severity', 'life_threatening')
+            ->count();
+        $anaphylaxisAcknowledged = filled(data_get($stay->admission_risk_screen, 'anaphylaxis_acknowledgement.recorded_at'));
+        $openComplaints = $stay->complaints->whereNotIn('status', ['resolved'])->count();
+        $withinPlanRestraints = $stay->restraintEvents->where('within_support_plan', true);
+        $bspAcknowledged = $withinPlanRestraints->isEmpty()
+            || $withinPlanRestraints->every(fn ($event) => filled($event->behaviour_support_plan_id));
 
         return [
             [
@@ -334,6 +365,15 @@ class RespiteEvidencePackController extends Controller
                 'required' => true,
                 'complete' => $consentComplete,
                 'count' => $consentComplete ? 1 : 0,
+                'rights_complete' => $rightsComplete,
+            ],
+            [
+                'id' => 'manifest_anaphylaxis',
+                'type' => 'anaphylaxis_acknowledgement',
+                'title' => 'Anaphylaxis acknowledgement and escalation plan',
+                'required' => $lifeThreateningAllergies > 0,
+                'complete' => $lifeThreateningAllergies === 0 || $anaphylaxisAcknowledged,
+                'count' => $lifeThreateningAllergies,
             ],
             [
                 'id' => 'manifest_restraints',
@@ -344,6 +384,14 @@ class RespiteEvidencePackController extends Controller
                 'count' => $stay->restraintEvents->count(),
             ],
             [
+                'id' => 'manifest_bsp_acknowledgements',
+                'type' => 'bsp_acknowledgements',
+                'title' => 'Behaviour support plan linkage for restrictive practice',
+                'required' => $withinPlanRestraints->isNotEmpty(),
+                'complete' => $bspAcknowledged,
+                'count' => $withinPlanRestraints->count(),
+            ],
+            [
                 'id' => 'manifest_incidents',
                 'type' => 'incidents_notifiable',
                 'title' => 'Incidents and notifiable-event references',
@@ -351,6 +399,15 @@ class RespiteEvidencePackController extends Controller
                 'complete' => $stay->incidents->whereNotIn('status', ['reviewed', 'closed'])->isEmpty() && $pendingNotifiables === 0,
                 'count' => $stay->incidents->count(),
                 'pending_notifiable_count' => $pendingNotifiables,
+            ],
+            [
+                'id' => 'manifest_complaints',
+                'type' => 'complaints',
+                'title' => 'Complaints, advocacy and resolution notes',
+                'required' => false,
+                'complete' => $openComplaints === 0,
+                'count' => $stay->complaints->count(),
+                'open_count' => $openComplaints,
             ],
             [
                 'id' => 'manifest_med_rec',

@@ -4,6 +4,7 @@
  */
 import { Button } from '@/components/ui/button';
 import {
+    AlertTriangle,
     BedDouble,
     CalendarCheck,
     CalendarDays,
@@ -199,6 +200,42 @@ function BookingCard({
                 </div>
             </div>
 
+            <div className="grid gap-1 rounded-[10px] border border-border/70 px-3 py-2">
+                {b.readinessSegments.map((segment) => (
+                    <div
+                        key={segment.key}
+                        className="flex items-center gap-2 text-[11.5px]"
+                    >
+                        <span
+                            className={`h-2 w-2 rounded-full ${
+                                segment.complete
+                                    ? 'bg-status-success'
+                                    : segment.status === 'attention'
+                                      ? 'bg-status-critical'
+                                      : 'bg-status-warning'
+                            }`}
+                        />
+                        <span className="font-medium">{segment.label}</span>
+                        <span className="ml-auto text-muted-foreground">
+                            {segment.complete ? 'Done' : 'Pending'}
+                        </span>
+                    </div>
+                ))}
+            </div>
+
+            {b.criticalAlerts.length > 0 ? (
+                <div className="rounded-[10px] border border-status-critical/30 bg-status-critical-bg px-3 py-2 text-[12px] text-status-critical">
+                    <div className="flex items-start gap-2 font-semibold">
+                        <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                        <span>
+                            {b.criticalAlerts
+                                .map((alert) => alert.label)
+                                .join(', ')}
+                        </span>
+                    </div>
+                </div>
+            ) : null}
+
             <div className="flex flex-wrap gap-1.5">
                 <Pill tone={funding.tone}>{funding.label}</Pill>
                 {b.serviceAgreement ? (
@@ -210,6 +247,19 @@ function BookingCard({
                             ? ` · ${b.serviceAgreement.carerSupportDaysRemaining}d left`
                             : ''}
                     </Pill>
+                ) : null}
+                {b.serviceAgreement?.budgetRemaining != null ? (
+                    <Pill tone="neutral">
+                        {formatNzd(b.serviceAgreement.budgetRemaining)} left
+                    </Pill>
+                ) : null}
+                {b.serviceAgreement?.endsAt ? (
+                    <Pill tone="neutral">
+                        Ends {new Date(b.serviceAgreement.endsAt).toLocaleDateString('en-NZ')}
+                    </Pill>
+                ) : null}
+                {!b.codeOfRightsProvided || !b.consentToRespite ? (
+                    <Pill tone="warning">Rights / consent pending</Pill>
                 ) : null}
             </div>
 
@@ -257,6 +307,14 @@ function BookingCard({
             </div>
         </div>
     );
+}
+
+function formatNzd(amount: number): string {
+    return new Intl.NumberFormat('en-NZ', {
+        style: 'currency',
+        currency: 'NZD',
+        maximumFractionDigits: 0,
+    }).format(amount);
 }
 
 function fundingStatusMeta(status: RespiteBookingRow['fundingStatus']): {

@@ -1,5 +1,6 @@
 <?php
 
+use App\Models\BehaviourSupportPlan;
 use App\Models\Client;
 use App\Models\DataBreachLog;
 use App\Models\RespiteBooking;
@@ -120,4 +121,46 @@ test('a privacy breach incident on a respite stay creates a breach log', functio
     expect($breach->breach_type)->toBe('respite_stay');
     expect($breach->requires_authority_notification)->toBeTrue();
     expect($breach->affected_data_categories)->toContain('respite_record');
+});
+
+test('recording a within-plan restraint auto-links the clients active behaviour support plan', function () {
+    $client = Client::factory()->create();
+    $booking = RespiteBooking::factory()->create([
+        'client_id' => $client->id,
+        'status' => 'confirmed',
+    ]);
+    $stay = RespiteStay::create([
+        'booking_id' => $booking->id,
+        'client_id' => $client->id,
+        'status' => 'active',
+        'actual_start' => now()->subDay(),
+    ]);
+    $plan = BehaviourSupportPlan::create([
+        'client_id' => $client->id,
+        'title' => 'Active positive behaviour support plan',
+        'approved_interventions' => 'Low-arousal physical redirection if agreed triggers occur.',
+        'restrictive_practice_type' => 'physical',
+        'status' => 'active',
+        'developed_by' => $this->admin->id,
+        'developed_at' => now()->subMonth(),
+        'review_date' => now()->addMonths(5),
+        'created_by' => $this->admin->id,
+    ]);
+
+    $this->actingAs($this->admin)
+        ->post("/respite/stays/{$stay->id}/restraints", [
+            'started_at' => now()->subHours(2)->format('Y-m-d H:i:s'),
+            'ended_at' => now()->subHour()->format('Y-m-d H:i:s'),
+            'restraint_type' => 'physical',
+            'severity' => 'medium',
+            'trigger_description' => 'Client moved toward an unsafe exit.',
+            'de_escalation_attempted' => 'Quiet space and whānau call offered.',
+            'restraint_description' => 'Brief redirection using approved support-plan method.',
+            'within_support_plan' => true,
+            'authorised_by' => $this->admin->id,
+        ])
+        ->assertRedirect()
+        ->assertSessionHasNoErrors();
+
+    expect(\App\Models\RestraintEvent::firstOrFail()->behaviour_support_plan_id)->toBe($plan->id);
 });

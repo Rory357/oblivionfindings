@@ -42,6 +42,7 @@ class DatabaseSeeder extends Seeder
         $this->call(CompetencyFrameworksSeeder::class);
         $this->call(NzComplianceObligationsSeeder::class);
         $this->call(RespiteRetentionPolicySeeder::class);
+        $this->call(RespiteDemoSeeder::class);
         $this->call(AssetCategoriesSeeder::class);
         $this->call(AssetProcedureTemplatesSeeder::class);
         $this->call(FleetDemoSeeder::class);

@@ -10,6 +10,7 @@ use App\Models\ClientMedicationAlert;
 use App\Models\MedicationAllergy;
 use App\Models\RespiteBooking;
 use App\Models\RespiteBookingRequest;
+use App\Models\RespiteComplaint;
 use App\Models\RespiteReferral;
 use App\Models\RespiteStay;
 use App\Models\RespiteTask;
@@ -98,6 +99,7 @@ class RespiteWorkspaceController extends Controller
             ->withCount([
                 'restraintEvents as unreviewed_restraint_count' => fn ($q) => $q->whereNull('reviewed_at'),
                 'incidents as open_incident_count' => fn ($q) => $q->whereNotIn('status', ['reviewed', 'closed']),
+                'complaints as open_complaint_count' => fn ($q) => $q->whereNotIn('status', ['resolved']),
             ])
             ->orderByDesc('actual_start')
             ->orderByDesc('id')
@@ -119,6 +121,15 @@ class RespiteWorkspaceController extends Controller
                 ->orderBy('last_name')->orderBy('first_name')
                 ->get(['id', 'first_name', 'last_name']),
             'serviceContexts' => ServiceContext::query()->orderBy('name')->get(['id', 'name']),
+            'serviceAgreements' => ServiceAgreement::query()
+                ->where('status', 'active')
+                ->orderBy('title')
+                ->get(['id', 'client_id', 'title', 'reference_number', 'status', 'ends_at', 'signed_at', 'signed_date', 'review_due_date', 'total_budget', 'budget_used', 'total_hours', 'hours_used', 'carer_support_days_allocated', 'carer_support_days_used', 'carer_support_entitlement_year'])
+                ->map(fn (ServiceAgreement $agreement) => [
+                    'clientId' => $agreement->client_id,
+                    ...$this->serviceAgreementSummary($agreement),
+                ])
+                ->values(),
             'fundingSources' => RespiteFundingSource::options(),
         ]);
     }
@@ -185,6 +196,38 @@ class RespiteWorkspaceController extends Controller
             : NotifiableIncident::whereIn('related_incident_id', $respiteIncidentIds)
                 ->where('status', 'pending')
                 ->count();
+        $notifiablePastDeadline = $respiteIncidentIds->isEmpty()
+            ? 0
+            : NotifiableIncident::whereIn('related_incident_id', $respiteIncidentIds)
+                ->where('status', 'pending')
+                ->where('notification_deadline', '<', now())
+                ->count();
+        $notifiableDueSoon = $respiteIncidentIds->isEmpty()
+            ? 0
+            : NotifiableIncident::whereIn('related_incident_id', $respiteIncidentIds)
+                ->where('status', 'pending')
+                ->whereBetween('notification_deadline', [now(), now()->addDay()])
+                ->count();
+        $restraintsAwaitingReview = RestraintEvent::whereNull('reviewed_at')->whereNotNull('stay_id')->count();
+        $bspAwaitingLink = RestraintEvent::whereNotNull('stay_id')
+            ->where('within_support_plan', true)
+            ->whereNull('behaviour_support_plan_id')
+            ->count();
+        $missingConsentRights = RespiteBooking::query()
+            ->whereIn('status', ['pending', 'confirmed'])
+            ->where(function ($query) {
+                $query->whereNull('consent_authority')
+                    ->orWhereNull('code_of_rights_provided')
+                    ->orWhere('code_of_rights_provided', '!=', true)
+                    ->orWhereNull('consent_to_respite')
+                    ->orWhere('consent_to_respite', '!=', true)
+                    ->orWhereNull('advocate_offered')
+                    ->orWhereNull('consent_capacity_basis')
+                    ->orWhereNull('rights_format_provided')
+                    ->orWhereNull('rights_recorded_at');
+            })
+            ->count();
+        $openComplaints = RespiteComplaint::whereNotIn('status', ['resolved'])->count();
         $fundingAttention = RespiteBooking::query()
             ->whereIn('status', ['pending', 'confirmed'])
             ->where(function ($query) {
@@ -213,9 +256,20 @@ class RespiteWorkspaceController extends Controller
             'bedsOccupied' => $inHouse,
             'fullHomes' => $fullHomes,
             'fundingAttention' => $fundingAttention,
-            'complianceAttention' => RestraintEvent::whereNull('reviewed_at')->whereNotNull('stay_id')->count()
+            'complianceAttention' => $restraintsAwaitingReview
                 + ClientIncident::whereNotNull('respite_stay_id')->whereNotIn('status', ['reviewed', 'closed'])->count()
-                + $pendingNotifiableCount,
+                + $pendingNotifiableCount
+                + $bspAwaitingLink
+                + $missingConsentRights
+                + $openComplaints,
+            'compliance' => [
+                'notifiablePastDeadline' => $notifiablePastDeadline,
+                'notifiableDueSoon' => $notifiableDueSoon,
+                'restraintsAwaitingReview' => $restraintsAwaitingReview,
+                'bspAwaitingLink' => $bspAwaitingLink,
+                'missingConsentRights' => $missingConsentRights,
+                'openComplaints' => $openComplaints,
+            ],
         ];
     }
 
@@ -334,6 +388,14 @@ class RespiteWorkspaceController extends Controller
             'serviceAgreement' => $this->serviceAgreementSummary($b->serviceAgreement),
             'agreementStatus' => $b->agreement_status,
             'consentAuthority' => $b->consent_authority,
+            'consentAuthorityName' => $b->consent_authority_name,
+            'consentAuthorityContact' => $b->consent_authority_contact,
+            'codeOfRightsProvided' => (bool) $b->code_of_rights_provided,
+            'consentToRespite' => (bool) $b->consent_to_respite,
+            'consentCapacityBasis' => $b->consent_capacity_basis,
+            'advocateOffered' => $b->advocate_offered,
+            'rightsFormatProvided' => $b->rights_format_provided,
+            'rightsRecordedAt' => optional($b->rights_recorded_at)->toIso8601String(),
             'culturalSnapshot' => $b->cultural_snapshot,
             'culturalPlacementCheck' => $b->cultural_placement_check,
             'settingRestriction' => $b->setting_restriction,
@@ -373,6 +435,7 @@ class RespiteWorkspaceController extends Controller
             'bedHoldUntil' => optional($s->bed_hold_until)->toIso8601String(),
             'unreviewedRestraints' => (int) ($s->unreviewed_restraint_count ?? 0),
             'openIncidents' => (int) ($s->open_incident_count ?? 0),
+            'openComplaints' => (int) ($s->open_complaint_count ?? 0),
             'criticalAlerts' => $this->criticalAlerts($client),
             'requiresAdmissionMedRec' => $this->hasLoadedActiveMedications($client),
             'admissionMedRecStatus' => $s->medicationReconciliations

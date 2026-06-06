@@ -7,11 +7,15 @@ import { cn } from '@/lib/utils';
 import {
     AlertTriangle,
     CalendarDays,
+    ClipboardCheck,
     Eye,
+    FileWarning,
     Home,
     LogIn,
     LogOut,
     MapPin,
+    MessageSquareWarning,
+    ShieldAlert,
 } from 'lucide-react';
 import { useState } from 'react';
 import { Empty, FilterChip, PaneHead } from '../pane-kit';
@@ -42,13 +46,21 @@ export function StaysPane({
     can,
     onView,
     onCheckIn,
+    onReconcile,
+    onRecordRestraint,
+    onLogIncident,
     onDischarge,
+    onLogComplaint,
 }: {
     stays: RespiteStayRow[];
     can: RespiteCan;
     onView: (row: RespiteStayRow) => void;
     onCheckIn: (row: RespiteStayRow) => void;
+    onReconcile: (row: RespiteStayRow) => void;
+    onRecordRestraint: (row: RespiteStayRow) => void;
+    onLogIncident: (row: RespiteStayRow) => void;
     onDischarge: (row: RespiteStayRow) => void;
+    onLogComplaint: (row: RespiteStayRow) => void;
 }) {
     const [scope, setScope] = useState<'live' | 'completed' | 'all'>('live');
 
@@ -89,7 +101,11 @@ export function StaysPane({
                         can={can}
                         onView={onView}
                         onCheckIn={onCheckIn}
+                        onReconcile={onReconcile}
+                        onRecordRestraint={onRecordRestraint}
+                        onLogIncident={onLogIncident}
                         onDischarge={onDischarge}
+                        onLogComplaint={onLogComplaint}
                     />
                 ))}
                 {rows.length === 0 ? (
@@ -105,15 +121,25 @@ function StayCard({
     can,
     onView,
     onCheckIn,
+    onReconcile,
+    onRecordRestraint,
+    onLogIncident,
     onDischarge,
+    onLogComplaint,
 }: {
     s: RespiteStayRow;
     can: RespiteCan;
     onView: (row: RespiteStayRow) => void;
     onCheckIn: (row: RespiteStayRow) => void;
+    onReconcile: (row: RespiteStayRow) => void;
+    onRecordRestraint: (row: RespiteStayRow) => void;
+    onLogIncident: (row: RespiteStayRow) => void;
     onDischarge: (row: RespiteStayRow) => void;
+    onLogComplaint: (row: RespiteStayRow) => void;
 }) {
     const prog = s.live ? dayProgress(s) : null;
+    const needsAdmissionMedRec =
+        s.requiresAdmissionMedRec && s.admissionMedRecStatus !== 'completed';
     return (
         <div className="rounded-[14px] border border-border bg-card p-4 transition-shadow hover:shadow-sm">
             <div className="flex items-start gap-3.5">
@@ -152,14 +178,25 @@ function StayCard({
                             {fmtDate(s.live ? s.plannedEnd : s.actualEnd)}
                         </span>
                     </div>
+                    {s.criticalAlerts.length > 0 ? (
+                        <div className="mt-2 rounded-[10px] border border-status-critical/30 bg-status-critical-bg px-3 py-2 text-[12px] text-status-critical">
+                            <div className="flex items-start gap-2 font-semibold">
+                                <AlertTriangle className="mt-0.5 h-3.5 w-3.5 shrink-0" />
+                                <span>
+                                    {s.criticalAlerts
+                                        .map((alert) => alert.label)
+                                        .join(', ')}
+                                </span>
+                            </div>
+                        </div>
+                    ) : null}
                     {s.criticalAlerts.length > 0 ||
                     s.unreviewedRestraints > 0 ||
                     s.openIncidents > 0 ||
-                    (s.requiresAdmissionMedRec &&
-                        s.admissionMedRecStatus !== 'completed') ? (
+                    s.openComplaints > 0 ||
+                    needsAdmissionMedRec ? (
                         <div className="mt-2 flex flex-wrap gap-1.5">
-                            {s.requiresAdmissionMedRec &&
-                            s.admissionMedRecStatus !== 'completed' ? (
+                            {needsAdmissionMedRec ? (
                                 <Pill tone="warning">
                                     Admission med-rec pending
                                 </Pill>
@@ -173,6 +210,12 @@ function StayCard({
                                 <Pill tone="critical">
                                     {s.openIncidents} open incident
                                     {s.openIncidents === 1 ? '' : 's'}
+                                </Pill>
+                            ) : null}
+                            {s.openComplaints > 0 ? (
+                                <Pill tone="warning">
+                                    {s.openComplaints} complaint
+                                    {s.openComplaints === 1 ? '' : 's'}
                                 </Pill>
                             ) : null}
                             {s.criticalAlerts.slice(0, 3).map((alert) => (
@@ -202,10 +245,44 @@ function StayCard({
                     ) : null}
                 </div>
                 <div className="flex shrink-0 flex-col justify-center gap-1.5">
+                    {can.staysManage && needsAdmissionMedRec ? (
+                        <Button
+                            size="sm"
+                            variant="outline"
+                            onClick={() => onReconcile(s)}
+                        >
+                            <ClipboardCheck className="h-3.5 w-3.5" /> Med-rec
+                        </Button>
+                    ) : null}
                     {can.staysManage && s.status === 'admitted' ? (
                         <Button size="sm" onClick={() => onCheckIn(s)}>
                             <LogIn className="h-3.5 w-3.5" /> Check in
                         </Button>
+                    ) : null}
+                    {can.staysManage && (s.live || s.status === 'admitted') ? (
+                        <>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => onRecordRestraint(s)}
+                            >
+                                <ShieldAlert className="h-3.5 w-3.5" /> Restraint
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => onLogIncident(s)}
+                            >
+                                <FileWarning className="h-3.5 w-3.5" /> Incident
+                            </Button>
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                onClick={() => onLogComplaint(s)}
+                            >
+                                <MessageSquareWarning className="h-3.5 w-3.5" /> Complaint
+                            </Button>
+                        </>
                     ) : null}
                     {can.staysManage && s.live ? (
                         <Button
