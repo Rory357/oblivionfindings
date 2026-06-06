@@ -8,6 +8,7 @@ use App\Models\ClientIncident;
 use App\Models\DataRetentionPolicy;
 use App\Models\RespiteBooking;
 use App\Models\RespiteBookingRequest;
+use App\Models\RespiteComplaint;
 use App\Models\RespiteDailyNote;
 use App\Models\RespiteEvidencePack;
 use App\Models\RespiteMedicationReconciliation;
@@ -303,6 +304,78 @@ class RespiteNzWorkflowCompletionTest extends TestCase
             ])
             ->assertRedirect()
             ->assertSessionHasNoErrors();
+    }
+
+    public function test_logging_a_complaint_persists_and_surfaces_in_the_evidence_manifest(): void
+    {
+        $client = Client::factory()->create();
+        $booking = RespiteBooking::factory()->create([
+            'client_id' => $client->id,
+            'status' => 'confirmed',
+        ]);
+        $stay = RespiteStay::create([
+            'booking_id' => $booking->id,
+            'client_id' => $client->id,
+            'status' => 'active',
+            'actual_start' => now()->subDay(),
+            'created_by' => $this->admin->id,
+        ]);
+
+        $this->actingAs($this->admin)
+            ->post(route('respite.stays.complaints.store', $stay), [
+                'source' => 'whanau',
+                'received_at' => now()->subHours(2)->format('Y-m-d H:i:s'),
+                'nature' => 'Whānau concerned about meal timing.',
+                'details' => 'Raised at evening visit; wants confirmation of dietary plan.',
+                'escalated_to_hdc' => 'offered',
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $complaint = RespiteComplaint::firstOrFail();
+        $this->assertSame($stay->id, $complaint->stay_id);
+        $this->assertSame($client->id, $complaint->client_id);
+        $this->assertSame('open', $complaint->status);
+
+        $this->actingAs($this->admin)
+            ->post(route('respite.evidence-packs.store'), [
+                'stay_id' => $stay->id,
+                'summary' => 'Complaint evidence pack',
+            ])
+            ->assertRedirect()
+            ->assertSessionHasNoErrors();
+
+        $pack = RespiteEvidencePack::firstOrFail();
+
+        // An open complaint surfaces in the manifest and is not "complete".
+        $openManifest = $this->exportedComplaintsManifestItem($pack);
+        $this->assertSame(1, $openManifest['count']);
+        $this->assertSame(1, $openManifest['open_count']);
+        $this->assertFalse($openManifest['complete']);
+
+        // Resolving the complaint clears the open count and completes the item.
+        $complaint->update(['status' => 'resolved', 'resolution' => 'Dietary plan confirmed with whānau.']);
+
+        $resolvedManifest = $this->exportedComplaintsManifestItem($pack);
+        $this->assertSame(1, $resolvedManifest['count']);
+        $this->assertSame(0, $resolvedManifest['open_count']);
+        $this->assertTrue($resolvedManifest['complete']);
+    }
+
+    /**
+     * Export the evidence pack and return its freshly-built "complaints" manifest item.
+     *
+     * @return array<string,mixed>
+     */
+    private function exportedComplaintsManifestItem(RespiteEvidencePack $pack): array
+    {
+        $response = $this->actingAs($this->admin)
+            ->get(route('respite.evidence-packs.export', $pack))
+            ->assertOk();
+
+        $payload = json_decode($response->streamedContent(), true);
+
+        return collect($payload['manifest'])->firstWhere('type', 'complaints');
     }
 
     public function test_respite_retention_policy_seeder_creates_health_record_and_declined_referral_windows(): void

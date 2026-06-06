@@ -290,7 +290,7 @@ class RespiteEvidencePackController extends Controller
             RespiteAuditLog::ACTION_EXPORTED,
             auth()->id(),
             null,
-            ['export_format' => 'pdf'],
+            ['export_format' => 'json'],
             null,
             RespiteAuditLog::CATEGORY_EVIDENCE
         );

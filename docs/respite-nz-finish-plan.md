@@ -254,3 +254,32 @@ php artisan migrate --force
 php artisan db:seed --class=RespiteRetentionPolicySeeder --force
 php artisan db:seed --class=RespiteDemoSeeder --force
 ```
+
+---
+
+## Audit + close-out verification (Claude session, 2026-06-06)
+
+Independently audited the close-out commit (`a210584b`) against the actual code (not the completion
+note) — read each enforcement path and ran the suite. **All A/B/C/D items confirmed genuinely done, not
+stored-only:** A1 anaphylaxis gate throws without ack+EpiPen+escalation (`RespiteStayController.php:521`);
+A2 consent segment is capacity-aware; A3 HDC rights gate + manifest; B1–B5 all wired via real modals
+(`modals/stay-actions.tsx`, `booking-confirm.tsx`) POSTing populated bodies to live endpoints (incl. the
+new med-rec capture route and BSP auto-resolve); D4 complaint entity, D5 daily-note→incident automation,
+D6 structured compliance lane, D7 real JSON `streamDownload` export, D8 `whaikaha` validation. Migration
+`..._140000` idempotent + reversible; `RespiteDemoSeeder` idempotent + registered.
+
+Closed the only residual nits found:
+
+- **Added** `RespiteNzWorkflowCompletionTest::test_logging_a_complaint_persists_and_surfaces_in_the_evidence_manifest`
+  — the complaint feature was wired but had **no test**; now proves it persists a `RespiteComplaint` and
+  surfaces in the evidence manifest as open/incomplete, then resolves to complete (also exercises the
+  export endpoint).
+- **Added** `RespiteFundingCompletionTest` › "the welfare consent-authority readiness segment blocks
+  independently of the rights segment" — the existing A2 test bundled the `consent` and `consent_rights`
+  segments (both incomplete in its before-state); this isolates the welfare-authority requirement with all
+  rights fields valid, so a regression that left the consent segment always-complete can no longer hide.
+- **Fixed** `RespiteEvidencePackController::export()` audit log: `export_format` was hard-coded `'pdf'`
+  while the endpoint streams JSON → now `'json'` (matches the actual artifact).
+
+Final verification: `npm run types` 0 · `npm run build` 0 · localisation grep empty ·
+`php artisan test tests/Feature/Respite` green (39 tests). **Respite is closeable.**
