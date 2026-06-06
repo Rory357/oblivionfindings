@@ -147,7 +147,7 @@ export default function PrivacyComplianceReport({ period, dsrStats, breachStats,
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-base">
                             <Shield className="h-5 w-5 text-primary" />
-                            Data Protection Impact Assessments
+                            Privacy Impact Assessments
                         </CardTitle>
                     </CardHeader>
                     <CardContent>

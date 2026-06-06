@@ -88,12 +88,12 @@ export default function PIAIndex({ filters, dpias, stats }: Props) {
             { title: 'Privacy', href: '/privacy/dashboard' },
             { title: 'Impact Assessments', href: '/privacy/pia' }
         ]}>
-            <Head title="Data Protection Impact Assessments" />
+            <Head title="Privacy Impact Assessments" />
 
             <div className="flex flex-col gap-6 p-6">
                 {/* Hero Header */}
                 <PageHero
-                    title="Data Protection Impact Assessments"
+                    title="Privacy Impact Assessments"
                     description="Privacy Impact Assessment — assess privacy risks before processing changes"
                     icon={<Activity className="h-7 w-7 text-white" />}
                     stats={stats ? [

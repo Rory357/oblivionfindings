@@ -142,7 +142,7 @@ const Terms: React.FC = () => {
                                 written consent
                             </li>
                             <li>
-                                Assisting with data protection impact
+                                Assisting with privacy impact
                                 assessments and breach notifications
                             </li>
                             <li>

@@ -143,7 +143,7 @@ class PrivacyControllerTest extends TestCase
         return PrivacyImpactAssessment::create(array_merge([
             'assessment_name' => 'New Client Portal Assessment',
             'project_or_process' => 'Client Portal Launch',
-            'description' => 'Assessment of data protection impact for the new client portal.',
+            'description' => 'Assessment of privacy impact for the new client portal.',
             'assessment_type' => 'new_project',
             'assessor_id' => $this->admin->id,
             'assessment_date' => now(),
