@@ -300,6 +300,14 @@ class RespiteNzWorkflowCompletionTest extends TestCase
 
     public function test_respite_retention_policy_seeder_creates_health_record_and_declined_referral_windows(): void
     {
+        DataRetentionPolicy::query()->create([
+            'model_type' => RespiteReferral::class,
+            'policy_name' => 'Respite referrals and declined intake records',
+            'retention_period_years' => 10,
+            'retention_conditions' => ['health_record' => true],
+            'active' => true,
+        ]);
+
         $this->seed(RespiteRetentionPolicySeeder::class);
 
         $healthRecordModels = [
@@ -333,5 +341,10 @@ class RespiteNzWorkflowCompletionTest extends TestCase
             'status' => 'declined',
             'linked_booking_request_id' => null,
         ], $declinedPolicy->retention_conditions);
+
+        $this->assertDatabaseMissing('data_retention_policies', [
+            'model_type' => RespiteReferral::class,
+            'policy_name' => 'Respite referrals and declined intake records',
+        ]);
     }
 }

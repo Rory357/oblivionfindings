@@ -24,6 +24,15 @@ class RespiteRetentionPolicySeeder extends Seeder
         $now = now();
         $healthRecordDescription = 'NZ respite health record retention policy seeded from the respite implementation plan.';
 
+        DB::table('data_retention_policies')
+            ->whereIn('policy_name', [
+                'Respite referrals and declined intake records',
+                'Respite booking requests',
+                'Respite bookings and funding records',
+                'Respite stay records',
+            ])
+            ->delete();
+
         $policies = [
             [
                 'model_type' => RespiteReferral::class,
