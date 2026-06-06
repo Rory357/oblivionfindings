@@ -55,11 +55,13 @@ type Props = {
 /* ---------- Agreement Types ---------- */
 
 const AGREEMENT_TYPES: Record<string, string> = {
-    ndis: 'NDIS',
+    whaikaha: 'Whaikaha',
+    carer_support: 'Carer Support',
+    nasc: 'NASC-allocated',
+    egl_if: 'EGL / Individualised Funding',
+    te_whatu_ora: 'Te Whatu Ora',
     msd: 'MSD — Ministry of Social Development',
-    dss: 'DSS — Disability Support Services',
     acc: 'ACC — Accident Compensation',
-    dhb: 'Health NZ / Te Whatu Ora',
     oranga_tamariki: 'Oranga Tamariki',
     private: 'Private / Self-Funded',
     charitable: 'Charitable Trust / NGO',
@@ -108,7 +110,7 @@ export default function ServiceAgreementCreate({ clients }: Props) {
         client_id: initialClientId,
         title: '',
         reference_number: '',
-        agreement_type: 'msd',
+        agreement_type: 'whaikaha',
         funding_body: '',
         funding_reference: '',
         status: 'draft',
@@ -149,8 +151,6 @@ export default function ServiceAgreementCreate({ clients }: Props) {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        const payload: any = { ...data };
-        if (docFiles.length > 0) payload.documents = docFiles;
         post('/operations/service-agreements', {
             forceFormData: docFiles.length > 0,
         });
@@ -220,7 +220,7 @@ export default function ServiceAgreementCreate({ clients }: Props) {
                                 <div className="grid gap-4 sm:grid-cols-2">
                                     <div className="space-y-1.5">
                                         <Label>Title *</Label>
-                                        <Input value={data.title} onChange={(e) => setData('title', e.target.value)} placeholder="e.g. DSS Residential Support 2026" />
+                                        <Input value={data.title} onChange={(e) => setData('title', e.target.value)} placeholder="e.g. Whaikaha Residential Support 2026" />
                                         {errors.title && <p className="text-xs text-destructive">{errors.title}</p>}
                                     </div>
                                     <div className="space-y-1.5">
@@ -359,7 +359,7 @@ export default function ServiceAgreementCreate({ clients }: Props) {
                                 icon={Landmark}
                                 iconBg="bg-primary/10 text-primary"
                                 title="NZ Funding Details"
-                                description="Whaikaha / DSS funding type and service level details."
+                                description="Whaikaha, NASC, ACC or private funding type and service level details."
                             />
                             <div className="space-y-4">
                                 <div className="grid gap-4 sm:grid-cols-2">

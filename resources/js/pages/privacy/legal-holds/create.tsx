@@ -56,7 +56,7 @@ export default function CreateLegalHold() {
 
     return (
         <AppLayout breadcrumbs={[
-            { title: 'Privacy & GDPR', href: '/privacy/dashboard' },
+            { title: 'Privacy', href: '/privacy/dashboard' },
             { title: 'Legal Holds', href: '/privacy/legal-holds' },
             { title: 'New Hold', href: '/privacy/legal-holds/create' },
         ]}>

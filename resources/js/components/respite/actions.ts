@@ -12,12 +12,24 @@ export const respiteActions = {
         router.put(`/respite/referrals/${id}`, { status: 'triaged' }, opts),
     acceptReferral: (id: number) =>
         router.put(`/respite/referrals/${id}`, { status: 'accepted' }, opts),
-    approveRequest: (id: number) =>
-        router.post(`/respite/requests/${id}/approve`, {}, opts),
-    confirmBooking: (id: number) =>
-        router.post(`/respite/bookings/${id}/confirm`, {}, opts),
-    checkInStay: (id: number) =>
-        router.post(`/respite/stays/${id}/check-in`, {}, opts),
-    startTask: (id: number) => router.post(`/respite/tasks/${id}/start`, {}, opts),
-    completeTask: (id: number) => router.post(`/respite/tasks/${id}/complete`, {}, opts),
+    approveRequest: (
+        id: number,
+        data: Record<string, string | number | boolean | null> = {},
+    ) => router.post(`/respite/requests/${id}/approve`, data, opts),
+    promoteRequest: (
+        id: number,
+        data: Record<string, string | number | boolean | null> = {},
+    ) => router.post(`/respite/requests/${id}/promote`, data, opts),
+    confirmBooking: (
+        id: number,
+        data: Record<string, string | number | boolean | null> = {},
+    ) => router.post(`/respite/bookings/${id}/confirm`, data, opts),
+    checkInStay: (
+        id: number,
+        data: Record<string, string | number | boolean | null> = {},
+    ) => router.post(`/respite/stays/${id}/check-in`, data, opts),
+    startTask: (id: number) =>
+        router.post(`/respite/tasks/${id}/start`, {}, opts),
+    completeTask: (id: number) =>
+        router.post(`/respite/tasks/${id}/complete`, {}, opts),
 };

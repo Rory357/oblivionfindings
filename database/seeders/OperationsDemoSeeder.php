@@ -153,7 +153,7 @@ class OperationsDemoSeeder extends Seeder
                 'title' => $client->first_name . "'s Funding Agreement " . now()->year,
                 'reference_number' => 'SA-' . now()->format('Ym') . '-' . str_pad($i + 1, 3, '0', STR_PAD_LEFT),
                 'agreement_type' => ['ndis', 'msd', 'private', 'dss', 'acc'][$i % 5],
-                'funding_body' => ['NDIS', 'MSD', 'Private', 'DSS', 'ACC'][$i % 5],
+                'funding_body' => ['Whaikaha', 'MSD', 'Private', 'Whaikaha', 'ACC'][$i % 5],
                 'status' => $i < 3 ? 'active' : 'draft',
                 'starts_at' => now()->subMonths(rand(0, 3)),
                 'ends_at' => now()->addMonths(rand(6, 12)),

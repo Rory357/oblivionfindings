@@ -58,13 +58,14 @@ type PageProps = {
 };
 
 const funderTypes = [
-    { value: 'government', label: 'Government' },
-    { value: 'moh', label: 'Ministry of Health' },
-    { value: 'msd', label: 'Ministry of Social Development' },
+    { value: 'whaikaha', label: 'Whaikaha' },
+    { value: 'carer_support', label: 'Carer Support' },
+    { value: 'nasc', label: 'NASC-allocated' },
+    { value: 'egl_if', label: 'EGL / Individualised Funding' },
     { value: 'acc', label: 'ACC' },
-    { value: 'dhb', label: 'Health NZ / DHB' },
+    { value: 'te_whatu_ora', label: 'Te Whatu Ora' },
+    { value: 'msd', label: 'MSD' },
     { value: 'private', label: 'Private' },
-    { value: 'donation', label: 'Donation / Trust' },
     { value: 'other', label: 'Other' },
 ];
 
@@ -122,7 +123,7 @@ function CreateFundingStreamDialog({ revenueAccounts }: { revenueAccounts: Reven
                                 id="fs-name"
                                 value={data.name}
                                 onChange={(e) => setData('name', e.target.value)}
-                                placeholder="e.g. MOH Residential Care"
+                                placeholder="e.g. Whaikaha Residential Care"
                             />
                             {errors.name && <p className="text-sm text-destructive">{errors.name}</p>}
                         </div>

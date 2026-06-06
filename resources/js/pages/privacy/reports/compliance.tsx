@@ -73,7 +73,7 @@ export default function PrivacyComplianceReport({ period, dsrStats, breachStats,
                         stats={[
                             { label: 'DSRs', value: dsrStats.total },
                             { label: 'Breaches', value: breachStats.total },
-                            { label: 'DPIAs', value: dpiaStats.total },
+                            { label: 'PIAs', value: dpiaStats.total },
                         ]}
                         actions={
                             <div className="flex gap-1">
@@ -102,7 +102,7 @@ export default function PrivacyComplianceReport({ period, dsrStats, breachStats,
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-base">
                             <FileText className="h-5 w-5 text-status-info" />
-                            Data Subject Requests
+                            Privacy Requests
                         </CardTitle>
                     </CardHeader>
                     <CardContent>
@@ -137,12 +137,12 @@ export default function PrivacyComplianceReport({ period, dsrStats, breachStats,
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
                             <StatCard label="Total Breaches" value={breachStats.total} />
                             <StatCard label="Resolved" value={breachStats.resolved} color="text-status-success" />
-                            <StatCard label="ICO Notifications" value={breachStats.ico_notifications} color="text-status-critical" />
+                            <StatCard label="OPC Notifications" value={breachStats.ico_notifications} color="text-status-critical" />
                         </div>
                     </CardContent>
                 </Card>
 
-                {/* DPIA Stats */}
+                {/* PIA Stats */}
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-base">
@@ -152,7 +152,7 @@ export default function PrivacyComplianceReport({ period, dsrStats, breachStats,
                     </CardHeader>
                     <CardContent>
                         <div className="grid grid-cols-2 sm:grid-cols-3 gap-4">
-                            <StatCard label="Total DPIAs" value={dpiaStats.total} />
+                            <StatCard label="Total PIAs" value={dpiaStats.total} />
                             <StatCard label="Approved" value={dpiaStats.approved} color="text-status-success" />
                             <StatCard label="High Risk" value={dpiaStats.high_risk} color="text-status-critical" />
                         </div>

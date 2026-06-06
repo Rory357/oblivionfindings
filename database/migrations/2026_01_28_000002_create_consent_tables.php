@@ -18,7 +18,7 @@ return new class extends Migration
             $table->string('category'); // essential, optional, third_party
             $table->text('description');
             $table->text('purpose'); // Why this consent is needed
-            $table->text('legal_basis'); // GDPR Article 6 basis
+            $table->text('legal_basis'); // Privacy Act 2020 IPP basis
             $table->boolean('is_mandatory')->default(false); // Required for service delivery
             $table->boolean('requires_capacity_assessment')->default(false);
             $table->boolean('allows_withdrawal')->default(true);
@@ -74,7 +74,7 @@ return new class extends Migration
             // Consent given
             $table->timestamp('given_at')->nullable();
             $table->foreignId('given_by_user_id')->nullable()->constrained('users')->nullOnDelete();
-            $table->string('given_by_relationship')->nullable(); // self, parent, guardian, attorney, deputy
+            $table->string('given_by_relationship')->nullable(); // self, parent, guardian, attorney, alternate lead
             $table->text('given_method')->nullable(); // verbal, written, electronic
             $table->text('given_notes')->nullable();
 

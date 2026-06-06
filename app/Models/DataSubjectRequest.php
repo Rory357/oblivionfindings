@@ -81,7 +81,7 @@ class DataSubjectRequest extends Model
                 $request->received_at = now();
             }
             if (empty($request->due_date)) {
-                $request->due_date = now()->addDays(30); // GDPR requirement
+                $request->due_date = now()->addDays(30); // Privacy Act 2020 requirement
             }
         });
     }

@@ -35,7 +35,7 @@ export default function EditRetentionPolicy({ policy }: Props) {
 
     return (
         <AppLayout breadcrumbs={[
-            { title: 'Privacy & GDPR', href: '/privacy/dashboard' },
+            { title: 'Privacy', href: '/privacy/dashboard' },
             { title: 'Retention Policies', href: '/privacy/retention' },
             { title: policy.policy_name, href: `/privacy/retention/${policy.id}/edit` },
         ]}>

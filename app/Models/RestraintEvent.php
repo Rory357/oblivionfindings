@@ -10,9 +10,10 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class RestraintEvent extends Model
 {
-    use HasFactory, SoftDeletes, AuditableChanges;
+    use AuditableChanges, HasFactory, SoftDeletes;
 
     protected $fillable = [
+        'stay_id',
         'client_id',
         'behaviour_support_plan_id',
         'site_id',
@@ -52,12 +53,17 @@ class RestraintEvent extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);
+    }
+
+    public function stay(): BelongsTo
+    {
+        return $this->belongsTo(RespiteStay::class, 'stay_id');
     }
 
     public function behaviourSupportPlan(): BelongsTo

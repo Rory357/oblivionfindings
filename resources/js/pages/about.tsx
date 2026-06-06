@@ -15,7 +15,7 @@ const About: React.FC = () => {
             icon: Shield,
             title: 'Trust & Security',
             description:
-                'We handle sensitive data, so we take security seriously. Bank-grade encryption, strict access controls, and full GDPR compliance come standard.',
+                'We handle sensitive data, so we take security seriously. Bank-grade encryption, strict access controls, and full Privacy Act 2020 compliance come standard.',
         },
         {
             icon: Target,

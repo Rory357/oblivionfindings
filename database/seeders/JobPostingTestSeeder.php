@@ -194,7 +194,7 @@ class JobPostingTestSeeder extends Seeder
                 'is_internal' => false,
                 'requires_approval' => true,
                 'summary' => 'Lead quality improvement initiatives across all service lines.',
-                'description' => "Oversee quality assurance and continuous improvement across our residential and community services.\n\nEnsure compliance with NZ Health and Disability Services Standards and Ministry of Health requirements.",
+                'description' => "Oversee quality assurance and continuous improvement across our residential and community services.\n\nEnsure compliance with NZ Health and Disability Services Standards and HealthCERT and Te Whatu Ora requirements.",
                 'status' => 'pending_approval',
                 'views_count' => 0,
                 'applications_count' => 0,

@@ -2,13 +2,16 @@
 
 namespace App\Http\Controllers\Respite;
 
+use App\Domain\Governance\Models\NotifiableIncident;
+use App\Events\Respite\RespiteEvent;
 use App\Http\Controllers\Controller;
+use App\Models\ClientMedication;
+use App\Models\RespiteAuditLog;
 use App\Models\RespiteEvidencePack;
 use App\Models\RespiteStay;
-use App\Models\RespiteAuditLog;
-use App\Events\Respite\RespiteEvent;
-use Illuminate\Http\Request;
 use Illuminate\Http\RedirectResponse;
+use Illuminate\Http\Request;
+use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
 use Inertia\Response;
 
@@ -52,8 +55,12 @@ class RespiteEvidencePackController extends Controller
             'summary' => 'nullable|string|max:5000',
         ]);
 
+        $stay = RespiteStay::with(['booking.serviceAgreement', 'handovers', 'communications', 'dailyNotes', 'medicationReconciliations', 'restraintEvents', 'incidents'])
+            ->findOrFail($validated['stay_id']);
+
+        $validated['booking_id'] = $stay->booking_id;
         $validated['status'] = 'draft';
-        $validated['items'] = [];
+        $validated['items'] = $this->buildManifest($stay);
         $validated['created_by'] = auth()->id();
 
         $pack = RespiteEvidencePack::create($validated);
@@ -187,8 +194,10 @@ class RespiteEvidencePackController extends Controller
         $items = array_filter($items, function ($item) use ($validated, &$removedItem) {
             if ($item['id'] === $validated['item_id']) {
                 $removedItem = $item;
+
                 return false;
             }
+
             return true;
         });
 
@@ -220,8 +229,23 @@ class RespiteEvidencePackController extends Controller
             'seal_reason' => 'required|string|max:500',
         ]);
 
+        $manifest = $this->buildManifestForPack($evidencePack);
+        $incomplete = collect($manifest)->where('required', true)->where('complete', false)->values();
+
+        if ($incomplete->isNotEmpty()) {
+            $evidencePack->update([
+                'items' => $manifest,
+                'updated_by' => auth()->id(),
+            ]);
+
+            throw ValidationException::withMessages([
+                'manifest' => 'Complete required evidence before sealing: '.$incomplete->pluck('title')->join(', '),
+            ]);
+        }
+
         $evidencePack->update([
             'status' => 'sealed',
+            'items' => $manifest,
             'sealed_at' => now(),
             'sealed_by_user_id' => auth()->id(),
             'updated_by' => auth()->id(),
@@ -272,5 +296,86 @@ class RespiteEvidencePackController extends Controller
 
         // TODO: Implement PDF export
         return back()->with('info', 'Export functionality coming soon.');
+    }
+
+    private function buildManifestForPack(RespiteEvidencePack $pack): array
+    {
+        $pack->loadMissing(['stay.booking.serviceAgreement', 'stay.handovers', 'stay.communications', 'stay.dailyNotes', 'stay.medicationReconciliations', 'stay.restraintEvents', 'stay.incidents']);
+
+        return $this->buildManifest($pack->stay);
+    }
+
+    /**
+     * @return array<int,array<string,mixed>>
+     */
+    private function buildManifest(RespiteStay $stay): array
+    {
+        $stay->loadMissing(['booking.serviceAgreement', 'handovers', 'communications', 'dailyNotes', 'medicationReconciliations', 'restraintEvents', 'incidents']);
+        $booking = $stay->booking;
+        $incidentIds = $stay->incidents->pluck('id');
+        $pendingNotifiables = $incidentIds->isNotEmpty()
+            ? NotifiableIncident::whereIn('related_incident_id', $incidentIds)->where('status', 'pending')->count()
+            : 0;
+        $activeMedicationCount = ClientMedication::query()->where('client_id', $stay->client_id)->active()->count();
+        $admissionMedRecDone = $stay->medicationReconciliations
+            ->where('type', 'admission')
+            ->whereIn('status', ['completed', 'overridden'])
+            ->isNotEmpty();
+        $agreementSigned = in_array($booking?->agreement_status, ['signed', 'waived'], true)
+            || (bool) $booking?->serviceAgreement?->signed_at
+            || (bool) $booking?->serviceAgreement?->signed_date;
+        $consentComplete = (bool) $booking?->consent_authority && $agreementSigned;
+
+        return [
+            [
+                'id' => 'manifest_consent_rights',
+                'type' => 'consent_rights',
+                'title' => 'Consent, PPPR authority and rights evidence',
+                'required' => true,
+                'complete' => $consentComplete,
+                'count' => $consentComplete ? 1 : 0,
+            ],
+            [
+                'id' => 'manifest_restraints',
+                'type' => 'restraint_events',
+                'title' => 'Restraint events and reviews',
+                'required' => true,
+                'complete' => $stay->restraintEvents->whereNull('reviewed_at')->isEmpty(),
+                'count' => $stay->restraintEvents->count(),
+            ],
+            [
+                'id' => 'manifest_incidents',
+                'type' => 'incidents_notifiable',
+                'title' => 'Incidents and notifiable-event references',
+                'required' => true,
+                'complete' => $stay->incidents->whereNotIn('status', ['reviewed', 'closed'])->isEmpty() && $pendingNotifiables === 0,
+                'count' => $stay->incidents->count(),
+                'pending_notifiable_count' => $pendingNotifiables,
+            ],
+            [
+                'id' => 'manifest_med_rec',
+                'type' => 'medication_reconciliation',
+                'title' => 'Medication reconciliation',
+                'required' => $activeMedicationCount > 0,
+                'complete' => $activeMedicationCount === 0 || $admissionMedRecDone,
+                'count' => $stay->medicationReconciliations->count(),
+            ],
+            [
+                'id' => 'manifest_handovers',
+                'type' => 'handovers_communications',
+                'title' => 'Handovers and family/whanau communications',
+                'required' => false,
+                'complete' => true,
+                'count' => $stay->handovers->count() + $stay->communications->count(),
+            ],
+            [
+                'id' => 'manifest_daily_notes',
+                'type' => 'daily_wellbeing_notes',
+                'title' => 'Daily wellbeing and cultural support notes',
+                'required' => false,
+                'complete' => true,
+                'count' => $stay->dailyNotes->count(),
+            ],
+        ];
     }
 }

@@ -11,14 +11,14 @@ use App\Http\Controllers\PrivacyReportController;
 use Illuminate\Support\Facades\Route;
 
 /**
- * Privacy & GDPR Management Routes
+ * Privacy Management Routes
  *
- * Handles data subject requests, retention policies, breach notifications,
- * and GDPR compliance workflows.
+ * Handles privacy requests, retention policies, breach notifications,
+ * and Privacy Act 2020 compliance workflows.
  */
 
 Route::middleware(['auth'])->group(function () {
-    // Data Subject Requests (GDPR Articles 15-22)
+    // Privacy Requests (Privacy Act 2020 IPP 6/7)
     // Create routes must come before wildcard routes
     Route::middleware('permission:privacy.processRequests')->group(function () {
         Route::get('/privacy/requests/create', [DataSubjectRequestController::class, 'create'])
@@ -86,7 +86,7 @@ Route::middleware(['auth'])->group(function () {
             ->name('privacy.legal-holds.release');
     });
 
-    // Data Breach Management (GDPR Article 33 - 72 hour notification)
+    // Data Breach Management (Privacy Act 2020 notifiable breach - as soon as practicable notification)
     // Create route must come before wildcard routes
     Route::middleware('permission:privacy.reportBreaches')->group(function () {
         Route::get('/privacy/breaches/create', [DataBreachController::class, 'create'])
@@ -99,7 +99,7 @@ Route::middleware(['auth'])->group(function () {
             ->name('privacy.breaches.show');
         Route::put('/privacy/breaches/{breach}', [DataBreachController::class, 'update'])
             ->name('privacy.breaches.update');
-        Route::post('/privacy/breaches/{breach}/notify-ico', [DataBreachController::class, 'notifyICO'])
+        Route::post('/privacy/breaches/{breach}/notify-ico', [DataBreachController::class, 'notifyOPC'])
             ->name('privacy.breaches.notify-ico');
         Route::post('/privacy/breaches/{breach}/notify-subjects', [DataBreachController::class, 'notifySubjects'])
             ->name('privacy.breaches.notify-subjects');
@@ -107,7 +107,7 @@ Route::middleware(['auth'])->group(function () {
             ->name('privacy.breaches.resolve');
     });
 
-    // Data Processing Impact Assessments (DPIA - GDPR Article 35)
+    // Data Processing Impact Assessments (PIA - Privacy Impact Assessment)
     // Create route must come before wildcard routes
     Route::middleware('permission:privacy.conductDPIA')->group(function () {
         Route::get('/privacy/dpia/create', [DPIAController::class, 'create'])

@@ -12,7 +12,7 @@ use Inertia\Response;
 class DPIAController extends Controller
 {
     /**
-     * Display a listing of DPIAs.
+     * Display a listing of PIAs.
      */
     public function index(Request $request): Response
     {
@@ -53,7 +53,7 @@ class DPIAController extends Controller
     }
 
     /**
-     * Show the form for creating a new DPIA.
+     * Show the form for creating a new PIA.
      */
     public function create(Request $request): Response
     {
@@ -65,7 +65,7 @@ class DPIAController extends Controller
     }
 
     /**
-     * Store a newly created DPIA.
+     * Store a newly created PIA.
      */
     public function store(Request $request): RedirectResponse
     {
@@ -94,11 +94,11 @@ class DPIAController extends Controller
 
         return redirect()
             ->route('privacy.dpia.show', $dpia)
-            ->with('success', 'DPIA created successfully.');
+            ->with('success', 'PIA created successfully.');
     }
 
     /**
-     * Display the specified DPIA.
+     * Display the specified PIA.
      */
     public function show(Request $request, PrivacyImpactAssessment $dpia): Response
     {
@@ -112,7 +112,7 @@ class DPIAController extends Controller
     }
 
     /**
-     * Show the form for editing the DPIA.
+     * Show the form for editing the PIA.
      */
     public function edit(Request $request, PrivacyImpactAssessment $dpia): Response
     {
@@ -125,7 +125,7 @@ class DPIAController extends Controller
     }
 
     /**
-     * Update the specified DPIA.
+     * Update the specified PIA.
      */
     public function update(Request $request, PrivacyImpactAssessment $dpia): RedirectResponse
     {
@@ -148,11 +148,11 @@ class DPIAController extends Controller
 
         $dpia->update($validated);
 
-        return back()->with('success', 'DPIA updated.');
+        return back()->with('success', 'PIA updated.');
     }
 
     /**
-     * Approve the DPIA.
+     * Approve the PIA.
      */
     public function approve(Request $request, PrivacyImpactAssessment $dpia): RedirectResponse
     {
@@ -164,11 +164,11 @@ class DPIAController extends Controller
             'approved_at' => now(),
         ]);
 
-        return back()->with('success', 'DPIA approved.');
+        return back()->with('success', 'PIA approved.');
     }
 
     /**
-     * Request review of the DPIA.
+     * Request review of the PIA.
      */
     public function review(Request $request, PrivacyImpactAssessment $dpia): RedirectResponse
     {
@@ -182,7 +182,7 @@ class DPIAController extends Controller
             'outcome' => 'requires_dpo_review',
         ]);
 
-        return back()->with('success', 'DPIA sent for review.');
+        return back()->with('success', 'PIA sent for review.');
     }
 
     private function authorizePermission(Request $request): void

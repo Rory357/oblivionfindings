@@ -8,9 +8,17 @@ use App\Models\DataRetentionPolicy;
 use App\Models\DataSubjectRequest;
 use App\Models\LegalHold;
 use App\Models\PrivacyImpactAssessment;
+use App\Models\RespiteBooking;
+use App\Models\RespiteBookingRequest;
+use App\Models\RespiteCommunicationLog;
+use App\Models\RespiteHandoverNote;
+use App\Models\RespiteReferral;
+use App\Models\RespiteStay;
 use App\Models\Role;
 use App\Models\User;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Storage;
 use Tests\TestCase;
 
 class PrivacyControllerTest extends TestCase
@@ -33,7 +41,7 @@ class PrivacyControllerTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
@@ -103,7 +111,7 @@ class PrivacyControllerTest extends TestCase
             'applies_to_soft_deleted' => true,
             'legal_hold_exemption' => true,
             'active_case_exemption' => true,
-            'legal_basis' => 'Care Act 2014 s.42',
+            'legal_basis' => 'HDC Code of Rights',
             'business_justification' => 'Regulatory requirement for care records.',
             'active' => true,
             'created_by' => $this->admin->id,
@@ -130,7 +138,7 @@ class PrivacyControllerTest extends TestCase
         ], $overrides));
     }
 
-    private function createDPIA(array $overrides = []): PrivacyImpactAssessment
+    private function createPIA(array $overrides = []): PrivacyImpactAssessment
     {
         return PrivacyImpactAssessment::create(array_merge([
             'assessment_name' => 'New Client Portal Assessment',
@@ -352,31 +360,31 @@ class PrivacyControllerTest extends TestCase
 
     public function test_dpia_show_requires_authentication(): void
     {
-        $dpia = $this->createDPIA();
+        $dpia = $this->createPIA();
         $this->get("/privacy/dpia/{$dpia->id}")->assertRedirect('/login');
     }
 
     public function test_dpia_edit_requires_authentication(): void
     {
-        $dpia = $this->createDPIA();
+        $dpia = $this->createPIA();
         $this->get("/privacy/dpia/{$dpia->id}/edit")->assertRedirect('/login');
     }
 
     public function test_dpia_update_requires_authentication(): void
     {
-        $dpia = $this->createDPIA();
+        $dpia = $this->createPIA();
         $this->put("/privacy/dpia/{$dpia->id}")->assertRedirect('/login');
     }
 
     public function test_dpia_approve_requires_authentication(): void
     {
-        $dpia = $this->createDPIA();
+        $dpia = $this->createPIA();
         $this->post("/privacy/dpia/{$dpia->id}/approve")->assertRedirect('/login');
     }
 
     public function test_dpia_review_requires_authentication(): void
     {
-        $dpia = $this->createDPIA();
+        $dpia = $this->createPIA();
         $this->post("/privacy/dpia/{$dpia->id}/review")->assertRedirect('/login');
     }
 
@@ -664,14 +672,14 @@ class PrivacyControllerTest extends TestCase
         $this->actingAs($this->admin)
             ->post("/privacy/requests/{$dsr->id}/refuse", [
                 'rejection_reason' => 'Request is manifestly unfounded and excessive.',
-                'rejection_legal_basis' => 'GDPR Article 12(5) - manifestly unfounded or excessive requests.',
+                'rejection_legal_basis' => 'Privacy Act 2020 section 53 - vexatious or trivial requests.',
             ])
             ->assertRedirect()
             ->assertSessionHas('success');
 
         $dsr->refresh();
         $this->assertEquals('rejected', $dsr->status);
-        $this->assertEquals('GDPR Article 12(5) - manifestly unfounded or excessive requests.', $dsr->rejection_legal_basis);
+        $this->assertEquals('Privacy Act 2020 section 53 - vexatious or trivial requests.', $dsr->rejection_legal_basis);
         $this->assertEquals('Request is manifestly unfounded and excessive.', $dsr->rejection_reason);
     }
 
@@ -688,7 +696,7 @@ class PrivacyControllerTest extends TestCase
     }
 
     // ══════════════════════════════════════════════════
-    //  SECTION 5: Deadline Extension (GDPR Provision)
+    //  SECTION 5: Deadline Extension (Privacy Act provision)
     // ══════════════════════════════════════════════════
 
     public function test_dsr_extend_requires_reason_and_date(): void
@@ -936,14 +944,14 @@ class PrivacyControllerTest extends TestCase
 
         $this->actingAs($this->admin)
             ->post("/privacy/breaches/{$breach->id}/notify-ico", [
-                'authority_reference' => 'ICO-2026-REF-12345',
+                'authority_reference' => 'OPC-2026-REF-12345',
             ])
             ->assertRedirect()
             ->assertSessionHas('success');
 
         $breach->refresh();
         $this->assertNotNull($breach->authority_notified_at);
-        $this->assertEquals('ICO-2026-REF-12345', $breach->authority_reference);
+        $this->assertEquals('OPC-2026-REF-12345', $breach->authority_reference);
     }
 
     public function test_breach_notify_subjects_records_notification(): void
@@ -1015,10 +1023,10 @@ class PrivacyControllerTest extends TestCase
         $breach->refresh();
         $this->assertEquals('under_investigation', $breach->status);
 
-        // Step 3: Notify ICO
+        // Step 3: Notify OPC
         $this->actingAs($this->admin)
             ->post("/privacy/breaches/{$breach->id}/notify-ico", [
-                'authority_reference' => 'ICO-REF-001',
+                'authority_reference' => 'OPC-REF-001',
             ])
             ->assertRedirect();
 
@@ -1048,7 +1056,7 @@ class PrivacyControllerTest extends TestCase
     }
 
     // ══════════════════════════════════════════════════
-    //  SECTION 9: 72-Hour ICO Notification Tracking
+    //  SECTION 9: 72-Hour OPC Notification Tracking
     // ══════════════════════════════════════════════════
 
     public function test_breach_requiring_notification_appears_in_stats(): void
@@ -1100,7 +1108,7 @@ class PrivacyControllerTest extends TestCase
 
         $this->actingAs($this->admin)
             ->post("/privacy/breaches/{$breach->id}/notify-ico", [
-                'authority_reference' => 'ICO-2026-001',
+                'authority_reference' => 'OPC-2026-001',
             ])
             ->assertRedirect();
 
@@ -1209,7 +1217,7 @@ class PrivacyControllerTest extends TestCase
         $hold = LegalHold::create([
             'hold_reference' => 'LH-'.now()->year.'-9001',
             'hold_type' => 'regulatory',
-            'reason' => 'CQC investigation.',
+            'reason' => 'HealthCERT investigation.',
             'holdable_type' => 'App\\Models\\Client',
             'holdable_id' => $client->id,
             'status' => 'active',
@@ -1251,7 +1259,7 @@ class PrivacyControllerTest extends TestCase
     }
 
     // ══════════════════════════════════════════════════
-    //  SECTION 12: DPIA Lifecycle
+    //  SECTION 12: PIA Lifecycle
     // ══════════════════════════════════════════════════
 
     public function test_dpia_store_creates_assessment(): void
@@ -1289,7 +1297,7 @@ class PrivacyControllerTest extends TestCase
 
     public function test_dpia_show_returns_inertia_page(): void
     {
-        $dpia = $this->createDPIA();
+        $dpia = $this->createPIA();
 
         $this->actingAs($this->admin)
             ->get("/privacy/dpia/{$dpia->id}")
@@ -1302,7 +1310,7 @@ class PrivacyControllerTest extends TestCase
 
     public function test_dpia_edit_returns_inertia_page(): void
     {
-        $dpia = $this->createDPIA();
+        $dpia = $this->createPIA();
 
         $this->actingAs($this->admin)
             ->get("/privacy/dpia/{$dpia->id}/edit")
@@ -1316,7 +1324,7 @@ class PrivacyControllerTest extends TestCase
 
     public function test_dpia_update_modifies_assessment(): void
     {
-        $dpia = $this->createDPIA();
+        $dpia = $this->createPIA();
 
         $this->actingAs($this->admin)
             ->put("/privacy/dpia/{$dpia->id}", [
@@ -1333,7 +1341,7 @@ class PrivacyControllerTest extends TestCase
 
     public function test_dpia_approve_sets_outcome_to_approved(): void
     {
-        $dpia = $this->createDPIA();
+        $dpia = $this->createPIA();
 
         $this->actingAs($this->admin)
             ->post("/privacy/dpia/{$dpia->id}/approve")
@@ -1348,7 +1356,7 @@ class PrivacyControllerTest extends TestCase
 
     public function test_dpia_review_sets_outcome_to_requires_dpo_review(): void
     {
-        $dpia = $this->createDPIA();
+        $dpia = $this->createPIA();
 
         $this->actingAs($this->admin)
             ->post("/privacy/dpia/{$dpia->id}/review", [
@@ -1363,7 +1371,7 @@ class PrivacyControllerTest extends TestCase
 
     public function test_dpia_review_requires_notes(): void
     {
-        $dpia = $this->createDPIA();
+        $dpia = $this->createPIA();
 
         $this->actingAs($this->admin)
             ->post("/privacy/dpia/{$dpia->id}/review", [])
@@ -1376,10 +1384,10 @@ class PrivacyControllerTest extends TestCase
 
     public function test_dpia_risk_levels_tracked_in_stats(): void
     {
-        $this->createDPIA(['overall_risk_level' => 'low']);
-        $this->createDPIA(['overall_risk_level' => 'medium']);
-        $this->createDPIA(['overall_risk_level' => 'high']);
-        $this->createDPIA(['overall_risk_level' => 'high']);
+        $this->createPIA(['overall_risk_level' => 'low']);
+        $this->createPIA(['overall_risk_level' => 'medium']);
+        $this->createPIA(['overall_risk_level' => 'high']);
+        $this->createPIA(['overall_risk_level' => 'high']);
 
         $this->actingAs($this->admin)
             ->get('/privacy/dpia')
@@ -1392,9 +1400,9 @@ class PrivacyControllerTest extends TestCase
 
     public function test_dpia_index_filters_by_risk_level(): void
     {
-        $this->createDPIA(['overall_risk_level' => 'low']);
-        $this->createDPIA(['overall_risk_level' => 'high']);
-        $this->createDPIA(['overall_risk_level' => 'high']);
+        $this->createPIA(['overall_risk_level' => 'low']);
+        $this->createPIA(['overall_risk_level' => 'high']);
+        $this->createPIA(['overall_risk_level' => 'high']);
 
         $this->actingAs($this->admin)
             ->get('/privacy/dpia?risk_level=high')
@@ -1406,9 +1414,9 @@ class PrivacyControllerTest extends TestCase
 
     public function test_dpia_index_filters_by_outcome(): void
     {
-        $this->createDPIA(['outcome' => 'approved']);
-        $this->createDPIA(['outcome' => 'approved']);
-        $this->createDPIA(['outcome' => 'requires_dpo_review']);
+        $this->createPIA(['outcome' => 'approved']);
+        $this->createPIA(['outcome' => 'approved']);
+        $this->createPIA(['outcome' => 'requires_dpo_review']);
 
         $this->actingAs($this->admin)
             ->get('/privacy/dpia?outcome=approved')
@@ -1659,8 +1667,8 @@ class PrivacyControllerTest extends TestCase
 
     public function test_dashboard_reflects_dpia_stats(): void
     {
-        $this->createDPIA(['overall_risk_level' => 'high', 'outcome' => null]);
-        $this->createDPIA(['overall_risk_level' => 'low', 'outcome' => 'approved']);
+        $this->createPIA(['overall_risk_level' => 'high', 'outcome' => null]);
+        $this->createPIA(['overall_risk_level' => 'low', 'outcome' => 'approved']);
 
         $this->actingAs($this->admin)
             ->get('/privacy/dashboard')
@@ -2150,8 +2158,8 @@ class PrivacyControllerTest extends TestCase
 
     public function test_dpia_index_search_by_query(): void
     {
-        $this->createDPIA(['assessment_name' => 'Unique Assessment']);
-        $this->createDPIA(['assessment_name' => 'Other Assessment']);
+        $this->createPIA(['assessment_name' => 'Unique Assessment']);
+        $this->createPIA(['assessment_name' => 'Other Assessment']);
 
         $this->actingAs($this->admin)
             ->get('/privacy/dpia?q=Unique')
@@ -2163,9 +2171,9 @@ class PrivacyControllerTest extends TestCase
 
     public function test_dpia_index_shows_stats(): void
     {
-        $this->createDPIA(['outcome' => null, 'overall_risk_level' => 'high']);
-        $this->createDPIA(['outcome' => 'approved', 'overall_risk_level' => 'low']);
-        $this->createDPIA(['outcome' => null, 'overall_risk_level' => 'medium']);
+        $this->createPIA(['outcome' => null, 'overall_risk_level' => 'high']);
+        $this->createPIA(['outcome' => 'approved', 'overall_risk_level' => 'low']);
+        $this->createPIA(['outcome' => null, 'overall_risk_level' => 'medium']);
 
         $this->actingAs($this->admin)
             ->get('/privacy/dpia')
@@ -2385,6 +2393,75 @@ class PrivacyControllerTest extends TestCase
         $this->assertNotNull($dsr->fresh()->export_path);
     }
 
+    public function test_dsr_export_includes_respite_records_for_linked_client(): void
+    {
+        $client = Client::factory()->create(['first_name' => 'Aroha', 'last_name' => 'Ngata']);
+        $referral = RespiteReferral::create([
+            'client_id' => $client->id,
+            'referrer_name' => 'NASC Coordinator',
+            'referral_reason' => 'Planned respite block',
+            'urgency' => 'planned',
+            'status' => 'accepted',
+            'received_at' => now()->subDays(10),
+            'funding_source' => 'whaikaha',
+            'funding_reference' => 'WK-44213',
+        ]);
+        $request = RespiteBookingRequest::create([
+            'referral_id' => $referral->id,
+            'client_id' => $client->id,
+            'requested_start' => now()->addDays(5),
+            'requested_end' => now()->addDays(8),
+            'status' => 'approved',
+            'funding_source' => 'whaikaha',
+            'funding_reference' => 'WK-44213',
+        ]);
+        $booking = RespiteBooking::factory()->create([
+            'client_id' => $client->id,
+            'booking_request_id' => $request->id,
+            'status' => 'confirmed',
+            'start_at' => now()->addDays(5),
+            'end_at' => now()->addDays(8),
+        ]);
+        $stay = RespiteStay::create([
+            'booking_id' => $booking->id,
+            'client_id' => $client->id,
+            'status' => 'active',
+            'actual_start' => now()->addDays(5),
+            'created_by' => $this->admin->id,
+        ]);
+        RespiteHandoverNote::create([
+            'stay_id' => $stay->id,
+            'handover_type' => 'arrival',
+            'notes' => 'Settled well on arrival.',
+            'created_by' => $this->admin->id,
+        ]);
+        RespiteCommunicationLog::create([
+            'stay_id' => $stay->id,
+            'channel' => 'phone',
+            'summary' => 'Updated whānau after arrival.',
+            'occurred_at' => now()->addDays(5)->addHour(),
+            'created_by' => $this->admin->id,
+        ]);
+        $dsr = $this->createDSR(['client_id' => $client->id]);
+
+        $this->actingAs($this->admin)
+            ->get("/privacy/requests/{$dsr->id}/export")
+            ->assertRedirect()
+            ->assertSessionHas('success');
+
+        $path = $dsr->fresh()->export_path;
+        $payload = json_decode(Storage::disk('local')->get($path), true);
+
+        $this->assertSame($referral->id, $payload['respite_records']['referrals'][0]['id']);
+        $this->assertSame($request->id, $payload['respite_records']['booking_requests'][0]['id']);
+        $this->assertSame($booking->id, $payload['respite_records']['bookings'][0]['id']);
+        $this->assertSame($stay->id, $payload['respite_records']['stays'][0]['id']);
+        $this->assertSame('arrival', $payload['respite_records']['handovers'][0]['type']);
+        $this->assertSame('Updated whānau after arrival.', $payload['respite_records']['communications'][0]['summary']);
+
+        Storage::disk('local')->delete($path);
+    }
+
     public function test_dsr_export_forbidden_without_view_requests_permission(): void
     {
         $dsr = $this->createDSR();
@@ -2438,7 +2515,7 @@ class PrivacyControllerTest extends TestCase
 
     public function test_dpia_belongs_to_assessor(): void
     {
-        $dpia = $this->createDPIA();
+        $dpia = $this->createPIA();
 
         $this->assertInstanceOf(User::class, $dpia->assessor);
         $this->assertEquals($this->admin->id, $dpia->assessor->id);

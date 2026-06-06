@@ -90,7 +90,7 @@ type Props = {
 // ── Constants ──────────────────────────────────────────────────────────
 
 const CERT_TYPES = [
-    'DSS',
+    'Whaikaha',
     'HSWA',
     'Fire Safety',
     'Building WoF',
@@ -922,7 +922,7 @@ export default function SiteComplianceIndex({
                                             issuing_body: e.target.value,
                                         }))
                                     }
-                                    placeholder="e.g. Ministry of Health"
+                                    placeholder="e.g. Te Whatu Ora"
                                 />
                             </div>
                             <div>

@@ -201,7 +201,7 @@ class EnforceDataRetentionJob implements ShouldQueue
         foreach ($fillable as $field) {
             foreach ($personalFieldPatterns as $pattern) {
                 if (str_contains(strtolower($field), $pattern)) {
-                    $anonymizedData[$field] = str_contains($pattern, 'date') || str_contains($pattern, 'dob')
+                    $anonymizedData[$field] = str_contains(strtolower($field), 'nhi') || str_contains($pattern, 'date') || str_contains($pattern, 'dob')
                         ? null
                         : '[REDACTED]';
                     break;

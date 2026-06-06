@@ -191,12 +191,12 @@ class TrainingCoursesSeeder extends Seeder
                 'active' => true,
             ],
             [
-                'name' => 'GDPR and Information Governance',
-                'code' => 'GDPR-001',
+                'name' => 'Privacy Act 2020 and Information Governance',
+                'code' => 'PRIVACY-001',
                 'category' => 'Data Protection',
-                'description' => 'GDPR compliance, data protection principles, confidentiality, and secure information handling.',
+                'description' => 'Privacy Act 2020 compliance, data protection principles, confidentiality, and secure information handling.',
                 'learning_outcomes' => json_encode([
-                    'Understand GDPR principles and rights',
+                    'Understand Privacy Act 2020 principles and rights',
                     'Handle personal data securely',
                     'Recognize and report data breaches',
                     'Maintain confidentiality',

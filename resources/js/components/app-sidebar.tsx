@@ -97,7 +97,7 @@ import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
 import AppLogoIcon from './app-logo-icon';
 const dashboard = () => '/dashboard';
 
-const SIDEBAR_ICON_CLASS = 'size-5 shrink-0';
+const SIDEBAR_OPCN_CLASS = 'size-5 shrink-0';
 const SIDEBAR_ITEM_BASE =
     'relative flex h-10 w-full items-center rounded-xl text-sm transition-colors outline-none focus-visible:ring-2 focus-visible:ring-sidebar-ring';
 const SIDEBAR_ITEM_ACTIVE =
@@ -115,7 +115,7 @@ function SidebarItemIcon({
     return (
         <Icon
             aria-hidden="true"
-            className={cn(SIDEBAR_ICON_CLASS, className)}
+            className={cn(SIDEBAR_OPCN_CLASS, className)}
         />
     );
 }
@@ -1251,7 +1251,7 @@ function buildSafetySubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
         });
     if (can?.privacy?.viewRequests)
         compliance.push({
-            title: 'Privacy & GDPR',
+            title: 'Privacy',
             href: '/privacy/dashboard',
             icon: Shield,
         });
@@ -2797,10 +2797,10 @@ export function AppSidebar({
                             className="size-9 shrink-0 rounded-xl text-sidebar-foreground/70 hover:bg-sidebar-accent hover:text-sidebar-foreground"
                         >
                             {isCollapsed ? (
-                                <PanelLeftOpen className={SIDEBAR_ICON_CLASS} />
+                                <PanelLeftOpen className={SIDEBAR_OPCN_CLASS} />
                             ) : (
                                 <PanelLeftClose
-                                    className={SIDEBAR_ICON_CLASS}
+                                    className={SIDEBAR_OPCN_CLASS}
                                 />
                             )}
                         </Button>
@@ -2977,7 +2977,7 @@ export function AppSidebar({
                                 >
                                     <Settings
                                         aria-hidden="true"
-                                        className={SIDEBAR_ICON_CLASS}
+                                        className={SIDEBAR_OPCN_CLASS}
                                     />
                                     {!isCollapsed && (
                                         <span className="min-w-0 flex-1 truncate">

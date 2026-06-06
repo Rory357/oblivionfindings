@@ -30,9 +30,9 @@ use Inertia\Inertia;
 |
 | Compliance Modules:
 | - safeguarding.php: Safeguarding concerns, investigations, alerts
-| - consents.php: Consent management, GDPR Article 7 compliance
+| - consents.php: Consent management, Privacy Act 2020 and HIPC consent workflows
 | - training.php: Staff vetting, training, competency assessments
-| - privacy.php: GDPR compliance, data subject requests, breach management
+| - privacy.php: Privacy Act 2020 compliance, privacy requests, breach management
 |
 */
 

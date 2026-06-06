@@ -21,6 +21,7 @@ class ClientIncident extends Model implements EmitsToTimeline
         'client_id',
         'reported_by',
         'shift_id',
+        'respite_stay_id',
         'service_context_id',
         'template_id',
 
@@ -126,6 +127,11 @@ class ClientIncident extends Model implements EmitsToTimeline
     public function shift(): BelongsTo
     {
         return $this->belongsTo(Shift::class);
+    }
+
+    public function respiteStay(): BelongsTo
+    {
+        return $this->belongsTo(RespiteStay::class, 'respite_stay_id');
     }
 
     public function serviceContext(): BelongsTo

@@ -13,7 +13,7 @@ type Props = {
 export default function ReviewRetention({ policies }: Props) {
     return (
         <AppLayout breadcrumbs={[
-            { title: 'Privacy & GDPR', href: '/privacy/dashboard' },
+            { title: 'Privacy', href: '/privacy/dashboard' },
             { title: 'Retention Policies', href: '/privacy/retention' },
             { title: 'Review Data', href: '/privacy/retention/review' },
         ]}>

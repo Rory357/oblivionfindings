@@ -49,20 +49,20 @@ export default function CreateDataSubjectRequest({ staff }: Props) {
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Privacy & GDPR', href: '/privacy/dashboard' },
-                { title: 'Data Subject Requests', href: '/privacy/requests' },
+                { title: 'Privacy', href: '/privacy/dashboard' },
+                { title: 'Privacy Requests', href: '/privacy/requests' },
                 { title: 'New Request', href: '/privacy/requests/create' },
             ]}
         >
-            <Head title="New Data Subject Request" />
+            <Head title="New Privacy Request" />
 
             <PageLayout
                 hero={
                     <PageHero
                         variant="compact"
                         backHref="/privacy/requests"
-                        title="New Data Subject Request"
-                        description="Record a new GDPR data subject request"
+                        title="New Privacy Request"
+                        description="Record a new Privacy Act 2020 privacy request"
                     />
                 }
             >
@@ -152,7 +152,7 @@ export default function CreateDataSubjectRequest({ staff }: Props) {
                                                 e.target.value,
                                             )
                                         }
-                                        placeholder="Full name of the data subject"
+                                        placeholder="Full name of the person"
                                     />
                                     {errors.subject_name && (
                                         <p className="text-xs text-status-critical">

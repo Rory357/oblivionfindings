@@ -3,8 +3,7 @@
 namespace App\Support\Respite;
 
 /**
- * Canonical NZ disability-respite funder list — current bodies/mechanisms only,
- * no Australian NDIS/DSS and no disestablished "DHB"/"MoH (disability)" labels.
+ * Canonical NZ disability-respite funder list with current bodies and mechanisms only.
  * Single source of truth for the intake picker, store validation and display.
  *
  * (The broader consolidation with fin_funding_streams.funder_type and the

@@ -170,7 +170,7 @@ const Terms: React.FC = () => {
                                 into the system
                             </li>
                             <li>
-                                Ensuring you have lawful basis for processing
+                                Ensuring you have Information Privacy Principles basis for processing
                                 resident data
                             </li>
                             <li>
@@ -179,7 +179,7 @@ const Terms: React.FC = () => {
                             </li>
                             <li>
                                 Complying with all applicable laws and
-                                regulations (e.g., CQC, GDPR)
+                                regulations (e.g., HealthCERT, Privacy Act 2020)
                             </li>
                             <li>
                                 Obtaining necessary consents from residents

@@ -50,7 +50,7 @@ const SmartMonitoring: React.FC = () => {
             icon: Eye,
             title: 'Privacy Masking',
             description:
-                'GDPR-compliant privacy zones automatically blur sensitive areas like bathrooms and bedrooms while maintaining security in common spaces.',
+                'Privacy Act 2020-aligned privacy zones automatically blur sensitive areas like bathrooms and bedrooms while maintaining security in common spaces.',
         },
         {
             icon: LayoutDashboard,
@@ -456,7 +456,7 @@ const SmartMonitoring: React.FC = () => {
                             <p className="mt-4 text-muted-foreground">
                                 We understand that CCTV in care settings
                                 requires a careful balance between safety and
-                                privacy. Our system is built with GDPR
+                                privacy. Our system is built with Privacy Act 2020
                                 compliance at its core.
                             </p>
                             <ul className="mt-6 space-y-3">
@@ -466,7 +466,7 @@ const SmartMonitoring: React.FC = () => {
                                     'Audit logs of all footage access',
                                     'Role-based permissions for viewing',
                                     'Data Processing Agreements included',
-                                    'ICO-registered and GDPR compliant',
+                                    'registered with the OPC and Privacy Act 2020 compliant',
                                 ].map((item, i) => (
                                     <li
                                         key={i}
@@ -495,11 +495,11 @@ const SmartMonitoring: React.FC = () => {
                                     />
                                 </div>
                                 <h3 className="mt-4 text-lg font-semibold text-foreground">
-                                    GDPR Compliant
+                                    Privacy Act 2020 Compliant
                                 </h3>
                                 <p className="mt-2 text-sm text-muted-foreground">
-                                    Full compliance with UK data protection
-                                    regulations for CCTV in care settings
+                                    Aligned with NZ privacy requirements for
+                                    CCTV in care settings
                                 </p>
                             </div>
                         </div>

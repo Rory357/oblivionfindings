@@ -3,6 +3,10 @@
 namespace App\Http\Controllers;
 
 use App\Models\DataSubjectRequest;
+use App\Models\RespiteBooking;
+use App\Models\RespiteBookingRequest;
+use App\Models\RespiteReferral;
+use App\Models\RespiteStay;
 use App\Models\User;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -13,7 +17,7 @@ use Inertia\Response;
 class DataSubjectRequestController extends Controller
 {
     /**
-     * Display a listing of data subject requests.
+     * Display a listing of privacy requests.
      */
     public function index(Request $request): Response
     {
@@ -331,6 +335,8 @@ class DataSubjectRequestController extends Controller
                 'expires_at' => $consent->expires_at?->format('Y-m-d'),
             ])->toArray();
 
+            $data['respite_records'] = $this->respiteExportRecords($client->id);
+
         } elseif ($dsRequest->user_id && $dsRequest->user) {
             $user = $dsRequest->user;
 
@@ -365,6 +371,82 @@ class DataSubjectRequestController extends Controller
         ]);
 
         return back()->with('success', 'Data export generated successfully.');
+    }
+
+    private function respiteExportRecords(int $clientId): array
+    {
+        $referrals = RespiteReferral::query()
+            ->where('client_id', $clientId)
+            ->orderByDesc('received_at')
+            ->get();
+        $requests = RespiteBookingRequest::query()
+            ->where('client_id', $clientId)
+            ->orderByDesc('requested_start')
+            ->get();
+        $bookings = RespiteBooking::query()
+            ->where('client_id', $clientId)
+            ->orderByDesc('start_at')
+            ->get();
+        $stays = RespiteStay::query()
+            ->where('client_id', $clientId)
+            ->with(['handovers', 'communications'])
+            ->orderByDesc('actual_start')
+            ->get();
+
+        return [
+            'referrals' => $referrals->map(fn (RespiteReferral $referral) => [
+                'id' => $referral->id,
+                'status' => $referral->status,
+                'urgency' => $referral->urgency,
+                'received_at' => $referral->received_at?->format('Y-m-d'),
+                'referrer_type' => $referral->referrer_type,
+                'referrer_name' => $referral->referrer_name,
+                'funding_source' => $referral->funding_source,
+                'funding_reference' => $referral->funding_reference,
+            ])->toArray(),
+            'booking_requests' => $requests->map(fn (RespiteBookingRequest $request) => [
+                'id' => $request->id,
+                'referral_id' => $request->referral_id,
+                'status' => $request->status,
+                'requested_start' => $request->requested_start?->format('Y-m-d'),
+                'requested_end' => $request->requested_end?->format('Y-m-d'),
+                'funding_source' => $request->funding_source,
+                'funding_reference' => $request->funding_reference,
+                'funding_status' => $request->funding_status,
+            ])->toArray(),
+            'bookings' => $bookings->map(fn (RespiteBooking $booking) => [
+                'id' => $booking->id,
+                'booking_request_id' => $booking->booking_request_id,
+                'status' => $booking->status,
+                'start_at' => $booking->start_at?->format('Y-m-d'),
+                'end_at' => $booking->end_at?->format('Y-m-d'),
+                'funding_source' => $booking->funding_source,
+                'funding_reference' => $booking->funding_reference,
+                'funding_status' => $booking->funding_status,
+            ])->toArray(),
+            'stays' => $stays->map(fn (RespiteStay $stay) => [
+                'id' => $stay->id,
+                'booking_id' => $stay->booking_id,
+                'status' => $stay->status,
+                'actual_start' => $stay->actual_start?->format('Y-m-d'),
+                'actual_end' => $stay->actual_end?->format('Y-m-d'),
+                'discharge_summary' => $stay->discharge_summary,
+            ])->toArray(),
+            'handovers' => $stays->flatMap(fn (RespiteStay $stay) => $stay->handovers->map(fn ($handover) => [
+                'id' => $handover->id,
+                'stay_id' => $stay->id,
+                'type' => $handover->handover_type,
+                'created_at' => $handover->created_at?->format('Y-m-d'),
+                'sensitive' => (bool) $handover->sensitive_flag,
+            ]))->values()->toArray(),
+            'communications' => $stays->flatMap(fn (RespiteStay $stay) => $stay->communications->map(fn ($communication) => [
+                'id' => $communication->id,
+                'stay_id' => $stay->id,
+                'channel' => $communication->channel,
+                'summary' => $communication->summary,
+                'occurred_at' => $communication->occurred_at?->format('Y-m-d'),
+            ]))->values()->toArray(),
+        ];
     }
 
     private function authorizePermission(Request $request, string $permission): void

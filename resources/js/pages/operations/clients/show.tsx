@@ -3471,7 +3471,7 @@ export default function ClientShow({
                                     {onboarding.workflow.steps.map(
                                         (step: any) => {
                                             const stepCategory =
-                                                /DBS|Health Screening|GDPR|Safeguarding/i.test(
+                                                /DBS|Health Screening|Privacy Act 2020|Safeguarding/i.test(
                                                     step.step_name ?? '',
                                                 )
                                                     ? {

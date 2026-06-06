@@ -32,7 +32,7 @@ export default function CreateRetentionPolicy() {
 
     return (
         <AppLayout breadcrumbs={[
-            { title: 'Privacy & GDPR', href: '/privacy/dashboard' },
+            { title: 'Privacy', href: '/privacy/dashboard' },
             { title: 'Retention Policies', href: '/privacy/retention' },
             { title: 'New Policy', href: '/privacy/retention/create' },
         ]}>
@@ -143,7 +143,7 @@ export default function CreateRetentionPolicy() {
                                     id="legal_basis"
                                     value={data.legal_basis}
                                     onChange={(e) => setData('legal_basis', e.target.value)}
-                                    placeholder="e.g., GDPR Article 17, Care Act 2014"
+                                    placeholder="e.g., Privacy Act 2020 Article 17, HDC Code of Rights"
                                 />
                             </div>
 

@@ -142,9 +142,9 @@ class DataBreachController extends Controller
     }
 
     /**
-     * Notify the ICO (72 hour GDPR requirement).
+     * Notify the OPC (as soon as practicable Privacy Act 2020 requirement).
      */
-    public function notifyICO(Request $request, DataBreachLog $breach): RedirectResponse
+    public function notifyOPC(Request $request, DataBreachLog $breach): RedirectResponse
     {
         abort_unless($request->user()?->canDo('privacy.reportBreaches'), 403);
 
@@ -163,11 +163,11 @@ class DataBreachController extends Controller
 
         $breach->update($attributes);
 
-        return back()->with('success', 'ICO notification recorded.');
+        return back()->with('success', 'OPC notification recorded.');
     }
 
     /**
-     * Notify affected data subjects.
+     * Notify affected people affected.
      */
     public function notifySubjects(Request $request, DataBreachLog $breach): RedirectResponse
     {

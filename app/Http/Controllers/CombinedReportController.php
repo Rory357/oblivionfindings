@@ -279,7 +279,7 @@ class CombinedReportController extends Controller
                 ['label' => 'Overdue asset inspections', 'value' => Asset::query()->where('requires_inspection', true)->whereNotNull('inspection_due_at')->where('inspection_due_at', '<', $now->toDateString())->count()],
                 ['label' => 'Overdue maintenance', 'value' => Asset::query()->where('requires_maintenance', true)->whereNotNull('maintenance_due_at')->where('maintenance_due_at', '<', $now->toDateString())->count()],
                 ['label' => 'Open safeguarding concerns', 'value' => SafeguardingConcern::query()->where('status', '!=', 'closed')->count()],
-                ['label' => 'Overdue data subject requests', 'value' => DataSubjectRequest::query()->overdue()->count()],
+                ['label' => 'Overdue privacy requests', 'value' => DataSubjectRequest::query()->overdue()->count()],
                 ['label' => 'Break-glass accesses (7d)', 'value' => ClientBreakGlassAccess::query()->where('created_at', '>=', $from7)->count()],
             ];
             $sections = [
@@ -342,7 +342,7 @@ class CombinedReportController extends Controller
                         ->all(),
                 ],
                 [
-                    'title' => 'Overdue Data Subject Requests',
+                    'title' => 'Overdue Privacy Requests',
                     'columns' => ['ID', 'Reference', 'Status', 'Due Date', 'Extended Due Date', 'Assigned To'],
                     'rows' => DataSubjectRequest::query()
                         ->overdue()

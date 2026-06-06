@@ -134,7 +134,7 @@ test('data settings create privacy requests and breach records through the brows
         clickDataSelector($browser, '[dusk="data-tab-requests"]');
         waitForDataSelector($browser, '[dusk="data-dsar-open"]');
         clickDataSelector($browser, '[dusk="data-dsar-open"]');
-        $browser->waitForText('New Data Subject Access Request', 10)
+        $browser->waitForText('New Privacy Request', 10)
             ->type('[dusk="data-dsar-name"]', $requesterName)
             ->type('[dusk="data-dsar-email"]', $requesterEmail)
             ->type('[dusk="data-dsar-phone"]', '0210000000')

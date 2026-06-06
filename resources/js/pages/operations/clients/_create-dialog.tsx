@@ -297,10 +297,13 @@ const TRANSPORT_OPTIONS = [
     'No specific needs',
 ];
 const FUNDING_OPTIONS = [
-    'NDIS',
-    'Whaikaha (MoH)',
+    'Whaikaha',
+    'Carer Support',
+    'NASC-allocated',
+    'EGL / Individualised Funding',
     'ACC',
-    'DHB / Te Whatu Ora',
+    'Te Whatu Ora',
+    'MSD',
     'Private',
     'Other',
 ];

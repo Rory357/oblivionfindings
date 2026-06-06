@@ -39,7 +39,7 @@ export default function CreateDataBreach({ staff }: Props) {
     return (
         <AppLayout
             breadcrumbs={[
-                { title: 'Privacy & GDPR', href: '/privacy/dashboard' },
+                { title: 'Privacy', href: '/privacy/dashboard' },
                 { title: 'Data Breaches', href: '/privacy/breaches' },
                 { title: 'Report Breach', href: '/privacy/breaches/create' },
             ]}
@@ -52,7 +52,7 @@ export default function CreateDataBreach({ staff }: Props) {
                         variant="compact"
                         backHref="/privacy/breaches"
                         title="Report Data Breach"
-                        description="GDPR Article 33 - ICO notification required within 72 hours"
+                        description="Privacy Act 2020 notifiable breach - notify the OPC as soon as practicable"
                     />
                 }
             >
@@ -196,7 +196,7 @@ export default function CreateDataBreach({ staff }: Props) {
                                         htmlFor="requires_authority_notification"
                                         className="text-sm font-normal"
                                     >
-                                        Requires ICO notification (within 72
+                                        Requires OPC notification (within 72
                                         hours)
                                     </Label>
                                 </div>

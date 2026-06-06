@@ -30,7 +30,7 @@ const parseList = (value: string) => {
     return items.length ? items : null;
 };
 
-export default function CreateDPIA({ staff: _staff }: Props) {
+export default function CreatePIA({ staff: _staff }: Props) {
     const form = useForm({
         assessment_name: '',
         project_or_process: '',
@@ -69,18 +69,18 @@ export default function CreateDPIA({ staff: _staff }: Props) {
 
     return (
         <AppLayout breadcrumbs={[
-            { title: 'Privacy & GDPR', href: '/privacy/dashboard' },
+            { title: 'Privacy', href: '/privacy/dashboard' },
             { title: 'Impact Assessments', href: '/privacy/dpia' },
-            { title: 'New DPIA', href: '/privacy/dpia/create' },
+            { title: 'New PIA', href: '/privacy/dpia/create' },
         ]}>
-            <Head title="New DPIA" />
+            <Head title="New PIA" />
 
             <PageLayout
                 hero={
                     <PageHero
                         variant="compact"
                         backHref="/privacy/dpia"
-                        title="New DPIA"
+                        title="New PIA"
                         description="Document data processing risks and mitigation steps."
                     />
                 }
@@ -188,7 +188,7 @@ export default function CreateDPIA({ staff: _staff }: Props) {
                                     {errors.personal_data_types && <p className="text-xs text-status-critical">{errors.personal_data_types}</p>}
                                 </div>
                                 <div className="space-y-2">
-                                    <Label>Data Subjects</Label>
+                                    <Label>People affected</Label>
                                     <Textarea
                                         value={data.data_subjects}
                                         onChange={(e) => setData('data_subjects', e.target.value)}
@@ -266,7 +266,7 @@ export default function CreateDPIA({ staff: _staff }: Props) {
                             Cancel
                         </Button>
                         <Button type="submit" disabled={processing}>
-                            {processing ? 'Creating...' : 'Create DPIA'}
+                            {processing ? 'Creating...' : 'Create PIA'}
                         </Button>
                     </div>
                 </form>

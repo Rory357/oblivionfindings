@@ -953,14 +953,14 @@ class GovernancePresenter
         return $this->makeCard(
             'privacy_data',
             'Privacy & data',
-            'Breaches, DPIAs, and data subject request backlog.',
+            'Breaches, PIAs, and privacy request backlog.',
             $widget['status'] ?? 'unknown',
             'Privacy register',
             $this->freshnessFor('privacy_data', $freshness),
             [
                 $this->metric('Breaches (90d)', $widget['breaches_90d'] ?? 0, ($widget['breaches_90d'] ?? 0) > 0 ? 'warning' : 'default'),
                 $this->metric('Open breaches', $widget['open_breaches'] ?? 0, ($widget['open_breaches'] ?? 0) > 0 ? 'critical' : 'default'),
-                $this->metric('Open DPIAs', $widget['open_dpias'] ?? 0),
+                $this->metric('Open PIAs', $widget['open_dpias'] ?? 0),
                 $this->metric('DSR backlog', $widget['dsr_backlog'] ?? 0, ($widget['dsr_backlog'] ?? 0) > 0 ? 'warning' : 'default'),
             ],
             [],

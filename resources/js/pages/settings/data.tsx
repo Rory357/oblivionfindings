@@ -864,13 +864,6 @@ export default function Data() {
         return formatLocalDate(d);
     }
 
-    function calc72HourDeadline(discoveryDate: string): string {
-        if (!discoveryDate) return '';
-        const d = new Date(discoveryDate);
-        d.setHours(d.getHours() + 72);
-        return formatLocalDate(d);
-    }
-
     // -----------------------------------------------------------------------
     // Render
     // -----------------------------------------------------------------------
@@ -1199,7 +1192,7 @@ export default function Data() {
                 <TabsContent value="requests" className="space-y-8">
 
                     {/* ==========================================================
-                        SECTION 2 -- Data Subject Access Requests (DSAR)
+                        SECTION 2 -- Privacy Access and Correction Requests
                     ========================================================== */}
                     <Card>
                         <CardHeader>
@@ -1209,7 +1202,7 @@ export default function Data() {
                                         <Eye className="h-5 w-5 text-primary" />
                                     </div>
                                     <div>
-                                        <CardTitle>Data Subject Access Requests (DSAR)</CardTitle>
+                                        <CardTitle>Privacy Access and Correction Requests</CardTitle>
                                         <CardDescription>
                                             Track and manage requests from individuals to access, correct, or delete their personal data (Privacy Act 2020)
                                         </CardDescription>
@@ -1353,11 +1346,11 @@ export default function Data() {
                                 </table>
                             </div>
 
-                            {/* 72 hour warning */}
+                            {/* Notifiable breach timing warning */}
                             <div className="flex items-start gap-2 rounded-lg border border-status-critical/30 bg-status-critical-bg p-3 text-sm text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical">
                                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                                 <span>
-                                    Under the Privacy Act 2020, serious breaches must be notified to the Privacy Commissioner as soon as practicable (within 72 hours of discovery).
+                                    Under the Privacy Act 2020, serious breaches must be assessed promptly and notified to the Privacy Commissioner as soon as practicable when serious harm is likely.
                                 </span>
                             </div>
                         </CardContent>
@@ -1764,7 +1757,7 @@ export default function Data() {
                             <div className="flex items-start gap-2 rounded-lg border border-status-info/30 bg-status-info-bg p-3 text-sm text-status-info dark:border-status-info/30 dark:bg-status-info-bg dark:text-status-info">
                                 <Info className="mt-0.5 h-4 w-4 shrink-0" />
                                 <span>
-                                    NZ organisations must notify the Privacy Commissioner of serious breaches within 72 hours. Use the Data Breach Management section above to track incidents.
+                                    NZ organisations must notify the Privacy Commissioner of notifiable privacy breaches as soon as practicable. Use the Data Breach Management section above to track incidents.
                                 </span>
                             </div>
 
@@ -1992,7 +1985,7 @@ export default function Data() {
                 >
                     <DialogContent className="max-w-lg">
                         <DialogHeader>
-                            <DialogTitle>New Data Subject Access Request</DialogTitle>
+                            <DialogTitle>New Privacy Request</DialogTitle>
                             <DialogDescription>
                                 Record a new request from an individual to access, correct, or delete their personal data.
                                 The 20 working day deadline will be calculated automatically.
@@ -2130,7 +2123,7 @@ export default function Data() {
                         <DialogHeader>
                             <DialogTitle className="text-status-critical">Report Data Breach</DialogTitle>
                             <DialogDescription>
-                                Record a data breach incident. Serious breaches must be reported to the Privacy Commissioner within 72 hours.
+                                Record a data breach incident. Notifiable privacy breaches must be reported to the Privacy Commissioner as soon as practicable.
                             </DialogDescription>
                         </DialogHeader>
                         <div className="space-y-4">
@@ -2222,7 +2215,7 @@ export default function Data() {
 
                             {breachDiscoveryDate && (
                                 <div className="rounded-lg border border-status-critical/30 bg-status-critical-bg p-3 text-sm text-status-critical dark:border-status-critical/30 dark:bg-status-critical-bg dark:text-status-critical">
-                                    <strong>Notification deadline:</strong> {calc72HourDeadline(breachDiscoveryDate)} (72 hours from discovery)
+                                    <strong>Notification timing:</strong> assess serious-harm likelihood and notify the Privacy Commissioner as soon as practicable.
                                 </div>
                             )}
 
@@ -2369,7 +2362,7 @@ export default function Data() {
                                             <SelectItem dusk="data-processor-country-nz" value="nz">New Zealand</SelectItem>
                                             <SelectItem dusk="data-processor-country-au" value="au">Australia</SelectItem>
                                             <SelectItem dusk="data-processor-country-us" value="us">USA</SelectItem>
-                                            <SelectItem dusk="data-processor-country-uk" value="uk">UK</SelectItem>
+                                            <SelectItem dusk="data-processor-country-uk" value="uk">Other overseas</SelectItem>
                                             <SelectItem dusk="data-processor-country-other" value="other">Other</SelectItem>
                                         </SelectContent>
                                     </Select>

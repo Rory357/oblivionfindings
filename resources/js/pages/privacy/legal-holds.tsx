@@ -63,7 +63,7 @@ export default function LegalHolds({ filters, holds, stats }: Props) {
 
     return (
         <AppLayout breadcrumbs={[
-            { title: 'Privacy & GDPR', href: '/privacy/dashboard' },
+            { title: 'Privacy', href: '/privacy/dashboard' },
             { title: 'Legal Holds', href: '/privacy/legal-holds' }
         ]}>
             <Head title="Legal Holds" />

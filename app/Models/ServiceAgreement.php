@@ -120,6 +120,16 @@ class ServiceAgreement extends Model
         return $this->hasMany(FundingClaim::class);
     }
 
+    public function respiteBookingRequests()
+    {
+        return $this->hasMany(RespiteBookingRequest::class);
+    }
+
+    public function respiteBookings()
+    {
+        return $this->hasMany(RespiteBooking::class);
+    }
+
     public function statusChanges()
     {
         return $this->hasMany(ServiceAgreementStatusChange::class);
