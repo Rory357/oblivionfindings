@@ -206,6 +206,9 @@ function BookingCard({
                         {b.serviceAgreement.referenceNumber ??
                             b.serviceAgreement.title ??
                             `Agreement #${b.serviceAgreement.id}`}
+                        {b.serviceAgreement.carerSupportDaysRemaining != null
+                            ? ` · ${b.serviceAgreement.carerSupportDaysRemaining}d left`
+                            : ''}
                     </Pill>
                 ) : null}
             </div>

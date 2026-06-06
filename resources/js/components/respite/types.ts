@@ -32,6 +32,10 @@ export interface ServiceAgreementSummary {
     reviewDueDate: string | null;
     budgetRemaining: number;
     hoursRemaining: number;
+    carerSupportDaysAllocated: number | null;
+    carerSupportDaysUsed: number | null;
+    carerSupportDaysRemaining: number | null;
+    carerSupportEntitlementYear: string | null;
 }
 
 export interface ReadinessSegment {
@@ -99,6 +103,9 @@ export interface RespiteRequestRow {
     expectedAvailabilityDate: string | null;
     isEmergency: boolean;
     fastTracked: boolean;
+    seriesId: string | null;
+    recurrenceRule: string | null;
+    allocatedDays: number | null;
     carer: Record<string, unknown> | null;
     cultural: Record<string, unknown> | null;
     site: string | null;
@@ -131,10 +138,15 @@ export interface RespiteBookingRow {
     agreementStatus: string | null;
     consentAuthority: string | null;
     culturalSnapshot: Record<string, unknown> | null;
+    culturalPlacementCheck: Record<string, unknown> | null;
+    settingRestriction: string | null;
     interpreterArranged: boolean;
     copaymentAmount: number | null;
+    copaymentBasis: string | null;
+    privatePayPortion: number | null;
     copaymentStatus: string | null;
     recurrenceRule: string | null;
+    seriesId: string | null;
     criticalAlerts: CriticalAlert[];
     readiness: number;
     readinessSegments: ReadinessSegment[];
@@ -154,6 +166,9 @@ export interface RespiteStayRow {
     actualEnd: string | null;
     plannedEnd: string | null;
     dischargeReason: string | null;
+    bedHoldStatus: string | null;
+    bedHoldReason: string | null;
+    bedHoldUntil: string | null;
     unreviewedRestraints: number;
     openIncidents: number;
     criticalAlerts: CriticalAlert[];

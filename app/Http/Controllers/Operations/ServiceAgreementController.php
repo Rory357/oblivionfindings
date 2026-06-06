@@ -129,6 +129,9 @@ class ServiceAgreementController extends Controller
             'funding_type' => ['nullable', 'string', 'max:100'],
             'service_level' => ['nullable', 'string', 'max:100'],
             'allocated_hours_per_week' => ['nullable', 'numeric', 'min:0'],
+            'carer_support_days_allocated' => ['nullable', 'integer', 'min:0', 'max:366'],
+            'carer_support_days_used' => ['nullable', 'integer', 'min:0', 'max:999'],
+            'carer_support_entitlement_year' => ['nullable', 'string', 'max:9'],
             'total_hours' => ['nullable', 'numeric', 'min:0'],
             'gst_inclusive' => ['nullable', 'boolean'],
             'whaikaha_reference' => ['nullable', 'string', 'max:255'],
@@ -172,6 +175,9 @@ class ServiceAgreementController extends Controller
             'funding_type' => $data['funding_type'] ?? null,
             'service_level' => $data['service_level'] ?? null,
             'allocated_hours_per_week' => $data['allocated_hours_per_week'] ?? null,
+            'carer_support_days_allocated' => $data['carer_support_days_allocated'] ?? null,
+            'carer_support_days_used' => $data['carer_support_days_used'] ?? 0,
+            'carer_support_entitlement_year' => $data['carer_support_entitlement_year'] ?? null,
             'total_hours' => $data['total_hours'] ?? null,
             'gst_inclusive' => $data['gst_inclusive'] ?? true,
             'whaikaha_reference' => $data['whaikaha_reference'] ?? null,
@@ -213,7 +219,12 @@ class ServiceAgreementController extends Controller
             ->withCount('fundingClaims')
             ->findOrFail($agreement);
 
-        $agreement->append(['budget_utilisation_percent', 'budget_remaining']);
+        $agreement->append([
+            'budget_utilisation_percent',
+            'budget_remaining',
+            'carer_support_days_remaining',
+            'carer_support_utilisation_percent',
+        ]);
 
         // Calculate actual budget from line items
         $budgetFromItems = $agreement->lineItems->sum('budget_used');
@@ -308,6 +319,9 @@ class ServiceAgreementController extends Controller
             'funding_type' => ['nullable', 'string', 'max:100'],
             'service_level' => ['nullable', 'string', 'max:100'],
             'allocated_hours_per_week' => ['nullable', 'numeric', 'min:0'],
+            'carer_support_days_allocated' => ['nullable', 'integer', 'min:0', 'max:366'],
+            'carer_support_days_used' => ['nullable', 'integer', 'min:0', 'max:999'],
+            'carer_support_entitlement_year' => ['nullable', 'string', 'max:9'],
             'total_hours' => ['nullable', 'numeric', 'min:0'],
             'gst_inclusive' => ['nullable', 'boolean'],
             'whaikaha_reference' => ['nullable', 'string', 'max:255'],
@@ -510,7 +524,7 @@ class ServiceAgreementController extends Controller
             'unit' => ['required', 'string', 'in:hour,night,day,km,trip,flat'],
             'quantity' => ['nullable', 'numeric', 'min:0'],
             'budget_allocated' => ['nullable', 'numeric', 'min:0'],
-            'ndis_line_item_code' => ['nullable', 'string', 'max:100'],
+            'funding_contract_reference' => ['nullable', 'string', 'max:100'],
             'category' => ['nullable', 'string', 'max:255'],
         ]);
 
@@ -521,7 +535,7 @@ class ServiceAgreementController extends Controller
             'unit' => $data['unit'],
             'quantity' => $data['quantity'] ?? null,
             'budget_allocated' => $data['budget_allocated'] ?? ($data['unit_price'] * ($data['quantity'] ?? 0)),
-            'ndis_line_item_code' => $data['ndis_line_item_code'] ?? null,
+            'funding_contract_reference' => $data['funding_contract_reference'] ?? null,
             'category' => $data['category'] ?? null,
         ]);
 
@@ -546,7 +560,7 @@ class ServiceAgreementController extends Controller
             'unit' => ['required', 'string', 'in:hour,night,day,km,trip,flat'],
             'quantity' => ['nullable', 'numeric', 'min:0'],
             'budget_allocated' => ['nullable', 'numeric', 'min:0'],
-            'ndis_line_item_code' => ['nullable', 'string', 'max:100'],
+            'funding_contract_reference' => ['nullable', 'string', 'max:100'],
             'category' => ['nullable', 'string', 'max:255'],
         ]);
 
@@ -556,7 +570,7 @@ class ServiceAgreementController extends Controller
             'unit' => $data['unit'],
             'quantity' => $data['quantity'] ?? null,
             'budget_allocated' => $data['budget_allocated'] ?? ($data['unit_price'] * ($data['quantity'] ?? 0)),
-            'ndis_line_item_code' => $data['ndis_line_item_code'] ?? null,
+            'funding_contract_reference' => $data['funding_contract_reference'] ?? null,
             'category' => $data['category'] ?? null,
         ]);
 

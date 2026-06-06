@@ -81,7 +81,7 @@ class FundingClaimController extends Controller
             'items.*.service_agreement_line_item_id' => ['nullable', 'integer', 'exists:service_agreement_line_items,id'],
             'items.*.shift_id' => ['nullable', 'integer', 'exists:shifts,id'],
             'items.*.timesheet_id' => ['nullable', 'integer', 'exists:timesheets,id'],
-            'items.*.ndis_line_item_code' => ['nullable', 'string', 'max:50'],
+            'items.*.funding_contract_reference' => ['nullable', 'string', 'max:50'],
         ]);
 
         $claim = DB::transaction(function () use ($data, $auth) {
@@ -110,7 +110,7 @@ class FundingClaimController extends Controller
                     'unit_price' => $itemData['unit_price'],
                     'total_amount' => $itemData['quantity'] * $itemData['unit_price'],
                     'service_date' => $itemData['service_date'],
-                    'ndis_line_item_code' => $itemData['ndis_line_item_code'] ?? null,
+                    'funding_contract_reference' => $itemData['funding_contract_reference'] ?? null,
                 ]);
             }
 

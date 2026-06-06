@@ -131,6 +131,9 @@ export default function ServiceAgreementCreate({ clients }: Props) {
         funding_type: '',
         service_level: '',
         allocated_hours_per_week: '',
+        carer_support_days_allocated: '',
+        carer_support_days_used: '',
+        carer_support_entitlement_year: '',
         total_hours: '',
         gst_inclusive: true,
         whaikaha_reference: '',
@@ -405,6 +408,20 @@ export default function ServiceAgreementCreate({ clients }: Props) {
                                                 ))}
                                             </SelectContent>
                                         </Select>
+                                    </div>
+                                </div>
+                                <div className="grid gap-4 sm:grid-cols-3">
+                                    <div className="space-y-1.5">
+                                        <Label>Carer Support Days Allocated</Label>
+                                        <Input type="number" step="1" min="0" value={data.carer_support_days_allocated} onChange={(e) => setData('carer_support_days_allocated', e.target.value)} placeholder="0" />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label>Carer Support Days Used</Label>
+                                        <Input type="number" step="1" min="0" value={data.carer_support_days_used} onChange={(e) => setData('carer_support_days_used', e.target.value)} placeholder="0" />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label>Entitlement Year</Label>
+                                        <Input value={data.carer_support_entitlement_year} onChange={(e) => setData('carer_support_entitlement_year', e.target.value)} placeholder="2026-2027" />
                                     </div>
                                 </div>
                                 <div className="grid gap-4 sm:grid-cols-2">

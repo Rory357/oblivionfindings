@@ -29,7 +29,7 @@ type ClaimItem = {
     unit_price: string;
     service_date: string;
     service_agreement_line_item_id: string;
-    ndis_line_item_code: string;
+    funding_contract_reference: string;
 };
 
 type Props = {
@@ -42,7 +42,7 @@ const blankItem = (): ClaimItem => ({
     unit_price: '0',
     service_date: '',
     service_agreement_line_item_id: '',
-    ndis_line_item_code: '',
+    funding_contract_reference: '',
 });
 
 export default function FundingClaimCreate({ agreements }: Props) {

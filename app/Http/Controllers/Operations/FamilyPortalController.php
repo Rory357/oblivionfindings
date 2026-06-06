@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Operations;
 
 use App\Http\Controllers\Controller;
 use App\Models\Client;
+use App\Models\ClientConsent;
 use App\Models\FamilyPortalSetting;
 use Illuminate\Http\Request;
 
@@ -81,7 +82,7 @@ class FamilyPortalController extends Controller
         $auth = $request->user();
         abort_unless($auth && $this->canManagePortal($auth), 403);
 
-        Client::query()
+        $clientModel = Client::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($client);
 
@@ -97,23 +98,38 @@ class FamilyPortalController extends Controller
             'notify_incident' => ['nullable', 'boolean'],
         ]);
 
+        $hasFamilyInformationConsent = $this->hasActiveFamilyInformationConsent($clientModel);
+        $showRespite = $data['show_respite'] ?? true;
+        $showCareNotes = $data['show_care_notes'] ?? true;
+        $showIncidents = $data['show_incidents'] ?? false;
+
+        if (! $hasFamilyInformationConsent) {
+            $showRespite = false;
+            $showCareNotes = false;
+            $showIncidents = false;
+        }
+
         FamilyPortalSetting::updateOrCreate(
             ['client_id' => $client],
             [
                 'organization_id' => $auth->organization_id,
                 'show_shift_schedule' => $data['show_shift_schedule'] ?? true,
-                'show_respite' => $data['show_respite'] ?? true,
-                'show_care_notes' => $data['show_care_notes'] ?? true,
+                'show_respite' => $showRespite,
+                'show_care_notes' => $showCareNotes,
                 'show_care_plans' => $data['show_care_plans'] ?? false,
                 'show_medication_status' => $data['show_medication_status'] ?? false,
-                'show_incidents' => $data['show_incidents'] ?? false,
+                'show_incidents' => $showIncidents,
                 'notify_shift_arrival' => $data['notify_shift_arrival'] ?? true,
                 'notify_shift_completion' => $data['notify_shift_completion'] ?? true,
                 'notify_incident' => $data['notify_incident'] ?? true,
             ]
         );
 
-        return redirect()->back()->with('success', 'Portal settings updated.');
+        $message = $hasFamilyInformationConsent
+            ? 'Portal settings updated.'
+            : 'Portal settings updated. Information-sharing surfaces remain off until active family information consent is recorded.';
+
+        return redirect()->back()->with('success', $message);
     }
 
     private function canViewPortal($auth): bool
@@ -126,5 +142,24 @@ class FamilyPortalController extends Controller
     {
         return $auth->canDo('family_portal.manage')
             || $auth->canDo('clients.update');
+    }
+
+    private function hasActiveFamilyInformationConsent(Client $client): bool
+    {
+        return ClientConsent::query()
+            ->active()
+            ->where('client_id', $client->id)
+            ->whereHas('consentType', function ($query) {
+                $query->where('name', 'Information Sharing with Whānau / Family')
+                    ->orWhere(function ($query) {
+                        $query->where('category', 'communication')
+                            ->where(function ($query) {
+                                $query->where('name', 'like', '%family%')
+                                    ->orWhere('name', 'like', '%whanau%')
+                                    ->orWhere('name', 'like', '%whānau%');
+                            });
+                    });
+            })
+            ->exists();
     }
 }

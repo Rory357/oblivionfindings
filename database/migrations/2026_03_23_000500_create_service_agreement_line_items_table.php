@@ -20,7 +20,7 @@ return new class extends Migration
             $table->decimal('budget_allocated', 12, 2)->default(0);
             $table->decimal('budget_used', 12, 2)->default(0);
             $table->string('category')->nullable();
-            $table->string('ndis_line_item_code')->nullable();
+            $table->string('funding_contract_reference')->nullable();
             $table->timestamps();
         });
     }

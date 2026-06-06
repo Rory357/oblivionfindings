@@ -211,7 +211,10 @@ function RequestCard({
                             <span>
                                 {r.serviceAgreement.title ??
                                     `Agreement #${r.serviceAgreement.id}`}{' '}
-                                · {r.serviceAgreement.hoursRemaining}h left
+                                ·{' '}
+                                {r.serviceAgreement.carerSupportDaysRemaining != null
+                                    ? `${r.serviceAgreement.carerSupportDaysRemaining}d left`
+                                    : `${r.serviceAgreement.hoursRemaining}h left`}
                             </span>
                         ) : null}
                         {r.site ? <span>{r.site}</span> : null}

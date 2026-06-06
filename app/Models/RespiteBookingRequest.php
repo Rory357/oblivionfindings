@@ -33,6 +33,9 @@ class RespiteBookingRequest extends Model
         'expected_availability_date',
         'is_emergency',
         'fast_tracked',
+        'series_id',
+        'recurrence_rule',
+        'allocated_days',
         'decision_notes',
         'approved_by_user_id',
         'approved_at',
@@ -50,6 +53,7 @@ class RespiteBookingRequest extends Model
         'expected_availability_date' => 'date',
         'is_emergency' => 'boolean',
         'fast_tracked' => 'boolean',
+        'allocated_days' => 'integer',
     ];
 
     public function referral(): BelongsTo

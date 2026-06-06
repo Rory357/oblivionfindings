@@ -19,6 +19,7 @@ use App\Models\Client;
 use App\Models\ClientAppointment;
 use App\Models\ClientAssessment;
 use App\Models\ClientBowelEntry;
+use App\Models\ClientConsent;
 use App\Models\ClientDocument;
 use App\Models\ClientExcursionRequest;
 use App\Models\ClientFluidEntry;
@@ -48,6 +49,7 @@ use App\Models\User;
 use App\Models\WorkplaceInjury;
 use App\Observers\AssetMaintenanceLogObserver;
 use App\Observers\ClientFundTransactionObserver;
+use App\Observers\ClientConsentObserver;
 use App\Observers\ClientIncidentObserver;
 use App\Observers\ClientLedgerEntryObserver;
 use App\Observers\ClientNoteObserver;
@@ -170,6 +172,7 @@ class AppServiceProvider extends ServiceProvider
         ]);
 
         Shift::observe(ShiftObserver::class);
+        ClientConsent::observe(ClientConsentObserver::class);
         ClientNote::observe(ClientNoteObserver::class);
         ProgressNote::observe(ProjectsToTimelineObserver::class);
         ClientBowelEntry::observe(ProjectsToTimelineObserver::class);

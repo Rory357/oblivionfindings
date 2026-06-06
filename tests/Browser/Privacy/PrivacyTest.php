@@ -77,7 +77,7 @@ test('privacy PIA page loads', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
-            ->visit('/privacy/dpia')
+            ->visit('/privacy/pia')
             ->waitForText('PIA', 10)
             ->assertSee('PIA');
     });
@@ -87,7 +87,7 @@ test('privacy PIA create page loads', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
-            ->visit('/privacy/dpia/create')
+            ->visit('/privacy/pia/create')
             ->waitForText('PIA', 10)
             ->assertSee('PIA');
     });

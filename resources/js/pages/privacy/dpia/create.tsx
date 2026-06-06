@@ -62,7 +62,7 @@ export default function CreatePIA({ staff: _staff }: Props) {
             description: data.description || null,
         };
         form.transform(() => payload);
-        form.post('/privacy/dpia', {
+        form.post('/privacy/pia', {
             onFinish: () => form.transform((d) => d),
         });
     };
@@ -70,8 +70,8 @@ export default function CreatePIA({ staff: _staff }: Props) {
     return (
         <AppLayout breadcrumbs={[
             { title: 'Privacy', href: '/privacy/dashboard' },
-            { title: 'Impact Assessments', href: '/privacy/dpia' },
-            { title: 'New PIA', href: '/privacy/dpia/create' },
+            { title: 'Impact Assessments', href: '/privacy/pia' },
+            { title: 'New PIA', href: '/privacy/pia/create' },
         ]}>
             <Head title="New PIA" />
 
@@ -79,7 +79,7 @@ export default function CreatePIA({ staff: _staff }: Props) {
                 hero={
                     <PageHero
                         variant="compact"
-                        backHref="/privacy/dpia"
+                        backHref="/privacy/pia"
                         title="New PIA"
                         description="Document data processing risks and mitigation steps."
                     />

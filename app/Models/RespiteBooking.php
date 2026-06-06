@@ -41,10 +41,15 @@ class RespiteBooking extends Model
         'readiness_override_reason',
         'capacity_override_reason',
         'cultural_snapshot',
+        'cultural_placement_check',
+        'setting_restriction',
         'interpreter_arranged',
         'copayment_amount',
+        'copayment_basis',
+        'private_pay_portion',
         'copayment_status',
         'recurrence_rule',
+        'series_id',
         'funding_expiry_acknowledged_at',
         'created_by',
         'updated_by',
@@ -58,8 +63,10 @@ class RespiteBooking extends Model
         'family_portal_consent_bound_at' => 'datetime',
         'approvals' => 'array',
         'cultural_snapshot' => 'array',
+        'cultural_placement_check' => 'array',
         'interpreter_arranged' => 'boolean',
         'copayment_amount' => 'decimal:2',
+        'private_pay_portion' => 'decimal:2',
         'funding_expiry_acknowledged_at' => 'datetime',
         'eligibility_checks' => 'array',
         'consent_records' => 'array',
@@ -136,6 +143,8 @@ class RespiteBooking extends Model
                 'Record who may legally consent under PPPR / HDC Right 7.'
             ),
             $this->interpreterReadinessSegment(),
+            $this->culturalPlacementReadinessSegment(),
+            $this->settingRestrictionReadinessSegment(),
             $this->readinessSegment(
                 'pre_arrival',
                 'Pre-arrival checklist',
@@ -205,6 +214,36 @@ class RespiteBooking extends Model
             'Interpreter arranged',
             ! $required || (bool) $this->interpreter_arranged,
             'Arrange the requested interpreter before arrival.'
+        );
+    }
+
+    private function culturalPlacementReadinessSegment(): array
+    {
+        $snapshot = $this->cultural_snapshot ?? [];
+        $requiresPlacementCheck = (bool) ($snapshot['is_maori'] ?? false)
+            || filled($snapshot['iwi'] ?? null)
+            || filled($snapshot['hapu'] ?? null)
+            || filled($snapshot['marae'] ?? null)
+            || filled($snapshot['cultural_considerations'] ?? null)
+            || filled($snapshot['cultural_dietary_needs'] ?? null);
+
+        return $this->readinessSegment(
+            'cultural_placement',
+            'Cultural placement checked',
+            ! $requiresPlacementCheck || ! empty($this->cultural_placement_check),
+            'Confirm cultural, whānau and dietary placement support before arrival.'
+        );
+    }
+
+    private function settingRestrictionReadinessSegment(): array
+    {
+        $restriction = $this->setting_restriction ?: 'none';
+
+        return $this->readinessSegment(
+            'setting_restriction',
+            'Restrictive setting authorised',
+            $restriction === 'none' || (bool) data_get($this->consent_authority_evidence, 'setting_restriction_authorised'),
+            'Record BSP and consent authority evidence for the restrictive setting.'
         );
     }
 

@@ -53,7 +53,7 @@ test('intake rejects a funding source outside the NZ list', function () {
             'referrer_name' => 'GP',
             'referral_reason' => 'Respite',
             'urgency' => 'planned',
-            'funding_source' => 'ndis', // Australian — not in the NZ list
+            'funding_source' => 'legacy_foreign_funder',
         ])
         ->assertSessionHasErrors('funding_source');
 });

@@ -78,8 +78,8 @@ export default function ShowPIA({ dpia }: Props) {
     return (
         <AppLayout breadcrumbs={[
             { title: 'Privacy', href: '/privacy/dashboard' },
-            { title: 'Impact Assessments', href: '/privacy/dpia' },
-            { title: dpia.assessment_name, href: `/privacy/dpia/${dpia.id}` },
+            { title: 'Impact Assessments', href: '/privacy/pia' },
+            { title: dpia.assessment_name, href: `/privacy/pia/${dpia.id}` },
         ]}>
             <Head title={`PIA - ${dpia.assessment_name}`} />
 
@@ -87,13 +87,13 @@ export default function ShowPIA({ dpia }: Props) {
                 hero={
                     <PageHero
                         variant="compact"
-                        backHref="/privacy/dpia"
+                        backHref="/privacy/pia"
                         backLabel="Back to list"
                         title={dpia.assessment_name}
                         description={`Assessed: ${formatDate(dpia.assessment_date)}${dpia.assessor ? ` by ${dpia.assessor.name}` : ''}${dpia.review_date ? ` - Review: ${formatDate(dpia.review_date)}` : ''}`}
                         actions={
                             can.conductDPIA ? (
-                                <Link href={`/privacy/dpia/${dpia.id}/edit`}>
+                                <Link href={`/privacy/pia/${dpia.id}/edit`}>
                                     <Button size="sm" variant="outline">
                                         Edit
                                     </Button>
@@ -208,7 +208,7 @@ export default function ShowPIA({ dpia }: Props) {
                                     size="sm"
                                     onClick={() => {
                                         if (confirm('Approve this PIA?')) {
-                                            router.post(`/privacy/dpia/${dpia.id}/approve`);
+                                            router.post(`/privacy/pia/${dpia.id}/approve`);
                                         }
                                     }}
                                 >
@@ -222,7 +222,7 @@ export default function ShowPIA({ dpia }: Props) {
                                 onClick={() => {
                                     const notes = prompt('Enter review notes:');
                                     if (notes) {
-                                        router.post(`/privacy/dpia/${dpia.id}/review`, {
+                                        router.post(`/privacy/pia/${dpia.id}/review`, {
                                             review_notes: notes,
                                         });
                                     }

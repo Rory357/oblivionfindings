@@ -22,7 +22,7 @@ class FundingClaimItem extends Model
         'unit_price',
         'total_amount',
         'service_date',
-        'ndis_line_item_code',
+        'funding_contract_reference',
     ];
 
     protected $casts = [

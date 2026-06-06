@@ -54,7 +54,7 @@ type LineItem = {
     budget_allocated: number;
     budget_used: number;
     category: string | null;
-    ndis_line_item_code: string | null;
+    funding_contract_reference: string | null;
 };
 
 type Rate = {
@@ -119,6 +119,11 @@ type Props = {
         funding_type: string | null;
         service_level: string | null;
         allocated_hours_per_week: number | null;
+        carer_support_days_allocated: number | null;
+        carer_support_days_used: number | null;
+        carer_support_days_remaining: number | null;
+        carer_support_utilisation_percent: number | null;
+        carer_support_entitlement_year: string | null;
         total_hours: number | null;
         hours_used: number | null;
         hours_remaining: number | null;
@@ -427,7 +432,7 @@ function LineItemDialog({
         quantity: lineItem?.quantity?.toString() ?? '',
         budget_allocated: lineItem?.budget_allocated?.toString() ?? '',
         category: lineItem?.category ?? '',
-        ndis_line_item_code: lineItem?.ndis_line_item_code ?? '',
+        funding_contract_reference: lineItem?.funding_contract_reference ?? '',
     });
 
     // Reset form when lineItem changes
@@ -441,7 +446,7 @@ function LineItemDialog({
             quantity: lineItem?.quantity?.toString() ?? '',
             budget_allocated: lineItem?.budget_allocated?.toString() ?? '',
             category: lineItem?.category ?? '',
-            ndis_line_item_code: lineItem?.ndis_line_item_code ?? '',
+            funding_contract_reference: lineItem?.funding_contract_reference ?? '',
         });
     }
 
@@ -522,8 +527,8 @@ function LineItemDialog({
                             <Input id="li-category" value={form.data.category} onChange={(e) => form.setData('category', e.target.value)} placeholder="e.g. Core Support" />
                         </div>
                         <div>
-                            <Label htmlFor="li-ndis">Funding / Contract Reference</Label>
-                            <Input id="li-ndis" value={form.data.ndis_line_item_code} onChange={(e) => form.setData('ndis_line_item_code', e.target.value)} placeholder="Optional" />
+                            <Label htmlFor="li-funding-reference">Funding / Contract Reference</Label>
+                            <Input id="li-funding-reference" value={form.data.funding_contract_reference} onChange={(e) => form.setData('funding_contract_reference', e.target.value)} placeholder="Optional" />
                         </div>
                     </div>
                     <DialogFooter>
@@ -807,7 +812,7 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
                 </Card>
 
                 {/* Funding Details */}
-                {(ag.funding_type || ag.service_level || ag.whaikaha_reference || (ag.total_hours != null && Number(ag.total_hours) > 0)) && (
+                {(ag.funding_type || ag.service_level || ag.whaikaha_reference || (ag.total_hours != null && Number(ag.total_hours) > 0) || ag.carer_support_days_allocated != null) && (
                     <Card className="mt-4">
                         <CardHeader className="pb-2">
                             <CardTitle className="flex items-center gap-2 text-sm font-medium">
@@ -851,6 +856,30 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
                                             <div className="rounded-lg border bg-muted/30 p-3">
                                                 <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Hours Remaining</div>
                                                 <div className="text-lg font-semibold tabular-nums text-status-success">{ag.hours_remaining}</div>
+                                            </div>
+                                        )}
+                                        {ag.carer_support_days_allocated != null && (
+                                            <div className="rounded-lg border bg-muted/30 p-3">
+                                                <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Carer Days Allocated</div>
+                                                <div className="text-lg font-semibold tabular-nums">{ag.carer_support_days_allocated}</div>
+                                            </div>
+                                        )}
+                                        {ag.carer_support_days_used != null && (
+                                            <div className="rounded-lg border bg-muted/30 p-3">
+                                                <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Carer Days Used</div>
+                                                <div className="text-lg font-semibold tabular-nums">{ag.carer_support_days_used}</div>
+                                            </div>
+                                        )}
+                                        {ag.carer_support_days_remaining != null && (
+                                            <div className="rounded-lg border bg-muted/30 p-3">
+                                                <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Carer Days Remaining</div>
+                                                <div className={`text-lg font-semibold tabular-nums ${ag.carer_support_days_remaining < 0 ? 'text-status-critical' : 'text-status-success'}`}>{ag.carer_support_days_remaining}</div>
+                                            </div>
+                                        )}
+                                        {ag.carer_support_entitlement_year && (
+                                            <div className="rounded-lg border bg-muted/30 p-3">
+                                                <div className="text-[10px] font-medium uppercase tracking-wider text-muted-foreground">Entitlement Year</div>
+                                                <div className="text-sm font-medium">{ag.carer_support_entitlement_year}</div>
                                             </div>
                                         )}
                                         {ag.whaikaha_reference && (
@@ -999,7 +1028,7 @@ export default function ServiceAgreementShow({ agreement: ag, budget_summary }: 
                                                             {formatCurrency(item.unit_price)}/{item.unit}
                                                             {item.quantity != null && <span className="ml-1">x {item.quantity}</span>}
                                                             {item.category && <span className="ml-2 text-status-info">{item.category}</span>}
-                                                            {item.ndis_line_item_code && <span className="ml-2 text-primary">#{item.ndis_line_item_code}</span>}
+                                                            {item.funding_contract_reference && <span className="ml-2 text-primary">#{item.funding_contract_reference}</span>}
                                                         </div>
                                                     </div>
                                                     <div className="flex items-start gap-2">

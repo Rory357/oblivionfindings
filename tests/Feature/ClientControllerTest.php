@@ -97,7 +97,7 @@ class ClientControllerTest extends TestCase
             'postcode' => '1010',
             'site_id' => $this->site->id,
             'service_context_id' => $this->serviceContext->id,
-            'funding_type' => 'ndis',
+            'funding_type' => 'whaikaha',
             'funding_notes' => 'Test funding notes',
         ], $overrides);
     }
@@ -546,7 +546,7 @@ class ClientControllerTest extends TestCase
             'suburb' => 'Parnell',
             'city' => 'Auckland',
             'postcode' => '1001',
-            'funding_type' => 'ndis',
+            'funding_type' => 'whaikaha',
             'funding_notes' => 'Funded until Dec',
             'site_id' => $this->site->id,
             'service_context_id' => $this->serviceContext->id,
@@ -572,7 +572,7 @@ class ClientControllerTest extends TestCase
                 ->where('suburb', 'Parnell')
                 ->where('city', 'Auckland')
                 ->where('postcode', '1001')
-                ->where('funding_type', 'ndis')
+                ->where('funding_type', 'whaikaha')
                 ->where('funding_notes', 'Funded until Dec')
                 ->has('profile_photo_url')
                 ->has('avatar')
@@ -1412,7 +1412,7 @@ class ClientControllerTest extends TestCase
             'postcode' => '1010',
             'site_id' => $this->site->id,
             'service_context_id' => $this->serviceContext->id,
-            'funding_type' => 'ndis',
+            'funding_type' => 'whaikaha',
             'funding_notes' => 'Test funding notes',
         ]);
 

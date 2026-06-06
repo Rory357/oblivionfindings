@@ -123,12 +123,12 @@ test.describe('privacy DSR and breach readiness', () => {
             'discovered',
         );
         await expect(
-            page.getByTestId('privacy-breach-ico-countdown'),
+            page.getByTestId('privacy-breach-opc-countdown'),
         ).toBeVisible();
 
         const breachId = idFromPath(new URL(page.url()).pathname, 'breaches');
         page.once('dialog', (dialog) => dialog.accept('OPC-PW-001'));
-        await page.getByTestId('privacy-breach-notify-ico').click();
+        await page.getByTestId('privacy-breach-notify-opc').click();
         await expect(page.getByTestId('privacy-breach-status')).toContainText(
             'notified',
         );

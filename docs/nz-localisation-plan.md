@@ -137,3 +137,35 @@ new NZ copy. Keep behaviour identical.
 
 - Section 2 grep is empty, `tsc`/build green, touched tests green, and a spot-check of the Privacy
   dashboard, a service agreement, and the marketing footer shows NZ-only terminology.
+
+## 8. Codex completion note - 2026-06-06
+
+Implemented in this pass:
+
+- Replaced the remaining Australian/UK funding, safeguarding and privacy copy in app code, seeders,
+  tests and routes while keeping stable internal identifiers where a rename would create permission or
+  routing churn.
+- Moved browser-visible privacy assessment routes from `/privacy/dpia...` to `/privacy/pia...`, and
+  breach notification from `notify-ico` to `notify-opc`.
+- Renamed the old `ndis_line_item_code` field to `funding_contract_reference` across models,
+  controllers, migrations, schema and funding/service-agreement UI, with a compatibility migration for
+  existing databases.
+- Reframed DSR user-facing copy and export storage paths as privacy requests; left model/table names
+  intact by design.
+- Localised demo seeders and compliance labels to NZ terminology, including Health NZ, HDC, OPC,
+  HealthCERT and NZD.
+
+Verification completed:
+
+- `rg` stale-localisation scans across `app`, `resources`, `database`, `routes`, `tests`, and `config`
+  returned no matches for the removed AU/UK/EU terms or old privacy paths.
+- `php artisan test tests/Feature/PrivacyControllerTest.php --filter "notify_opc" --stop-on-failure --debug`
+  passed: 2 tests, 6 assertions.
+- `php artisan test tests/Feature/PrivacyControllerTest.php --filter "breach_opc" --stop-on-failure --debug`
+  passed: 1 test, 4 assertions.
+- `php artisan test tests/Feature/PrivacyControllerTest.php --filter test_dpia_store_creates_assessment --stop-on-failure --debug`
+  passed: 1 test, 3 assertions.
+- `php artisan test tests/Feature/PrivacyControllerTest.php --filter test_dpia_show_returns_inertia_page --stop-on-failure --debug`
+  passed: 1 test, 11 assertions.
+- `npm run types` passed.
+- `npm run build` passed.

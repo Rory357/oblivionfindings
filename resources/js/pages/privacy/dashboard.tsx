@@ -131,7 +131,7 @@ export default function PrivacyDashboard({
                         </Card>
                     </Link>
 
-                    <Link href="/privacy/dpia" className="block">
+                    <Link href="/privacy/pia" className="block">
                         <Card className="transition-shadow hover:shadow-md">
                             <CardHeader className="pb-2">
                                 <CardTitle className="flex items-center gap-2 text-sm font-medium">

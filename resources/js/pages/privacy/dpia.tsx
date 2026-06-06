@@ -42,7 +42,7 @@ export default function PIAIndex({ filters, dpias, stats }: Props) {
     const can = auth?.can?.privacy ?? {};
 
     const onFilter = (next: Partial<typeof filters>) => {
-        router.get('/privacy/dpia', { ...filters, ...next }, { preserveState: true, preserveScroll: true });
+        router.get('/privacy/pia', { ...filters, ...next }, { preserveState: true, preserveScroll: true });
     };
 
     const getOutcomeColor = (outcome: string | null) => {
@@ -86,7 +86,7 @@ export default function PIAIndex({ filters, dpias, stats }: Props) {
     return (
         <AppLayout breadcrumbs={[
             { title: 'Privacy', href: '/privacy/dashboard' },
-            { title: 'Impact Assessments', href: '/privacy/dpia' }
+            { title: 'Impact Assessments', href: '/privacy/pia' }
         ]}>
             <Head title="Data Protection Impact Assessments" />
 
@@ -108,7 +108,7 @@ export default function PIAIndex({ filters, dpias, stats }: Props) {
                                 <Button variant="outline" size="sm">Privacy Dashboard</Button>
                             </Link>
                             {can.conductDPIA && (
-                                <Link href="/privacy/dpia/create">
+                                <Link href="/privacy/pia/create">
                                     <Button size="sm">
                                         <Plus className="mr-1.5 h-4 w-4" />
                                         New Assessment
@@ -202,7 +202,7 @@ export default function PIAIndex({ filters, dpias, stats }: Props) {
                                                 {dpia.review_date && ` • Review: ${formatDate(dpia.review_date)}`}
                                             </div>
                                         </div>
-                                        <Link href={`/privacy/dpia/${dpia.id}`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
+                                        <Link href={`/privacy/pia/${dpia.id}`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
                                             View
                                         </Link>
                                     </div>

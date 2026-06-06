@@ -315,3 +315,31 @@ The respite redesign is built on a genuinely strong backend — eMAR, risk-plan 
 - **NZ context:** NASC allocations, IF/EGL budgets and Te Whatu Ora/Whaikaha contracts all have review/expiry dates and ACC authorisation can lapse; a stay crossing a funding expiry, or an imminent arrival with no verified funder, is the classic preventable NZ revenue loss.
 - **Recommendation:** Add a funding lane to the overview: count of imminent arrivals where funding_status != approved/not_required, and stays whose linked ServiceAgreement ends_at/review_due_date falls before stay end — reusing the existing expiringSoon scope / CheckExpiringAgreementsJob rather than building new expiry logic.
 
+## Codex close-out - 2026-06-06
+
+The gaps in this analysis have been implemented through the localisation and respite implementation
+plans. Source recommendations remain in this file for audit traceability, but the previously
+future-scoped fast-follows are no longer open implementation work in the current codebase.
+
+Closed items include:
+
+- Funding source carry-through, service-agreement links, funding status, readiness gate and discharge
+  consumption.
+- Status vocabulary, per-home occupancy, waitlist promotion, carer crisis attention and emergency
+  fast-path metadata.
+- Admission as transfer of care: med-rec gates, critical alerts, risk screen and discharge compliance
+  blocks.
+- Compliance wiring: respite incidents, restraint events, notifiable incidents, complaints/HDC wiring,
+  evidence manifest, NZ safeguarding authorities and OPC privacy-breach linkage.
+- Consent and PPPR: who-consents fields, active family-information consent binding, and immediate
+  shutdown of sensitive family-portal surfaces on withdrawal.
+- Te Tiriti and cultural safety: referral/intake cultural snapshot, iwi/hapu/marae support, interpreter
+  readiness, wairua/whānau daily note fields, cultural dietary context, cultural placement readiness,
+  restrictive-setting evidence and cultural leave/bed-hold.
+- Data/privacy records: NHI at referral with hash-based dedup support, respite records in privacy
+  exports, retention-policy wiring and NZ privacy terminology.
+- Fast-follows: co-payment/private-pay fields, recurring block metadata, funding-expiry attention lane
+  and Carer Support day burn-down.
+
+Verification evidence is captured in `docs/respite-nz-implementation-plan.md`.
+

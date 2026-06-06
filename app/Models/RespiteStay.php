@@ -30,6 +30,9 @@ class RespiteStay extends Model
         'post_respite_summary',
         'transport_arrangements',
         'absence_records',
+        'bed_hold_status',
+        'bed_hold_reason',
+        'bed_hold_until',
         'cultural_support_notes',
         'evidence_pack_id',
         'created_by',
@@ -47,6 +50,7 @@ class RespiteStay extends Model
         'discharge_checklist_complete' => 'boolean',
         'transport_arrangements' => 'array',
         'absence_records' => 'array',
+        'bed_hold_until' => 'datetime',
     ];
 
     public function booking(): BelongsTo

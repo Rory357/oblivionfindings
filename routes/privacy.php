@@ -99,32 +99,32 @@ Route::middleware(['auth'])->group(function () {
             ->name('privacy.breaches.show');
         Route::put('/privacy/breaches/{breach}', [DataBreachController::class, 'update'])
             ->name('privacy.breaches.update');
-        Route::post('/privacy/breaches/{breach}/notify-ico', [DataBreachController::class, 'notifyOPC'])
-            ->name('privacy.breaches.notify-ico');
+        Route::post('/privacy/breaches/{breach}/notify-opc', [DataBreachController::class, 'notifyOPC'])
+            ->name('privacy.breaches.notify-opc');
         Route::post('/privacy/breaches/{breach}/notify-subjects', [DataBreachController::class, 'notifySubjects'])
             ->name('privacy.breaches.notify-subjects');
         Route::post('/privacy/breaches/{breach}/resolve', [DataBreachController::class, 'resolve'])
             ->name('privacy.breaches.resolve');
     });
 
-    // Data Processing Impact Assessments (PIA - Privacy Impact Assessment)
+    // Privacy Impact Assessments
     // Create route must come before wildcard routes
     Route::middleware('permission:privacy.conductDPIA')->group(function () {
-        Route::get('/privacy/dpia/create', [DPIAController::class, 'create'])
+        Route::get('/privacy/pia/create', [DPIAController::class, 'create'])
             ->name('privacy.dpia.create');
-        Route::get('/privacy/dpia', [DPIAController::class, 'index'])
+        Route::get('/privacy/pia', [DPIAController::class, 'index'])
             ->name('privacy.dpia.index');
-        Route::post('/privacy/dpia', [DPIAController::class, 'store'])
+        Route::post('/privacy/pia', [DPIAController::class, 'store'])
             ->name('privacy.dpia.store');
-        Route::get('/privacy/dpia/{dpia}', [DPIAController::class, 'show'])
+        Route::get('/privacy/pia/{dpia}', [DPIAController::class, 'show'])
             ->name('privacy.dpia.show');
-        Route::get('/privacy/dpia/{dpia}/edit', [DPIAController::class, 'edit'])
+        Route::get('/privacy/pia/{dpia}/edit', [DPIAController::class, 'edit'])
             ->name('privacy.dpia.edit');
-        Route::put('/privacy/dpia/{dpia}', [DPIAController::class, 'update'])
+        Route::put('/privacy/pia/{dpia}', [DPIAController::class, 'update'])
             ->name('privacy.dpia.update');
-        Route::post('/privacy/dpia/{dpia}/approve', [DPIAController::class, 'approve'])
+        Route::post('/privacy/pia/{dpia}/approve', [DPIAController::class, 'approve'])
             ->name('privacy.dpia.approve');
-        Route::post('/privacy/dpia/{dpia}/review', [DPIAController::class, 'review'])
+        Route::post('/privacy/pia/{dpia}/review', [DPIAController::class, 'review'])
             ->name('privacy.dpia.review');
     });
 

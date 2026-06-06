@@ -325,10 +325,10 @@ class PrivacyControllerTest extends TestCase
         $this->put("/privacy/breaches/{$breach->id}")->assertRedirect('/login');
     }
 
-    public function test_breaches_notify_ico_requires_authentication(): void
+    public function test_breaches_notify_opc_requires_authentication(): void
     {
         $breach = $this->createBreach();
-        $this->post("/privacy/breaches/{$breach->id}/notify-ico")->assertRedirect('/login');
+        $this->post("/privacy/breaches/{$breach->id}/notify-opc")->assertRedirect('/login');
     }
 
     public function test_breaches_notify_subjects_requires_authentication(): void
@@ -345,47 +345,47 @@ class PrivacyControllerTest extends TestCase
 
     public function test_dpia_index_requires_authentication(): void
     {
-        $this->get('/privacy/dpia')->assertRedirect('/login');
+        $this->get('/privacy/pia')->assertRedirect('/login');
     }
 
     public function test_dpia_create_requires_authentication(): void
     {
-        $this->get('/privacy/dpia/create')->assertRedirect('/login');
+        $this->get('/privacy/pia/create')->assertRedirect('/login');
     }
 
     public function test_dpia_store_requires_authentication(): void
     {
-        $this->post('/privacy/dpia')->assertRedirect('/login');
+        $this->post('/privacy/pia')->assertRedirect('/login');
     }
 
     public function test_dpia_show_requires_authentication(): void
     {
         $dpia = $this->createPIA();
-        $this->get("/privacy/dpia/{$dpia->id}")->assertRedirect('/login');
+        $this->get("/privacy/pia/{$dpia->id}")->assertRedirect('/login');
     }
 
     public function test_dpia_edit_requires_authentication(): void
     {
         $dpia = $this->createPIA();
-        $this->get("/privacy/dpia/{$dpia->id}/edit")->assertRedirect('/login');
+        $this->get("/privacy/pia/{$dpia->id}/edit")->assertRedirect('/login');
     }
 
     public function test_dpia_update_requires_authentication(): void
     {
         $dpia = $this->createPIA();
-        $this->put("/privacy/dpia/{$dpia->id}")->assertRedirect('/login');
+        $this->put("/privacy/pia/{$dpia->id}")->assertRedirect('/login');
     }
 
     public function test_dpia_approve_requires_authentication(): void
     {
         $dpia = $this->createPIA();
-        $this->post("/privacy/dpia/{$dpia->id}/approve")->assertRedirect('/login');
+        $this->post("/privacy/pia/{$dpia->id}/approve")->assertRedirect('/login');
     }
 
     public function test_dpia_review_requires_authentication(): void
     {
         $dpia = $this->createPIA();
-        $this->post("/privacy/dpia/{$dpia->id}/review")->assertRedirect('/login');
+        $this->post("/privacy/pia/{$dpia->id}/review")->assertRedirect('/login');
     }
 
     public function test_dashboard_requires_authentication(): void
@@ -499,14 +499,14 @@ class PrivacyControllerTest extends TestCase
     public function test_dpia_index_forbidden_without_conduct_dpi_a_permission(): void
     {
         $this->actingAs($this->supportWorker)
-            ->get('/privacy/dpia')
+            ->get('/privacy/pia')
             ->assertForbidden();
     }
 
     public function test_dpia_index_accessible_by_admin(): void
     {
         $this->actingAs($this->admin)
-            ->get('/privacy/dpia')
+            ->get('/privacy/pia')
             ->assertOk();
     }
 
@@ -938,12 +938,12 @@ class PrivacyControllerTest extends TestCase
         $this->assertEquals('under_investigation', $breach->status);
     }
 
-    public function test_breach_notify_ico_records_notification(): void
+    public function test_breach_notify_opc_records_notification(): void
     {
         $breach = $this->createBreach();
 
         $this->actingAs($this->admin)
-            ->post("/privacy/breaches/{$breach->id}/notify-ico", [
+            ->post("/privacy/breaches/{$breach->id}/notify-opc", [
                 'authority_reference' => 'OPC-2026-REF-12345',
             ])
             ->assertRedirect()
@@ -1025,7 +1025,7 @@ class PrivacyControllerTest extends TestCase
 
         // Step 3: Notify OPC
         $this->actingAs($this->admin)
-            ->post("/privacy/breaches/{$breach->id}/notify-ico", [
+            ->post("/privacy/breaches/{$breach->id}/notify-opc", [
                 'authority_reference' => 'OPC-REF-001',
             ])
             ->assertRedirect();
@@ -1099,7 +1099,7 @@ class PrivacyControllerTest extends TestCase
             );
     }
 
-    public function test_breach_ico_notification_timestamp_is_tracked(): void
+    public function test_breach_opc_notification_timestamp_is_tracked(): void
     {
         $breach = $this->createBreach([
             'requires_authority_notification' => true,
@@ -1107,7 +1107,7 @@ class PrivacyControllerTest extends TestCase
         ]);
 
         $this->actingAs($this->admin)
-            ->post("/privacy/breaches/{$breach->id}/notify-ico", [
+            ->post("/privacy/breaches/{$breach->id}/notify-opc", [
                 'authority_reference' => 'OPC-2026-001',
             ])
             ->assertRedirect();
@@ -1265,7 +1265,7 @@ class PrivacyControllerTest extends TestCase
     public function test_dpia_store_creates_assessment(): void
     {
         $this->actingAs($this->admin)
-            ->post('/privacy/dpia', [
+            ->post('/privacy/pia', [
                 'assessment_name' => 'Cloud Migration Assessment',
                 'project_or_process' => 'AWS Cloud Migration',
                 'description' => 'Assessment of migrating data to AWS cloud services.',
@@ -1300,7 +1300,7 @@ class PrivacyControllerTest extends TestCase
         $dpia = $this->createPIA();
 
         $this->actingAs($this->admin)
-            ->get("/privacy/dpia/{$dpia->id}")
+            ->get("/privacy/pia/{$dpia->id}")
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('privacy/dpia/show')
@@ -1313,7 +1313,7 @@ class PrivacyControllerTest extends TestCase
         $dpia = $this->createPIA();
 
         $this->actingAs($this->admin)
-            ->get("/privacy/dpia/{$dpia->id}/edit")
+            ->get("/privacy/pia/{$dpia->id}/edit")
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('privacy/dpia/edit')
@@ -1327,7 +1327,7 @@ class PrivacyControllerTest extends TestCase
         $dpia = $this->createPIA();
 
         $this->actingAs($this->admin)
-            ->put("/privacy/dpia/{$dpia->id}", [
+            ->put("/privacy/pia/{$dpia->id}", [
                 'assessment_name' => 'Updated Assessment Name',
                 'overall_risk_level' => 'high',
             ])
@@ -1344,7 +1344,7 @@ class PrivacyControllerTest extends TestCase
         $dpia = $this->createPIA();
 
         $this->actingAs($this->admin)
-            ->post("/privacy/dpia/{$dpia->id}/approve")
+            ->post("/privacy/pia/{$dpia->id}/approve")
             ->assertRedirect()
             ->assertSessionHas('success');
 
@@ -1359,7 +1359,7 @@ class PrivacyControllerTest extends TestCase
         $dpia = $this->createPIA();
 
         $this->actingAs($this->admin)
-            ->post("/privacy/dpia/{$dpia->id}/review", [
+            ->post("/privacy/pia/{$dpia->id}/review", [
                 'review_notes' => 'Additional safeguards needed for health data processing.',
             ])
             ->assertRedirect()
@@ -1374,7 +1374,7 @@ class PrivacyControllerTest extends TestCase
         $dpia = $this->createPIA();
 
         $this->actingAs($this->admin)
-            ->post("/privacy/dpia/{$dpia->id}/review", [])
+            ->post("/privacy/pia/{$dpia->id}/review", [])
             ->assertSessionHasErrors(['review_notes']);
     }
 
@@ -1390,7 +1390,7 @@ class PrivacyControllerTest extends TestCase
         $this->createPIA(['overall_risk_level' => 'high']);
 
         $this->actingAs($this->admin)
-            ->get('/privacy/dpia')
+            ->get('/privacy/pia')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('stats.high_risk', 2)
@@ -1405,7 +1405,7 @@ class PrivacyControllerTest extends TestCase
         $this->createPIA(['overall_risk_level' => 'high']);
 
         $this->actingAs($this->admin)
-            ->get('/privacy/dpia?risk_level=high')
+            ->get('/privacy/pia?risk_level=high')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->has('dpias.data', 2)
@@ -1419,7 +1419,7 @@ class PrivacyControllerTest extends TestCase
         $this->createPIA(['outcome' => 'requires_dpo_review']);
 
         $this->actingAs($this->admin)
-            ->get('/privacy/dpia?outcome=approved')
+            ->get('/privacy/pia?outcome=approved')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->has('dpias.data', 2)
@@ -1429,7 +1429,7 @@ class PrivacyControllerTest extends TestCase
     public function test_dpia_store_validates_risk_level_values(): void
     {
         $this->actingAs($this->admin)
-            ->post('/privacy/dpia', [
+            ->post('/privacy/pia', [
                 'assessment_name' => 'Test',
                 'project_or_process' => 'Test',
                 'assessment_type' => 'new_project',
@@ -1899,7 +1899,7 @@ class PrivacyControllerTest extends TestCase
     public function test_dpia_store_validates_required_fields(): void
     {
         $this->actingAs($this->admin)
-            ->post('/privacy/dpia', [])
+            ->post('/privacy/pia', [])
             ->assertSessionHasErrors([
                 'assessment_name',
                 'project_or_process',
@@ -1913,7 +1913,7 @@ class PrivacyControllerTest extends TestCase
     public function test_dpia_store_validates_assessment_type_enum(): void
     {
         $this->actingAs($this->admin)
-            ->post('/privacy/dpia', [
+            ->post('/privacy/pia', [
                 'assessment_name' => 'Test',
                 'project_or_process' => 'Test',
                 'assessment_type' => 'invalid_type',
@@ -2162,7 +2162,7 @@ class PrivacyControllerTest extends TestCase
         $this->createPIA(['assessment_name' => 'Other Assessment']);
 
         $this->actingAs($this->admin)
-            ->get('/privacy/dpia?q=Unique')
+            ->get('/privacy/pia?q=Unique')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->has('dpias.data', 1)
@@ -2176,7 +2176,7 @@ class PrivacyControllerTest extends TestCase
         $this->createPIA(['outcome' => null, 'overall_risk_level' => 'medium']);
 
         $this->actingAs($this->admin)
-            ->get('/privacy/dpia')
+            ->get('/privacy/pia')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->where('stats.total', 3)
@@ -2291,7 +2291,7 @@ class PrivacyControllerTest extends TestCase
     public function test_dpia_index_returns_correct_inertia_component(): void
     {
         $this->actingAs($this->admin)
-            ->get('/privacy/dpia')
+            ->get('/privacy/pia')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('privacy/dpia')
@@ -2304,7 +2304,7 @@ class PrivacyControllerTest extends TestCase
     public function test_dpia_create_returns_correct_inertia_component(): void
     {
         $this->actingAs($this->admin)
-            ->get('/privacy/dpia/create')
+            ->get('/privacy/pia/create')
             ->assertOk()
             ->assertInertia(fn ($page) => $page
                 ->component('privacy/dpia/create')

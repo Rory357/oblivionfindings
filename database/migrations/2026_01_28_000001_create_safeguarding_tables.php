@@ -165,7 +165,7 @@ return new class extends Migration
             $table->id();
             $table->foreignId('safeguarding_concern_id')->constrained('safeguarding_concerns')->cascadeOnDelete();
 
-            $table->string('authority_type'); // police, cqc, local_authority, safeguarding_board, coroner, other
+            $table->string('authority_type'); // police, hdc, health_nz, whaikaha, oranga_tamariki, coroner, other
             $table->string('authority_name');
             $table->string('authority_contact')->nullable();
             $table->string('authority_reference')->nullable(); // Their case reference number

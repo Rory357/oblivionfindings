@@ -72,10 +72,15 @@ class RespiteBookingController extends Controller
             'consent_authority_contact' => 'nullable|string|max:255',
             'consent_authority_evidence' => 'nullable|array',
             'cultural_snapshot' => 'nullable|array',
+            'cultural_placement_check' => 'nullable|array',
+            'setting_restriction' => 'nullable|in:none,locked_unit,enhanced_observation,restricted_leave,other',
             'interpreter_arranged' => 'nullable|boolean',
             'copayment_amount' => 'nullable|numeric|min:0',
+            'copayment_basis' => 'nullable|in:none,per_night,fixed',
+            'private_pay_portion' => 'nullable|numeric|min:0',
             'copayment_status' => 'nullable|in:not_applicable,quoted,accepted,invoiced,paid,waived',
             'recurrence_rule' => 'nullable|string|max:255',
+            'series_id' => 'nullable|string|max:100',
             'funding_approved_ref' => 'nullable|string|max:255',
             'funding_approved_at' => 'nullable|date',
         ]);
@@ -92,7 +97,7 @@ class RespiteBookingController extends Controller
                 ]);
             }
 
-            foreach (['funding_source', 'funding_reference', 'service_agreement_id', 'funding_status', 'funding_approved_ref', 'funding_approved_at'] as $field) {
+            foreach (['funding_source', 'funding_reference', 'service_agreement_id', 'funding_status', 'funding_approved_ref', 'funding_approved_at', 'recurrence_rule', 'series_id'] as $field) {
                 $validated[$field] = $validated[$field] ?? $sourceRequest->{$field};
             }
 
@@ -168,10 +173,15 @@ class RespiteBookingController extends Controller
             'consent_authority_contact' => 'nullable|string|max:255',
             'consent_authority_evidence' => 'nullable|array',
             'cultural_snapshot' => 'nullable|array',
+            'cultural_placement_check' => 'nullable|array',
+            'setting_restriction' => 'nullable|in:none,locked_unit,enhanced_observation,restricted_leave,other',
             'interpreter_arranged' => 'nullable|boolean',
             'copayment_amount' => 'nullable|numeric|min:0',
+            'copayment_basis' => 'nullable|in:none,per_night,fixed',
+            'private_pay_portion' => 'nullable|numeric|min:0',
             'copayment_status' => 'nullable|in:not_applicable,quoted,accepted,invoiced,paid,waived',
             'recurrence_rule' => 'nullable|string|max:255',
+            'series_id' => 'nullable|string|max:100',
             'funding_approved_ref' => 'nullable|string|max:255',
             'funding_approved_at' => 'nullable|date',
         ]);

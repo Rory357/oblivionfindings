@@ -34,6 +34,9 @@ class ServiceAgreement extends Model
         'funding_type',
         'service_level',
         'allocated_hours_per_week',
+        'carer_support_days_allocated',
+        'carer_support_days_used',
+        'carer_support_entitlement_year',
         'nasc_assessor_name',
         'nasc_support_package_ref',
         'support_needs_level',
@@ -77,6 +80,8 @@ class ServiceAgreement extends Model
         'hours_used' => 'decimal:2',
         'gst_inclusive' => 'boolean',
         'allocated_hours_per_week' => 'decimal:2',
+        'carer_support_days_allocated' => 'integer',
+        'carer_support_days_used' => 'integer',
         'submitted_for_approval_at' => 'datetime',
         'approved_at' => 'datetime',
         'nasc_assessment_date' => 'date',
@@ -171,6 +176,24 @@ class ServiceAgreement extends Model
         }
 
         return round(($this->hours_used / $this->total_hours) * 100, 1);
+    }
+
+    public function getCarerSupportDaysRemainingAttribute(): ?int
+    {
+        if ($this->carer_support_days_allocated === null) {
+            return null;
+        }
+
+        return (int) $this->carer_support_days_allocated - (int) ($this->carer_support_days_used ?? 0);
+    }
+
+    public function getCarerSupportUtilisationPercentAttribute(): ?float
+    {
+        if (! $this->carer_support_days_allocated || $this->carer_support_days_allocated <= 0) {
+            return null;
+        }
+
+        return round(((int) ($this->carer_support_days_used ?? 0) / (int) $this->carer_support_days_allocated) * 100, 1);
     }
 
     public function scopeActive($query)

@@ -14,7 +14,7 @@ type ClaimItem = {
     unit_price: number;
     total_amount: number;
     service_date: string;
-    ndis_line_item_code?: string | null;
+    funding_contract_reference?: string | null;
 };
 
 type Claim = {
@@ -181,8 +181,8 @@ export default function FundingClaimShow({ claim }: Props) {
                                             <CalendarDays className="h-3 w-3" />
                                             {formatDate(item.service_date)}
                                         </span>
-                                        {item.ndis_line_item_code && (
-                                            <span> • {item.ndis_line_item_code}</span>
+                                        {item.funding_contract_reference && (
+                                            <span> • {item.funding_contract_reference}</span>
                                         )}
                                     </p>
                                 </div>

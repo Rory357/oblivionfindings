@@ -133,9 +133,13 @@ test('discharge posts consumed respite nights to the linked service agreement on
     $agreement = ServiceAgreement::factory()->create([
         'client_id' => $client->id,
         'status' => 'active',
+        'agreement_type' => 'carer_support',
         'daily_rate' => 200,
         'hours_used' => 10,
         'budget_used' => 50,
+        'carer_support_days_allocated' => 10,
+        'carer_support_days_used' => 2,
+        'carer_support_entitlement_year' => '2026-2027',
     ]);
     $booking = RespiteBooking::factory()->create([
         'client_id' => $client->id,
@@ -163,6 +167,8 @@ test('discharge posts consumed respite nights to the linked service agreement on
 
     expect((float) $agreement->hours_used)->toBe(82.0);
     expect((float) $agreement->budget_used)->toBe(650.0);
+    expect($agreement->carer_support_days_used)->toBe(5);
+    expect($agreement->carer_support_days_remaining)->toBe(5);
 
     $this->actingAs($this->admin)
         ->post(route('respite.stays.discharge', $stay->refresh()), [
@@ -174,6 +180,42 @@ test('discharge posts consumed respite nights to the linked service agreement on
 
     expect((float) $agreement->hours_used)->toBe(82.0);
     expect((float) $agreement->budget_used)->toBe(650.0);
+    expect($agreement->carer_support_days_used)->toBe(5);
 
     Carbon::setTestNow();
+});
+
+test('booking readiness gates cultural placement and restrictive setting evidence', function () {
+    $booking = RespiteBooking::factory()->create([
+        'funding_status' => 'approved',
+        'agreement_status' => 'waived',
+        'cultural_snapshot' => [
+            'is_maori' => true,
+            'iwi' => 'Ngāti Porou',
+            'cultural_dietary_needs' => 'Rongoā storage discussed with whānau.',
+        ],
+        'cultural_placement_check' => null,
+        'setting_restriction' => 'secure_locked',
+        'consent_authority_evidence' => [],
+    ]);
+
+    $readiness = collect($booking->readiness()['segments'])->keyBy('key');
+
+    expect($readiness['cultural_placement']['complete'])->toBeFalse();
+    expect($readiness['setting_restriction']['complete'])->toBeFalse();
+
+    $booking->forceFill([
+        'cultural_placement_check' => [
+            'confirmed_by' => $this->admin->id,
+            'notes' => 'Kaupapa fit, whānau connection, and cultural dietary support confirmed.',
+        ],
+        'consent_authority_evidence' => [
+            'setting_restriction_authorised' => true,
+        ],
+    ])->save();
+
+    $readiness = collect($booking->fresh()->readiness()['segments'])->keyBy('key');
+
+    expect($readiness['cultural_placement']['complete'])->toBeTrue();
+    expect($readiness['setting_restriction']['complete'])->toBeTrue();
 });

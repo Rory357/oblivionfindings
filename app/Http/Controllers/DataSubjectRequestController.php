@@ -99,7 +99,7 @@ class DataSubjectRequestController extends Controller
 
         return redirect()
             ->route('privacy.requests.show', $dsr)
-            ->with('success', 'Data subject request created with reference: '.$dsr->reference_number);
+            ->with('success', 'Privacy request created with reference: '.$dsr->reference_number);
     }
 
     /**
@@ -361,8 +361,8 @@ class DataSubjectRequestController extends Controller
             'due_date' => $dsRequest->due_date?->format('Y-m-d'),
         ];
 
-        $filename = 'dsr-'.$dsRequest->reference_number.'-'.now()->format('Y-m-d').'.json';
-        $path = 'private/dsr-exports/'.$filename;
+        $filename = 'privacy-request-'.$dsRequest->reference_number.'-'.now()->format('Y-m-d').'.json';
+        $path = 'private/privacy-request-exports/'.$filename;
         Storage::disk('local')->put($path, json_encode($data, JSON_PRETTY_PRINT));
 
         $dsRequest->update([

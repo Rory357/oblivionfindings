@@ -90,6 +90,9 @@ class RespiteBookingRequestController extends Controller
             'expected_availability_date' => 'nullable|date',
             'is_emergency' => 'nullable|boolean',
             'fast_tracked' => 'nullable|boolean',
+            'series_id' => 'nullable|string|max:100',
+            'recurrence_rule' => 'nullable|string|max:255',
+            'allocated_days' => 'nullable|integer|min:1',
         ]);
 
         $client = Client::findOrFail($validated['client_id']);
@@ -151,6 +154,9 @@ class RespiteBookingRequestController extends Controller
             'expected_availability_date' => 'nullable|date',
             'is_emergency' => 'nullable|boolean',
             'fast_tracked' => 'nullable|boolean',
+            'series_id' => 'nullable|string|max:100',
+            'recurrence_rule' => 'nullable|string|max:255',
+            'allocated_days' => 'nullable|integer|min:1',
             'decision_notes' => 'nullable|string',
         ]);
 
@@ -167,6 +173,9 @@ class RespiteBookingRequestController extends Controller
             'priority' => $validated['priority'] ?? $request->priority,
             'is_emergency' => $validated['is_emergency'] ?? $request->is_emergency,
             'fast_tracked' => $validated['fast_tracked'] ?? $request->fast_tracked,
+            'series_id' => $validated['series_id'] ?? $request->series_id,
+            'recurrence_rule' => $validated['recurrence_rule'] ?? $request->recurrence_rule,
+            'allocated_days' => $validated['allocated_days'] ?? $request->allocated_days,
         ]);
         $validated = array_merge($validated, array_intersect_key($funding, array_flip([
             'funding_source',
@@ -179,6 +188,9 @@ class RespiteBookingRequestController extends Controller
             'priority',
             'is_emergency',
             'fast_tracked',
+            'series_id',
+            'recurrence_rule',
+            'allocated_days',
         ])));
 
         $validated['updated_by'] = auth()->id();
@@ -238,6 +250,8 @@ class RespiteBookingRequestController extends Controller
                 'funding_approved_ref' => $request->funding_approved_ref,
                 'funding_approved_at' => $approvedAt,
                 'approvals' => $approvals ?: $booking->approvals,
+                'series_id' => $request->series_id,
+                'recurrence_rule' => $request->recurrence_rule,
                 'cultural_snapshot' => $request->intake_snapshot['cultural'] ?? null,
                 'interpreter_arranged' => (bool) data_get($request->intake_snapshot, 'cultural.interpreter_arranged', false),
                 'updated_by' => auth()->id(),
@@ -344,6 +358,8 @@ class RespiteBookingRequestController extends Controller
                 'agreement_status' => $this->agreementStatusFor($request->serviceAgreement),
                 'approvals' => $approvals,
                 'capacity_override_reason' => $validated['capacity_override_reason'] ?? null,
+                'series_id' => $request->series_id,
+                'recurrence_rule' => $request->recurrence_rule,
                 'cultural_snapshot' => $request->intake_snapshot['cultural'] ?? null,
                 'interpreter_arranged' => (bool) data_get($request->intake_snapshot, 'cultural.interpreter_arranged', false),
                 'created_by' => $booking->exists ? $booking->created_by : auth()->id(),

@@ -46,7 +46,7 @@ return new class extends Migration
             $table->index(['model_type', 'active']);
         });
 
-        // Data subject requests (Privacy Act 2020)
+        // Privacy requests (Privacy Act 2020)
         Schema::create('data_subject_requests', function (Blueprint $table) {
             $table->id();
             $table->string('reference_number')->unique();

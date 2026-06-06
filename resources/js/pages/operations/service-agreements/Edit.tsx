@@ -133,6 +133,9 @@ type Props = {
         funding_type: string | null;
         service_level: string | null;
         allocated_hours_per_week: number | null;
+        carer_support_days_allocated: number | null;
+        carer_support_days_used: number | null;
+        carer_support_entitlement_year: string | null;
         total_hours: number | null;
         gst_inclusive: boolean;
         whaikaha_reference: string | null;
@@ -174,6 +177,9 @@ export default function ServiceAgreementEdit({ agreement, clients }: Props) {
         funding_type: agreement.funding_type ?? '',
         service_level: agreement.service_level ?? '',
         allocated_hours_per_week: agreement.allocated_hours_per_week != null ? String(agreement.allocated_hours_per_week) : '',
+        carer_support_days_allocated: agreement.carer_support_days_allocated != null ? String(agreement.carer_support_days_allocated) : '',
+        carer_support_days_used: agreement.carer_support_days_used != null ? String(agreement.carer_support_days_used) : '',
+        carer_support_entitlement_year: agreement.carer_support_entitlement_year ?? '',
         total_hours: agreement.total_hours != null ? String(agreement.total_hours) : '',
         gst_inclusive: agreement.gst_inclusive ?? true,
         whaikaha_reference: agreement.whaikaha_reference ?? '',
@@ -507,6 +513,20 @@ export default function ServiceAgreementEdit({ agreement, clients }: Props) {
                                                 ))}
                                             </SelectContent>
                                         </Select>
+                                    </div>
+                                </div>
+                                <div className="grid gap-4 sm:grid-cols-3">
+                                    <div className="space-y-1.5">
+                                        <Label>Carer Support Days Allocated</Label>
+                                        <Input type="number" step="1" min="0" value={data.carer_support_days_allocated} onChange={(e) => setData('carer_support_days_allocated', e.target.value)} placeholder="0" />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label>Carer Support Days Used</Label>
+                                        <Input type="number" step="1" min="0" value={data.carer_support_days_used} onChange={(e) => setData('carer_support_days_used', e.target.value)} placeholder="0" />
+                                    </div>
+                                    <div className="space-y-1.5">
+                                        <Label>Entitlement Year</Label>
+                                        <Input value={data.carer_support_entitlement_year} onChange={(e) => setData('carer_support_entitlement_year', e.target.value)} placeholder="2026-2027" />
                                     </div>
                                 </div>
                                 <div className="grid gap-4 sm:grid-cols-2">

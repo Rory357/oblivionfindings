@@ -3,6 +3,8 @@
 namespace Tests\Feature\Respite;
 
 use App\Models\Client;
+use App\Models\ClientConsent;
+use App\Models\ConsentType;
 use App\Models\FamilyPortalSetting;
 use App\Models\RespiteBooking;
 use App\Models\Role;
@@ -110,5 +112,44 @@ class RespitePortalVisibilityTest extends TestCase
             ->assertInertia(fn ($page) => $page
                 ->where('upcomingRespite', [])
             );
+    }
+
+    public function test_withdrawing_family_information_consent_disables_sensitive_portal_surfaces(): void
+    {
+        FamilyPortalSetting::create([
+            'client_id' => $this->client->id,
+            'show_shift_schedule' => true,
+            'show_respite' => true,
+            'show_care_notes' => true,
+            'show_incidents' => true,
+        ]);
+
+        $consentType = ConsentType::factory()->create([
+            'name' => 'Information Sharing with Whānau / Family',
+            'category' => 'communication',
+        ]);
+
+        $consent = ClientConsent::create([
+            'client_id' => $this->client->id,
+            'consent_type_id' => $consentType->id,
+            'status' => 'given',
+            'given_at' => now(),
+            'given_method' => 'written',
+            'given_by_relationship' => 'guardian',
+            'given_by_user_id' => $this->portalUser->id,
+        ]);
+
+        $consent->update([
+            'status' => 'withdrawn',
+            'withdrawn_at' => now(),
+            'withdrawal_reason' => 'Client withdrew portal sharing consent.',
+        ]);
+
+        $setting = FamilyPortalSetting::where('client_id', $this->client->id)->firstOrFail();
+
+        $this->assertFalse($setting->show_respite);
+        $this->assertFalse($setting->show_care_notes);
+        $this->assertFalse($setting->show_incidents);
+        $this->assertTrue($setting->show_shift_schedule);
     }
 }

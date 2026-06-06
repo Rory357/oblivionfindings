@@ -22,7 +22,7 @@ class ServiceAgreementLineItem extends Model
         'budget_allocated',
         'budget_used',
         'category',
-        'ndis_line_item_code',
+        'funding_contract_reference',
     ];
 
     protected $casts = [

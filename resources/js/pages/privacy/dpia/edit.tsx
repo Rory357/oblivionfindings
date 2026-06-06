@@ -73,7 +73,7 @@ export default function EditPIA({ dpia, staff: _staff }: Props) {
             description: data.description || null,
         };
         form.transform(() => payload);
-        form.put(`/privacy/dpia/${dpia.id}`, {
+        form.put(`/privacy/pia/${dpia.id}`, {
             onFinish: () => form.transform((d) => d),
         });
     };
@@ -81,8 +81,8 @@ export default function EditPIA({ dpia, staff: _staff }: Props) {
     return (
         <AppLayout breadcrumbs={[
             { title: 'Privacy', href: '/privacy/dashboard' },
-            { title: 'Impact Assessments', href: '/privacy/dpia' },
-            { title: dpia.assessment_name, href: `/privacy/dpia/${dpia.id}/edit` },
+            { title: 'Impact Assessments', href: '/privacy/pia' },
+            { title: dpia.assessment_name, href: `/privacy/pia/${dpia.id}/edit` },
         ]}>
             <Head title={`Edit PIA - ${dpia.assessment_name}`} />
 
@@ -90,7 +90,7 @@ export default function EditPIA({ dpia, staff: _staff }: Props) {
                 hero={
                     <PageHero
                         variant="compact"
-                        backHref="/privacy/dpia"
+                        backHref="/privacy/pia"
                         title="Edit PIA"
                         description={`Outcome: ${dpia.outcome ? dpia.outcome.replace(/_/g, ' ') : 'Pending review'}`}
                     />

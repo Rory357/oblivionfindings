@@ -7,6 +7,7 @@ use App\Events\Respite\RespiteEvent;
 use App\Http\Controllers\Controller;
 use App\Models\ClientIncident;
 use App\Models\ClientMedication;
+use App\Models\DataBreachLog;
 use App\Models\RespiteBooking;
 use App\Models\RespiteMedicationReconciliation;
 use App\Models\RespiteStay;
@@ -145,6 +146,46 @@ class RespiteStayController extends Controller
         ]));
 
         return back()->with('success', 'Stay extended.');
+    }
+
+    public function recordBedHold(Request $request, RespiteStay $stay): RedirectResponse
+    {
+        $stay->loadMissing('client');
+        $this->authorize('view', $stay->client);
+
+        $validated = $request->validate([
+            'bed_hold_status' => 'required|in:held,released,cancelled',
+            'bed_hold_reason' => 'nullable|in:cultural_leave,whanau_visit,hospital_transfer,home_visit,other',
+            'bed_hold_until' => 'nullable|date',
+            'absence_record' => 'nullable|array',
+        ]);
+
+        $absenceRecords = $stay->absence_records ?? [];
+        if (! empty($validated['absence_record'])) {
+            $absenceRecords[] = [
+                ...$validated['absence_record'],
+                'bed_hold_status' => $validated['bed_hold_status'],
+                'bed_hold_reason' => $validated['bed_hold_reason'] ?? null,
+                'recorded_by' => auth()->id(),
+                'recorded_at' => now()->toIso8601String(),
+            ];
+        }
+
+        $stay->update([
+            'bed_hold_status' => $validated['bed_hold_status'],
+            'bed_hold_reason' => $validated['bed_hold_reason'] ?? null,
+            'bed_hold_until' => $validated['bed_hold_until'] ?? null,
+            'absence_records' => $absenceRecords,
+            'updated_by' => auth()->id(),
+        ]);
+
+        event(new RespiteEvent('respite.stay.bed_hold_recorded', [
+            'id' => $stay->id,
+            'client_id' => $stay->client_id,
+            'status' => $validated['bed_hold_status'],
+        ]));
+
+        return back()->with('success', 'Bed hold updated.');
     }
 
     public function discharge(Request $request, RespiteStay $stay): RedirectResponse
@@ -298,6 +339,25 @@ class RespiteStayController extends Controller
             ]);
         }
 
+        if (($validated['incident_type'] ?? null) === 'privacy_breach') {
+            DataBreachLog::create([
+                'breach_reference' => $this->nextBreachReference(),
+                'breach_type' => 'respite_stay',
+                'severity' => $validated['severity'],
+                'discovered_at' => $incident->occurred_at ?? now(),
+                'discovered_by_user_id' => auth()->id(),
+                'nature_of_breach' => $validated['title']."\n\n".$validated['description'],
+                'affected_data_categories' => ['health_information', 'respite_record'],
+                'approximate_individuals_affected' => 1,
+                'likely_consequences' => '',
+                'measures_taken' => $validated['immediate_action_taken'] ?? '',
+                'requires_authority_notification' => ($validated['notification_authority'] ?? null) === 'privacy_commissioner' || (bool) ($validated['is_notifiable'] ?? false),
+                'requires_subject_notification' => false,
+                'status' => 'discovered',
+                'created_by' => auth()->id(),
+            ]);
+        }
+
         event(new RespiteEvent('respite.stay.incident_recorded', [
             'id' => $incident->id,
             'stay_id' => $stay->id,
@@ -333,10 +393,26 @@ class RespiteStayController extends Controller
             $budget = $hours * (float) $agreement->hourly_rate;
         }
 
-        $agreement->forceFill([
+        $updates = [
             'hours_used' => (float) ($agreement->hours_used ?? 0) + $hours,
             'budget_used' => (float) ($agreement->budget_used ?? 0) + $budget,
-        ])->save();
+        ];
+
+        if ($agreement->agreement_type === 'carer_support' || $agreement->funding_type === 'carer_support') {
+            $updates['carer_support_days_used'] = (int) ($agreement->carer_support_days_used ?? 0) + $nights;
+        }
+
+        $agreement->forceFill($updates)->save();
+    }
+
+    private function nextBreachReference(): string
+    {
+        return 'BR-'.now()->year.'-'.str_pad(
+            DataBreachLog::whereYear('created_at', now()->year)->count() + 1,
+            4,
+            '0',
+            STR_PAD_LEFT
+        );
     }
 
     private function guardAdmissionMedicationReconciliation(RespiteStay $stay, ?string $overrideReason): void

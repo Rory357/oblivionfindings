@@ -218,7 +218,7 @@ const Pricing: React.FC = () => {
                                 ) : (
                                     <div className="flex items-baseline gap-1">
                                         <span className="text-muted-foreground">
-                                            £
+                                            $
                                         </span>
                                         <span className="text-4xl font-bold text-foreground">
                                             {plan.price}

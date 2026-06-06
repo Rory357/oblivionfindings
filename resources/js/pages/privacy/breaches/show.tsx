@@ -291,13 +291,13 @@ export default function ShowDataBreach({ breach }: Props) {
                                     <Button
                                         size="sm"
                                         variant="destructive"
-                                        data-test="privacy-breach-notify-ico"
+                                        data-test="privacy-breach-notify-opc"
                                         onClick={() => {
                                             const reference = prompt(
                                                 'Enter OPC reference number (if available):',
                                             );
                                             router.post(
-                                                `/privacy/breaches/${breach.id}/notify-ico`,
+                                                `/privacy/breaches/${breach.id}/notify-opc`,
                                                 {
                                                     authority_reference:
                                                         reference || '',

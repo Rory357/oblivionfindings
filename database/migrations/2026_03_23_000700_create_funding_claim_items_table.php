@@ -20,7 +20,7 @@ return new class extends Migration
             $table->decimal('unit_price', 8, 2);
             $table->decimal('total_amount', 12, 2);
             $table->date('service_date');
-            $table->string('ndis_line_item_code')->nullable();
+            $table->string('funding_contract_reference')->nullable();
             $table->timestamps();
 
             $table->foreign('service_agreement_line_item_id', 'fci_sali_foreign')

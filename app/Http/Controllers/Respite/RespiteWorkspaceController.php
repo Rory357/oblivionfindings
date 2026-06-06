@@ -54,7 +54,7 @@ class RespiteWorkspaceController extends Controller
                 'client.site:id,name',
                 'serviceContext:id,name',
                 'approvedBy:id,name',
-                'serviceAgreement:id,client_id,title,reference_number,status,ends_at,signed_at,signed_date,review_due_date,total_budget,budget_used,total_hours,hours_used',
+                'serviceAgreement:id,client_id,title,reference_number,status,ends_at,signed_at,signed_date,review_due_date,total_budget,budget_used,total_hours,hours_used,carer_support_days_allocated,carer_support_days_used,carer_support_entitlement_year',
             ])
             ->orderByDesc('requested_start')
             ->limit(self::LIST_CAP)
@@ -77,7 +77,7 @@ class RespiteWorkspaceController extends Controller
                 'client.medications' => fn ($q) => $q->active()->select('id', 'client_id'),
                 'coordinator:id,name',
                 'location:id,name',
-                'serviceAgreement:id,client_id,title,reference_number,status,ends_at,signed_at,signed_date,review_due_date,total_budget,budget_used,total_hours,hours_used',
+                'serviceAgreement:id,client_id,title,reference_number,status,ends_at,signed_at,signed_date,review_due_date,total_budget,budget_used,total_hours,hours_used,carer_support_days_allocated,carer_support_days_used,carer_support_entitlement_year',
             ])
             ->withCount('stays')
             ->orderByDesc('start_at')
@@ -292,6 +292,9 @@ class RespiteWorkspaceController extends Controller
             'expectedAvailabilityDate' => optional($rq->expected_availability_date)->toDateString(),
             'isEmergency' => (bool) $rq->is_emergency,
             'fastTracked' => (bool) $rq->fast_tracked,
+            'seriesId' => $rq->series_id,
+            'recurrenceRule' => $rq->recurrence_rule,
+            'allocatedDays' => $rq->allocated_days,
             'carer' => $rq->intake_snapshot['carer'] ?? null,
             'cultural' => $rq->intake_snapshot['cultural'] ?? null,
             'site' => $client?->site?->name,
@@ -332,10 +335,15 @@ class RespiteWorkspaceController extends Controller
             'agreementStatus' => $b->agreement_status,
             'consentAuthority' => $b->consent_authority,
             'culturalSnapshot' => $b->cultural_snapshot,
+            'culturalPlacementCheck' => $b->cultural_placement_check,
+            'settingRestriction' => $b->setting_restriction,
             'interpreterArranged' => (bool) $b->interpreter_arranged,
             'copaymentAmount' => $b->copayment_amount !== null ? (float) $b->copayment_amount : null,
+            'copaymentBasis' => $b->copayment_basis,
+            'privatePayPortion' => $b->private_pay_portion !== null ? (float) $b->private_pay_portion : null,
             'copaymentStatus' => $b->copayment_status,
             'recurrenceRule' => $b->recurrence_rule,
+            'seriesId' => $b->series_id,
             'criticalAlerts' => $this->criticalAlerts($client),
             'readiness' => $readiness['score'],
             'readinessSegments' => $readiness['segments'],
@@ -360,6 +368,9 @@ class RespiteWorkspaceController extends Controller
             'actualEnd' => optional($s->actual_end)->toIso8601String(),
             'plannedEnd' => optional($s->booking?->end_at)->toIso8601String(),
             'dischargeReason' => $s->discharge_reason,
+            'bedHoldStatus' => $s->bed_hold_status,
+            'bedHoldReason' => $s->bed_hold_reason,
+            'bedHoldUntil' => optional($s->bed_hold_until)->toIso8601String(),
             'unreviewedRestraints' => (int) ($s->unreviewed_restraint_count ?? 0),
             'openIncidents' => (int) ($s->open_incident_count ?? 0),
             'criticalAlerts' => $this->criticalAlerts($client),
@@ -421,6 +432,10 @@ class RespiteWorkspaceController extends Controller
             'reviewDueDate' => optional($agreement->review_due_date)->toDateString(),
             'budgetRemaining' => (float) $agreement->budget_remaining,
             'hoursRemaining' => (float) $agreement->hours_remaining,
+            'carerSupportDaysAllocated' => $agreement->carer_support_days_allocated,
+            'carerSupportDaysUsed' => $agreement->carer_support_days_used,
+            'carerSupportDaysRemaining' => $agreement->carer_support_days_remaining,
+            'carerSupportEntitlementYear' => $agreement->carer_support_entitlement_year,
         ];
     }
 

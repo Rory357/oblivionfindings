@@ -87,7 +87,7 @@ class SiteComplianceController extends Controller
         $this->authorize('update', $site);
 
         $validated = $request->validate([
-            'certification_type' => 'required|string|in:dss_certification,hswa_compliance,fire_safety,building_wof,food_safety,first_aid,civil_defence,infection_control,medication_management,restraint_minimisation,cultural_safety,other',
+            'certification_type' => 'required|string|in:healthcert_certification,hswa_compliance,fire_safety,building_wof,food_safety,first_aid,civil_defence,infection_control,medication_management,restraint_minimisation,cultural_safety,other',
             'name' => 'required|string|max:255',
             'issuing_body' => 'nullable|string|max:255',
             'reference_number' => 'nullable|string|max:100',
@@ -116,7 +116,7 @@ class SiteComplianceController extends Controller
         abort_if($certification->site_id !== $site->id, 404);
 
         $validated = $request->validate([
-            'certification_type' => 'sometimes|required|string|in:dss_certification,hswa_compliance,fire_safety,building_wof,food_safety,first_aid,civil_defence,infection_control,medication_management,restraint_minimisation,cultural_safety,other',
+            'certification_type' => 'sometimes|required|string|in:healthcert_certification,hswa_compliance,fire_safety,building_wof,food_safety,first_aid,civil_defence,infection_control,medication_management,restraint_minimisation,cultural_safety,other',
             'name' => 'sometimes|required|string|max:255',
             'issuing_body' => 'nullable|string|max:255',
             'reference_number' => 'nullable|string|max:100',

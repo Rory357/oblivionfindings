@@ -89,6 +89,10 @@ function buildRows(detail: RespiteDetail): Row[] {
             ['Agreement', agreementLabel(r.serviceAgreement)],
             ['Priority', r.priority ?? '—'],
             ['Waitlist', r.waitlistPosition ? `#${r.waitlistPosition}` : '—'],
+            ['Expected availability', fmtDate(r.expectedAvailabilityDate)],
+            ['Allocated days', r.allocatedDays?.toString() ?? '—'],
+            ['Recurring block', r.recurrenceRule ?? '—'],
+            ['Series', r.seriesId ?? '—'],
             [
                 'Emergency fast-track',
                 r.isEmergency
@@ -129,10 +133,16 @@ function buildRows(detail: RespiteDetail): Row[] {
             [
                 'Co-payment',
                 b.copaymentAmount != null
-                    ? `$${b.copaymentAmount.toFixed(2)} · ${b.copaymentStatus ?? 'not recorded'}`
+                    ? `$${b.copaymentAmount.toFixed(2)} · ${b.copaymentBasis ?? 'none'} · ${b.copaymentStatus ?? 'not recorded'}`
                     : '—',
             ],
+            [
+                'Private pay portion',
+                b.privatePayPortion != null ? `$${b.privatePayPortion.toFixed(2)}` : '—',
+            ],
             ['Recurring block', b.recurrenceRule ?? '—'],
+            ['Series', b.seriesId ?? '—'],
+            ['Setting restriction', b.settingRestriction?.replace(/_/g, ' ') ?? '—'],
             ['Critical alerts', criticalAlertLabel(b.criticalAlerts)],
             ['Pre-stay readiness', `${b.readiness}%`],
             [
@@ -147,6 +157,8 @@ function buildRows(detail: RespiteDetail): Row[] {
     return [
         ['Home', s.site ?? '—'],
         ['Critical alerts', criticalAlertLabel(s.criticalAlerts)],
+        ['Bed hold', s.bedHoldStatus?.replace(/_/g, ' ') ?? '—'],
+        ['Bed hold until', fmtDate(s.bedHoldUntil)],
         [
             'Admission med-rec',
             s.requiresAdmissionMedRec
@@ -178,6 +190,8 @@ function agreementLabel(
         title: string | null;
         referenceNumber: string | null;
         hoursRemaining: number;
+        carerSupportDaysRemaining?: number | null;
+        carerSupportEntitlementYear?: string | null;
         signedDate?: string | null;
     } | null,
 ): string {
@@ -185,6 +199,13 @@ function agreementLabel(
 
     const title =
         agreement.referenceNumber ?? agreement.title ?? 'Linked agreement';
+    const entitlement = agreement.carerSupportEntitlementYear
+        ? ` · ${agreement.carerSupportEntitlementYear}`
+        : '';
+
+    if (agreement.carerSupportDaysRemaining !== null && agreement.carerSupportDaysRemaining !== undefined) {
+        return `${title} · ${agreement.carerSupportDaysRemaining}d left${entitlement}${agreement.signedDate ? ' · signed' : ''}`;
+    }
 
     return `${title} · ${agreement.hoursRemaining}h left${agreement.signedDate ? ' · signed' : ''}`;
 }

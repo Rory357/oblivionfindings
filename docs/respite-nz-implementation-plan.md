@@ -205,3 +205,38 @@ booking; funding-expiry/unverified-funding **overview lane** (reuse `ServiceAgre
 P1 funding (1) → admission med-rec/alerts (3) → compliance wiring (4) → consent/PPPR (5) → cultural (6)
 → carer/crisis (7) → status/occupancy (2) → data/privacy (8) → fast-follows (9). Re-sequence to taste,
 but Phase 1 and the localisation pass come first.
+
+## Codex completion note - 2026-06-06
+
+Implemented in this pass:
+
+- Completed the localisation follow-through required before this plan: stale NDIS/DSS/GDPR/ICO/CQC
+  references were removed from app code, tests, seeders and routes; old browser paths were localised to
+  PIA/OPC.
+- Finished the remaining Phase 5 consent binding: withdrawal of active family information consent now
+  shuts off sensitive family-portal surfaces, and settings cannot re-enable them without active consent.
+- Finished the Phase 8 privacy linkage: respite privacy incidents now create a `DataBreachLog` entry for
+  OPC assessment.
+- Finished Phase 9 fast-follows: recurring series metadata, co-payment/private-pay fields, cultural
+  placement checks, restrictive-setting context, cultural leave/bed-hold fields and action, funding
+  attention lane, and Carer Support day burn-down are now implemented.
+- Made the readiness ring enforce the new cultural placement and restrictive-setting checks instead of
+  only storing their data.
+- Added Carer Support day counters (`carer_support_days_allocated`,
+  `carer_support_days_used`, `carer_support_entitlement_year`) to service agreements, surfaced them in
+  create/edit/show screens and respite agreement summaries, and incremented used days once on stay
+  discharge.
+
+Verification completed:
+
+- `php artisan test tests/Feature/Respite/RespiteFundingCompletionTest.php --stop-on-failure --debug`
+  passed: 5 tests, 32 assertions.
+- `php artisan test tests/Feature/Respite/RespiteActionsTest.php --stop-on-failure --debug`
+  passed: 4 tests, 14 assertions.
+- `php artisan test tests/Feature/Respite/RespitePortalVisibilityTest.php --filter test_withdrawing_family_information_consent_disables_sensitive_portal_surfaces --stop-on-failure --debug`
+  passed: 1 test, 4 assertions.
+- `php artisan test tests/Feature/Respite/RespiteIntakeTest.php --filter "intake rejects a funding source outside the NZ list" --stop-on-failure --debug`
+  passed: 1 test, 2 assertions.
+- `php -l` passed for all changed PHP files.
+- `npm run types` passed.
+- `npm run build` passed.
