@@ -8,6 +8,7 @@ use App\Jobs\EnforceDataRetentionJob;
 use App\Models\Client;
 use App\Models\DataRetentionPolicy;
 use App\Models\LegalHold;
+use App\Models\RespiteReferral;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Facades\Storage;
@@ -104,6 +105,40 @@ class EnforceDataRetentionJobTest extends TestCase
         $this->assertFalse(Client::withTrashed()->findOrFail($client->id)->trashed());
     }
 
+    public function test_retention_conditions_filter_declined_never_converted_respite_referrals(): void
+    {
+        Carbon::setTestNow('2026-05-01 10:00:00');
+
+        $declined = $this->oldReferral([
+            'status' => 'declined',
+            'linked_booking_request_id' => null,
+        ]);
+        $accepted = $this->oldReferral([
+            'status' => 'accepted',
+            'linked_booking_request_id' => null,
+        ]);
+        $converted = $this->oldReferral([
+            'status' => 'declined',
+            'linked_booking_request_id' => 123,
+        ]);
+
+        $this->policy([
+            'model_type' => RespiteReferral::class,
+            'policy_name' => 'Declined respite referral disposal',
+            'retention_period_years' => 1,
+            'retention_conditions' => [
+                'status' => 'declined',
+                'linked_booking_request_id' => null,
+            ],
+        ]);
+
+        (new EnforceDataRetentionJob)->handle();
+
+        $this->assertTrue(RespiteReferral::withTrashed()->findOrFail($declined->id)->trashed());
+        $this->assertFalse(RespiteReferral::withTrashed()->findOrFail($accepted->id)->trashed());
+        $this->assertFalse(RespiteReferral::withTrashed()->findOrFail($converted->id)->trashed());
+    }
+
     public function test_finance_audit_exports_are_pruned_by_finance_job(): void
     {
         Carbon::setTestNow('2026-05-01 10:00:00');
@@ -161,6 +196,24 @@ class EnforceDataRetentionJobTest extends TestCase
             'active_case_exemption' => false,
             'active' => true,
         ], $attributes));
+    }
+
+    private function oldReferral(array $attributes = []): RespiteReferral
+    {
+        $referral = RespiteReferral::query()->create(array_merge([
+            'client_id' => Client::factory()->create()->id,
+            'referrer_name' => 'NASC coordinator',
+            'referral_reason' => 'Planned respite support',
+            'status' => 'received',
+            'received_at' => now()->subYears(2),
+        ], $attributes));
+
+        $referral->forceFill([
+            'created_at' => now()->subYears(2),
+            'updated_at' => now()->subYears(2),
+        ])->save();
+
+        return $referral;
     }
 
     private function auditExport(string $path, string $status, Carbon $generatedAt): FinAuditExport

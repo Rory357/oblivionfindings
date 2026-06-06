@@ -5,9 +5,12 @@ namespace Tests\Feature\Respite;
 use App\Domain\Governance\Models\NotifiableIncident;
 use App\Models\Client;
 use App\Models\ClientIncident;
+use App\Models\DataRetentionPolicy;
 use App\Models\RespiteBooking;
 use App\Models\RespiteBookingRequest;
+use App\Models\RespiteDailyNote;
 use App\Models\RespiteEvidencePack;
+use App\Models\RespiteMedicationReconciliation;
 use App\Models\RespiteReferral;
 use App\Models\RespiteStay;
 use App\Models\RestraintEvent;
@@ -16,6 +19,7 @@ use App\Models\ServiceContext;
 use App\Models\Site;
 use App\Models\User;
 use Database\Seeders\RbacSeeder;
+use Database\Seeders\RespiteRetentionPolicySeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Illuminate\Support\Carbon;
 use Tests\TestCase;
@@ -292,5 +296,42 @@ class RespiteNzWorkflowCompletionTest extends TestCase
             ])
             ->assertRedirect()
             ->assertSessionHasNoErrors();
+    }
+
+    public function test_respite_retention_policy_seeder_creates_health_record_and_declined_referral_windows(): void
+    {
+        $this->seed(RespiteRetentionPolicySeeder::class);
+
+        $healthRecordModels = [
+            RespiteReferral::class,
+            RespiteBookingRequest::class,
+            RespiteBooking::class,
+            RespiteStay::class,
+            RespiteDailyNote::class,
+            RespiteEvidencePack::class,
+            RespiteMedicationReconciliation::class,
+        ];
+
+        foreach ($healthRecordModels as $modelType) {
+            $this->assertDatabaseHas('data_retention_policies', [
+                'model_type' => $modelType,
+                'retention_period_years' => 10,
+                'hard_delete_after_years' => 12,
+                'active_case_exemption' => false,
+                'active' => true,
+            ]);
+        }
+
+        $declinedPolicy = DataRetentionPolicy::query()
+            ->where('model_type', RespiteReferral::class)
+            ->where('policy_name', 'Declined respite referral disposal')
+            ->firstOrFail();
+
+        $this->assertSame(2, $declinedPolicy->retention_period_years);
+        $this->assertSame(3, $declinedPolicy->hard_delete_after_years);
+        $this->assertSame([
+            'status' => 'declined',
+            'linked_booking_request_id' => null,
+        ], $declinedPolicy->retention_conditions);
     }
 }

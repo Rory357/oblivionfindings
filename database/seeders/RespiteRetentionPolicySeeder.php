@@ -4,6 +4,9 @@ namespace Database\Seeders;
 
 use App\Models\RespiteBooking;
 use App\Models\RespiteBookingRequest;
+use App\Models\RespiteDailyNote;
+use App\Models\RespiteEvidencePack;
+use App\Models\RespiteMedicationReconciliation;
 use App\Models\RespiteReferral;
 use App\Models\RespiteStay;
 use Illuminate\Database\Seeder;
@@ -19,20 +22,91 @@ class RespiteRetentionPolicySeeder extends Seeder
         }
 
         $now = now();
+        $healthRecordDescription = 'NZ respite health record retention policy seeded from the respite implementation plan.';
+
         $policies = [
-            [RespiteReferral::class, 'Respite referrals and declined intake records', 10, ['health_record' => true]],
-            [RespiteBookingRequest::class, 'Respite booking requests', 10, ['health_record' => true]],
-            [RespiteBooking::class, 'Respite bookings and funding records', 10, ['health_record' => true]],
-            [RespiteStay::class, 'Respite stay records', 10, ['health_record' => true]],
+            [
+                'model_type' => RespiteReferral::class,
+                'policy_name' => 'Declined respite referral disposal',
+                'description' => 'Shorter NZ HIPC Rule 9 disposal window for declined respite referrals that never converted to a booking request.',
+                'retention_period_years' => 2,
+                'hard_delete_after_years' => 3,
+                'retention_conditions' => ['status' => 'declined', 'linked_booking_request_id' => null],
+            ],
+            [
+                'model_type' => RespiteReferral::class,
+                'policy_name' => 'Respite referral health records',
+                'description' => $healthRecordDescription,
+                'retention_period_years' => 10,
+                'hard_delete_after_years' => 12,
+                'retention_conditions' => null,
+            ],
+            [
+                'model_type' => RespiteBookingRequest::class,
+                'policy_name' => 'Respite booking request health records',
+                'description' => $healthRecordDescription,
+                'retention_period_years' => 10,
+                'hard_delete_after_years' => 12,
+                'retention_conditions' => null,
+            ],
+            [
+                'model_type' => RespiteBooking::class,
+                'policy_name' => 'Respite booking and funding records',
+                'description' => $healthRecordDescription,
+                'retention_period_years' => 10,
+                'hard_delete_after_years' => 12,
+                'retention_conditions' => null,
+            ],
+            [
+                'model_type' => RespiteStay::class,
+                'policy_name' => 'Respite stay health records',
+                'description' => $healthRecordDescription,
+                'retention_period_years' => 10,
+                'hard_delete_after_years' => 12,
+                'retention_conditions' => null,
+            ],
+            [
+                'model_type' => RespiteDailyNote::class,
+                'policy_name' => 'Respite daily note health records',
+                'description' => $healthRecordDescription,
+                'retention_period_years' => 10,
+                'hard_delete_after_years' => 12,
+                'retention_conditions' => null,
+            ],
+            [
+                'model_type' => RespiteEvidencePack::class,
+                'policy_name' => 'Respite evidence pack health records',
+                'description' => $healthRecordDescription,
+                'retention_period_years' => 10,
+                'hard_delete_after_years' => 12,
+                'retention_conditions' => null,
+            ],
+            [
+                'model_type' => RespiteMedicationReconciliation::class,
+                'policy_name' => 'Respite medication reconciliation health records',
+                'description' => $healthRecordDescription,
+                'retention_period_years' => 10,
+                'hard_delete_after_years' => 12,
+                'retention_conditions' => null,
+            ],
         ];
 
-        foreach ($policies as [$model, $name, $years, $conditions]) {
+        foreach ($policies as $policy) {
             DB::table('data_retention_policies')->updateOrInsert(
-                ['model_type' => $model, 'policy_name' => $name],
+                ['model_type' => $policy['model_type'], 'policy_name' => $policy['policy_name']],
                 [
-                    'description' => 'NZ respite health record retention policy seeded from the respite implementation plan.',
-                    'retention_period_years' => $years,
-                    'retention_conditions' => json_encode($conditions),
+                    'description' => $policy['description'],
+                    'retention_period_years' => $policy['retention_period_years'],
+                    'archive_after_years' => null,
+                    'hard_delete_after_years' => $policy['hard_delete_after_years'],
+                    'retention_conditions' => $policy['retention_conditions'] === null
+                        ? null
+                        : json_encode($policy['retention_conditions']),
+                    'legal_basis' => 'Health (Retention of Health Information) Regulations 1996; HIPC 2020 Rule 9.',
+                    'business_justification' => 'Retain respite health records for audit and continuity of care while disposing of declined never-converted referrals sooner.',
+                    'applies_to_soft_deleted' => true,
+                    'legal_hold_exemption' => true,
+                    'active_case_exemption' => false,
                     'active' => true,
                     'updated_at' => $now,
                     'created_at' => $now,

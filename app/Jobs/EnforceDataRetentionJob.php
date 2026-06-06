@@ -14,6 +14,7 @@ use Illuminate\Queue\InteractsWithQueue;
 use Illuminate\Queue\SerializesModels;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
+use Illuminate\Support\Facades\Schema;
 
 class EnforceDataRetentionJob implements ShouldQueue
 {
@@ -59,6 +60,7 @@ class EnforceDataRetentionJob implements ShouldQueue
             $query = $modelClass::where($createdAtColumn, '<', $cutoff)
                 ->whereNull($model->getTable().'.deleted_at');
 
+            $this->applyRetentionConditions($query, $policy, $model);
             $this->applyExemptions($query, $policy, $modelClass);
 
             $recordsToSoftDelete = $query->get();
@@ -93,6 +95,7 @@ class EnforceDataRetentionJob implements ShouldQueue
 
             $query->where($createdAtColumn, '<', $hardCutoff);
 
+            $this->applyRetentionConditions($query, $policy, $model);
             $this->applyExemptions($query, $policy, $modelClass);
 
             $recordsToAnonymize = $query->get();
@@ -121,6 +124,7 @@ class EnforceDataRetentionJob implements ShouldQueue
             $query = $modelClass::where($createdAtColumn, '<', $archiveCutoff)
                 ->whereNull($model->getTable().'.deleted_at');
 
+            $this->applyRetentionConditions($query, $policy, $model);
             $this->applyExemptions($query, $policy, $modelClass);
 
             $recordsToArchive = $query->get();
@@ -144,6 +148,61 @@ class EnforceDataRetentionJob implements ShouldQueue
 
         // Update last_applied_at timestamp
         $policy->update(['last_applied_at' => now()]);
+    }
+
+    private function applyRetentionConditions($query, DataRetentionPolicy $policy, object $model): void
+    {
+        if (! is_array($policy->retention_conditions) || $policy->retention_conditions === []) {
+            return;
+        }
+
+        $table = $model->getTable();
+
+        foreach ($policy->retention_conditions as $field => $value) {
+            if (! is_string($field) || $field === '' || ! Schema::hasColumn($table, $field)) {
+                continue;
+            }
+
+            $column = $table.'.'.$field;
+
+            if (is_array($value)) {
+                if (array_is_list($value)) {
+                    $query->whereIn($column, $value);
+
+                    continue;
+                }
+
+                if (array_key_exists('in', $value)) {
+                    $query->whereIn($column, (array) $value['in']);
+
+                    continue;
+                }
+
+                if (array_key_exists('not_in', $value)) {
+                    $query->whereNotIn($column, (array) $value['not_in']);
+
+                    continue;
+                }
+
+                if (array_key_exists('null', $value)) {
+                    $value['null'] ? $query->whereNull($column) : $query->whereNotNull($column);
+
+                    continue;
+                }
+
+                if (array_key_exists('not_null', $value)) {
+                    $value['not_null'] ? $query->whereNotNull($column) : $query->whereNull($column);
+
+                    continue;
+                }
+
+                continue;
+            }
+
+            $value === null
+                ? $query->whereNull($column)
+                : $query->where($column, $value);
+        }
     }
 
     /**
