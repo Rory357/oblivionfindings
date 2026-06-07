@@ -1815,7 +1815,58 @@ class ClientController extends Controller
         $this->authorize('update', $client);
 
         try {
-            $client->update($request->validated());
+            $data = $request->validated();
+            $syncMedical = array_key_exists('medical', $data);
+            $syncConditions = array_key_exists('conditions', $data);
+            $syncEmergencyContacts = array_key_exists('emergency_contacts', $data);
+
+            $medical = $data['medical'] ?? [];
+            $conditions = $data['conditions'] ?? [];
+            $emergencyContacts = $data['emergency_contacts'] ?? [];
+
+            $clientFields = collect($data)->except([
+                'create_client_portal_user',
+                'profile_photo',
+                'medical',
+                'conditions',
+                'emergency_contacts',
+            ])->all();
+
+            if ($request->hasFile('profile_photo')) {
+                if ($client->profile_photo_path) {
+                    Storage::disk('public')->delete($client->profile_photo_path);
+                }
+
+                $clientFields['profile_photo_path'] = $this->storeAvatar(
+                    $request->file('profile_photo'),
+                    'profile-photos/clients',
+                );
+            }
+
+            DB::transaction(function () use (
+                $client,
+                $clientFields,
+                $medical,
+                $conditions,
+                $emergencyContacts,
+                $syncMedical,
+                $syncConditions,
+                $syncEmergencyContacts
+            ) {
+                $client->update($clientFields);
+
+                if ($syncMedical) {
+                    $this->syncClientMedicalProfile($client, $medical);
+                }
+
+                if ($syncConditions) {
+                    $this->syncClientConditions($client, $conditions);
+                }
+
+                if ($syncEmergencyContacts) {
+                    $this->syncClientEmergencyContacts($client, $emergencyContacts);
+                }
+            });
 
             app(NotificationService::class)->notifyCrud($request->user(), 'updated', 'client', $client, $client, [
                 'title' => "Client updated: {$client->first_name} {$client->last_name}",
@@ -1837,6 +1888,86 @@ class ClientController extends Controller
             return back()
                 ->withInput()
                 ->with('error', 'Failed to update client: '.$e->getMessage());
+        }
+    }
+
+    private function syncClientMedicalProfile(Client $client, array $medical): void
+    {
+        $medicalFilled = collect($medical)->contains(
+            fn ($v) => is_array($v) ? count($v) > 0 : (filled($v) && $v !== false && $v !== '0')
+        );
+
+        if (! $medicalFilled) {
+            $client->medicalProfile()->delete();
+
+            return;
+        }
+
+        $client->medicalProfile()->updateOrCreate([], [
+            'gp_name' => $medical['gp_name'] ?? null,
+            'gp_practice' => $medical['gp_practice'] ?? null,
+            'gp_phone' => $medical['gp_phone'] ?? null,
+            'hospital_preference' => $medical['hospital_preference'] ?? null,
+            'blood_type' => $medical['blood_type'] ?? null,
+            'organ_donor' => (bool) ($medical['organ_donor'] ?? false),
+            'allergies' => $medical['allergies'] ?? [],
+            'disabilities' => $medical['disabilities'] ?? [],
+            'medical_history' => $medical['medical_history'] ?? null,
+            'mental_health_history' => $medical['mental_health_history'] ?? null,
+            'surgical_history' => $medical['surgical_history'] ?? null,
+            'immunisation_notes' => $medical['immunisation_notes'] ?? null,
+            'notes' => $medical['notes'] ?? null,
+        ]);
+    }
+
+    private function syncClientConditions(Client $client, array $conditions): void
+    {
+        $client->conditions()->delete();
+
+        foreach ($conditions as $condition) {
+            if (blank($condition['label'] ?? null)) {
+                continue;
+            }
+
+            $client->conditions()->create([
+                'label' => $condition['label'],
+                'severity' => $condition['severity'] ?? 'Mild',
+                'notes' => $condition['notes'] ?? null,
+            ]);
+        }
+    }
+
+    private function syncClientEmergencyContacts(Client $client, array $emergencyContacts): void
+    {
+        $client->emergencyContacts()->delete();
+
+        $order = 0;
+        foreach ($emergencyContacts as $contact) {
+            $hasName = filled($contact['name'] ?? null);
+            $hasPhone = filled($contact['phone'] ?? null);
+            if (! $hasName && ! $hasPhone) {
+                continue;
+            }
+
+            $order++;
+            $client->emergencyContacts()->create([
+                'name' => $contact['name'] ?? '',
+                'relationship' => $contact['relationship'] ?? null,
+                'phone' => $contact['phone'] ?? null,
+                'alternate_phone' => $contact['alternate_phone'] ?? null,
+                'email' => $contact['email'] ?? null,
+                'address' => $contact['address'] ?? null,
+                'notes' => $contact['notes'] ?? null,
+                'contact_order' => $order,
+                'is_primary_contact' => $order === 1,
+                'preferred_method' => $contact['preferred_method'] ?? null,
+                'availability' => $contact['availability'] ?? null,
+                'can_view_medical' => (bool) ($contact['can_view_medical'] ?? false),
+                'can_view_medications' => (bool) ($contact['can_view_medications'] ?? false),
+                'can_view_incidents' => (bool) ($contact['can_view_incidents'] ?? false),
+                'can_receive_updates' => (bool) ($contact['can_receive_updates'] ?? true),
+                'authorised_health_info' => (bool) ($contact['can_view_medical'] ?? false),
+            ]);
         }
     }
 

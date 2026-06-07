@@ -1,8 +1,10 @@
 <?php
 
+use App\Models\AppSetting;
 use App\Models\Client;
 use App\Models\RespiteReferral;
 use App\Models\Role;
+use App\Models\ServiceContext;
 use App\Models\User;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 
@@ -44,6 +46,30 @@ test('intake creates a lightweight client and a referral from new_client fields'
     expect($referral->risk_level)->toBe('high');
     expect($referral->funding_source)->toBe('whaikaha');
     expect($referral->funding_reference)->toBe('WK-44213');
+});
+
+test('intake applies the default service context to a lightweight client', function () {
+    $context = ServiceContext::factory()->create(['is_active' => true]);
+    AppSetting::create([
+        'key' => 'service_context.default_id',
+        'value' => $context->id,
+    ]);
+
+    $this->actingAs($this->admin)
+        ->post('/respite/referrals', [
+            'new_client' => [
+                'first_name' => 'Hemi',
+                'last_name' => 'Wiremu',
+            ],
+            'referrer_name' => 'NASC Coordinator',
+            'referral_reason' => 'Scheduled respite block',
+            'urgency' => 'planned',
+        ])
+        ->assertRedirect();
+
+    $client = Client::where('first_name', 'Hemi')->firstOrFail();
+
+    expect($client->service_context_id)->toBe($context->id);
 });
 
 test('intake rejects a funding source outside the NZ list', function () {

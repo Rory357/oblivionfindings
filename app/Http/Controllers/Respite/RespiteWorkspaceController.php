@@ -4,6 +4,7 @@ namespace App\Http\Controllers\Respite;
 
 use App\Domain\Governance\Models\NotifiableIncident;
 use App\Http\Controllers\Controller;
+use App\Models\AssetGeofence;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ClientMedicationAlert;
@@ -19,6 +20,7 @@ use App\Models\SafeguardingAlert;
 use App\Models\ServiceAgreement;
 use App\Models\ServiceContext;
 use App\Models\Site;
+use App\Models\User;
 use App\Support\Respite\RespiteFundingSource;
 use Illuminate\Support\Carbon;
 use Inertia\Inertia;
@@ -42,7 +44,12 @@ class RespiteWorkspaceController extends Controller
     public function index(): Response
     {
         $referrals = RespiteReferral::query()
-            ->with(['client:id,first_name,last_name,date_of_birth,site_id', 'client.site:id,name'])
+            ->with([
+                'client' => fn ($query) => $query
+                    ->select($this->clientProfileColumns())
+                    ->with(['site:id,name', 'medicalProfile', 'conditions', 'emergencyContacts'])
+                    ->withCount('emergencyContacts'),
+            ])
             ->withCount('bookingRequests')
             ->orderByDesc('received_at')
             ->limit(self::LIST_CAP)
@@ -52,8 +59,10 @@ class RespiteWorkspaceController extends Controller
 
         $requestModels = RespiteBookingRequest::query()
             ->with([
-                'client:id,first_name,last_name,site_id',
-                'client.site:id,name',
+                'client' => fn ($query) => $query
+                    ->select($this->clientProfileColumns())
+                    ->with(['site:id,name', 'medicalProfile', 'conditions', 'emergencyContacts'])
+                    ->withCount('emergencyContacts'),
                 'serviceContext:id,name',
                 'approvedBy:id,name',
                 'serviceAgreement:id,client_id,title,reference_number,status,ends_at,signed_at,signed_date,review_due_date,total_budget,budget_used,total_hours,hours_used,carer_support_days_allocated,carer_support_days_used,carer_support_entitlement_year',
@@ -119,8 +128,18 @@ class RespiteWorkspaceController extends Controller
             'stats' => $this->stats(),
             // Lookup data for the create / onboard pop-ups.
             'clients' => Client::query()
+                ->with('site:id,name')
                 ->orderBy('last_name')->orderBy('first_name')
-                ->get(['id', 'first_name', 'last_name']),
+                ->get(['id', 'first_name', 'last_name', 'date_of_birth', 'nhi_number', 'site_id'])
+                ->map(fn (Client $client) => [
+                    'id' => $client->id,
+                    'first_name' => $client->first_name,
+                    'last_name' => $client->last_name,
+                    'date_of_birth' => $client->date_of_birth?->toDateString(),
+                    'nhi_number' => $client->nhi_number,
+                    'site' => $client->site?->name,
+                ])
+                ->values(),
             'serviceContexts' => ServiceContext::query()->orderBy('name')->get(['id', 'name']),
             'serviceAgreements' => ServiceAgreement::query()
                 ->where('status', 'active')
@@ -132,7 +151,243 @@ class RespiteWorkspaceController extends Controller
                 ])
                 ->values(),
             'fundingSources' => RespiteFundingSource::options(),
+            'clientProfileOptions' => $this->clientProfileOptions(),
         ]);
+    }
+
+    private function clientProfileOptions(): array
+    {
+        return [
+            'sites' => Site::query()
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name']),
+            'serviceContexts' => ServiceContext::query()
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'type', 'name']),
+            'keyWorkers' => User::staff()
+                ->orderBy('name')
+                ->get(['id', 'name']),
+            'geofences' => AssetGeofence::query()
+                ->where('is_active', true)
+                ->orderBy('name')
+                ->get(['id', 'name']),
+            'defaultServiceContextId' => ServiceContext::defaultId(),
+        ];
+    }
+
+    private function clientProfileColumns(): array
+    {
+        return [
+            'id',
+            'site_id',
+            'service_context_id',
+            'nhi_number',
+            'first_name',
+            'last_name',
+            'preferred_name',
+            'date_of_birth',
+            'gender',
+            'preferred_pronouns',
+            'status',
+            'phone',
+            'email',
+            'address_line_1',
+            'address_line_2',
+            'suburb',
+            'city',
+            'postcode',
+            'funding_type',
+            'funding_notes',
+            'ethnicity',
+            'iwi',
+            'hapu',
+            'marae',
+            'languages',
+            'religion',
+            'mobility_needs',
+            'sensory_needs',
+            'cognitive_needs',
+            'dietary_requirements',
+            'cultural_dietary_needs',
+            'sleep_preferences',
+            'transport_needs',
+            'transport_notes',
+            'fluid_intake_min_ml',
+            'fluid_intake_max_ml',
+            'seizure_duration_escalation_seconds',
+            'interests_hobbies',
+            'strengths_abilities',
+            'life_story',
+            'education_level',
+            'employment_status',
+            'service_start_date',
+            'key_worker_id',
+            'risk_level',
+            'safeguarding_flag',
+            'house_geofence_id',
+        ];
+    }
+
+    private function clientProfileComplete(?Client $client): bool
+    {
+        if (! $client) {
+            return false;
+        }
+
+        return filled($client->first_name)
+            && filled($client->last_name)
+            && filled($client->date_of_birth)
+            && filled($client->site_id)
+            && filled($client->service_context_id)
+            && (int) ($client->emergency_contacts_count ?? $client->emergencyContacts()->count()) > 0;
+    }
+
+    private function clientProfilePrefill(?Client $client, array $context = []): ?array
+    {
+        if (! $client) {
+            return null;
+        }
+
+        $cultural = $context['cultural'] ?? [];
+        $carer = $context['carer'] ?? [];
+        $languages = $this->stringList($client->languages);
+        $interpreterLanguage = data_get($cultural, 'interpreter_language');
+        if ($languages === [] && filled($interpreterLanguage)) {
+            $languages = [(string) $interpreterLanguage];
+        }
+
+        $emergencyContacts = $client->emergencyContacts
+            ->sortBy('contact_order')
+            ->map(fn ($contact) => [
+                'name' => $contact->name ?? '',
+                'relationship' => $contact->relationship ?? '',
+                'phone' => $contact->phone ?? '',
+                'alternate_phone' => $contact->alternate_phone ?? '',
+                'email' => $contact->email ?? '',
+                'address' => $contact->address ?? '',
+                'preferred_method' => $contact->preferred_method ?: 'phone',
+                'availability' => $contact->availability ?? '',
+                'notes' => $contact->notes ?? '',
+                'can_view_medical' => (bool) $contact->can_view_medical,
+                'can_view_medications' => (bool) $contact->can_view_medications,
+                'can_view_incidents' => (bool) $contact->can_view_incidents,
+                'can_receive_updates' => (bool) $contact->can_receive_updates,
+            ])
+            ->values()
+            ->all();
+
+        if ($emergencyContacts === [] && filled(data_get($carer, 'primary_carer_name'))) {
+            $emergencyContacts[] = [
+                'name' => (string) data_get($carer, 'primary_carer_name'),
+                'relationship' => (string) (data_get($carer, 'primary_carer_relationship') ?: 'Primary carer'),
+                'phone' => (string) (data_get($carer, 'primary_carer_contact') ?: ''),
+                'alternate_phone' => '',
+                'email' => '',
+                'address' => '',
+                'preferred_method' => 'phone',
+                'availability' => '',
+                'notes' => 'Primary carer from respite referral.',
+                'can_view_medical' => false,
+                'can_view_medications' => false,
+                'can_view_incidents' => false,
+                'can_receive_updates' => true,
+            ];
+        }
+
+        $medicalProfile = $client->medicalProfile;
+
+        return [
+            '_modal' => true,
+            'site_id' => $this->stringValue($client->site_id),
+            'service_context_id' => $this->stringValue($client->service_context_id),
+            'status' => $client->status ?: 'active',
+            'first_name' => $client->first_name ?? '',
+            'last_name' => $client->last_name ?? '',
+            'preferred_name' => $client->preferred_name ?? '',
+            'date_of_birth' => $client->date_of_birth?->toDateString() ?? '',
+            'gender' => $client->gender ?? '',
+            'preferred_pronouns' => $client->preferred_pronouns ?? '',
+            'nhi_number' => $client->nhi_number ?? '',
+            'phone' => $client->phone ?? '',
+            'email' => $client->email ?? '',
+            'address_line_1' => $client->address_line_1 ?? '',
+            'address_line_2' => $client->address_line_2 ?? '',
+            'suburb' => $client->suburb ?? '',
+            'city' => $client->city ?? '',
+            'postcode' => $client->postcode ?? '',
+            'create_client_portal_user' => false,
+            'ethnicity' => $client->ethnicity
+                ?: (string) (data_get($cultural, 'ethnicity') ?: ((bool) data_get($cultural, 'is_maori') ? 'Maori' : '')),
+            'languages' => $languages,
+            'religion' => $client->religion ?? '',
+            'mobility_needs' => $client->mobility_needs ?? '',
+            'sensory_needs' => $client->sensory_needs ?? '',
+            'cognitive_needs' => $client->cognitive_needs ?? '',
+            'dietary_requirements' => $client->dietary_requirements
+                ?: $client->cultural_dietary_needs
+                ?: (string) (data_get($cultural, 'cultural_dietary_needs') ?: ''),
+            'sleep_preferences' => $client->sleep_preferences ?? '',
+            'transport_needs' => $this->stringList($client->transport_needs),
+            'transport_notes' => $client->transport_notes ?? '',
+            'fluid_intake_min_ml' => $this->stringValue($client->fluid_intake_min_ml),
+            'fluid_intake_max_ml' => $this->stringValue($client->fluid_intake_max_ml),
+            'seizure_duration_escalation_seconds' => $this->stringValue($client->seizure_duration_escalation_seconds),
+            'interests_hobbies' => $client->interests_hobbies ?? '',
+            'strengths_abilities' => $client->strengths_abilities ?? '',
+            'life_story' => $client->life_story ?? '',
+            'education_level' => $client->education_level ?? '',
+            'employment_status' => $client->employment_status ?? '',
+            'medical' => [
+                'gp_name' => $medicalProfile?->gp_name ?? '',
+                'gp_practice' => $medicalProfile?->gp_practice ?? '',
+                'gp_phone' => $medicalProfile?->gp_phone ?? '',
+                'hospital_preference' => $medicalProfile?->hospital_preference ?? '',
+                'blood_type' => $medicalProfile?->blood_type ?? '',
+                'organ_donor' => (bool) ($medicalProfile?->organ_donor ?? false),
+                'allergies' => $this->stringList($medicalProfile?->allergies),
+                'disabilities' => $this->stringList($medicalProfile?->disabilities),
+                'medical_history' => $medicalProfile?->medical_history ?? '',
+                'mental_health_history' => $medicalProfile?->mental_health_history ?? '',
+                'surgical_history' => $medicalProfile?->surgical_history ?? '',
+                'immunisation_notes' => $medicalProfile?->immunisation_notes ?? '',
+                'notes' => $medicalProfile?->notes ?? '',
+            ],
+            'conditions' => $client->conditions
+                ->map(fn ($condition) => [
+                    'label' => $condition->label ?? '',
+                    'severity' => $condition->severity ?: 'Mild',
+                    'notes' => $condition->notes ?? '',
+                ])
+                ->values()
+                ->all(),
+            'service_start_date' => $client->service_start_date?->toDateString() ?? '',
+            'key_worker_id' => $this->stringValue($client->key_worker_id),
+            'risk_level' => $client->risk_level ?: 'low',
+            'safeguarding_flag' => (bool) $client->safeguarding_flag,
+            'house_geofence_id' => $this->stringValue($client->house_geofence_id),
+            'funding_type' => $client->funding_type ?? '',
+            'funding_notes' => $client->funding_notes ?? '',
+            'emergency_contacts' => $emergencyContacts,
+        ];
+    }
+
+    private function stringList(mixed $value): array
+    {
+        if (! is_array($value)) {
+            return [];
+        }
+
+        return array_values(array_filter(
+            array_map(fn ($item) => is_scalar($item) ? (string) $item : null, $value),
+            fn ($item) => filled($item),
+        ));
+    }
+
+    private function stringValue(mixed $value): string
+    {
+        return filled($value) ? (string) $value : '';
     }
 
     /** Respite-capable homes with their bed capacity (for occupancy + pickers). */
@@ -324,6 +579,23 @@ class RespiteWorkspaceController extends Controller
             'interpreterArranged' => (bool) $r->interpreter_arranged,
             'carerStrainLevel' => $r->carer_strain_level,
             'carerBreakdown' => (bool) $r->carer_breakdown_flag,
+            'clientProfileComplete' => $this->clientProfileComplete($client),
+            'clientProfilePrefill' => $this->clientProfilePrefill($client, [
+                'cultural' => [
+                    'is_maori' => (bool) $r->is_maori,
+                    'ethnicity' => $r->ethnicity,
+                    'iwi' => $r->iwi,
+                    'hapu' => $r->hapu,
+                    'marae' => $r->marae,
+                    'interpreter_language' => $r->interpreter_language,
+                    'cultural_dietary_needs' => $r->cultural_dietary_needs,
+                ],
+                'carer' => [
+                    'primary_carer_name' => $r->primary_carer_name,
+                    'primary_carer_relationship' => $r->primary_carer_relationship,
+                    'primary_carer_contact' => $r->primary_carer_contact,
+                ],
+            ]),
         ];
     }
 
@@ -369,6 +641,11 @@ class RespiteWorkspaceController extends Controller
             // "Onboarded" simply means the spawned booking has been confirmed —
             // it then surfaces in Bookings, the Calendar and Stays.
             'onboarded' => $confirmed,
+            'clientProfileComplete' => $this->clientProfileComplete($client),
+            'clientProfilePrefill' => $this->clientProfilePrefill($client, [
+                'cultural' => $rq->intake_snapshot['cultural'] ?? [],
+                'carer' => $rq->intake_snapshot['carer'] ?? [],
+            ]),
         ];
     }
 

@@ -83,7 +83,15 @@ export function BookingsPane({
             </div>
 
             {rows.length === 0 ? (
-                <Empty icon={CalendarCheck} title="No bookings match" />
+                <Empty
+                    icon={CalendarCheck}
+                    title="No bookings match"
+                    sub={
+                        bookings.length === 0
+                            ? 'No approved bookings yet. Approve a booking request first, then onboard and confirm the booking.'
+                            : 'Try a different status.'
+                    }
+                />
             ) : (
                 <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-3">
                     {rows.map((b) => (

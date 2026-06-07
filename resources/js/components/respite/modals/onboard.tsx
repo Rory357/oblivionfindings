@@ -1,21 +1,27 @@
 /**
- * Onboard pop-up — opened from an approved Booking Request. Because intake
- * already created the client with the carried referral data, there is nothing
- * to re-key here: onboarding confirms the spawned booking, which surfaces it in
- * Approved Bookings, the Calendar and Stays. Posts to the existing confirm
- * endpoint; nothing navigates.
+ * Onboard pop-up — opened from an approved Booking Request. Coordinators can
+ * complete the full client profile from here, then record consent and confirm
+ * the spawned booking so it surfaces in Approved Bookings, the Calendar and Stays.
  */
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { router } from '@inertiajs/react';
-import { CalendarCheck, CheckCircle2, Sparkles } from 'lucide-react';
+import { CalendarCheck, CheckCircle2, ClipboardCheck, Sparkles } from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import { Avatar, fmtRange } from '../shared';
 import type { RespiteRequestRow } from '../types';
 
-export function OnboardModal({ request, onClose }: { request: RespiteRequestRow | null; onClose: () => void }) {
+export function OnboardModal({
+    request,
+    onClose,
+    onCompleteProfile,
+}: {
+    request: RespiteRequestRow | null;
+    onClose: () => void;
+    onCompleteProfile: (row: RespiteRequestRow) => void;
+}) {
     const [processing, setProcessing] = useState(false);
     const [authority, setAuthority] = useState('self');
     const [authorityName, setAuthorityName] = useState('');
@@ -80,7 +86,7 @@ export function OnboardModal({ request, onClose }: { request: RespiteRequestRow 
                             <Avatar name={request.client} className="h-11 w-11 text-sm" />
                             <div>
                                 <DialogTitle className="text-left text-lg">Onboard {request.client}</DialogTitle>
-                                <DialogDescription className="text-left">Confirm the booking to complete intake.</DialogDescription>
+                                <DialogDescription className="text-left">Complete the profile, then confirm consent and the booking.</DialogDescription>
                             </div>
                         </div>
 
@@ -88,11 +94,35 @@ export function OnboardModal({ request, onClose }: { request: RespiteRequestRow 
                             <div className="flex items-start gap-2 rounded-[10px] bg-status-info-bg p-3 text-[12.5px] text-status-info">
                                 <Sparkles className="mt-0.5 h-4 w-4 shrink-0" />
                                 <span>
-                                    Prefilled from referral <strong>{request.referralRef}</strong> — the client record already carries this intake, so
-                                    nothing is re-keyed.
+                                    Referral <strong>{request.referralRef}</strong> can prefill the full client wizard with cultural, carer and funding context.
                                 </span>
                             </div>
                         ) : null}
+
+                        <div className="rounded-xl border border-border bg-muted/30 p-3.5">
+                            <div className="flex items-start justify-between gap-3">
+                                <div>
+                                    <div className="text-sm font-semibold">
+                                        {request.clientProfileComplete
+                                            ? 'Client profile is complete'
+                                            : 'Complete full client profile'}
+                                    </div>
+                                    <p className="mt-1 text-[12.5px] leading-snug text-muted-foreground">
+                                        Capture support needs, health details, contacts and care setup on the existing client record before the stay starts.
+                                    </p>
+                                </div>
+                                <Button
+                                    type="button"
+                                    size="sm"
+                                    variant={request.clientProfileComplete ? 'outline' : 'default'}
+                                    onClick={() => onCompleteProfile(request)}
+                                    disabled={!request.clientId}
+                                >
+                                    <ClipboardCheck className="h-3.5 w-3.5" />
+                                    {request.clientProfileComplete ? 'Review profile' : 'Complete profile'}
+                                </Button>
+                            </div>
+                        </div>
 
                         <dl className="rounded-xl border border-border px-3.5">
                             {rows.map(([k, v], i) => (

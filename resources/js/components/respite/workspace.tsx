@@ -4,6 +4,10 @@
  * views open in a pop-up; nothing in here navigates to another page.
  */
 import {
+    AddClientDialog,
+    type ClientWizardForm,
+} from '@/components/clients/add-client-dialog';
+import {
     PageHero,
     type PageHeroBadge,
     type PageHeroMetaItem,
@@ -65,6 +69,11 @@ type ReasonKind =
     | 'reject'
     | 'fundingOverride';
 
+type ProfileCompletionTarget = {
+    clientId: number;
+    initialValues: Partial<ClientWizardForm>;
+};
+
 const REASON_CONFIG: Record<
     ReasonKind,
     { title: string; label: string; placeholder: string; confirmLabel: string }
@@ -120,6 +129,8 @@ export function RespiteWorkspace({
     const [onboardReq, setOnboardReq] = useState<RespiteRequestRow | null>(
         null,
     );
+    const [profileFor, setProfileFor] =
+        useState<ProfileCompletionTarget | null>(null);
     const [confirmBooking, setConfirmBooking] =
         useState<RespiteBookingRow | null>(null);
     const [checkInStay, setCheckInStay] = useState<RespiteStayRow | null>(null);
@@ -178,6 +189,19 @@ export function RespiteWorkspace({
                 { funding_override_reason: reason },
                 opts,
             );
+    };
+
+    const openProfileCompletion = (
+        row: Pick<
+            RespiteReferralRow | RespiteRequestRow,
+            'clientId' | 'clientProfilePrefill'
+        >,
+    ) => {
+        if (!row.clientId) return;
+        setProfileFor({
+            clientId: row.clientId,
+            initialValues: row.clientProfilePrefill ?? {},
+        });
     };
 
     const stats = data.stats;
@@ -314,6 +338,7 @@ export function RespiteWorkspace({
                         onView={(row) => setDetail({ kind: 'referral', row })}
                         onNew={() => setIntakeOpen(true)}
                         onCreateRequest={(row) => setRequestFor(row)}
+                        onCompleteProfile={openProfileCompletion}
                         onDecline={(row) =>
                             setReasonAction({
                                 kind: 'decline',
@@ -345,6 +370,7 @@ export function RespiteWorkspace({
                             respiteActions.promoteRequest(row.id)
                         }
                         onOnboard={(row) => setOnboardReq(row)}
+                        onCompleteProfile={openProfileCompletion}
                         onReject={(row) =>
                             setReasonAction({
                                 kind: 'reject',
@@ -403,7 +429,30 @@ export function RespiteWorkspace({
             />
             <OnboardModal
                 request={onboardReq}
+                onCompleteProfile={(row) => {
+                    setOnboardReq(null);
+                    openProfileCompletion(row);
+                }}
                 onClose={() => setOnboardReq(null)}
+            />
+            <AddClientDialog
+                isOpen={profileFor !== null}
+                onClose={() => setProfileFor(null)}
+                clientId={profileFor?.clientId}
+                initialValues={profileFor?.initialValues}
+                onSaved={() => {
+                    setProfileFor(null);
+                    router.reload({
+                        only: ['referrals', 'requests', 'bookings', 'clients'],
+                    });
+                }}
+                sites={data.clientProfileOptions.sites}
+                serviceContexts={data.clientProfileOptions.serviceContexts}
+                keyWorkers={data.clientProfileOptions.keyWorkers}
+                geofences={data.clientProfileOptions.geofences}
+                defaultServiceContextId={
+                    data.clientProfileOptions.defaultServiceContextId
+                }
             />
             <ConfirmBookingModal
                 booking={confirmBooking}

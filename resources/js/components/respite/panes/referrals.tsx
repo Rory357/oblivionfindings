@@ -4,7 +4,7 @@
  */
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { CalendarPlus, Check, Eye, Flag, Inbox, Plus, X } from 'lucide-react';
+import { CalendarPlus, Check, ClipboardCheck, Eye, Flag, Inbox, Plus, X } from 'lucide-react';
 import { useState } from 'react';
 import { respiteActions } from '../actions';
 import { Avatar, relTime, StatusBadge, UrgencyBadge, urgencyAccent } from '../shared';
@@ -32,6 +32,7 @@ export function ReferralsPane({
     onView,
     onNew,
     onCreateRequest,
+    onCompleteProfile,
     onDecline,
 }: {
     referrals: RespiteReferralRow[];
@@ -39,6 +40,7 @@ export function ReferralsPane({
     onView: (row: RespiteReferralRow) => void;
     onNew: () => void;
     onCreateRequest: (row: RespiteReferralRow) => void;
+    onCompleteProfile: (row: RespiteReferralRow) => void;
     onDecline: (row: RespiteReferralRow) => void;
 }) {
     const [q, setQ] = useState('');
@@ -95,7 +97,15 @@ export function ReferralsPane({
             ) : (
                 <div className="grid gap-2.5">
                     {rows.map((r) => (
-                        <ReferralCard key={r.id} r={r} can={can} onView={onView} onCreateRequest={onCreateRequest} onDecline={onDecline} />
+                        <ReferralCard
+                            key={r.id}
+                            r={r}
+                            can={can}
+                            onView={onView}
+                            onCreateRequest={onCreateRequest}
+                            onCompleteProfile={onCompleteProfile}
+                            onDecline={onDecline}
+                        />
                     ))}
                     {rows.length === 0 ? <Empty icon={Inbox} title="No referrals match" sub="Try clearing a filter." /> : null}
                 </div>
@@ -109,12 +119,14 @@ function ReferralCard({
     can,
     onView,
     onCreateRequest,
+    onCompleteProfile,
     onDecline,
 }: {
     r: RespiteReferralRow;
     can: RespiteCan;
     onView: (row: RespiteReferralRow) => void;
     onCreateRequest: (row: RespiteReferralRow) => void;
+    onCompleteProfile: (row: RespiteReferralRow) => void;
     onDecline: (row: RespiteReferralRow) => void;
 }) {
     return (
@@ -155,6 +167,11 @@ function ReferralCard({
                     {can.create && r.status === 'accepted' && !r.hasRequest ? (
                         <Button size="sm" onClick={() => onCreateRequest(r)}>
                             <CalendarPlus className="h-3.5 w-3.5" /> Create booking request
+                        </Button>
+                    ) : null}
+                    {can.update && r.clientId && !r.clientProfileComplete ? (
+                        <Button size="sm" variant="outline" onClick={() => onCompleteProfile(r)}>
+                            <ClipboardCheck className="h-3.5 w-3.5" /> Complete profile
                         </Button>
                     ) : null}
                     {can.update && (r.status === 'received' || r.status === 'triaged') ? (

@@ -11,9 +11,10 @@
 > tests green** incl. 2 new). It is in the working tree, **not yet committed or
 > deployed**. See the "✅ DONE" record inside §4.
 >
-> **Codex picks up Part B (full client intake) and Part C (polish).** Those are
-> the remaining, actionable work. Do **not** re-do Part A — verify it instead
-> (its acceptance criteria are at the end of §4).
+> **Parts B and C are now COMPLETE** — Codex extracted/reused the full 8-step
+> client wizard for respite profile completion, widened the client update path to
+> persist the same nested profile payload as create, added the requested
+> guardrails, and verified with the commands listed in §8.
 
 ---
 
@@ -349,13 +350,51 @@ This makes the next step discoverable and directly answers "nothing is showing".
 
 ---
 
-## 5. Part B — Full client intake through respite ("gather all client information")
+## 5. Part B — Full client intake through respite ("gather all client information") ✅ DONE
 
 Goal: restore the documented design — the full **8-step `AddClientDialog`** is
 used inside respite to capture the complete person-centred profile, instead of
 the 4-field shell being the end of the story.
 
-### B1. Make `AddClientDialog` reusable (extract + add edit mode)
+> ### ✅ As-built record (implemented 2026-06-08 by Codex)
+> **Shared full-client wizard**
+> - Extracted the operations add-client wizard to
+>   `resources/js/components/clients/add-client-dialog.tsx`.
+> - Left `resources/js/pages/operations/clients/_create-dialog.tsx` as a
+>   re-export so the existing `/operations/clients` Add client flow keeps its
+>   import path.
+> - Added edit/complete mode (`clientId`, `initialValues`, `onSaved`) so the
+>   same 8-step wizard can save onto an existing respite-created shell instead
+>   of creating a duplicate.
+>
+> **Backend profile completion**
+> - `UpdateClientRequest` now accepts the full wizard payload, including cultural
+>   identity, support needs, about/care fields, medical profile, conditions,
+>   emergency contacts, consent/portal fields, and photo upload.
+> - `ClientController@update` now syncs the nested medical profile, conditions,
+>   and emergency contacts when those blocks are present, matching the create
+>   workflow while preserving ordinary update behaviour.
+>
+> **Respite workspace**
+> - `RespiteWorkspaceController` now loads each referral/request client with
+>   medical profile, conditions, emergency contacts, site, and profile fields.
+> - Added `clientProfileComplete` and `clientProfilePrefill` to referral and
+>   request rows. Completion rule: first name, last name, date of birth, site,
+>   service context, and at least one emergency contact.
+> - Added `clientProfileOptions` (`sites`, active `serviceContexts`,
+>   `keyWorkers`, active `geofences`, default service context) for the wizard.
+> - Prefill maps the shell client plus referral/request cultural and primary
+>   carer context into the wizard shape, including fallback emergency contact
+>   rows when only primary carer details exist.
+>
+> **Frontend reachability**
+> - `workspace.tsx` mounts `AddClientDialog` in complete-profile mode.
+> - `OnboardModal` now offers "Complete profile" / "Review profile" before
+>   confirmation and no longer says there is nothing to re-key.
+> - Referrals and Booking Requests now show a "Complete profile" action when the
+>   linked client is still a shell.
+
+### B1. Make `AddClientDialog` reusable (extract + add edit mode) ✅ DONE
 1. **Extract** `AddClientDialog` from
    `resources/js/pages/operations/clients/_create-dialog.tsx` to a shared
    location, e.g. `resources/js/components/clients/add-client-dialog.tsx`
@@ -384,7 +423,7 @@ the 4-field shell being the end of the story.
    > verify and extend it to match `StoreClientRequest`. Confirm
    > `ClientController@update` persists the same relations `@store` does.
 
-### B2. Restore "onboard opens the full wizard" (the documented flow)
+### B2. Restore "onboard opens the full wizard" (the documented flow) ✅ DONE
 Per `docs/respite-nz-gap-analysis.md:30-33`, onboarding an approved request should
 open the full client wizard prefilled, **then** confirm the booking. Two ways —
 pick one:
@@ -398,7 +437,7 @@ pick one:
 - **B2b (closer to the doc):** Replace the onboard step with the full wizard as
   step 1, consent as the final step.
 
-### B3. "Complete profile" available any time the client is a shell
+### B3. "Complete profile" available any time the client is a shell ✅ DONE
 Don't make full capture *only* reachable at onboard (that's late). Surface it
 wherever a respite client is still a shell:
 - Backend: in `mapReferral()` (and optionally `mapRequest`/`mapBooking`), add
@@ -410,7 +449,7 @@ wherever a respite client is still a shell:
   prefilled. This is the literal answer to *"bring up the new-client pop-up to
   gather all client information."*
 
-### B4. Prefill source
+### B4. Prefill source ✅ DONE
 Prefill `initialValues` from:
 - The existing `Client` row (whatever the shell already has), **plus**
 - The referral's cultural/carer fields (ethnicity, iwi/hapū/marae, interpreter,
@@ -423,14 +462,14 @@ To feed this, either:
   existing client-edit data source) the modal fetches on open. Prefer reusing
   existing data already in the payload to avoid an extra endpoint.
 
-### B5. Optional: capture-full-profile at referral time
+### B5. Optional: capture-full-profile at referral time ⏸️ DEFERRED
 On the referral intake "New person" step, add an optional checkbox **"Capture
 full profile now"**. If ticked, after the referral POST succeeds, immediately
 open `AddClientDialog` (edit mode) for the newly created `flash.created_*` /
 referral's client. Keep it optional so crisis triage stays fast. (Lower priority
 than B2/B3.)
 
-### Part B acceptance criteria
+### Part B acceptance criteria ✅ VERIFIED
 - From respite (onboard and/or a "Complete profile" action), the full 8-step
   client wizard opens **prefilled** with the shell's data + referral cultural/carer
   data.
@@ -442,17 +481,17 @@ than B2/B3.)
 
 ---
 
-## 6. Part C — polish / guardrails (optional but recommended)
+## 6. Part C — polish / guardrails (optional but recommended) ✅ DONE
 
-- **Empty-state copy.** In `panes/requests.tsx` and `panes/bookings.tsx`, when
+- ✅ **Empty-state copy.** In `panes/requests.tsx` and `panes/bookings.tsx`, when
   empty but upstream items exist, hint the next action (e.g. "No requests yet —
   create one from an accepted referral on the Referrals tab"). Prevents the
   "nothing is showing" confusion recurring.
-- **Duplicate-client hint at intake (D3 fast-follow, see
+- ✅ **Duplicate-client hint at intake (D3 fast-follow, see
   `docs/respite-nz-finish-plan.md:187`).** When the NHI typed in referral intake
   matches an existing client, show "matches existing client — link instead?".
   Backend already de-dupes by `nhi_hash`; just surface it.
-- **`service_context_id` on the shell.** `RespiteReferralController@store` creates
+- ✅ **`service_context_id` on the shell.** `RespiteReferralController@store` creates
   the client without a service context. Consider defaulting it to
   `ServiceContext::defaultId()` (used elsewhere in
   `RespiteBookingRequestController`) so the shell isn't half-formed before Part B
@@ -477,10 +516,10 @@ than B2/B3.)
   `mapReferral()` flags.
 - `tests/Feature/Respite/RespiteActionsTest.php` — 2 new cases.
 
-> ℹ️ Part B will add `clientProfileComplete` to `mapReferral()` +
-> `RespiteReferralRow` (not added yet).
+> ✅ Part B added `clientProfileComplete` and `clientProfilePrefill` to referral
+> and request rows.
 
-**Part B (Codex — remaining)**
+**Part B ✅ DONE**
 - `resources/js/pages/operations/clients/_create-dialog.tsx` → extract to
   `resources/js/components/clients/add-client-dialog.tsx` (+ re-export) and add
   `clientId`/`initialValues`/`onSaved` edit mode.
@@ -488,8 +527,12 @@ than B2/B3.)
   (B2a) + copy fix.
 - `resources/js/components/respite/panes/{referrals,requests}.tsx` — "Complete
   profile" action when `!clientProfileComplete`.
+- `resources/js/components/respite/modals/referral-intake.tsx` — duplicate NHI
+  hint with link-to-existing action.
 - `app/Http/Controllers/Respite/RespiteWorkspaceController.php` —
   `clientProfileComplete` + any prefill bundle.
+- `app/Http/Controllers/Respite/RespiteReferralController.php` — default shell
+  `service_context_id`.
 - Verify `app/Http/Requests/UpdateClientRequest.php` + `ClientController@update`
   accept the full nested payload (extend if needed).
 
@@ -504,8 +547,19 @@ than B2/B3.)
 - ✅ Covered already: the request carries the referral's `intake_snapshot`
   (cultural/carer/funding) — `RespiteNzWorkflowCompletionTest`; approve→booking→
   shift — `RespiteReadinessTest`.
-- TODO (Part B): `PUT /operations/clients/{id}` from the wizard payload updates
-  the shell to a complete profile without creating a duplicate.
+- ✅ DONE (Part B): `PUT /operations/clients/{id}` from the wizard payload
+  updates the shell to a complete profile without creating a duplicate.
+
+**Codex verification completed 2026-06-08:**
+- `php artisan test tests/Feature/Respite/RespiteIntakeTest.php --filter="default service context"` — passed.
+- `npm run types` — passed.
+- `php artisan test tests/Feature/Respite/RespiteIntakeTest.php tests/Feature/Respite/RespiteNzWorkflowCompletionTest.php --filter="intake|client profile|booking request|onboard|workspace"` — passed.
+- `php artisan test --filter=test_update_accepts_full_wizard_payload_for_respite_shell_completion_without_duplicate` — passed.
+- `php artisan test tests/Feature/ClientControllerTest.php --filter=test_store_persists_medical_conditions_and_emergency_contacts` — passed.
+- `php artisan test tests/Feature/ClientControllerTest.php --filter=test_update_modifies_all_fields` — passed.
+- `php artisan test tests/Feature/ClientControllerTest.php --filter=test_update_allows_nullable_optional_fields` — passed.
+- `php artisan test tests/Feature/Respite` — passed, 42 tests / 337 assertions.
+- `npm run build` — passed.
 
 **Manual (run on `oblivionfindings.test`, then verify on `.com` after deploy):**
 - Walk §1 "Reproduce" steps and confirm the referral now advances to a request,

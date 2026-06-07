@@ -2065,6 +2065,104 @@ class ClientControllerTest extends TestCase
         $this->assertSame('updated@example.com', $client->email);
     }
 
+    public function test_update_accepts_full_wizard_payload_for_respite_shell_completion_without_duplicate(): void
+    {
+        $shell = Client::factory()->create([
+            'first_name' => 'Ari',
+            'last_name' => 'Taylor',
+            'date_of_birth' => '2012-03-04',
+            'site_id' => $this->site->id,
+            'service_context_id' => null,
+            'status' => 'active',
+            'ethnicity' => null,
+            'languages' => [],
+            'dietary_requirements' => null,
+        ]);
+
+        $payload = $this->validClientData([
+            '_modal' => true,
+            'first_name' => 'Ari',
+            'last_name' => 'Taylor',
+            'preferred_name' => 'AJ',
+            'date_of_birth' => '2012-03-04',
+            'status' => 'active',
+            'ethnicity' => 'Maori',
+            'languages' => ['English', 'te reo Maori'],
+            'dietary_requirements' => 'Dairy free kai',
+            'mobility_needs' => 'Uses a walking frame',
+            'medical' => [
+                'gp_name' => 'Dr Green',
+                'gp_practice' => 'Harbour Clinic',
+                'gp_phone' => '09 123 4567',
+                'hospital_preference' => 'North Shore Hospital',
+                'blood_type' => 'O+',
+                'organ_donor' => false,
+                'allergies' => ['dairy'],
+                'disabilities' => ['limited_mobility'],
+                'medical_history' => 'Asthma history',
+                'mental_health_history' => '',
+                'surgical_history' => '',
+                'immunisation_notes' => 'Up to date',
+                'notes' => 'Bring inhaler on respite stays',
+            ],
+            'conditions' => [
+                ['label' => 'Asthma', 'severity' => 'Moderate', 'notes' => 'Triggered by cold air'],
+            ],
+            'emergency_contacts' => [
+                [
+                    'name' => 'Moana Taylor',
+                    'relationship' => 'Mother',
+                    'phone' => '021 555 010',
+                    'alternate_phone' => '',
+                    'email' => 'moana@example.test',
+                    'address' => '1 Harbour Road',
+                    'availability' => 'Any time',
+                    'preferred_method' => 'phone',
+                    'notes' => 'Primary carer',
+                    'can_view_medical' => true,
+                    'can_view_medications' => true,
+                    'can_view_incidents' => true,
+                    'can_receive_updates' => true,
+                ],
+            ],
+        ]);
+
+        $response = $this->actingAs($this->admin)
+            ->from('/respite')
+            ->put("/clients/{$shell->id}", $payload);
+
+        $response->assertRedirect('/respite');
+        $response->assertSessionHasNoErrors();
+
+        $this->assertSame(1, Client::query()->where('first_name', 'Ari')->where('last_name', 'Taylor')->count());
+
+        $shell->refresh();
+        $this->assertSame($this->serviceContext->id, $shell->service_context_id);
+        $this->assertSame('AJ', $shell->preferred_name);
+        $this->assertSame('Maori', $shell->ethnicity);
+        $this->assertSame(['English', 'te reo Maori'], $shell->languages);
+        $this->assertSame('Dairy free kai', $shell->dietary_requirements);
+        $this->assertSame('Uses a walking frame', $shell->mobility_needs);
+
+        $this->assertDatabaseHas('client_medical_profiles', [
+            'client_id' => $shell->id,
+            'gp_name' => 'Dr Green',
+            'medical_history' => 'Asthma history',
+        ]);
+        $this->assertDatabaseHas('client_conditions', [
+            'client_id' => $shell->id,
+            'label' => 'Asthma',
+            'severity' => 'Moderate',
+        ]);
+        $this->assertDatabaseHas('client_emergency_contacts', [
+            'client_id' => $shell->id,
+            'name' => 'Moana Taylor',
+            'relationship' => 'Mother',
+            'phone' => '021 555 010',
+            'is_primary_contact' => true,
+        ]);
+    }
+
     public function test_update_returns_404_for_nonexistent_client(): void
     {
         $response = $this->actingAs($this->admin)

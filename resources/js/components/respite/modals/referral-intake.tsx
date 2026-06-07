@@ -16,7 +16,15 @@ import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { useForm } from '@inertiajs/react';
-import { ArrowLeft, ArrowRight, Check, Inbox, X, Zap } from 'lucide-react';
+import {
+    ArrowLeft,
+    ArrowRight,
+    Check,
+    Inbox,
+    Link2,
+    X,
+    Zap,
+} from 'lucide-react';
 import { useEffect, useState, type ReactNode } from 'react';
 import type { ClientOption, FundingOption, RespiteHome } from '../types';
 
@@ -102,6 +110,9 @@ const BLANK: IntakeForm = {
     funding_source: '',
     funding_ref: '',
 };
+
+const normaliseNhi = (value?: string | null) =>
+    (value ?? '').trim().toUpperCase().replace(/\s+/g, '');
 
 export function ReferralIntakeModal({
     open,
@@ -469,6 +480,15 @@ function ClientStep({
     homes: RespiteHome[];
     err: Partial<Record<string, string>>;
 }) {
+    const existingNhiMatch =
+        data.mode === 'new' && normaliseNhi(data.nhi_number)
+            ? clients.find(
+                  (client) =>
+                      normaliseNhi(client.nhi_number) ===
+                      normaliseNhi(data.nhi_number),
+              )
+            : undefined;
+
     return (
         <>
             <div className="mb-4 inline-flex rounded-[9px] border border-border bg-muted p-0.5">
@@ -548,6 +568,39 @@ function ClientStep({
                             />
                         </Field>
                     </div>
+                    {existingNhiMatch ? (
+                        <div className="mb-3.5 rounded-[10px] border border-status-warning/30 bg-status-warning-bg p-3 text-[12.5px] text-status-warning">
+                            <div className="font-semibold">
+                                NHI matches an existing client
+                            </div>
+                            <p className="mt-1 text-muted-foreground">
+                                {existingNhiMatch.first_name}{' '}
+                                {existingNhiMatch.last_name}
+                                {existingNhiMatch.date_of_birth
+                                    ? ` · DOB ${existingNhiMatch.date_of_birth}`
+                                    : ''}
+                                {existingNhiMatch.site
+                                    ? ` · ${existingNhiMatch.site}`
+                                    : ''}
+                            </p>
+                            <Button
+                                type="button"
+                                size="sm"
+                                variant="outline"
+                                className="mt-2"
+                                onClick={() => {
+                                    setData((current) => ({
+                                        ...current,
+                                        mode: 'existing',
+                                        client_id: String(existingNhiMatch.id),
+                                    }));
+                                }}
+                            >
+                                <Link2 className="h-3.5 w-3.5" />
+                                Link this client
+                            </Button>
+                        </div>
+                    ) : null}
                     <Field label="Preferred home" hint="optional">
                         <NativeSelect
                             value={data.site_id}

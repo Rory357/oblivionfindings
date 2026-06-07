@@ -6,6 +6,7 @@ use App\Events\Respite\RespiteEvent;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\RespiteReferral;
+use App\Models\ServiceContext;
 use App\Support\Respite\RespiteFundingSource;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -117,6 +118,7 @@ class RespiteReferralController extends Controller
                     'date_of_birth' => $nc['date_of_birth'] ?? null,
                     'nhi_number' => $nhi,
                     'site_id' => $nc['site_id'] ?? null,
+                    'service_context_id' => ServiceContext::defaultId(),
                     'funding_type' => RespiteFundingSource::label($fundingSource),
                     'funding_notes' => $fundingReference,
                     'status' => 'active',
@@ -233,6 +235,7 @@ class RespiteReferralController extends Controller
     {
         $updates = [
             'nhi_number' => $nhi ?: $client->nhi_number,
+            'service_context_id' => $client->service_context_id ?: ServiceContext::defaultId(),
             'ethnicity' => $validated['ethnicity'] ?? $client->ethnicity,
             'iwi' => $validated['iwi'] ?? $client->iwi,
             'hapu' => $validated['hapu'] ?? $client->hapu,

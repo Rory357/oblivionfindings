@@ -3,6 +3,8 @@
  * Records are pre-flattened server-side so panes never touch DB column names.
  */
 
+import type { ClientWizardForm } from '@/components/clients/add-client-dialog';
+
 export type Urgency = 'planned' | 'urgent' | 'crisis';
 
 export interface RespiteHome {
@@ -84,6 +86,8 @@ export interface RespiteReferralRow {
     interpreterArranged: boolean;
     carerStrainLevel: string | null;
     carerBreakdown: boolean;
+    clientProfileComplete: boolean;
+    clientProfilePrefill: Partial<ClientWizardForm> | null;
 }
 
 export interface RespiteRequestRow {
@@ -120,6 +124,8 @@ export interface RespiteRequestRow {
     hasBooking: boolean;
     bookingId: number | null;
     onboarded: boolean;
+    clientProfileComplete: boolean;
+    clientProfilePrefill: Partial<ClientWizardForm> | null;
 }
 
 export interface RespiteBookingRow {
@@ -231,6 +237,17 @@ export interface ClientOption {
     id: number;
     first_name: string;
     last_name: string;
+    date_of_birth?: string | null;
+    nhi_number?: string | null;
+    site?: string | null;
+}
+
+export interface ClientProfileOptions {
+    sites: { id: number; name: string }[];
+    serviceContexts: { id: number; type?: string | null; name: string }[];
+    keyWorkers: { id: number; name: string }[];
+    geofences: { id: number; name: string }[];
+    defaultServiceContextId: number | null;
 }
 
 export interface RespiteWorkspaceData {
@@ -245,6 +262,7 @@ export interface RespiteWorkspaceData {
     serviceContexts: { id: number; name: string }[];
     serviceAgreements: (ServiceAgreementSummary & { clientId: number })[];
     fundingSources: FundingOption[];
+    clientProfileOptions: ClientProfileOptions;
 }
 
 export interface FundingOption {

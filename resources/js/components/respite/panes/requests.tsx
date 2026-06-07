@@ -44,6 +44,7 @@ export function RequestsPane({
     onApprove,
     onPromote,
     onOnboard,
+    onCompleteProfile,
     onReject,
 }: {
     requests: RespiteRequestRow[];
@@ -53,6 +54,7 @@ export function RequestsPane({
     onApprove: (row: RespiteRequestRow) => void;
     onPromote: (row: RespiteRequestRow) => void;
     onOnboard: (row: RespiteRequestRow) => void;
+    onCompleteProfile: (row: RespiteRequestRow) => void;
     onReject: (row: RespiteRequestRow) => void;
 }) {
     const [q, setQ] = useState('');
@@ -131,6 +133,7 @@ export function RequestsPane({
                             onApprove={onApprove}
                             onPromote={onPromote}
                             onOnboard={onOnboard}
+                            onCompleteProfile={onCompleteProfile}
                             onReject={onReject}
                         />
                     ))}
@@ -138,7 +141,11 @@ export function RequestsPane({
                         <Empty
                             icon={ClipboardCheck}
                             title="No requests match"
-                            sub="Try a different status."
+                            sub={
+                                requests.length === 0
+                                    ? 'No requests yet. Create one from an accepted referral, or start a new booking request for an existing client.'
+                                    : 'Try a different status.'
+                            }
                         />
                     ) : null}
                 </div>
@@ -154,6 +161,7 @@ function RequestCard({
     onApprove,
     onPromote,
     onOnboard,
+    onCompleteProfile,
     onReject,
 }: {
     r: RespiteRequestRow;
@@ -162,6 +170,7 @@ function RequestCard({
     onApprove: (row: RespiteRequestRow) => void;
     onPromote: (row: RespiteRequestRow) => void;
     onOnboard: (row: RespiteRequestRow) => void;
+    onCompleteProfile: (row: RespiteRequestRow) => void;
     onReject: (row: RespiteRequestRow) => void;
 }) {
     const funding = fundingStatusMeta(r.fundingStatus);
@@ -258,6 +267,11 @@ function RequestCard({
                     !r.onboarded ? (
                         <Button size="sm" onClick={() => onOnboard(r)}>
                             <UserPlus className="h-3.5 w-3.5" /> Onboard
+                        </Button>
+                    ) : null}
+                    {can.update && r.clientId && !r.clientProfileComplete ? (
+                        <Button size="sm" variant="outline" onClick={() => onCompleteProfile(r)}>
+                            <ClipboardCheck className="h-3.5 w-3.5" /> Complete profile
                         </Button>
                     ) : null}
                     {can.update && needsReview(r.status) ? (
