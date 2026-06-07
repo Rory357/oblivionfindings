@@ -8,6 +8,7 @@ import {
     CheckCircle2,
     ClipboardCheck,
     Eye,
+    Plus,
     UserPlus,
     X,
 } from 'lucide-react';
@@ -38,6 +39,7 @@ const needsReview = (s: string) => s === 'submitted' || s === 'under_review';
 export function RequestsPane({
     requests,
     can,
+    onNew,
     onView,
     onApprove,
     onPromote,
@@ -46,6 +48,7 @@ export function RequestsPane({
 }: {
     requests: RespiteRequestRow[];
     can: RespiteCan;
+    onNew: () => void;
     onView: (row: RespiteRequestRow) => void;
     onApprove: (row: RespiteRequestRow) => void;
     onPromote: (row: RespiteRequestRow) => void;
@@ -73,6 +76,11 @@ export function RequestsPane({
                 count={`${rows.length} of ${requests.length}`}
             >
                 <ViewToggle view={view} setView={setView} />
+                {can.create ? (
+                    <Button size="sm" onClick={onNew}>
+                        <Plus className="h-3.5 w-3.5" /> New booking request
+                    </Button>
+                ) : null}
             </PaneHead>
 
             <div className="mb-4 flex flex-wrap items-center gap-2">

@@ -164,3 +164,55 @@ test('recording a within-plan restraint auto-links the clients active behaviour 
 
     expect(\App\Models\RestraintEvent::firstOrFail()->behaviour_support_plan_id)->toBe($plan->id);
 });
+
+test('creating a booking request from a referral links it and advances the referral', function () {
+    $client = Client::factory()->create();
+    $referral = RespiteReferral::create([
+        'client_id' => $client->id,
+        'referrer_name' => 'NASC — Waitematā',
+        'referral_reason' => 'Planned respite for a carer break',
+        'urgency' => 'planned',
+        'status' => 'triaged',
+        'received_at' => now(),
+    ]);
+
+    $response = $this->actingAs($this->admin)
+        ->from('/respite?tab=referrals')
+        ->post('/respite/requests', [
+            '_modal' => true,
+            'referral_id' => $referral->id,
+            'client_id' => $client->id,
+            'requested_start' => now()->addDays(7)->toDateString(),
+            'requested_end' => now()->addDays(14)->toDateString(),
+            'priority' => 'routine',
+        ]);
+
+    // _modal posts return to the workspace (lists refresh in place), not the
+    // legacy request-detail page.
+    $response->assertRedirect('/respite?tab=referrals');
+    $response->assertSessionHasNoErrors();
+
+    $request = RespiteBookingRequest::query()->latest('id')->firstOrFail();
+    expect($request->referral_id)->toBe($referral->id);
+    expect($request->client_id)->toBe($client->id);
+    expect($request->status)->toBe('submitted');
+
+    $referral->refresh();
+    expect($referral->status)->toBe('accepted');
+    expect($referral->linked_booking_request_id)->toBe($request->id);
+});
+
+test('the legacy request create still lands on the request detail when not modal', function () {
+    $client = Client::factory()->create();
+
+    $response = $this->actingAs($this->admin)
+        ->post('/respite/requests', [
+            'client_id' => $client->id,
+            'requested_start' => now()->addDays(3)->toDateString(),
+            'requested_end' => now()->addDays(6)->toDateString(),
+        ]);
+
+    $request = RespiteBookingRequest::query()->latest('id')->firstOrFail();
+    $response->assertRedirect("/respite/requests/{$request->id}");
+    expect($request->referral_id)->toBeNull();
+});

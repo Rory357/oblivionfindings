@@ -122,6 +122,17 @@ export function OverviewPane({
                 tab: 'referrals',
             }),
         );
+    referrals
+        .filter((r) => r.status === 'accepted' && !r.hasRequest)
+        .forEach((r) =>
+            actions.push({
+                tone: 'info',
+                icon: ClipboardCheck,
+                title: `Ready to book — ${r.client}`,
+                sub: 'Accepted referral — create a booking request',
+                tab: 'referrals',
+            }),
+        );
     requests
         .filter((r) => r.status === 'submitted' || r.status === 'under_review')
         .forEach((r) =>

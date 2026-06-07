@@ -33,6 +33,7 @@ import { ConfirmBookingModal } from './modals/booking-confirm';
 import { OnboardModal } from './modals/onboard';
 import { ReasonDialog } from './modals/reason-dialog';
 import { ReferralIntakeModal } from './modals/referral-intake';
+import { RequestIntakeModal } from './modals/request-intake';
 import {
     CheckInModal,
     ComplaintModal,
@@ -52,6 +53,7 @@ import {
     RESPITE_TABS,
     type RespiteCan,
     type RespiteBookingRow,
+    type RespiteReferralRow,
     type RespiteRequestRow,
     type RespiteStayRow,
     type RespiteTab,
@@ -110,6 +112,11 @@ export function RespiteWorkspace({
     const [tab, setTab] = useState<RespiteTab>(() => readTab());
     const [detail, setDetail] = useState<RespiteDetail | null>(null);
     const [intakeOpen, setIntakeOpen] = useState(false);
+    // `null` = closed; a referral row = create a request from it; 'standalone' =
+    // create a request for an existing client with no referral.
+    const [requestFor, setRequestFor] = useState<
+        RespiteReferralRow | 'standalone' | null
+    >(null);
     const [onboardReq, setOnboardReq] = useState<RespiteRequestRow | null>(
         null,
     );
@@ -306,6 +313,7 @@ export function RespiteWorkspace({
                         can={can}
                         onView={(row) => setDetail({ kind: 'referral', row })}
                         onNew={() => setIntakeOpen(true)}
+                        onCreateRequest={(row) => setRequestFor(row)}
                         onDecline={(row) =>
                             setReasonAction({
                                 kind: 'decline',
@@ -319,6 +327,7 @@ export function RespiteWorkspace({
                     <RequestsPane
                         requests={data.requests}
                         can={can}
+                        onNew={() => setRequestFor('standalone')}
                         onView={(row) => setDetail({ kind: 'request', row })}
                         onApprove={(row) => {
                             if (row.fundingStatus === 'pending_approval') {
@@ -381,6 +390,15 @@ export function RespiteWorkspace({
                 onClose={() => setIntakeOpen(false)}
                 clients={data.clients}
                 homes={data.homes}
+                fundingSources={data.fundingSources}
+            />
+            <RequestIntakeModal
+                open={requestFor !== null}
+                referral={requestFor === 'standalone' ? null : requestFor}
+                onClose={() => setRequestFor(null)}
+                clients={data.clients}
+                serviceContexts={data.serviceContexts}
+                serviceAgreements={data.serviceAgreements}
                 fundingSources={data.fundingSources}
             />
             <OnboardModal

@@ -4,7 +4,7 @@
  */
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
-import { Check, Eye, Flag, Inbox, Plus, X } from 'lucide-react';
+import { CalendarPlus, Check, Eye, Flag, Inbox, Plus, X } from 'lucide-react';
 import { useState } from 'react';
 import { respiteActions } from '../actions';
 import { Avatar, relTime, StatusBadge, UrgencyBadge, urgencyAccent } from '../shared';
@@ -31,12 +31,14 @@ export function ReferralsPane({
     can,
     onView,
     onNew,
+    onCreateRequest,
     onDecline,
 }: {
     referrals: RespiteReferralRow[];
     can: RespiteCan;
     onView: (row: RespiteReferralRow) => void;
     onNew: () => void;
+    onCreateRequest: (row: RespiteReferralRow) => void;
     onDecline: (row: RespiteReferralRow) => void;
 }) {
     const [q, setQ] = useState('');
@@ -93,7 +95,7 @@ export function ReferralsPane({
             ) : (
                 <div className="grid gap-2.5">
                     {rows.map((r) => (
-                        <ReferralCard key={r.id} r={r} can={can} onView={onView} onDecline={onDecline} />
+                        <ReferralCard key={r.id} r={r} can={can} onView={onView} onCreateRequest={onCreateRequest} onDecline={onDecline} />
                     ))}
                     {rows.length === 0 ? <Empty icon={Inbox} title="No referrals match" sub="Try clearing a filter." /> : null}
                 </div>
@@ -106,11 +108,13 @@ function ReferralCard({
     r,
     can,
     onView,
+    onCreateRequest,
     onDecline,
 }: {
     r: RespiteReferralRow;
     can: RespiteCan;
     onView: (row: RespiteReferralRow) => void;
+    onCreateRequest: (row: RespiteReferralRow) => void;
     onDecline: (row: RespiteReferralRow) => void;
 }) {
     return (
@@ -146,6 +150,11 @@ function ReferralCard({
                     {can.update && r.status === 'triaged' ? (
                         <Button size="sm" className="bg-status-success text-white hover:bg-status-success/90" onClick={() => respiteActions.acceptReferral(r.id)}>
                             <Check className="h-3.5 w-3.5" /> Accept
+                        </Button>
+                    ) : null}
+                    {can.create && r.status === 'accepted' && !r.hasRequest ? (
+                        <Button size="sm" onClick={() => onCreateRequest(r)}>
+                            <CalendarPlus className="h-3.5 w-3.5" /> Create booking request
                         </Button>
                     ) : null}
                     {can.update && (r.status === 'received' || r.status === 'triaged') ? (

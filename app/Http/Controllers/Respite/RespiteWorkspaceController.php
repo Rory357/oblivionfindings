@@ -43,6 +43,7 @@ class RespiteWorkspaceController extends Controller
     {
         $referrals = RespiteReferral::query()
             ->with(['client:id,first_name,last_name,date_of_birth,site_id', 'client.site:id,name'])
+            ->withCount('bookingRequests')
             ->orderByDesc('received_at')
             ->limit(self::LIST_CAP)
             ->get()
@@ -305,8 +306,15 @@ class RespiteWorkspaceController extends Controller
             'reason' => $r->referral_reason,
             'riskLevel' => $r->risk_level,
             'funding' => RespiteFundingSource::label($r->funding_source),
+            'fundingSource' => $r->funding_source,
+            'fundingReference' => $r->funding_reference,
             'site' => $client?->site?->name,
             'triageNotes' => $r->triage_notes,
+            // Drives the "Create booking request" action — hidden once the
+            // referral already has a request (column link or any related row).
+            'hasRequest' => ($r->booking_requests_count ?? 0) > 0
+                || $r->linked_booking_request_id !== null,
+            'linkedRequestId' => $r->linked_booking_request_id,
             'isMaori' => (bool) $r->is_maori,
             'iwi' => $r->iwi,
             'hapu' => $r->hapu,

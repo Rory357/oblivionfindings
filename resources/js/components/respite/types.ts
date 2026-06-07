@@ -69,8 +69,12 @@ export interface RespiteReferralRow {
     reason: string | null;
     riskLevel: string | null;
     funding: string | null;
+    fundingSource: string | null;
+    fundingReference: string | null;
     site: string | null;
     triageNotes: string | null;
+    hasRequest: boolean;
+    linkedRequestId: number | null;
     isMaori: boolean;
     iwi: string | null;
     hapu: string | null;

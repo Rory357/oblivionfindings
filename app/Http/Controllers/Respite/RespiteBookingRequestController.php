@@ -105,11 +105,39 @@ class RespiteBookingRequestController extends Controller
 
         $requestModel = RespiteBookingRequest::create($validated);
 
+        // Advance the source referral out of the triage queue and record the
+        // link, so the workspace can hide the "Create booking request" action
+        // once a request exists for it.
+        if (! empty($validated['referral_id'])) {
+            $referral = RespiteReferral::find($validated['referral_id']);
+
+            if ($referral && $referral->status !== 'declined') {
+                $referral->update([
+                    'linked_booking_request_id' => $requestModel->id,
+                    'status' => 'accepted',
+                    'updated_by' => auth()->id(),
+                ]);
+
+                event(new RespiteEvent('respite.referral.updated', [
+                    'id' => $referral->id,
+                    'client_id' => $referral->client_id,
+                    'status' => $referral->status,
+                ]));
+            }
+        }
+
         event(new RespiteEvent('respite.booking_request.submitted', [
             'id' => $requestModel->id,
             'client_id' => $requestModel->client_id,
             'status' => $requestModel->status,
         ]));
+
+        // The workspace pop-up posts with _modal so it stays on the workspace
+        // (the lists refresh in place); the legacy full-page create still lands
+        // on the request detail.
+        if ($request->boolean('_modal')) {
+            return back()->with('success', 'Respite booking request submitted.');
+        }
 
         return redirect()
             ->route('respite.requests.show', $requestModel)
