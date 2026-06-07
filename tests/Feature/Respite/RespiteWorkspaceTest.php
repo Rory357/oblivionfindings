@@ -66,6 +66,29 @@ test('the respite workspace renders one payload with pipeline lists, homes and c
         );
 });
 
+test('the complete-profile prefill derives the canonical macron ethnicity from a Māori referral', function () {
+    $client = Client::factory()->create(['ethnicity' => null]);
+
+    RespiteReferral::create([
+        'client_id' => $client->id,
+        'referrer_name' => 'NASC Coordinator',
+        'referral_reason' => 'Planned respite block',
+        'urgency' => 'planned',
+        'status' => 'received',
+        'received_at' => now(),
+        'is_maori' => true,
+    ]);
+
+    $this->actingAs($this->admin)
+        ->get('/respite')
+        ->assertOk()
+        ->assertInertia(
+            fn (AssertableInertia $page) => $page
+                ->where('referrals.0.clientProfilePrefill.ethnicity', 'Māori')
+                ->where('referrals.0.clientProfileComplete', false),
+        );
+});
+
 test('legacy respite index routes redirect into the workspace tabs', function () {
     $this->actingAs($this->admin)->get('/respite/requests')->assertRedirect('/respite?tab=requests');
     $this->actingAs($this->admin)->get('/respite/bookings')->assertRedirect('/respite?tab=bookings');

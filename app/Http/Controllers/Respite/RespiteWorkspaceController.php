@@ -319,7 +319,7 @@ class RespiteWorkspaceController extends Controller
             'postcode' => $client->postcode ?? '',
             'create_client_portal_user' => false,
             'ethnicity' => $client->ethnicity
-                ?: (string) (data_get($cultural, 'ethnicity') ?: ((bool) data_get($cultural, 'is_maori') ? 'Maori' : '')),
+                ?: (string) (data_get($cultural, 'ethnicity') ?: ((bool) data_get($cultural, 'is_maori') ? 'Māori' : '')),
             'languages' => $languages,
             'religion' => $client->religion ?? '',
             'mobility_needs' => $client->mobility_needs ?? '',
