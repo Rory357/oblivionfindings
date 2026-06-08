@@ -131,6 +131,14 @@ class DraftTimesheetService
             ? $this->snapshots->snapshotForShift($session->shift, User::query()->find($session->user_id))
             : null;
 
+        $sessionBreakMinutes = (int) ($session->break_minutes ?? 0);
+        $existingBreakMinutes = $timesheet && $timesheet->exists && $timesheet->break_minutes !== null
+            ? (int) $timesheet->break_minutes
+            : null;
+        $breakMinutes = $existingBreakMinutes !== null
+            ? max($existingBreakMinutes, $sessionBreakMinutes)
+            : $sessionBreakMinutes;
+
         $payload = [
             'user_id' => $session->user_id,
             'client_id' => $clientId,
@@ -142,7 +150,7 @@ class DraftTimesheetService
             'work_date' => $session->clock_in_at->toDateString(),
             'starts_at' => $session->clock_in_at,
             'ends_at' => $session->clock_out_at,
-            'break_minutes' => (int) ($session->break_minutes ?? 0),
+            'break_minutes' => $breakMinutes,
             'sleepover' => (bool) ($session->shift?->is_sleepover ?? false),
             'on_call' => (bool) ($session->shift?->is_on_call ?? false),
             'shift_site_name_snapshot' => $snapshot['site_name'] ?? null,

@@ -10,6 +10,58 @@ use Illuminate\Support\Str;
 
 class MarScheduleService
 {
+    public function workerTimezone(): string
+    {
+        return (string) config('app.worker_timezone', 'Pacific/Auckland');
+    }
+
+    public function dateFromInput(?string $date = null, ?Carbon $fallback = null): Carbon
+    {
+        $timezone = $this->workerTimezone();
+
+        if ($date !== null && trim($date) !== '') {
+            return Carbon::parse($date, $timezone)->timezone($timezone)->startOfDay();
+        }
+
+        return ($fallback ?: Carbon::now($timezone))->copy()->timezone($timezone)->startOfDay();
+    }
+
+    public function parseWorkerDateTime(string $value): Carbon
+    {
+        $value = trim($value);
+        $timezone = $this->workerTimezone();
+
+        if (preg_match('/(?:Z|[+-]\d{2}:?\d{2})$/', $value) === 1) {
+            return Carbon::parse($value)->timezone($timezone);
+        }
+
+        return Carbon::parse($value, $timezone);
+    }
+
+    /**
+     * @return array{0: Carbon, 1: Carbon}
+     */
+    public function utcDayWindow(Carbon $date): array
+    {
+        $localDate = $date->copy()->timezone($this->workerTimezone())->startOfDay();
+
+        return [
+            $localDate->copy()->utc(),
+            $localDate->copy()->endOfDay()->utc(),
+        ];
+    }
+
+    /**
+     * @return array{0: Carbon, 1: Carbon}
+     */
+    public function utcSlotWindow(Carbon $scheduled): array
+    {
+        return [
+            $scheduled->copy()->utc()->subMinute(),
+            $scheduled->copy()->utc()->addMinute(),
+        ];
+    }
+
     public function windowBeforeMinutes(): int
     {
         return (int) (AppSetting::query()->where('key', 'medications.mar.window_before_minutes')->value('value')
@@ -39,6 +91,8 @@ class MarScheduleService
      */
     public function scheduledTimesForDate(ClientMedication $medication, Carbon $date): array
     {
+        $date = $date->copy()->timezone($this->workerTimezone())->startOfDay();
+
         if (!$medication->active) {
             return [];
         }
@@ -56,9 +110,41 @@ class MarScheduleService
             return [];
         }
 
+        $times = $this->doseTimesFromColumn($medication);
+
+        if ($times === []) {
+            $times = $this->doseTimesFromFrequency($medication);
+        }
+
+        if ($times === []) {
+            return [];
+        }
+
+        return array_map(fn ($t) => $date->copy()->setTimeFromTimeString($t), $times);
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function doseTimesFromColumn(ClientMedication $medication): array
+    {
+        $doseTimes = is_array($medication->dose_times) ? $medication->dose_times : [];
+
+        return collect($doseTimes)
+            ->filter(fn ($time) => is_string($time) && preg_match('/^([01]\d|2[0-3]):[0-5]\d$/', $time) === 1)
+            ->unique()
+            ->sort()
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @return array<int, string>
+     */
+    private function doseTimesFromFrequency(ClientMedication $medication): array
+    {
         $freq = trim((string) ($medication->frequency ?? ''));
         if ($freq === '') {
-            // No frequency specified; treat as unscheduled (won't appear in Daily MAR).
             return [];
         }
 
@@ -114,7 +200,7 @@ class MarScheduleService
 
         sort($times);
 
-        return array_map(fn ($t) => $date->copy()->setTimeFromTimeString($t), $times);
+        return $times;
     }
 
     public function windowForScheduled(Carbon $scheduled): array

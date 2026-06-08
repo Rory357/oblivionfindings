@@ -70,7 +70,7 @@ export function RunModal({ runId, onClose }: { runId: number; onClose: () => voi
     }, []);
 
     const items = runDetail?.items ?? [];
-    const readOnly = runDetail?.status === 'completed';
+    const readOnly = runDetail?.status === 'completed' || !cfg.can.run;
 
     const answered = items.filter((it) => isAnswered(resp[it.id]?.value)).length;
     const pct = items.length ? Math.round((answered / items.length) * 100) : 0;
@@ -212,7 +212,11 @@ export function RunModal({ runId, onClose }: { runId: number; onClose: () => voi
                         <div className="shrink-0 border-t border-border bg-card p-4">
                             {readOnly ? (
                                 <div className="flex items-center justify-between gap-2">
-                                    <span className="text-xs text-muted-foreground">This run is completed.</span>
+                                    <span className="text-xs text-muted-foreground">
+                                        {runDetail?.status === 'completed'
+                                            ? 'This run is completed.'
+                                            : 'You can view this checklist but cannot complete it.'}
+                                    </span>
                                     <Button variant="outline" onClick={close}>
                                         Close
                                     </Button>

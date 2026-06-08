@@ -5,11 +5,13 @@ namespace App\Http\Controllers\Emar;
 use App\Http\Controllers\Concerns\HandlesOfflineSubmission;
 use App\Http\Controllers\Controller;
 use App\Models\ClientMedication;
+use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationRound;
 use App\Models\Shift;
 use App\Models\User;
 use App\Services\EnhancedMarService;
 use App\Services\GuidedRoundService;
+use App\Services\MarScheduleService;
 use App\Support\EmarUrl;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
@@ -41,6 +43,7 @@ class WorkerMedsController extends Controller
     public function __construct(
         protected GuidedRoundService $guidedRoundService,
         protected EnhancedMarService $marService,
+        protected MarScheduleService $scheduleService,
     ) {
     }
 
@@ -237,49 +240,64 @@ class WorkerMedsController extends Controller
             $medications = ClientMedication::whereIn('client_id', $clientIds)
                 ->active()
                 ->where('is_prn', false)
-                ->whereNotNull('dose_times')
+                ->where(function ($query) {
+                    $query->whereNotNull('dose_times')
+                        ->orWhereNotNull('frequency');
+                })
                 ->with('client:id,first_name,last_name')
                 ->get();
 
             $result = [];
 
             foreach ($medications as $med) {
-                $doseTimes = $med->dose_times;
-                if (empty($doseTimes) || ! is_array($doseTimes)) {
-                    continue;
-                }
+                $day = $windowStart->copy()->startOfDay();
+                $lastDay = $windowEnd->copy()->startOfDay();
 
-                foreach ($doseTimes as $doseTime) {
-                    $scheduled = $now->copy()->startOfDay()->setTimeFromTimeString($doseTime);
+                while ($day->lessThanOrEqualTo($lastDay)) {
+                    foreach ($this->scheduleService->scheduledTimesForDate($med, $day) as $scheduled) {
+                        if ($scheduled->lt($windowStart) || $scheduled->gt($windowEnd)) {
+                            continue;
+                        }
 
-                    if ($scheduled->lt($windowStart) || $scheduled->gt($windowEnd)) {
-                        continue;
+                        [$slotStartUtc, $slotEndUtc] = $this->scheduleService->utcSlotWindow($scheduled);
+                        $administration = ClientMedicationAdministration::query()
+                            ->where('client_id', $med->client_id)
+                            ->where('client_medication_id', $med->id)
+                            ->whereBetween('scheduled_for', [$slotStartUtc, $slotEndUtc])
+                            ->latest('id')
+                            ->first();
+
+                        if ($administration && in_array($administration->status, ['given', 'refused', 'withheld', 'missed'], true)) {
+                            continue;
+                        }
+
+                        if ($scheduled->lt($now)) {
+                            $status = 'overdue';
+                        } elseif ($scheduled->lte($now->copy()->addHour())) {
+                            $status = 'due';
+                        } else {
+                            $status = 'upcoming';
+                        }
+
+                        $clientName = $med->client
+                            ? trim($med->client->first_name . ' ' . $med->client->last_name)
+                            : 'Unknown';
+
+                        $result[] = [
+                            'client_id' => $med->client_id,
+                            'client_name' => $clientName,
+                            'medication_id' => $med->id,
+                            'medication_name' => $med->name,
+                            'dose' => $med->dosage,
+                            'route' => $med->route,
+                            'is_controlled' => (bool) ($med->controlled_drug ?? false),
+                            'scheduled_for' => $scheduled->toIso8601String(),
+                            'status' => $status,
+                            'mar_url' => EmarUrl::mar($med->client_id, $scheduled->toDateString()),
+                        ];
                     }
 
-                    if ($scheduled->lt($now)) {
-                        $status = 'overdue';
-                    } elseif ($scheduled->lte($now->copy()->addHour())) {
-                        $status = 'due';
-                    } else {
-                        $status = 'upcoming';
-                    }
-
-                    $clientName = $med->client
-                        ? trim($med->client->first_name . ' ' . $med->client->last_name)
-                        : 'Unknown';
-
-                    $result[] = [
-                        'client_id' => $med->client_id,
-                        'client_name' => $clientName,
-                        'medication_id' => $med->id,
-                        'medication_name' => $med->name,
-                        'dose' => $med->dosage,
-                        'route' => $med->route,
-                        'is_controlled' => (bool) ($med->controlled_drug ?? false),
-                        'scheduled_for' => $scheduled->toIso8601String(),
-                        'status' => $status,
-                        'mar_url' => EmarUrl::mar($med->client_id, $scheduled->toDateString()),
-                    ];
+                    $day->addDay();
                 }
             }
 
@@ -294,7 +312,9 @@ class WorkerMedsController extends Controller
             });
 
             return $result;
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            report($e);
+
             return [];
         }
     }

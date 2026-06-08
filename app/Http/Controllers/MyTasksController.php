@@ -3,25 +3,24 @@
 namespace App\Http\Controllers;
 
 use App\Domain\Hr\Models\HrAttendanceSession;
-use App\Domain\Hr\Models\HrLeaveBalance;
-use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Services\AttendanceService;
 use App\Http\Resources\MyShiftResource;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ClientMedication;
+use App\Models\ClientMedicationAdministration;
 use App\Models\ControlRoom\OperatorNote;
 use App\Models\ControlRoomAlert;
 use App\Models\IncidentFollowup;
 use App\Models\MedicationRound;
 use App\Models\Shift;
 use App\Models\ShiftHandover;
-use App\Models\ShiftOpenPosition;
 use App\Models\Site;
 use App\Models\SiteChecklistRun;
 use App\Models\Timesheet;
 use App\Models\User;
 use App\Services\GuidedRoundService;
+use App\Services\MarScheduleService;
 use App\Services\ShiftHandoverService;
 use App\Support\EmarUrl;
 use App\Support\ResidentHue;
@@ -30,6 +29,7 @@ use App\Support\ShiftTaskSupport;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\Lang;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
@@ -84,11 +84,7 @@ class MyTasksController extends Controller
 
         // 6. Tasks (CR alerts + followups + notes - existing aggregation)
         $tasks = $this->getCrTasks($userId);
-
-        // 7. Leave
-        $leave = $this->getLeave($userId, $workerNow);
-
-        $pendingClaimsCount = $this->getPendingClaimsCount($user);
+        $notifications = $this->getDigestNotifications($user);
 
         // 8. Stats
         $todayShifts = $shifts->filter(fn ($s) => $s['is_today']);
@@ -102,12 +98,6 @@ class MyTasksController extends Controller
             'cr_alerts' => collect($tasks)->where('type', 'alert')->count(),
             'notifications_unread' => $user->unreadNotifications()->count(),
         ];
-
-        // 9. Manager check
-        $isManager = $user->canDo('shifts.manageAny');
-
-        // 10. Manager data
-        $managerData = $isManager ? $this->getManagerData($user, $today, $tomorrowEnd) : null;
 
         // 11. Frontline clock state (PR 4)
         $clock = $this->getClockState($user, $queryNow);
@@ -123,6 +113,9 @@ class MyTasksController extends Controller
         $previousShift = $clock['open_session'] || $nextShiftBriefing
             ? null
             : $this->getPreviousShift($user, $workerNow);
+        $handover = $this->buildDigestHandover(
+            $activeShift ? $this->findIncomingHandover($user, $activeShift) : ($nextShiftBriefing['incoming_handover'] ?? null),
+        );
 
         // 14. Active-shift card (site-first). The new /my-day hero reads this
         //     instead of the legacy `clock.open_session.shift`. The card
@@ -145,11 +138,8 @@ class MyTasksController extends Controller
             'timesheets' => $timesheets,
             'incidents' => $incidents,
             'tasks' => $tasks,
+            'notifications' => $notifications,
             'stats' => $stats,
-            'leave' => $leave,
-            'pending_claims_count' => $pendingClaimsCount,
-            'is_manager' => $isManager,
-            'manager_data' => $managerData,
             'clock' => $clock,
             'active_round' => $activeRound,
             'active_shift' => $activeShiftCard,
@@ -158,6 +148,7 @@ class MyTasksController extends Controller
             'runDetail' => RunDetailPresenter::for($request->integer('run'), $activeShiftSiteId),
             'next_shift_briefing' => $nextShiftBriefing,
             'previous_shift' => $previousShift,
+            'handover' => $handover,
             // Per-worker observation capabilities, used by the Vitals & obs
             // flow on /my-day to gate the observation-type list. We resolve
             // them here (rather than client-side via auth) because permission
@@ -274,7 +265,9 @@ class MyTasksController extends Controller
                 ->first();
 
             return $shift;
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            report($e);
+
             return null;
         }
     }
@@ -352,9 +345,6 @@ class MyTasksController extends Controller
             || $user->canDo('shifts.manageAny');
 
         $openSession = null;
-        $eligibleShifts = collect();
-        $activeShift = null;
-
         try {
             $openSession = HrAttendanceSession::query()
                 ->with([
@@ -367,30 +357,9 @@ class MyTasksController extends Controller
                 ->open()
                 ->latest('clock_in_at')
                 ->first();
-
-            $eligibleShifts = app(AttendanceService::class)
-                ->eligibleShiftsForUser($user, $now)
-                ->load('client:id,first_name,last_name');
-
-            $activeShift = $eligibleShifts->count() === 1 ? $eligibleShifts->first() : null;
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            report($e);
             // Fail soft — home should still render without the clock card.
-        }
-
-        $shiftToCard = fn ($shift) => [
-            'id' => $shift->id,
-            'starts_at' => optional($shift->starts_at)->toIso8601String(),
-            'ends_at' => optional($shift->ends_at)->toIso8601String(),
-            'status' => $shift->status,
-            'location' => $shift->location,
-            'client_name' => $shift->client
-                ? trim($shift->client->first_name.' '.$shift->client->last_name)
-                : null,
-        ];
-
-        $activeShiftCard = $activeShift ? $shiftToCard($activeShift) : null;
-        if ($activeShiftCard && $activeShift) {
-            $activeShiftCard['incoming_handover'] = $this->findIncomingHandover($user, $activeShift);
         }
 
         $openShift = $openSession?->shift;
@@ -446,10 +415,10 @@ class MyTasksController extends Controller
                     : false,
                 'end_of_shift_blockers' => $endOfShiftBlockers,
                 'end_of_shift_ready' => $endOfShiftBlockers === [],
+                'can_force_clinical_blockers' => $user->canDo('shifts.manageAny')
+                    || $user->canDo('timesheets.manageAny')
+                    || $user->canDo('clients.update'),
             ] : null,
-            'active_shift' => $activeShiftCard,
-            'eligible_shifts' => $eligibleShifts->map($shiftToCard)->values()->all(),
-            'eligible_shift_count' => $eligibleShifts->count(),
         ];
     }
 
@@ -505,9 +474,86 @@ class MyTasksController extends Controller
                     ? trim($handover->client->first_name.' '.$handover->client->last_name)
                     : null,
             ];
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            report($e);
+
             return null;
         }
+    }
+
+    private function buildDigestHandover(?array $handover): ?array
+    {
+        if (! $handover) {
+            return null;
+        }
+
+        $outgoingName = $handover['outgoing_staff_name'] ?? null;
+
+        return [
+            'id' => $handover['id'] ?? null,
+            'from' => $outgoingName ? [
+                'name' => $outgoingName,
+                'initials' => $this->initialsFromName($outgoingName),
+                'hue' => ResidentHue::for('staff:'.$outgoingName),
+                'role' => 'Previous shift',
+            ] : null,
+            'summary' => $handover['handover_notes'] ?? null,
+            'flags' => $this->handoverDigestFlags($handover),
+            'unread' => true,
+            'recorded_at' => $handover['submitted_at'] ?? null,
+        ];
+    }
+
+    private function handoverDigestFlags(array $handover): array
+    {
+        $flags = [];
+        foreach (($handover['medications_due'] ?? []) as $item) {
+            $label = $this->handoverItemLabel($item, 'Medication follow-up');
+            if ($label) {
+                $flags[] = ['tone' => 'warn', 'label' => $label];
+            }
+        }
+
+        foreach (($handover['incidents_to_note'] ?? []) as $item) {
+            $label = $this->handoverItemLabel($item, 'Incident noted');
+            if ($label) {
+                $flags[] = ['tone' => 'warn', 'label' => $label];
+            }
+        }
+
+        foreach (($handover['follow_up_items'] ?? []) as $item) {
+            $label = $this->handoverItemLabel($item, 'Follow-up needed');
+            if ($label) {
+                $flags[] = ['tone' => 'info', 'label' => $label];
+            }
+        }
+
+        return array_slice($flags, 0, 6);
+    }
+
+    private function handoverItemLabel(mixed $item, string $fallback): ?string
+    {
+        if (! is_array($item)) {
+            return $fallback;
+        }
+
+        foreach (['label', 'title', 'type', 'status'] as $key) {
+            $value = trim((string) ($item[$key] ?? ''));
+            if ($value !== '') {
+                return $value;
+            }
+        }
+
+        return $fallback;
+    }
+
+    private function initialsFromName(string $name): string
+    {
+        $parts = preg_split('/\s+/', trim($name)) ?: [];
+        $first = $parts[0] ?? '';
+        $last = count($parts) > 1 ? $parts[count($parts) - 1] : '';
+
+        return ResidentHue::initials($first, $last ?: null) ?: mb_strtoupper(mb_substr($name, 0, 1));
     }
 
     /**
@@ -525,7 +571,9 @@ class MyTasksController extends Controller
                     ShiftHandoverService::STATUS_ACKNOWLEDGED,
                 ])
                 ->exists();
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            report($e);
+
             return false;
         }
     }
@@ -542,7 +590,9 @@ class MyTasksController extends Controller
                 ->map(function (Shift $shift) use ($workerNow) {
                     return MyShiftResource::fromShift($shift, $workerNow);
                 });
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            report($e);
+
             return collect();
         }
     }
@@ -554,79 +604,105 @@ class MyTasksController extends Controller
         }
 
         try {
+            $scheduleService = app(MarScheduleService::class);
             $windowStart = $now->copy()->subHours(2);
             $windowEnd = $now->copy()->addHours(4);
 
             $medications = ClientMedication::whereIn('client_id', $clientIds)
                 ->active()
                 ->where('is_prn', false)
-                ->whereNotNull('dose_times')
+                ->where(function ($query) {
+                    $query->whereNotNull('dose_times')
+                        ->orWhereNotNull('frequency');
+                })
                 ->with('client:id,first_name,last_name')
                 ->get();
 
             $result = [];
 
             foreach ($medications as $med) {
-                $doseTimes = $med->dose_times;
-                if (empty($doseTimes) || ! is_array($doseTimes)) {
-                    continue;
-                }
+                $day = $windowStart->copy()->startOfDay();
+                $lastDay = $windowEnd->copy()->startOfDay();
 
-                foreach ($doseTimes as $doseTime) {
-                    $scheduled = $now->copy()->startOfDay()->setTimeFromTimeString($doseTime);
+                while ($day->lessThanOrEqualTo($lastDay)) {
+                    foreach ($scheduleService->scheduledTimesForDate($med, $day) as $scheduled) {
+                        if ($scheduled->lt($windowStart) || $scheduled->gt($windowEnd)) {
+                            continue;
+                        }
 
-                    if ($scheduled->lt($windowStart) || $scheduled->gt($windowEnd)) {
-                        continue;
+                        $scheduledIso = $scheduled->toIso8601String();
+                        $snoozeKey = sprintf(
+                            'my-day.med-snooze.user-%d.med-%d.%s',
+                            auth()->id(),
+                            $med->id,
+                            $scheduledIso,
+                        );
+
+                        if (Cache::has($snoozeKey)) {
+                            continue;
+                        }
+
+                        [$slotStartUtc, $slotEndUtc] = $scheduleService->utcSlotWindow($scheduled);
+                        $administration = ClientMedicationAdministration::query()
+                            ->where('client_id', $med->client_id)
+                            ->where('client_medication_id', $med->id)
+                            ->whereBetween('scheduled_for', [$slotStartUtc, $slotEndUtc])
+                            ->latest('id')
+                            ->first();
+
+                        if ($administration && in_array($administration->status, ['given', 'refused', 'withheld'], true)) {
+                            $status = $administration->status;
+                        } elseif ($scheduled->lt($now)) {
+                            $status = 'overdue';
+                        } elseif ($scheduled->lte($now->copy()->addHour())) {
+                            $status = 'due';
+                        } else {
+                            $status = 'upcoming';
+                        }
+
+                        $clientName = $med->client
+                            ? trim($med->client->first_name.' '.$med->client->last_name)
+                            : 'Unknown';
+
+                        $result[] = [
+                            // Compound id: medication + dose-time slot. Stable per
+                            // dose-row so the front-end can key rows and target
+                            // mutations (administer/refuse/snooze) at the right
+                            // occurrence. A medication with two in-window doses
+                            // (e.g. Paracetamol 09:00 + 13:00) yields distinct ids.
+                            // `medication_id` carries the bare ClientMedication id
+                            // the action endpoints still resolve via route-model
+                            // binding — the occurrence is addressed by that id plus
+                            // `scheduled_for`.
+                            'id' => $med->id.':'.$scheduledIso,
+                            'medication_id' => $med->id,
+                            'client_id' => $med->client_id,
+                            'client_name' => $clientName,
+                            'medication_name' => $med->name,
+                            'dose' => $med->dosage,
+                            'route' => $med->route ?? 'Oral',
+                            'flag' => $med->is_prn ? 'PRN' : null,
+                            'scheduled_for' => $scheduledIso,
+                            'status' => $status,
+                            'emar_url' => EmarUrl::mar($med->client_id, $scheduled->toDateString()),
+                        ];
                     }
 
-                    $scheduledIso = $scheduled->toIso8601String();
-
-                    if ($scheduled->lt($now)) {
-                        $status = 'overdue';
-                    } elseif ($scheduled->lte($now->copy()->addHour())) {
-                        $status = 'due';
-                    } else {
-                        $status = 'upcoming';
-                    }
-
-                    $clientName = $med->client
-                        ? trim($med->client->first_name.' '.$med->client->last_name)
-                        : 'Unknown';
-
-                    $result[] = [
-                        // Compound id: medication + dose-time slot. Stable per
-                        // dose-row so the front-end can key rows and target
-                        // mutations (administer/refuse/snooze) at the right
-                        // occurrence. A medication with two in-window doses
-                        // (e.g. Paracetamol 09:00 + 13:00) yields distinct ids.
-                        // `medication_id` carries the bare ClientMedication id
-                        // the action endpoints still resolve via route-model
-                        // binding — the occurrence is addressed by that id plus
-                        // `scheduled_for`.
-                        'id' => $med->id.':'.$scheduledIso,
-                        'medication_id' => $med->id,
-                        'client_id' => $med->client_id,
-                        'client_name' => $clientName,
-                        'medication_name' => $med->name,
-                        'dose' => $med->dosage,
-                        'route' => $med->route ?? 'Oral',
-                        'flag' => $med->is_prn ? 'PRN' : null,
-                        'scheduled_for' => $scheduledIso,
-                        'status' => $status,
-                        'emar_url' => EmarUrl::mar($med->client_id, $scheduled->toDateString()),
-                    ];
+                    $day->addDay();
                 }
             }
 
             // Sort: overdue first, then due, then upcoming
             usort($result, function ($a, $b) {
-                $order = ['overdue' => 0, 'due' => 1, 'upcoming' => 2];
+                $order = ['overdue' => 0, 'due' => 1, 'upcoming' => 2, 'given' => 3, 'refused' => 4, 'withheld' => 5];
 
                 return ($order[$a['status']] ?? 3) <=> ($order[$b['status']] ?? 3);
             });
 
             return $result;
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            report($e);
+
             return [];
         }
     }
@@ -666,7 +742,9 @@ class MyTasksController extends Controller
             $briefing['what_to_know'] = $shift->notes;
 
             return $briefing;
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            report($e);
+
             return null;
         }
     }
@@ -712,7 +790,9 @@ class MyTasksController extends Controller
             );
 
             return $summary;
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            report($e);
+
             return null;
         }
     }
@@ -724,6 +804,7 @@ class MyTasksController extends Controller
         }
 
         try {
+            $scheduleService = app(MarScheduleService::class);
             $start = $shift->starts_at->copy()->timezone($workerNow->getTimezone());
             $end = $shift->ends_at->copy()->timezone($workerNow->getTimezone());
 
@@ -731,20 +812,18 @@ class MyTasksController extends Controller
                 ->where('client_id', $shift->client_id)
                 ->active()
                 ->where('is_prn', false)
-                ->whereNotNull('dose_times')
+                ->where(function ($query) {
+                    $query->whereNotNull('dose_times')
+                        ->orWhereNotNull('frequency');
+                })
                 ->get()
-                ->flatMap(function (ClientMedication $medication) use ($start, $end) {
+                ->flatMap(function (ClientMedication $medication) use ($start, $end, $scheduleService) {
                     $items = [];
-                    $doseTimes = is_array($medication->dose_times)
-                        ? $medication->dose_times
-                        : [];
                     $day = $start->copy()->startOfDay();
                     $lastDay = $end->copy()->startOfDay();
 
                     while ($day->lessThanOrEqualTo($lastDay)) {
-                        foreach ($doseTimes as $doseTime) {
-                            $scheduled = $day->copy()->setTimeFromTimeString($doseTime);
-
+                        foreach ($scheduleService->scheduledTimesForDate($medication, $day) as $scheduled) {
                             if ($scheduled->betweenIncluded($start, $end)) {
                                 $items[] = [
                                     'medication_name' => $medication->name,
@@ -764,7 +843,9 @@ class MyTasksController extends Controller
                 ->values()
                 ->take(6)
                 ->all();
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            report($e);
+
             return [];
         }
     }
@@ -822,7 +903,9 @@ class MyTasksController extends Controller
                 'percent' => $progress['percent'],
                 'url' => route('meds.round.show', $round),
             ];
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            report($e);
+
             return null;
         }
     }
@@ -901,7 +984,9 @@ class MyTasksController extends Controller
                     ];
                 })
                 ->all();
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            report($e);
+
             return [];
         }
     }
@@ -938,7 +1023,9 @@ class MyTasksController extends Controller
                     ];
                 })
                 ->all();
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            report($e);
+
             return [];
         }
     }
@@ -970,80 +1057,6 @@ class MyTasksController extends Controller
 
             return Carbon::parse($a['due_at'])->timestamp - Carbon::parse($b['due_at'])->timestamp;
         })->values()->all();
-    }
-
-    private function getLeave(int $userId, Carbon $now): array
-    {
-        try {
-            $balances = HrLeaveBalance::where('user_id', $userId)
-                ->where('year', $now->year)
-                ->get()
-                ->map(fn ($b) => [
-                    'type' => $b->leave_type,
-                    'remaining_hours' => round($b->balance_hours - $b->used_hours - $b->pending_hours, 1),
-                    'total_hours' => $b->balance_hours,
-                ])
-                ->all();
-
-            $pendingRequests = HrLeaveRequest::where('user_id', $userId)
-                ->where('status', 'pending')
-                ->count();
-
-            return [
-                'balances' => $balances,
-                'pending_requests' => $pendingRequests,
-            ];
-        } catch (\Throwable) {
-            return [
-                'balances' => [],
-                'pending_requests' => 0,
-            ];
-        }
-    }
-
-    private function getManagerData($user, Carbon $today, Carbon $tomorrowEnd): array
-    {
-        try {
-            $orgId = $user->organisation_id ?? $user->org_id ?? null;
-
-            $todayEnd = $today->copy()->endOfDay();
-
-            $teamShiftsToday = Shift::whereBetween('starts_at', [$today, $todayEnd]);
-            if ($orgId) {
-                $teamShiftsToday = $teamShiftsToday->whereHas('client', fn ($q) => $q->where('organisation_id', $orgId));
-            }
-            $teamShiftsTodayCount = $teamShiftsToday->count();
-
-            $unassignedShifts = Shift::whereNull('user_id')
-                ->whereBetween('starts_at', [$today, $tomorrowEnd]);
-            if ($orgId) {
-                $unassignedShifts = $unassignedShifts->whereHas('client', fn ($q) => $q->where('organisation_id', $orgId));
-            }
-            $unassignedShiftsCount = $unassignedShifts->count();
-
-            $timesheetsPendingApproval = Timesheet::where('status', 'submitted')->count();
-
-            $staffOnToday = Shift::whereBetween('starts_at', [$today, $todayEnd])
-                ->whereNotNull('user_id');
-            if ($orgId) {
-                $staffOnToday = $staffOnToday->whereHas('client', fn ($q) => $q->where('organisation_id', $orgId));
-            }
-            $staffOnTodayCount = $staffOnToday->distinct('user_id')->count('user_id');
-
-            return [
-                'team_shifts_today' => $teamShiftsTodayCount,
-                'unassigned_shifts' => $unassignedShiftsCount,
-                'timesheets_pending_approval' => $timesheetsPendingApproval,
-                'staff_on_today' => $staffOnTodayCount,
-            ];
-        } catch (\Throwable) {
-            return [
-                'team_shifts_today' => 0,
-                'unassigned_shifts' => 0,
-                'timesheets_pending_approval' => 0,
-                'staff_on_today' => 0,
-            ];
-        }
     }
 
     /**
@@ -1150,7 +1163,9 @@ class MyTasksController extends Controller
                     ];
                 })
                 ->all();
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            report($e);
+
             return [];
         }
     }
@@ -1199,7 +1214,9 @@ class MyTasksController extends Controller
                     ];
                 })
                 ->all();
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            report($e);
+
             return [];
         }
     }
@@ -1234,22 +1251,117 @@ class MyTasksController extends Controller
                 })
                 ->values()
                 ->all();
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            report($e);
+
             return [];
         }
     }
 
-    private function getPendingClaimsCount(User $user): int
+    private function getDigestNotifications(User $user): array
     {
         try {
-            return ShiftOpenPosition::query()
-                ->when($user->organization_id, fn ($query) => $query->where('organization_id', $user->organization_id))
-                ->where('claimed_by', $user->id)
-                ->where('status', 'claimed')
-                ->count();
-        } catch (\Throwable) {
-            return 0;
+            $workerNow = Carbon::now($this->workerTimezone());
+
+            return $user->unreadNotifications()
+                ->latest()
+                ->limit(5)
+                ->get(['id', 'type', 'data', 'created_at'])
+                ->map(function ($notification) use ($workerNow) {
+                    $data = is_array($notification->data) ? $notification->data : [];
+                    $createdAt = $this->digestNotificationCreatedAt($notification);
+
+                    return [
+                        'id' => (string) $notification->id,
+                        'title' => $this->digestNotificationTitle($data, (string) $notification->type),
+                        'at' => $this->digestNotificationAge($createdAt, $workerNow),
+                        'tone' => $this->digestNotificationTone($data),
+                    ];
+                })
+                ->values()
+                ->all();
+        } catch (\Throwable $e) {
+            report($e);
+
+            return [];
         }
+    }
+
+    private function digestNotificationTitle(array $data, string $type): string
+    {
+        foreach (['title', 'subject', 'headline', 'message', 'body', 'event_key'] as $key) {
+            $value = $data[$key] ?? null;
+            if (is_string($value) && trim($value) !== '') {
+                $title = trim($value);
+
+                if ($key === 'event_key') {
+                    $title = Str::headline(str_replace(['.', '_', '-'], ' ', $title));
+                }
+
+                return Str::limit($title, 90);
+            }
+        }
+
+        $fallback = class_basename($type);
+
+        return Str::headline(str_replace('Notification', '', $fallback)) ?: 'Notification';
+    }
+
+    private function digestNotificationTone(array $data): string
+    {
+        $value = strtolower((string) ($data['tone'] ?? $data['priority'] ?? $data['severity'] ?? $data['kind'] ?? ''));
+
+        if (in_array($value, ['critical', 'high', 'urgent', 'primary', 'warning'], true)) {
+            return 'primary';
+        }
+
+        if (in_array($value, ['info', 'success', 'medium', 'low', 'operational'], true)) {
+            return 'info';
+        }
+
+        return 'muted';
+    }
+
+    private function digestNotificationCreatedAt($notification): ?Carbon
+    {
+        $raw = method_exists($notification, 'getRawOriginal')
+            ? $notification->getRawOriginal('created_at')
+            : null;
+
+        if ($raw) {
+            return Carbon::parse((string) $raw, (string) config('app.timezone', 'UTC'))
+                ->timezone($this->workerTimezone());
+        }
+
+        return $notification->created_at
+            ? $notification->created_at->copy()->timezone($this->workerTimezone())
+            : null;
+    }
+
+    private function digestNotificationAge(?Carbon $createdAt, Carbon $workerNow): string
+    {
+        if (! $createdAt) {
+            return '';
+        }
+
+        $seconds = max(0, (int) $createdAt->diffInSeconds($workerNow, false));
+        if ($seconds < 60) {
+            return 'just now';
+        }
+
+        $minutes = intdiv($seconds, 60);
+        if ($minutes < 60) {
+            return $minutes.' '.Str::plural('minute', $minutes).' ago';
+        }
+
+        $hours = intdiv($minutes, 60);
+        if ($hours < 24) {
+            return $hours.' '.Str::plural('hour', $hours).' ago';
+        }
+
+        $days = intdiv($hours, 24);
+
+        return $days.' '.Str::plural('day', $days).' ago';
     }
 
     private function workerTimezone(): string

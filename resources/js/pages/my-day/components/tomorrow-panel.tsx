@@ -3,6 +3,7 @@ import { ArrowRight } from 'lucide-react';
 
 import { Avatar, AvatarFallback, AvatarImage } from '@/components/ui/avatar';
 import { Button } from '@/components/ui/button';
+import HandoverReadCard from '@/components/handover-read-card';
 import { useMyDayLabels } from '@/hooks/use-my-day-labels';
 
 import { residentHue, residentInitials } from '../lib/resident-hue';
@@ -77,6 +78,11 @@ export function TomorrowPanel({ briefing, heading }: TomorrowPanelProps) {
                         <li key={i}>{line}</li>
                     ))}
                 </ul>
+            ) : null}
+            {briefing.incoming_handover ? (
+                <div className="mt-3">
+                    <HandoverReadCard handover={briefing.incoming_handover} />
+                </div>
             ) : null}
             <Button asChild variant="ghost" size="sm" className="mt-2">
                 <Link href="/my-roster">

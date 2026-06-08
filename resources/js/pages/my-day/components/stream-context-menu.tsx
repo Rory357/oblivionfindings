@@ -179,11 +179,18 @@ function buildTaskMenu(item: Extract<StreamItem, { kind: 'task' }>): MenuEntry[]
 
 function buildMedMenu(item: Extract<StreamItem, { kind: 'med' }>): MenuEntry[][] {
     const m = item.data;
-    const given = m.status === 'given';
-    if (given) {
+    const resolvedLabel =
+        m.status === 'given'
+            ? 'Already given'
+            : m.status === 'withheld'
+              ? 'Already withheld'
+              : m.status === 'refused'
+                ? 'Already refused'
+                : null;
+    if (resolvedLabel) {
         return [
             [
-                { icon: ArrowRight, label: 'Already given', action: 'noop', disabled: true },
+                { icon: ArrowRight, label: resolvedLabel, action: 'noop', disabled: true },
                 { icon: Pill, label: 'Open in eMAR', action: 'open-emar' },
                 { icon: Shield, label: 'Why this dose?', action: 'explain-med', disabled: true },
             ],

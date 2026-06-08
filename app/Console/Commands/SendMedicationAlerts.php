@@ -4,6 +4,7 @@ namespace App\Console\Commands;
 
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
+use App\Models\ClientMedication;
 use App\Models\MedicationCompetencyAssessment;
 use App\Models\MedicationRound;
 use App\Models\User;
@@ -11,7 +12,10 @@ use App\Notifications\MedicationCompetencyExpiringNotification;
 use App\Notifications\MedicationOverdueNotification;
 use App\Notifications\MedicationRefusalClusterNotification;
 use App\Notifications\MedicationStockLowNotification;
+use App\Services\MarScheduleService;
 use Illuminate\Console\Command;
+use Illuminate\Support\Carbon;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Facades\DB;
 
 class SendMedicationAlerts extends Command
@@ -34,54 +38,119 @@ class SendMedicationAlerts extends Command
         return self::SUCCESS;
     }
 
-    /**
-     * Check for overdue medications: administrations where scheduled_for < now() - window_minutes
-     * AND status = 'pending'. Notify the assigned round staff.
-     */
     protected function checkOverdueMedications(): void
     {
         $this->info('Checking for overdue medications...');
 
-        $overdueAdministrations = ClientMedicationAdministration::where('status', 'pending')
-            ->where('scheduled_for', '<', now())
-            ->with(['medication.client', 'round.assignedTo'])
-            ->get()
-            ->filter(function ($admin) {
-                $client = $admin->medication?->client ?? $admin->client;
-                if ($client?->suppress_med_admin_alerts) {
-                    return false;
-                }
+        $scheduleService = app(MarScheduleService::class);
+        $now = Carbon::now($scheduleService->workerTimezone());
+        $lookbackStart = $now->copy()->subDay()->startOfDay();
+        $lookbackEnd = $now->copy()->startOfDay();
 
-                // Respect the round's window_minutes if available
-                if ($admin->round && $admin->round->window_minutes) {
-                    return now()->gt($admin->scheduled_for->addMinutes($admin->round->window_minutes));
-                }
-                // Default: overdue if scheduled_for is in the past
-                return true;
-            });
+        $medications = ClientMedication::query()
+            ->active()
+            ->where('is_prn', false)
+            ->where(function ($query) {
+                $query->whereNotNull('dose_times')
+                    ->orWhereNotNull('frequency');
+            })
+            ->with('client:id,first_name,last_name,site_id,service_context_id,suppress_med_admin_alerts')
+            ->get();
 
         $count = 0;
-        foreach ($overdueAdministrations as $admin) {
-            $staff = $admin->round?->assignedTo;
-            if (!$staff) {
+        foreach ($medications as $medication) {
+            $client = $medication->client;
+            if (! $client || $client->suppress_med_admin_alerts) {
                 continue;
             }
 
-            $medicationName = $admin->medication?->name ?? 'Unknown medication';
-            $clientName = $admin->medication?->client?->name ?? $admin->client?->name ?? 'Unknown client';
-            $clientId = $admin->client_id;
-            $scheduledTime = $admin->scheduled_for->format('H:i');
+            $day = $lookbackStart->copy();
 
-            $staff->notify(new MedicationOverdueNotification(
-                medication: $medicationName,
-                clientName: $clientName,
-                scheduledTime: $scheduledTime,
-                clientId: $clientId,
-            ));
-            $count++;
+            while ($day->lessThanOrEqualTo($lookbackEnd)) {
+                foreach ($scheduleService->scheduledTimesForDate($medication, $day) as $scheduledFor) {
+                    [, $slotWindowEnd] = $scheduleService->windowForScheduled($scheduledFor);
+                    if ($slotWindowEnd->greaterThanOrEqualTo($now)) {
+                        continue;
+                    }
+
+                    [$slotStartUtc, $slotEndUtc] = $scheduleService->utcSlotWindow($scheduledFor);
+                    $hasAdministration = ClientMedicationAdministration::query()
+                        ->where('client_id', $client->id)
+                        ->where('client_medication_id', $medication->id)
+                        ->whereBetween('scheduled_for', [$slotStartUtc, $slotEndUtc])
+                        ->exists();
+
+                    if ($hasAdministration) {
+                        continue;
+                    }
+
+                    $round = $this->roundForSlot($medication, $scheduledFor, $scheduleService);
+                    $staff = $round?->assignedTo;
+                    if (! $staff) {
+                        continue;
+                    }
+
+                    $alertKey = sprintf(
+                        'emar:overdue-alert:user-%d.med-%d.%s',
+                        $staff->id,
+                        $medication->id,
+                        $scheduledFor->copy()->utc()->format('YmdHi'),
+                    );
+
+                    if (! Cache::add($alertKey, true, now()->addDay())) {
+                        continue;
+                    }
+
+                    $clientName = trim(($client->first_name ?? '').' '.($client->last_name ?? ''));
+
+                    $staff->notify(new MedicationOverdueNotification(
+                        medication: $medication->name ?? 'Unknown medication',
+                        clientName: $clientName !== '' ? $clientName : 'Unknown client',
+                        scheduledTime: $scheduledFor->format('H:i'),
+                        clientId: $client->id,
+                    ));
+                    $count++;
+                }
+
+                $day->addDay();
+            }
         }
 
         $this->info("Sent {$count} overdue medication alerts.");
+    }
+
+    protected function roundForSlot(ClientMedication $medication, Carbon $scheduledFor, MarScheduleService $scheduleService): ?MedicationRound
+    {
+        $client = $medication->client;
+        if (! $client) {
+            return null;
+        }
+
+        return MedicationRound::query()
+            ->whereDate('round_date', $scheduledFor->toDateString())
+            ->whereNotNull('assigned_to')
+            ->with('assignedTo')
+            ->when($client->site_id, fn ($query) => $query->where(function ($scope) use ($client) {
+                $scope->whereNull('site_id')->orWhere('site_id', $client->site_id);
+            }))
+            ->when($client->service_context_id, fn ($query) => $query->where(function ($scope) use ($client) {
+                $scope->whereNull('service_context_id')->orWhere('service_context_id', $client->service_context_id);
+            }))
+            ->get()
+            ->first(function (MedicationRound $round) use ($scheduledFor, $scheduleService) {
+                if (! $round->scheduled_time) {
+                    return false;
+                }
+
+                $roundDate = $scheduleService->dateFromInput($round->round_date?->toDateString());
+                $roundTime = $roundDate->copy()->setTimeFromTimeString($round->scheduled_time);
+                $windowMinutes = max(0, (int) ($round->window_minutes ?? 60));
+
+                return $scheduledFor->betweenIncluded(
+                    $roundTime->copy()->subMinutes($windowMinutes),
+                    $roundTime->copy()->addMinutes($windowMinutes),
+                );
+            });
     }
 
     /**

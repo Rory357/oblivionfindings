@@ -157,6 +157,7 @@ test('clock out reuses an existing draft timesheet for the same shift and staff 
         'shift_id' => $shift->id,
         'client_id' => $client->id,
         'user_id' => $this->staff->id,
+        'break_minutes' => 45,
         'status' => 'draft',
         'created_by' => $this->staff->id,
     ]);
@@ -202,7 +203,41 @@ test('clock out reuses an existing draft timesheet for the same shift and staff 
 
     $existingTimesheet->refresh();
     expect((int) $existingTimesheet->attendance_session_id)->toBe($openSession->id)
-        ->and((int) $existingTimesheet->break_minutes)->toBe(20);
+        ->and((int) $existingTimesheet->break_minutes)->toBe(45)
+        ->and((int) $openSession->fresh()->break_minutes)->toBe(20);
+});
+
+test('clock in without an explicit shift is blocked when multiple eligible shifts match', function () {
+    $serviceContext = ServiceContext::factory()->create();
+
+    Shift::query()->create([
+        'client_id' => Client::factory()->create()->id,
+        'service_context_id' => $serviceContext->id,
+        'user_id' => $this->staff->id,
+        'starts_at' => now()->subMinutes(30),
+        'ends_at' => now()->addHours(3),
+        'status' => 'scheduled',
+        'created_by' => $this->staff->id,
+    ]);
+
+    Shift::query()->create([
+        'client_id' => Client::factory()->create()->id,
+        'service_context_id' => $serviceContext->id,
+        'user_id' => $this->staff->id,
+        'starts_at' => now()->addMinutes(30),
+        'ends_at' => now()->addHours(4),
+        'status' => 'scheduled',
+        'created_by' => $this->staff->id,
+    ]);
+
+    $this->actingAs($this->staff)
+        ->post('/attendance/clock-in')
+        ->assertSessionHasErrors(['clock_in']);
+
+    expect(HrAttendanceSession::query()
+        ->where('user_id', $this->staff->id)
+        ->open()
+        ->exists())->toBeFalse();
 });
 
 // ──────────────────────────────────────────────

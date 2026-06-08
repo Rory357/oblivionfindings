@@ -10,7 +10,7 @@ use App\Models\MedicationRound;
 use App\Models\TimelineEvent;
 use App\Services\EnhancedMarService;
 use App\Services\GuidedRoundService;
-use Carbon\Carbon;
+use App\Services\MarScheduleService;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
@@ -30,6 +30,7 @@ class GuidedRoundController extends Controller
     public function __construct(
         protected GuidedRoundService $guidedRoundService,
         protected EnhancedMarService $marService,
+        protected MarScheduleService $scheduleService,
     ) {
     }
 
@@ -133,7 +134,7 @@ class GuidedRoundController extends Controller
             ]);
         }
 
-        $scheduled = Carbon::parse($data['scheduled_for']);
+        $scheduled = $this->scheduleService->parseWorkerDateTime((string) $data['scheduled_for']);
 
         return DB::transaction(function () use ($request, $round, $medication, $data, $backendStatus, $scheduled, $user) {
             // Guard against double administration for the same dose in the
@@ -141,10 +142,7 @@ class GuidedRoundController extends Controller
             // partial network error).
             $existing = $medication->administrations()
                 ->where('medication_round_id', $round->id)
-                ->whereBetween('scheduled_for', [
-                    $scheduled->copy()->subSeconds(30),
-                    $scheduled->copy()->addSeconds(30),
-                ])
+                ->whereBetween('scheduled_for', $this->scheduleService->utcSlotWindow($scheduled))
                 ->first();
 
             if ($existing) {

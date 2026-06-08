@@ -4,6 +4,8 @@ use App\Domain\Hr\Models\HrAttendanceSession;
 use App\Domain\Hr\Services\AttendanceService;
 use App\Domain\Shifts\Timesheets\Drafts\DraftTimesheetService;
 use App\Models\Client;
+use App\Models\ClientIncident;
+use App\Models\Permission;
 use App\Models\Role;
 use App\Models\ServiceContext;
 use App\Models\Shift;
@@ -72,6 +74,28 @@ test('clock out is blocked when end of shift checklist items are outstanding', f
     expect($session->fresh()->status)->toBe('open');
 });
 
+test('inertia clock out blocker response redirects with blocker flash instead of raw json', function () {
+    $session = openShiftSessionFor($this->staff);
+
+    $response = $this->actingAs($this->staff)
+        ->withHeaders([
+            'X-Inertia' => 'true',
+            'X-Requested-With' => 'XMLHttpRequest',
+            'Accept' => 'application/json',
+        ])
+        ->post('/attendance/clock-out', [
+            'session_id' => $session->id,
+            'break_minutes' => 0,
+        ]);
+
+    $response
+        ->assertRedirect()
+        ->assertSessionHasErrors(['clock_out'])
+        ->assertSessionHas('clock_out_blockers');
+
+    expect($session->fresh()->status)->toBe('open');
+});
+
 test('forced clock out succeeds with an override reason', function () {
     $session = openShiftSessionFor($this->staff);
 
@@ -81,6 +105,63 @@ test('forced clock out succeeds with an override reason', function () {
             'break_minutes' => 0,
             'force' => true,
             'override_reason' => 'Medication record is being corrected by the senior.',
+        ])
+        ->assertSessionHas('success');
+
+    expect($session->fresh()->status)->toBe('closed');
+});
+
+test('frontline forced clock out cannot bypass clinical blockers', function () {
+    $session = openShiftSessionFor($this->staff);
+
+    ClientIncident::factory()->create([
+        'client_id' => $session->shift->client_id,
+        'shift_id' => $session->shift_id,
+        'reported_by' => $this->staff->id,
+        'status' => 'draft',
+        'submitted_at' => null,
+    ]);
+
+    $this->actingAs($this->staff)
+        ->post('/attendance/clock-out', [
+            'session_id' => $session->id,
+            'break_minutes' => 0,
+            'force' => true,
+            'override_reason' => 'I need to leave and will finish the incident later.',
+        ])
+        ->assertSessionHasErrors(['clock_out']);
+
+    expect($session->fresh()->status)->toBe('open');
+});
+
+test('manager capability can force clock out through clinical blockers with a reason', function () {
+    $manager = User::factory()->create([
+        'role' => 'provider_manager',
+        'approved_at' => now(),
+    ]);
+    $permission = Permission::query()->firstOrCreate(
+        ['key' => 'shifts.manageAny'],
+        ['description' => 'shifts.manageAny'],
+    );
+    $manager->permissionOverrides()->syncWithoutDetaching([
+        $permission->id => ['allowed' => true],
+    ]);
+    $session = openShiftSessionFor($manager);
+
+    ClientIncident::factory()->create([
+        'client_id' => $session->shift->client_id,
+        'shift_id' => $session->shift_id,
+        'reported_by' => $manager->id,
+        'status' => 'draft',
+        'submitted_at' => null,
+    ]);
+
+    $this->actingAs($manager)
+        ->post('/attendance/clock-out', [
+            'session_id' => $session->id,
+            'break_minutes' => 0,
+            'force' => true,
+            'override_reason' => 'Manager approved clinical blocker override.',
         ])
         ->assertSessionHas('success');
 

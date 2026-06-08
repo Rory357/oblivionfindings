@@ -18,6 +18,10 @@ use Illuminate\Support\Collection;
  */
 class GuidedRoundService
 {
+    public function __construct(protected MarScheduleService $scheduleService)
+    {
+    }
+
     /**
      * Resolve the ordered list of doses for this round, with any existing
      * administration attached. Items the worker has already acted on are kept
@@ -42,12 +46,14 @@ class GuidedRoundService
      */
     public function items(MedicationRound $round): array
     {
-        $date = $round->round_date instanceof Carbon
-            ? $round->round_date->copy()
-            : Carbon::parse($round->round_date);
+        $date = $this->scheduleService->dateFromInput(
+            $round->round_date instanceof Carbon
+                ? $round->round_date->toDateString()
+                : (string) $round->round_date,
+        );
 
         $windowMinutes = max(0, (int) ($round->window_minutes ?? 60));
-        $roundTime = Carbon::parse($date->toDateString() . ' ' . $round->scheduled_time);
+        $roundTime = $date->copy()->setTimeFromTimeString($round->scheduled_time);
         $windowStart = $roundTime->copy()->subMinutes($windowMinutes);
         $windowEnd = $roundTime->copy()->addMinutes($windowMinutes);
 
@@ -76,31 +82,24 @@ class GuidedRoundService
         $administrations = ClientMedicationAdministration::query()
             ->where('medication_round_id', $round->id)
             ->get()
-            ->keyBy(fn ($a) => $a->client_medication_id . ':' . optional($a->scheduled_for)->toIso8601String());
+            ->keyBy(function (ClientMedicationAdministration $administration) {
+                $rawScheduledFor = $administration->getRawOriginal('scheduled_for');
+                $scheduledKey = $rawScheduledFor
+                    ? Carbon::parse((string) $rawScheduledFor, 'UTC')->format('Y-m-d H:i')
+                    : '';
+
+                return $administration->client_medication_id . ':' . $scheduledKey;
+            });
 
         $items = new Collection();
 
         foreach ($medications as $med) {
-            $doseTimes = $med->dose_times;
-            if (empty($doseTimes) && ! empty($med->frequency)) {
-                $doseTimes = DoseSchedulingService::calculateDoseTimes($med->frequency);
-            }
-            if (! is_array($doseTimes) || count($doseTimes) === 0) {
-                continue;
-            }
-
-            foreach ($doseTimes as $time) {
-                try {
-                    $scheduled = Carbon::parse($date->toDateString() . ' ' . $time);
-                } catch (\Throwable) {
-                    continue;
-                }
-
+            foreach ($this->scheduleService->scheduledTimesForDate($med, $date) as $scheduled) {
                 if (! $scheduled->between($windowStart, $windowEnd, true)) {
                     continue;
                 }
 
-                $key = $med->id . ':' . $scheduled->toIso8601String();
+                $key = $med->id . ':' . $scheduled->copy()->utc()->format('Y-m-d H:i');
                 $admin = $administrations->get($key);
 
                 $client = $med->client;

@@ -36,6 +36,7 @@ use App\Services\AuditLogger;
 use App\Services\DoseSchedulingService;
 use App\Services\MedicationAlertService;
 use App\Services\MedicationIncidentIntegrationService;
+use App\Services\MarScheduleService;
 use App\Services\MedicationRuleService;
 use App\Services\MedicationScanVerificationService;
 use App\Services\ShiftHandoverService;
@@ -380,10 +381,17 @@ class EmarController extends Controller
         ?string $statusOverride = null,
         ?string $scheduledForOverride = null,
     ): array {
+        $scheduledFor = $administration
+            ? $this->administrationDateUtc($administration, 'scheduled_for')
+            : null;
+        $administeredAt = $administration
+            ? $this->administrationDateUtc($administration, 'administered_at')
+            : null;
+
         return [
             'id' => $administration?->id,
-            'scheduled_for' => $scheduledForOverride ?? $administration?->scheduled_for?->toIso8601String(),
-            'administered_at' => $administration?->administered_at?->toIso8601String(),
+            'scheduled_for' => $scheduledForOverride ?? $scheduledFor?->toIso8601String(),
+            'administered_at' => $administeredAt?->toIso8601String(),
             'status' => $statusOverride ?? $administration?->status,
             'administered_by' => $administration?->administeredBy?->name,
             'witnessed_by' => $administration?->witnessedBy?->name,
@@ -887,7 +895,10 @@ class EmarController extends Controller
     // ─── MAR Charts ────────────────────────────────────────
     public function mar(Request $request)
     {
-        $date = $request->input('date', today()->toDateString());
+        $scheduleService = app(MarScheduleService::class);
+        $scheduleDate = $scheduleService->dateFromInput($request->input('date'));
+        $date = $scheduleDate->toDateString();
+        [$dayStartUtc, $dayEndUtc] = $scheduleService->utcDayWindow($scheduleDate);
         $clients = Client::query()
             ->withCount(['medications as active_medications_count' => fn ($q) => $q->active()])
             ->having('active_medications_count', '>', 0)
@@ -906,15 +917,16 @@ class EmarController extends Controller
             $selectedClient = Client::with([
                 'medications' => fn ($q) => $q->active()->orderBy('name'),
                 'medications.stock',
-                'medications.administrations' => fn ($q) => $q
-                    ->whereDate('scheduled_for', $date)
-                    ->orWhereDate('administered_at', $date),
+                'medications.administrations' => fn ($q) => $q->where(function ($query) use ($dayStartUtc, $dayEndUtc) {
+                    $query->whereBetween('scheduled_for', [$dayStartUtc, $dayEndUtc])
+                        ->orWhereBetween('administered_at', [$dayStartUtc, $dayEndUtc]);
+                }),
                 'medications.administrations.attachments.uploadedBy:id,name',
             ])->findOrFail($request->client_id);
 
             $this->authorize('viewMedications', $selectedClient);
 
-            $marData = $this->buildMarData($selectedClient, $date);
+            $marData = $this->buildMarData($selectedClient, $scheduleDate);
             $clientContext = $this->buildClientMedicationContext($selectedClient);
             $breakGlassAccess = $this->getBreakGlassState($selectedClient);
             $pendingCorrections = $this->getPendingCorrections($selectedClient);
@@ -942,13 +954,19 @@ class EmarController extends Controller
         ]);
     }
 
-    private function buildMarData(Client $client, string $date): array
+    private function buildMarData(Client $client, \Carbon\Carbon $date): array
     {
         $ruleService = app(MedicationRuleService::class);
+        $scheduleService = app(MarScheduleService::class);
         $medications = $client->medications()->active()->with([
             'stock',
-            'administrations' => function ($q) use ($date) {
-                $q->whereDate('scheduled_for', $date)->orWhereDate('administered_at', $date);
+            'administrations' => function ($q) use ($date, $scheduleService) {
+                [$dayStartUtc, $dayEndUtc] = $scheduleService->utcDayWindow($date);
+
+                $q->where(function ($query) use ($dayStartUtc, $dayEndUtc) {
+                    $query->whereBetween('scheduled_for', [$dayStartUtc, $dayEndUtc])
+                        ->orWhereBetween('administered_at', [$dayStartUtc, $dayEndUtc]);
+                });
             },
             'administrations.administeredBy:id,name',
             'administrations.witnessedBy:id,name',
@@ -958,41 +976,40 @@ class EmarController extends Controller
         $scheduled = $medications->where('is_prn', false)->values();
         $prn = $medications->where('is_prn', true)->values();
 
-        $scheduledPayload = $scheduled->map(function ($med) use ($client, $date, $ruleService) {
+        $scheduledPayload = $scheduled->map(function ($med) use ($client, $date, $ruleService, $scheduleService) {
                 $adminRules = $ruleService->requirementsFor($med);
-                $doseTimes = $med->dose_times ?? [];
-
-                // If no dose_times stored yet, auto-calculate from frequency
-                if (empty($doseTimes) && $med->frequency) {
-                    $doseTimes = DoseSchedulingService::calculateDoseTimes($med->frequency);
-                }
+                $scheduledSlots = $scheduleService->scheduledTimesForDate($med, $date);
+                $doseTimes = collect($scheduledSlots)
+                    ->map(fn (\Carbon\Carbon $slot) => $slot->format('H:i'))
+                    ->values()
+                    ->all();
+                $matchedAdministrationIds = [];
 
                 // Build administration slots: for each dose_time, find matching admin record
-                $administrations = collect($doseTimes)->map(function ($time) use ($med, $date) {
-                    $scheduledDatetime = $date . ' ' . $time . ':00';
-
+                $administrations = collect($scheduledSlots)->map(function (\Carbon\Carbon $scheduledAt) use ($med, &$matchedAdministrationIds, $scheduleService) {
+                    [$slotStartUtc, $slotEndUtc] = $scheduleService->utcSlotWindow($scheduledAt);
                     // Find an administration record matching this time slot
-                    $admin = $med->administrations->first(function ($a) use ($time) {
-                        if (!$a->scheduled_for) return false;
-                        return $a->scheduled_for->format('H:i') === $time;
+                    $admin = $med->administrations->first(function ($a) use ($slotStartUtc, $slotEndUtc) {
+                        $scheduledFor = $this->administrationDateUtc($a, 'scheduled_for');
+
+                        return $scheduledFor?->betweenIncluded($slotStartUtc, $slotEndUtc) === true;
                     });
 
                     if ($admin) {
+                        $matchedAdministrationIds[] = $admin->id;
                         return $this->serializeAdministration($admin);
                     }
 
                     // No record yet: determine if pending or missed
-                    $now = now();
-                    $scheduledAt = \Carbon\Carbon::parse($scheduledDatetime);
+                    $now = now($scheduleService->workerTimezone());
                     $status = $now->greaterThan($scheduledAt->copy()->addHour()) ? 'missed' : 'pending';
 
                     return $this->serializeAdministration(null, $status, $scheduledAt->toIso8601String());
                 })->values();
 
                 // Also include any administration records that don't match a dose_time slot
-                $unmatchedAdmins = $med->administrations->filter(function ($a) use ($doseTimes) {
-                    if (!$a->scheduled_for) return true;
-                    return !in_array($a->scheduled_for->format('H:i'), $doseTimes);
+                $unmatchedAdmins = $med->administrations->filter(function ($a) use ($matchedAdministrationIds) {
+                    return ! in_array($a->id, $matchedAdministrationIds, true);
                 })->map(fn ($a) => $this->serializeAdministration($a));
 
                 return [
@@ -1111,6 +1128,15 @@ class EmarController extends Controller
                 'care_level' => $client->care_level,
             ],
         ];
+    }
+
+    private function administrationDateUtc(ClientMedicationAdministration $administration, string $column): ?\Illuminate\Support\Carbon
+    {
+        $raw = $administration->getRawOriginal($column);
+
+        return $raw
+            ? \Illuminate\Support\Carbon::parse((string) $raw, 'UTC')
+            : null;
     }
 
     private function getActiveInteractions(Client $client): array

@@ -2087,14 +2087,14 @@ class MedicationControllerTest extends TestCase
     {
         $this->actingAs($this->admin)
             ->get("/clients/{$this->client->id}/mar")
-            ->assertRedirect(EmarUrl::mar($this->client, now()->toDateString()));
+            ->assertRedirect(EmarUrl::mar($this->client, now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString()));
     }
 
     public function test_mar_show_accessible_by_assigned_support_worker(): void
     {
         $this->actingAs($this->supportWorker)
             ->get("/clients/{$this->client->id}/mar")
-            ->assertRedirect(EmarUrl::mar($this->client, now()->toDateString()));
+            ->assertRedirect(EmarUrl::mar($this->client, now(config('app.worker_timezone', 'Pacific/Auckland'))->toDateString()));
     }
 
     public function test_mar_show_forbidden_for_unassigned_support_worker(): void

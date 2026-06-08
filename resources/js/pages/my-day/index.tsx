@@ -6,6 +6,7 @@ import {
     ClipboardCheck,
     FileText,
     Home,
+    Pill,
     Users,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
@@ -41,6 +42,7 @@ import {
 } from './lib/stream-grouping';
 import type {
     MyDayActiveSite,
+    MyDayActiveRound,
     MyDayHandover,
     MyDayHrTask,
     MyDayMedDue,
@@ -157,8 +159,10 @@ export default function MyDay() {
     // ──────────────────────────────────────────────────────────────────────
 
     const activeShift = props.active_shift;
+    const activeRound = props.active_round ?? null;
     const site: MyDayActiveSite | null = activeShift?.site ?? null;
     const shiftChecklists = props.shiftChecklists ?? [];
+    const canViewShiftChecklists = !!props.checklistConfig?.can.view;
     const canRunShiftChecklists = !!props.checklistConfig?.can.run;
     const residents: MyDayResident[] = useMemo(() => site?.residents ?? [], [site]);
     const singleResident: MyDayResident | null = useMemo(() => {
@@ -381,18 +385,11 @@ export default function MyDay() {
     }, [isOnBreak, openSession?.id]);
 
     // The "Today's timesheet" hero button is the worker's one-click entry
-    // into the per-client allocation popup for the shift they're on right
-    // now. Behaviour:
-    //   1. If a draft / returned timesheet already exists for today, open
-    //      it in the TimesheetReviewDialog directly (per-client allocation
-    //      review still lives here — that's the editing surface).
-    //   2. Otherwise redirect to the unified Create Timesheet dialog at
-    //      /operations/timesheets?create=1&shift_id=<active> so creation
-    //      always funnels through the same component. See
-    //      design_handoff_timesheets_redesign/README.md — single create flow
-    //      is a hard requirement.
-    //   3. If there's no active shift today, fall through to the full list
-    //      so the worker can still log a manual timesheet from there.
+    // into the per-client allocation popup for today's shift. If a draft /
+    // returned timesheet already exists, open it locally. Otherwise call the
+    // existing ensure-today endpoint; it finds-or-creates the draft and flashes
+    // `open_timesheet_id`, which the effect below uses to open the refreshed
+    // popup without sending the worker away from /my-day.
     const todaysTimesheet = useMemo<MyDayTimesheet | null>(() => {
         const todayIso = props.today_iso;
         if (!todayIso) return null;
@@ -410,18 +407,8 @@ export default function MyDay() {
             setTimesheetUnderReview(todaysTimesheet);
             return;
         }
-        // No draft for today yet — route the worker into the unified
-        // CreateTimesheetDialog on the timesheets index page. The active
-        // shift (if there is one) is pre-selected so they can pull tasks
-        // through and continue without re-picking. When there's no active
-        // shift, the dialog still opens with manual-entry as the fallback.
-        const query: Record<string, string> = { create: '1' };
-        if (activeShift?.id) {
-            query.shift_id = String(activeShift.id);
-        }
-        const qs = new URLSearchParams(query).toString();
-        router.visit(`/operations/timesheets?${qs}`);
-    }, [todaysTimesheet, activeShift?.id]);
+        router.post('/my-tasks/timesheet/ensure-today', {}, { preserveScroll: true });
+    }, [todaysTimesheet]);
 
     // Inertia flash `open_timesheet_id` is set by /ensure-today after it
     // finds-or-creates a draft for today. When we see it land, look up the
@@ -494,9 +481,20 @@ export default function MyDay() {
 
     const handleRefuseMed = useCallback((medicationId: number, scheduledFor: string) => {
         if (!confirm(t('confirm_refuse_dose'))) return;
+        const reason = window.prompt(
+            t('prompt_refuse_dose_reason'),
+            t('default_refuse_dose_reason'),
+        );
+        if (reason === null) return;
+        const trimmedReason = reason.trim();
+        if (!trimmedReason) return;
         router.post(
             `/my-day/medications/${medicationId}/refuse`,
-            { scheduled_for: scheduledFor },
+            {
+                scheduled_for: scheduledFor,
+                reason_code: 'refused',
+                reason: trimmedReason,
+            },
             { preserveScroll: true },
         );
     }, [t]);
@@ -657,10 +655,13 @@ export default function MyDay() {
                 />
 
                 <aside className="flex flex-col gap-4">
-                    {activeShift && canRunShiftChecklists && shiftChecklists.length > 0 && checklistProviderValue ? (
+                    {activeRound ? <ActiveRoundBanner round={activeRound} /> : null}
+
+                    {activeShift && canViewShiftChecklists && shiftChecklists.length > 0 && checklistProviderValue ? (
                         <ChecklistConfigProvider value={checklistProviderValue}>
                             <ShiftChecklistsCard
                                 runs={shiftChecklists}
+                                canRun={canRunShiftChecklists}
                                 onOpen={setActiveChecklistRun}
                             />
                         </ChecklistConfigProvider>
@@ -772,9 +773,11 @@ export default function MyDay() {
 
 function ShiftChecklistsCard({
     runs,
+    canRun,
     onOpen,
 }: {
     runs: ShiftChecklistRun[];
+    canRun: boolean;
     onOpen: (runId: number) => void;
 }) {
     return (
@@ -788,7 +791,7 @@ function ShiftChecklistsCard({
             </CardHeader>
             <CardContent className="space-y-2">
                 {runs.map((run) => (
-                    <ShiftChecklistRow key={run.id} run={run} onOpen={onOpen} />
+                    <ShiftChecklistRow key={run.id} run={run} canRun={canRun} onOpen={onOpen} />
                 ))}
             </CardContent>
         </Card>
@@ -797,9 +800,11 @@ function ShiftChecklistsCard({
 
 function ShiftChecklistRow({
     run,
+    canRun,
     onOpen,
 }: {
     run: ShiftChecklistRun;
+    canRun: boolean;
     onOpen: (runId: number) => void;
 }) {
     const status = run.is_overdue
@@ -824,9 +829,45 @@ function ShiftChecklistRow({
             </div>
             <Button type="button" size="sm" onClick={() => onOpen(run.id)}>
                 <CheckCircle2 className="h-4 w-4" />
-                {run.status === 'in_progress' ? 'Continue' : 'Complete'}
+                {!canRun ? 'View' : run.status === 'in_progress' ? 'Continue' : 'Complete'}
             </Button>
         </div>
+    );
+}
+
+function ActiveRoundBanner({ round }: { round: MyDayActiveRound }) {
+    const verb = round.status === 'in_progress' ? 'Resume' : 'Start';
+    const scheduled = round.scheduled_time ? round.scheduled_time.slice(0, 5) : null;
+
+    return (
+        <a
+            href={round.url}
+            aria-label={`${verb} ${round.name}`}
+            className="frontline-focus group block rounded-xl border border-status-success/30 bg-status-success-bg p-4 transition-shadow hover:shadow-sm"
+        >
+            <div className="flex items-start gap-3">
+                <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-status-success text-white">
+                    <Pill className="h-5 w-5" />
+                </div>
+                <div className="min-w-0 flex-1">
+                    <div className="text-sm font-semibold text-status-success">
+                        {verb} {round.name}
+                    </div>
+                    <p className="mt-0.5 text-xs text-muted-foreground">
+                        {round.completed} of {round.total} done
+                        {scheduled ? ` · ${scheduled}` : ''}
+                    </p>
+                    <div className="mt-2 h-1.5 overflow-hidden rounded-full bg-status-success/15">
+                        <div
+                            className="h-full rounded-full bg-status-success"
+                            style={{
+                                width: `${Math.max(0, Math.min(100, round.percent))}%`,
+                            }}
+                        />
+                    </div>
+                </div>
+            </div>
+        </a>
     );
 }
 

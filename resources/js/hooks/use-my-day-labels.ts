@@ -46,6 +46,8 @@ export type MyDayLabelKey =
     | 'optional_notes_placeholder'
     | 'override_audit_title'
     | 'override_audit_subtitle'
+    | 'clinical_override_locked'
+    | 'manager_override_required'
     | 'update_and_resubmit'
     | 'update_and_resubmit_title'
     | 'update_and_resubmit_action'
@@ -162,6 +164,8 @@ export type MyDayLabelKey =
     | 'ctx_why_this_dose'
     | 'ctx_dictate_update'
     | 'confirm_refuse_dose'
+    | 'prompt_refuse_dose_reason'
+    | 'default_refuse_dose_reason'
     | 'toast_marking_dose_given'
     | 'toast_dose_left_as_due'
     | 'toast_timesheet_sending'
@@ -208,6 +212,9 @@ const FALLBACKS: Record<MyDayLabelKey, string> = {
     override_audit_title: 'Override will be audit logged',
     override_audit_subtitle:
         'You can end the shift now if needed, but the reason and outstanding items will be recorded.',
+    clinical_override_locked:
+        'Unsigned medication or draft incident blockers need a manager override.',
+    manager_override_required: 'Manager override required',
     update_and_resubmit: 'Update & resubmit',
     update_and_resubmit_title: 'Update and resubmit',
     update_and_resubmit_action: 'Save and resubmit',
@@ -326,6 +333,8 @@ const FALLBACKS: Record<MyDayLabelKey, string> = {
     ctx_why_this_dose: 'Why this dose?',
     ctx_dictate_update: 'Dictate update',
     confirm_refuse_dose: 'Mark this dose as refused / not given?',
+    prompt_refuse_dose_reason: 'Why was this dose refused or not given?',
+    default_refuse_dose_reason: 'Resident declined',
     toast_marking_dose_given: 'Marking dose given…',
     toast_dose_left_as_due: 'Dose left as due.',
     toast_timesheet_sending: 'Timesheet sending…',

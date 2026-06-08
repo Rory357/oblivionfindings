@@ -81,7 +81,7 @@ export interface MyDayMedDue {
     dose: string;
     route?: string;
     scheduled_for: string;
-    status: 'overdue' | 'due' | 'upcoming' | 'given' | 'refused';
+    status: 'overdue' | 'due' | 'upcoming' | 'given' | 'refused' | 'withheld';
     flag?: string | null;
     emar_url: string;
 }
@@ -234,6 +234,7 @@ export interface MyDayClockSession {
     handover_submitted?: boolean;
     end_of_shift_blockers?: MyDayEndOfShiftBlocker[];
     end_of_shift_ready?: boolean;
+    can_force_clinical_blockers?: boolean;
     quick_action_urls?: {
         incident?: string;
         emar?: string;
@@ -244,9 +245,6 @@ export interface MyDayClockSession {
 export interface MyDayClockState {
     can_clock: boolean;
     open_session: MyDayClockSession | null;
-    active_shift: MyDayShift | null;
-    eligible_shifts?: MyDayShift[];
-    eligible_shift_count: number;
 }
 
 export interface MyDayHandover {
@@ -258,6 +256,19 @@ export interface MyDayHandover {
     recorded_at?: string;
 }
 
+export interface MyDayHandoverReadPayload {
+    id: number;
+    handover_notes: string | null;
+    client_mood: string | null;
+    medications_due: Array<Record<string, unknown>>;
+    incidents_to_note: Array<Record<string, unknown>>;
+    follow_up_items: Array<Record<string, unknown>>;
+    submitted_at: string | null;
+    outgoing_staff_name: string | null;
+    outgoing_shift_ends_at: string | null;
+    client_name: string | null;
+}
+
 export interface MyDayHrTask {
     id: number;
     kind: 'signature' | 'attestation';
@@ -267,10 +278,22 @@ export interface MyDayHrTask {
 }
 
 export interface MyDayNotification {
-    id: number;
+    id: string;
     title: string;
     at: string;
     tone?: 'primary' | 'info' | 'muted';
+}
+
+export interface MyDayActiveRound {
+    id: number;
+    name: string;
+    status: 'pending' | 'in_progress' | string;
+    scheduled_time?: string | null;
+    given: number;
+    total: number;
+    completed: number;
+    percent: number;
+    url: string;
 }
 
 export interface MyDayPreShiftBriefing {
@@ -292,7 +315,7 @@ export interface MyDayPreShiftBriefing {
     bullets?: string[];
     /** Free-text shift notes (the controller copies `shift.notes` here). */
     what_to_know?: string | null;
-    incoming_handover?: { summary?: string } | null;
+    incoming_handover?: MyDayHandoverReadPayload | null;
 }
 
 export interface ShiftChecklistRun {
@@ -329,18 +352,9 @@ export interface MyDayPageProps {
     incidents: MyDayIncident[];
     tasks: MyDayTaskFollowup[];
     stats: MyDayStats;
-    pending_claims_count: number;
-    leave: {
-        balances: {
-            type: string;
-            remaining_hours: number;
-            total_hours: number;
-        }[];
-        pending_requests: number;
-    };
-    is_manager: boolean;
     clock?: MyDayClockState;
     active_shift?: (MyDayShift & { site?: MyDayActiveSite | null }) | null;
+    active_round?: MyDayActiveRound | null;
     shiftChecklists?: ShiftChecklistRun[];
     checklistConfig?: MyDayChecklistConfig;
     runDetail?: RunDetail | null;
