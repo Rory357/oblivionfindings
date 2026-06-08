@@ -726,11 +726,18 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     // -------------------------------------------------------------------------
     // Shift Notes (NEW)
     // -------------------------------------------------------------------------
+    // Manager/scheduler surface: frontline staff are redirected to /my-day by
+    // role_scope, and everyone else needs shifts.viewAny to match the sidebar.
 
-    Route::get('/shift-notes', [ShiftNoteController::class, 'index'])->name('operations.shift_notes.index');
-    Route::get('/shift-notes/export', [ShiftNoteController::class, 'export'])->name('operations.shift_notes.export');
-    Route::patch('/shift-notes/{note}/flag', [ShiftNoteController::class, 'flag'])->name('operations.shift_notes.flag');
-    Route::patch('/shift-notes/{note}/review', [ShiftNoteController::class, 'markReviewed'])->name('operations.shift_notes.review');
+    Route::middleware(['role_scope:my-day', 'permission:shifts.viewAny'])->group(function () {
+        Route::get('/shift-notes', [ShiftNoteController::class, 'index'])->name('operations.shift_notes.index');
+        Route::get('/shift-notes/export', [ShiftNoteController::class, 'export'])->name('operations.shift_notes.export');
+    });
+
+    Route::middleware('permission:shifts.viewAny')->group(function () {
+        Route::patch('/shift-notes/{note}/flag', [ShiftNoteController::class, 'flag'])->name('operations.shift_notes.flag');
+        Route::patch('/shift-notes/{note}/review', [ShiftNoteController::class, 'markReviewed'])->name('operations.shift_notes.review');
+    });
 
     // -------------------------------------------------------------------------
     // Handovers (NEW)
@@ -1019,10 +1026,10 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     // -------------------------------------------------------------------------
 
     Route::get('/job-board', [JobBoardController::class, 'index'])
-        ->middleware('permission:job_board.viewAny|shifts.viewAny|shifts.viewAssigned')
+        ->middleware('permission:job_board.viewAny|job_board.claim|shifts.viewAny|shifts.viewAssigned')
         ->name('operations.job_board.index');
     Route::post('/job-board/alerts/toggle', [JobBoardController::class, 'toggleAlerts'])
-        ->middleware('permission:job_board.viewAny|shifts.viewAny|shifts.viewAssigned')
+        ->middleware('permission:job_board.viewAny|job_board.claim|shifts.viewAny|shifts.viewAssigned')
         ->name('operations.job_board.alerts.toggle');
     Route::post('/job-board/{position}/claim', [JobBoardController::class, 'claim'])
         ->middleware('permission:job_board.claim|shifts.viewAssigned|shifts.manageAny')

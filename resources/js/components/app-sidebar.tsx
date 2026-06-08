@@ -452,6 +452,7 @@ function buildIconNavItems({
 
     const hasWorkforce =
         !!can?.shifts?.viewAny ||
+        !!can?.shifts?.viewAssigned ||
         !!can?.job_board?.viewAny ||
         !!can?.job_board?.claim ||
         !!can?.rostering?.viewAny ||
@@ -936,7 +937,12 @@ function buildWorkforceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             href: '/operations/shifts',
             icon: CalendarDays,
         });
-    if (can?.job_board?.viewAny || can?.job_board?.claim)
+    if (
+        can?.job_board?.viewAny ||
+        can?.job_board?.claim ||
+        can?.shifts?.viewAny ||
+        can?.shifts?.viewAssigned
+    )
         workforce.push({
             title: 'Job Board',
             href: '/operations/job-board',
