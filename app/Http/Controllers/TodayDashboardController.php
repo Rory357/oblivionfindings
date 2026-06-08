@@ -15,16 +15,16 @@ class TodayDashboardController extends Controller
         $user = $request->user();
         abort_unless($user, 403);
 
-        $today = now()->startOfDay();
-        $tomorrow = (clone $today)->addDay();
+        $today = $mar->dateFromInput();
+        $tomorrow = $today->copy()->addDay();
 
         $shiftQuery = Shift::query()
             ->with([
                 'client:id,first_name,last_name',
-                'client.medications:id,client_id,name,dosage,frequency,is_prn,controlled_drug,active',
+                'client.medications:id,client_id,name,dosage,frequency,dose_times,is_prn,controlled_drug,active',
                 'staff:id,name,email',
             ])
-            ->whereBetween('starts_at', [$today, $tomorrow])
+            ->whereBetween('starts_at', [$today->copy()->utc(), $tomorrow->copy()->utc()])
             ->orderBy('starts_at');
 
         // Staff see only their own shifts unless manageAny
@@ -56,7 +56,7 @@ class TodayDashboardController extends Controller
 
         // MAR due/overdue (only for clients in today's shifts)
         $due = [];
-        $now = now();
+        $now = now($mar->workerTimezone());
         $windowStart = $now->copy()->subHours(2); // show recent overdue
         $windowEnd = $now->copy()->addHours(4);   // and upcoming
 
@@ -64,10 +64,14 @@ class TodayDashboardController extends Controller
         if ($clientIds->count() > 0) {
             $admins = ClientMedicationAdministration::query()
                 ->whereIn('client_id', $clientIds)
-                ->whereBetween('scheduled_for', [$today, $tomorrow])
+                ->whereBetween('scheduled_for', [$today->copy()->utc(), $tomorrow->copy()->utc()])
                 ->get()
                 ->keyBy(function ($a) {
-                    $ts = optional($a->scheduled_for)->format('Y-m-d H:i') ?? '';
+                    $rawScheduledFor = $a->getRawOriginal('scheduled_for');
+                    $ts = $rawScheduledFor
+                        ? \Illuminate\Support\Carbon::parse((string) $rawScheduledFor, 'UTC')->format('Y-m-d H:i')
+                        : '';
+
                     return $a->client_id . '|' . $a->client_medication_id . '|' . $ts;
                 });
 
@@ -88,7 +92,7 @@ class TodayDashboardController extends Controller
                             continue;
                         }
 
-                        $key = $client->id . '|' . $med->id . '|' . $scheduledFor->format('Y-m-d H:i');
+                        $key = $client->id . '|' . $med->id . '|' . $scheduledFor->copy()->utc()->format('Y-m-d H:i');
                         if ($admins->has($key)) {
                             continue;
                         }

@@ -55,6 +55,11 @@ import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 
 import { residentHue, residentInitials } from './lib/resident-hue';
+import {
+    allocationErrorForRow,
+    isAllocationBalanced,
+    splitHoursEvenly,
+} from './lib/timesheet-allocation';
 import { ResidentDot } from './components/resident-dot';
 import type {
     MyDayResident,
@@ -1201,19 +1206,19 @@ function TimesheetReviewBody({
         }
 
         if (m === 'residential_house' || m === 'equal_split' || m === 'time_segmented') {
-            const per = candidates.length > 0 ? totalHours / candidates.length : totalHours;
-            return candidates.map((c) => {
+            const splits = splitHoursEvenly(totalHours, candidates.length);
+            return candidates.map((c, index) => {
                 const found = existing.find((e) => e.client_id === c.id);
                 if (found) {
                     return {
                         ...found,
                         hours_text:
                             m === 'equal_split' || m === 'residential_house'
-                                ? per.toFixed(2)
+                                ? (splits[index] ?? '0.00')
                                 : found.hours_text,
                     };
                 }
-                return rowFromCandidate(c, per);
+                return rowFromCandidate(c, Number.parseFloat(splits[index] ?? '0'));
             });
         }
 
@@ -1255,11 +1260,13 @@ function TimesheetReviewBody({
     );
 
     const applyEqualSplit = useCallback(() => {
-        const per = rows.length > 0 ? totalHours / rows.length : 0;
         setRows((prev) =>
-            prev.map((r) => ({ ...r, hours_text: per.toFixed(2) })),
+            prev.map((r, index) => ({
+                ...r,
+                hours_text: splitHoursEvenly(totalHours, prev.length)[index] ?? '0.00',
+            })),
         );
-    }, [rows.length, totalHours]);
+    }, [totalHours]);
 
     // Live total + variance.
     const allocatedTotal = useMemo(
@@ -1271,8 +1278,7 @@ function TimesheetReviewBody({
         [rows],
     );
     const remaining = totalHours - allocatedTotal;
-    const isResidential = method === 'residential_house';
-    const sumOk = isResidential || Math.abs(remaining) <= 0.02;
+    const sumOk = isAllocationBalanced(method, allocatedTotal, totalHours);
 
     const handleSubmit = useCallback(() => {
         setSubmitting(true);
@@ -1379,11 +1385,9 @@ function TimesheetReviewBody({
                             <AlertTriangle className="h-4 w-4" />
                         )}
                         <span>
-                            {isResidential
-                                ? 'House-level billing — per-resident split handled downstream.'
-                                : sumOk
-                                  ? `Sum balances at ${allocatedTotal.toFixed(2)}h of ${totalHours.toFixed(2)}h.`
-                                  : `${allocatedTotal.toFixed(2)}h allocated of ${totalHours.toFixed(2)}h — ${remaining > 0 ? `${remaining.toFixed(2)}h left` : `${Math.abs(remaining).toFixed(2)}h over`}.`}
+                            {sumOk
+                                ? `Sum balances at ${allocatedTotal.toFixed(2)}h of ${totalHours.toFixed(2)}h.`
+                                : `${allocatedTotal.toFixed(2)}h allocated of ${totalHours.toFixed(2)}h — ${remaining > 0 ? `${remaining.toFixed(2)}h left` : `${Math.abs(remaining).toFixed(2)}h over`}.`}
                         </span>
                     </div>
                     {(method === 'equal_split' || method === 'residential_house') && rows.length > 1 ? (
@@ -1421,13 +1425,14 @@ function TimesheetReviewBody({
                                 </TabsTrigger>
                             ))}
                         </TabsList>
-                        {rows.map((r) => (
+                        {rows.map((r, index) => (
                             <TabsContent
                                 key={r.client_id}
                                 value={String(r.client_id)}
                                 className="mt-3"
                             >
                                 <AllocationRowEditor
+                                    index={index}
                                     row={r}
                                     method={method}
                                     onChange={(patch) => updateRow(r.client_id, patch)}
@@ -1440,6 +1445,7 @@ function TimesheetReviewBody({
                     // Single-row methods (1:1 shift, single allocation) — skip
                     // the tabs entirely and just render the editor.
                     <AllocationRowEditor
+                        index={0}
                         row={rows[0]}
                         method={method}
                         onChange={(patch) => updateRow(rows[0].client_id, patch)}
@@ -1539,17 +1545,38 @@ function AllocationMethodPicker({
 }
 
 function AllocationRowEditor({
+    index,
     row,
     method,
     onChange,
     errors,
 }: {
+    index: number;
     row: AllocationRow;
     method: TimesheetAllocationMethod;
     onChange: (patch: Partial<AllocationRow>) => void;
     errors: Record<string, string>;
 }) {
     const hoursLocked = method === 'residential_house' || method === 'equal_split';
+    const hoursError = allocationErrorForRow(
+        errors,
+        index,
+        row.client_id,
+        'hours',
+    );
+    const startsAtError = allocationErrorForRow(
+        errors,
+        index,
+        row.client_id,
+        'starts_at',
+    );
+    const endsAtError = allocationErrorForRow(
+        errors,
+        index,
+        row.client_id,
+        'ends_at',
+    );
+
     return (
         <div className="space-y-3">
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
@@ -1574,6 +1601,7 @@ function AllocationRowEditor({
                             <span className="font-medium">Manual</span> to edit.
                         </p>
                     ) : null}
+                    <FieldError message={hoursError} />
                 </div>
 
                 {method === 'time_segmented' ? (
@@ -1585,6 +1613,7 @@ function AllocationRowEditor({
                                 value={row.starts_at}
                                 onChange={(e) => onChange({ starts_at: e.target.value })}
                             />
+                            <FieldError message={startsAtError} />
                         </div>
                         <div className="sm:col-span-1">
                             <Label className="mb-1 block">End</Label>
@@ -1593,6 +1622,7 @@ function AllocationRowEditor({
                                 value={row.ends_at}
                                 onChange={(e) => onChange({ ends_at: e.target.value })}
                             />
+                            <FieldError message={endsAtError} />
                         </div>
                     </>
                 ) : null}
@@ -1613,11 +1643,6 @@ function AllocationRowEditor({
                 />
             </div>
 
-            {errors[`client_allocations.${row.client_id}.hours`] ? (
-                <p className="text-xs text-status-critical">
-                    {errors[`client_allocations.${row.client_id}.hours`]}
-                </p>
-            ) : null}
         </div>
     );
 }

@@ -185,6 +185,12 @@ class AttendanceController extends Controller
         try {
             $closed = $this->attendanceService->clockOut($auth, $session, $data);
         } catch (AttendanceClockOutBlockedException $exception) {
+            if ($request->header('X-Inertia')) {
+                return redirect()->back()
+                    ->withErrors(['clock_out' => $exception->getMessage()])
+                    ->with('clock_out_blockers', $exception->blockers());
+            }
+
             if ($request->expectsJson()) {
                 return response()->json([
                     'message' => $exception->getMessage(),
@@ -352,9 +358,11 @@ class AttendanceController extends Controller
         $auth = $request->user();
         abort_unless($this->canClock($auth), 403);
 
+        $handover->loadMissing(['incomingShift:id,user_id', 'client:id,site_id']);
+        $isUnassigned = $handover->incoming_staff_id === null && $handover->incoming_shift_id === null;
         $relatedToUser = (int) $handover->incoming_staff_id === (int) $auth->id
             || (int) $handover->incomingShift?->user_id === (int) $auth->id
-            || ($handover->incoming_staff_id === null && $handover->incoming_shift_id === null);
+            || ($isUnassigned && $this->workerHasMatchingShiftForUnassignedHandover($auth, $handover));
 
         abort_unless(
             $relatedToUser || $auth->canDo('shifts.manageAny') || $auth->canDo('handovers.viewAny'),
@@ -366,7 +374,7 @@ class AttendanceController extends Controller
             // read surface found the handover via client match without a
             // linked incoming shift, attach the arriving worker so the
             // acknowledgement can settle.
-            if (! $handover->incoming_staff_id) {
+            if ($isUnassigned) {
                 $handover->forceFill(['incoming_staff_id' => $auth->id])->save();
             }
 
@@ -378,5 +386,34 @@ class AttendanceController extends Controller
         }
 
         return redirect()->back()->with('success', 'Handover marked as read.');
+    }
+
+    protected function workerHasMatchingShiftForUnassignedHandover(User $auth, ShiftHandover $handover): bool
+    {
+        $clientId = $handover->client_id ? (int) $handover->client_id : null;
+
+        if (! $clientId) {
+            return false;
+        }
+
+        $workerNow = now(config('app.worker_timezone', 'Pacific/Auckland'));
+        $windowStart = $workerNow->copy()->subHours(4)->utc();
+        $windowEnd = $workerNow->copy()->addHours(36)->utc();
+
+        return Shift::query()
+            ->where('user_id', $auth->id)
+            ->where('client_id', $clientId)
+            ->whereNotIn('status', ['cancelled', 'completed'])
+            ->where(function ($query) use ($windowStart, $windowEnd) {
+                $query
+                    ->whereBetween('starts_at', [$windowStart, $windowEnd])
+                    ->orWhereBetween('ends_at', [$windowStart, $windowEnd])
+                    ->orWhere(function ($overlap) use ($windowStart, $windowEnd) {
+                        $overlap
+                            ->where('starts_at', '<=', $windowStart)
+                            ->where('ends_at', '>=', $windowEnd);
+                    });
+            })
+            ->exists();
     }
 }

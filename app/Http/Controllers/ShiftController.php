@@ -29,6 +29,7 @@ use App\Notifications\ShiftBroadcastNotification;
 use App\Notifications\TimesheetCreationFailedNotification;
 use App\Services\CoverageReservationService;
 use App\Services\EnhancedMarService;
+use App\Services\MarScheduleService;
 use App\Services\NotificationService;
 use App\Services\ServiceContextResolver;
 use App\Services\ShiftAssignmentRecommendationService;
@@ -386,10 +387,14 @@ class ShiftController extends Controller
         $medicationWitnesses = collect();
 
         if ($canViewMedications && $shift->client) {
+            $scheduleService = app(MarScheduleService::class);
+            $shiftDate = $scheduleService->dateFromInput(
+                ($shift->starts_at ?? now())->copy()->timezone($scheduleService->workerTimezone())->toDateString(),
+            );
             $mar = app(EnhancedMarService::class)->build(
                 $shift->client,
-                ($shift->starts_at ?? now())->copy()->startOfDay(),
-                now(),
+                $shiftDate,
+                now($scheduleService->workerTimezone()),
                 $shift->id,
             );
 

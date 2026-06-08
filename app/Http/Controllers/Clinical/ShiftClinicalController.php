@@ -9,6 +9,7 @@ use App\Domain\Clinical\Services\ClinicalObservationService;
 use App\Domain\Clinical\Services\ClinicalProtocolService;
 use App\Enums\AlertSeverity;
 use App\Http\Controllers\Controller;
+use App\Models\Client;
 use App\Models\Shift;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
@@ -59,6 +60,7 @@ class ShiftClinicalController extends Controller
         }
 
         $validated = $request->validate([
+            'client_id' => ['nullable', 'integer', 'exists:clients,id'],
             'observation_type' => ['required', Rule::in(array_column(ObservationType::cases(), 'value'))],
             'data' => ['present', 'array'],
             'notes' => ['nullable', 'string', 'max:2000'],
@@ -72,15 +74,11 @@ class ShiftClinicalController extends Controller
             abort(403, 'Clinical observation permission required for ' . $type->label());
         }
 
-        $shift->loadMissing('client');
-
-        if (! $shift->client) {
-            abort(422, 'Shift has no associated client.');
-        }
+        $client = $this->resolveObservationClient($shift, $validated['client_id'] ?? null);
 
         try {
             $observation = $this->observationService->record(
-                $shift->client,
+                $client,
                 $user,
                 $validated,
                 $shift,
@@ -99,6 +97,33 @@ class ShiftClinicalController extends Controller
         }
 
         return back()->with('success', $type->label() . ' recorded successfully.');
+    }
+
+    protected function resolveObservationClient(Shift $shift, ?int $clientId): Client
+    {
+        $shift->loadMissing('client');
+
+        if ($clientId) {
+            $client = Client::query()->findOrFail($clientId);
+
+            if ((int) $client->id === (int) $shift->client_id) {
+                return $client;
+            }
+
+            if ($shift->site_id && (int) $client->site_id === (int) $shift->site_id) {
+                return $client;
+            }
+
+            throw ValidationException::withMessages([
+                'client_id' => 'Select a resident attached to this shift or site.',
+            ]);
+        }
+
+        if (! $shift->client) {
+            abort(422, 'Shift has no associated client.');
+        }
+
+        return $shift->client;
     }
 
     /**

@@ -4,6 +4,7 @@ namespace App\Http\Controllers;
 
 use App\Models\Client;
 use App\Services\EnhancedMarService;
+use App\Services\MarScheduleService;
 use App\Services\MedicationAlertService;
 use Illuminate\Http\Request;
 
@@ -26,7 +27,8 @@ class MedicationsController extends Controller
         $clients = $q->get(['id', 'first_name', 'last_name', 'status']);
 
         // For a central "run-the-day" view, show today's due counts.
-        $today = now()->startOfDay();
+        $scheduleService = app(MarScheduleService::class);
+        $today = $scheduleService->dateFromInput();
         $mar = app(EnhancedMarService::class);
         $alertService = app(MedicationAlertService::class);
 

@@ -60,6 +60,7 @@ export type EndOfShiftChecklistSession = {
     handover_submitted?: boolean;
     tasks?: ShiftTaskListItem[];
     end_of_shift_blockers?: EndOfShiftBlocker[];
+    can_force_clinical_blockers?: boolean;
 };
 
 const BREAK_CHIPS: ReadonlyArray<number> = [0, 15, 30, 45, 60];
@@ -81,6 +82,7 @@ function ChecklistBody({
     setBreakMinutes,
     overrideReason,
     setOverrideReason,
+    clinicalOverrideLocked,
     handoverValue,
     setHandoverValue,
     handoverSavedAt,
@@ -98,6 +100,7 @@ function ChecklistBody({
     setBreakMinutes: (next: number) => void;
     overrideReason: string;
     setOverrideReason: (next: string) => void;
+    clinicalOverrideLocked: boolean;
     handoverValue: HandoverWriteValue;
     setHandoverValue: (next: HandoverWriteValue) => void;
     handoverSavedAt: number | null;
@@ -284,6 +287,15 @@ function ChecklistBody({
                         />
                     </div>
                 ) : null}
+
+                {clinicalOverrideLocked ? (
+                    <div className="rounded-lg border border-status-critical/30 bg-status-critical-bg p-3 text-sm text-status-critical">
+                        <div className="flex items-center gap-2 font-medium">
+                            <AlertTriangle className="h-4 w-4" />
+                            {t('clinical_override_locked')}
+                        </div>
+                    </div>
+                ) : null}
             </section>
 
             <section className="space-y-1.5">
@@ -332,8 +344,12 @@ export default function EndOfShiftChecklist({
     open: boolean;
     onOpenChange: (open: boolean) => void;
 }) {
-    const page = usePage().props as { auth?: { user?: { id?: number } } };
+    const page = usePage().props as {
+        auth?: { user?: { id?: number } };
+        flash?: { clock_out_blockers?: EndOfShiftBlocker[] | null };
+    };
     const userId = page.auth?.user?.id ?? 0;
+    const flashedClockOutBlockers = page.flash?.clock_out_blockers ?? null;
     const t = useMyDayLabels();
     const isMobile = useIsMobile();
     const [submitting, setSubmitting] = useState(false);
@@ -351,6 +367,9 @@ export default function EndOfShiftChecklist({
     const [tasks, setTasks] = useState<ShiftTaskListItem[]>(
         session.tasks ?? [],
     );
+    const [serverBlockers, setServerBlockers] = useState<
+        EndOfShiftBlocker[] | null
+    >(null);
 
     useEffect(() => {
         if (!open) {
@@ -361,7 +380,16 @@ export default function EndOfShiftChecklist({
         setNotes('');
         setOverrideReason('');
         setBreakMinutes(session.break_minutes ?? 0);
+        setServerBlockers(null);
     }, [open, session.id, session.break_minutes]);
+
+    useEffect(() => {
+        if (!open || !flashedClockOutBlockers?.length) {
+            return;
+        }
+
+        setServerBlockers(flashedClockOutBlockers);
+    }, [flashedClockOutBlockers, open]);
 
     // Resync local tasks if the session payload changes (e.g. live refresh).
     useEffect(() => {
@@ -375,7 +403,7 @@ export default function EndOfShiftChecklist({
         const incompleteCount = tasks.filter(
             (task) => !task.is_completed,
         ).length;
-        return (session.end_of_shift_blockers ?? [])
+        return (serverBlockers ?? session.end_of_shift_blockers ?? [])
             .map((blocker) =>
                 blocker.key === 'tasks_pending'
                     ? { ...blocker, count: incompleteCount }
@@ -385,7 +413,7 @@ export default function EndOfShiftChecklist({
                 (blocker) =>
                     blocker.key !== 'tasks_pending' || incompleteCount > 0,
             );
-    }, [session.end_of_shift_blockers, tasks]);
+    }, [serverBlockers, session.end_of_shift_blockers, tasks]);
     const otherBlockers = useMemo(
         () => blockers.filter((blocker) => blocker.key !== 'handover_missing'),
         [blockers],
@@ -393,9 +421,16 @@ export default function EndOfShiftChecklist({
     const hasHandoverBlocker = blockers.some(
         (blocker) => blocker.key === 'handover_missing',
     );
+    const hasClinicalBlocker = otherBlockers.some((blocker) =>
+        ['incidents_draft', 'meds_unsigned'].includes(blocker.key),
+    );
+    const clinicalOverrideLocked =
+        hasClinicalBlocker && !session.can_force_clinical_blockers;
     const force = otherBlockers.length > 0;
     const canSubmit =
-        !submitting && (!force || overrideReason.trim().length >= 4);
+        !submitting &&
+        !clinicalOverrideLocked &&
+        (!force || overrideReason.trim().length >= 4);
     const handoverDraftKey = session.shift_id
         ? `oblivion:clockout-handover:v1:u${userId}:s${session.shift_id}`
         : null;
@@ -479,7 +514,13 @@ export default function EndOfShiftChecklist({
                 preserveScroll: true,
                 onSuccess: () => {
                     clearHandoverDraft();
+                    setServerBlockers(null);
                     onOpenChange(false);
+                },
+                onError: () => {
+                    if (flashedClockOutBlockers?.length) {
+                        setServerBlockers(flashedClockOutBlockers);
+                    }
                 },
                 onFinish: () => setSubmitting(false),
             },
@@ -504,6 +545,7 @@ export default function EndOfShiftChecklist({
             setBreakMinutes={setBreakMinutes}
             overrideReason={overrideReason}
             setOverrideReason={setOverrideReason}
+            clinicalOverrideLocked={clinicalOverrideLocked}
             handoverValue={handoverValue}
             setHandoverValue={setHandoverValue}
             handoverSavedAt={handoverSavedAt}
@@ -526,7 +568,9 @@ export default function EndOfShiftChecklist({
     const label = submitting
         ? t('ending')
         : force
-          ? t('end_shift_anyway')
+          ? clinicalOverrideLocked
+              ? t('manager_override_required')
+              : t('end_shift_anyway')
           : hasHandoverBlocker
             ? t('save_handover_and_end')
             : t('end_shift');

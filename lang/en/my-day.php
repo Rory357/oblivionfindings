@@ -62,6 +62,8 @@ return [
     'optional_notes_placeholder' => 'Anything payroll or your manager should know.',
     'override_audit_title' => 'Override will be audit logged',
     'override_audit_subtitle' => 'You can end the shift now if needed, but the reason and outstanding items will be recorded.',
+    'clinical_override_locked' => 'Unsigned medication or draft incident blockers need a manager override.',
+    'manager_override_required' => 'Manager override required',
 
     // Update + resubmit (returned timesheet)
     'update_and_resubmit' => 'Update & resubmit',
@@ -197,6 +199,8 @@ return [
 
     // Inline confirms + toasts on /my-day
     'confirm_refuse_dose' => 'Mark this dose as refused / not given?',
+    'prompt_refuse_dose_reason' => 'Why was this dose refused or not given?',
+    'default_refuse_dose_reason' => 'Resident declined',
     'toast_marking_dose_given' => 'Marking dose given…',
     'toast_dose_left_as_due' => 'Dose left as due.',
     'toast_timesheet_sending' => 'Timesheet sending…',

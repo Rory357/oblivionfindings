@@ -153,6 +153,9 @@ function MedRow({
     const med = item.data;
     const overdue = med.status === 'overdue';
     const given = med.status === 'given';
+    const notGiven = med.status === 'refused' || med.status === 'withheld';
+    const resolved = given || notGiven;
+    const resolvedLabel = given ? 'Given' : med.status === 'withheld' ? 'Withheld' : 'Refused';
 
     const handleContext = (e: MouseEvent<HTMLDivElement>) => {
         e.preventDefault();
@@ -176,19 +179,21 @@ function MedRow({
             {/* eslint-disable-next-line no-restricted-syntax -- 20px circular checkbox with status-tinted border; not a shadcn Button. */}
             <button
                 type="button"
-                onClick={() => !given && onGiveMed(med.medication_id, med.scheduled_for)}
-                title={given ? 'Already given' : 'Mark as given'}
-                aria-pressed={given}
+                onClick={() => !resolved && onGiveMed(med.medication_id, med.scheduled_for)}
+                title={resolved ? resolvedLabel : 'Mark as given'}
+                aria-pressed={resolved}
                 className={cn(
                     'flex h-5 w-5 shrink-0 items-center justify-center rounded-full border-[1.5px]',
                     given
                         ? 'border-status-success bg-status-success text-status-success-foreground'
+                        : notGiven
+                          ? 'border-status-warning bg-status-warning text-status-warning-foreground'
                         : overdue
                           ? 'border-status-critical text-transparent'
                           : 'border-muted-foreground text-transparent',
                 )}
             >
-                {given ? <Check className="h-2.5 w-2.5" /> : null}
+                {resolved ? <Check className="h-2.5 w-2.5" /> : null}
             </button>
 
             <div
@@ -196,6 +201,8 @@ function MedRow({
                     'flex h-[26px] w-[26px] shrink-0 items-center justify-center rounded-md',
                     given
                         ? 'bg-status-success-bg text-status-success'
+                        : notGiven
+                          ? 'bg-status-warning-bg text-status-warning'
                         : overdue
                           ? 'bg-status-critical-bg text-status-critical'
                           : 'bg-accent text-primary',
@@ -208,7 +215,7 @@ function MedRow({
                 <div
                     className={cn(
                         'text-[13.5px] font-medium',
-                        given ? 'text-muted-foreground line-through' : 'text-foreground',
+                        resolved ? 'text-muted-foreground line-through' : 'text-foreground',
                     )}
                 >
                     {med.medication_name}
@@ -245,19 +252,24 @@ function MedRow({
                             Overdue
                         </Badge>
                     ) : null}
-                    {given ? (
+                    {resolved ? (
                         <Badge
                             variant="outline"
-                            className="border-status-success/30 bg-status-success-bg text-[10px] text-status-success"
+                            className={cn(
+                                'text-[10px]',
+                                given
+                                    ? 'border-status-success/30 bg-status-success-bg text-status-success'
+                                    : 'border-status-warning/30 bg-status-warning-bg text-status-warning',
+                            )}
                         >
-                            Given
+                            {resolvedLabel}
                         </Badge>
                     ) : null}
                 </div>
             ) : null}
 
-            {/* Hover actions (replace static badges except Given which sticks above when hovering) */}
-            {!given ? (
+            {/* Hover actions (replace static badges except resolved states above) */}
+            {!resolved ? (
                 <div
                     className={cn(
                         'flex gap-1 transition-opacity',

@@ -6,6 +6,7 @@ use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Services\EnhancedMarService;
+use App\Services\MarScheduleService;
 use App\Services\MedicationAlertService;
 use App\Support\EmarUrl;
 use App\Models\User;
@@ -31,7 +32,7 @@ class ClientMarController extends Controller
 
         abort_unless($user && ($user->canDo('medications.view') || $user->canDo('medications.administer.record') || $user->canDo('clients.update')), 403);
 
-        $date = $request->query('date') ? Carbon::parse($request->query('date')) : now();
+        $date = app(MarScheduleService::class)->dateFromInput($request->query('date'));
         return redirect()->to(EmarUrl::mar($client, $date->startOfDay()->toDateString()));
     }
 
@@ -41,8 +42,7 @@ class ClientMarController extends Controller
         $user = $request->user();
         abort_unless($user && ($user->canDo('medications.reports.export') || $user->canDo('reports.viewAny') || $user->canDo('clients.update')), 403);
 
-        $date = $request->query('date') ? Carbon::parse($request->query('date')) : now();
-        $date = $date->startOfDay();
+        $date = app(MarScheduleService::class)->dateFromInput($request->query('date'));
         $payload = app(EnhancedMarService::class)->build($client, $date);
 
         $filename = 'MAR_' . $client->id . '_' . $date->toDateString() . '.csv';

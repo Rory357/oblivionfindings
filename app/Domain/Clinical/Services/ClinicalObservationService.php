@@ -39,7 +39,7 @@ class ClinicalObservationService
             ? $input['observation_type']
             : ObservationType::from($input['observation_type']);
 
-        $this->validateDataForType($type, $input['data']);
+        $input['data'] = $this->validateDataForType($type, $input['data']);
 
         $observation = ClinicalObservation::create([
             'client_id' => $client->id,
@@ -115,17 +115,38 @@ class ClinicalObservationService
      *
      * @throws ValidationException
      */
-    protected function validateDataForType(ObservationType $type, array $data): void
+    protected function validateDataForType(ObservationType $type, array $data): array
     {
         $rules = $this->requiredFieldsForType($type);
+        $errors = [];
 
-        $missing = array_diff($rules, array_keys($data));
-
-        if (! empty($missing)) {
-            throw ValidationException::withMessages([
-                'data' => "Missing required fields for {$type->value} observation: " . implode(', ', $missing),
-            ]);
+        foreach ($rules as $field) {
+            if (! array_key_exists($field, $data) || $data[$field] === null || $data[$field] === '') {
+                $errors["data.{$field}"] = "The {$this->fieldLabel($field)} field is required.";
+            }
         }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+
+        $normalized = $data;
+
+        match ($type) {
+            ObservationType::Vitals => $this->validateVitals($normalized, $errors),
+            ObservationType::Weight => $this->validateWeight($normalized, $errors),
+            ObservationType::Bowel => $this->validateBowel($normalized, $errors),
+            ObservationType::Sleep => $this->validateSleep($normalized, $errors),
+            ObservationType::FluidIntake => $this->validateFluidIntake($normalized, $errors),
+            ObservationType::Pain => $this->validatePain($normalized, $errors),
+            ObservationType::General => null,
+        };
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
+
+        return $normalized;
     }
 
     /**
@@ -144,6 +165,232 @@ class ClinicalObservationService
             ObservationType::Pain => ['score', 'location'],
             ObservationType::General => [],
         };
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @param array<string, string> $errors
+     */
+    protected function validateVitals(array &$data, array &$errors): void
+    {
+        $this->numericField($data, $errors, 'systolic', 50, 260);
+        $this->numericField($data, $errors, 'diastolic', 30, 160);
+        $this->numericField($data, $errors, 'pulse', 30, 220);
+        $this->numericField($data, $errors, 'temperature', 30, 45, required: false);
+        $this->numericField($data, $errors, 'respiration_rate', 4, 60, required: false);
+        $this->numericField($data, $errors, 'o2_saturation', 50, 100, required: false);
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @param array<string, string> $errors
+     */
+    protected function validateWeight(array &$data, array &$errors): void
+    {
+        $this->numericField($data, $errors, 'weight_kg', 1, 500);
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @param array<string, string> $errors
+     */
+    protected function validateBowel(array &$data, array &$errors): void
+    {
+        $this->integerField($data, $errors, 'bristol_type', 1, 7);
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @param array<string, string> $errors
+     */
+    protected function validateSleep(array &$data, array &$errors): void
+    {
+        $this->timeField($data, $errors, 'bed_time');
+        $this->timeField($data, $errors, 'wake_time');
+        $this->enumField($data, $errors, 'quality', ['good', 'fair', 'poor']);
+        $this->integerField($data, $errors, 'interruptions', 0, 50, required: false);
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @param array<string, string> $errors
+     */
+    protected function validateFluidIntake(array &$data, array &$errors): void
+    {
+        $this->numericField($data, $errors, 'amount_ml', 1, 5000);
+        $this->enumField($data, $errors, 'fluid_type', ['water', 'tea', 'coffee', 'juice', 'milk', 'other']);
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @param array<string, string> $errors
+     */
+    protected function validatePain(array &$data, array &$errors): void
+    {
+        $this->integerField($data, $errors, 'score', 0, 10);
+        $this->stringField($data, $errors, 'location', max: 120);
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @param array<string, string> $errors
+     */
+    protected function numericField(
+        array &$data,
+        array &$errors,
+        string $field,
+        float $min,
+        float $max,
+        bool $required = true,
+    ): void {
+        if (! $this->hasValue($data, $field)) {
+            if ($required) {
+                $errors["data.{$field}"] = "The {$this->fieldLabel($field)} field is required.";
+            }
+
+            return;
+        }
+
+        if (! is_numeric($data[$field])) {
+            $errors["data.{$field}"] = "The {$this->fieldLabel($field)} must be a number.";
+
+            return;
+        }
+
+        $value = (float) $data[$field];
+        if ($value < $min || $value > $max) {
+            $errors["data.{$field}"] = sprintf(
+                'The %s must be between %s and %s.',
+                $this->fieldLabel($field),
+                $this->formatRangeNumber($min),
+                $this->formatRangeNumber($max),
+            );
+
+            return;
+        }
+
+        $data[$field] = $value;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @param array<string, string> $errors
+     */
+    protected function integerField(
+        array &$data,
+        array &$errors,
+        string $field,
+        int $min,
+        int $max,
+        bool $required = true,
+    ): void {
+        if (! $this->hasValue($data, $field)) {
+            if ($required) {
+                $errors["data.{$field}"] = "The {$this->fieldLabel($field)} field is required.";
+            }
+
+            return;
+        }
+
+        $value = filter_var($data[$field], FILTER_VALIDATE_INT);
+        if ($value === false) {
+            $errors["data.{$field}"] = "The {$this->fieldLabel($field)} must be a whole number.";
+
+            return;
+        }
+
+        if ($value < $min || $value > $max) {
+            $errors["data.{$field}"] = "The {$this->fieldLabel($field)} must be between {$min} and {$max}.";
+
+            return;
+        }
+
+        $data[$field] = $value;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @param array<string, string> $errors
+     * @param array<int, string> $allowed
+     */
+    protected function enumField(array &$data, array &$errors, string $field, array $allowed): void
+    {
+        if (! $this->hasValue($data, $field)) {
+            $errors["data.{$field}"] = "The {$this->fieldLabel($field)} field is required.";
+
+            return;
+        }
+
+        $value = (string) $data[$field];
+        if (! in_array($value, $allowed, true)) {
+            $errors["data.{$field}"] = "Choose a valid {$this->fieldLabel($field)}.";
+
+            return;
+        }
+
+        $data[$field] = $value;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @param array<string, string> $errors
+     */
+    protected function timeField(array &$data, array &$errors, string $field): void
+    {
+        if (! $this->hasValue($data, $field)) {
+            $errors["data.{$field}"] = "The {$this->fieldLabel($field)} field is required.";
+
+            return;
+        }
+
+        $value = (string) $data[$field];
+        if (! preg_match('/^(?:[01]\d|2[0-3]):[0-5]\d$/', $value)) {
+            $errors["data.{$field}"] = "Enter a valid {$this->fieldLabel($field)}.";
+
+            return;
+        }
+
+        $data[$field] = $value;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     * @param array<string, string> $errors
+     */
+    protected function stringField(array &$data, array &$errors, string $field, int $max): void
+    {
+        if (! $this->hasValue($data, $field)) {
+            $errors["data.{$field}"] = "The {$this->fieldLabel($field)} field is required.";
+
+            return;
+        }
+
+        $value = trim((string) $data[$field]);
+        if (mb_strlen($value) > $max) {
+            $errors["data.{$field}"] = "The {$this->fieldLabel($field)} must be {$max} characters or fewer.";
+
+            return;
+        }
+
+        $data[$field] = $value;
+    }
+
+    /**
+     * @param array<string, mixed> $data
+     */
+    protected function hasValue(array $data, string $field): bool
+    {
+        return array_key_exists($field, $data) && $data[$field] !== null && $data[$field] !== '';
+    }
+
+    protected function fieldLabel(string $field): string
+    {
+        return str_replace('_', ' ', $field);
+    }
+
+    protected function formatRangeNumber(float $value): string
+    {
+        return rtrim(rtrim(number_format($value, 1, '.', ''), '0'), '.');
     }
 
     // ── Timeline ─────────────────────────────────────────────────────────

@@ -86,4 +86,42 @@ describe('EndOfShiftChecklist', () => {
         expect(screen.getByLabelText('Reason to end anyway')).toHaveValue('');
         expect(screen.getByLabelText('Optional notes')).toHaveValue('');
     });
+
+    it('disables force submit for clinical blockers without manager override capability', () => {
+        const session = {
+            id: 11,
+            shift_id: 21,
+            client_name: 'Ari Kauri',
+            break_minutes: 0,
+            tasks: [],
+            can_force_clinical_blockers: false,
+            end_of_shift_blockers: [
+                {
+                    key: 'meds_unsigned',
+                    label: 'Sign medication records',
+                    detail: '1 scheduled medication still needs a MAR entry.',
+                    count: 1,
+                    action_url: '/meds/today',
+                    blocking: true,
+                },
+            ],
+        };
+
+        render(
+            <EndOfShiftChecklist
+                session={session}
+                open
+                onOpenChange={vi.fn()}
+            />,
+        );
+
+        expect(
+            screen.getByText(
+                'Unsigned medication or draft incident blockers need a manager override.',
+            ),
+        ).toBeVisible();
+        expect(
+            screen.getByRole('button', { name: /manager override required/i }),
+        ).toBeDisabled();
+    });
 });

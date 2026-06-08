@@ -17,6 +17,7 @@ use App\Services\AuditLogger;
 use App\Services\EnhancedMarService;
 use App\Services\MedicationAlertService;
 use App\Services\MedicationIncidentIntegrationService;
+use App\Services\MarScheduleService;
 use App\Services\MedicationReportingService;
 use App\Services\MedicationScanVerificationService;
 use App\Services\MedicationSafetyService;
@@ -41,6 +42,7 @@ class MedicationsApiController extends Controller
         protected MedicationIncidentIntegrationService $incidentService,
         protected MedicationAlertService $alertService,
         protected MedicationScanVerificationService $scanVerificationService,
+        protected MarScheduleService $scheduleService,
     ) {}
 
     private function idempotencyKey(string $scope, string $requestUuid): string
@@ -291,13 +293,16 @@ class MedicationsApiController extends Controller
     {
         $this->authorize('viewMedications', $client);
 
-        $date = $request->input('date') 
-            ? Carbon::parse($request->input('date')) 
-            : now();
+        $date = $this->scheduleService->dateFromInput($request->input('date'));
 
         $activeShiftId = $request->input('shift_id');
 
-        $marData = $this->marService->build($client, $date, now(), $activeShiftId);
+        $marData = $this->marService->build(
+            $client,
+            $date,
+            now($this->scheduleService->workerTimezone()),
+            $activeShiftId,
+        );
 
         // Add permissions
         $user = $request->user();
@@ -707,14 +712,12 @@ class MedicationsApiController extends Controller
         }
 
         if (($data['queued_offline'] ?? false) && !$medication->is_prn && !empty($data['scheduled_for'])) {
-            $scheduledFor = Carbon::parse($data['scheduled_for']);
+            $scheduledFor = $this->scheduleService->parseWorkerDateTime((string) $data['scheduled_for']);
+            [$slotStartUtc, $slotEndUtc] = $this->scheduleService->utcSlotWindow($scheduledFor);
             $conflictingAdministration = ClientMedicationAdministration::query()
                 ->where('client_id', $client->id)
                 ->where('client_medication_id', $medication->id)
-                ->whereBetween('scheduled_for', [
-                    $scheduledFor->copy()->subMinute(),
-                    $scheduledFor->copy()->addMinute(),
-                ])
+                ->whereBetween('scheduled_for', [$slotStartUtc, $slotEndUtc])
                 ->latest('id')
                 ->first();
 

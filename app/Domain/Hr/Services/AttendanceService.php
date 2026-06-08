@@ -17,6 +17,7 @@ use App\Models\ShiftHandover;
 use App\Models\ShiftTask;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\MarScheduleService;
 use App\Services\ShiftHandoverService;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
@@ -155,6 +156,15 @@ class AttendanceService
 
             if ($blockers !== [] && ! $force) {
                 throw new AttendanceClockOutBlockedException($blockers);
+            }
+
+            if (
+                $blockers !== []
+                && $force
+                && $this->hasClinicalClockOutBlockers($blockers)
+                && ! $this->canForceClinicalClockOut($user)
+            ) {
+                throw new \LogicException('Clinical blockers need a manager override before this shift can be force clocked out.');
             }
 
             if ($blockers !== [] && $force && $overrideReason === '') {
@@ -300,6 +310,29 @@ class AttendanceService
         }
 
         return $blockers;
+    }
+
+    /**
+     * @param  array<int, array<string, mixed>>  $blockers
+     */
+    protected function hasClinicalClockOutBlockers(array $blockers): bool
+    {
+        $clinicalKeys = ['incidents_draft', 'meds_unsigned'];
+
+        foreach ($blockers as $blocker) {
+            if (in_array((string) ($blocker['key'] ?? ''), $clinicalKeys, true)) {
+                return true;
+            }
+        }
+
+        return false;
+    }
+
+    protected function canForceClinicalClockOut(User $user): bool
+    {
+        return $user->canDo('shifts.manageAny')
+            || $user->canDo('timesheets.manageAny')
+            || $user->canDo('clients.update');
     }
 
     /**
@@ -565,15 +598,19 @@ class AttendanceService
             ->where('client_id', $shift->client_id)
             ->active()
             ->where('is_prn', false)
-            ->whereNotNull('dose_times')
-            ->get(['id', 'dose_times']);
+            ->where(function ($query) {
+                $query->whereNotNull('dose_times')
+                    ->orWhereNotNull('frequency');
+            })
+            ->get(['id', 'dose_times', 'frequency', 'active', 'is_prn', 'start_date', 'end_date']);
 
         if ($medications->isEmpty()) {
             return 0;
         }
 
-        $start = $shift->starts_at->copy();
-        $end = $shift->ends_at->copy();
+        $scheduleService = app(MarScheduleService::class);
+        $start = $shift->starts_at->copy()->timezone($scheduleService->workerTimezone());
+        $end = $shift->ends_at->copy()->timezone($scheduleService->workerTimezone());
 
         $signedKeys = ClientMedicationAdministration::query()
             ->where('client_id', $shift->client_id)
@@ -584,25 +621,23 @@ class AttendanceService
                 $end->copy()->utc(),
             ])
             ->get(['client_medication_id', 'scheduled_for'])
-            ->mapWithKeys(fn (ClientMedicationAdministration $administration) => [
-                $administration->client_medication_id.'|'.$administration->scheduled_for?->copy()->utc()->format('Y-m-d H:i') => true,
-            ]);
+            ->mapWithKeys(function (ClientMedicationAdministration $administration) {
+                $rawScheduledFor = $administration->getRawOriginal('scheduled_for');
+                $scheduledKey = $rawScheduledFor
+                    ? Carbon::parse((string) $rawScheduledFor, 'UTC')->format('Y-m-d H:i')
+                    : '';
+
+                return [$administration->client_medication_id.'|'.$scheduledKey => true];
+            });
 
         $unsigned = 0;
 
         foreach ($medications as $medication) {
-            $doseTimes = is_array($medication->dose_times) ? $medication->dose_times : [];
-            if ($doseTimes === []) {
-                continue;
-            }
-
             $day = $start->copy()->startOfDay();
             $lastDay = $end->copy()->startOfDay();
 
             while ($day->lessThanOrEqualTo($lastDay)) {
-                foreach ($doseTimes as $doseTime) {
-                    $scheduled = $day->copy()->setTimeFromTimeString($doseTime);
-
+                foreach ($scheduleService->scheduledTimesForDate($medication, $day) as $scheduled) {
                     if (! $scheduled->betweenIncluded($start, $end)) {
                         continue;
                     }

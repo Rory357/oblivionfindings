@@ -276,6 +276,20 @@ class MyDayActionsController extends Controller
                         "client_allocations.{$i}.starts_at" => 'Start and end times are required for time-segmented allocations.',
                     ]);
                 }
+
+                $startsAt = Carbon::parse($row['starts_at']);
+                $endsAt = Carbon::parse($row['ends_at']);
+                $segmentHours = round($startsAt->floatDiffInRealHours($endsAt), 2);
+                $submittedHours = round((float) $row['hours'], 2);
+
+                if (abs($segmentHours - $submittedHours) > 0.02) {
+                    throw ValidationException::withMessages([
+                        "client_allocations.{$i}.hours" => sprintf(
+                            'The hours for this time segment must match its start/end duration of %.2fh.',
+                            $segmentHours,
+                        ),
+                    ]);
+                }
             }
         }
 

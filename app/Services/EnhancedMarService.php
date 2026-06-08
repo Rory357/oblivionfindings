@@ -39,8 +39,9 @@ class EnhancedMarService
      */
     public function build(Client $client, Carbon $date, ?Carbon $now = null, ?int $activeShiftId = null): array
     {
-        $now = $now ?? now();
-        $isToday = $date->isToday();
+        $date = $date->copy()->timezone($this->scheduleService->workerTimezone())->startOfDay();
+        $now = ($now ?? now())->copy()->timezone($this->scheduleService->workerTimezone());
+        $isToday = $date->isSameDay($now);
         
         // Get client's allergies for safety display
         $allergies = $client->medicationAllergies()
@@ -59,10 +60,10 @@ class EnhancedMarService
         $medications = $client->medications()
             ->active()
             ->where(function ($q) use ($date) {
-                $q->whereNull('start_date')->orWhere('start_date', '<=', $date);
+                $q->whereNull('start_date')->orWhere('start_date', '<=', $date->toDateString());
             })
             ->where(function ($q) use ($date) {
-                $q->whereNull('end_date')->orWhere('end_date', '>=', $date);
+                $q->whereNull('end_date')->orWhere('end_date', '>=', $date->toDateString());
             })
             ->with(['stock'])
             ->get();
@@ -70,10 +71,10 @@ class EnhancedMarService
         $awaitingVerification = $client->medications()
             ->awaitingVerification()
             ->where(function ($q) use ($date) {
-                $q->whereNull('start_date')->orWhere('start_date', '<=', $date);
+                $q->whereNull('start_date')->orWhere('start_date', '<=', $date->toDateString());
             })
             ->where(function ($q) use ($date) {
-                $q->whereNull('end_date')->orWhere('end_date', '>=', $date);
+                $q->whereNull('end_date')->orWhere('end_date', '>=', $date->toDateString());
             })
             ->with(['stock'])
             ->get()
@@ -242,11 +243,10 @@ class EnhancedMarService
         ?int $activeShiftId
     ): array {
         // Get existing administration for this slot
+        [$slotStartUtc, $slotEndUtc] = $this->scheduleService->utcSlotWindow($scheduledFor);
+
         $existing = ClientMedicationAdministration::where('client_medication_id', $medication->id)
-            ->whereBetween('scheduled_for', [
-                $scheduledFor->copy()->subMinute(),
-                $scheduledFor->copy()->addMinute(),
-            ])
+            ->whereBetween('scheduled_for', [$slotStartUtc, $slotEndUtc])
             ->with(['administeredBy:id,name', 'witnessedBy:id,name'])
             ->first();
 
@@ -352,6 +352,9 @@ class EnhancedMarService
      */
     private function formatAdministration(ClientMedicationAdministration $admin): array
     {
+        $scheduledFor = $this->administrationDateUtc($admin, 'scheduled_for');
+        $administeredAt = $this->administrationDateUtc($admin, 'administered_at');
+
         return [
             'id' => $admin->id,
             'status' => $admin->status,
@@ -361,8 +364,8 @@ class EnhancedMarService
             'reason_code' => $admin->reason_code,
             'reason_label' => $admin->reason_code ? NotGivenReason::tryFrom($admin->reason_code)?->label() : null,
             'notes' => $admin->notes,
-            'scheduled_for' => $admin->scheduled_for?->toIso8601String(),
-            'administered_at' => $admin->administered_at?->toIso8601String(),
+            'scheduled_for' => $scheduledFor?->toIso8601String(),
+            'administered_at' => $administeredAt?->toIso8601String(),
             'administered_by' => $admin->administeredBy?->name,
             'witnessed_by' => $admin->witnessedBy?->name,
             'witnessed_at' => $admin->witnessed_at?->toIso8601String(),
@@ -377,6 +380,15 @@ class EnhancedMarService
             'correction_reason' => $admin->correction_reason,
             'outcome' => $admin->outcome,
         ];
+    }
+
+    private function administrationDateUtc(ClientMedicationAdministration $administration, string $column): ?Carbon
+    {
+        $raw = $administration->getRawOriginal($column);
+
+        return $raw
+            ? Carbon::parse((string) $raw, 'UTC')
+            : null;
     }
 
     /**
@@ -449,32 +461,39 @@ class EnhancedMarService
      */
     private function getHistory(Client $client, Carbon $date): array
     {
+        [$dayStartUtc, $dayEndUtc] = $this->scheduleService->utcDayWindow($date);
+
         return ClientMedicationAdministration::where('client_id', $client->id)
-            ->where(function ($q) use ($date) {
-                $q->whereBetween('administered_at', [$date->copy()->startOfDay(), $date->copy()->endOfDay()])
-                    ->orWhereBetween('scheduled_for', [$date->copy()->startOfDay(), $date->copy()->endOfDay()]);
+            ->where(function ($q) use ($dayStartUtc, $dayEndUtc) {
+                $q->whereBetween('administered_at', [$dayStartUtc, $dayEndUtc])
+                    ->orWhereBetween('scheduled_for', [$dayStartUtc, $dayEndUtc]);
             })
             ->with(['medication:id,name,dosage,controlled_drug', 'administeredBy:id,name', 'witnessedBy:id,name'])
             ->orderByDesc('administered_at')
             ->orderByDesc('id')
             ->limit(50)
             ->get()
-            ->map(fn ($a) => [
-                'id' => $a->id,
-                'medication_name' => $a->medication?->name ?? 'Unknown',
-                'status' => $a->status,
-                'status_label' => $this->getStatusLabel($a->status),
-                'dose_given' => $a->dose_given,
-                'reason' => $a->reason,
-                'notes' => $a->notes,
-                'administered_at' => $a->administered_at?->toIso8601String(),
-                'scheduled_for' => $a->scheduled_for?->toIso8601String(),
-                'administered_by' => $a->administeredBy?->name,
-                'witnessed_by' => $a->witnessedBy?->name,
-                'is_correction' => $a->is_correction,
-                'correction_reason' => $a->correction_reason,
-                'controlled_drug' => $a->medication?->controlled_drug ?? false,
-            ])
+            ->map(function (ClientMedicationAdministration $administration) {
+                $scheduledFor = $this->administrationDateUtc($administration, 'scheduled_for');
+                $administeredAt = $this->administrationDateUtc($administration, 'administered_at');
+
+                return [
+                    'id' => $administration->id,
+                    'medication_name' => $administration->medication?->name ?? 'Unknown',
+                    'status' => $administration->status,
+                    'status_label' => $this->getStatusLabel($administration->status),
+                    'dose_given' => $administration->dose_given,
+                    'reason' => $administration->reason,
+                    'notes' => $administration->notes,
+                    'administered_at' => $administeredAt?->toIso8601String(),
+                    'scheduled_for' => $scheduledFor?->toIso8601String(),
+                    'administered_by' => $administration->administeredBy?->name,
+                    'witnessed_by' => $administration->witnessedBy?->name,
+                    'is_correction' => $administration->is_correction,
+                    'correction_reason' => $administration->correction_reason,
+                    'controlled_drug' => $administration->medication?->controlled_drug ?? false,
+                ];
+            })
             ->toArray();
     }
 
@@ -576,8 +595,12 @@ class EnhancedMarService
         }
 
         // Validate time window for scheduled doses
-        $scheduledFor = isset($data['scheduled_for']) ? Carbon::parse($data['scheduled_for']) : null;
-        $adminAt = isset($data['administered_at']) ? Carbon::parse($data['administered_at']) : now();
+        $scheduledFor = isset($data['scheduled_for'])
+            ? $this->scheduleService->parseWorkerDateTime((string) $data['scheduled_for'])
+            : null;
+        $adminAt = isset($data['administered_at'])
+            ? $this->scheduleService->parseWorkerDateTime((string) $data['administered_at'])
+            : now($this->scheduleService->workerTimezone());
         $windowCheck = null;
 
         if ($scheduledFor && !$medication->is_prn) {
@@ -610,6 +633,27 @@ class EnhancedMarService
                 ];
             }
 
+            if ($scheduledFor && ! $medication->is_prn) {
+                [$slotStartUtc, $slotEndUtc] = $this->scheduleService->utcSlotWindow($scheduledFor);
+
+                $existing = ClientMedicationAdministration::query()
+                    ->where('client_id', $client->id)
+                    ->where('client_medication_id', $medication->id)
+                    ->whereBetween('scheduled_for', [$slotStartUtc, $slotEndUtc])
+                    ->lockForUpdate()
+                    ->latest('id')
+                    ->first();
+
+                if ($existing) {
+                    return [
+                        'success' => true,
+                        'administration' => $existing,
+                        'safety_check' => $safetyCheck,
+                        'duplicate' => true,
+                    ];
+                }
+            }
+
             // Lock stock record if it exists
             if ($medication->controlled_drug) {
                 $medication->load(['stock' => function ($q) {
@@ -626,8 +670,8 @@ class EnhancedMarService
             $admin->witnessed_by = $witnessValidation['witnessed_by'] ?? null;
             $admin->witnessed_at = $witnessValidation['witnessed_at'] ?? null;
             $admin->witness_method = $witnessValidation['witness_method'] ?? null;
-            $admin->scheduled_for = $scheduledFor;
-            $admin->administered_at = $adminAt;
+            $admin->scheduled_for = $scheduledFor?->copy()->utc();
+            $admin->administered_at = $adminAt->copy()->utc();
             $admin->status = $data['status'];
             $admin->reason = $data['reason'] ?? null;
             $admin->reason_code = $data['reason_code'] ?? null;

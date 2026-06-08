@@ -62,6 +62,8 @@ return [
     'optional_notes_placeholder' => 'Tētahi mea hei tuhi mā utu, mā tō kaiwhakahaere rānei.',
     'override_audit_title' => 'Ka rēkoata atu te whakamutu tonu',
     'override_audit_subtitle' => 'Ka taea e koe te whakamutu i tēnei wā, engari ka mau tonu te take me ngā mea kāore anō kia oti.',
+    'clinical_override_locked' => 'Mā te kaiwhakahaere e whakaae kia kapea ngā aukati rongoā kāore anō kia haina, ngā pūrongo aituā hukihuki rānei.',
+    'manager_override_required' => 'Me whai whakaaetanga kaiwhakahaere',
 
     // Update + resubmit (returned timesheet)
     'update_and_resubmit' => 'Whakahou & tuku anō',
@@ -196,6 +198,8 @@ return [
 
     // Inline confirms + toasts on /my-day
     'confirm_refuse_dose' => 'Tohua tēnei rongoā kua whakakāhoretia / kāore i hoatu?',
+    'prompt_refuse_dose_reason' => 'He aha te take i whakakāhoretia ai, kāore rānei i hoatu?',
+    'default_refuse_dose_reason' => 'I whakakāhore te tangata',
     'toast_marking_dose_given' => 'E tohu ana kua hoatu te rongoā…',
     'toast_dose_left_as_due' => 'Kei te toe tonu te rongoā.',
     'toast_timesheet_sending' => 'E tuku ana te pepa wā…',
