@@ -44,7 +44,7 @@ describe('app sidebar workforce navigation', () => {
         );
     });
 
-    it('groups roster and time navigation under Workforce instead of Operations', () => {
+    it('groups shift, handover, and time navigation under Workforce instead of Operations', () => {
         const catalog = buildNavSearchCatalog({
             can: {
                 clients: { viewAny: true },
@@ -61,6 +61,8 @@ describe('app sidebar workforce navigation', () => {
             'Job Board',
             'Rostering',
             'Availability',
+            'Handovers',
+            'Shift Notes',
             'Timesheets',
             'Conflict Queue',
         ];
@@ -87,6 +89,16 @@ describe('app sidebar workforce navigation', () => {
 
         expect(catalog.find((item) => item.label === 'Shifts')).toMatchObject({
             href: '/operations/shifts',
+        });
+        expect(
+            catalog.find((item) => item.label === 'Handovers'),
+        ).toMatchObject({
+            href: '/operations/handovers',
+        });
+        expect(
+            catalog.find((item) => item.label === 'Shift Notes'),
+        ).toMatchObject({
+            href: '/operations/shift-notes',
         });
         expect(
             catalog.find((item) => item.label === 'Conflict Queue'),
@@ -143,6 +155,14 @@ describe('app sidebar workforce navigation', () => {
                         title: 'Conflict Queue',
                         href: '/operations/rostering/conflicts',
                     },
+                    {
+                        title: 'Handovers',
+                        href: '/operations/handovers',
+                    },
+                    {
+                        title: 'Shift Notes',
+                        href: '/operations/shift-notes',
+                    },
                 ],
             },
         ] as any;
@@ -157,6 +177,34 @@ describe('app sidebar workforce navigation', () => {
         expect(
             isIconActive(
                 '/operations/rostering/conflicts',
+                workforceItem,
+                workforceGroups,
+            ),
+        ).toBe(true);
+        expect(
+            isIconActive(
+                '/operations/handovers',
+                operationsItem,
+                operationsGroups,
+            ),
+        ).toBe(false);
+        expect(
+            isIconActive(
+                '/operations/handovers',
+                workforceItem,
+                workforceGroups,
+            ),
+        ).toBe(true);
+        expect(
+            isIconActive(
+                '/operations/shift-notes',
+                operationsItem,
+                operationsGroups,
+            ),
+        ).toBe(false);
+        expect(
+            isIconActive(
+                '/operations/shift-notes',
                 workforceItem,
                 workforceGroups,
             ),

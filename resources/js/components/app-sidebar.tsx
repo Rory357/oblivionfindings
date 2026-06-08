@@ -206,6 +206,8 @@ const WORKFORCE_ROUTE_PREFIXES = [
     '/operations/shifts',
     '/operations/job-board',
     '/operations/rostering',
+    '/operations/handovers',
+    '/operations/shift-notes',
     '/operations/timesheets',
 ];
 
@@ -410,8 +412,8 @@ function buildIconNavItems({
     }
 
     // Operations holds client, funding, communication, and admin tools. Core
-    // roster/time surfaces live in Workforce so schedulers have one focused
-    // place for shift navigation.
+    // shift, handover, roster, and time surfaces live in Workforce so
+    // schedulers have one focused place for shift navigation.
     const hasOps =
         !!can?.operations?.dashboard ||
         !!can?.clients?.viewAny ||
@@ -428,7 +430,6 @@ function buildIconNavItems({
         !!can?.mileage?.viewAny ||
         !!can?.mileage?.viewOwn ||
         !!can?.messages?.viewAny ||
-        !!can?.handovers?.viewAny ||
         !!can?.custom_forms?.viewAny ||
         !!can?.care_note_templates?.viewAny ||
         !!can?.evv?.viewAny ||
@@ -454,6 +455,7 @@ function buildIconNavItems({
         !!can?.job_board?.viewAny ||
         !!can?.job_board?.claim ||
         !!can?.rostering?.viewAny ||
+        !!can?.handovers?.viewAny ||
         !!can?.timesheets?.viewAny ||
         !!can?.timesheets?.viewAssigned;
     if (hasWorkforce) {
@@ -861,18 +863,6 @@ function buildOperationsSubPanelGroups({
             href: '/operations/messages',
             icon: MessageSquareText,
         });
-    if (can?.handovers?.viewAny || can?.shifts?.viewAny)
-        comms.push({
-            title: 'Handovers',
-            href: '/operations/handovers',
-            icon: GitBranch,
-        });
-    if (can?.shifts?.viewAny)
-        comms.push({
-            title: 'Shift Notes',
-            href: '/operations/shift-notes',
-            icon: BookOpen,
-        });
     if (comms.length > 0)
         groups.push({ label: 'Communications', items: comms });
 
@@ -964,6 +954,18 @@ function buildWorkforceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             title: 'Availability',
             href: '/operations/rostering?tab=availability',
             icon: Clock,
+        });
+    if (can?.handovers?.viewAny || can?.shifts?.viewAny)
+        workforce.push({
+            title: 'Handovers',
+            href: '/operations/handovers',
+            icon: GitBranch,
+        });
+    if (can?.shifts?.viewAny)
+        workforce.push({
+            title: 'Shift Notes',
+            href: '/operations/shift-notes',
+            icon: BookOpen,
         });
     if (can?.timesheets?.viewAny || can?.timesheets?.viewAssigned)
         workforce.push({
