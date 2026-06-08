@@ -2223,56 +2223,56 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     }
     groups.push(people);
 
-    // Workforce
-    const workforce: SubPanelGroup = { label: 'Workforce', items: [] };
+    // Time & Leave
+    const timeAndLeave: SubPanelGroup = { label: 'Time & Leave', items: [] };
     if (can?.hr?.leave?.viewAny) {
-        workforce.items.push({
+        timeAndLeave.items.push({
             title: 'Leave & Rosters',
             href: '/hr/leave',
             icon: CalendarDays,
         });
-        workforce.items.push({
+        timeAndLeave.items.push({
             title: 'Leave Reports',
             href: '/hr/leave/reports',
             icon: FileText,
         });
     }
     if (can?.hr?.time?.view) {
-        workforce.items.push({
+        timeAndLeave.items.push({
             title: 'Timekeeping',
             href: '/hr/time',
             icon: Clock,
         });
     }
     if (can?.hr?.compensation?.view) {
-        workforce.items.push({
+        timeAndLeave.items.push({
             title: 'Compensation',
             href: '/hr/compensation/bands',
             icon: DollarSign,
         });
     }
     if (can?.hr?.benefits?.view) {
-        workforce.items.push({
+        timeAndLeave.items.push({
             title: 'Benefits',
             href: '/hr/benefits',
             icon: Shield,
         });
     }
     if (can?.hr?.expenses?.view) {
-        workforce.items.push({
+        timeAndLeave.items.push({
             title: 'Expenses',
             href: '/hr/expenses',
             icon: DollarSign,
         });
     }
     if (can?.hr?.leave?.viewAny || can?.hr?.leave?.viewOwn) {
-        workforce.items.push({
+        timeAndLeave.items.push({
             title: 'Time Off Calendar',
             href: '/hr/calendar/time-off',
             icon: CalendarDays,
         });
     }
-    if (workforce.items.length > 0) groups.push(workforce);
+    if (timeAndLeave.items.length > 0) groups.push(timeAndLeave);
 
     // Performance
     const performance: SubPanelGroup = { label: 'Performance', items: [] };
