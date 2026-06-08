@@ -581,6 +581,35 @@ class JobBoardControllerTest extends TestCase
             ->assertForbidden();
     }
 
+    public function test_index_allows_every_capability_admitted_by_the_workforce_nav_gate(): void
+    {
+        $claimOnly = $this->userWithPermissions(['job_board.claim'], [
+            'organization_id' => 1,
+        ]);
+        $assignedShiftViewer = $this->userWithPermissions(['shifts.viewAssigned'], [
+            'organization_id' => 1,
+        ]);
+        $noAccess = User::factory()->create(['organization_id' => 1]);
+
+        $this->allowEligibility();
+
+        $this->actingAs($claimOnly)
+            ->get(route('operations.job_board.index'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('operations/job-board/Index'));
+
+        $this->actingAs($assignedShiftViewer)
+            ->get(route('operations.job_board.index'))
+            ->assertOk()
+            ->assertInertia(fn (Assert $page) => $page
+                ->component('operations/job-board/Index'));
+
+        $this->actingAs($noAccess)
+            ->get(route('operations.job_board.index'))
+            ->assertForbidden();
+    }
+
     public function test_expire_positions_command_cancels_expired_open_positions_and_nudges_stale_claims(): void
     {
         Notification::fake();

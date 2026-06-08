@@ -529,6 +529,7 @@ class JobBoardController extends Controller
     {
         return (bool) $auth && (
             $auth->canDo('job_board.viewAny')
+            || $auth->canDo('job_board.claim')
             || $auth->canDo('shifts.viewAny')
             || $auth->canDo('shifts.viewAssigned')
         );

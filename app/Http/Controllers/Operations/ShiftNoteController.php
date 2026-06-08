@@ -15,7 +15,7 @@ class ShiftNoteController extends Controller
     public function index(Request $request)
     {
         $auth = $request->user();
-        abort_unless($auth, 403);
+        abort_unless($auth && $auth->canDo('shifts.viewAny'), 403);
 
         $orgId = $auth->organization_id;
 
@@ -110,7 +110,7 @@ class ShiftNoteController extends Controller
     public function export(Request $request)
     {
         $auth = $request->user();
-        abort_unless($auth, 403);
+        abort_unless($auth && $auth->canDo('shifts.viewAny'), 403);
 
         $orgId = $auth->organization_id;
         $filters = $request->only(['q', 'type', 'client_id', 'author_id', 'date_from', 'date_to', 'flagged']);
@@ -159,7 +159,7 @@ class ShiftNoteController extends Controller
     public function flag(Request $request, $note)
     {
         $auth = $request->user();
-        abort_unless($auth, 403);
+        abort_unless($auth && $auth->canDo('shifts.viewAny'), 403);
 
         $note = ClientNote::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
@@ -180,7 +180,7 @@ class ShiftNoteController extends Controller
     public function markReviewed(Request $request, $note)
     {
         $auth = $request->user();
-        abort_unless($auth, 403);
+        abort_unless($auth && $auth->canDo('shifts.viewAny'), 403);
 
         $note = ClientNote::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
