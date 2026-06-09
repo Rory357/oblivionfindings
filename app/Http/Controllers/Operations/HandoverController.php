@@ -38,6 +38,8 @@ class HandoverController extends Controller
             ? Carbon::parse($filters['week'], $tz)->startOfWeek(Carbon::MONDAY)
             : Carbon::now($tz)->startOfWeek(Carbon::MONDAY);
         $weekEnd = $weekStart->copy()->endOfWeek(Carbon::SUNDAY);
+        $startUtc = $weekStart->copy()->utc();
+        $endUtc = $weekEnd->copy()->utc();
 
         $canViewAny = $this->handoverService->canViewAny($auth);
 
@@ -55,7 +57,20 @@ class HandoverController extends Controller
                 'acknowledger:id,name',
                 'submitter:id,name',
             ])
-            ->whereBetween('created_at', [$weekStart->copy()->utc(), $weekEnd->copy()->utc()])
+            // Filter the week by the handover's effective date — its outgoing
+            // shift's start (what the UI groups + navigates by), falling back to
+            // created_at only when there's no dated shift. Keeps the week filter
+            // consistent with the day grouping, the rail strip, and the
+            // post-create week jump.
+            ->where(function ($dateScope) use ($startUtc, $endUtc) {
+                $dateScope
+                    ->whereHas('outgoingShift', fn ($s) => $s
+                        ->whereNotNull('starts_at')
+                        ->whereBetween('starts_at', [$startUtc, $endUtc]))
+                    ->orWhere(fn ($noShift) => $noShift
+                        ->whereDoesntHave('outgoingShift', fn ($s) => $s->whereNotNull('starts_at'))
+                        ->whereBetween('created_at', [$startUtc, $endUtc]));
+            })
             ->when(! $canViewAny, function ($query) use ($auth) {
                 $query->where(function ($nested) use ($auth) {
                     $nested->where('outgoing_staff_id', $auth->id)

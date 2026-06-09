@@ -131,11 +131,10 @@ function initFromEditing(h: Handover): WizForm {
 
 function readiness(f: WizForm): number {
     let filled = 0;
-    const total = 6;
+    const total = 5;
     if (f.client_id) filled++;
-    if (f.outgoing) filled++;
     if (f.outgoing_shift) filled++;
-    if (f.incoming || f.leave_open) filled++;
+    if (f.incoming_shift || f.leave_open) filled++;
     if (f.narrative.trim().length > 10) filled++;
     if (f.mood) filled++;
     return Math.round((filled / total) * 100);
@@ -267,6 +266,7 @@ export function HandoverWizard({
     onOpenChange,
     editing,
     catalogue,
+    currentUser,
     preselectClientId,
     onAddClient,
     onSubmitted,
@@ -275,6 +275,7 @@ export function HandoverWizard({
     onOpenChange: (open: boolean) => void;
     editing: Handover | null;
     catalogue: Catalogue;
+    currentUser: { id: number; name: string };
     preselectClientId: number | null;
     onAddClient: () => void;
     onSubmitted: (weekStart: Date) => void;
@@ -343,25 +344,42 @@ export function HandoverWizard({
         ? catalogue.shifts.find((s) => String(s.id) === f.incoming_shift)
         : null;
 
+    // Workers are derived from the roster: a handover's outgoing/incoming worker
+    // IS the shift's assignee (an open outgoing shift is recorded against the
+    // person logging it). These read-only displays mirror what the server saves.
+    const staffName = (id: string) =>
+        catalogue.staff.find((s) => String(s.id) === id)?.name ?? null;
+    const outgoingShiftOpen = !!oSh && !oSh.user_id;
+    const outgoingWorkerName = f.outgoing ? staffName(f.outgoing) : null;
+    const incomingWorkerName = f.incoming ? staffName(f.incoming) : null;
+
+    // Resolve who a shift hands to: its assignee, or the current user when the
+    // outgoing shift is open (matching the server's `shift.user_id ?: actor`).
+    const incomingWorkerFor = (shiftId: string) => {
+        const shift = catalogue.shifts.find((s) => String(s.id) === shiftId);
+        return shift?.user_id ? String(shift.user_id) : '';
+    };
+
     const pickOutgoingShift = (v: string) => {
         const shift = catalogue.shifts.find((s) => String(s.id) === v);
+        const nextId = nextShiftIdAfter(catalogue.shifts, f.client_id, v) || '';
         setF((p) => ({
             ...p,
             outgoing_shift: v,
-            // Default the outgoing worker to the shift's assigned staff.
-            outgoing: shift?.user_id ? String(shift.user_id) : p.outgoing,
-            incoming_shift: p.leave_open
-                ? ''
-                : nextShiftIdAfter(catalogue.shifts, p.client_id, v) || '',
+            // Outgoing worker = shift assignee, else the current user (you).
+            outgoing: shift?.user_id
+                ? String(shift.user_id)
+                : String(currentUser.id),
+            incoming_shift: p.leave_open ? '' : nextId,
+            incoming: p.leave_open ? '' : incomingWorkerFor(nextId),
         }));
     };
 
     const pickIncomingShift = (v: string) => {
-        const shift = catalogue.shifts.find((s) => String(s.id) === v);
         setF((p) => ({
             ...p,
             incoming_shift: v,
-            incoming: shift?.user_id ? String(shift.user_id) : p.incoming,
+            incoming: incomingWorkerFor(v),
         }));
     };
 
@@ -372,10 +390,9 @@ export function HandoverWizard({
                 e.client_id = 'Choose the client this handover is about';
             if (!f.outgoing_shift)
                 e.outgoing_shift = 'Select the outgoing shift';
-            if (!f.outgoing) e.outgoing = 'Select the outgoing support worker';
-            if (!f.incoming && !f.leave_open)
-                e.incoming =
-                    'Pick the incoming worker, or mark the shift open';
+            if (!f.incoming_shift && !f.leave_open)
+                e.incoming_shift =
+                    'Pick the new shift, or mark it open (needs cover)';
         }
         if (key === 'narrative') {
             if (f.narrative.trim().length < 10)
@@ -397,7 +414,7 @@ export function HandoverWizard({
         if (Object.keys(all).length) {
             setErrors(all);
             setStepIndex(
-                all.client_id || all.outgoing || all.outgoing_shift || all.incoming
+                all.client_id || all.outgoing_shift || all.incoming_shift
                     ? 0
                     : 1,
             );
@@ -686,34 +703,16 @@ export function HandoverWizard({
                                     <div className="space-y-1.5">
                                         <label className="text-[13px] font-semibold">
                                             Outgoing support worker
-                                            <span className="text-status-critical">
-                                                {' '}
-                                                *
-                                            </span>
                                         </label>
-                                        <select
-                                            className={cn(
-                                                SELECT_CLASS,
-                                                errors.outgoing && BAD_CLASS,
-                                            )}
-                                            value={f.outgoing}
-                                            disabled={!!editing}
-                                            onChange={(e) =>
-                                                set('outgoing', e.target.value)
-                                            }
+                                        <DerivedWorker
+                                            muted={!outgoingWorkerName}
                                         >
-                                            <option value="">Select…</option>
-                                            {catalogue.staff.map((s) => (
-                                                <option key={s.id} value={s.id}>
-                                                    {s.name}
-                                                </option>
-                                            ))}
-                                        </select>
-                                        {errors.outgoing ? (
-                                            <FieldError>
-                                                {errors.outgoing}
-                                            </FieldError>
-                                        ) : null}
+                                            {!f.outgoing_shift
+                                                ? 'Select the outgoing shift first'
+                                                : outgoingWorkerName
+                                                  ? `${outgoingWorkerName}${outgoingShiftOpen ? ' · you (open shift)' : ''}`
+                                                  : '—'}
+                                        </DerivedWorker>
                                     </div>
                                 </div>
 
@@ -739,6 +738,7 @@ export function HandoverWizard({
                                                 f.leave_open ||
                                                 !f.outgoing_shift
                                             }
+                                            bad={!!errors.incoming_shift}
                                             suggestId={suggestNextId}
                                             placeholder={
                                                 f.leave_open
@@ -752,71 +752,56 @@ export function HandoverWizard({
                                             <input
                                                 type="checkbox"
                                                 checked={f.leave_open}
-                                                onChange={(e) =>
+                                                onChange={(e) => {
+                                                    const open =
+                                                        e.target.checked;
+                                                    const nextId = open
+                                                        ? ''
+                                                        : nextShiftIdAfter(
+                                                              catalogue.shifts,
+                                                              f.client_id,
+                                                              f.outgoing_shift,
+                                                          ) || '';
                                                     setF((p) => ({
                                                         ...p,
-                                                        leave_open:
-                                                            e.target.checked,
-                                                        incoming: e.target
-                                                            .checked
+                                                        leave_open: open,
+                                                        incoming_shift: nextId,
+                                                        incoming: open
                                                             ? ''
-                                                            : p.incoming,
-                                                        incoming_shift: e.target
-                                                            .checked
-                                                            ? ''
-                                                            : nextShiftIdAfter(
-                                                                  catalogue.shifts,
-                                                                  p.client_id,
-                                                                  p.outgoing_shift,
-                                                              ) || '',
-                                                    }))
-                                                }
+                                                            : incomingWorkerFor(
+                                                                  nextId,
+                                                              ),
+                                                    }));
+                                                }}
                                                 className="h-4 w-4 accent-primary"
                                             />
                                             Leave the new shift open (needs
                                             cover)
                                         </label>
+                                        {errors.incoming_shift ? (
+                                            <FieldError>
+                                                {errors.incoming_shift}
+                                            </FieldError>
+                                        ) : null}
                                     </div>
                                     <div className="space-y-1.5">
                                         <label className="text-[13px] font-semibold">
                                             Incoming support worker
                                         </label>
-                                        <select
-                                            className={cn(
-                                                SELECT_CLASS,
-                                                errors.incoming && BAD_CLASS,
-                                            )}
-                                            value={f.incoming}
-                                            disabled={f.leave_open}
-                                            onChange={(e) =>
-                                                set('incoming', e.target.value)
+                                        <DerivedWorker
+                                            muted={
+                                                !incomingWorkerName ||
+                                                f.leave_open
                                             }
                                         >
-                                            <option value="">
-                                                {f.leave_open
-                                                    ? 'Open — needs cover'
-                                                    : 'Select…'}
-                                            </option>
-                                            {catalogue.staff
-                                                .filter(
-                                                    (s) =>
-                                                        String(s.id) !==
-                                                        f.outgoing,
-                                                )
-                                                .map((s) => (
-                                                    <option
-                                                        key={s.id}
-                                                        value={s.id}
-                                                    >
-                                                        {s.name}
-                                                    </option>
-                                                ))}
-                                        </select>
-                                        {errors.incoming ? (
-                                            <FieldError>
-                                                {errors.incoming}
-                                            </FieldError>
-                                        ) : null}
+                                            {f.leave_open
+                                                ? 'Open — needs cover'
+                                                : !f.incoming_shift
+                                                  ? 'Pick the new shift first'
+                                                  : incomingWorkerName
+                                                    ? incomingWorkerName
+                                                    : 'Unassigned — set on the roster'}
+                                        </DerivedWorker>
                                     </div>
                                 </div>
                             </div>
@@ -1057,6 +1042,27 @@ function StepHead({
                 <h2 className="text-[17px] font-bold">{title}</h2>
                 <p className="text-[13px] text-muted-foreground">{blurb}</p>
             </div>
+        </div>
+    );
+}
+
+/** Read-only display for a derived worker — the field is taken from the roster
+ *  (the shift's assignee), so it's shown rather than chosen. */
+function DerivedWorker({
+    children,
+    muted,
+}: {
+    children: React.ReactNode;
+    muted?: boolean;
+}) {
+    return (
+        <div
+            className={cn(
+                'flex h-10 w-full items-center rounded-lg border border-input bg-muted/40 px-3 text-sm',
+                muted ? 'text-muted-foreground' : 'text-foreground',
+            )}
+        >
+            {children}
         </div>
     );
 }

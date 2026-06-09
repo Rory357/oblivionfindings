@@ -453,6 +453,45 @@ class ShiftHandoverWorkflowTest extends TestCase
         $this->assertSame(ShiftHandoverService::STATUS_SUBMITTED, $handover->status);
     }
 
+    public function test_index_filters_by_outgoing_shift_week_not_created_at(): void
+    {
+        // Shift happened two weeks ago, but the handover row is created "now".
+        $shiftDay = now()->copy()->subWeeks(2)->startOfWeek(\Carbon\Carbon::MONDAY)->addDays(2);
+        $outgoingShift = Shift::factory()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'service_context_id' => $this->serviceContext->id,
+            'user_id' => $this->outgoingStaff->id,
+            'starts_at' => $shiftDay->copy()->setTime(10, 0),
+            'ends_at' => $shiftDay->copy()->setTime(18, 0),
+            'actual_starts_at' => $shiftDay->copy()->setTime(10, 0),
+            'status' => 'completed',
+            'started_by' => $this->outgoingStaff->id,
+            'created_by' => $this->manager->id,
+        ]);
+        $handover = ShiftHandover::factory()->create([
+            'outgoing_shift_id' => $outgoingShift->id,
+            'client_id' => $this->client->id,
+            'outgoing_staff_id' => $this->outgoingStaff->id,
+            'status' => ShiftHandoverService::STATUS_SUBMITTED,
+            'submitted_at' => now(),
+            'submitted_by' => $this->outgoingStaff->id,
+        ]);
+
+        // Current week excludes it (the shift is two weeks ago)…
+        $this->actingAs($this->manager)
+            ->get('/operations/handovers')
+            ->assertInertia(fn (Assert $page) => $page->has('handovers', 0));
+
+        // …but the shift's own week includes it.
+        $weekParam = $shiftDay->copy()->startOfWeek(\Carbon\Carbon::MONDAY)->toDateString();
+        $this->actingAs($this->manager)
+            ->get('/operations/handovers?week='.$weekParam)
+            ->assertInertia(fn (Assert $page) => $page
+                ->has('handovers', 1)
+                ->where('handovers.0.id', $handover->id));
+    }
+
     protected function makeUser(string $roleName, array $extraPermissions = []): User
     {
         $user = User::factory()->create([

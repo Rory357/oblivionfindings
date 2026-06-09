@@ -270,6 +270,7 @@ export default function HandoversIndex({
                     onOpenChange={(open) => (open ? null : closeWizard())}
                     editing={editingHandover}
                     catalogue={catalogue}
+                    currentUser={currentUser}
                     preselectClientId={pendingClientId}
                     onAddClient={() => setAddClientOpen(true)}
                     onSubmitted={(week) => goWeek(week)}
