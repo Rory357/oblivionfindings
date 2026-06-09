@@ -260,9 +260,12 @@ class ShiftHandoverWorkflowTest extends TestCase
         $indexResponse->assertOk();
         $indexResponse->assertInertia(fn (Assert $page) => $page
             ->component('operations/handovers/Index')
-            ->has('handovers.data', 1)
-            ->where('handovers.data.0.status', ShiftHandoverService::STATUS_DRAFT)
-            ->where('handovers.data.0.can_submit', true)
+            ->has('handovers', 1)
+            ->where('handovers.0.status', ShiftHandoverService::STATUS_DRAFT)
+            ->where('handovers.0.can_submit', true)
+            ->where('handovers.0.can_edit', true)
+            ->has('catalogue')
+            ->has('can')
         );
 
         $submitResponse = $this->actingAs($this->manager)
@@ -345,6 +348,109 @@ class ShiftHandoverWorkflowTest extends TestCase
             ->firstOrFail();
 
         $this->assertSame($incomingShift->id, $waiverEvent->meta['matched_incoming_shift_id'] ?? null);
+    }
+
+    public function test_outgoing_staff_can_create_handover_via_index_endpoint(): void
+    {
+        $outgoingShift = $this->makeInProgressShift($this->outgoingStaff);
+        $incomingShift = $this->makeScheduledIncomingShift($this->incomingStaff, $outgoingShift);
+
+        $response = $this->actingAs($this->outgoingStaff)
+            ->post('/operations/handovers', [
+                'shift_id' => $outgoingShift->id,
+                'incoming_shift_id' => $incomingShift->id,
+                'handover_notes' => 'Wizard-created handover with structured lists.',
+                'client_mood' => 'Settled',
+                'medications_due_text' => "Quetiapine 25mg — due 20:00\nParacetamol 1g — given",
+                'tasks_pending_text' => 'Restock bathroom consumables',
+                'submit' => true,
+            ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success', 'Handover submitted.');
+
+        $handover = ShiftHandover::query()->latest('id')->firstOrFail();
+        $this->assertSame(ShiftHandoverService::STATUS_SUBMITTED, $handover->status);
+        $this->assertSame($outgoingShift->id, (int) $handover->outgoing_shift_id);
+        // The newline-delimited *_text fields are parsed into {label} items.
+        $this->assertCount(2, $handover->medications_due);
+        $this->assertSame('Quetiapine 25mg — due 20:00', $handover->medications_due[0]['label']);
+        $this->assertCount(1, $handover->tasks_pending);
+    }
+
+    public function test_outgoing_staff_can_update_draft_handover(): void
+    {
+        $outgoingShift = $this->makeInProgressShift($this->outgoingStaff);
+        $this->makeScheduledIncomingShift($this->incomingStaff, $outgoingShift);
+
+        $handover = ShiftHandover::factory()->draft()->create([
+            'outgoing_shift_id' => $outgoingShift->id,
+            'client_id' => $this->client->id,
+            'outgoing_staff_id' => $this->outgoingStaff->id,
+            'handover_notes' => 'Original note',
+        ]);
+
+        $response = $this->actingAs($this->outgoingStaff)
+            ->put("/operations/handovers/{$handover->id}", [
+                'handover_notes' => 'Updated narrative after review.',
+                'client_mood' => 'Bright',
+                'follow_up_items_text' => 'Send art photo to family portal',
+                'submit' => false,
+            ]);
+
+        $response->assertRedirect();
+        $response->assertSessionHas('success', 'Handover updated.');
+
+        $handover->refresh();
+        $this->assertSame('Updated narrative after review.', $handover->handover_notes);
+        $this->assertSame('Bright', $handover->client_mood);
+        $this->assertSame(ShiftHandoverService::STATUS_DRAFT, $handover->status);
+        $this->assertSame('Send art photo to family portal', $handover->follow_up_items[0]['label']);
+    }
+
+    public function test_edit_lock_blocks_staff_after_window_but_allows_manager(): void
+    {
+        $outgoingShift = Shift::factory()->create([
+            'client_id' => $this->client->id,
+            'site_id' => $this->site->id,
+            'service_context_id' => $this->serviceContext->id,
+            'user_id' => $this->outgoingStaff->id,
+            'starts_at' => now()->subDays(10),
+            'ends_at' => now()->subDays(10)->addHours(8),
+            'actual_starts_at' => now()->subDays(10),
+            'status' => 'completed',
+            'started_by' => $this->outgoingStaff->id,
+            'created_by' => $this->manager->id,
+        ]);
+
+        $handover = ShiftHandover::factory()->create([
+            'outgoing_shift_id' => $outgoingShift->id,
+            'incoming_shift_id' => null,
+            'client_id' => $this->client->id,
+            'outgoing_staff_id' => $this->outgoingStaff->id,
+            'incoming_staff_id' => $this->incomingStaff->id,
+            'status' => ShiftHandoverService::STATUS_SUBMITTED,
+            'submitted_at' => now()->subDays(10),
+            'submitted_by' => $this->outgoingStaff->id,
+        ]);
+
+        // Past the 7-day window, the outgoing worker is locked out…
+        $this->actingAs($this->outgoingStaff)
+            ->put("/operations/handovers/{$handover->id}", [
+                'handover_notes' => 'Late staff edit should be blocked.',
+            ])
+            ->assertForbidden();
+
+        // …but a manager can still correct it.
+        $this->actingAs($this->manager)
+            ->put("/operations/handovers/{$handover->id}", [
+                'handover_notes' => 'Manager correction after the window.',
+            ])
+            ->assertRedirect();
+
+        $handover->refresh();
+        $this->assertSame('Manager correction after the window.', $handover->handover_notes);
+        $this->assertSame(ShiftHandoverService::STATUS_SUBMITTED, $handover->status);
     }
 
     protected function makeUser(string $roleName, array $extraPermissions = []): User
