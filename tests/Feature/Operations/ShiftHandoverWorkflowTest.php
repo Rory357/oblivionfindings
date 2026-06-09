@@ -408,6 +408,64 @@ class ShiftHandoverWorkflowTest extends TestCase
         $this->assertSame('Send art photo to family portal', $handover->follow_up_items[0]['label']);
     }
 
+    public function test_editing_posted_handover_refreshes_client_timeline_snapshot(): void
+    {
+        $outgoingShift = $this->makeInProgressShift($this->outgoingStaff);
+        $incomingShift = $this->makeScheduledIncomingShift($this->incomingStaff, $outgoingShift);
+
+        // Create + submit through the real flow so the lifecycle timeline events
+        // exist with the original mood/notes.
+        $this->actingAs($this->outgoingStaff)
+            ->post('/operations/handovers', [
+                'shift_id' => $outgoingShift->id,
+                'incoming_shift_id' => $incomingShift->id,
+                'handover_notes' => 'Original notes before the edit.',
+                'client_mood' => 'settled',
+                'submit' => true,
+            ])
+            ->assertRedirect();
+
+        $handover = ShiftHandover::query()->latest('id')->firstOrFail();
+        $this->assertSame(ShiftHandoverService::STATUS_SUBMITTED, $handover->status);
+
+        $submittedEvent = TimelineEvent::query()
+            ->where('type', ShiftTimelineService::HANDOVER_SUBMITTED_EVENT_TYPE)
+            ->where('source_type', ShiftHandover::class)
+            ->where('source_id', $handover->id)
+            ->firstOrFail();
+        $this->assertStringContainsString('Original notes before the edit.', (string) $submittedEvent->body);
+
+        // Edit the posted handover's content.
+        $this->actingAs($this->outgoingStaff)
+            ->put("/operations/handovers/{$handover->id}", [
+                'handover_notes' => 'Revised notes after the edit.',
+                'client_mood' => 'bright',
+                'submit' => false,
+            ])
+            ->assertRedirect()
+            ->assertSessionHas('success', 'Handover updated.');
+
+        // The submitted event is updated in place (no duplicate row) and now
+        // reflects the revised mood/notes.
+        $this->assertSame(1, TimelineEvent::query()
+            ->where('type', ShiftTimelineService::HANDOVER_SUBMITTED_EVENT_TYPE)
+            ->where('source_id', $handover->id)
+            ->count());
+
+        $refreshedSubmitted = $submittedEvent->fresh();
+        $this->assertStringContainsString('Revised notes after the edit.', (string) $refreshedSubmitted->body);
+        $this->assertStringContainsString('bright', (string) $refreshedSubmitted->body);
+        $this->assertStringNotContainsString('Original notes before the edit.', (string) $refreshedSubmitted->body);
+
+        // The created (draft) event embeds the same snapshot, so it is refreshed too.
+        $createdEvent = TimelineEvent::query()
+            ->where('type', ShiftTimelineService::HANDOVER_CREATED_EVENT_TYPE)
+            ->where('source_id', $handover->id)
+            ->firstOrFail();
+        $this->assertStringContainsString('Revised notes after the edit.', (string) $createdEvent->body);
+        $this->assertStringNotContainsString('Original notes before the edit.', (string) $createdEvent->body);
+    }
+
     public function test_edit_lock_blocks_staff_after_window_but_allows_manager(): void
     {
         $outgoingShift = Shift::factory()->create([

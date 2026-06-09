@@ -40,6 +40,28 @@ const templates = [
     },
 ];
 
+// Friendly labels for the per-event Badge + the filter dropdown. The
+// shift_handover_* entries cover the handover-workflow lifecycle events emitted
+// by ShiftTimelineService (created/submitted/acknowledged/waived). Unknown types
+// fall back to a de-underscored form so they still read cleanly.
+const TYPE_LABELS: Record<string, string> = {
+    note: 'Note',
+    progress_note: 'Progress note',
+    handover: 'Handover',
+    shift_handover_created: 'Handover drafted',
+    shift_handover_submitted: 'Handover submitted',
+    shift_handover_acknowledged: 'Handover acknowledged',
+    shift_handover_waived: 'Handover waived',
+    incident: 'Incident',
+    shift: 'Shift',
+    medication: 'Medication',
+    assessment: 'Assessment',
+};
+
+function typeLabel(type: string): string {
+    return TYPE_LABELS[type] ?? type.replace(/_/g, ' ');
+}
+
 export function ClientTimelineTab({
     clientId,
     events,
@@ -116,7 +138,7 @@ export function ClientTimelineTab({
                             <SelectItem value="all">All types</SelectItem>
                             {eventTypes.map((t) => (
                                 <SelectItem key={t} value={t}>
-                                    {t}
+                                    {typeLabel(t)}
                                 </SelectItem>
                             ))}
                         </SelectContent>
@@ -378,6 +400,31 @@ export function ClientTimelineTab({
                                         bg: 'bg-status-info-bg',
                                         icon: '🤝',
                                     },
+                                    // Shift-handover workflow lifecycle events
+                                    // (ShiftTimelineService): same 🤝 glyph, colour
+                                    // tracks status — drafted=info, submitted
+                                    // awaiting ack=warning, acknowledged=success,
+                                    // waived (completed without handover)=critical.
+                                    shift_handover_created: {
+                                        dot: 'bg-status-info',
+                                        bg: 'bg-status-info-bg',
+                                        icon: '🤝',
+                                    },
+                                    shift_handover_submitted: {
+                                        dot: 'bg-status-warning',
+                                        bg: 'bg-status-warning-bg',
+                                        icon: '🤝',
+                                    },
+                                    shift_handover_acknowledged: {
+                                        dot: 'bg-status-success',
+                                        bg: 'bg-status-success-bg',
+                                        icon: '🤝',
+                                    },
+                                    shift_handover_waived: {
+                                        dot: 'bg-status-critical',
+                                        bg: 'bg-status-critical-bg',
+                                        icon: '🤝',
+                                    },
                                     incident: {
                                         dot: 'bg-status-critical',
                                         bg: 'bg-status-critical-bg',
@@ -465,7 +512,9 @@ export function ClientTimelineTab({
                                                                 variant="outline"
                                                                 className="h-4 px-1.5 text-[9px] capitalize"
                                                             >
-                                                                {e.type}
+                                                                {typeLabel(
+                                                                    e.type,
+                                                                )}
                                                             </Badge>
                                                         </div>
                                                         {e.actor?.name && (

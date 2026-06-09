@@ -570,12 +570,42 @@ class ShiftHandoverService
                 'status' => $fresh->status,
             ]);
 
+            // Keep the client-timeline snapshot (mood/notes) in step with this
+            // content edit. Done before the submit branch so a draft's created
+            // event picks up the new content even when the edit also submits —
+            // submit() then writes the submitted event itself.
+            $this->refreshHandoverTimelineSnapshot($fresh);
+
             if (($data['submit'] ?? false) && $fresh->status === self::STATUS_DRAFT) {
                 return $this->submit($fresh, $actor);
             }
 
             return $fresh;
         });
+    }
+
+    /**
+     * Refresh the client-timeline snapshot after a content edit. The mood/notes a
+     * viewer sees are embedded in the handover-created (draft) and
+     * handover-submitted event bodies; the recordHandover* upserts are keyed on
+     * (type, ShiftHandover, source_id), so they update those events in place. No
+     * actor/time is passed, so the original attribution and timeline position are
+     * preserved. The acknowledged event body carries no editable snapshot content,
+     * so it is intentionally left untouched.
+     */
+    protected function refreshHandoverTimelineSnapshot(ShiftHandover $handover): void
+    {
+        $shift = $handover->outgoingShift;
+
+        if (! $shift) {
+            return;
+        }
+
+        $this->timelineService->recordHandoverCreated($handover, $shift);
+
+        if (in_array($handover->status, [self::STATUS_SUBMITTED, self::STATUS_ACKNOWLEDGED], true)) {
+            $this->timelineService->recordHandoverSubmitted($handover, $shift);
+        }
     }
 
     protected function resolveIncomingShift(Shift $outgoingShift, mixed $incomingShiftId): ?Shift
