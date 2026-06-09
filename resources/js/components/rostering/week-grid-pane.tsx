@@ -22,6 +22,7 @@ import { useMemo, useState } from 'react';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
+import { avatarHueStyle } from './avatar-hue';
 import {
     ShiftContextMenu,
     type ShiftCtxItem,
@@ -872,10 +873,7 @@ export function WeekGridPane({
                                 <div className="flex items-center gap-2 px-3 py-2">
                                     <div
                                         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold uppercase"
-                                        style={{
-                                            background: `hsl(${row.hue} 55% 90%)`,
-                                            color: `hsl(${row.hue} 50% 35%)`,
-                                        }}
+                                        style={avatarHueStyle(row.hue)}
                                     >
                                         {row.initials}
                                     </div>

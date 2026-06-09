@@ -1,6 +1,7 @@
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 
+import { avatarHueStyle } from './avatar-hue';
 import { MicroStats, type MicroStat } from './micro-stats';
 
 export type TimeOffRequest = {
@@ -103,10 +104,7 @@ export function TimeOffPane({
                                 <div className="flex items-center gap-2.5">
                                     <div
                                         className="flex h-9 w-9 shrink-0 items-center justify-center rounded-full text-xs font-bold uppercase"
-                                        style={{
-                                            background: `hsl(${req.hue} 55% 90%)`,
-                                            color: `hsl(${req.hue} 50% 35%)`,
-                                        }}
+                                        style={avatarHueStyle(req.hue)}
                                     >
                                         {req.initials}
                                     </div>
@@ -217,10 +215,7 @@ export function TimeOffPane({
                                 <div className="flex items-center gap-2 pr-2">
                                     <div
                                         className="flex h-5 w-5 shrink-0 items-center justify-center rounded-full text-[9px] font-bold uppercase"
-                                        style={{
-                                            background: `hsl(${req.hue} 55% 90%)`,
-                                            color: `hsl(${req.hue} 50% 35%)`,
-                                        }}
+                                        style={avatarHueStyle(req.hue)}
                                     >
                                         {req.initials}
                                     </div>

@@ -5,6 +5,7 @@ export {
     type FillBySite,
     type ShiftTypeSlice,
 } from './analytics-pane';
+export { avatarHueStyle } from './avatar-hue';
 export {
     AvailabilityPane,
     type AvailabilityLeaveRequest,

@@ -792,7 +792,7 @@ class MyHrController extends Controller
         $user = $request->user();
 
         $validated = $request->validate([
-            'break_minutes' => ['nullable', 'integer', 'min:0', 'max:480'],
+            'break_minutes' => ['nullable', 'integer', 'min:0', 'max:240'],
             'mileage_km' => ['nullable', 'numeric', 'min:0', 'max:9999'],
             'notes' => ['nullable', 'string', 'max:500'],
         ]);
