@@ -1,5 +1,6 @@
 import {
     CalendarPlus,
+    Copy,
     LayoutTemplate,
     MoreVertical,
     Pencil,
@@ -87,6 +88,7 @@ export type TemplatesPaneProps = {
     onView: (template: RosterTemplateRow) => void;
     onEdit: (template: RosterTemplateRow) => void;
     onDelete: (template: RosterTemplateRow) => void;
+    onDuplicate: (template: RosterTemplateRow) => void;
 };
 
 /* ------------------------------------------------------------------ */
@@ -137,6 +139,7 @@ function TemplateCard({
     onView,
     onEdit,
     onDelete,
+    onDuplicate,
 }: {
     template: RosterTemplateRow;
     canManage: boolean;
@@ -144,6 +147,7 @@ function TemplateCard({
     onView: () => void;
     onEdit: () => void;
     onDelete: () => void;
+    onDuplicate: () => void;
 }) {
     const assignedRows = template.template_shifts.filter(
         (s) => s.user_id != null,
@@ -225,6 +229,11 @@ function TemplateCard({
                                 <DropdownMenuItem onSelect={() => onEdit()}>
                                     <Pencil className="h-3.5 w-3.5" /> Edit
                                     template
+                                </DropdownMenuItem>
+                            ) : null}
+                            {canManage ? (
+                                <DropdownMenuItem onSelect={() => onDuplicate()}>
+                                    <Copy className="h-3.5 w-3.5" /> Duplicate
                                 </DropdownMenuItem>
                             ) : null}
                             {canDelete ? (
@@ -318,6 +327,7 @@ export function TemplatesPane({
     onView,
     onEdit,
     onDelete,
+    onDuplicate,
 }: TemplatesPaneProps) {
     const [search, setSearch] = useState('');
     const [activeOnly, setActiveOnly] = useState(false);
@@ -431,6 +441,7 @@ export function TemplatesPane({
                             onView={() => onView(template)}
                             onEdit={() => onEdit(template)}
                             onDelete={() => setPendingDelete(template)}
+                            onDuplicate={() => onDuplicate(template)}
                         />
                     ))}
                 </div>

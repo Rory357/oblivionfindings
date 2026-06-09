@@ -79,6 +79,17 @@ export {
     type ResolveConflictShift,
 } from './resolve-conflict-dialog';
 export {
+    SeriesDetailDialog,
+    type SeriesDetail,
+    type SeriesDetailDialogProps,
+    type SeriesOccurrence,
+} from './series-dialogs';
+export {
+    SeriesPane,
+    type RosterSeriesRow,
+    type SeriesPaneProps,
+} from './series-pane';
+export {
     ShiftContextMenu,
     type ShiftCtxItem,
     type ShiftCtxState,

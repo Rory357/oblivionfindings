@@ -141,6 +141,78 @@ it('surfaces preflight warnings before applying unassigned template rows', funct
     expect(Shift::count())->toBe(1);
 });
 
+it('stamps the pattern across cadence cycles', function () {
+    $site = Site::factory()->create();
+    $client = Client::factory()->create([
+        'organization_id' => 1,
+        'site_id' => $site->id,
+    ]);
+    $actor = rosteringTemplateActor();
+    $template = RosterTemplate::factory()->create([
+        'organization_id' => 1,
+        'created_by' => $actor->id,
+        'template_type' => 'fortnightly',
+    ]);
+
+    RosterTemplateShift::factory()->unassigned()->create([
+        'organization_id' => 1,
+        'roster_template_id' => $template->id,
+        'client_id' => $client->id,
+        'service_context_id' => null,
+        'day_of_week' => 0,
+        'start_time' => '09:00',
+        'end_time' => '13:00',
+    ]);
+
+    $this->actingAs($actor)
+        ->post(route('operations.rostering.templates.apply', $template), [
+            'week_start' => '2026-05-04',
+            'cycles' => 3,
+            'confirm_warnings' => true,
+        ])
+        ->assertRedirect(route('operations.rostering.index', ['week' => '2026-05-04']));
+
+    // Fortnightly cadence advances 2 weeks per cycle.
+    $dates = Shift::query()->orderBy('starts_at')->get()
+        ->map(fn (Shift $shift) => $shift->starts_at->toDateString())
+        ->all();
+
+    expect($dates)->toBe(['2026-05-04', '2026-05-18', '2026-06-01']);
+});
+
+it('snaps a non-Monday week_start to the Monday anchor', function () {
+    $site = Site::factory()->create();
+    $client = Client::factory()->create([
+        'organization_id' => 1,
+        'site_id' => $site->id,
+    ]);
+    $actor = rosteringTemplateActor();
+    $template = RosterTemplate::factory()->create([
+        'organization_id' => 1,
+        'created_by' => $actor->id,
+    ]);
+
+    RosterTemplateShift::factory()->unassigned()->create([
+        'organization_id' => 1,
+        'roster_template_id' => $template->id,
+        'client_id' => $client->id,
+        'service_context_id' => null,
+        'day_of_week' => 0,
+        'start_time' => '09:00',
+        'end_time' => '13:00',
+    ]);
+
+    // 2026-05-06 is a Wednesday; the Monday row must still land on Monday 05-04.
+    $this->actingAs($actor)
+        ->post(route('operations.rostering.templates.apply', $template), [
+            'week_start' => '2026-05-06',
+            'confirm_warnings' => true,
+        ])
+        ->assertRedirect(route('operations.rostering.index', ['week' => '2026-05-04']));
+
+    expect(Shift::first()->starts_at->toDateString())->toBe('2026-05-04');
+});
+
 function rosteringTemplateActor(): User
 {
     $actor = User::factory()->create(['organization_id' => 1]);

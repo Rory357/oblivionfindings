@@ -9,7 +9,9 @@ import {
     Check,
     ChevronLeft,
     ChevronRight,
+    ClipboardCheck,
     Clock,
+    Copy,
     LayoutTemplate,
     ListChecks,
     Loader2,
@@ -106,6 +108,8 @@ const DAY_LABELS = [
     'Sunday',
 ];
 
+const DAY_SHORT = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+
 const SHIFT_TYPE_OPTIONS = [
     { value: 'standard', label: 'Standard' },
     { value: 'sleepover', label: 'Sleepover' },
@@ -133,6 +137,26 @@ function nextMonday(): string {
     const daysUntilMonday = day === 1 ? 7 : (8 - day) % 7 || 7;
     result.setDate(result.getDate() + daysUntilMonday);
     return result.toISOString().slice(0, 10);
+}
+
+// Monday of the week containing the given yyyy-mm-dd (mirrors the server snap).
+function mondayOf(dateStr: string): Date {
+    const d = new Date(`${dateStr}T00:00:00`);
+    if (Number.isNaN(d.getTime())) return new Date();
+    const day = d.getDay(); // 0=Sun … 6=Sat
+    const diff = (day === 0 ? -6 : 1) - day;
+    d.setDate(d.getDate() + diff);
+    return d;
+}
+
+function addDaysLocal(date: Date, days: number): Date {
+    const d = new Date(date);
+    d.setDate(d.getDate() + days);
+    return d;
+}
+
+function shortDate(d: Date): string {
+    return d.toLocaleDateString('en-NZ', { day: '2-digit', month: 'short' });
 }
 
 /* ------------------------------------------------------------------ */
@@ -285,7 +309,7 @@ function toWizardRow(shift: RosterTemplateShiftRow): WizardShiftRow {
     };
 }
 
-const WIZARD_STEPS: { key: 'details' | 'shifts'; label: string; icon: IconType; blurb: string }[] = [
+const WIZARD_STEPS: { key: 'details' | 'shifts' | 'review'; label: string; icon: IconType; blurb: string }[] = [
     {
         key: 'details',
         label: 'Details',
@@ -297,6 +321,12 @@ const WIZARD_STEPS: { key: 'details' | 'shifts'; label: string; icon: IconType; 
         label: 'Shift rows',
         icon: ListChecks,
         blurb: 'The repeatable pattern',
+    },
+    {
+        key: 'review',
+        label: 'Review',
+        icon: ClipboardCheck,
+        blurb: 'Check the week shape',
     },
 ];
 
@@ -409,6 +439,20 @@ function WizardBody({
             'template_shifts',
             data.template_shifts.filter((_, i) => i !== index),
         );
+    // Clone a row in place (inserted right after it) and bump it to the next day —
+    // the fast way to fan a shift out across the week.
+    const duplicateRow = (index: number) => {
+        const source = data.template_shifts[index];
+        const clone: WizardShiftRow = {
+            ...source,
+            day_of_week: String((Number(source.day_of_week) + 1) % 7),
+        };
+        setData('template_shifts', [
+            ...data.template_shifts.slice(0, index + 1),
+            clone,
+            ...data.template_shifts.slice(index + 1),
+        ]);
+    };
 
     const validateDetails = (): boolean => {
         const e: Record<string, string> = {};
@@ -436,6 +480,7 @@ function WizardBody({
 
     const goNext = () => {
         if (cur.key === 'details' && !validateDetails()) return;
+        if (cur.key === 'shifts' && !validateShifts()) return;
         setStepIndex((i) => Math.min(i + 1, WIZARD_STEPS.length - 1));
     };
     const goBack = () => {
@@ -665,7 +710,7 @@ function WizardBody({
                                 </Field>
                             </div>
                         </div>
-                    ) : (
+                    ) : cur.key === 'shifts' ? (
                         <div className="animate-in fade-in slide-in-from-right-2 duration-300">
                             <StepHeading
                                 icon={ListChecks}
@@ -712,6 +757,7 @@ function WizardBody({
                                             setRow(index, patch)
                                         }
                                         onRemove={() => removeRow(index)}
+                                        onDuplicate={() => duplicateRow(index)}
                                     />
                                 ))}
                             </div>
@@ -726,6 +772,11 @@ function WizardBody({
                                 <Plus className="h-4 w-4" /> Add shift row
                             </Button>
                         </div>
+                    ) : (
+                        <ReviewPane
+                            shifts={data.template_shifts}
+                            cadence={data.template_type}
+                        />
                     )}
                 </div>
 
@@ -814,6 +865,7 @@ function RowEditor({
     clients,
     onChange,
     onRemove,
+    onDuplicate,
 }: {
     index: number;
     row: WizardShiftRow;
@@ -825,6 +877,7 @@ function RowEditor({
     clients: TemplateClientOption[];
     onChange: (patch: Partial<WizardShiftRow>) => void;
     onRemove: () => void;
+    onDuplicate: () => void;
 }) {
     const overnight = row.end_time <= row.start_time;
     return (
@@ -847,17 +900,28 @@ function RowEditor({
                         </span>
                     ) : null}
                 </div>
-                {canRemove ? (
+                <div className="flex items-center gap-1">
                     <Button
                         type="button"
                         variant="ghost"
                         size="sm"
                         className="text-muted-foreground"
-                        onClick={onRemove}
+                        onClick={onDuplicate}
                     >
-                        <Trash2 className="h-3.5 w-3.5" /> Remove
+                        <Copy className="h-3.5 w-3.5" /> Duplicate
                     </Button>
-                ) : null}
+                    {canRemove ? (
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            className="text-muted-foreground"
+                            onClick={onRemove}
+                        >
+                            <Trash2 className="h-3.5 w-3.5" /> Remove
+                        </Button>
+                    ) : null}
+                </div>
             </div>
 
             <div className="grid gap-4 sm:grid-cols-2 xl:grid-cols-4">
@@ -1015,6 +1079,131 @@ function RowEditor({
 }
 
 /* ------------------------------------------------------------------ */
+/*  Review step — the week shape before committing                     */
+/* ------------------------------------------------------------------ */
+
+function ReviewPane({
+    shifts,
+    cadence,
+}: {
+    shifts: WizardShiftRow[];
+    cadence: string;
+}) {
+    const byDay = useMemo(() => {
+        const counts = [0, 0, 0, 0, 0, 0, 0];
+        for (const s of shifts) {
+            const d = Number(s.day_of_week);
+            if (d >= 0 && d < 7) counts[d]++;
+        }
+        return counts;
+    }, [shifts]);
+
+    const assigned = shifts.filter((s) => s.user_id).length;
+    const open = shifts.length - assigned;
+    const cadenceNote =
+        cadence === 'fortnightly'
+            ? 'Each apply cycle advances 2 weeks.'
+            : cadence === 'monthly'
+              ? 'Each apply cycle advances 4 weeks.'
+              : 'Each apply cycle advances 1 week.';
+
+    return (
+        <div className="animate-in fade-in slide-in-from-right-2 duration-300">
+            <StepHeading
+                icon={ClipboardCheck}
+                title="Review"
+                blurb="This is the week each apply will stamp. Day 1 is the Monday of the chosen week."
+            />
+
+            <div className="mb-4 grid grid-cols-7 gap-1">
+                {DAY_SHORT.map((day, i) => {
+                    const count = byDay[i];
+                    return (
+                        <div
+                            key={day}
+                            className={cn(
+                                'flex h-12 flex-col items-center justify-center rounded-md border text-[11px] font-semibold',
+                                count
+                                    ? 'border-primary/30 bg-primary/10 text-primary'
+                                    : 'border-border bg-muted/40 text-muted-foreground',
+                            )}
+                        >
+                            <span className="uppercase tracking-wide">{day}</span>
+                            <span className="tabular-nums">{count || '·'}</span>
+                        </div>
+                    );
+                })}
+            </div>
+
+            <div className="flex flex-wrap items-center gap-1.5 text-[11px]">
+                <span className="rounded-full bg-muted px-2 py-0.5 font-semibold text-muted-foreground">
+                    {shifts.length} {shifts.length === 1 ? 'shift' : 'shifts'} / week
+                </span>
+                <span className="rounded-full bg-muted px-2 py-0.5 font-semibold text-muted-foreground">
+                    {assigned} assigned
+                </span>
+                {open > 0 ? (
+                    <span className="rounded-full bg-status-warning-bg px-2 py-0.5 font-semibold text-status-warning">
+                        {open} open
+                    </span>
+                ) : null}
+                <span className="rounded-full bg-primary/10 px-2 py-0.5 font-semibold capitalize text-primary">
+                    {cadence}
+                </span>
+            </div>
+            <p className="mt-2 text-[13px] text-muted-foreground">{cadenceNote}</p>
+
+            <div className="mt-4 space-y-2.5">
+                {DAY_LABELS.map((label, dayIdx) => {
+                    const dayRows = shifts.filter(
+                        (s) => Number(s.day_of_week) === dayIdx,
+                    );
+                    if (dayRows.length === 0) return null;
+                    return (
+                        <div
+                            key={label}
+                            className="rounded-lg border border-border p-3"
+                        >
+                            <div className="text-sm font-semibold">{label}</div>
+                            <ul className="mt-1.5 space-y-1 text-[13px] text-muted-foreground">
+                                {dayRows.map((r, i) => {
+                                    const overnight = r.end_time <= r.start_time;
+                                    return (
+                                        <li
+                                            key={i}
+                                            className="flex flex-wrap items-center gap-x-2"
+                                        >
+                                            <span className="font-medium text-foreground tabular-nums">
+                                                {r.start_time}–{r.end_time}
+                                                {overnight ? ' (+1)' : ''}
+                                            </span>
+                                            <span aria-hidden>·</span>
+                                            <span>
+                                                {r.user_id ? 'Assigned' : 'Open'}
+                                            </span>
+                                            {r.is_sleepover ? (
+                                                <span className="rounded bg-primary/10 px-1.5 text-[11px] font-semibold text-primary">
+                                                    Sleepover
+                                                </span>
+                                            ) : null}
+                                            {r.is_on_call ? (
+                                                <span className="rounded bg-primary/10 px-1.5 text-[11px] font-semibold text-primary">
+                                                    On-call
+                                                </span>
+                                            ) : null}
+                                        </li>
+                                    );
+                                })}
+                            </ul>
+                        </div>
+                    );
+                })}
+            </div>
+        </div>
+    );
+}
+
+/* ------------------------------------------------------------------ */
 /*  Detail dialog (view + apply)                                       */
 /* ------------------------------------------------------------------ */
 
@@ -1023,7 +1212,9 @@ export type TemplateDetailDialogProps = {
     open: boolean;
     onOpenChange: (open: boolean) => void;
     canManage: boolean;
+    canDelete: boolean;
     onEdit: (template: RosterTemplateRow) => void;
+    onDelete: (template: RosterTemplateRow) => void;
 };
 
 export function TemplateDetailDialog({
@@ -1031,7 +1222,9 @@ export function TemplateDetailDialog({
     open,
     onOpenChange,
     canManage,
+    canDelete,
     onEdit,
+    onDelete,
 }: TemplateDetailDialogProps) {
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
@@ -1053,7 +1246,9 @@ export function TemplateDetailDialog({
                         template={template}
                         onOpenChange={onOpenChange}
                         canManage={canManage}
+                        canDelete={canDelete}
                         onEdit={onEdit}
+                        onDelete={onDelete}
                     />
                 ) : null}
             </DialogContent>
@@ -1065,17 +1260,44 @@ function DetailBody({
     template,
     onOpenChange,
     canManage,
+    canDelete,
     onEdit,
+    onDelete,
 }: {
     template: RosterTemplateRow;
     onOpenChange: (open: boolean) => void;
     canManage: boolean;
+    canDelete: boolean;
     onEdit: (template: RosterTemplateRow) => void;
+    onDelete: (template: RosterTemplateRow) => void;
 }) {
     const applyForm = useForm({
         week_start: nextMonday(),
+        cycles: 1,
         confirm_warnings: false,
     });
+    const [confirmDeleteOpen, setConfirmDeleteOpen] = useState(false);
+
+    const intervalWeeks =
+        template.template_type === 'fortnightly'
+            ? 2
+            : template.template_type === 'monthly'
+              ? 4
+              : 1;
+    const cycles = applyForm.data.cycles;
+    const totalShifts = template.template_shifts_count * cycles;
+    const cycleWeeks = useMemo(
+        () =>
+            Array.from({ length: cycles }, (_, k) =>
+                shortDate(
+                    addDaysLocal(
+                        mondayOf(applyForm.data.week_start),
+                        k * intervalWeeks * 7,
+                    ),
+                ),
+            ),
+        [applyForm.data.week_start, cycles, intervalWeeks],
+    );
     const [warningOpen, setWarningOpen] = useState(false);
     const errors = applyForm.errors as Record<string, string | undefined>;
     const warningLines = useMemo(
@@ -1149,6 +1371,16 @@ function DetailBody({
                             <Pencil className="h-3.5 w-3.5" /> Edit
                         </Button>
                     ) : null}
+                    {canDelete ? (
+                        <Button
+                            variant="outline"
+                            size="sm"
+                            className="text-status-critical hover:text-status-critical"
+                            onClick={() => setConfirmDeleteOpen(true)}
+                        >
+                            <Trash2 className="h-3.5 w-3.5" /> Delete
+                        </Button>
+                    ) : null}
                     <button
                         type="button"
                         onClick={() => onOpenChange(false)}
@@ -1191,8 +1423,8 @@ function DetailBody({
                         Apply to a week
                     </div>
                     <p className="mt-1 text-[13px] text-muted-foreground">
-                        Creates draft shifts for the chosen week. The date is
-                        treated as the Monday anchor.
+                        Creates draft shifts for the chosen week (snapped to its
+                        Monday). Apply more than one cycle to stamp several weeks.
                     </p>
 
                     {blockLines.length > 0 ? (
@@ -1234,6 +1466,52 @@ function DetailBody({
                                 }
                             />
                         </div>
+                        <div className="space-y-1.5">
+                            <Label htmlFor="apply-cycles">
+                                Cycles
+                                {intervalWeeks > 1
+                                    ? ` · every ${intervalWeeks} weeks`
+                                    : ''}
+                            </Label>
+                            <Input
+                                id="apply-cycles"
+                                type="number"
+                                min={1}
+                                max={12}
+                                value={applyForm.data.cycles}
+                                onChange={(e) =>
+                                    applyForm.setData(
+                                        'cycles',
+                                        Math.max(
+                                            1,
+                                            Math.min(
+                                                12,
+                                                Number(e.target.value) || 1,
+                                            ),
+                                        ),
+                                    )
+                                }
+                            />
+                        </div>
+                        {template.template_shifts_count > 0 ? (
+                            <div
+                                className="rounded-md border border-border bg-card/60 p-2.5 text-[12px] text-muted-foreground"
+                                data-test="template-apply-preview"
+                            >
+                                Creates{' '}
+                                <span className="font-semibold text-foreground tabular-nums">
+                                    {totalShifts}
+                                </span>{' '}
+                                draft shift{totalShifts === 1 ? '' : 's'} across{' '}
+                                <span className="font-semibold text-foreground tabular-nums">
+                                    {cycles}
+                                </span>{' '}
+                                week{cycles === 1 ? '' : 's'} —{' '}
+                                <span className="text-foreground">
+                                    {cycleWeeks.join(', ')}
+                                </span>
+                            </div>
+                        ) : null}
                         <Button
                             type="submit"
                             className="w-full"
@@ -1282,6 +1560,38 @@ function DetailBody({
                             }}
                         >
                             Apply anyway
+                        </AlertDialogAction>
+                    </AlertDialogFooter>
+                </AlertDialogContent>
+            </AlertDialog>
+
+            <AlertDialog
+                open={confirmDeleteOpen}
+                onOpenChange={setConfirmDeleteOpen}
+            >
+                <AlertDialogContent>
+                    <AlertDialogHeader>
+                        <AlertDialogTitle>
+                            Delete “{template.name}”?
+                        </AlertDialogTitle>
+                        <AlertDialogDescription>
+                            This removes the template and its{' '}
+                            {template.template_shifts_count} shift rows. Shifts
+                            already created from it are not affected. This cannot
+                            be undone.
+                        </AlertDialogDescription>
+                    </AlertDialogHeader>
+                    <AlertDialogFooter>
+                        <AlertDialogCancel>Cancel</AlertDialogCancel>
+                        <AlertDialogAction
+                            className="bg-status-critical text-white hover:bg-status-critical/90"
+                            onClick={() => {
+                                setConfirmDeleteOpen(false);
+                                onOpenChange(false);
+                                onDelete(template);
+                            }}
+                        >
+                            Delete template
                         </AlertDialogAction>
                     </AlertDialogFooter>
                 </AlertDialogContent>

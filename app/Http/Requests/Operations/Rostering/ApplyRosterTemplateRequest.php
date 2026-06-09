@@ -17,6 +17,10 @@ class ApplyRosterTemplateRequest extends FormRequest
     {
         return [
             'week_start' => ['required', 'date'],
+            // How many cadence cycles to stamp. 1 = the chosen week only (the
+            // historical behaviour). The interval per cycle is derived from the
+            // template's cadence (weekly/fortnightly/monthly) in the controller.
+            'cycles' => ['sometimes', 'integer', 'min:1', 'max:12'],
             'confirm_warnings' => ['sometimes', 'boolean'],
         ];
     }
