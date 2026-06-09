@@ -213,7 +213,7 @@ export function NoteDetailDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden border-t-4 p-0 sm:max-w-[640px]">
+            <DialogContent className="flex max-h-[90vh] flex-col gap-0 overflow-hidden border-t-4 p-0 sm:max-w-[640px] [&>button]:hidden">
                 <DialogDescription className="sr-only">
                     Shift note detail and editor.
                 </DialogDescription>
