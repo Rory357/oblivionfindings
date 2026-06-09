@@ -18,11 +18,14 @@ use App\Models\RosterTemplate;
 use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\ShiftEligibilityOverride;
+use App\Models\ShiftSeries;
 use App\Models\Site;
 use App\Models\StaffTimeOff;
 use App\Models\User;
+use App\Services\Operations\ShiftSeriesPresenter;
 use App\Services\ShiftCoverageService;
 use App\Services\ShiftStaffEligibilityService;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Log;
@@ -37,8 +40,7 @@ class RosteringController extends Controller
         protected RosterPublishingService $publishing,
         protected RosterSuggestionService $suggestions,
         protected RosteringFeatureFlags $featureFlags,
-    ) {
-    }
+    ) {}
 
     public function index(RosteringIndexRequest $request)
     {
@@ -71,7 +73,7 @@ class RosteringController extends Controller
 
         $data = $request->validated();
 
-        $week = !empty($data['week'])
+        $week = ! empty($data['week'])
             ? Carbon::parse($data['week'])
             : now();
 
@@ -84,7 +86,11 @@ class RosteringController extends Controller
         $sites = [];
         $serviceContexts = [];
 
-        if ($canManageAny) {
+        // The template wizard (Templates tab) needs the client/staff/service-context
+        // pickers too, and it is gated on the broader $canManageTemplates. Load the
+        // datasets for either gate so a roster_templates.create user who is not a
+        // shifts.manageAny manager doesn't open the wizard to empty dropdowns.
+        if ($canManageAny || $canManageTemplates) {
             // Org-scope the filter dropdowns so managers only see their own
             // organization's staff/clients. Sites are not organization-scoped
             // in the schema (the table carries tenant_id, not organization_id),
@@ -137,13 +143,13 @@ class RosteringController extends Controller
         // Normalise the site_id filter once — may be null, a single int, or an int[].
         $siteFilter = $request->siteFilter();
 
-        if (!$canManageAny) {
+        if (! $canManageAny) {
             $query->where('user_id', $auth->id);
         } else {
-            if (!empty($data['staff_id'])) {
+            if (! empty($data['staff_id'])) {
                 $query->where('user_id', $data['staff_id']);
             }
-            if (!empty($data['client_id'])) {
+            if (! empty($data['client_id'])) {
                 $query->where('client_id', $data['client_id']);
             }
             if ($siteFilter !== null) {
@@ -164,10 +170,10 @@ class RosteringController extends Controller
             ->where('ends_at', '>', $weekStart)
             ->orderBy('starts_at');
 
-        if (!$canManageAny) {
+        if (! $canManageAny) {
             $timeOffQuery->where('user_id', $auth->id);
         } else {
-            if (!empty($data['staff_id'])) {
+            if (! empty($data['staff_id'])) {
                 $timeOffQuery->where('user_id', $data['staff_id']);
             }
         }
@@ -176,7 +182,7 @@ class RosteringController extends Controller
 
         // Conflict detection (UI-only warnings): actionable overlaps only.
         // Completed shifts are immutable (locked) and cancelled shifts are non-actionable.
-        $actionableShifts = $shifts->filter(fn ($s) => !in_array($s->status, ['completed', 'cancelled'], true))->values();
+        $actionableShifts = $shifts->filter(fn ($s) => ! in_array($s->status, ['completed', 'cancelled'], true))->values();
 
         // Overlaps per staff and per client.
         $staffOverlapCount = 0;
@@ -184,7 +190,7 @@ class RosteringController extends Controller
 
         if ($canManageAny) {
             $staffGroups = $actionableShifts
-                ->filter(fn ($s) => !empty($s->user_id))
+                ->filter(fn ($s) => ! empty($s->user_id))
                 ->groupBy('user_id');
 
             foreach ($staffGroups as $group) {
@@ -215,9 +221,11 @@ class RosteringController extends Controller
         $timeOffConflicts = 0;
         if ($canManageAny) {
             $byUser = $timeOffs->groupBy('user_id');
-            foreach ($actionableShifts->filter(fn($s) => !empty($s->user_id)) as $s) {
+            foreach ($actionableShifts->filter(fn ($s) => ! empty($s->user_id)) as $s) {
                 $blocks = $byUser->get($s->user_id);
-                if (!$blocks) continue;
+                if (! $blocks) {
+                    continue;
+                }
                 foreach ($blocks as $b) {
                     if ($b->starts_at < $s->ends_at && $b->ends_at > $s->starts_at) {
                         $timeOffConflicts++;
@@ -240,7 +248,10 @@ class RosteringController extends Controller
             'client_overlaps' => $clientOverlapCount,
             'timesheets_pending' => (int) $shifts->filter(function ($s) {
                 $ts = $s->timesheets->first();
-                if (!$ts) return false;
+                if (! $ts) {
+                    return false;
+                }
+
                 return in_array($ts->status, ['draft', 'submitted', 'returned'], true);
             })->count(),
             'time_off_conflicts' => $timeOffConflicts,
@@ -250,11 +261,11 @@ class RosteringController extends Controller
         $capacity = [];
         if ($canManageAny) {
             $staffForCapacity = $staff;
-            if (!empty($data['staff_id'])) {
+            if (! empty($data['staff_id'])) {
                 $staffForCapacity = $staffForCapacity->where('id', (int) $data['staff_id']);
             }
 
-            $grouped = $shifts->filter(fn ($s) => !empty($s->user_id) && $s->status !== 'cancelled')
+            $grouped = $shifts->filter(fn ($s) => ! empty($s->user_id) && $s->status !== 'cancelled')
                 ->groupBy('user_id');
 
             foreach ($staffForCapacity as $u) {
@@ -566,6 +577,17 @@ class RosteringController extends Controller
             'rosterTemplates' => $request->query('tab') === 'templates'
                 ? $this->buildRosterTemplates($organizationId)
                 : Inertia::optional(fn () => $this->buildRosterTemplates($organizationId)),
+            'canManageSeries' => $auth->canDo('shifts.manageAny') || $auth->canDo('rostering.viewAny'),
+            // Recurring series (tab). Same lazy pattern as rosterTemplates: eager on
+            // the ?tab=recurring landing, otherwise resolved on a partial reload.
+            'rosterSeries' => $request->query('tab') === 'recurring'
+                ? app(ShiftSeriesPresenter::class)->list()
+                : Inertia::optional(fn () => app(ShiftSeriesPresenter::class)->list()),
+            // Detail for the series pop-up. Eager when deep-linked (?series=ID),
+            // otherwise resolved on demand when a card is opened (partial reload).
+            'seriesDetail' => $request->query('series')
+                ? $this->buildSeriesDetail($request->query('series'))
+                : Inertia::optional(fn () => $this->buildSeriesDetail($request->query('series'))),
             'rosterPeriod' => $selectedRosterPeriod ? [
                 'id' => $selectedRosterPeriod->id,
                 'site_id' => $selectedRosterPeriod->site_id,
@@ -581,7 +603,7 @@ class RosteringController extends Controller
             ] : null,
             'stats' => $stats,
             'shifts' => $shifts->map(function (Shift $shift) {
-                $clientName = $shift->client ? ($shift->client->first_name . ' ' . $shift->client->last_name) : null;
+                $clientName = $shift->client ? ($shift->client->first_name.' '.$shift->client->last_name) : null;
                 $staffName = $shift->staff ? $shift->staff->name : null;
                 $ts = $shift->timesheets->first();
                 $activeReplacement = $shift->replacementRequests
@@ -761,6 +783,26 @@ class RosteringController extends Controller
             ->all();
     }
 
+    /**
+     * Build the detail payload for one recurring series (the tab pop-up).
+     *
+     * @return array<string, mixed>|null
+     */
+    protected function buildSeriesDetail($seriesId): ?array
+    {
+        if (! $seriesId) {
+            return null;
+        }
+
+        $series = ShiftSeries::find($seriesId);
+
+        if (! $series) {
+            return null;
+        }
+
+        return app(ShiftSeriesPresenter::class)->detail($series);
+    }
+
     protected function buildAvailabilitySummary(User $auth): array
     {
         $staff = User::query()
@@ -830,7 +872,7 @@ class RosteringController extends Controller
 
         $data = $request->validated();
 
-        $week = !empty($data['week']) ? Carbon::parse($data['week']) : now();
+        $week = ! empty($data['week']) ? Carbon::parse($data['week']) : now();
         $weekStart = (clone $week)->startOfWeek(Carbon::MONDAY)->startOfDay();
         $weekEnd = (clone $weekStart)->addDays(7);
 
@@ -1219,7 +1261,7 @@ class RosteringController extends Controller
      */
     protected function getComplianceBadges(?int $organizationId): array
     {
-        if (!$organizationId) {
+        if (! $organizationId) {
             return [];
         }
 
@@ -1309,7 +1351,7 @@ class RosteringController extends Controller
         $eligibilityResults = [];
 
         if ($assignees->isNotEmpty()) {
-            (new \Illuminate\Database\Eloquent\Collection($assignees->all()))
+            (new Collection($assignees->all()))
                 ->loadMissing([
                     'staffAvailability',
                     'staffTimeOff',
@@ -1361,12 +1403,14 @@ class RosteringController extends Controller
         foreach ($futureShifts as $shift) {
             if (! $shift->staff) {
                 $eligibleCount++;
+
                 continue;
             }
 
             $result = $eligibilityResults[$shift->id][$shift->staff->id] ?? null;
             if (! $result) {
                 $eligibleCount++;
+
                 continue;
             }
 
@@ -1420,8 +1464,8 @@ class RosteringController extends Controller
      * the controller's $staff collection only selects [id, name, email]
      * and the rule classes lazy-load extra relations.
      *
-     * @param  iterable<\App\Models\Shift>  $openShifts
-     * @param  iterable<\App\Models\User>   $staffPool
+     * @param  iterable<Shift>  $openShifts
+     * @param  iterable<User>  $staffPool
      * @return array<int, array<int, array{status: string, reasons: array<int, string>}>>
      */
     protected function buildOpenShiftEligibility(iterable $openShifts, iterable $staffPool): array

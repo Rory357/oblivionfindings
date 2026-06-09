@@ -811,6 +811,10 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         ->middleware('permission:roster_templates.create')
         ->name('operations.rostering.templates.store');
 
+    Route::post('/rostering/templates/{template}/duplicate', [RosterTemplateController::class, 'duplicate'])
+        ->middleware('permission:roster_templates.create')
+        ->name('operations.rostering.templates.duplicate');
+
     Route::middleware('permission:roster_templates.update')->group(function () {
         Route::put('/rostering/templates/{template}', [RosterTemplateController::class, 'update'])->name('operations.rostering.templates.update');
         Route::post('/rostering/templates/{template}/apply', [RosterTemplateController::class, 'apply'])->name('operations.rostering.templates.apply');

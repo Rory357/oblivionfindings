@@ -12,8 +12,8 @@ use App\Models\SiteCoverageRequirement;
 use App\Models\User;
 use App\Services\CoverageReservationService;
 use App\Services\NotificationService;
+use App\Services\Operations\ShiftSeriesPresenter;
 use App\Services\ShiftConflictService;
-use App\Services\ShiftCoverageService;
 use App\Services\ShiftReplacementService;
 use App\Services\ShiftStateGuardService;
 use App\Services\ShiftTimelineService;
@@ -29,10 +29,20 @@ use Illuminate\Validation\ValidationException;
 
 class ShiftSeriesController extends Controller
 {
+    public function __construct(private ShiftSeriesPresenter $presenter) {}
+
     public function index(Request $request)
     {
         $auth = $request->user();
         abort_unless($this->canViewSeries($auth), 403);
+
+        // Recurring series now live as a tab in the Rostering workspace. Send
+        // users who can open that workspace there; everyone else who may view
+        // series (e.g. the read-only Auditor role, which lacks rostering.viewAny)
+        // keeps the standalone list as a fallback.
+        if ($auth->canDo('rostering.viewAny')) {
+            return redirect()->route('operations.rostering.index', ['tab' => 'recurring']);
+        }
 
         $series = ShiftSeries::query()
             ->with([
@@ -102,142 +112,17 @@ class ShiftSeriesController extends Controller
         $auth = $request->user();
         abort_unless($this->canViewSeries($auth), 403);
 
-        $series->load([
-            'client:id,first_name,last_name',
-            'site:id,name,type',
-            'staff:id,name,email',
-            'serviceContext:id,name,type',
-        ]);
-
-        $today = now()->startOfDay();
-
-        $upcomingOccurrences = Shift::query()
-            ->with([
-                'staff:id,name,email',
-                'serviceContext:id,name,type',
-                'replacementRequests' => fn ($query) => $query->active()
-                    ->with([
-                        'requester:id,name',
-                        'currentStaff:id,name',
-                        'replacementStaff:id,name',
-                        'openPosition:id,replacement_request_id,status,claimed_by,expires_at',
-                        'openPosition.claimer:id,name',
-                    ]),
-            ])
-            ->withCount([
-                'incidents as incidents_count',
-                'tasks as tasks_total',
-                'tasks as tasks_completed' => fn ($query) => $query->where('is_completed', true),
-            ])
-            ->where('shift_series_id', $series->id)
-            ->where('ends_at', '>=', $today)
-            ->orderBy('starts_at')
-            ->limit(18)
-            ->get();
-
-        $recentOccurrences = Shift::query()
-            ->with(['staff:id,name,email', 'serviceContext:id,name,type'])
-            ->withCount([
-                'incidents as incidents_count',
-                'tasks as tasks_total',
-                'tasks as tasks_completed' => fn ($query) => $query->where('is_completed', true),
-            ])
-            ->where('shift_series_id', $series->id)
-            ->where('ends_at', '<', $today)
-            ->orderByDesc('starts_at')
-            ->limit(8)
-            ->get();
-
-        $stats = [
-            'occurrences_total' => Shift::query()->where('shift_series_id', $series->id)->count(),
-            'remaining_occurrences' => Shift::query()
-                ->where('shift_series_id', $series->id)
-                ->whereNotIn('status', ['completed', 'cancelled'])
-                ->where('ends_at', '>=', $today)
-                ->count(),
-            'open_occurrences' => Shift::query()
-                ->where('shift_series_id', $series->id)
-                ->whereNull('user_id')
-                ->whereNotIn('status', ['completed', 'cancelled'])
-                ->where('ends_at', '>=', $today)
-                ->count(),
-            'completed_occurrences' => Shift::query()
-                ->where('shift_series_id', $series->id)
-                ->where('status', 'completed')
-                ->count(),
-            'cancelled_occurrences' => Shift::query()
-                ->where('shift_series_id', $series->id)
-                ->where('status', 'cancelled')
-                ->count(),
-            'active_replacements' => Shift::query()
-                ->where('shift_series_id', $series->id)
-                ->whereHas('replacementRequests', fn ($query) => $query->active())
-                ->count(),
-        ];
-
-        $nextOccurrence = $upcomingOccurrences->first();
-        $coverageAlignment = [
-            'linked_rule_issues' => [],
-            'orphan_series' => null,
-        ];
-
-        if ($series->site_id) {
-            $alignmentWindowEnd = now()->addDays(28)->endOfDay();
-            $alignment = app(ShiftCoverageService::class)->buildRecurringAlignment(
-                now()->startOfDay(),
-                $alignmentWindowEnd,
-                $series->site_id,
-            );
-
-            $coverageAlignment['linked_rule_issues'] = collect($alignment['rule_drift'] ?? [])
-                ->filter(fn (array $issue) => collect($issue['matching_series'] ?? [])
-                    ->contains(fn (array $row) => (int) ($row['id'] ?? 0) === (int) $series->id))
-                ->values()
-                ->all();
-            $coverageAlignment['orphan_series'] = collect($alignment['orphan_series'] ?? [])
-                ->first(fn (array $issue) => (int) ($issue['series_id'] ?? 0) === (int) $series->id);
+        // Rostering users open the series in the Recurring tab pop-up; other
+        // viewers (Auditor) keep the standalone read-only detail page.
+        if ($auth->canDo('rostering.viewAny')) {
+            return redirect()->route('operations.rostering.index', [
+                'tab' => 'recurring',
+                'series' => $series->id,
+            ]);
         }
 
         return inertia('operations/shifts/series/Show', [
-            'series' => [
-                'id' => $series->id,
-                'status' => $series->status,
-                'shift_type' => $series->shift_type ?? 'standard',
-                'client' => $series->client ? [
-                    'id' => $series->client->id,
-                    'name' => trim($series->client->first_name.' '.$series->client->last_name),
-                ] : null,
-                'site' => $series->site ? [
-                    'id' => $series->site->id,
-                    'name' => $series->site->name,
-                    'type' => $series->site->type,
-                ] : null,
-                'staff' => $series->staff ? [
-                    'id' => $series->staff->id,
-                    'name' => $series->staff->name,
-                    'email' => $series->staff->email,
-                ] : null,
-                'service_context' => $series->serviceContext ? [
-                    'id' => $series->serviceContext->id,
-                    'name' => $series->serviceContext->name,
-                    'type' => $series->serviceContext->type,
-                ] : null,
-                'location' => $series->location,
-                'notes' => $series->notes,
-                'weekdays' => $series->by_weekday ?? [],
-                'starts_time' => $series->starts_time,
-                'ends_time' => $series->ends_time,
-                'start_date' => optional($series->start_date)->toDateString(),
-                'end_date' => optional($series->end_date)->toDateString(),
-                'is_sleepover' => (bool) $series->is_sleepover,
-                'is_on_call' => (bool) $series->is_on_call,
-                'expected_break_minutes' => $series->expected_break_minutes,
-            ],
-            'stats' => $stats,
-            'nextOccurrence' => $nextOccurrence ? $this->mapOccurrence($nextOccurrence) : null,
-            'upcomingOccurrences' => $upcomingOccurrences->map(fn (Shift $shift) => $this->mapOccurrence($shift))->values(),
-            'recentOccurrences' => $recentOccurrences->map(fn (Shift $shift) => $this->mapOccurrence($shift))->values(),
-            'coverageAlignment' => $coverageAlignment,
+            ...$this->presenter->detail($series),
             'canManageAny' => $this->canManageSeries($auth),
         ]);
     }
@@ -536,46 +421,6 @@ class ShiftSeriesController extends Controller
 
         return redirect($data['return_to'] ?? route('operations.shifts.index'))
             ->with('success', 'Recurring shifts created ('.$result['count'].').');
-    }
-
-    private function mapOccurrence(Shift $shift): array
-    {
-        $replacement = $shift->replacementRequests
-            ->sortByDesc('requested_at')
-            ->first();
-
-        return [
-            'id' => $shift->id,
-            'starts_at' => optional($shift->starts_at)->toIso8601String(),
-            'ends_at' => optional($shift->ends_at)->toIso8601String(),
-            'status' => $shift->status,
-            'user_id' => $shift->user_id,
-            'staff' => $shift->staff ? [
-                'id' => $shift->staff->id,
-                'name' => $shift->staff->name,
-                'email' => $shift->staff->email,
-            ] : null,
-            'service_context' => $shift->serviceContext ? [
-                'id' => $shift->serviceContext->id,
-                'name' => $shift->serviceContext->name,
-                'type' => $shift->serviceContext->type,
-            ] : null,
-            'location' => $shift->location,
-            'tasks_total' => (int) ($shift->tasks_total ?? 0),
-            'tasks_completed' => (int) ($shift->tasks_completed ?? 0),
-            'incidents_count' => (int) ($shift->incidents_count ?? 0),
-            'replacement' => $replacement ? [
-                'id' => $replacement->id,
-                'status' => $replacement->status,
-                'reason' => $replacement->reason,
-                'requested_by' => $replacement->requester?->name,
-                'current_staff' => $replacement->currentStaff?->name,
-                'replacement_staff' => $replacement->replacementStaff?->name,
-                'open_position_status' => $replacement->openPosition?->status,
-                'open_position_claimed_by' => $replacement->openPosition?->claimer?->name,
-                'expires_at' => optional($replacement->openPosition?->expires_at)->toIso8601String(),
-            ] : null,
-        ];
     }
 
     protected function assertCoverageClientMatchesContext(int $clientId, ?int $siteId, ?int $coverageRuleId = null): void

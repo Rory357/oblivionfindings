@@ -94,6 +94,64 @@ class RosterTemplateController extends Controller
             ->with('status', 'Roster template deleted.');
     }
 
+    public function duplicate(Request $request, $template)
+    {
+        $auth = $request->user();
+        abort_unless($this->canCreateTemplates($auth), 403);
+
+        $template = RosterTemplate::where('organization_id', $auth->organization_id)
+            ->with('templateShifts')
+            ->findOrFail($template);
+
+        $copy = RosterTemplate::create([
+            'organization_id' => $auth->organization_id,
+            'name' => $this->duplicateName($template->name),
+            'description' => $template->description,
+            'template_type' => $template->template_type,
+            'is_active' => $template->is_active,
+            'created_by' => $auth->id,
+        ]);
+
+        $copy->templateShifts()->createMany(
+            $template->templateShifts
+                ->map(fn ($shift) => [
+                    'organization_id' => $auth->organization_id,
+                    'client_id' => $shift->client_id,
+                    'user_id' => $shift->user_id,
+                    'service_context_id' => $shift->service_context_id,
+                    'day_of_week' => $shift->day_of_week,
+                    'start_time' => $shift->start_time,
+                    'end_time' => $shift->end_time,
+                    'shift_type' => $shift->shift_type,
+                    'is_sleepover' => $shift->is_sleepover,
+                    'is_on_call' => $shift->is_on_call,
+                    'expected_break_minutes' => $shift->expected_break_minutes,
+                    'required_skills' => $shift->required_skills,
+                    'location' => $shift->location,
+                    'notes' => $shift->notes,
+                ])
+                ->all()
+        );
+
+        return redirect()
+            ->route('operations.rostering.index', ['tab' => 'templates'])
+            ->with('status', 'Roster template duplicated.');
+    }
+
+    private function duplicateName(string $name): string
+    {
+        $base = trim(preg_replace('/\s*\(copy(?:\s+\d+)?\)$/i', '', $name)) ?: $name;
+        $candidate = $base.' (copy)';
+        $counter = 2;
+
+        while (RosterTemplate::query()->where('name', $candidate)->exists()) {
+            $candidate = $base.' (copy '.$counter.')';
+            $counter++;
+        }
+
+        return $candidate;
+    }
+
     public function apply(
         ApplyRosterTemplateRequest $request,
         $template,
@@ -113,9 +171,17 @@ class RosterTemplateController extends Controller
 
         $data = $request->validated();
 
-        $weekStart = Carbon::parse($data['week_start'])->startOfDay();
+        // Always anchor on the Monday of the chosen week. The pattern's day_of_week
+        // (0 = Monday) is offset from here, so a non-Monday date must not be allowed
+        // to silently shift the whole week.
+        $weekStart = Carbon::parse($data['week_start'])->startOfWeek(Carbon::MONDAY)->startOfDay();
 
-        $idempotencyKey = $this->templateApplyIdempotencyKey($template, $weekStart, $auth);
+        // Stamp the one-week pattern across N cadence cycles. weekly = every week,
+        // fortnightly = every 2nd week, monthly = every 4th week. cycles defaults to 1.
+        $cycles = max(1, min(12, (int) ($data['cycles'] ?? 1)));
+        $intervalWeeks = $this->cadenceIntervalWeeks($template->template_type);
+
+        $idempotencyKey = $this->templateApplyIdempotencyKey($template, $weekStart, $auth, $cycles, $intervalWeeks);
 
         if (Cache::has($idempotencyKey)) {
             return redirect()
@@ -123,7 +189,13 @@ class RosterTemplateController extends Controller
                 ->with('status', 'This template was already applied by you for that week in the last hour; no duplicate shifts were created.');
         }
 
-        $occurrences = $this->buildTemplateOccurrences($template, $weekStart, $auth);
+        $occurrences = collect();
+        for ($cycle = 0; $cycle < $cycles; $cycle++) {
+            $anchor = $weekStart->copy()->addWeeks($cycle * $intervalWeeks);
+            $occurrences = $occurrences->concat($this->buildTemplateOccurrences($template, $anchor, $auth));
+        }
+        $occurrences = $occurrences->values();
+
         $preflight = $validator->validateProposedShifts($occurrences->pluck('proposed'));
 
         if ($preflight['blocks'] !== []) {
@@ -250,14 +322,25 @@ class RosterTemplateController extends Controller
             ->implode("\n");
     }
 
-    private function templateApplyIdempotencyKey(RosterTemplate $template, Carbon $weekStart, User $auth): string
+    private function templateApplyIdempotencyKey(RosterTemplate $template, Carbon $weekStart, User $auth, int $cycles = 1, int $intervalWeeks = 1): string
     {
         return 'rostering:template-apply:'.sha1(implode('|', [
             $auth->organization_id ?? 'global',
             $template->id,
             $weekStart->toDateString(),
             $auth->id,
+            $cycles,
+            $intervalWeeks,
         ]));
+    }
+
+    private function cadenceIntervalWeeks(?string $cadence): int
+    {
+        return match ($cadence) {
+            'fortnightly' => 2,
+            'monthly' => 4,
+            default => 1,
+        };
     }
 
     private function normalizeTemplateShift(array $row): array

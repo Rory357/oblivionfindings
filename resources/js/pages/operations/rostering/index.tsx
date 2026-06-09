@@ -35,6 +35,10 @@ import {
     RequestReplacementDialog,
     type RequestReplacementShift,
     ResolveConflictDialog,
+    type RosterSeriesRow,
+    type SeriesDetail,
+    SeriesDetailDialog,
+    SeriesPane,
     type ShiftTypeSlice,
     type Signal,
     SignalRail,
@@ -80,6 +84,7 @@ import {
     MoreHorizontal,
     PieChart,
     Plane,
+    Repeat,
     Wand2,
     Zap,
 } from 'lucide-react';
@@ -293,6 +298,11 @@ type Props = {
     canDeleteTemplates?: boolean;
     /** Lazy: undefined until the Templates tab is opened. */
     rosterTemplates?: RosterTemplateRow[];
+    canManageSeries?: boolean;
+    /** Lazy: undefined until the Recurring tab is opened. */
+    rosterSeries?: RosterSeriesRow[];
+    /** Lazy: resolved when a series card is opened (?series=ID). */
+    seriesDetail?: SeriesDetail | null;
     rosterPeriod: RosterPeriodSummary | null;
     stats: {
         total: number;
@@ -402,7 +412,8 @@ type RosterTab =
     | 'availability'
     | 'capacity'
     | 'analytics'
-    | 'templates';
+    | 'templates'
+    | 'recurring';
 
 const ROSTER_TABS: RosterTab[] = [
     'shifts',
@@ -414,6 +425,7 @@ const ROSTER_TABS: RosterTab[] = [
     'capacity',
     'analytics',
     'templates',
+    'recurring',
 ];
 
 function isRosterTab(value: unknown): value is RosterTab {
@@ -597,11 +609,32 @@ export default function RosteringIndex(props: Props) {
     const [cachedTemplates, setCachedTemplates] = useState<
         RosterTemplateRow[] | null
     >(props.rosterTemplates ?? null);
+    // Recurring series tab — same lazy-prop caching as templates.
+    const [loadingSeries, setLoadingSeries] = useState(false);
+    const [detailSeriesId, setDetailSeriesId] = useState<number | null>(() => {
+        if (typeof window === 'undefined') return null;
+        const raw = new URLSearchParams(window.location.search).get('series');
+        const id = raw ? Number(raw) : NaN;
+        return Number.isFinite(id) ? id : null;
+    });
+    const [cachedSeries, setCachedSeries] = useState<RosterSeriesRow[] | null>(
+        props.rosterSeries ?? null,
+    );
+    const [cachedSeriesDetail, setCachedSeriesDetail] =
+        useState<SeriesDetail | null>(props.seriesDetail ?? null);
     const todayBtnRef = useRef<HTMLButtonElement>(null);
 
     useEffect(() => {
         if (props.rosterTemplates) setCachedTemplates(props.rosterTemplates);
     }, [props.rosterTemplates]);
+    useEffect(() => {
+        if (props.rosterSeries) setCachedSeries(props.rosterSeries);
+    }, [props.rosterSeries]);
+    useEffect(() => {
+        if (props.seriesDetail !== undefined) {
+            setCachedSeriesDetail(props.seriesDetail);
+        }
+    }, [props.seriesDetail]);
 
     const staffFilterItems: EntityFilterOption[] = useMemo(
         () =>
@@ -713,6 +746,22 @@ export default function RosteringIndex(props: Props) {
             return;
         }
 
+        if (next === 'recurring' && !props.rosterSeries) {
+            setLoadingSeries(true);
+            router.get(
+                rosteringIndex.url(),
+                { ...filterPayload(), tab: 'recurring' },
+                {
+                    only: ['rosterSeries'],
+                    preserveState: true,
+                    preserveScroll: true,
+                    replace: true,
+                    onFinish: () => setLoadingSeries(false),
+                },
+            );
+            return;
+        }
+
         if (next !== 'availability' || props.staffAvailabilitySummary) {
             return;
         }
@@ -729,6 +778,28 @@ export default function RosteringIndex(props: Props) {
                 onFinish: () => setLoadingAvailability(false),
             },
         );
+    };
+
+    // Open a recurring series in the detail pop-up; lazy-loads its full payload.
+    const openSeries = (row: RosterSeriesRow) => {
+        setDetailSeriesId(row.id);
+        if (cachedSeriesDetail?.id !== row.id) {
+            setCachedSeriesDetail(null);
+        }
+        router.get(
+            rosteringIndex.url(),
+            { ...filterPayload(), tab: 'recurring', series: row.id },
+            {
+                only: ['seriesDetail'],
+                preserveState: true,
+                preserveScroll: true,
+                replace: true,
+            },
+        );
+    };
+
+    const newRecurringShift = () => {
+        router.visit('/operations/shifts?create=1&repeat_weekly=1');
     };
 
     const goWeek = (offsetDays: number) => {
@@ -1647,7 +1718,7 @@ export default function RosteringIndex(props: Props) {
                         ? `${recurringOpen} recurring occurrence${recurringOpen === 1 ? '' : 's'} still need cover.`
                         : 'Recurring patterns are generating this week.',
                 cta: 'Open recurring series',
-                href: '/operations/shifts/series',
+                href: '/operations/rostering?tab=recurring',
             });
         }
         const expired = props.analytics?.complianceExpired ?? 0;
@@ -2051,6 +2122,13 @@ export default function RosteringIndex(props: Props) {
             icon: LayoutTemplate,
             tone: 'violet' as const,
             badge: cachedTemplates?.length,
+        },
+        {
+            id: 'recurring',
+            label: 'Recurring',
+            icon: Repeat,
+            tone: 'info' as const,
+            badge: cachedSeries?.length,
         },
     ];
 
@@ -2658,6 +2736,22 @@ export default function RosteringIndex(props: Props) {
                                         { preserveScroll: true },
                                     )
                                 }
+                                onDuplicate={(t) =>
+                                    router.post(
+                                        `/operations/rostering/templates/${t.id}/duplicate`,
+                                        {},
+                                        { preserveScroll: true },
+                                    )
+                                }
+                            />
+                        ) : null}
+                        {tab === 'recurring' ? (
+                            <SeriesPane
+                                series={cachedSeries}
+                                loading={loadingSeries && !cachedSeries}
+                                canManage={Boolean(props.canManageSeries)}
+                                onView={openSeries}
+                                onNewRecurring={newRecurringShift}
                             />
                         ) : null}
                     </main>
@@ -2966,11 +3060,6 @@ export default function RosteringIndex(props: Props) {
                                 Conflict queue
                             </Button>
                         </Link>
-                        <Link href="/operations/shifts/series">
-                            <Button size="sm" variant="outline">
-                                Recurring series
-                            </Button>
-                        </Link>
                     </div>
                 ) : null}
 
@@ -2988,10 +3077,25 @@ export default function RosteringIndex(props: Props) {
                     open={detailTemplate !== null}
                     onOpenChange={(open) => !open && setDetailTemplate(null)}
                     canManage={Boolean(props.canManageTemplates)}
+                    canDelete={Boolean(props.canDeleteTemplates)}
                     onEdit={(t) => {
                         setDetailTemplate(null);
                         setTemplateWizard({ mode: 'edit', template: t });
                     }}
+                    onDelete={(t) =>
+                        router.delete(
+                            `/operations/rostering/templates/${t.id}`,
+                            { preserveScroll: true },
+                        )
+                    }
+                />
+
+                <SeriesDetailDialog
+                    seriesId={detailSeriesId}
+                    detail={cachedSeriesDetail}
+                    open={detailSeriesId !== null}
+                    onOpenChange={(open) => !open && setDetailSeriesId(null)}
+                    canManage={Boolean(props.canManageSeries)}
                 />
 
                 {pickerOpen ? (
