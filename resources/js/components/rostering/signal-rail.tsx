@@ -9,6 +9,8 @@ import type { ReactNode } from 'react';
 
 import { cn } from '@/lib/utils';
 
+import { avatarHueStyle } from './avatar-hue';
+
 export type SignalTone = 'critical' | 'warning' | 'info' | 'success';
 
 export type Signal = {
@@ -159,10 +161,7 @@ export function SignalRail({
                                 >
                                     <span
                                         className="flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[10px] font-bold uppercase"
-                                        style={{
-                                            background: `hsl(${row.hue} 55% 90%)`,
-                                            color: `hsl(${row.hue} 50% 35%)`,
-                                        }}
+                                        style={avatarHueStyle(row.hue)}
                                     >
                                         {row.initials}
                                     </span>

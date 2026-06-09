@@ -164,3 +164,16 @@ test('staff cannot submit another users hr timesheet', function () {
         ->post(route('hr.time.timesheets.submit', $timesheet))
         ->assertForbidden();
 });
+
+test('hr clock out rejects break_minutes above the shared 240 cap', function () {
+    // D4 — break cap unified to 240 across the HR module too, matching the
+    // frontline /attendance + /timesheets surfaces (this path was 480 before).
+    $user = hrRoleUser('support_worker');
+    grantHrTimePermission($user, 'timesheets.viewAny');
+
+    $this->actingAs($user)
+        ->post('/hr/time/clock-out', [
+            'break_minutes' => 300,
+        ])
+        ->assertSessionHasErrors(['break_minutes']);
+});

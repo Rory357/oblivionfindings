@@ -346,7 +346,7 @@ class TimeTrackingController extends Controller
         abort_unless($user && $user->canDo('timesheets.viewAny'), 403);
 
         $validated = $request->validate([
-            'break_minutes' => ['nullable', 'integer', 'min:0', 'max:480'],
+            'break_minutes' => ['nullable', 'integer', 'min:0', 'max:240'],
             'mileage_km' => ['nullable', 'numeric', 'min:0', 'max:9999'],
             'notes' => ['nullable', 'string', 'max:500'],
         ]);

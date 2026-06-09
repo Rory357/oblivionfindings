@@ -17,7 +17,7 @@ class StoreTimesheetRequest extends FormRequest
             'user_id' => ['nullable', 'exists:users,id'],
             'clock_in' => ['required', 'date'],
             'clock_out' => ['required', 'date', 'after:clock_in'],
-            'break_minutes' => ['nullable', 'integer', 'min:0', 'max:480'],
+            'break_minutes' => ['nullable', 'integer', 'min:0', 'max:240'],
             'notes' => ['nullable', 'string', 'max:500'],
             'project_code' => ['nullable', 'string', 'max:50'],
             'cost_centre' => ['nullable', 'string', 'max:50'],

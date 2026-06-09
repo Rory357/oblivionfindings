@@ -1,5 +1,6 @@
 import { cn } from '@/lib/utils';
 
+import { avatarHueStyle } from './avatar-hue';
 import { MicroStats, type MicroStat } from './micro-stats';
 
 export type CapacityRow = {
@@ -129,10 +130,7 @@ export function CapacityHeatmapPane({
                                 <div className="flex items-center gap-2 px-3 py-2">
                                     <div
                                         className="flex h-8 w-8 shrink-0 items-center justify-center rounded-full text-[11px] font-bold uppercase"
-                                        style={{
-                                            background: `hsl(${row.hue} 55% 90%)`,
-                                            color: `hsl(${row.hue} 50% 35%)`,
-                                        }}
+                                        style={avatarHueStyle(row.hue)}
                                     >
                                         {row.initials}
                                     </div>
