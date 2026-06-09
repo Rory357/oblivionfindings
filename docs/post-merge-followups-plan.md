@@ -175,6 +175,21 @@ D5 (doc committed). **Deferred:** D3 (optional nav change — recipe in §3).
 - `docs/post-merge-followups-plan.md` (this file) + `docs/my-day-fresh-audit-prompt.md` (D5).
 
 **Local verification:** `npm run types` = 0; `HrTimeTrackingAuthorizationTest` 7/7 green (incl. new test);
-frontline cap tests unaffected; `npm run build` green. No new permissions/migrations → §1 seeders are only the
-pre-existing demo-data refresh (RBAC `rostering.viewAny` from `9e254e9e`, demo shifts) — see §1/§2 for the
-post-deploy server + Chrome checklist.
+frontline break-cap tests 44/44 green (51 total); `npm run build` green.
+
+**Live verification on `oblivionfindings.com` — ALL GREEN (2026-06-09, as admin):**
+- **D1 confirmed 3 ways:** source math (worst hue ≈4.97:1), deployed-bundle content (rostering chunk
+  `index-DApAhoOe.js` has `50% 28%`, old `50% 35%` gone), and **live DOM** (rendered avatar chips compute to
+  `hsl(H 50% 28%)`, contrast 5.36–8.11, all ≥4.5:1).
+- Rostering **Calendar tab** renders (FullCalendar, 26 shifts); **`/scheduling`→`/operations/rostering?tab=calendar`**
+  redirect works; **no "Scheduling" nav** item; `/meds/today` + `/medications` + My Day render with **0 app console
+  errors** (only generic browser-extension "message channel" noise on `/login`).
+- **§2 #2–3 verified via admin impersonation** (no passwords; `POST /system/users/{id}/impersonate` →
+  `…/stop-impersonating`): **Coordinator** `coord@demo.test` reaches `/operations/rostering` with **no 403**;
+  **`sw1@demo.test`** My Day rail is **fully populated** (active shift "Wiremu Tait" 14:58–22:58, 2 overdue doses
+  + 4 meds, 9 tasks, Handover/Needs you/Updates·5 tabs). Admin session restored afterward.
+
+**§1 seeders turned out unnecessary** — `rostering.viewAny` for Coordinators and sw1's demo shift data were
+already present on the server, so the Coordinator-403 and My-Day-rail checks passed without running them. (The
+agent cannot run seeders anyway: no SSH key on the box → password auth, which the agent is barred from entering.)
+**Net: every item in §2 is green; nothing outstanding.**
