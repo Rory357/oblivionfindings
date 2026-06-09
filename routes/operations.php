@@ -753,6 +753,12 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     Route::post('/shifts/{shift}/handover', [HandoverController::class, 'store'])
         ->middleware('permission:handovers.create|shifts.update|shifts.manageAny')
         ->name('operations.shifts.handover.store');
+    Route::post('/handovers', [HandoverController::class, 'store'])
+        ->middleware('permission:handovers.create|shifts.update|shifts.manageAny')
+        ->name('operations.handovers.store');
+    Route::put('/handovers/{handover}', [HandoverController::class, 'update'])
+        ->middleware('permission:handovers.create|shifts.update|shifts.manageAny')
+        ->name('operations.handovers.update');
     Route::patch('/handovers/{handover}/submit', [HandoverController::class, 'submit'])
         ->middleware('permission:handovers.create|shifts.update|shifts.manageAny')
         ->name('operations.handovers.submit');

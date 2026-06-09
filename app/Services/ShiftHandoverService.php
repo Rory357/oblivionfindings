@@ -19,6 +19,13 @@ class ShiftHandoverService
 
     public const STATUS_ACKNOWLEDGED = 'acknowledged';
 
+    /**
+     * Days the outgoing/assigned staff member may keep editing a posted handover
+     * after the shift. Past this window it locks to managers only. Drafts stay
+     * editable by their author regardless of age.
+     */
+    public const EDIT_WINDOW_DAYS = 7;
+
     public function __construct(
         protected ShiftTimelineService $timelineService,
     ) {
@@ -465,6 +472,110 @@ class ShiftHandoverService
             $handover->outgoingShift?->user_id ? (int) $handover->outgoingShift?->user_id : null,
             $handover->incomingShift?->user_id ? (int) $handover->incomingShift?->user_id : null,
         ], fn ($value) => $value !== null), true);
+    }
+
+    /**
+     * Editability of a handover for a given user. Managers (handover/shift
+     * oversight) can always edit; the outgoing/assigned author can edit a draft
+     * indefinitely and a posted handover for EDIT_WINDOW_DAYS after the shift.
+     * After that it locks to managers only. Mirrors the prototype's editLock().
+     *
+     * @return array{editable: bool, locked: bool, reason: string, days_left: int|null, age_days: int|null}
+     */
+    public function editPermission(ShiftHandover $handover, ?User $auth): array
+    {
+        if (! $auth) {
+            return ['editable' => false, 'locked' => true, 'reason' => 'unauthenticated', 'days_left' => null, 'age_days' => null];
+        }
+
+        if ($this->canViewAny($auth) || $auth->canDo('shifts.manageAny')) {
+            return ['editable' => true, 'locked' => false, 'reason' => 'manager', 'days_left' => null, 'age_days' => null];
+        }
+
+        $isOwner = (int) $handover->outgoing_staff_id === (int) $auth->id
+            || (int) ($handover->outgoingShift?->user_id ?? 0) === (int) $auth->id;
+
+        if (! $isOwner) {
+            return ['editable' => false, 'locked' => true, 'reason' => 'not_owner', 'days_left' => null, 'age_days' => null];
+        }
+
+        if ($handover->status === self::STATUS_DRAFT) {
+            return ['editable' => true, 'locked' => false, 'reason' => 'draft', 'days_left' => null, 'age_days' => null];
+        }
+
+        $reference = $handover->outgoingShift?->starts_at ?? $handover->created_at;
+        $ageDays = $reference
+            ? (int) $reference->copy()->startOfDay()->diffInDays(now()->startOfDay())
+            : 0;
+
+        if ($ageDays >= self::EDIT_WINDOW_DAYS) {
+            return ['editable' => false, 'locked' => true, 'reason' => 'window_closed', 'days_left' => 0, 'age_days' => $ageDays];
+        }
+
+        return [
+            'editable' => true,
+            'locked' => false,
+            'reason' => 'within_window',
+            'days_left' => self::EDIT_WINDOW_DAYS - $ageDays,
+            'age_days' => $ageDays,
+        ];
+    }
+
+    /**
+     * Apply a direct content edit to an existing handover (narrative, mood, and
+     * the four structured lists). Unlike save(), this works on submitted and
+     * acknowledged handovers (gated by editPermission) without re-running the
+     * shift-keyed upsert. Incoming shift/staff may only be re-targeted while the
+     * handover is still a draft, to respect the acknowledgement invariants.
+     *
+     * @param  array<string, mixed>  $data
+     */
+    public function applyEdit(ShiftHandover $handover, User $actor, array $data): ShiftHandover
+    {
+        return DB::transaction(function () use ($handover, $actor, $data) {
+            $handover = ShiftHandover::query()->lockForUpdate()->findOrFail($handover->id);
+            $handover->loadMissing(['outgoingShift:id,user_id,client_id,site_id,service_context_id,starts_at,ends_at,status']);
+
+            $attributes = [
+                'handover_notes' => (string) $data['handover_notes'],
+                'client_mood' => $data['client_mood'] ?? null,
+            ];
+
+            foreach (['medications_due', 'incidents_to_note', 'follow_up_items', 'tasks_pending'] as $listKey) {
+                if (array_key_exists($listKey, $data)) {
+                    $attributes[$listKey] = $this->normalizeStructuredItems($data[$listKey]);
+                }
+            }
+
+            // Re-targeting the incoming shift/worker is only safe on a draft —
+            // once submitted/acknowledged the acknowledgement invariants pin it.
+            if ($handover->status === self::STATUS_DRAFT && array_key_exists('incoming_shift_id', $data)) {
+                $incomingShift = $this->resolveIncomingShift($handover->outgoingShift, $data['incoming_shift_id'] ?? null);
+                $attributes['incoming_shift_id'] = $incomingShift?->id;
+                $attributes['incoming_staff_id'] = $incomingShift?->user_id ?? ($data['incoming_staff_id'] ?? null);
+            }
+
+            $handover->fill($attributes)->save();
+
+            $fresh = $handover->fresh([
+                'outgoingShift.client:id,first_name,last_name,site_id',
+                'outgoingShift.staff:id,name',
+                'incomingShift:id,client_id,site_id,service_context_id,user_id,starts_at,ends_at,status',
+                'incomingStaff:id,name',
+                'outgoingStaff:id,name',
+            ]) ?? $handover;
+
+            AuditLogger::log('shift.handover.updated', $fresh, [
+                'shift_id' => $fresh->outgoing_shift_id,
+                'status' => $fresh->status,
+            ]);
+
+            if (($data['submit'] ?? false) && $fresh->status === self::STATUS_DRAFT) {
+                return $this->submit($fresh, $actor);
+            }
+
+            return $fresh;
+        });
     }
 
     protected function resolveIncomingShift(Shift $outgoingShift, mixed $incomingShiftId): ?Shift
