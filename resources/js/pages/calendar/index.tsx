@@ -16,9 +16,8 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import AppLayout from '@/layouts/app-layout';
 import { useCreateShiftLauncher } from '@/pages/operations/shifts/components/use-create-shift-launcher';
-import { Head, usePage } from '@inertiajs/react';
+import { usePage } from '@inertiajs/react';
 
 import type {
     DateSelectArg,
@@ -39,13 +38,14 @@ import { useCallback, useMemo, useRef, useState } from 'react';
 
 type Props = {
     canManageAny: boolean;
-    staff: Array<{ id: number; name: string; email: string }>;
+    staff: Array<{ id: number; name: string; email?: string }>;
     clients: Array<{
         id: number;
-        first_name: string;
-        last_name: string;
+        first_name?: string | null;
+        last_name?: string | null;
         service_context_id?: number | null;
         site?: { id: number; name: string } | null;
+        site_id?: number | null;
     }>;
     serviceContexts: Array<{
         id: number;
@@ -279,7 +279,7 @@ export default function CalendarIndex(props: Props) {
         () =>
             (props.clients ?? []).map((c) => ({
                 id: c.id,
-                label: `${c.first_name} ${c.last_name}`,
+                label: `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim(),
                 service_context_id: c.service_context_id ?? null,
                 site_name: c.site?.name ?? '',
             })),
@@ -361,7 +361,7 @@ export default function CalendarIndex(props: Props) {
                 }
 
                 const res = await fetch(
-                    `/scheduling/events?${params.toString()}`,
+                    `/operations/rostering/calendar/events?${params.toString()}`,
                     {
                         headers: { Accept: 'application/json' },
                         credentials: 'same-origin',
@@ -614,13 +614,13 @@ export default function CalendarIndex(props: Props) {
             };
 
             if (modalMode === 'create') {
-                await jsonRequest('/scheduling/shifts', {
+                await jsonRequest('/operations/rostering/calendar/shifts', {
                     method: 'POST',
                     body: payload,
                 });
             } else {
                 if (!form.id) throw new Error('Missing shift id');
-                await jsonRequest(`/scheduling/shifts/${form.id}`, {
+                await jsonRequest(`/operations/rostering/calendar/shifts/${form.id}`, {
                     method: 'PATCH',
                     body: payload,
                 });
@@ -637,7 +637,7 @@ export default function CalendarIndex(props: Props) {
 
     async function patchEventTime(id: string, start: Date, end: Date | null) {
         const endSafe = end ?? addHours(start, 1);
-        await jsonRequest(`/scheduling/shifts/${id}`, {
+        await jsonRequest(`/operations/rostering/calendar/shifts/${id}`, {
             method: 'PATCH',
             body: {
                 starts_at: toDatetimeLocalValue(start),
@@ -673,8 +673,10 @@ export default function CalendarIndex(props: Props) {
     }
 
     return (
-        <AppLayout breadcrumbs={[{ title: 'Scheduling', href: '/scheduling' }]}>
-            <Head title="Scheduling" />
+        <div className="space-y-4">
+            {/* Embedded as the "Calendar" tab inside /operations/rostering.
+                The page chrome (AppLayout/Head) is supplied by the Rostering
+                page; this component renders only the calendar body. */}
 
             <div className="space-y-4 p-4">
                 <Card>
@@ -1884,6 +1886,6 @@ export default function CalendarIndex(props: Props) {
             </Dialog>
 
             {createShiftLauncher.dialog}
-        </AppLayout>
+        </div>
     );
 }

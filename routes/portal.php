@@ -11,7 +11,6 @@ use App\Http\Controllers\TimelineController;
 use App\Http\Controllers\RagController;
 use App\Http\Controllers\NotificationInboxController;
 use App\Http\Controllers\AnnouncementInboxController;
-use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\Portal\FamilyDashboardController;
 use App\Http\Controllers\Portal\PortalTimelineController;
 use App\Http\Controllers\Portal\PortalHealthController;
@@ -261,18 +260,10 @@ Route::middleware(['auth'])->group(function () {
         ->middleware(['permission:summaries.generate', 'throttle:ai-queries'])
         ->name('summaries.generate');
 
-    // Scheduling (staffing / shifts calendar). Relocated from /calendar, which now
-    // serves the Site Calendar roll-up (SiteCalendarController@global, routes/sites.php).
-    Route::middleware('permission:calendar.viewAny')->group(function () {
-        Route::get('/scheduling', [CalendarController::class, 'index'])->name('scheduling.index');
-        Route::get('/scheduling/events', [CalendarController::class, 'events'])->name('scheduling.events');
-
-        // Scheduling interactions (create/edit shifts inline)
-        Route::post('/scheduling/shifts', [CalendarController::class, 'storeShift'])
-            ->middleware('permission:shifts.create')
-            ->name('scheduling.shifts.store');
-        Route::patch('/scheduling/shifts/{shift}', [CalendarController::class, 'updateShift'])
-            ->middleware('permission:shifts.update')
-            ->name('scheduling.shifts.update');
-    });
+    // Scheduling has been consolidated into the Rostering workspace: the
+    // FullCalendar is now the "Calendar" tab at /operations/rostering, and its
+    // data/write endpoints live under operations.rostering.calendar.* (see
+    // routes/operations.php). Keep a redirect so old bookmarks / links land on
+    // the calendar tab.
+    Route::redirect('/scheduling', '/operations/rostering?tab=calendar', 301);
 });

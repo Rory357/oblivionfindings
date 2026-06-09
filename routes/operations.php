@@ -56,6 +56,7 @@ use App\Http\Controllers\Operations\RosterTemplateController;
 use App\Http\Controllers\Operations\ServiceAgreementController;
 use App\Http\Controllers\Operations\ShiftNoteController;
 use App\Http\Controllers\Operations\ShiftReportController;
+use App\Http\Controllers\CalendarController;
 use App\Http\Controllers\RosteringController;
 use App\Http\Controllers\ShiftController;
 use App\Http\Controllers\ShiftSeriesController;
@@ -776,6 +777,18 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
             ->name('operations.rostering.coverage.dismiss');
         Route::delete('/rostering/coverage/{key}/clear', [CoverageGapController::class, 'clear'])
             ->name('operations.rostering.coverage.clear');
+
+        // Calendar tab — the FullCalendar view embedded in the Rostering
+        // workspace (re-homed from the removed standalone /scheduling page).
+        // Shares the rostering.viewAny gate; writes keep the shift gates.
+        Route::get('/rostering/calendar/events', [CalendarController::class, 'events'])
+            ->name('operations.rostering.calendar.events');
+        Route::post('/rostering/calendar/shifts', [CalendarController::class, 'storeShift'])
+            ->middleware('permission:shifts.create')
+            ->name('operations.rostering.calendar.shifts.store');
+        Route::patch('/rostering/calendar/shifts/{shift}', [CalendarController::class, 'updateShift'])
+            ->middleware('permission:shifts.update')
+            ->name('operations.rostering.calendar.shifts.update');
     });
 
     // Roster templates

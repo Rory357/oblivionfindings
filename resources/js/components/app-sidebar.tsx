@@ -31,6 +31,7 @@ import {
     Briefcase,
     Building2,
     CalendarDays,
+    CalendarRange,
     Car,
     Cctv,
     CheckCircle2,
@@ -957,6 +958,12 @@ function buildWorkforceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
         });
     if (can?.rostering?.viewAny)
         workforce.push({
+            title: 'Calendar',
+            href: '/operations/rostering?tab=calendar',
+            icon: CalendarRange,
+        });
+    if (can?.rostering?.viewAny)
+        workforce.push({
             title: 'Availability',
             href: '/operations/rostering?tab=availability',
             icon: Clock,
@@ -1834,12 +1841,6 @@ function buildSystemSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             title: 'Site Reports',
             href: '/reports/sites',
             icon: FileText,
-        });
-    if (can?.calendar?.viewAny)
-        items.push({
-            title: 'Scheduling',
-            href: '/scheduling',
-            icon: CalendarDays,
         });
     if (can?.timeline?.viewAny)
         items.push({ title: 'Timeline', href: '/timeline', icon: Clock });

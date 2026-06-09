@@ -6,7 +6,6 @@ use App\Models\Client;
 use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\SiteCoverageRequirement;
-use App\Models\User;
 use App\Services\CoverageReservationService;
 use App\Services\NotificationService;
 use App\Services\ShiftConflictService;
@@ -27,49 +26,16 @@ class CalendarController extends Controller
         protected ShiftCoverageService $shiftCoverageService,
     ) {}
 
-    public function index(Request $request)
-    {
-        $auth = $request->user();
-        abort_unless($auth && $auth->canDo('calendar.viewAny'), 403);
-
-        $canManageAny = $auth->canDo('shifts.manageAny');
-
-        // Provide service contexts to allow shift creation/editing to capture
-        // the service setting (residential / home support / respite) for audit.
-        $serviceContexts = ServiceContext::query()
-            ->orderBy('name')
-            ->get(['id', 'name', 'type', 'is_active']);
-
-        $staff = [];
-        $clients = [];
-
-        if ($canManageAny) {
-            $staff = User::staff()
-                ->orderBy('name')
-                ->get(['id', 'name', 'email']);
-
-            $clients = Client::query()
-                ->with('site:id,name')
-                ->orderBy('first_name')
-                ->get(['id', 'first_name', 'last_name', 'service_context_id', 'site_id']);
-        }
-
-        return inertia('calendar/index', [
-            'canManageAny' => $canManageAny,
-            'staff' => $staff,
-            'clients' => $clients,
-            'serviceContexts' => $serviceContexts,
-            'defaultServiceContextId' => ServiceContext::defaultId(),
-        ]);
-    }
-
     /**
-     * JSON feed for FullCalendar.
+     * JSON feed for FullCalendar — the "Calendar" tab inside the Rostering
+     * workspace (/operations/rostering?tab=calendar). The standalone
+     * /scheduling page was retired; the Rostering page now supplies the page
+     * chrome and the canManageAny/staff/clients/serviceContexts props.
      */
     public function events(Request $request)
     {
         $auth = $request->user();
-        abort_unless($auth && $auth->canDo('calendar.viewAny'), 403);
+        abort_unless($auth && $auth->canDo('rostering.viewAny'), 403);
 
         $data = $request->validate([
             'start' => ['required', 'date'],

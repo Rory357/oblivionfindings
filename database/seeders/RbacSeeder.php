@@ -619,7 +619,9 @@ class RbacSeeder extends Seeder
             'timesheets.viewAny', 'timesheets.approve',
             'timeline.viewAny', 'timeline.create', 'timeline.pin',
             'progress_notes.viewAny', 'progress_notes.create', 'progress_notes.update', 'progress_notes.review',
-            'summaries.viewAny', 'summaries.generate', 'calendar.viewAny', 'rag.ask.any',
+            // rostering.viewAny added when /scheduling was folded into the
+            // Rostering workspace, so Coordinators keep calendar access there.
+            'summaries.viewAny', 'summaries.generate', 'calendar.viewAny', 'rostering.viewAny', 'rag.ask.any',
             'fleet.viewAny', 'fleet.manage', 'fleet.driverSessions.manage', 'fleet.signals.view',
             'fleet.trips.manage', 'fleet.fuel.manage', 'fleet.reports.view',
             'fleet.bookings.approve', 'fleet.incidents.manage', 'fleet.maintenance.manage',

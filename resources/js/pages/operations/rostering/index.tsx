@@ -78,6 +78,10 @@ import {
     Wand2,
     Zap,
 } from 'lucide-react';
+
+// The scheduling FullCalendar, re-homed from the retired /scheduling page and
+// rendered as the "Calendar" tab below.
+import RosteringCalendarView from '@/pages/calendar/index';
 import { useMemo, useRef, useState } from 'react';
 import {
     CreateShiftDialog,
@@ -382,6 +386,7 @@ type Props = {
 
 type RosterTab =
     | 'shifts'
+    | 'calendar'
     | 'open'
     | 'coverage'
     | 'timeoff'
@@ -391,6 +396,7 @@ type RosterTab =
 
 const ROSTER_TABS: RosterTab[] = [
     'shifts',
+    'calendar',
     'open',
     'coverage',
     'timeoff',
@@ -1949,6 +1955,12 @@ export default function RosteringIndex(props: Props) {
             badge: total,
         },
         {
+            id: 'calendar',
+            label: 'Calendar',
+            icon: CalendarRange,
+            tone: 'info' as const,
+        },
+        {
             id: 'open',
             label: 'Open shifts',
             icon: AlertTriangle,
@@ -2257,7 +2269,14 @@ export default function RosteringIndex(props: Props) {
                     }
                 />
 
-                <div className="grid grid-cols-1 gap-3 lg:grid-cols-3">
+                {/* The summary donuts double as tab switchers (role="tab"), so
+                    they need a tablist parent to satisfy WCAG 4.1.2 (axe
+                    aria-required-parent). */}
+                <div
+                    role="tablist"
+                    aria-label="Roster summary views"
+                    className="grid grid-cols-1 gap-3 lg:grid-cols-3"
+                >
                     <DonutCard
                         tone="primary"
                         title="Shifts"
@@ -2467,6 +2486,17 @@ export default function RosteringIndex(props: Props) {
                                     )
                                 }
                                 onViewTimesheet={openTimesheet}
+                            />
+                        ) : null}
+                        {tab === 'calendar' ? (
+                            <RosteringCalendarView
+                                canManageAny={props.canManageAny}
+                                staff={props.staff ?? []}
+                                clients={props.clients ?? []}
+                                serviceContexts={props.serviceContexts ?? []}
+                                defaultServiceContextId={
+                                    props.defaultServiceContextId ?? null
+                                }
                             />
                         ) : null}
                         {tab === 'open' ? (

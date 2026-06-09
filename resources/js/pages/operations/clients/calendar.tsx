@@ -448,7 +448,7 @@ export default function ClientCalendar({ client, pending_visit_count }: Props) {
                                     className="w-full justify-start gap-2 text-sm"
                                     asChild
                                 >
-                                    <Link href="/scheduling">
+                                    <Link href="/operations/rostering?tab=calendar">
                                         <Calendar className="h-4 w-4" />
                                         Team Calendar
                                     </Link>
