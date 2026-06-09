@@ -205,4 +205,5 @@ return [
     'toast_dose_left_as_due' => 'Dose left as due.',
     'toast_timesheet_sending' => 'Timesheet sending…',
     'toast_timesheet_in_draft' => 'Timesheet still in draft.',
+    'toast_dose_record_failed' => "Couldn't record this dose. Open the eMAR to complete it.",
 ];

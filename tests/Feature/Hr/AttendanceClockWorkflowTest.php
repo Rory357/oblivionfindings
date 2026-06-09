@@ -333,6 +333,30 @@ test('clock out with zero break on short session succeeds', function () {
     expect((int) $session->break_minutes)->toBe(0);
 });
 
+test('clock out rejects break_minutes above the shared 240 cap', function () {
+    // F3 — break cap unified to 240 everywhere. A 5-hour break is rejected by
+    // validation even on this 6-hour session (so the cap, not the
+    // break-vs-duration rule, is what blocks it).
+    $session = HrAttendanceSession::query()->create([
+        'tenant_id' => null,
+        'user_id' => $this->staff->id,
+        'clock_in_at' => now()->subMinutes(360),
+        'status' => 'open',
+        'source' => 'manual',
+        'created_by' => $this->staff->id,
+    ]);
+
+    $this->actingAs($this->staff)
+        ->post('/attendance/clock-out', [
+            'session_id' => $session->id,
+            'break_minutes' => 300,
+        ])
+        ->assertSessionHasErrors(['break_minutes']);
+
+    $session->refresh();
+    expect($session->status)->toBe('open');
+});
+
 // ──────────────────────────────────────────────
 // Clock-surface consistency safeguard
 //

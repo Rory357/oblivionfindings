@@ -7,6 +7,7 @@ use App\Models\Shift;
 use App\Models\User;
 use Illuminate\Support\Carbon;
 use Illuminate\Support\Facades\Cache;
+use Illuminate\Support\Facades\DB;
 
 beforeEach(function () {
     Cache::flush();
@@ -137,6 +138,41 @@ it('hides a My Day medication slot while the worker snooze cache key is active',
             ->where('medications_due.0.medication_id', $med->id)
             ->where('medications_due.0.status', 'upcoming')
         );
+})->group('my-day');
+
+it('matches every dose slot with a single administration query (no N+1)', function () {
+    [$worker, $client] = makeWorkerWithMyDayMedicationClient();
+
+    // 3 meds × 2 in-window dose times = 6 slots for one resident. Before F1 the
+    // rail issued one ClientMedicationAdministration query per slot, re-run on
+    // every 60s live refresh; now it must be a single query for the window.
+    foreach (['Paracetamol', 'Metformin', 'Aspirin'] as $name) {
+        ClientMedication::factory()->create([
+            'client_id' => $client->id,
+            'name' => $name,
+            'is_prn' => false,
+            'active' => true,
+            'state' => 'active',
+            'start_date' => '2026-05-01',
+            'end_date' => null,
+            'dose_times' => ['09:00', '13:00'],
+        ]);
+    }
+
+    DB::enableQueryLog();
+
+    $this->actingAs($worker)
+        ->get('/my-day')
+        ->assertOk()
+        ->assertInertia(fn ($page) => $page->has('medications_due', 6));
+
+    $adminQueries = collect(DB::getQueryLog())
+        ->filter(fn ($entry) => str_contains($entry['query'], 'client_medication_administrations'))
+        ->count();
+
+    DB::disableQueryLog();
+
+    expect($adminQueries)->toBe(1);
 })->group('my-day');
 
 function makeWorkerWithMyDayMedicationClient(): array

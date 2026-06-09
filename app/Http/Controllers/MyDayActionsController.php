@@ -112,7 +112,7 @@ class MyDayActionsController extends Controller
                     ?? $now->toDateString(),
                 'starts_at' => $shift->starts_at,
                 'ends_at' => $shift->ends_at,
-                'break_minutes' => (int) ($shift->expected_break_minutes ?? 30),
+                'break_minutes' => (int) ($shift->expected_break_minutes ?? 0),
                 'status' => 'draft',
                 'is_residential_billable' => false,
                 'created_by' => $user->id,

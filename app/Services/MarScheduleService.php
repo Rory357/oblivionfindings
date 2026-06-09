@@ -4,8 +4,10 @@ namespace App\Services;
 
 use App\Models\AppSetting;
 use App\Models\ClientMedication;
+use App\Models\ClientMedicationAdministration;
 use Carbon\Carbon;
 use Illuminate\Support\Arr;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
 
 class MarScheduleService
@@ -60,6 +62,67 @@ class MarScheduleService
             $scheduled->copy()->utc()->subMinute(),
             $scheduled->copy()->utc()->addMinute(),
         ];
+    }
+
+    /**
+     * Pre-fetch every administration that could match a dose slot inside the
+     * worker-tz window [$from, $to] in a SINGLE query, keyed for in-memory
+     * matching by {@see slotKey()}. Callers iterate generated slots and look up
+     * `$map->get($this->slotKey(...))` instead of issuing one administration
+     * query per slot (the N+1 that re-ran on every /my-day & /meds/today
+     * 60s refresh). Mirrors the pattern in TodayDashboardController.
+     *
+     * The DB window spans the full local day(s) the [$from, $to] range covers
+     * (it may straddle two worker-local days near midnight), expressed in UTC.
+     * Ordered by id so a same-slot collision keeps the latest row (matching the
+     * old per-slot `->latest('id')->first()`).
+     *
+     * @param  array<int, int>  $clientIds
+     * @return Collection<string, ClientMedicationAdministration>
+     */
+    public function administrationsForWindow(array $clientIds, Carbon $from, Carbon $to): Collection
+    {
+        if ($clientIds === []) {
+            return collect();
+        }
+
+        [$dayStartUtc] = $this->utcDayWindow($from);
+        [, $dayEndUtc] = $this->utcDayWindow($to);
+
+        return ClientMedicationAdministration::query()
+            ->whereIn('client_id', $clientIds)
+            ->whereBetween('scheduled_for', [$dayStartUtc, $dayEndUtc])
+            ->orderBy('id')
+            ->get(['id', 'client_id', 'client_medication_id', 'scheduled_for', 'status'])
+            ->keyBy(fn (ClientMedicationAdministration $administration) => $this->slotKey(
+                (int) $administration->client_id,
+                (int) $administration->client_medication_id,
+                $this->rawScheduledForUtc($administration),
+            ));
+    }
+
+    /**
+     * Stable key used on both sides of the in-memory slot↔administration match:
+     * the generated slot Carbon and the stored administration are both reduced
+     * to their UTC minute, so they collide iff they are the same dose slot.
+     */
+    public function slotKey(int $clientId, int $medicationId, Carbon $scheduled): string
+    {
+        return $clientId.':'.$medicationId.':'.$scheduled->copy()->utc()->format('Y-m-d H:i');
+    }
+
+    /**
+     * Read an administration's `scheduled_for` back as a true UTC Carbon from
+     * the raw column value — avoiding the Eloquent accessor, which can
+     * re-introduce the worker-tz offset (see house timezone convention).
+     */
+    private function rawScheduledForUtc(ClientMedicationAdministration $administration): Carbon
+    {
+        $raw = $administration->getRawOriginal('scheduled_for');
+
+        return $raw
+            ? Carbon::parse((string) $raw, 'UTC')
+            : Carbon::createFromTimestamp(0, 'UTC');
     }
 
     public function windowBeforeMinutes(): int

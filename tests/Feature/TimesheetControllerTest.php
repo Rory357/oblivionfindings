@@ -252,6 +252,68 @@ class TimesheetControllerTest extends TestCase
         ]);
     }
 
+    public function test_update_rejects_break_minutes_above_shared_240_cap(): void
+    {
+        // F3 — the timesheet break cap was unified down to 240 (was 600) so it
+        // matches the clock-out cap. A 5-hour "break" on an 8-hour shift is now
+        // rejected rather than silently accepted.
+        $timesheet = $this->makeDraftTimesheet($this->staff, ['break_minutes' => 30]);
+
+        $this->actingAs($this->staff)
+            ->put(route('operations.timesheets.update', $timesheet), [
+                'client_id' => $timesheet->client_id,
+                'work_date' => $timesheet->work_date->format('Y-m-d'),
+                'starts_at' => $timesheet->starts_at->format('Y-m-d H:i:s'),
+                'ends_at' => $timesheet->ends_at->format('Y-m-d H:i:s'),
+                'break_minutes' => 300,
+                'notes' => 'Five hour break',
+            ])
+            ->assertSessionHasErrors('break_minutes');
+
+        $this->assertSame(30, (int) $timesheet->fresh()->break_minutes);
+    }
+
+    public function test_update_accepts_break_minutes_at_the_240_cap(): void
+    {
+        // The 8-hour draft shift comfortably exceeds 240 minutes, so the cap —
+        // not the break-vs-duration rule — is what's under test here.
+        $timesheet = $this->makeDraftTimesheet($this->staff, ['break_minutes' => 30]);
+
+        $this->actingAs($this->staff)
+            ->put(route('operations.timesheets.update', $timesheet), [
+                'client_id' => $timesheet->client_id,
+                'work_date' => $timesheet->work_date->format('Y-m-d'),
+                'starts_at' => $timesheet->starts_at->format('Y-m-d H:i:s'),
+                'ends_at' => $timesheet->ends_at->format('Y-m-d H:i:s'),
+                'break_minutes' => 240,
+                'notes' => 'Exactly at the cap',
+            ])
+            ->assertSessionHas('success');
+
+        $this->assertSame(240, (int) $timesheet->fresh()->break_minutes);
+    }
+
+    public function test_ensure_today_seeds_zero_break_when_shift_has_no_break(): void
+    {
+        // F3 — a shift with no expected break must seed a 0-minute break, not a
+        // fabricated 30-minute unpaid deduction the worker never took.
+        $shift = $this->makeScheduledShift($this->staff, [
+            'starts_at' => Carbon::parse('2026-04-12 09:00:00'),
+            'ends_at' => Carbon::parse('2026-04-12 17:00:00'),
+            'expected_break_minutes' => null,
+        ]);
+
+        $this->actingAs($this->staff)
+            ->post('/my-tasks/timesheet/ensure-today')
+            ->assertSessionHas('open_timesheet_id');
+
+        $this->assertDatabaseHas('timesheets', [
+            'shift_id' => $shift->id,
+            'user_id' => $this->staff->id,
+            'break_minutes' => 0,
+        ]);
+    }
+
     public function test_payroll_lock_uses_employee_profile_tenant_for_edit_blocking(): void
     {
         $timesheet = $this->makeDraftTimesheet($this->staff, [

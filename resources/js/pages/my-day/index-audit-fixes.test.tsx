@@ -9,6 +9,7 @@ const mocks = vi.hoisted(() => ({
     routerPost: vi.fn(),
     routerVisit: vi.fn(),
     routerPatch: vi.fn(),
+    toastError: vi.fn(),
 }));
 
 vi.mock('@inertiajs/react', () => ({
@@ -19,6 +20,10 @@ vi.mock('@inertiajs/react', () => ({
         patch: mocks.routerPatch,
     },
     usePage: () => ({ props: mocks.props }),
+}));
+
+vi.mock('sonner', () => ({
+    toast: { error: mocks.toastError },
 }));
 
 vi.mock('@/layouts/app-layout', () => ({
@@ -169,6 +174,7 @@ describe('My Day audit wiring', () => {
         mocks.routerPost.mockClear();
         mocks.routerVisit.mockClear();
         mocks.routerPatch.mockClear();
+        mocks.toastError.mockClear();
         mocks.props = baseProps();
     });
 
@@ -180,10 +186,29 @@ describe('My Day audit wiring', () => {
         expect(mocks.routerPost).toHaveBeenCalledWith(
             '/my-tasks/timesheet/ensure-today',
             {},
-            { preserveScroll: true },
+            // F2 — now carries an onError handler so a "no shift today" response
+            // surfaces a toast instead of looking like a dead button.
+            expect.objectContaining({ preserveScroll: true, onError: expect.any(Function) }),
         );
         expect(mocks.routerVisit).not.toHaveBeenCalledWith(
             expect.stringContaining('/operations/timesheets?create=1'),
+        );
+    });
+
+    it('toasts the server error when ensure-today reports no shift today (F2)', () => {
+        render(<MyDay />);
+
+        fireEvent.click(screen.getByRole('button', { name: /today's timesheet/i }));
+
+        // Replay the backend's `back()->withErrors(['timesheet' => …])` through
+        // the onError handler the page wired onto the request.
+        const options = mocks.routerPost.mock.calls.at(-1)?.[2] as {
+            onError?: (errors: Record<string, string>) => void;
+        };
+        options?.onError?.({ timesheet: 'No shift today to write a timesheet against.' });
+
+        expect(mocks.toastError).toHaveBeenCalledWith(
+            'No shift today to write a timesheet against.',
         );
     });
 

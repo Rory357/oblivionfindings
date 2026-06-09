@@ -10,6 +10,7 @@ import {
     Users,
 } from 'lucide-react';
 import { useCallback, useEffect, useMemo, useRef, useState } from 'react';
+import { toast } from 'sonner';
 
 import { ChecklistConfigProvider } from '@/components/checklists/context';
 import { CategoryIcon, StatusBadge } from '@/components/checklists/primitives';
@@ -407,7 +408,14 @@ export default function MyDay() {
             setTimesheetUnderReview(todaysTimesheet);
             return;
         }
-        router.post('/my-tasks/timesheet/ensure-today', {}, { preserveScroll: true });
+        router.post('/my-tasks/timesheet/ensure-today', {}, {
+            preserveScroll: true,
+            // ensure-today returns `back()->withErrors(['timesheet' => …])` when
+            // there's no shift today. Without this the button looked dead.
+            onError: (errors) => {
+                toast.error(errors.timesheet ?? 'No timesheet to open for today.');
+            },
+        });
     }, [todaysTimesheet]);
 
     // Inertia flash `open_timesheet_id` is set by /ensure-today after it
@@ -472,7 +480,21 @@ export default function MyDay() {
                 router.post(
                     `/my-day/medications/${medicationId}/administer`,
                     { scheduled_for: scheduledFor },
-                    { preserveScroll: true, only: ['medications_due', 'stats'] as never },
+                    {
+                        preserveScroll: true,
+                        only: ['medications_due', 'stats'] as never,
+                        // Surface a server rejection (e.g. controlled drug needs a
+                        // witness, or the dose is outside its time window) instead
+                        // of silently leaving the row unchanged.
+                        onError: (errors) => {
+                            const message = Object.values(errors)[0];
+                            toast.error(
+                                typeof message === 'string'
+                                    ? message
+                                    : t('toast_dose_record_failed'),
+                            );
+                        },
+                    },
                 );
             },
             undoneMessage: t('toast_dose_left_as_due'),
@@ -495,7 +517,17 @@ export default function MyDay() {
                 reason_code: 'refused',
                 reason: trimmedReason,
             },
-            { preserveScroll: true },
+            {
+                preserveScroll: true,
+                onError: (errors) => {
+                    const message = Object.values(errors)[0];
+                    toast.error(
+                        typeof message === 'string'
+                            ? message
+                            : t('toast_dose_record_failed'),
+                    );
+                },
+            },
         );
     }, [t]);
 

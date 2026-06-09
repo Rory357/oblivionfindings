@@ -8,7 +8,6 @@ use App\Http\Resources\MyShiftResource;
 use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\ClientMedication;
-use App\Models\ClientMedicationAdministration;
 use App\Models\ControlRoom\OperatorNote;
 use App\Models\ControlRoomAlert;
 use App\Models\IncidentFollowup;
@@ -618,6 +617,11 @@ class MyTasksController extends Controller
                 ->with('client:id,first_name,last_name')
                 ->get();
 
+            // One administration query for the whole window, matched in memory
+            // per slot — replaces the old per-dose-slot query (an N+1 that
+            // re-ran every 60s with the /my-day live refresh).
+            $administrations = $scheduleService->administrationsForWindow($clientIds, $windowStart, $windowEnd);
+
             $result = [];
 
             foreach ($medications as $med) {
@@ -642,13 +646,9 @@ class MyTasksController extends Controller
                             continue;
                         }
 
-                        [$slotStartUtc, $slotEndUtc] = $scheduleService->utcSlotWindow($scheduled);
-                        $administration = ClientMedicationAdministration::query()
-                            ->where('client_id', $med->client_id)
-                            ->where('client_medication_id', $med->id)
-                            ->whereBetween('scheduled_for', [$slotStartUtc, $slotEndUtc])
-                            ->latest('id')
-                            ->first();
+                        $administration = $administrations->get(
+                            $scheduleService->slotKey((int) $med->client_id, (int) $med->id, $scheduled),
+                        );
 
                         if ($administration && in_array($administration->status, ['given', 'refused', 'withheld'], true)) {
                             $status = $administration->status;

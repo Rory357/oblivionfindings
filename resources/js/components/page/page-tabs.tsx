@@ -15,7 +15,7 @@ import {
     DropdownMenuItem,
     DropdownMenuTrigger,
 } from '@/components/ui/dropdown-menu';
-import { TabsList, TabsRoot, TabsTrigger } from '@/components/ui/tabs';
+import { TabsContent, TabsList, TabsRoot, TabsTrigger } from '@/components/ui/tabs';
 import { cn } from '@/lib/utils';
 
 export type PageTabItem = {
@@ -208,7 +208,27 @@ export function PageTabs({
                 </TabsList>
             </div>
 
-            {children}
+            {children ?? (
+                /*
+                 * PageTabs is sometimes used as a pure segmented filter (e.g.
+                 * the /my-day resident switcher) with no TabsContent panels of
+                 * its own. Radix still wires every trigger's `aria-controls` to
+                 * a generated panel id, so the *active* trigger would point at a
+                 * non-existent element → axe `aria-valid-attr-value` (critical,
+                 * WCAG 4.1.2 Name, Role, Value). Emit an empty, force-mounted
+                 * panel per value so every reference resolves; `hidden` keeps
+                 * them out of layout and the tab order so the UI stays
+                 * panel-less.
+                 */
+                visible.map((item) => (
+                    <TabsContent
+                        key={item.value}
+                        value={item.value}
+                        forceMount
+                        className="hidden"
+                    />
+                ))
+            )}
         </TabsRoot>
     );
 }

@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Emar;
 use App\Http\Controllers\Concerns\HandlesOfflineSubmission;
 use App\Http\Controllers\Controller;
 use App\Models\ClientMedication;
-use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationRound;
 use App\Models\Shift;
 use App\Models\User;
@@ -200,7 +199,8 @@ class WorkerMedsController extends Controller
             if (! empty($shiftClientIds)) {
                 return $shiftClientIds;
             }
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            report($e);
             // fall through
         }
 
@@ -214,7 +214,9 @@ class WorkerMedsController extends Controller
                     ->unique()
                     ->values()
                     ->all();
-            } catch (\Throwable) {
+            } catch (\Throwable $e) {
+                report($e);
+
                 return [];
             }
         }
@@ -247,6 +249,11 @@ class WorkerMedsController extends Controller
                 ->with('client:id,first_name,last_name')
                 ->get();
 
+            // One administration query for the whole window, matched in memory
+            // per slot — replaces the old per-dose-slot query (an N+1 that
+            // re-ran every 60s with the page's live refresh).
+            $administrations = $this->scheduleService->administrationsForWindow($clientIds, $windowStart, $windowEnd);
+
             $result = [];
 
             foreach ($medications as $med) {
@@ -259,13 +266,9 @@ class WorkerMedsController extends Controller
                             continue;
                         }
 
-                        [$slotStartUtc, $slotEndUtc] = $this->scheduleService->utcSlotWindow($scheduled);
-                        $administration = ClientMedicationAdministration::query()
-                            ->where('client_id', $med->client_id)
-                            ->where('client_medication_id', $med->id)
-                            ->whereBetween('scheduled_for', [$slotStartUtc, $slotEndUtc])
-                            ->latest('id')
-                            ->first();
+                        $administration = $administrations->get(
+                            $this->scheduleService->slotKey((int) $med->client_id, (int) $med->id, $scheduled),
+                        );
 
                         if ($administration && in_array($administration->status, ['given', 'refused', 'withheld', 'missed'], true)) {
                             continue;
@@ -375,7 +378,9 @@ class WorkerMedsController extends Controller
             }
 
             return $result;
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            report($e);
+
             return [];
         }
     }
@@ -425,7 +430,9 @@ class WorkerMedsController extends Controller
                 'percent' => $progress['percent'],
                 'url' => route('meds.round.show', $round),
             ];
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            report($e);
+
             return null;
         }
     }
@@ -470,7 +477,9 @@ class WorkerMedsController extends Controller
                 ->filter(fn ($r) => $r['total'] > 0)
                 ->values()
                 ->all();
-        } catch (\Throwable) {
+        } catch (\Throwable $e) {
+            report($e);
+
             return [];
         }
     }

@@ -243,10 +243,13 @@
 
     /* Brand-derived shades used by the /my-day redesign. The hero uses
        --brand-tint-deep for the "now" rule borders, and --text-faint for
-       caps-uppercase microcopy (e.g. tip text below the rail). */
+       caps-uppercase microcopy (e.g. tip text below the rail). The L value is
+       tuned so this faint microcopy clears WCAG 2.1 AA (4.5:1) against
+       --background (#f7f8fd) at small sizes; 0.58 measured 4.03 and failed.
+       Verified via axe-core in tests/e2e/my-day-a11y.spec.ts. */
     --brand-deep: oklch(from var(--primary) calc(l - 0.09) c h);
     --brand-tint-deep: oklch(from var(--primary) 0.88 0.07 h);
-    --text-faint: oklch(from var(--foreground) 0.58 c h);
+    --text-faint: oklch(from var(--foreground) 0.54 c h);
 
     /* Map tokens — themable. Status colours (online/offline/idle/moving) stay
        semantic and remain hardcoded inside leaflet-map.tsx. */

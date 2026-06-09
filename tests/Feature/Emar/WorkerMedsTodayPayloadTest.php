@@ -12,6 +12,7 @@ use App\Models\Shift;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\DB;
 use Inertia\Testing\AssertableInertia as Assert;
 use Tests\TestCase;
 
@@ -106,6 +107,63 @@ class WorkerMedsTodayPayloadTest extends TestCase
                 ->where('prn_medications.0.near_limit', false)
                 ->where('prn_medications.0.over_limit', false)
             );
+    }
+
+    public function test_meds_due_matches_administrations_with_a_single_query(): void
+    {
+        Carbon::setTestNow(Carbon::parse('2026-04-30 09:30:00', config('app.worker_timezone', 'Pacific/Auckland')));
+        $this->seed(\Database\Seeders\RbacSeeder::class);
+
+        $worker = $this->makeRoleUser('support_worker');
+        $this->grantPermissions($worker, ['medications.administer.record']);
+
+        $serviceContext = ServiceContext::factory()->create([
+            'name' => 'Worker Meds N+1',
+            'type' => 'residential',
+            'is_active' => true,
+        ]);
+
+        $client = Client::factory()->create([
+            'service_context_id' => $serviceContext->id,
+            'status' => 'active',
+        ]);
+
+        Shift::factory()->create([
+            'client_id' => $client->id,
+            'service_context_id' => $serviceContext->id,
+            'user_id' => $worker->id,
+            'starts_at' => Carbon::parse('2026-04-30 09:00:00', config('app.worker_timezone'))->utc(),
+            'ends_at' => Carbon::parse('2026-04-30 13:00:00', config('app.worker_timezone'))->utc(),
+            'status' => 'scheduled',
+        ]);
+
+        // 3 scheduled meds × 3 in-window dose times = 9 slots, no PRN meds (PRN
+        // 24h counts hit the administrations table through a separate accessor).
+        // Before F1 the list issued one administration query per slot.
+        foreach (['Med A', 'Med B', 'Med C'] as $name) {
+            ClientMedication::query()->create([
+                'client_id' => $client->id,
+                'name' => $name,
+                'dosage' => '1 tablet',
+                'frequency' => 'Three times daily',
+                'dose_times' => ['08:00', '10:00', '12:00'],
+                'is_prn' => false,
+                'active' => true,
+                'state' => 'active',
+            ]);
+        }
+
+        DB::enableQueryLog();
+
+        $this->actingAs($worker)->get('/meds/today')->assertOk();
+
+        $adminQueries = collect(DB::getQueryLog())
+            ->filter(fn (array $entry) => str_contains($entry['query'], 'client_medication_administrations'))
+            ->count();
+
+        DB::disableQueryLog();
+
+        $this->assertSame(1, $adminQueries);
     }
 
     protected function makeRoleUser(string $roleName): User

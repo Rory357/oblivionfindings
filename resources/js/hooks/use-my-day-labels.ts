@@ -169,7 +169,8 @@ export type MyDayLabelKey =
     | 'toast_marking_dose_given'
     | 'toast_dose_left_as_due'
     | 'toast_timesheet_sending'
-    | 'toast_timesheet_in_draft';
+    | 'toast_timesheet_in_draft'
+    | 'toast_dose_record_failed';
 
 const FALLBACKS: Record<MyDayLabelKey, string> = {
     today: 'Today',
@@ -339,6 +340,8 @@ const FALLBACKS: Record<MyDayLabelKey, string> = {
     toast_dose_left_as_due: 'Dose left as due.',
     toast_timesheet_sending: 'Timesheet sending…',
     toast_timesheet_in_draft: 'Timesheet still in draft.',
+    toast_dose_record_failed:
+        "Couldn't record this dose. Open the eMAR to complete it.",
 };
 
 function interpolate(template: string, params?: Record<string, string | number>) {

@@ -204,4 +204,5 @@ return [
     'toast_dose_left_as_due' => 'Kei te toe tonu te rongoā.',
     'toast_timesheet_sending' => 'E tuku ana te pepa wā…',
     'toast_timesheet_in_draft' => 'Kei te tauira tonu te pepa wā.',
+    'toast_dose_record_failed' => 'Kāore i taea te tuhi i tēnei rongoā. Whakatuwheratia te eMAR ki te whakaoti.',
 ];
