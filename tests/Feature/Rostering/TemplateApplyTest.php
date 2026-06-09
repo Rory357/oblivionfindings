@@ -53,9 +53,11 @@ it('applies a template once per actor and week through the lifecycle assignment 
         ->post(route('operations.rostering.templates.apply', $template), $payload)
         ->assertRedirect(route('operations.rostering.index', ['week' => '2026-05-04']));
 
+    // Second apply within the hour is idempotent — it bounces back to the
+    // Templates tab with a status note instead of creating duplicate shifts.
     $this->actingAs($actor)
         ->post(route('operations.rostering.templates.apply', $template), $payload)
-        ->assertRedirect(route('operations.rostering.templates.show', $template));
+        ->assertRedirect(route('operations.rostering.index', ['tab' => 'templates']));
 
     expect(Shift::count())->toBe(1);
     $shift = Shift::first();

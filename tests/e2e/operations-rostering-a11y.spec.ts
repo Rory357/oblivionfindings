@@ -114,7 +114,8 @@ test.describe('operations rostering a11y smoke', () => {
         const consoleErrors = collectConsoleErrors(page);
 
         await loginAsStaff(page);
-        await page.goto('/operations/rostering/templates/9001');
+        await page.goto('/operations/rostering?tab=templates');
+        await page.getByTestId('template-card-9001').click();
         await expect(page.getByTestId('template-apply-card')).toBeVisible();
 
         await expectNoBlockingAxeViolations(page);

@@ -91,6 +91,21 @@ export {
 } from './signal-rail';
 export { SiteFilter, type SiteOption } from './site-filter';
 export { TabStrip, type RosterTabItem, type RosterTabTone } from './tab-strip';
+export {
+    TemplateDetailDialog,
+    type TemplateDetailDialogProps,
+    TemplateWizardDialog,
+    type TemplateWizardDialogProps,
+    type TemplateClientOption,
+    type TemplateServiceContextOption,
+    type TemplateStaffOption,
+} from './template-dialogs';
+export {
+    TemplatesPane,
+    type RosterTemplateRow,
+    type RosterTemplateShiftRow,
+    type TemplatesPaneProps,
+} from './templates-pane';
 export { TimeOffPane, type TimeOffRequest } from './time-off-pane';
 export {
     UnassignMakeOpenDialog,

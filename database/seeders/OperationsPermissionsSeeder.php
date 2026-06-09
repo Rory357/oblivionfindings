@@ -63,6 +63,7 @@ class OperationsPermissionsSeeder extends Seeder
             ['key' => 'roster_templates.viewAny', 'description' => 'View Roster Templates'],
             ['key' => 'roster_templates.create', 'description' => 'Create Roster Templates'],
             ['key' => 'roster_templates.update', 'description' => 'Update Roster Templates'],
+            ['key' => 'roster_templates.delete', 'description' => 'Delete Roster Templates'],
             ['key' => 'rostering.autoSchedule', 'description' => 'Auto-schedule Roster'],
             ['key' => 'rostering.publish', 'description' => 'Publish Roster'],
 

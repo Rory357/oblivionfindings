@@ -23,7 +23,10 @@ test.describe('roster templates — apply preflight', () => {
         const consoleErrors = collectConsoleErrors(page);
 
         await loginAsStaff(page);
-        await page.goto('/operations/rostering/templates/9001');
+        // Templates are now a tab inside the Rostering workspace; open the detail
+        // pop-up for the seeded template, which carries the apply panel.
+        await page.goto('/operations/rostering?tab=templates');
+        await page.getByTestId('template-card-9001').click();
 
         await expect(page.getByTestId('template-apply-card')).toBeVisible();
         await page.locator('#week-start').fill('2026-05-25');
