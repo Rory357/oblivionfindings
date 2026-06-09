@@ -736,6 +736,8 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     });
 
     Route::middleware('permission:shifts.viewAny')->group(function () {
+        Route::post('/shift-notes', [ShiftNoteController::class, 'store'])->name('operations.shift_notes.store');
+        Route::put('/shift-notes/{note}', [ShiftNoteController::class, 'update'])->name('operations.shift_notes.update');
         Route::patch('/shift-notes/{note}/flag', [ShiftNoteController::class, 'flag'])->name('operations.shift_notes.flag');
         Route::patch('/shift-notes/{note}/review', [ShiftNoteController::class, 'markReviewed'])->name('operations.shift_notes.review');
     });

@@ -25,6 +25,8 @@ class ShiftNoteAuthorizationTest extends TestCase
 
     private User $coordinatorWithoutShiftNotes;
 
+    private Shift $shift;
+
     private ClientNote $note;
 
     protected function setUp(): void
@@ -58,18 +60,22 @@ class ShiftNoteAuthorizationTest extends TestCase
 
         $client = Client::factory()->create(['organization_id' => 1]);
         $serviceContext = ServiceContext::factory()->create();
-        $shift = Shift::factory()->create([
+        $this->shift = Shift::factory()->create([
             'organization_id' => 1,
             'client_id' => $client->id,
             'service_context_id' => $serviceContext->id,
             'user_id' => $this->supportWorker->id,
             'created_by' => $this->admin->id,
+            // Within the current ISO week so the note lands in the default
+            // (current-week) view, which scopes by the shift's start date.
+            'starts_at' => now()->startOfWeek()->addDays(1)->setTime(9, 0),
+            'ends_at' => now()->startOfWeek()->addDays(1)->setTime(17, 0),
         ]);
 
         $this->note = ClientNote::query()->create([
             'organization_id' => 1,
             'client_id' => $client->id,
-            'shift_id' => $shift->id,
+            'shift_id' => $this->shift->id,
             'user_id' => $this->supportWorker->id,
             'type' => 'daily_note',
             'subject' => 'Shift summary',
@@ -98,7 +104,9 @@ class ShiftNoteAuthorizationTest extends TestCase
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->component('operations/shift-notes/Index')
-                ->has('notes.data', 1));
+                ->has('notes', 1)
+                ->has('catalogue')
+                ->where('currentUser.is_manager', true));
     }
 
     public function test_non_frontline_user_without_shift_view_any_is_forbidden_from_read_routes(): void
@@ -146,6 +154,115 @@ class ShiftNoteAuthorizationTest extends TestCase
             'id' => $this->note->id,
             'reviewed_by' => $this->admin->id,
         ]);
+    }
+
+    public function test_manager_can_create_a_shift_note(): void
+    {
+        $this->actingAs($this->admin)
+            ->from(route('operations.shift_notes.index'))
+            ->post(route('operations.shift_notes.store'), [
+                'shift_id' => $this->shift->id,
+                'type' => 'shift_note',
+                'body' => 'Settled morning shift, no concerns.',
+            ])
+            ->assertRedirect(route('operations.shift_notes.index'));
+
+        $this->assertDatabaseHas('client_notes', [
+            'shift_id' => $this->shift->id,
+            'user_id' => $this->admin->id,
+            'type' => 'shift_note',
+            'body' => 'Settled morning shift, no concerns.',
+        ]);
+    }
+
+    public function test_manager_can_update_any_note(): void
+    {
+        $this->actingAs($this->admin)
+            ->from(route('operations.shift_notes.index'))
+            ->put(route('operations.shift_notes.update', $this->note), [
+                'type' => 'progress_note',
+                'body' => 'Corrected by the coordinator.',
+            ])
+            ->assertRedirect(route('operations.shift_notes.index'));
+
+        $this->assertDatabaseHas('client_notes', [
+            'id' => $this->note->id,
+            'type' => 'progress_note',
+            'body' => 'Corrected by the coordinator.',
+            'edited_by' => $this->admin->id,
+        ]);
+    }
+
+    public function test_author_can_update_their_note_within_the_edit_window(): void
+    {
+        $author = $this->userWithPermissions(['shifts.viewAny']);
+        $note = $this->authoredNote($author, now());
+
+        $this->actingAs($author)
+            ->from(route('operations.shift_notes.index'))
+            ->put(route('operations.shift_notes.update', $note), [
+                'type' => 'note',
+                'body' => 'Author tidied up the wording.',
+            ])
+            ->assertRedirect(route('operations.shift_notes.index'));
+
+        $this->assertDatabaseHas('client_notes', [
+            'id' => $note->id,
+            'body' => 'Author tidied up the wording.',
+            'edited_by' => $author->id,
+        ]);
+    }
+
+    public function test_author_cannot_update_their_note_after_the_edit_window_closes(): void
+    {
+        $author = $this->userWithPermissions(['shifts.viewAny']);
+        $note = $this->authoredNote($author, now()->subDays(8));
+
+        $this->actingAs($author)
+            ->put(route('operations.shift_notes.update', $note), [
+                'type' => 'note',
+                'body' => 'Too late to edit this.',
+            ])
+            ->assertForbidden();
+
+        $this->assertDatabaseMissing('client_notes', [
+            'id' => $note->id,
+            'body' => 'Too late to edit this.',
+        ]);
+    }
+
+    public function test_non_author_non_manager_cannot_update_a_note(): void
+    {
+        $coordinator = $this->userWithPermissions(['shifts.viewAny']);
+
+        $this->actingAs($coordinator)
+            ->put(route('operations.shift_notes.update', $this->note), [
+                'type' => 'note',
+                'body' => 'Not my note to edit.',
+            ])
+            ->assertForbidden();
+
+        $this->assertDatabaseMissing('client_notes', [
+            'id' => $this->note->id,
+            'body' => 'Not my note to edit.',
+        ]);
+    }
+
+    private function authoredNote(User $author, \Illuminate\Support\Carbon $createdAt): ClientNote
+    {
+        $note = ClientNote::query()->create([
+            'organization_id' => 1,
+            'client_id' => $this->note->client_id,
+            'shift_id' => $this->shift->id,
+            'user_id' => $author->id,
+            'type' => 'shift_note',
+            'body' => 'Original wording.',
+            'visibility' => 'internal',
+        ]);
+
+        $note->forceFill(['created_at' => $createdAt])->saveQuietly();
+
+        return $note->refresh();
     }
 
     public function test_controller_guards_still_require_shift_view_any_if_route_permission_middleware_is_bypassed(): void

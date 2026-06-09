@@ -28,6 +28,8 @@ class ClientNote extends Model implements EmitsToTimeline
         'flagged_reason',
         'reviewed_at',
         'reviewed_by',
+        'edited_at',
+        'edited_by',
         'is_private',
         'attachments',
         'mood_rating',
@@ -51,6 +53,7 @@ class ClientNote extends Model implements EmitsToTimeline
         'is_flagged' => 'boolean',
         'is_private' => 'boolean',
         'reviewed_at' => 'datetime',
+        'edited_at' => 'datetime',
         'attachments' => 'array',
         'mood_rating' => 'integer',
         'behaviour_tags' => 'array',
@@ -93,6 +96,11 @@ class ClientNote extends Model implements EmitsToTimeline
     public function reviewer(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reviewed_by');
+    }
+
+    public function editor(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'edited_by');
     }
 
     public function scopeFlagged($query)
