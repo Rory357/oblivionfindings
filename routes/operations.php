@@ -799,19 +799,19 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
             ->name('operations.rostering.calendar.shifts.update');
     });
 
-    // Roster templates
-    Route::middleware('permission:roster_templates.create')->group(function () {
-        Route::get('/rostering/templates/create', [RosterTemplateController::class, 'create'])->name('operations.rostering.templates.create');
-        Route::post('/rostering/templates', [RosterTemplateController::class, 'store'])->name('operations.rostering.templates.store');
-    });
+    // Roster templates — now a tab inside the Rostering workspace. The list,
+    // create, edit, view and apply all happen in pop-ups on /operations/rostering;
+    // only the mutation endpoints live here. The old index URL 302s to the tab so
+    // existing bookmarks keep working.
+    Route::get('/rostering/templates', fn () => redirect()->route('operations.rostering.index', ['tab' => 'templates']))
+        ->middleware('permission:roster_templates.viewAny|rostering.viewAny')
+        ->name('operations.rostering.templates.index');
 
-    Route::middleware('permission:roster_templates.viewAny')->group(function () {
-        Route::get('/rostering/templates', [RosterTemplateController::class, 'index'])->name('operations.rostering.templates.index');
-        Route::get('/rostering/templates/{template}', [RosterTemplateController::class, 'show'])->name('operations.rostering.templates.show');
-    });
+    Route::post('/rostering/templates', [RosterTemplateController::class, 'store'])
+        ->middleware('permission:roster_templates.create')
+        ->name('operations.rostering.templates.store');
 
     Route::middleware('permission:roster_templates.update')->group(function () {
-        Route::get('/rostering/templates/{template}/edit', [RosterTemplateController::class, 'edit'])->name('operations.rostering.templates.edit');
         Route::put('/rostering/templates/{template}', [RosterTemplateController::class, 'update'])->name('operations.rostering.templates.update');
         Route::post('/rostering/templates/{template}/apply', [RosterTemplateController::class, 'apply'])->name('operations.rostering.templates.apply');
     });

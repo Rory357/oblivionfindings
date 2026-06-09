@@ -8,9 +8,7 @@ use App\Http\Controllers\Controller;
 use App\Http\Requests\Operations\Rostering\ApplyRosterTemplateRequest;
 use App\Http\Requests\Operations\Rostering\StoreRosterTemplateRequest;
 use App\Http\Requests\Operations\Rostering\UpdateRosterTemplateRequest;
-use App\Models\Client;
 use App\Models\RosterTemplate;
-use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\User;
 use Carbon\Carbon;
@@ -23,34 +21,6 @@ use Throwable;
 
 class RosterTemplateController extends Controller
 {
-    public function index(Request $request)
-    {
-        $auth = $request->user();
-        abort_unless($this->canViewTemplates($auth), 403);
-
-        $templates = RosterTemplate::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->with('creator:id,name')
-            ->withCount('templateShifts')
-            ->orderByDesc('updated_at')
-            ->paginate(25)
-            ->withQueryString();
-
-        return inertia('operations/rostering/templates/Index', [
-            'templates' => $templates,
-        ]);
-    }
-
-    public function create(Request $request)
-    {
-        $auth = $request->user();
-        abort_unless($this->canCreateTemplates($auth), 403);
-
-        return inertia('operations/rostering/templates/Create', [
-            ...$this->formOptions(),
-        ]);
-    }
-
     public function store(StoreRosterTemplateRequest $request)
     {
         $auth = $request->user();
@@ -76,45 +46,9 @@ class RosterTemplateController extends Controller
                 ->all()
         );
 
-        return redirect()->route('operations.rostering.templates.show', $template);
-    }
-
-    public function show(Request $request, $template)
-    {
-        $auth = $request->user();
-        abort_unless($this->canViewTemplates($auth), 403);
-
-        $template = RosterTemplate::where('organization_id', $auth->organization_id)
-            ->with([
-                'creator:id,name',
-                'templateShifts.client:id,first_name,last_name',
-                'templateShifts.user:id,name',
-                'templateShifts.serviceContext:id,name,type',
-            ])
-            ->findOrFail($template);
-
-        return inertia('operations/rostering/templates/Show', [
-            'template' => $template,
-        ]);
-    }
-
-    public function edit(Request $request, $template)
-    {
-        $auth = $request->user();
-        abort_unless($this->canUpdateTemplates($auth), 403);
-
-        $template = RosterTemplate::where('organization_id', $auth->organization_id)
-            ->with([
-                'templateShifts.client:id,first_name,last_name',
-                'templateShifts.user:id,name',
-                'templateShifts.serviceContext:id,name,type',
-            ])
-            ->findOrFail($template);
-
-        return inertia('operations/rostering/templates/Edit', [
-            'template' => $template,
-            ...$this->formOptions(),
-        ]);
+        return redirect()
+            ->route('operations.rostering.index', ['tab' => 'templates'])
+            ->with('status', 'Roster template created.');
     }
 
     public function update(UpdateRosterTemplateRequest $request, $template)
@@ -142,7 +76,9 @@ class RosterTemplateController extends Controller
                 ->all()
         );
 
-        return redirect()->route('operations.rostering.templates.show', $template);
+        return redirect()
+            ->route('operations.rostering.index', ['tab' => 'templates'])
+            ->with('status', 'Roster template updated.');
     }
 
     public function destroy(Request $request, $template)
@@ -153,7 +89,9 @@ class RosterTemplateController extends Controller
         $template = RosterTemplate::where('organization_id', $auth->organization_id)->findOrFail($template);
         $template->delete();
 
-        return redirect()->route('operations.rostering.templates.index');
+        return redirect()
+            ->route('operations.rostering.index', ['tab' => 'templates'])
+            ->with('status', 'Roster template deleted.');
     }
 
     public function apply(
@@ -181,7 +119,7 @@ class RosterTemplateController extends Controller
 
         if (Cache::has($idempotencyKey)) {
             return redirect()
-                ->route('operations.rostering.templates.show', $template)
+                ->route('operations.rostering.index', ['tab' => 'templates'])
                 ->with('status', 'This template was already applied by you for that week in the last hour; no duplicate shifts were created.');
         }
 
@@ -208,7 +146,7 @@ class RosterTemplateController extends Controller
 
         if (! Cache::add($idempotencyKey, now()->toIso8601String(), now()->addHour())) {
             return redirect()
-                ->route('operations.rostering.templates.show', $template)
+                ->route('operations.rostering.index', ['tab' => 'templates'])
                 ->with('status', 'This template was already applied by you for that week in the last hour; no duplicate shifts were created.');
         }
 
@@ -380,25 +318,6 @@ class RosterTemplateController extends Controller
             'starts_at' => $startsAt,
             'ends_at' => $endsAt,
         ];
-    }
-
-    private function formOptions(): array
-    {
-        return [
-            'clients' => Client::query()
-                ->with('site:id,name')
-                ->orderBy('first_name')
-                ->get(['id', 'first_name', 'last_name', 'service_context_id', 'site_id']),
-            'staff' => User::staff()->orderBy('name')->get(['id', 'name', 'email']),
-            'serviceContexts' => ServiceContext::query()
-                ->orderBy('name')
-                ->get(['id', 'name', 'type', 'is_active']),
-        ];
-    }
-
-    private function canViewTemplates($auth): bool
-    {
-        return (bool) $auth && ($auth->canDo('roster_templates.viewAny') || $auth->canDo('rostering.viewAny'));
     }
 
     private function canCreateTemplates($auth): bool

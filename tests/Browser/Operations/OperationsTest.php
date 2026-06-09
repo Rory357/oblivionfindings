@@ -146,23 +146,27 @@ test('operations rostering page loads', function () {
     });
 });
 
-test('operations rostering templates page loads', function () {
+test('operations rostering templates tab loads', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
+        // The legacy /templates URL now 302s to the Rostering Templates tab.
         $browser->loginAs($user)
             ->visit('/operations/rostering/templates')
             ->waitForText('Template', 10)
+            ->assertPathIs('/operations/rostering')
             ->assertSee('Template');
     });
 });
 
-test('operations rostering templates create page loads', function () {
+test('operations rostering templates create modal opens', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
-            ->visit('/operations/rostering/templates/create')
-            ->waitForText('Template', 10)
-            ->assertSee('Template');
+            ->visit('/operations/rostering?tab=templates')
+            ->waitForText('New template', 10)
+            ->press('New template')
+            ->waitForText('Template details', 10)
+            ->assertSee('Template details');
     });
 });
 

@@ -14,6 +14,7 @@ use App\Http\Requests\Operations\Rostering\RosteringIndexRequest;
 use App\Models\Client;
 use App\Models\RosterPeriod;
 use App\Models\RosterSuggestionRun;
+use App\Models\RosterTemplate;
 use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\ShiftEligibilityOverride;
@@ -47,6 +48,17 @@ class RosteringController extends Controller
         $canManageAny = $auth->canDo('shifts.manageAny');
         $canApproveLeave = $auth->canDo('hr.leave.approve') || $auth->canDo('hr.leave.manage');
         $organizationId = $auth->organization_id;
+
+        // Roster Templates live as a tab in this workspace. View access piggybacks
+        // on the rostering.viewAny gate this method already enforces; create/update
+        // and delete keep their own permissions (with a rostering.* fallback so a
+        // scheduler who manages shifts can also manage the patterns).
+        $canManageTemplates = $auth->canDo('roster_templates.create')
+            || $auth->canDo('roster_templates.update')
+            || $auth->canDo('rostering.create')
+            || $auth->canDo('rostering.edit');
+        $canDeleteTemplates = $auth->canDo('roster_templates.delete')
+            || $auth->canDo('rostering.delete');
 
         // /availability redirects here with ?tab=availability. On that landing the
         // availability pane is the only tab body rendered, so heavy manager-only
@@ -546,6 +558,14 @@ class RosteringController extends Controller
             'sites' => $sites,
             'serviceContexts' => $serviceContexts,
             'defaultServiceContextId' => ServiceContext::defaultId(),
+            'canManageTemplates' => $canManageTemplates,
+            'canDeleteTemplates' => $canDeleteTemplates,
+            // Roster templates (tab). Loaded lazily like staffAvailabilitySummary:
+            // eager only on the ?tab=templates landing, otherwise resolved on a
+            // partial reload when the user opens the tab.
+            'rosterTemplates' => $request->query('tab') === 'templates'
+                ? $this->buildRosterTemplates($organizationId)
+                : Inertia::optional(fn () => $this->buildRosterTemplates($organizationId)),
             'rosterPeriod' => $selectedRosterPeriod ? [
                 'id' => $selectedRosterPeriod->id,
                 'site_id' => $selectedRosterPeriod->site_id,
@@ -668,6 +688,77 @@ class RosteringController extends Controller
                 'complianceExpired' => $complianceExpired,
             ],
         ]);
+    }
+
+    /**
+     * Flat payload for the Roster Templates tab — every template with its shift
+     * rows and the relations the pop-ups need (client/staff/service context).
+     * Templates are few and small, so loading the rows up front lets the
+     * view/apply/edit modals run entirely client-side with no extra round-trips.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    protected function buildRosterTemplates(?int $organizationId): array
+    {
+        return RosterTemplate::query()
+            ->when($organizationId, fn ($q) => $q->where('organization_id', $organizationId))
+            ->with([
+                'creator:id,name',
+                'templateShifts.client:id,first_name,last_name',
+                'templateShifts.user:id,name',
+                'templateShifts.serviceContext:id,name,type',
+            ])
+            ->withCount('templateShifts')
+            ->orderByDesc('is_active')
+            ->orderBy('name')
+            ->get()
+            ->map(fn (RosterTemplate $template) => [
+                'id' => $template->id,
+                'name' => $template->name,
+                'description' => $template->description,
+                'template_type' => $template->template_type,
+                'is_active' => (bool) $template->is_active,
+                'template_shifts_count' => (int) $template->template_shifts_count,
+                'creator' => $template->creator ? [
+                    'id' => $template->creator->id,
+                    'name' => $template->creator->name,
+                ] : null,
+                'updated_at' => optional($template->updated_at)->toIso8601String(),
+                'template_shifts' => $template->templateShifts
+                    ->sortBy([['day_of_week', 'asc'], ['start_time', 'asc']])
+                    ->values()
+                    ->map(fn ($shift) => [
+                        'id' => $shift->id,
+                        'client_id' => $shift->client_id,
+                        'user_id' => $shift->user_id,
+                        'service_context_id' => $shift->service_context_id,
+                        'day_of_week' => (int) $shift->day_of_week,
+                        'start_time' => substr((string) $shift->start_time, 0, 5),
+                        'end_time' => substr((string) $shift->end_time, 0, 5),
+                        'shift_type' => $shift->shift_type ?? 'standard',
+                        'is_sleepover' => (bool) $shift->is_sleepover,
+                        'is_on_call' => (bool) $shift->is_on_call,
+                        'expected_break_minutes' => $shift->expected_break_minutes,
+                        'required_skills' => $shift->required_skills ?? [],
+                        'location' => $shift->location,
+                        'notes' => $shift->notes,
+                        'client' => $shift->client ? [
+                            'id' => $shift->client->id,
+                            'first_name' => $shift->client->first_name,
+                            'last_name' => $shift->client->last_name,
+                        ] : null,
+                        'user' => $shift->user ? [
+                            'id' => $shift->user->id,
+                            'name' => $shift->user->name,
+                        ] : null,
+                        'service_context' => $shift->serviceContext ? [
+                            'id' => $shift->serviceContext->id,
+                            'name' => $shift->serviceContext->name,
+                        ] : null,
+                    ])
+                    ->all(),
+            ])
+            ->all();
     }
 
     protected function buildAvailabilitySummary(User $auth): array

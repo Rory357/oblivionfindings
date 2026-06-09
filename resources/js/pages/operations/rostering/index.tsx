@@ -40,6 +40,10 @@ import {
     SignalRail,
     SiteFilter,
     TabStrip,
+    TemplateDetailDialog,
+    TemplateWizardDialog,
+    TemplatesPane,
+    type RosterTemplateRow,
     TimeOffPane,
     type TimeOffRequest,
     UnassignMakeOpenDialog,
@@ -71,6 +75,7 @@ import {
     ChevronLeft,
     ChevronRight,
     LayoutGrid,
+    LayoutTemplate,
     LineChart,
     MoreHorizontal,
     PieChart,
@@ -82,7 +87,7 @@ import {
 // The scheduling FullCalendar, re-homed from the retired /scheduling page and
 // rendered as the "Calendar" tab below.
 import RosteringCalendarView from '@/pages/calendar/index';
-import { useMemo, useRef, useState } from 'react';
+import { useEffect, useMemo, useRef, useState } from 'react';
 import {
     CreateShiftDialog,
     type EditableShift,
@@ -284,6 +289,10 @@ type Props = {
     sites: Site[];
     serviceContexts?: ServiceContext[];
     defaultServiceContextId?: number | null;
+    canManageTemplates?: boolean;
+    canDeleteTemplates?: boolean;
+    /** Lazy: undefined until the Templates tab is opened. */
+    rosterTemplates?: RosterTemplateRow[];
     rosterPeriod: RosterPeriodSummary | null;
     stats: {
         total: number;
@@ -392,7 +401,8 @@ type RosterTab =
     | 'timeoff'
     | 'availability'
     | 'capacity'
-    | 'analytics';
+    | 'analytics'
+    | 'templates';
 
 const ROSTER_TABS: RosterTab[] = [
     'shifts',
@@ -403,6 +413,7 @@ const ROSTER_TABS: RosterTab[] = [
     'availability',
     'capacity',
     'analytics',
+    'templates',
 ];
 
 function isRosterTab(value: unknown): value is RosterTab {
@@ -573,7 +584,24 @@ export default function RosteringIndex(props: Props) {
         site_id?: number | null;
     }>({});
     const [loadingAvailability, setLoadingAvailability] = useState(false);
+    const [loadingTemplates, setLoadingTemplates] = useState(false);
+    // Template pop-ups: the wizard (create/edit) and the detail/apply dialog.
+    const [templateWizard, setTemplateWizard] = useState<{
+        mode: 'create' | 'edit';
+        template: RosterTemplateRow | null;
+    } | null>(null);
+    const [detailTemplate, setDetailTemplate] =
+        useState<RosterTemplateRow | null>(null);
+    // rosterTemplates is a lazy Inertia prop — week/filter navigations drop it.
+    // Cache the last loaded list so the tab doesn't blank on those visits.
+    const [cachedTemplates, setCachedTemplates] = useState<
+        RosterTemplateRow[] | null
+    >(props.rosterTemplates ?? null);
     const todayBtnRef = useRef<HTMLButtonElement>(null);
+
+    useEffect(() => {
+        if (props.rosterTemplates) setCachedTemplates(props.rosterTemplates);
+    }, [props.rosterTemplates]);
 
     const staffFilterItems: EntityFilterOption[] = useMemo(
         () =>
@@ -668,6 +696,23 @@ export default function RosteringIndex(props: Props) {
         }
 
         setTab(next);
+
+        if (next === 'templates' && !props.rosterTemplates) {
+            setLoadingTemplates(true);
+            router.get(
+                rosteringIndex.url(),
+                { ...filterPayload(), tab: 'templates' },
+                {
+                    only: ['rosterTemplates'],
+                    preserveState: true,
+                    preserveScroll: true,
+                    replace: true,
+                    onFinish: () => setLoadingTemplates(false),
+                },
+            );
+            return;
+        }
+
         if (next !== 'availability' || props.staffAvailabilitySummary) {
             return;
         }
@@ -2000,6 +2045,13 @@ export default function RosteringIndex(props: Props) {
             icon: LineChart,
             tone: 'critical' as const,
         },
+        {
+            id: 'templates',
+            label: 'Templates',
+            icon: LayoutTemplate,
+            tone: 'violet' as const,
+            badge: cachedTemplates?.length,
+        },
     ];
 
     const availabilitySummary = props.staffAvailabilitySummary ?? {
@@ -2581,6 +2633,33 @@ export default function RosteringIndex(props: Props) {
                                 overtimeTrend={overtimeTrend}
                             />
                         ) : null}
+                        {tab === 'templates' ? (
+                            <TemplatesPane
+                                templates={cachedTemplates}
+                                loading={loadingTemplates && !cachedTemplates}
+                                canManage={Boolean(props.canManageTemplates)}
+                                canDelete={Boolean(props.canDeleteTemplates)}
+                                onCreate={() =>
+                                    setTemplateWizard({
+                                        mode: 'create',
+                                        template: null,
+                                    })
+                                }
+                                onView={(t) => setDetailTemplate(t)}
+                                onEdit={(t) =>
+                                    setTemplateWizard({
+                                        mode: 'edit',
+                                        template: t,
+                                    })
+                                }
+                                onDelete={(t) =>
+                                    router.delete(
+                                        `/operations/rostering/templates/${t.id}`,
+                                        { preserveScroll: true },
+                                    )
+                                }
+                            />
+                        ) : null}
                     </main>
                     <SignalRail signals={signals} capacity={capacityRailRows} />
                 </div>
@@ -2892,13 +2971,28 @@ export default function RosteringIndex(props: Props) {
                                 Recurring series
                             </Button>
                         </Link>
-                        <Link href="/operations/rostering/templates">
-                            <Button size="sm" variant="outline">
-                                Roster templates
-                            </Button>
-                        </Link>
                     </div>
                 ) : null}
+
+                <TemplateWizardDialog
+                    open={templateWizard !== null}
+                    onOpenChange={(open) => !open && setTemplateWizard(null)}
+                    template={templateWizard?.template}
+                    clients={props.clients ?? []}
+                    staff={props.staff ?? []}
+                    serviceContexts={props.serviceContexts ?? []}
+                />
+
+                <TemplateDetailDialog
+                    template={detailTemplate}
+                    open={detailTemplate !== null}
+                    onOpenChange={(open) => !open && setDetailTemplate(null)}
+                    canManage={Boolean(props.canManageTemplates)}
+                    onEdit={(t) => {
+                        setDetailTemplate(null);
+                        setTemplateWizard({ mode: 'edit', template: t });
+                    }}
+                />
 
                 {pickerOpen ? (
                     <WeekPicker
