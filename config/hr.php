@@ -23,8 +23,12 @@ return [
         'annual' => ['label' => 'Annual Leave', 'accrual' => true],
         'sick' => ['label' => 'Sick Leave', 'accrual' => true],
         'bereavement' => ['label' => 'Bereavement Leave', 'accrual' => false],
+        'family_violence' => ['label' => 'Family Violence Leave', 'accrual' => true],
         'parental' => ['label' => 'Parental Leave', 'accrual' => false],
-        'lieu' => ['label' => 'Time in Lieu', 'accrual' => false],
+        'public_holiday' => ['label' => 'Public Holiday', 'accrual' => false],
+        'alternative' => ['label' => 'Alternative Holiday', 'accrual' => false],
+        'toil' => ['label' => 'Time in Lieu (TOIL)', 'accrual' => false],
+        'unpaid' => ['label' => 'Unpaid Leave', 'accrual' => false],
         'other' => ['label' => 'Other Leave', 'accrual' => false],
     ],
 
@@ -32,16 +36,25 @@ return [
     |--------------------------------------------------------------------------
     | Leave Engine Defaults
     |--------------------------------------------------------------------------
+    | Simplified hours-based model: annual/sick/family-violence entitlements
+    | accrue in monthly twelfths. The Holidays Act 2003 expresses annual leave
+    | in weeks (4 weeks after 12 months) and sick/family-violence leave as
+    | lump-sum day entitlements (10 days after 6 months) — see
+    | docs/hr-nz-statutory-notes.md before relying on these balances for
+    | statutory compliance. Alternative holidays are accrued automatically
+    | when an approved timesheet is worked on a public holiday.
     */
     'leave' => [
         'full_time_hours_per_week' => env('HR_FULL_TIME_HOURS_PER_WEEK', 40),
-        'accrual_types' => ['annual', 'sick'],
+        'accrual_types' => ['annual', 'sick', 'family_violence'],
         'default_entitlements' => [
             'annual' => env('HR_ANNUAL_LEAVE_HOURS', 152), // 4 weeks @ 38h
             'sick' => env('HR_SICK_LEAVE_HOURS', 80), // 10 days @ 8h
             'bereavement' => env('HR_BEREAVEMENT_LEAVE_HOURS', 24),
+            'family_violence' => env('HR_FAMILY_VIOLENCE_LEAVE_HOURS', 80), // 10 days @ 8h
             'parental' => 0,
             'public_holiday' => 0,
+            'alternative' => 0, // accrued per worked public holiday, not entitlement-based
             'unpaid' => 0,
             'toil' => 0,
             'other' => 0,

@@ -59,6 +59,7 @@ class DatabaseSeeder extends Seeder
         $this->call(GovernanceSeeder::class);
         $this->call(HrSeeder::class);
         $this->call(HrPublicHolidaysSeeder::class);
+        $this->call(HrPayEquityBandsSeeder::class);
         $this->call(RoleCatalogSeeder::class);
         $this->call(CateringPermissionsSeeder::class);
         $this->call(CateringSeeder::class);

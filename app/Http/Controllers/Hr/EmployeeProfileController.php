@@ -432,6 +432,9 @@ class EmployeeProfileController extends Controller
                 'is_first_aider' => (bool) $profile->is_first_aider,
                 'is_fire_warden' => (bool) $profile->is_fire_warden,
                 'can_drive_clients' => (bool) $profile->can_drive_clients,
+                'work_rights_status' => $profile->work_rights_status,
+                'visa_type' => $profile->visa_type,
+                'visa_expires_at' => $profile->visa_expires_at?->toDateString(),
                 'notes' => $profile->notes,
                 'emergency_contact_name' => $profile->emergency_contact_name ?? ($profile->emergency_contacts[0]['name'] ?? null),
                 'emergency_contact_phone' => $profile->emergency_contact_phone ?? ($profile->emergency_contacts[0]['phone'] ?? null),
@@ -494,13 +497,20 @@ class EmployeeProfileController extends Controller
             ->orderBy('name')
             ->get(['id', 'name']);
 
+        // The edit page renders these as {value, label} select options.
+        $options = fn (array $values) => array_map(fn (string $value) => [
+            'value' => $value,
+            'label' => ucwords(str_replace('_', ' ', $value)),
+        ], $values);
+
         return Inertia::render('hr/employees/edit', [
             'profile' => $profile,
             'sites' => $sites,
             'departments' => $departments,
-            'employmentTypes' => ['full_time', 'part_time', 'casual', 'fixed_term', 'contractor'],
-            'contractTypes' => ['permanent', 'fixed_term', 'casual', 'contractor'],
-            'payFrequencies' => ['weekly', 'fortnightly', 'monthly'],
+            'employmentTypes' => $options(['full_time', 'part_time', 'casual', 'fixed_term', 'contractor']),
+            'contractTypes' => $options(['permanent', 'fixed_term', 'casual', 'contractor']),
+            'payFrequencies' => $options(['weekly', 'fortnightly', 'monthly']),
+            'workRightsStatuses' => $options(['citizen', 'permanent_resident', 'resident_visa', 'work_visa', 'student_visa', 'other']),
         ]);
     }
 

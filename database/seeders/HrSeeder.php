@@ -209,8 +209,8 @@ class HrSeeder extends Seeder
         $year = now()->year;
 
         foreach ($users as $user) {
-            foreach (['annual' => 160, 'sick' => 80] as $type => $entitlement) {
-                $taken = rand(0, (int) ($entitlement * 0.6));
+            foreach (['annual' => 160, 'sick' => 80, 'family_violence' => 80] as $type => $entitlement) {
+                $taken = $type === 'family_violence' ? 0 : rand(0, (int) ($entitlement * 0.6));
                 $remaining = max($entitlement - $taken, 0);
                 HrLeaveBalance::firstOrCreate(
                     ['tenant_id' => $tenantId, 'user_id' => $user->id, 'leave_type' => $type, 'year' => $year],

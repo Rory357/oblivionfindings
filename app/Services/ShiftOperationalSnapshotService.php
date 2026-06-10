@@ -104,7 +104,10 @@ class ShiftOperationalSnapshotService
             'service_context_name_snapshot' => $shiftSnapshot['service_context_name'],
             'client_name_snapshot' => $shiftSnapshot['client_name'] ?: $this->clientName($timesheet->client),
             'staff_name_snapshot' => $shiftSnapshot['staff_name'] ?: $timesheet->staff?->name,
-            'shift_type_snapshot' => $shiftSnapshot['shift_type'],
+            // Shift-less (activity/manual) timesheets have no shift to derive a
+            // type from — keep the value stamped at draft time instead of
+            // regenerating it to null and tripping the billing snapshot guard.
+            'shift_type_snapshot' => $shiftSnapshot['shift_type'] ?: ($timesheet->shift_type_snapshot ?: ($timesheet->shift_id ? null : 'standard')),
             'coverage_roles_snapshot' => $shiftSnapshot['coverage_roles'],
         ];
     }

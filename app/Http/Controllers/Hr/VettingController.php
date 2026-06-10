@@ -120,7 +120,7 @@ class VettingController extends Controller
             'checkTypes' => [
                 ['value' => 'police_check', 'label' => 'Police Check'],
                 ['value' => 'ministry_of_justice', 'label' => 'Ministry of Justice'],
-                ['value' => 'vulnerable_children_act', 'label' => 'Vulnerable Children Act'],
+                ['value' => 'vulnerable_children_act', 'label' => "Children's Act Safety Check"],
                 ['value' => 'identity_verification', 'label' => 'Identity Verification'],
                 ['value' => 'qualification_verification', 'label' => 'Qualification Verification'],
                 ['value' => 'right_to_work', 'label' => 'Right to Work'],
@@ -155,7 +155,7 @@ class VettingController extends Controller
             'checkTypes' => [
                 ['value' => 'police_check', 'label' => 'Police Check'],
                 ['value' => 'ministry_of_justice', 'label' => 'Ministry of Justice'],
-                ['value' => 'vulnerable_children_act', 'label' => 'Vulnerable Children Act'],
+                ['value' => 'vulnerable_children_act', 'label' => "Children's Act Safety Check"],
                 ['value' => 'identity_verification', 'label' => 'Identity Verification'],
                 ['value' => 'qualification_verification', 'label' => 'Qualification Verification'],
                 ['value' => 'right_to_work', 'label' => 'Right to Work'],

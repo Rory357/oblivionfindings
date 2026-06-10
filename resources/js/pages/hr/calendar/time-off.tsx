@@ -61,8 +61,11 @@ const leaveTypeColors: Record<string, string> = {
     sick: 'bg-status-critical-bg text-status-critical',
     personal: 'bg-primary/20 text-primary',
     bereavement: 'bg-muted text-foreground',
+    family_violence: 'bg-status-critical-bg text-status-critical',
     parental: 'bg-status-critical-bg text-status-critical',
     public_holiday: 'bg-status-success-bg text-status-success',
+    alternative: 'bg-status-success-bg text-status-success',
+    toil: 'bg-primary/20 text-primary',
     unpaid: 'bg-status-warning-bg text-status-warning',
     other: 'bg-status-warning-bg text-status-warning',
 };

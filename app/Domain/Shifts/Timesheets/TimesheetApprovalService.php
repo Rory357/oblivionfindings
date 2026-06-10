@@ -3,6 +3,7 @@
 namespace App\Domain\Shifts\Timesheets;
 
 use App\Domain\Hr\Models\HrPayrollRun;
+use App\Domain\Hr\Services\AlternativeHolidayService;
 use App\Models\Timesheet;
 use App\Models\User;
 use App\Services\Operations\BillingService;
@@ -11,6 +12,7 @@ use App\Services\Operations\TimesheetReconciliationService;
 use App\Services\ShiftOperationalSnapshotService;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
 
 class TimesheetApprovalService
@@ -20,6 +22,7 @@ class TimesheetApprovalService
         private readonly ShiftOperationalSnapshotService $snapshots,
         private readonly TimesheetHrSyncService $hrSync,
         private readonly BillingService $billing,
+        private readonly AlternativeHolidayService $alternativeHolidays,
     ) {}
 
     public function submit(Timesheet $timesheet, User $actor): TimesheetWorkflowResult
@@ -105,6 +108,15 @@ class TimesheetApprovalService
                 ])->save();
 
                 $this->syncApprovedTimesheet($locked);
+
+                try {
+                    $this->alternativeHolidays->accrueForTimesheet($locked->fresh() ?? $locked);
+                } catch (\Throwable $exception) {
+                    Log::warning('Alternative holiday accrual failed for approved timesheet', [
+                        'timesheet_id' => $locked->id,
+                        'error' => $exception->getMessage(),
+                    ]);
+                }
 
                 return new TimesheetWorkflowResult(
                     $locked->fresh(['shift.client']) ?? $locked,

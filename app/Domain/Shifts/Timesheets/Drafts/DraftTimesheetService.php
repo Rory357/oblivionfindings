@@ -3,8 +3,11 @@
 namespace App\Domain\Shifts\Timesheets\Drafts;
 
 use App\Domain\Hr\Models\HrAttendanceSession;
+use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrTimeEntry;
+use App\Domain\Hr\Services\PublicHolidayCalendar;
 use App\Models\Shift;
+use App\Models\Site;
 use App\Models\Timesheet;
 use App\Models\User;
 use App\Services\Operations\PayrollRateResolver;
@@ -17,7 +20,25 @@ class DraftTimesheetService
         protected ShiftOperationalSnapshotService $snapshots,
         protected TimesheetReconciliationService $reconciler,
         protected PayrollRateResolver $payrollRates,
+        protected PublicHolidayCalendar $publicHolidays,
     ) {}
+
+    /**
+     * Whether the given worker-local work date is a public holiday for the
+     * workplace (national always; regional anniversaries by site region).
+     */
+    protected function isPublicHolidayFor(string $workDate, ?int $userId, ?int $siteId): bool
+    {
+        $region = $siteId
+            ? Site::query()->whereKey($siteId)->value('region')
+            : null;
+
+        $tenantId = $userId
+            ? HrEmployeeProfile::query()->where('user_id', $userId)->value('tenant_id')
+            : null;
+
+        return $this->publicHolidays->isPublicHoliday($workDate, $tenantId !== null ? (int) $tenantId : null, $region);
+    }
 
     /**
      * @return array{success: bool, reason: string|null, timesheet: Timesheet|null}
@@ -62,18 +83,27 @@ class DraftTimesheetService
 
         $snapshot = $this->snapshots->snapshotForShift($shift, $shift->staff);
 
+        $workDate = $startsAt->copy()
+            ->setTimezone(config('app.worker_timezone', config('app.timezone', 'UTC')))
+            ->toDateString();
+
         $timesheet->fill([
             'user_id' => $shift->user_id,
             'client_id' => $shift->client_id,
             'shift_site_id' => $snapshot['site_id'] ?? $timesheet->shift_site_id,
             'shift_service_context_id' => $snapshot['service_context_id'] ?? $timesheet->shift_service_context_id,
             'attendance_session_id' => $timesheet->attendance_session_id ?: $uniqueAttendanceSession?->id,
-            'work_date' => $startsAt->toDateString(),
+            'work_date' => $workDate,
             'starts_at' => $startsAt,
             'ends_at' => $endsAt,
             'break_minutes' => (int) ($shift->expected_break_minutes ?? $timesheet->break_minutes ?? 0),
             'sleepover' => (bool) $shift->is_sleepover,
             'on_call' => (bool) $shift->is_on_call,
+            'public_holiday' => $this->isPublicHolidayFor(
+                $workDate,
+                (int) $shift->user_id,
+                $snapshot['site_id'] ?? $shift->client?->site_id,
+            ),
             'shift_site_name_snapshot' => $snapshot['site_name'] ?? $timesheet->shift_site_name_snapshot,
             'shift_location_snapshot' => $snapshot['location'] ?? $timesheet->shift_location_snapshot,
             'service_context_name_snapshot' => $snapshot['service_context_name'] ?? $timesheet->service_context_name_snapshot,
@@ -139,6 +169,12 @@ class DraftTimesheetService
             ? max($existingBreakMinutes, $sessionBreakMinutes)
             : $sessionBreakMinutes;
 
+        // Work date in the worker's timezone — a 09:00 NZT clock-in is 21:00
+        // UTC the previous day, so the raw UTC date would mis-date the sheet.
+        $workDate = $session->clock_in_at->copy()
+            ->setTimezone(config('app.worker_timezone', config('app.timezone', 'UTC')))
+            ->toDateString();
+
         $payload = [
             'user_id' => $session->user_id,
             'client_id' => $clientId,
@@ -147,12 +183,17 @@ class DraftTimesheetService
             'site_id' => $isNonShift ? $session->site_id : null,
             'shift_site_id' => $snapshot['site_id'] ?? null,
             'shift_service_context_id' => $snapshot['service_context_id'] ?? null,
-            'work_date' => $session->clock_in_at->toDateString(),
+            'work_date' => $workDate,
             'starts_at' => $session->clock_in_at,
             'ends_at' => $session->clock_out_at,
             'break_minutes' => $breakMinutes,
             'sleepover' => (bool) ($session->shift?->is_sleepover ?? false),
             'on_call' => (bool) ($session->shift?->is_on_call ?? false),
+            'public_holiday' => $this->isPublicHolidayFor(
+                $workDate,
+                (int) $session->user_id,
+                $snapshot['site_id'] ?? $session->site_id,
+            ),
             'shift_site_name_snapshot' => $snapshot['site_name'] ?? null,
             'shift_location_snapshot' => $snapshot['location'] ?? null,
             'service_context_name_snapshot' => $snapshot['service_context_name'] ?? null,
@@ -236,6 +277,8 @@ class DraftTimesheetService
             ? $this->snapshots->snapshotForShift($entry->shift, $entry->user)
             : $this->snapshots->snapshotForClient($client, $entry->user);
 
+        $workDate = $entry->entry_date?->toDateString() ?? $entry->clock_in->toDateString();
+
         $payload = [
             'user_id' => $entry->user_id,
             'client_id' => $entry->shift?->client_id ?? $entry->client_id,
@@ -244,14 +287,18 @@ class DraftTimesheetService
             'site_id' => $entry->shift_id ? null : ($entry->site_id ?? $snapshot['site_id'] ?? null),
             'shift_site_id' => $snapshot['site_id'] ?? null,
             'shift_service_context_id' => $snapshot['service_context_id'] ?? null,
-            'work_date' => $entry->entry_date?->toDateString() ?? $entry->clock_in->toDateString(),
+            'work_date' => $workDate,
             'starts_at' => $entry->clock_in,
             'ends_at' => $entry->clock_out,
             'break_minutes' => (int) ($entry->break_minutes ?? 0),
             'mileage_km' => $entry->mileage_km,
             'sleepover' => (bool) $entry->is_sleepover,
             'on_call' => (bool) $entry->is_on_call,
-            'public_holiday' => (bool) $entry->is_public_holiday,
+            'public_holiday' => (bool) $entry->is_public_holiday || $this->isPublicHolidayFor(
+                $workDate,
+                (int) $entry->user_id,
+                $entry->site_id ?? $snapshot['site_id'] ?? null,
+            ),
             'notes' => $entry->notes,
             'shift_site_name_snapshot' => $snapshot['site_name'] ?? null,
             'shift_location_snapshot' => $snapshot['location'] ?? null,
