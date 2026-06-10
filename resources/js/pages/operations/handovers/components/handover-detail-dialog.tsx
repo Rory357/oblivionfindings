@@ -21,6 +21,7 @@ import {
 } from 'lucide-react';
 import { type ComponentType } from 'react';
 
+import { formatDate } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 
 import {
@@ -131,13 +132,7 @@ function TimelineRow({
             <div className="text-right text-[11.5px] text-muted-foreground">
                 {iso ? (
                     <>
-                        <div>
-                            {new Date(iso).toLocaleDateString('en-NZ', {
-                                weekday: 'short',
-                                day: 'numeric',
-                                month: 'short',
-                            })}
-                        </div>
+                        <div>{formatDate(iso)}</div>
                         <div>{fmtTime(iso)}</div>
                     </>
                 ) : (

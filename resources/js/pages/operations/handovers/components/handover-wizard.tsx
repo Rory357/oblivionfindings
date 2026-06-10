@@ -1,3 +1,7 @@
+/* eslint-disable no-restricted-syntax -- The handover wizard mirrors the bespoke
+ * Add-client modal surface (stepper rail + scroll-contained body + custom footer)
+ * and intentionally uses styled native controls. Every colour is a semantic
+ * design token, per docs/DESIGN_TOKENS.md. */
 /* New / Edit handover wizard — 4 steps modelled on the Add Client wizard, built
  * around the outgoing-shift → new-shift chain. */
 import { startOfWeek } from '@/components/rostering';
@@ -33,6 +37,7 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
+import { FieldErr as FieldError, StepHead } from '@/components/wizard/primitives';
 import { cn } from '@/lib/utils';
 
 import {
@@ -248,15 +253,6 @@ function ListBuilder({
                     </button>
                 </div>
             </div>
-        </div>
-    );
-}
-
-function FieldError({ children }: { children: string }) {
-    return (
-        <div className="mt-1 flex items-center gap-1 text-[12px] text-status-critical">
-            <AlertTriangle className="h-3.5 w-3.5" />
-            {children}
         </div>
     );
 }
@@ -485,7 +481,7 @@ export function HandoverWizard({
                 </DialogDescription>
 
                 {/* Stepper rail */}
-                <aside className="hidden w-[260px] shrink-0 flex-col border-r border-border bg-muted/30 p-4 md:flex">
+                <aside className="hidden w-[248px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar p-4 md:flex">
                     <div className="mb-4 flex items-center gap-2.5">
                         <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/15 text-primary">
                             {editing ? (
@@ -518,8 +514,8 @@ export function HandoverWizard({
                                     className={cn(
                                         'flex items-start gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors',
                                         active
-                                            ? 'bg-card shadow-sm'
-                                            : 'hover:bg-card/60',
+                                            ? 'bg-primary/10'
+                                            : 'hover:bg-accent',
                                     )}
                                 >
                                     <span
@@ -580,7 +576,7 @@ export function HandoverWizard({
                             <X className="h-4.5 w-4.5" />
                         </button>
                     </header>
-                    <div className="h-1 bg-muted">
+                    <div className="h-[3px] shrink-0 bg-muted">
                         <div
                             className="h-full bg-primary transition-all"
                             style={{
@@ -948,7 +944,7 @@ export function HandoverWizard({
                     </div>
 
                     {/* Footer */}
-                    <footer className="flex items-center justify-between gap-2 border-t border-border px-5 py-3.5">
+                    <footer className="flex items-center justify-between gap-2 border-t border-border bg-muted/30 px-5 py-3.5">
                         <div>
                             {stepIndex > 0 ? (
                                 <button
@@ -1021,28 +1017,6 @@ export function HandoverWizard({
                 </div>
             </DialogContent>
         </Dialog>
-    );
-}
-
-function StepHead({
-    icon: Icon,
-    title,
-    blurb,
-}: {
-    icon: typeof ArrowLeftRight;
-    title: string;
-    blurb: string;
-}) {
-    return (
-        <div className="flex items-start gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
-                <Icon className="h-5 w-5" />
-            </span>
-            <div>
-                <h2 className="text-[17px] font-bold">{title}</h2>
-                <p className="text-[13px] text-muted-foreground">{blurb}</p>
-            </div>
-        </div>
     );
 }
 

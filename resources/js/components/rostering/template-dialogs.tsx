@@ -21,13 +21,7 @@ import {
     Users,
     X,
 } from 'lucide-react';
-import {
-    useEffect,
-    useMemo,
-    useState,
-    type ComponentType,
-    type ReactNode,
-} from 'react';
+import { useEffect, useMemo, useState } from 'react';
 
 import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
 import {
@@ -49,15 +43,14 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
+import {
+    Field,
+    SelectInput,
+    SubHead,
+    type IconType,
+} from '@/components/wizard/primitives';
 import { cn } from '@/lib/utils';
 
 import {
@@ -120,8 +113,6 @@ const SHIFT_TYPE_OPTIONS = [
 
 const NONE = '__none__';
 
-type IconType = ComponentType<{ className?: string }>;
-
 function clientLabel(client: TemplateClientOption): string {
     if (client.name) return client.name;
     return (
@@ -157,87 +148,6 @@ function addDaysLocal(date: Date, days: number): Date {
 
 function shortDate(d: Date): string {
     return d.toLocaleDateString('en-NZ', { day: '2-digit', month: 'short' });
-}
-
-/* ------------------------------------------------------------------ */
-/*  Shared primitives (match add-client-dialog look & feel)            */
-/* ------------------------------------------------------------------ */
-
-function Field({
-    label,
-    required,
-    hint,
-    error,
-    span,
-    children,
-}: {
-    label?: string;
-    required?: boolean;
-    hint?: string;
-    error?: string;
-    span?: boolean;
-    children: ReactNode;
-}) {
-    return (
-        <div className={cn('min-w-0', span && 'sm:col-span-2')}>
-            {label ? (
-                <Label className="mb-1.5 flex items-center gap-1.5">
-                    {label}
-                    {required ? (
-                        <span className="text-status-critical">*</span>
-                    ) : null}
-                    {hint ? (
-                        <span className="text-xs font-normal text-muted-foreground">
-                            {hint}
-                        </span>
-                    ) : null}
-                </Label>
-            ) : null}
-            {children}
-            {error ? (
-                <p className="mt-1 flex items-center gap-1 text-xs text-status-critical">
-                    <AlertTriangle className="h-3 w-3 shrink-0" />
-                    {error}
-                </p>
-            ) : null}
-        </div>
-    );
-}
-
-function SubHead({ icon: Icon, children }: { icon: IconType; children: ReactNode }) {
-    return (
-        <div className="col-span-full mt-1 flex items-center gap-2 text-[11px] font-bold uppercase tracking-wide text-muted-foreground">
-            <Icon className="h-3.5 w-3.5" />
-            {children}
-        </div>
-    );
-}
-
-function SelectInput({
-    value,
-    onChange,
-    placeholder,
-    options,
-}: {
-    value: string;
-    onChange: (v: string) => void;
-    placeholder: string;
-    options: { value: string; label: string }[];
-}) {
-    return (
-        <Select value={value || undefined} onValueChange={onChange}>
-            <SelectTrigger className="w-full">
-                <SelectValue placeholder={placeholder} />
-            </SelectTrigger>
-            <SelectContent>
-                {options.map((o) => (
-                    <SelectItem key={o.value} value={o.value}>
-                        {o.label}
-                    </SelectItem>
-                ))}
-            </SelectContent>
-        </Select>
-    );
 }
 
 /* ------------------------------------------------------------------ */
@@ -546,7 +456,7 @@ function WizardBody({
     return (
         <div className="flex h-[min(92vh,820px)] min-h-0 overflow-hidden">
             {/* Stepper rail */}
-            <aside className="hidden w-[220px] shrink-0 flex-col gap-1 border-r border-sidebar-border bg-sidebar p-4 sm:flex">
+            <aside className="hidden w-[248px] shrink-0 flex-col gap-1 border-r border-sidebar-border bg-sidebar p-4 sm:flex">
                 <div className="mb-3 flex items-center gap-2.5">
                     <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground">
                         <LayoutTemplate className="h-5 w-5" />

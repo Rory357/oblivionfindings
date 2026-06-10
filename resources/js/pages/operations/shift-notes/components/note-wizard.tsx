@@ -1,3 +1,7 @@
+/* eslint-disable no-restricted-syntax -- The shift-note wizard mirrors the bespoke
+ * Add-client modal surface (stepper rail + scroll-contained body + custom footer)
+ * and intentionally uses styled native controls. Every colour is a semantic
+ * design token, per docs/DESIGN_TOKENS.md. */
 /* Add Shift Note wizard — 5-step stepper modal modelled on the Add Client /
  * handover wizard shell. Step 1 links the note to a real client shift (so it is
  * correctly filed against the roster); the rest mirror the design prototype. */
@@ -29,6 +33,8 @@ import {
 import { useEffect, useMemo, useState } from 'react';
 import { toast } from 'sonner';
 
+import { StepHead } from '@/components/wizard/primitives';
+import { formatDate } from '@/lib/datetime';
 import {
     type Catalogue,
     type CatalogueShift,
@@ -88,13 +94,7 @@ type WizForm = {
 
 function shiftOptionLabel(s: CatalogueShift): string {
     if (!s.starts_at) return s.label;
-    const d = new Date(s.starts_at);
-    const day = d.toLocaleDateString('en-NZ', {
-        weekday: 'short',
-        day: 'numeric',
-        month: 'short',
-    });
-    return `${day} · ${fmtClock(s.starts_at)}–${fmtClock(s.ends_at)}`;
+    return `${formatDate(s.starts_at)} · ${fmtClock(s.starts_at)}–${fmtClock(s.ends_at)}`;
 }
 
 function Switch({ on, onClick }: { on: boolean; onClick: () => void }) {
@@ -258,7 +258,7 @@ export function NoteWizard({
                 ) : (
                     <>
                         {/* Stepper rail */}
-                        <aside className="hidden w-[252px] shrink-0 flex-col border-r border-border bg-muted/30 p-4 md:flex">
+                        <aside className="hidden w-[248px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar p-4 md:flex">
                             <div className="mb-4 flex items-center gap-2.5">
                                 <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/15 text-primary">
                                     <NotebookPen className="h-4.5 w-4.5" />
@@ -285,8 +285,8 @@ export function NoteWizard({
                                             className={cn(
                                                 'flex items-start gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors',
                                                 active
-                                                    ? 'bg-card shadow-sm'
-                                                    : 'hover:bg-card/60',
+                                                    ? 'bg-primary/10'
+                                                    : 'hover:bg-accent',
                                             )}
                                         >
                                             <span
@@ -349,7 +349,7 @@ export function NoteWizard({
                                     <X className="h-4.5 w-4.5" />
                                 </button>
                             </header>
-                            <div className="h-1 bg-muted">
+                            <div className="h-[3px] shrink-0 bg-muted">
                                 <div
                                     className="h-full bg-primary transition-all"
                                     style={{
@@ -683,7 +683,7 @@ export function NoteWizard({
                             </div>
 
                             {/* Footer */}
-                            <footer className="flex items-center justify-between gap-2 border-t border-border px-5 py-3.5">
+                            <footer className="flex items-center justify-between gap-2 border-t border-border bg-muted/30 px-5 py-3.5">
                                 <div>
                                     {stepIndex > 0 ? (
                                         <button
@@ -741,28 +741,6 @@ export function NoteWizard({
                 )}
             </DialogContent>
         </Dialog>
-    );
-}
-
-function StepHead({
-    icon: Icon,
-    title,
-    blurb,
-}: {
-    icon: typeof CalendarRange;
-    title: string;
-    blurb: string;
-}) {
-    return (
-        <div className="flex items-start gap-3">
-            <span className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/15 text-primary">
-                <Icon className="h-5 w-5" />
-            </span>
-            <div>
-                <h2 className="text-[17px] font-bold">{title}</h2>
-                <p className="text-[13px] text-muted-foreground">{blurb}</p>
-            </div>
-        </div>
     );
 }
 
