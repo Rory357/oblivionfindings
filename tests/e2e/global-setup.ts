@@ -3,6 +3,8 @@ import { existsSync, renameSync } from 'node:fs';
 import { dirname, resolve } from 'node:path';
 import { fileURLToPath } from 'node:url';
 
+import { phpRequiresShell, resolvePhpBinary } from './php-binary';
+
 /**
  * Playwright global setup.
  *
@@ -51,12 +53,15 @@ async function globalSetup(): Promise<void> {
         return;
     }
 
+    console.log(`[playwright global-setup] using PHP binary: ${phpBin}`);
+
     try {
-        // Use `shell: true` so Windows .bat shims (Herd ships php.bat) work.
-        // execFileSync without shell mode cannot exec .bat files; the result
-        // is an opaque "spawn ENOENT" with no useful message.
-        const useShell =
-            phpBin.toLowerCase().endsWith('.bat') || phpBin === 'php';
+        // resolvePhpBinary unwraps Herd's php.bat shim to the php.exe it
+        // wraps so we can spawn without a shell — cmd.exe shell mode joins
+        // arguments unquoted and mangles them. Shell mode remains only for
+        // bare `php` (PATH lookup) or a .bat that couldn't be unwrapped,
+        // which execFileSync cannot exec directly.
+        const useShell = phpRequiresShell(phpBin);
         const seederClasses = [
             'RbacSeeder',
             // Module permission seeders define keys (e.g. `rostering.publish`)
@@ -104,44 +109,20 @@ async function globalSetup(): Promise<void> {
         }
     } catch (error) {
         const message = error instanceof Error ? error.message : String(error);
-        const stderr =
-            error && typeof error === 'object' && 'stderr' in error
-                ? String((error as { stderr?: unknown }).stderr ?? '')
-                : '';
+        // artisan renders exceptions to stdout, not stderr — without stdout
+        // a failed seeder reports an unactionable "Command failed: …".
+        const { stdout, stderr } = (error ?? {}) as {
+            stdout?: unknown;
+            stderr?: unknown;
+        };
+        const detail = [message, stdout, stderr]
+            .map((part) => String(part ?? '').trim())
+            .filter(Boolean)
+            .join('\n');
         console.error(
-            `[playwright global-setup] failed to re-seed rostering demo data — tests may fail if fixtures are stale.\n${message}\n${stderr}`,
+            `[playwright global-setup] failed to re-seed rostering demo data — tests may fail if fixtures are stale.\n${detail}`,
         );
     }
-}
-
-/**
- * Locate the PHP binary. Prefers `PHP_BINARY` env var, falls back to common
- * Herd / system locations on Windows + Linux.
- */
-function resolvePhpBinary(): string | null {
-    const explicit = process.env.PHP_BINARY;
-    if (explicit && existsSync(explicit)) {
-        return explicit;
-    }
-
-    const candidates = [
-        // Herd on Windows
-        `${process.env.USERPROFILE ?? ''}\\.config\\herd\\bin\\php.bat`,
-        `${process.env.USERPROFILE ?? ''}\\.config\\herd\\bin\\php.exe`,
-        // Herd on macOS / Linux
-        `${process.env.HOME ?? ''}/.config/herd-lite/bin/php`,
-        `${process.env.HOME ?? ''}/Library/Application Support/Herd/bin/php`,
-        // System PATH fallback
-        'php',
-    ];
-
-    for (const candidate of candidates) {
-        if (candidate && (candidate === 'php' || existsSync(candidate))) {
-            return candidate;
-        }
-    }
-
-    return null;
 }
 
 export default globalSetup;

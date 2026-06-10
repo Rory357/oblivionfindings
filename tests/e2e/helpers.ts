@@ -1,8 +1,10 @@
 import { expect, type Page, type TestInfo } from '@playwright/test';
 import { execFileSync } from 'node:child_process';
-import { existsSync, mkdtempSync, rmSync, writeFileSync } from 'node:fs';
+import { mkdtempSync, rmSync, writeFileSync } from 'node:fs';
 import { tmpdir } from 'node:os';
 import { join } from 'node:path';
+
+import { phpRequiresShell, resolvePhpBinary } from './php-binary';
 
 export const ROSTERING_DEMO_PUBLISH_TARGET = {
     week: '2026-05-04',
@@ -18,27 +20,6 @@ export const ROSTERING_DEMO_SUGGESTION_TARGET = {
     week: '2026-05-11',
     siteId: 9001,
 } as const;
-
-function resolvePhpBinary(): string {
-    const explicit = process.env.PHP_BINARY;
-    if (explicit && existsSync(explicit)) {
-        return explicit;
-    }
-
-    const candidates = [
-        `${process.env.USERPROFILE ?? ''}\\.config\\herd\\bin\\php.bat`,
-        `${process.env.USERPROFILE ?? ''}\\.config\\herd\\bin\\php.exe`,
-        `${process.env.HOME ?? ''}/.config/herd-lite/bin/php`,
-        `${process.env.HOME ?? ''}/Library/Application Support/Herd/bin/php`,
-        'php',
-    ];
-
-    return (
-        candidates.find(
-            (candidate) => candidate === 'php' || existsSync(candidate),
-        ) ?? 'php'
-    );
-}
 
 export function resetMedicationReadinessFixtures() {
     runArtisan(['db:seed', '--class=FrontlineLifecycleDemoSeeder', '--force']);
@@ -165,20 +146,18 @@ export function seedGovernancePrivacyConsentsReadinessFixtures() {
 }
 
 export function runArtisan(args: string[]) {
-    const phpBin = resolvePhpBinary();
-    const useShell = phpBin.toLowerCase().endsWith('.bat') || phpBin === 'php';
+    const phpBin = resolvePhpBinary() ?? 'php';
 
     return execFileSync(phpBin, ['artisan', ...args], {
         cwd: process.cwd(),
         encoding: 'utf8',
         stdio: ['ignore', 'pipe', 'pipe'],
-        shell: useShell,
+        shell: phpRequiresShell(phpBin),
     });
 }
 
 export function runLaravelPhp(code: string) {
-    const phpBin = resolvePhpBinary();
-    const useShell = phpBin.toLowerCase().endsWith('.bat') || phpBin === 'php';
+    const phpBin = resolvePhpBinary() ?? 'php';
     const tempDir = mkdtempSync(join(tmpdir(), 'of-laravel-'));
     const scriptPath = join(tempDir, 'run.php');
 
@@ -199,7 +178,7 @@ export function runLaravelPhp(code: string) {
             cwd: process.cwd(),
             encoding: 'utf8',
             stdio: ['ignore', 'pipe', 'pipe'],
-            shell: useShell,
+            shell: phpRequiresShell(phpBin),
         });
     } finally {
         rmSync(tempDir, { recursive: true, force: true });
