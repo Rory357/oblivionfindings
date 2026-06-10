@@ -43,6 +43,14 @@ Route::middleware([
     // untouched; this is just a fast, frontline-shaped surface for it.
     Route::post('/meds/today/prn', [WorkerMedsController::class, 'recordPrn'])
         ->name('meds.today.prn');
+
+    // Desktop medication board — scheduled-dose recording (Record Dose
+    // wizard) and the PRN follow-up effect check. Both delegate to the same
+    // services as the admin paths; no second administration pipeline.
+    Route::post('/meds/today/record', [WorkerMedsController::class, 'recordDose'])
+        ->name('meds.today.record');
+    Route::post('/meds/today/prn/effect', [WorkerMedsController::class, 'recordPrnEffect'])
+        ->name('meds.today.prn_effect');
 });
 
 Route::middleware(['auth'])->prefix('emar')->group(function () {

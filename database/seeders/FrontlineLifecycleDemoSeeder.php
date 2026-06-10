@@ -985,6 +985,22 @@ class FrontlineLifecycleDemoSeeder extends Seeder
         ], $overrides);
 
         if ($shift) {
+            // A previous demo / e2e run may have approved this fixture
+            // shift's timesheet, which locks payroll-critical fields on the
+            // shift (Shift::updating guard) and breaks the deterministic
+            // re-seed. These PW:* shifts exist only for Playwright, so
+            // quietly un-approve their timesheets before moving the shift.
+            $shift->timesheets()
+                ->where('status', 'approved')
+                ->get()
+                ->each(function (Timesheet $timesheet): void {
+                    $timesheet->forceFill([
+                        'status' => 'submitted',
+                        'approved_at' => null,
+                        'approved_by' => null,
+                    ])->saveQuietly();
+                });
+
             $shift->forceFill($attributes)->save();
         } else {
             $shift = Shift::create($attributes);
