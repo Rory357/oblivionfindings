@@ -266,6 +266,8 @@ export function TilePicker({
         description?: string;
         icon?: IconType;
         accent?: string;
+        /** Optional highlighted line under the description (e.g. eligibility). */
+        meta?: string;
     }[];
     cols?: 2 | 3;
 }) {
@@ -314,6 +316,11 @@ export function TilePicker({
                             {o.description ? (
                                 <span className="mt-0.5 block text-xs leading-snug text-muted-foreground">
                                     {o.description}
+                                </span>
+                            ) : null}
+                            {o.meta ? (
+                                <span className="mt-1 block text-[11px] font-medium text-primary">
+                                    {o.meta}
                                 </span>
                             ) : null}
                         </span>

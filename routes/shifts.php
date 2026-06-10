@@ -106,6 +106,12 @@ Route::middleware(['auth'])->group(function () {
         ->middleware('permission:timesheets.manageAny')
         ->whereNumber('session')
         ->name('attendance.sessions.end');
+    // Correction is broader than end: managers fix anyone's session, workers
+    // their own (the controller enforces ownership for non-managers).
+    Route::post('/attendance/sessions/{session}/correct', [AttendanceController::class, 'correctSession'])
+        ->middleware('permission:timesheets.manageAny|timesheets.create|shifts.viewAssigned|shifts.update|shifts.manageAny')
+        ->whereNumber('session')
+        ->name('attendance.sessions.correct');
     Route::post('/attendance/break/start', [AttendanceController::class, 'startBreak'])
         ->middleware('permission:timesheets.create|shifts.viewAssigned|shifts.update|shifts.manageAny')
         ->name('attendance.break.start');
