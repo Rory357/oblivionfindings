@@ -1,16 +1,21 @@
 <?php
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
-use App\Domain\Hr\Models\HrTimesheet;
+use App\Models\Client;
 use App\Models\Permission;
 use App\Models\Role;
+use App\Models\Timesheet;
 use App\Models\User;
+use Carbon\CarbonImmutable;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
+use Illuminate\Support\Facades\Route;
+use Inertia\Testing\AssertableInertia as Assert;
 
 uses(RefreshDatabase::class);
 
 beforeEach(function () {
-    $this->seed(\Database\Seeders\RbacSeeder::class);
+    $this->seed(RbacSeeder::class);
 });
 
 function hrRoleUser(string $roleName): User
@@ -55,18 +60,31 @@ function hrTimeProfile(User $user, ?User $manager = null): void
     ]);
 }
 
-function hrRouteTimesheet(User $staff, array $overrides = []): HrTimesheet
+function hrSharedOperationsTimesheet(User $staff, array $overrides = []): Timesheet
 {
-    return HrTimesheet::query()->create(array_merge([
-        'tenant_id' => 1,
+    $client = Client::factory()->create([
+        'first_name' => 'Aroha',
+        'last_name' => 'Ngata',
+        'status' => 'active',
+    ]);
+    $startsAt = CarbonImmutable::parse('2026-04-20 09:00:00', config('app.worker_timezone'))->utc();
+    $endsAt = $startsAt->addHours(8);
+
+    return Timesheet::query()->create(array_merge([
         'user_id' => $staff->id,
-        'period_start' => '2026-04-20',
-        'period_end' => '2026-04-26',
+        'client_id' => $client->id,
+        'work_date' => '2026-04-20',
+        'starts_at' => $startsAt,
+        'ends_at' => $endsAt,
+        'break_minutes' => 30,
         'status' => 'submitted',
-        'total_hours' => 8,
         'submitted_at' => now()->subHour(),
         'submitted_by' => $staff->id,
         'created_by' => $staff->id,
+        'client_name_snapshot' => 'Aroha Ngata',
+        'staff_name_snapshot' => $staff->name,
+        'shift_type_snapshot' => 'standard',
+        'coverage_roles_snapshot' => [],
     ], $overrides));
 }
 
@@ -86,83 +104,71 @@ test('hr users can access the hr time dashboard', function () {
         ->assertOk();
 });
 
-test('team approver can approve a direct report hr timesheet', function () {
-    $manager = hrRoleUser('support_worker');
+test('hr time timesheets tab lists the shared operations timesheet rows', function () {
+    $hr = hrRoleUser('hr');
     $staff = hrRoleUser('support_worker');
-    grantHrTimePermission($manager, 'hr.time.approveTeam');
-    grantHrTimePermission($manager, 'hr.time.viewAny');
-    hrTimeProfile($manager);
-    hrTimeProfile($staff, $manager);
-    $timesheet = hrRouteTimesheet($staff);
-
-    $this->actingAs($manager)
-        ->post(route('hr.time.timesheets.approve', $timesheet))
-        ->assertSessionHas('success', 'Timesheet approved.');
-
-    $this->assertDatabaseHas('hr_timesheets', [
-        'id' => $timesheet->id,
-        'status' => 'approved',
-        'approved_by' => $manager->id,
-    ]);
-});
-
-test('team approver cannot approve outside their team', function () {
-    $manager = hrRoleUser('support_worker');
-    $otherManager = hrRoleUser('support_worker');
-    $staff = hrRoleUser('support_worker');
-    grantHrTimePermission($manager, 'hr.time.approveTeam');
-    grantHrTimePermission($manager, 'hr.time.viewAny');
-    hrTimeProfile($manager);
-    hrTimeProfile($otherManager);
-    hrTimeProfile($staff, $otherManager);
-    $timesheet = hrRouteTimesheet($staff);
-
-    $this->actingAs($manager)
-        ->post(route('hr.time.timesheets.approve', $timesheet))
-        ->assertForbidden();
-
-    $this->assertDatabaseHas('hr_timesheets', [
-        'id' => $timesheet->id,
-        'status' => 'submitted',
-        'approved_by' => null,
-    ]);
-});
-
-test('bulk approval cannot include hr timesheets outside reviewer scope', function () {
-    $manager = hrRoleUser('support_worker');
-    $otherManager = hrRoleUser('support_worker');
-    $directReport = hrRoleUser('support_worker');
-    $outsideStaff = hrRoleUser('support_worker');
-    grantHrTimePermission($manager, 'hr.time.approveTeam');
-    grantHrTimePermission($manager, 'hr.time.viewAny');
-    hrTimeProfile($manager);
-    hrTimeProfile($otherManager);
-    hrTimeProfile($directReport, $manager);
-    hrTimeProfile($outsideStaff, $otherManager);
-    $allowed = hrRouteTimesheet($directReport);
-    $blocked = hrRouteTimesheet($outsideStaff);
-
-    $this->actingAs($manager)
-        ->post(route('hr.time.timesheets.bulk-approve'), [
-            'ids' => [$allowed->id, $blocked->id],
-        ])
-        ->assertForbidden();
-
-    $this->assertDatabaseHas('hr_timesheets', ['id' => $allowed->id, 'status' => 'submitted']);
-    $this->assertDatabaseHas('hr_timesheets', ['id' => $blocked->id, 'status' => 'submitted']);
-});
-
-test('staff cannot submit another users hr timesheet', function () {
-    $staff = hrRoleUser('support_worker');
-    $otherStaff = hrRoleUser('support_worker');
-    grantHrTimePermission($staff, 'hr.time.viewAny');
+    hrTimeProfile($hr);
     hrTimeProfile($staff);
-    hrTimeProfile($otherStaff);
-    $timesheet = hrRouteTimesheet($otherStaff, ['status' => 'draft', 'submitted_at' => null, 'submitted_by' => null]);
 
-    $this->actingAs($staff)
-        ->post(route('hr.time.timesheets.submit', $timesheet))
-        ->assertForbidden();
+    $timesheet = hrSharedOperationsTimesheet($staff, [
+        'status' => 'draft',
+        'submitted_at' => null,
+        'submitted_by' => null,
+    ]);
+
+    $this->actingAs($hr)
+        ->get('/hr/time?tab=timesheets')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('hr/time/index')
+            ->where('timesheets.data.0.id', $timesheet->id)
+            ->where('timesheets.data.0.source', 'operations')
+            ->where('timesheets.data.0.module_url', '/operations/timesheets?view='.$timesheet->id)
+            ->where('timesheets.data.0.user_name', $staff->name)
+        );
+});
+
+test('hr time approval queue lists submitted operations timesheets', function () {
+    $hr = hrRoleUser('hr');
+    $staff = hrRoleUser('support_worker');
+    hrTimeProfile($hr);
+    hrTimeProfile($staff);
+
+    $timesheet = hrSharedOperationsTimesheet($staff);
+
+    $this->actingAs($hr)
+        ->get('/hr/time?tab=approvals')
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('hr/time/index')
+            ->where('pendingApprovalCount', 1)
+            ->where('kpiStats.pending_timesheets', 1)
+            ->where('approvalTimesheets.0.id', $timesheet->id)
+            ->where('approvalTimesheets.0.source', 'operations')
+            ->where('approvalTimesheets.0.module_url', '/operations/timesheets?tab=submitted&view='.$timesheet->id)
+        );
+});
+
+test('legacy hr timesheet workflow routes are removed', function () {
+    foreach ([
+        'hr.time.timesheets.submit',
+        'hr.time.timesheets.approve',
+        'hr.time.timesheets.reject',
+        'hr.time.timesheets.return',
+        'hr.time.timesheets.bulk-approve',
+        'hr.time.timesheets.bulk-reject',
+        'hr.time.timesheets.bulk-return',
+    ] as $routeName) {
+        expect(Route::getRoutes()->getByName($routeName))->toBeNull();
+    }
+});
+
+test('hr time frontend links to operations timesheets instead of posting to legacy hr endpoints', function () {
+    $source = file_get_contents(resource_path('js/pages/hr/time/index.tsx'));
+
+    expect($source)->not->toContain('/hr/time/timesheets/');
+    expect($source)->not->toContain('/hr/time/timesheets/bulk-');
+    expect($source)->toContain('/operations/timesheets');
 });
 
 test('hr clock out rejects break_minutes above the shared 240 cap', function () {

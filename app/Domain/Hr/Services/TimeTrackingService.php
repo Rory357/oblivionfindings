@@ -5,7 +5,7 @@ namespace App\Domain\Hr\Services;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrTimeEntry;
 use App\Domain\Hr\Models\HrTimeEntryAmendment;
-use App\Domain\Hr\Models\HrTimesheet;
+use App\Domain\Shifts\Timesheets\Drafts\DraftTimesheetService;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Facades\DB;
@@ -14,6 +14,7 @@ class TimeTrackingService
 {
     public function __construct(
         private readonly AttendanceService $attendanceService,
+        private readonly DraftTimesheetService $draftTimesheets,
     ) {}
 
     /**
@@ -114,57 +115,43 @@ class TimeTrackingService
     public function createManualEntry(User $user, array $data): HrTimeEntry
     {
         $tenantId = $this->resolveTenantId($user);
-        $clockIn = Carbon::parse($data['clock_in']);
-        $clockOut = Carbon::parse($data['clock_out']);
+        $clockInLocal = $this->parseWorkerLocalDateTime($data['clock_in']);
+        $clockOutLocal = $this->parseWorkerLocalDateTime($data['clock_out']);
+        $clockIn = $clockInLocal->copy()->utc();
+        $clockOut = $clockOutLocal->copy()->utc();
         $breakMinutes = (int) ($data['break_minutes'] ?? 0);
         $totalMinutes = $clockIn->diffInMinutes($clockOut) - $breakMinutes;
         $totalHours = max(0, round($totalMinutes / 60, 2));
 
-        return HrTimeEntry::create([
-            'tenant_id' => $tenantId,
-            'user_id' => $data['user_id'] ?? $user->id,
-            'entry_date' => $clockIn->toDateString(),
-            'clock_in' => $clockIn,
-            'clock_out' => $clockOut,
-            'break_minutes' => $breakMinutes,
-            'total_hours' => $totalHours,
-            'entry_type' => 'manual',
-            'status' => 'submitted',
-            'notes' => $data['notes'] ?? null,
-            'project_code' => $data['project_code'] ?? null,
-            'cost_centre' => $data['cost_centre'] ?? null,
-            'created_by' => $user->id,
-        ]);
-    }
+        return DB::transaction(function () use ($tenantId, $data, $user, $clockInLocal, $clockIn, $clockOut, $breakMinutes, $totalHours) {
+            $entry = HrTimeEntry::create([
+                'tenant_id' => $tenantId,
+                'user_id' => $data['user_id'] ?? $user->id,
+                'shift_id' => $data['shift_id'] ?? null,
+                'site_id' => $data['site_id'] ?? null,
+                'client_id' => $data['client_id'] ?? null,
+                'entry_date' => $clockInLocal->toDateString(),
+                'clock_in' => $clockIn,
+                'clock_out' => $clockOut,
+                'break_minutes' => $breakMinutes,
+                'total_hours' => $totalHours,
+                'entry_type' => 'manual',
+                'status' => 'submitted',
+                'notes' => $data['notes'] ?? null,
+                'project_code' => $data['project_code'] ?? null,
+                'cost_centre' => $data['cost_centre'] ?? null,
+                'pay_type' => $data['pay_type'] ?? 'standard',
+                'is_sleepover' => (bool) ($data['is_sleepover'] ?? false),
+                'is_on_call' => (bool) ($data['is_on_call'] ?? false),
+                'is_public_holiday' => (bool) ($data['is_public_holiday'] ?? false),
+                'mileage_km' => $data['mileage_km'] ?? null,
+                'created_by' => $user->id,
+            ]);
 
-    /**
-     * Submit a timesheet for approval.
-     */
-    public function submitTimesheet(HrTimesheet $timesheet, User $user): HrTimesheet
-    {
-        return app(HrTimesheetApprovalService::class)
-            ->submit($timesheet, $user)
-            ->timesheet;
-    }
+            $this->draftTimesheets->fromManualEntry($entry->fresh(), $user->id);
 
-    /**
-     * Approve a submitted timesheet.
-     */
-    public function approveTimesheet(HrTimesheet $timesheet, User $approver): HrTimesheet
-    {
-        return app(HrTimesheetApprovalService::class)
-            ->approve($timesheet, $approver)
-            ->timesheet;
-    }
-
-    /**
-     * Reject a submitted timesheet.
-     */
-    public function rejectTimesheet(HrTimesheet $timesheet, User $reviewer, string $reason): HrTimesheet
-    {
-        return app(HrTimesheetApprovalService::class)
-            ->reject($timesheet, $reviewer, $reason)
-            ->timesheet;
+            return $entry->fresh();
+        });
     }
 
     /**
@@ -256,11 +243,12 @@ class TimeTrackingService
 
             // Parse time fields
             if (isset($data['clock_in'])) {
-                $data['clock_in'] = Carbon::parse($data['clock_in']);
-                $data['entry_date'] = $data['clock_in']->toDateString();
+                $clockInLocal = $this->parseWorkerLocalDateTime($data['clock_in']);
+                $data['clock_in'] = $clockInLocal->copy()->utc();
+                $data['entry_date'] = $clockInLocal->toDateString();
             }
             if (isset($data['clock_out'])) {
-                $data['clock_out'] = Carbon::parse($data['clock_out']);
+                $data['clock_out'] = $this->parseWorkerLocalDateTime($data['clock_out'])->utc();
             }
 
             // Recalculate hours if times changed
@@ -285,7 +273,12 @@ class TimeTrackingService
 
             $entry->update($data);
 
-            return $entry->fresh();
+            $freshEntry = $entry->fresh();
+            if ($freshEntry->clock_out && ! $freshEntry->attendance_session_id) {
+                $this->draftTimesheets->fromManualEntry($freshEntry, $editor->id);
+            }
+
+            return $freshEntry;
         });
     }
 
@@ -303,8 +296,10 @@ class TimeTrackingService
             throw new \LogicException('You can only clock on behalf of your direct reports.');
         }
 
-        $clockIn = Carbon::parse($data['clock_in']);
-        $clockOut = isset($data['clock_out']) ? Carbon::parse($data['clock_out']) : null;
+        $clockInLocal = $this->parseWorkerLocalDateTime($data['clock_in']);
+        $clockOutLocal = isset($data['clock_out']) ? $this->parseWorkerLocalDateTime($data['clock_out']) : null;
+        $clockIn = $clockInLocal->copy()->utc();
+        $clockOut = $clockOutLocal?->copy()->utc();
         $breakMinutes = (int) ($data['break_minutes'] ?? 0);
 
         $totalHours = null;
@@ -317,62 +312,47 @@ class TimeTrackingService
             $breakCompliant = $breakMinutes >= $requiredBreak;
         }
 
-        return HrTimeEntry::create([
-            'tenant_id' => $tenantId,
-            'user_id' => $targetUserId,
-            'shift_id' => $data['shift_id'] ?? null,
-            'client_id' => $data['client_id'] ?? null,
-            'entry_date' => $clockIn->toDateString(),
-            'clock_in' => $clockIn,
-            'clock_out' => $clockOut,
-            'break_minutes' => $breakMinutes,
-            'total_hours' => $totalHours,
-            'entry_type' => 'admin_clock',
-            'status' => $clockOut ? 'submitted' : 'active',
-            'pay_type' => $data['pay_type'] ?? 'standard',
-            'is_sleepover' => (bool) ($data['is_sleepover'] ?? false),
-            'is_on_call' => (bool) ($data['is_on_call'] ?? false),
-            'mileage_km' => $data['mileage_km'] ?? null,
-            'break_compliance_met' => $breakCompliant,
-            'notes' => $data['notes'] ?? null,
-            'created_by' => $manager->id,
-        ]);
+        return DB::transaction(function () use ($tenantId, $targetUserId, $data, $clockInLocal, $clockIn, $clockOut, $breakMinutes, $totalHours, $breakCompliant, $manager) {
+            $entry = HrTimeEntry::create([
+                'tenant_id' => $tenantId,
+                'user_id' => $targetUserId,
+                'shift_id' => $data['shift_id'] ?? null,
+                'site_id' => $data['site_id'] ?? null,
+                'client_id' => $data['client_id'] ?? null,
+                'entry_date' => $clockInLocal->toDateString(),
+                'clock_in' => $clockIn,
+                'clock_out' => $clockOut,
+                'break_minutes' => $breakMinutes,
+                'total_hours' => $totalHours,
+                'entry_type' => 'admin_clock',
+                'status' => $clockOut ? 'submitted' : 'active',
+                'pay_type' => $data['pay_type'] ?? 'standard',
+                'is_sleepover' => (bool) ($data['is_sleepover'] ?? false),
+                'is_on_call' => (bool) ($data['is_on_call'] ?? false),
+                'is_public_holiday' => (bool) ($data['is_public_holiday'] ?? false),
+                'mileage_km' => $data['mileage_km'] ?? null,
+                'break_compliance_met' => $breakCompliant,
+                'notes' => $data['notes'] ?? null,
+                'created_by' => $manager->id,
+            ]);
+
+            if ($clockOut) {
+                $this->draftTimesheets->fromManualEntry($entry->fresh(), $manager->id);
+            }
+
+            return $entry->fresh();
+        });
     }
 
-    /* ------------------------------------------------------------------ */
-    /*  Return timesheet for changes */
-    /* ------------------------------------------------------------------ */
-
-    public function returnTimesheet(HrTimesheet $timesheet, User $reviewer, string $notes): HrTimesheet
+    private function parseWorkerLocalDateTime(mixed $value): Carbon
     {
-        return app(HrTimesheetApprovalService::class)
-            ->returnForChanges($timesheet, $reviewer, $notes)
-            ->timesheet;
-    }
+        $timezone = (string) config('app.worker_timezone', config('app.timezone', 'UTC'));
 
-    /* ------------------------------------------------------------------ */
-    /*  Bulk timesheet actions */
-    /* ------------------------------------------------------------------ */
+        if ($value instanceof \DateTimeInterface) {
+            return Carbon::instance($value)->setTimezone($timezone);
+        }
 
-    public function bulkApproveTimesheets(array $ids, User $approver, ?string $notes = null): int
-    {
-        return app(HrTimesheetApprovalService::class)
-            ->bulkApprove(HrTimesheet::query()->whereIn('id', $ids)->get(), $approver, $notes)
-            ->changedCount();
-    }
-
-    public function bulkRejectTimesheets(array $ids, User $reviewer, string $reason): int
-    {
-        return app(HrTimesheetApprovalService::class)
-            ->bulkReject(HrTimesheet::query()->whereIn('id', $ids)->get(), $reviewer, $reason)
-            ->changedCount();
-    }
-
-    public function bulkReturnTimesheets(array $ids, User $reviewer, string $notes): int
-    {
-        return app(HrTimesheetApprovalService::class)
-            ->bulkReturn(HrTimesheet::query()->whereIn('id', $ids)->get(), $reviewer, $notes)
-            ->changedCount();
+        return Carbon::parse((string) $value, $timezone);
     }
 
     private function resolveTenantId(User $user): int

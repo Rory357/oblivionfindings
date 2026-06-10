@@ -302,3 +302,43 @@ Then live-verify: `/hr/orgchart`, `/training/matrix`, `/hr/settings/webhooks` as
 - A payroll engine — export-to-provider remains the model.
 - Dusk/browser suite changes beyond what P0-2 forces.
 - The `/hr/feed`, wellbeing survey audience-scoping, and report subscription internals — reviewed, no defects found worth scheduling; revisit only if QA surfaces issues.
+
+---
+
+## §9 Codex implementation close-out (2026-06-10)
+
+### Scope completed
+
+- P0-1 through P0-4 implemented: HR permission seed coverage/backfills, legacy HR timesheet approval surface removal, report-builder save wiring, and people CSV export wiring.
+- P1-1 through P1-9 implemented: recruitment conversion roles/invite, training-compliance bridge, manual HR time-entry to operations-timesheet bridge, NZ public holidays, announcement/onboarding notifications, e-signature request permission gate, HR record-retention delete restrictions, protected HR API endpoints, and worker-local leave date parsing.
+- P2-1 through P2-8 implemented: HR `en-NZ` locale sweep, orphan page routes, permission-key cleanup, hermetic rostering feature flags in `phpunit.xml`, recruitment dead prop removal, core HR model factories, `HrDemoSeeder`, and exit-interview route/controller permission simplification.
+- Legacy HR timesheet application layer removed: workflow service/result/request/notification/test/pages and the unused `HrTimesheet` model are gone; operations timesheets are the remaining approval/payroll path.
+
+### Verification passed
+
+```bash
+vendor\bin\pint --dirty
+php artisan test tests/Feature/Hr --env=testing
+php artisan test tests/Feature/PermissionDefinitionCoverageTest.php --env=testing
+php artisan test tests/Feature/Hr/HrTimeTrackingAuthorizationTest.php --env=testing
+php artisan wayfinder:generate
+npm run types
+npm run build
+rg -n "en-GB" resources/js/pages/hr
+rg -n "\bHrTimesheet\b|hr_timesheets" app routes resources tests database/seeders -S
+```
+
+Results:
+
+- `php artisan test tests/Feature/Hr --env=testing`: 109 passed, 1164 assertions.
+- `PermissionDefinitionCoverageTest`: 6 passed, 15 assertions.
+- `HrTimeTrackingAuthorizationTest`: 7 passed, 52 assertions after deleting the dead `HrTimesheet` model.
+- `npm run types` initially failed because generated `@/routes` modules were missing; `php artisan wayfinder:generate` refreshed `resources/js/actions` and `resources/js/routes`, and the rerun passed.
+- `npm run build` passed.
+- `en-GB` grep returned no HR-page matches.
+- Legacy HR timesheet grep returned no application/test/seeder matches outside migrations.
+
+### Review boundary
+
+- Live deployment and the deploy runbook in §6 are not executed in this worktree.
+- The statutory/regulatory gaps listed in §5A remain future work unless separately requested.

@@ -8,8 +8,8 @@ use App\Domain\Hr\Models\HrOffboardingTask;
 use App\Domain\Hr\Models\HrOnboardingChecklist;
 use App\Domain\Hr\Models\HrOnboardingTask;
 use App\Domain\Hr\Models\HrOnboardingTemplate;
+use App\Domain\Hr\Notifications\OnboardingChecklistAssignedNotification;
 use App\Domain\Hr\Notifications\OnboardingTaskAssignedNotification;
-use App\Domain\Hr\Services\HrWebhookService;
 use App\Models\AssetAssignment;
 use App\Models\User;
 use Carbon\Carbon;
@@ -26,9 +26,7 @@ class OnboardingService
      * creates an HrOnboardingChecklist with individual HrOnboardingTask rows cloned
      * from the template's tasks JSON.
      *
-     * @param  HrEmployeeProfile  $profile
-     * @param  int                $createdBy  User ID initiating the onboarding
-     * @return HrOnboardingChecklist
+     * @param  int  $createdBy  User ID initiating the onboarding
      *
      * @throws \RuntimeException If no active template matches the employee's role
      */
@@ -127,6 +125,19 @@ class OnboardingService
                 }
             }
 
+            $subjectUser = $profile->user;
+            if ($subjectUser) {
+                try {
+                    $subjectUser->notify(new OnboardingChecklistAssignedNotification($checklist->fresh('tasks')));
+                } catch (\Throwable $exception) {
+                    Log::warning('Failed to notify onboarding checklist subject', [
+                        'checklist_id' => $checklist->id,
+                        'user_id' => $subjectUser->id,
+                        'error' => $exception->getMessage(),
+                    ]);
+                }
+            }
+
             return $checklist->load('tasks');
         });
     }
@@ -137,10 +148,8 @@ class OnboardingService
      * Validates the task belongs to an active checklist, records evidence if
      * provided, and checks whether the entire checklist is now complete.
      *
-     * @param  HrOnboardingTask  $task
-     * @param  int               $completedBy  User ID completing the task
-     * @param  array             $data         Optional data: evidence_path, notes, signed_off_by
-     * @return HrOnboardingTask
+     * @param  int  $completedBy  User ID completing the task
+     * @param  array  $data  Optional data: evidence_path, notes, signed_off_by
      *
      * @throws \LogicException If task is already completed or checklist is not active
      */
@@ -247,10 +256,8 @@ class OnboardingService
      * Creates an HrOffboardingChecklist with standard departure tasks
      * (IT access revocation, equipment return, exit interview, etc.).
      *
-     * @param  HrEmployeeProfile  $profile
-     * @param  int                $createdBy   User ID initiating the offboarding
-     * @param  array              $options     Optional overrides: end_date, termination_reason
-     * @return HrOffboardingChecklist
+     * @param  int  $createdBy  User ID initiating the offboarding
+     * @param  array  $options  Optional overrides: end_date, termination_reason
      */
     public function generateOffboardingChecklist(HrEmployeeProfile $profile, int $createdBy, array $options = []): HrOffboardingChecklist
     {
@@ -259,7 +266,7 @@ class OnboardingService
             $offboardingTemplate = HrOnboardingTemplate::query()
                 ->forTenant($profile->tenant_id)
                 ->active()
-                ->where('role', 'offboarding:' . $profile->position_role)
+                ->where('role', 'offboarding:'.$profile->position_role)
                 ->first();
 
             $checklist = HrOffboardingChecklist::create([
@@ -341,13 +348,13 @@ class OnboardingService
                 foreach ($activeAssignments as $assignment) {
                     $assetName = trim((string) ($assignment->asset?->name ?? 'Assigned asset'));
                     $assetMeta = collect([
-                        $assignment->asset?->asset_tag ? 'Tag ' . $assignment->asset->asset_tag : null,
-                        $assignment->asset?->serial_number ? 'Serial ' . $assignment->asset->serial_number : null,
+                        $assignment->asset?->asset_tag ? 'Tag '.$assignment->asset->asset_tag : null,
+                        $assignment->asset?->serial_number ? 'Serial '.$assignment->asset->serial_number : null,
                     ])->filter()->implode(', ');
 
                     $description = 'Recover this assigned asset as part of offboarding.';
                     if ($assetMeta !== '') {
-                        $description .= ' ' . $assetMeta . '.';
+                        $description .= ' '.$assetMeta.'.';
                     }
 
                     $assetTask = HrOffboardingTask::create([
@@ -380,7 +387,6 @@ class OnboardingService
     /**
      * Get the progress summary for a checklist.
      *
-     * @param  HrOnboardingChecklist|HrOffboardingChecklist  $checklist
      * @return array{total: int, completed: int, pending: int, percent: float}
      */
     public function getProgress(HrOnboardingChecklist|HrOffboardingChecklist $checklist): array

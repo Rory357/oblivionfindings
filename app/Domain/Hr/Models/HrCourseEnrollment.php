@@ -5,6 +5,7 @@ namespace App\Domain\Hr\Models;
 use App\Domain\Finance\Models\FinJournal;
 use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
+use Database\Factories\Hr\HrCourseEnrollmentFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -12,7 +13,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class HrCourseEnrollment extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory;
+
+    protected static function newFactory()
+    {
+        return HrCourseEnrollmentFactory::new();
+    }
 
     protected $fillable = [
         'tenant_id',
@@ -35,7 +41,7 @@ class HrCourseEnrollment extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function user(): BelongsTo
@@ -59,7 +65,7 @@ class HrCourseEnrollment extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Scopes                                                             */
+    /*  Scopes */
     /* ------------------------------------------------------------------ */
 
     public function scopeForTenant(Builder $query, ?int $tenantId): Builder

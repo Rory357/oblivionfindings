@@ -133,7 +133,7 @@ const formatDate = (value?: string | null) => {
     const date = new Date(value);
     return Number.isNaN(date.getTime())
         ? value
-        : date.toLocaleDateString('en-GB', {
+        : date.toLocaleDateString('en-NZ', {
               day: '2-digit',
               month: 'short',
               year: 'numeric',
@@ -145,7 +145,7 @@ const formatDateTime = (value?: string | null) => {
     const date = new Date(value);
     return Number.isNaN(date.getTime())
         ? value
-        : date.toLocaleDateString('en-GB', {
+        : date.toLocaleDateString('en-NZ', {
               day: '2-digit',
               month: 'short',
               year: 'numeric',

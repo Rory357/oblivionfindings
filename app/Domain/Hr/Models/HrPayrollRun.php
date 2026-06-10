@@ -4,6 +4,7 @@ namespace App\Domain\Hr\Models;
 
 use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
+use Database\Factories\Hr\HrPayrollRunFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -12,7 +13,12 @@ use Illuminate\Database\Eloquent\Relations\HasMany;
 
 class HrPayrollRun extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory;
+
+    protected static function newFactory()
+    {
+        return HrPayrollRunFactory::new();
+    }
 
     protected $fillable = [
         'tenant_id',
@@ -55,7 +61,7 @@ class HrPayrollRun extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function items(): HasMany
@@ -83,8 +89,13 @@ class HrPayrollRun extends Model
         return $this->belongsTo(HrPayrollExportProfile::class, 'export_profile_id');
     }
 
+    public function creator(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
     /* ------------------------------------------------------------------ */
-    /*  Scopes                                                             */
+    /*  Scopes */
     /* ------------------------------------------------------------------ */
 
     public function scopeForTenant(Builder $query, ?int $tenantId): Builder

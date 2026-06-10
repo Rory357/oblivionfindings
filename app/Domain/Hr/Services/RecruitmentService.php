@@ -4,10 +4,13 @@ namespace App\Domain\Hr\Services;
 
 use App\Domain\Hr\Models\HrApplication;
 use App\Domain\Hr\Models\HrCandidate;
+use App\Domain\Hr\Models\HrDocument;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrOffer;
+use App\Models\Role;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 
 class RecruitmentService
@@ -211,16 +214,43 @@ class RecruitmentService
         return DB::transaction(function () use ($candidate, $offer, $convertedBy) {
             $candidate->loadMissing('documents');
             $workEmail = $offer->work_email ?: $candidate->personal_email;
+            $roleName = $offer->position_role ?: 'support_worker';
             $user = User::query()->firstOrCreate(
                 ['email' => $workEmail],
                 [
                     'name' => $candidate->full_name,
-                    'role' => $offer->position_role ?: 'support_worker',
+                    'role' => $roleName,
                     'password' => bcrypt(Str::random(40)),
                     'approved_at' => now(),
                     'approved_by' => $convertedBy,
                 ]
             );
+
+            $existingProfile = HrEmployeeProfile::query()->where('user_id', $user->id)->first();
+            if (
+                $existingProfile
+                && $existingProfile->candidate_id
+                && (int) $existingProfile->candidate_id !== (int) $candidate->id
+            ) {
+                throw new \LogicException('This email is already linked to another converted candidate.');
+            }
+
+            $updates = [];
+            if (! $user->role) {
+                $updates['role'] = $roleName;
+            }
+            if (! $user->approved_at) {
+                $updates['approved_at'] = now();
+                $updates['approved_by'] = $convertedBy;
+            }
+            if ($updates !== []) {
+                $user->forceFill($updates)->save();
+            }
+
+            $role = Role::query()->where('name', $roleName)->first();
+            if ($role) {
+                $user->roles()->syncWithoutDetaching([$role->id]);
+            }
 
             $profile = HrEmployeeProfile::query()->updateOrCreate(
                 ['user_id' => $user->id],
@@ -254,6 +284,8 @@ class RecruitmentService
 
             $this->onboardingService->generateChecklist($profile, $convertedBy);
 
+            Password::broker()->sendResetLink(['email' => $user->email]);
+
             return $profile->fresh();
         });
     }
@@ -283,10 +315,10 @@ class RecruitmentService
         ];
 
         foreach ($candidateDocs as $doc) {
-            \App\Domain\Hr\Models\HrDocument::create([
+            HrDocument::create([
                 'tenant_id' => $profile->tenant_id,
                 'employee_profile_id' => $profile->id,
-                'title' => $doc->title ?: ($doc->category_label . ' - ' . $doc->original_name),
+                'title' => $doc->title ?: ($doc->category_label.' - '.$doc->original_name),
                 'category' => $categoryMap[$doc->category] ?? 'other',
                 'folder' => 'Recruitment',
                 'storage_disk' => 'private',
@@ -392,6 +424,6 @@ class RecruitmentService
         $prefix = (string) config('hr.employee_number_prefix', 'EMP');
         $latestId = (int) (HrEmployeeProfile::query()->max('id') ?? 0) + 1;
 
-        return $prefix . str_pad((string) $latestId, 5, '0', STR_PAD_LEFT);
+        return $prefix.str_pad((string) $latestId, 5, '0', STR_PAD_LEFT);
     }
 }

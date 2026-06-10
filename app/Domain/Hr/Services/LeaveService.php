@@ -14,6 +14,7 @@ use App\Models\StaffTimeOff;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Notifications\Notification;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Log;
@@ -41,9 +42,7 @@ class LeaveService
      * If insufficient balance, the request is still created but flagged for
      * escalation. Pending hours are incremented on the balance record.
      *
-     * @param  User   $user
      * @param  array  $data  Request attributes: leave_type, starts_at, ends_at, hours_requested, reason, supporting_doc_path
-     * @return HrLeaveRequest
      *
      * @throws \InvalidArgumentException If leave_type is invalid or dates are malformed
      */
@@ -55,8 +54,11 @@ class LeaveService
         }
 
         try {
-            $startsAt = Carbon::parse($data['starts_at'])->startOfDay();
-            $endsAt = Carbon::parse($data['ends_at'])->endOfDay();
+            $timezone = (string) config('app.worker_timezone', config('app.timezone', 'UTC'));
+            $localStartsAt = Carbon::parse($data['starts_at'], $timezone)->startOfDay();
+            $localEndsAt = Carbon::parse($data['ends_at'], $timezone)->endOfDay();
+            $startsAt = $localStartsAt->copy()->utc();
+            $endsAt = $localEndsAt->copy()->utc();
         } catch (\Throwable) {
             throw new \InvalidArgumentException('Leave dates are invalid.');
         }
@@ -67,7 +69,7 @@ class LeaveService
 
         $hoursRequested = isset($data['hours_requested']) && (float) $data['hours_requested'] > 0
             ? (float) $data['hours_requested']
-            : $this->calculateRequestedHours($user, $startsAt, $endsAt);
+            : $this->calculateRequestedHours($user, $localStartsAt, $localEndsAt);
 
         if ($hoursRequested <= 0) {
             throw new \InvalidArgumentException('Requested leave hours must be greater than zero.');
@@ -86,8 +88,8 @@ class LeaveService
             throw new \InvalidArgumentException('Leave request overlaps with an existing pending or approved leave request.');
         }
 
-        return DB::transaction(function () use ($user, $data, $leaveType, $startsAt, $endsAt, $hoursRequested) {
-            $year = $startsAt->year;
+        return DB::transaction(function () use ($user, $data, $leaveType, $localStartsAt, $startsAt, $endsAt, $hoursRequested) {
+            $year = $localStartsAt->year;
             $tenantId = $this->resolveTenantId($user, $data['tenant_id'] ?? null);
             $balance = $this->ensureBalanceRecord($user, $leaveType, $year, false, $tenantId);
             $before = $this->snapshotBalance($balance);
@@ -160,10 +162,6 @@ class LeaveService
      * Converts pending hours to used hours on the balance, creates a
      * StaffTimeOff record for roster integration, and notifies the employee.
      *
-     * @param  HrLeaveRequest  $request
-     * @param  User            $reviewer
-     * @param  string|null     $reviewNotes
-     * @return HrLeaveRequest
      *
      * @throws \LogicException If request is not in 'pending' status
      */
@@ -174,7 +172,8 @@ class LeaveService
         }
 
         return DB::transaction(function () use ($request, $reviewer, $reviewNotes) {
-            $year = Carbon::parse($request->starts_at)->year;
+            $timezone = (string) config('app.worker_timezone', config('app.timezone', 'UTC'));
+            $year = Carbon::parse($request->starts_at)->setTimezone($timezone)->year;
             $requestUser = $request->user ?: User::query()->findOrFail($request->user_id);
             $balance = $this->ensureBalanceRecord(
                 $requestUser,
@@ -241,10 +240,6 @@ class LeaveService
      * Releases pending hours back to available balance and notifies
      * the employee with the decline reason.
      *
-     * @param  HrLeaveRequest  $request
-     * @param  User            $reviewer
-     * @param  string          $reason
-     * @return HrLeaveRequest
      *
      * @throws \LogicException If request is not in 'pending' status
      */
@@ -302,9 +297,6 @@ class LeaveService
      * Returns accrued, used, pending, and available hours. If no balance record
      * exists, returns zeroes.
      *
-     * @param  int     $userId
-     * @param  string  $leaveType
-     * @param  int     $year
      * @return array{accrued: float, used: float, pending: float, available: float}
      */
     public function calculateBalance(int $userId, string $leaveType, int $year): array
@@ -337,9 +329,7 @@ class LeaveService
     /**
      * Cancel a pending or approved leave request.
      *
-     * @param  HrLeaveRequest  $request
-     * @param  int             $cancelledBy  User ID
-     * @return HrLeaveRequest
+     * @param  int  $cancelledBy  User ID
      *
      * @throws \LogicException If request is already cancelled or declined
      */
@@ -397,8 +387,7 @@ class LeaveService
     /**
      * Determine the escalation target for a leave request that exceeds balance.
      *
-     * @param  User  $user
-     * @return int|null  User ID of the escalation target, or null
+     * @return int|null User ID of the escalation target, or null
      */
     protected function getEscalationTarget(User $user): ?int
     {
@@ -520,8 +509,7 @@ class LeaveService
             ->count();
 
         $dueSoonCount = $pendingRows
-            ->filter(fn (HrLeaveRequest $request) =>
-                $request->approval_due_at &&
+            ->filter(fn (HrLeaveRequest $request) => $request->approval_due_at &&
                 $request->approval_due_at->between(now(), now()->copy()->addDay())
             )
             ->count();
@@ -775,7 +763,8 @@ class LeaveService
         ];
 
         try {
-            $user->notify(new class($payload) extends \Illuminate\Notifications\Notification {
+            $user->notify(new class($payload) extends Notification
+            {
                 public function __construct(private readonly array $payload) {}
 
                 public function via(object $notifiable): array

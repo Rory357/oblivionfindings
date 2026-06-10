@@ -8,7 +8,6 @@ use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrOnboardingTask;
 use App\Domain\Hr\Models\HrPerformanceReview;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
-use App\Domain\Hr\Models\HrTimesheet;
 use App\Domain\Hr\Notifications\ComplianceExpiryNotification;
 use App\Domain\Hr\Notifications\ExpenseApprovedNotification;
 use App\Domain\Hr\Notifications\ExpenseSubmittedNotification;
@@ -18,8 +17,8 @@ use App\Domain\Hr\Notifications\LeaveDeclinedNotification;
 use App\Domain\Hr\Notifications\LeaveRequestNotification;
 use App\Domain\Hr\Notifications\OnboardingTaskAssignedNotification;
 use App\Domain\Hr\Notifications\PerformanceReviewDueNotification;
-use App\Domain\Hr\Notifications\TimesheetSubmittedNotification;
 use App\Models\User;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 
 class HrNotificationService
@@ -222,31 +221,6 @@ class HrNotificationService
     }
 
     /**
-     * Notify approvers about a submitted timesheet.
-     */
-    public function notifyTimesheetSubmitted(HrTimesheet $timesheet): void
-    {
-        $timesheet->loadMissing('user');
-
-        $approvers = $this->getUsersWithPermission([
-            'timesheets.manageAny',
-            'timesheets.approve',
-        ], $timesheet->tenant_id);
-
-        foreach ($approvers as $approver) {
-            try {
-                $approver->notify(new TimesheetSubmittedNotification($timesheet));
-            } catch (\Throwable $e) {
-                Log::warning('Failed to send timesheet submitted notification', [
-                    'timesheet_id' => $timesheet->id,
-                    'approver_id' => $approver->id,
-                    'error' => $e->getMessage(),
-                ]);
-            }
-        }
-    }
-
-    /**
      * Notify the manager when an employee completes a goal.
      */
     public function notifyGoalCompleted(HrGoal $goal): void
@@ -283,7 +257,7 @@ class HrNotificationService
     /**
      * Get users who can approve leave requests for the given request.
      */
-    protected function getLeaveApprovers(HrLeaveRequest $request): \Illuminate\Support\Collection
+    protected function getLeaveApprovers(HrLeaveRequest $request): Collection
     {
         return $this->getUsersWithPermission(['hr.leave.approve'], $request->tenant_id)
             ->reject(fn (User $u) => $u->id === $request->user_id);
@@ -294,7 +268,7 @@ class HrNotificationService
      *
      * @param  array<int, string>  $permissions
      */
-    protected function getUsersWithPermission(array $permissions, ?int $tenantId): \Illuminate\Support\Collection
+    protected function getUsersWithPermission(array $permissions, ?int $tenantId): Collection
     {
         return User::query()
             ->when($tenantId, fn ($q) => $q->where('tenant_id', $tenantId))

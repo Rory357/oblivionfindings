@@ -121,7 +121,7 @@ export default function ReportBuilder({ sources }: Props) {
         setLoading(true);
 
         try {
-            const response = await fetch('/hr/reports/preview', {
+            const response = await fetch('/hr/reports/builder/preview', {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -154,7 +154,7 @@ export default function ReportBuilder({ sources }: Props) {
     const handleSave = () => {
         if (!reportName.trim()) return;
 
-        router.post('/hr/reports/save', {
+        router.post('/hr/reports/builder', {
             name: reportName,
             description: reportDescription || null,
             report_type: reportType,

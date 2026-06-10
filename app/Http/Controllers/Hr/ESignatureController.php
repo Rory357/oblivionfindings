@@ -2,10 +2,10 @@
 
 namespace App\Http\Controllers\Hr;
 
-use App\Http\Controllers\Controller;
 use App\Domain\Hr\Models\HrDocument;
 use App\Domain\Hr\Models\HrDocumentSignature;
 use App\Domain\Hr\Services\ESignatureService;
+use App\Http\Controllers\Controller;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -17,7 +17,7 @@ class ESignatureController extends Controller
     ) {}
 
     /* ------------------------------------------------------------------ */
-    /*  Pending — list documents awaiting user's signature                  */
+    /*  Pending — list documents awaiting user's signature */
     /* ------------------------------------------------------------------ */
 
     public function pending(Request $request)
@@ -42,7 +42,7 @@ class ESignatureController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Show — document view + signature pad                                */
+    /*  Show — document view + signature pad */
     /* ------------------------------------------------------------------ */
 
     public function show(Request $request, HrDocumentSignature $signature)
@@ -71,7 +71,7 @@ class ESignatureController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Sign — capture signature                                            */
+    /*  Sign — capture signature */
     /* ------------------------------------------------------------------ */
 
     public function sign(Request $request, HrDocumentSignature $signature)
@@ -93,7 +93,7 @@ class ESignatureController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Decline — decline to sign                                           */
+    /*  Decline — decline to sign */
     /* ------------------------------------------------------------------ */
 
     public function decline(Request $request, HrDocumentSignature $signature)
@@ -115,13 +115,13 @@ class ESignatureController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Request — HR sends document for signature                           */
+    /*  Request — HR sends document for signature */
     /* ------------------------------------------------------------------ */
 
     public function request(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.documents.manage'), 403);
+        abort_unless($user && ($user->canDo('hr.signatures.manage') || $user->canDo('hr.documents.manage')), 403);
 
         $validated = $request->validate([
             'document_id' => ['required', 'integer', 'exists:hr_documents,id'],

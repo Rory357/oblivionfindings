@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers\Hr;
 
-use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrExitInterview;
 use App\Domain\Hr\Services\ExitInterviewService;
+use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -179,16 +179,11 @@ class ExitInterviewController extends Controller
         return (bool) $user && (
             $user->canDo('hr.exit-interviews.view')
             || $user->canDo('hr.exit-interviews.manage')
-            || $user->canDo('hr.onboarding.view')
-            || $user->canDo('hr.onboarding.manage')
         );
     }
 
     private function canManage($user): bool
     {
-        return (bool) $user && (
-            $user->canDo('hr.exit-interviews.manage')
-            || $user->canDo('hr.onboarding.manage')
-        );
+        return (bool) $user && $user->canDo('hr.exit-interviews.manage');
     }
 }

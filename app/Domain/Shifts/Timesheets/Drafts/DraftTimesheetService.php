@@ -3,6 +3,7 @@
 namespace App\Domain\Shifts\Timesheets\Drafts;
 
 use App\Domain\Hr\Models\HrAttendanceSession;
+use App\Domain\Hr\Models\HrTimeEntry;
 use App\Models\Shift;
 use App\Models\Timesheet;
 use App\Models\User;
@@ -16,8 +17,7 @@ class DraftTimesheetService
         protected ShiftOperationalSnapshotService $snapshots,
         protected TimesheetReconciliationService $reconciler,
         protected PayrollRateResolver $payrollRates,
-    ) {
-    }
+    ) {}
 
     /**
      * @return array{success: bool, reason: string|null, timesheet: Timesheet|null}
@@ -195,6 +195,100 @@ class DraftTimesheetService
 
         $timesheet = $timesheet->fresh();
         $this->reconciler->reconcile($timesheet, $session);
+
+        return $timesheet->fresh();
+    }
+
+    public function fromManualEntry(HrTimeEntry $entry, int $actorId): ?Timesheet
+    {
+        if (! $entry->clock_out) {
+            return null;
+        }
+
+        $entry->loadMissing([
+            'shift.client:id,first_name,last_name,site_id,service_context_id',
+            'shift.site:id,name',
+            'shift.serviceContext:id,name',
+            'shift.staff:id,name',
+            'client:id,first_name,last_name,site_id,service_context_id',
+            'client.site:id,name',
+            'client.serviceContext:id,name',
+            'user:id,name',
+        ]);
+
+        $timesheet = Timesheet::query()
+            ->where('hr_time_entry_id', $entry->id)
+            ->first();
+
+        if (! $timesheet && $entry->shift_id) {
+            $timesheet = Timesheet::query()
+                ->where('shift_id', $entry->shift_id)
+                ->where('user_id', $entry->user_id)
+                ->first();
+        }
+
+        if ($timesheet && $timesheet->exists && ! in_array($timesheet->status, ['draft', 'returned'], true)) {
+            return $timesheet->fresh();
+        }
+
+        $client = $entry->shift?->client ?? $entry->client;
+        $snapshot = $entry->shift
+            ? $this->snapshots->snapshotForShift($entry->shift, $entry->user)
+            : $this->snapshots->snapshotForClient($client, $entry->user);
+
+        $payload = [
+            'user_id' => $entry->user_id,
+            'client_id' => $entry->shift?->client_id ?? $entry->client_id,
+            'shift_id' => $entry->shift_id,
+            'activity_type' => $entry->shift_id ? null : 'other',
+            'site_id' => $entry->shift_id ? null : ($entry->site_id ?? $snapshot['site_id'] ?? null),
+            'shift_site_id' => $snapshot['site_id'] ?? null,
+            'shift_service_context_id' => $snapshot['service_context_id'] ?? null,
+            'work_date' => $entry->entry_date?->toDateString() ?? $entry->clock_in->toDateString(),
+            'starts_at' => $entry->clock_in,
+            'ends_at' => $entry->clock_out,
+            'break_minutes' => (int) ($entry->break_minutes ?? 0),
+            'mileage_km' => $entry->mileage_km,
+            'sleepover' => (bool) $entry->is_sleepover,
+            'on_call' => (bool) $entry->is_on_call,
+            'public_holiday' => (bool) $entry->is_public_holiday,
+            'notes' => $entry->notes,
+            'shift_site_name_snapshot' => $snapshot['site_name'] ?? null,
+            'shift_location_snapshot' => $snapshot['location'] ?? null,
+            'service_context_name_snapshot' => $snapshot['service_context_name'] ?? null,
+            'client_name_snapshot' => $snapshot['client_name'] ?? null,
+            'staff_name_snapshot' => $snapshot['staff_name'] ?? null,
+            'shift_type_snapshot' => $snapshot['shift_type'] ?? null,
+            'coverage_roles_snapshot' => $snapshot['coverage_roles'] ?? [],
+            'status' => 'draft',
+            'hr_time_entry_id' => $entry->id,
+        ];
+
+        if (! $timesheet) {
+            Timesheet::ensureNoDuplicateShiftUserPair(
+                $entry->shift_id ? (int) $entry->shift_id : null,
+                (int) $entry->user_id,
+            );
+
+            $timesheet = Timesheet::query()->create([
+                ...$payload,
+                'created_by' => $actorId,
+            ]);
+        } else {
+            $timesheet->update($payload);
+            $timesheet = $timesheet->fresh();
+        }
+
+        $timesheet->loadMissing(['shift.site:id,name', 'shift.client:id,first_name,last_name,site_id', 'shift.serviceContext:id,name', 'user.hrEmployeeProfile', 'client:id,service_context_id']);
+        $rate = $this->payrollRates->resolve($timesheet);
+        $timesheet->forceFill([
+            'pay_type' => $rate['pay_type'],
+            'pay_rate' => $rate['pay_rate'],
+            'payroll_segments_exported' => $rate['segments'],
+        ])->saveQuietly();
+
+        $timesheet = $timesheet->fresh();
+        $this->reconciler->reconcile($timesheet);
 
         return $timesheet->fresh();
     }

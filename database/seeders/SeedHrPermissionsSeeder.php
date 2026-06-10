@@ -83,15 +83,20 @@ class SeedHrPermissionsSeeder extends Seeder
             'hr.payslips.view' => 'View payslips',
             'hr.payslips.generate' => 'Generate payslips',
 
-            // Report Builder
-            'hr.reports.builder' => 'Use custom report builder',
-
             // Settings
             'hr.settings.manage' => 'Manage HR settings (webhooks, custom fields, audit)',
 
             // Wellbeing
             'hr.wellbeing.view' => 'View wellbeing dashboard',
         ];
+
+        Permission::query()
+            ->whereIn('key', [
+                'hr.disciplinary.view',
+                'hr.reports.builder',
+                'hr.vetting.view_disclosures',
+            ])
+            ->delete();
 
         $createdIds = [];
 
@@ -116,6 +121,48 @@ class SeedHrPermissionsSeeder extends Seeder
             $this->command->warn('No admin role found. Permissions created but not assigned.');
         }
 
+        $this->attachPermissions('hr', array_keys($permissions));
+        $this->attachPermissions('provider_manager', [
+            'hr.orgchart.view',
+            'hr.positions.view',
+            'hr.employees.viewAny',
+            'hr.compliance.view',
+            'hr.training.view',
+            'training.viewAny',
+            'hr.leave.viewAny',
+            'hr.leave.approve',
+        ]);
+        $this->attachPermissions('coordinator', [
+            'hr.employees.viewAny',
+            'hr.compliance.view',
+            'hr.training.view',
+            'training.viewAny',
+            'hr.leave.viewAny',
+            'hr.leave.approve',
+        ]);
+        $this->attachPermissions('team_lead', [
+            'hr.employees.viewAny',
+            'hr.compliance.view',
+            'hr.training.view',
+            'training.viewAny',
+            'hr.leave.viewAny',
+            'hr.leave.approve',
+        ]);
+
         $this->command->info('Seeded '.count($permissions).' HR permissions.');
+    }
+
+    /**
+     * @param  array<int, string>  $keys
+     */
+    private function attachPermissions(string $roleName, array $keys): void
+    {
+        $role = Role::where('name', $roleName)->first();
+        if (! $role) {
+            return;
+        }
+
+        $permissionIds = Permission::whereIn('key', $keys)->pluck('id')->all();
+        $role->permissions()->syncWithoutDetaching($permissionIds);
     }
 }

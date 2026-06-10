@@ -2,11 +2,11 @@
 
 namespace App\Http\Controllers\Hr;
 
-use App\Http\Controllers\Controller;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrPayrollRun;
 use App\Domain\Hr\Models\HrPayslip;
 use App\Domain\Hr\Services\PayslipService;
+use App\Http\Controllers\Controller;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -24,7 +24,7 @@ class PayslipController extends Controller
     public function index(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.payroll.view'), 403);
+        abort_unless($user && $user->canDo('hr.payslips.view'), 403);
 
         $payslips = HrPayslip::query()
             ->with(['user:id,name', 'employeeProfile:id,employee_number,position_title'])
@@ -52,7 +52,7 @@ class PayslipController extends Controller
                 'period_end' => $request->query('period_end'),
             ],
             'can' => [
-                'generate' => $user->canDo('hr.payroll.export'),
+                'generate' => $user->canDo('hr.payslips.generate'),
             ],
         ]);
     }
@@ -63,7 +63,7 @@ class PayslipController extends Controller
     public function generate(Request $request)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.payroll.export'), 403);
+        abort_unless($user && $user->canDo('hr.payslips.generate'), 403);
 
         $data = $request->validate([
             'period_start' => ['required', 'date'],
@@ -117,7 +117,7 @@ class PayslipController extends Controller
     public function show(Request $request, HrPayslip $payslip)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.payroll.view'), 403);
+        abort_unless($user && $user->canDo('hr.payslips.view'), 403);
 
         $payslip->load([
             'user:id,name,email',
@@ -158,7 +158,7 @@ class PayslipController extends Controller
         $user = $request->user();
 
         // Allow HR admins or the employee themselves
-        $canView = ($user && $user->canDo('hr.payroll.view'))
+        $canView = ($user && $user->canDo('hr.payslips.view'))
             || ($user && $user->id === $payslip->user_id);
         abort_unless($canView, 403);
 

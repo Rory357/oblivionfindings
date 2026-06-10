@@ -4,6 +4,7 @@ namespace App\Domain\Hr\Models;
 
 use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
+use Database\Factories\Hr\HrCandidateFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,7 +14,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class HrCandidate extends Model
 {
-    use HasFactory, SoftDeletes, AuditableChanges;
+    use AuditableChanges, HasFactory, SoftDeletes;
+
+    protected static function newFactory()
+    {
+        return HrCandidateFactory::new();
+    }
 
     protected $fillable = [
         'tenant_id',
@@ -41,7 +47,7 @@ class HrCandidate extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function applications(): HasMany
@@ -70,7 +76,7 @@ class HrCandidate extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Scopes                                                             */
+    /*  Scopes */
     /* ------------------------------------------------------------------ */
 
     public function scopeForTenant($query, ?int $tenantId)
@@ -84,7 +90,7 @@ class HrCandidate extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Accessors                                                          */
+    /*  Accessors */
     /* ------------------------------------------------------------------ */
 
     public function getFullNameAttribute(): string

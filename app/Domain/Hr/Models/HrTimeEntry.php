@@ -5,15 +5,24 @@ namespace App\Domain\Hr\Models;
 use App\Models\Client;
 use App\Models\Shift;
 use App\Models\Site;
+use App\Models\Timesheet;
 use App\Models\User;
+use Database\Factories\Hr\HrTimeEntryFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
+use Illuminate\Database\Eloquent\Relations\HasMany;
+use Illuminate\Database\Eloquent\Relations\HasOne;
 use Illuminate\Database\Eloquent\SoftDeletes;
 
 class HrTimeEntry extends Model
 {
     use HasFactory, SoftDeletes;
+
+    protected static function newFactory()
+    {
+        return HrTimeEntryFactory::new();
+    }
 
     protected $fillable = [
         'tenant_id',
@@ -40,7 +49,6 @@ class HrTimeEntry extends Model
         'is_public_holiday',
         'mileage_km',
         'break_compliance_met',
-        'hr_timesheet_id',
         'approved_by',
         'approved_at',
         'amended_by',
@@ -67,7 +75,7 @@ class HrTimeEntry extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function user(): BelongsTo
@@ -105,9 +113,9 @@ class HrTimeEntry extends Model
         return $this->belongsTo(Client::class);
     }
 
-    public function timesheet(): BelongsTo
+    public function timesheet(): HasOne
     {
-        return $this->belongsTo(HrTimesheet::class, 'hr_timesheet_id');
+        return $this->hasOne(Timesheet::class, 'hr_time_entry_id');
     }
 
     public function amendedByUser(): BelongsTo
@@ -115,13 +123,13 @@ class HrTimeEntry extends Model
         return $this->belongsTo(User::class, 'amended_by');
     }
 
-    public function amendments(): \Illuminate\Database\Eloquent\Relations\HasMany
+    public function amendments(): HasMany
     {
         return $this->hasMany(HrTimeEntryAmendment::class, 'hr_time_entry_id');
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Scopes                                                             */
+    /*  Scopes */
     /* ------------------------------------------------------------------ */
 
     public function scopeForTenant($query, ?int $tenantId)
@@ -173,7 +181,7 @@ class HrTimeEntry extends Model
     {
         return $query->where(function ($q) use ($userId, $teamUserIds) {
             $q->where('user_id', $userId)
-              ->orWhereIn('user_id', $teamUserIds);
+                ->orWhereIn('user_id', $teamUserIds);
         });
     }
 }

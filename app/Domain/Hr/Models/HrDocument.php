@@ -4,13 +4,19 @@ namespace App\Domain\Hr\Models;
 
 use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
+use Database\Factories\Hr\HrDocumentFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class HrDocument extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory;
+
+    protected static function newFactory()
+    {
+        return HrDocumentFactory::new();
+    }
 
     protected $fillable = [
         'tenant_id',
@@ -50,7 +56,7 @@ class HrDocument extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function employeeProfile(): BelongsTo

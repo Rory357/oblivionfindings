@@ -5,6 +5,7 @@ namespace App\Domain\Hr\Models;
 use App\Models\Concerns\AuditableChanges;
 use App\Models\Site;
 use App\Models\User;
+use Database\Factories\Hr\HrEmployeeProfileFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -13,7 +14,12 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class HrEmployeeProfile extends Model
 {
-    use HasFactory, SoftDeletes, AuditableChanges;
+    use AuditableChanges, HasFactory, SoftDeletes;
+
+    protected static function newFactory()
+    {
+        return HrEmployeeProfileFactory::new();
+    }
 
     protected $fillable = [
         'tenant_id',
@@ -90,7 +96,7 @@ class HrEmployeeProfile extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function user(): BelongsTo
@@ -159,7 +165,7 @@ class HrEmployeeProfile extends Model
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Scopes                                                             */
+    /*  Scopes */
     /* ------------------------------------------------------------------ */
 
     public function scopeForTenant($query, ?int $tenantId)
@@ -176,12 +182,12 @@ class HrEmployeeProfile extends Model
     {
         return $query->where(function ($q) use ($siteId) {
             $q->where('primary_site_id', $siteId)
-              ->orWhereJsonContains('secondary_site_ids', $siteId);
+                ->orWhereJsonContains('secondary_site_ids', $siteId);
         });
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Accessors                                                          */
+    /*  Accessors */
     /* ------------------------------------------------------------------ */
 
     public function getFullNameAttribute(): string

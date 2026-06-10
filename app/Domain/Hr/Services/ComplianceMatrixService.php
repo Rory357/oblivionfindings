@@ -2,21 +2,19 @@
 
 namespace App\Domain\Hr\Services;
 
-use App\Domain\Hr\Models\HrComplianceMatrix;
 use App\Domain\Hr\Models\HrComplianceRequirement;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrPolicyAttestation;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
-use App\Models\User;
 use App\Models\Shift;
+use App\Models\User;
 use Illuminate\Support\Collection;
 
 class ComplianceMatrixService
 {
     public function __construct(
-        protected LiveComplianceValidator $liveValidator = new LiveComplianceValidator(),
-    ) {
-    }
+        protected LiveComplianceValidator $liveValidator = new LiveComplianceValidator,
+    ) {}
 
     /**
      * Evaluate all active employees against compliance matrix.
@@ -38,6 +36,7 @@ class ComplianceMatrixService
             $this->evaluateStaff($user);
             $count++;
         }
+
         return $count;
     }
 
@@ -46,6 +45,7 @@ class ComplianceMatrixService
      */
     public function evaluateStaff(User $user): void
     {
+        $tenantId = $this->tenantIdForUser($user);
         $requirements = $this->getApplicableRequirements($user);
 
         foreach ($requirements as $requirement) {
@@ -53,7 +53,7 @@ class ComplianceMatrixService
 
             HrStaffComplianceStatus::updateOrCreate(
                 [
-                    'tenant_id' => $user->tenant_id,
+                    'tenant_id' => $tenantId,
                     'user_id' => $user->id,
                     'requirement_id' => $requirement->id,
                 ],
@@ -111,6 +111,7 @@ class ComplianceMatrixService
                             $f['reason'] = $liveFail['reason'];
                             $f['expires_at'] = $liveFail['expires_at'] ?? $f['expires_at'];
                         }
+
                         return $f;
                     });
                 }
@@ -162,10 +163,10 @@ class ComplianceMatrixService
 
         return HrStaffComplianceStatus::where('user_id', $user->id)
             ->whereIn('status', ['expired', 'not_started'])
-            ->whereHas('requirement', fn($q) => $q->where('hard_stop', true)->where('is_active', true))
+            ->whereHas('requirement', fn ($q) => $q->where('hard_stop', true)->where('is_active', true))
             ->with('requirement:id,code,name')
             ->get()
-            ->map(fn($s) => [
+            ->map(fn ($s) => [
                 'requirement' => $s->requirement->name,
                 'code' => $s->requirement->code,
                 'status' => $s->status,
@@ -206,14 +207,14 @@ class ComplianceMatrixService
         return HrStaffComplianceStatus::where('user_id', $user->id)
             ->where(function ($q) {
                 $q->where('status', 'expiring_soon')
-                  ->orWhere(function ($q2) {
-                      $q2->whereIn('status', ['expired', 'not_started'])
-                          ->whereHas('requirement', fn($q3) => $q3->where('hard_stop', false));
-                  });
+                    ->orWhere(function ($q2) {
+                        $q2->whereIn('status', ['expired', 'not_started'])
+                            ->whereHas('requirement', fn ($q3) => $q3->where('hard_stop', false));
+                    });
             })
             ->with('requirement:id,code,name')
             ->get()
-            ->map(fn($s) => [
+            ->map(fn ($s) => [
                 'requirement' => $s->requirement->name,
                 'code' => $s->requirement->code,
                 'status' => $s->status,
@@ -239,13 +240,29 @@ class ComplianceMatrixService
     protected function getApplicableRequirements(User $user): Collection
     {
         $roles = $user->roles->pluck('name')->toArray();
+        $tenantId = $this->tenantIdForUser($user);
 
-        return HrComplianceRequirement::where('tenant_id', $user->tenant_id)
+        return HrComplianceRequirement::where('tenant_id', $tenantId)
             ->where('is_active', true)
             ->whereHas('matrixEntries', function ($q) use ($roles) {
                 $q->whereIn('role', $roles);
             })
             ->get();
+    }
+
+    protected function tenantIdForUser(User $user): ?int
+    {
+        $tenantId = $user->getAttribute('tenant_id');
+        if (is_numeric($tenantId)) {
+            return (int) $tenantId;
+        }
+
+        $organizationId = $user->getAttribute('organization_id');
+        if (is_numeric($organizationId)) {
+            return (int) $organizationId;
+        }
+
+        return null;
     }
 
     protected function checkRequirement(User $user, HrComplianceRequirement $requirement): array
@@ -277,7 +294,7 @@ class ComplianceMatrixService
 
                         if ($expiresAt->isPast()) {
                             $result['status'] = 'expired';
-                        } elseif ($expiresAt->diffInDays(now()) <= $requirement->renewal_reminder_days) {
+                        } elseif ($expiresAt->isFuture() && $expiresAt->diffInDays(now(), true) <= $requirement->renewal_reminder_days) {
                             $result['status'] = 'expiring_soon';
                         } else {
                             $result['status'] = 'compliant';
@@ -302,7 +319,7 @@ class ComplianceMatrixService
 
                     if ($credential->expires_at && $credential->expires_at->isPast()) {
                         $result['status'] = 'expired';
-                    } elseif ($credential->expires_at && $credential->expires_at->diffInDays(now()) <= $requirement->renewal_reminder_days) {
+                    } elseif ($credential->expires_at && $credential->expires_at->isFuture() && $credential->expires_at->diffInDays(now(), true) <= $requirement->renewal_reminder_days) {
                         $result['status'] = 'expiring_soon';
                     } else {
                         $result['status'] = 'compliant';
@@ -328,7 +345,7 @@ class ComplianceMatrixService
 
                         if ($expiresAt->isPast()) {
                             $result['status'] = 'expired';
-                        } elseif ($expiresAt->diffInDays(now()) <= $requirement->renewal_reminder_days) {
+                        } elseif ($expiresAt->isFuture() && $expiresAt->diffInDays(now(), true) <= $requirement->renewal_reminder_days) {
                             $result['status'] = 'expiring_soon';
                         } else {
                             $result['status'] = 'compliant';
@@ -342,7 +359,7 @@ class ComplianceMatrixService
             case 'policy_attestation':
                 $attestation = HrPolicyAttestation::where('user_id', $user->id)
                     ->where('policy_id', $requirement->reference_id)
-                    ->whereHas('policyVersion', fn($q) => $q->where('is_current', true))
+                    ->whereHas('policyVersion', fn ($q) => $q->where('is_current', true))
                     ->orderByDesc('attested_at')
                     ->first();
 
@@ -358,7 +375,7 @@ class ComplianceMatrixService
 
                         if ($expiresAt->isPast()) {
                             $result['status'] = 'expired';
-                        } elseif ($expiresAt->diffInDays(now()) <= $requirement->renewal_reminder_days) {
+                        } elseif ($expiresAt->isFuture() && $expiresAt->diffInDays(now(), true) <= $requirement->renewal_reminder_days) {
                             $result['status'] = 'expiring_soon';
                         }
                     }

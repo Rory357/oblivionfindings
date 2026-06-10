@@ -15,7 +15,7 @@ import {
 import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
-import { CalendarDays, Globe, MapPin, Plus, Trash2 } from 'lucide-react';
+import { CalendarDays, Globe, MapPin, Pencil, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 type PublicHoliday = {
@@ -43,6 +43,9 @@ const breadcrumbs = [
 
 export default function Holidays({ holidays, year, can }: Props) {
     const [showForm, setShowForm] = useState(false);
+    const [editingHoliday, setEditingHoliday] = useState<PublicHoliday | null>(
+        null,
+    );
 
     const form = useForm({
         name: '',
@@ -53,12 +56,36 @@ export default function Holidays({ holidays, year, can }: Props) {
 
     const handleSubmit = (e: React.FormEvent) => {
         e.preventDefault();
-        form.post('/hr/leave/holidays', {
+
+        const options = {
             onSuccess: () => {
-                form.reset();
-                setShowForm(false);
+                resetForm();
             },
+        };
+
+        if (editingHoliday) {
+            form.put(`/hr/leave/holidays/${editingHoliday.id}`, options);
+            return;
+        }
+
+        form.post('/hr/leave/holidays', options);
+    };
+
+    const resetForm = () => {
+        form.reset();
+        setEditingHoliday(null);
+        setShowForm(false);
+    };
+
+    const startEdit = (holiday: PublicHoliday) => {
+        setEditingHoliday(holiday);
+        form.setData({
+            name: holiday.name,
+            date: holiday.date,
+            region: holiday.region ?? '',
+            is_national: holiday.is_national,
         });
+        setShowForm(true);
     };
 
     const handleDelete = (id: number) => {
@@ -117,7 +144,13 @@ export default function Holidays({ holidays, year, can }: Props) {
                                     {year + 1} &rarr;
                                 </Button>
                                 {can.manage && (
-                                    <Button onClick={() => setShowForm(!showForm)}>
+                                    <Button
+                                        onClick={() =>
+                                            showForm
+                                                ? resetForm()
+                                                : setShowForm(true)
+                                        }
+                                    >
                                         <Plus className="mr-2 h-4 w-4" />
                                         Add Holiday
                                     </Button>
@@ -132,7 +165,9 @@ export default function Holidays({ holidays, year, can }: Props) {
                     <Card>
                         <CardHeader>
                             <CardTitle className="text-base">
-                                Add Public Holiday
+                                {editingHoliday
+                                    ? 'Edit Public Holiday'
+                                    : 'Add Public Holiday'}
                             </CardTitle>
                         </CardHeader>
                         <CardContent>
@@ -218,7 +253,7 @@ export default function Holidays({ holidays, year, can }: Props) {
                                     <Button
                                         type="button"
                                         variant="outline"
-                                        onClick={() => setShowForm(false)}
+                                        onClick={resetForm}
                                     >
                                         Cancel
                                     </Button>
@@ -300,18 +335,31 @@ export default function Holidays({ holidays, year, can }: Props) {
                                             </TableCell>
                                             {can.manage && (
                                                 <TableCell className="text-right">
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        onClick={() =>
-                                                            handleDelete(
-                                                                holiday.id,
-                                                            )
-                                                        }
-                                                        className="text-status-critical hover:text-status-critical"
-                                                    >
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
+                                                    <div className="flex justify-end gap-1">
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() =>
+                                                                startEdit(
+                                                                    holiday,
+                                                                )
+                                                            }
+                                                        >
+                                                            <Pencil className="h-4 w-4" />
+                                                        </Button>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() =>
+                                                                handleDelete(
+                                                                    holiday.id,
+                                                                )
+                                                            }
+                                                            className="text-status-critical hover:text-status-critical"
+                                                        >
+                                                            <Trash2 className="h-4 w-4" />
+                                                        </Button>
+                                                    </div>
                                                 </TableCell>
                                             )}
                                         </TableRow>

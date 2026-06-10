@@ -99,7 +99,7 @@ const formatDate = (value?: string | null) => {
     const d = new Date(value);
     return Number.isNaN(d.getTime())
         ? value
-        : d.toLocaleDateString('en-GB', {
+        : d.toLocaleDateString('en-NZ', {
               day: '2-digit',
               month: 'short',
               year: 'numeric',
@@ -111,7 +111,7 @@ const formatDateTime = (value?: string | null) => {
     const d = new Date(value);
     return Number.isNaN(d.getTime())
         ? value
-        : d.toLocaleString('en-GB', {
+        : d.toLocaleString('en-NZ', {
               day: '2-digit',
               month: 'short',
               year: 'numeric',

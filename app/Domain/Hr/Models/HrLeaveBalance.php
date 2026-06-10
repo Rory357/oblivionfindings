@@ -4,6 +4,7 @@ namespace App\Domain\Hr\Models;
 
 use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
+use Database\Factories\Hr\HrLeaveBalanceFactory;
 use Illuminate\Database\Eloquent\Builder;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -11,7 +12,12 @@ use Illuminate\Database\Eloquent\Relations\BelongsTo;
 
 class HrLeaveBalance extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory;
+
+    protected static function newFactory()
+    {
+        return HrLeaveBalanceFactory::new();
+    }
 
     protected $fillable = [
         'tenant_id',
@@ -38,7 +44,7 @@ class HrLeaveBalance extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function user(): BelongsTo

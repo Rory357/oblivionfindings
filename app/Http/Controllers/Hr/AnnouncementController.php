@@ -2,15 +2,21 @@
 
 namespace App\Http\Controllers\Hr;
 
-use App\Http\Controllers\Controller;
 use App\Domain\Hr\Models\HrAnnouncement;
 use App\Domain\Hr\Models\HrAnnouncementAcknowledgement;
+use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Notifications\AnnouncementPublishedNotification;
+use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use Illuminate\Http\Request;
+use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class AnnouncementController extends Controller
 {
+    use ResolvesHrTenant;
+
     /**
      * List announcements (feed view).
      */
@@ -20,7 +26,9 @@ class AnnouncementController extends Controller
         $canView = $user && ($user->canDo('hr.announcements.view') || $user->canDo('hr.announcements.manage'));
         abort_unless($canView, 403);
 
-        $announcements = HrAnnouncement::forTenant($user->tenant_id)
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        $announcements = HrAnnouncement::forTenant($tenantId)
             ->published()
             ->with(['creator:id,name'])
             ->withCount('acknowledgements')
@@ -92,13 +100,21 @@ class AnnouncementController extends Controller
             'requires_acknowledgement' => ['sometimes', 'boolean'],
         ]);
 
-        DB::transaction(function () use ($user, $data) {
-            HrAnnouncement::create([
-                'tenant_id' => $user->tenant_id,
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        DB::transaction(function () use ($user, $data, $tenantId) {
+            $announcement = HrAnnouncement::create([
+                'tenant_id' => $tenantId,
                 'created_by' => $user->id,
                 'published_at' => $data['published_at'] ?? now(),
                 ...$data,
             ]);
+
+            if ($announcement->published_at && $announcement->published_at->lte(now())) {
+                $notification = new AnnouncementPublishedNotification($announcement->fresh());
+                $this->announcementRecipients($announcement, $tenantId, $user->id)
+                    ->each(fn ($recipient) => $recipient->notify($notification));
+            }
         });
 
         return redirect()->route('hr.announcements.index')->with('success', 'Announcement published.');
@@ -149,5 +165,44 @@ class AnnouncementController extends Controller
         );
 
         return redirect()->back()->with('success', 'Announcement acknowledged.');
+    }
+
+    private function announcementRecipients(HrAnnouncement $announcement, int $tenantId, int $creatorId): Collection
+    {
+        $targetValue = trim((string) $announcement->target_value);
+
+        $profiles = HrEmployeeProfile::query()
+            ->where('tenant_id', $tenantId)
+            ->where('is_active', true)
+            ->whereNotNull('user_id')
+            ->where('user_id', '!=', $creatorId)
+            ->with('user.roles:id,name')
+            ->when($announcement->target_audience === 'department' && $targetValue !== '', function ($query) use ($targetValue) {
+                $query->where('department', $targetValue);
+            })
+            ->when($announcement->target_audience === 'site' && $targetValue !== '', function ($query) use ($targetValue) {
+                $query->where(function ($siteQuery) use ($targetValue) {
+                    if (is_numeric($targetValue)) {
+                        $siteQuery->where('primary_site_id', (int) $targetValue)
+                            ->orWhereJsonContains('secondary_site_ids', (int) $targetValue);
+                    } else {
+                        $siteQuery->whereRaw('1 = 0');
+                    }
+                });
+            })
+            ->when($announcement->target_audience === 'role' && $targetValue !== '', function ($query) use ($targetValue) {
+                $query->where(function ($roleQuery) use ($targetValue) {
+                    $roleQuery->where('position_role', $targetValue)
+                        ->orWhereHas('user', fn ($userQuery) => $userQuery->where('role', $targetValue))
+                        ->orWhereHas('user.roles', fn ($rolePivotQuery) => $rolePivotQuery->where('name', $targetValue));
+                });
+            })
+            ->get();
+
+        return $profiles
+            ->pluck('user')
+            ->filter()
+            ->unique('id')
+            ->values();
     }
 }
