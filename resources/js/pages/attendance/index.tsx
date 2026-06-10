@@ -1,5 +1,6 @@
 import { PageHero, type PageHeroBadge } from '@/components/page';
 import PageShell from '@/components/page-shell';
+import { ReasonDialog } from '@/components/reason-dialog';
 import { TimesheetStatusBadge } from '@/components/timesheet-status-badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -130,6 +131,7 @@ export default function AttendanceIndex({
     canClock,
 }: Props) {
     const [breakMinutes, setBreakMinutes] = useState('0');
+    const [endTarget, setEndTarget] = useState<Props['onClockNow'][number] | null>(null);
     const [selectedShiftId, setSelectedShiftId] = useState<string>(
         activeShift
             ? String(activeShift.id)
@@ -585,18 +587,54 @@ export default function AttendanceIndex({
                                                 No shift linked
                                             </span>
                                         )}
-                                        {s.is_stale ? (
-                                            <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-status-warning-bg px-2 py-0.5 text-xs font-medium text-status-warning">
-                                                <AlertTriangle className="h-3 w-3" />
-                                                16h+ open
-                                            </span>
-                                        ) : null}
+                                        <span className="ml-auto flex items-center gap-2">
+                                            {s.is_stale ? (
+                                                <span className="inline-flex items-center gap-1 rounded-full bg-status-warning-bg px-2 py-0.5 text-xs font-medium text-status-warning">
+                                                    <AlertTriangle className="h-3 w-3" />
+                                                    16h+ open
+                                                </span>
+                                            ) : null}
+                                            <Button
+                                                variant="outline"
+                                                size="sm"
+                                                className={cn(
+                                                    'h-7 px-2.5 text-xs',
+                                                    s.is_stale &&
+                                                        'border-status-critical/30 text-status-critical hover:bg-status-critical-bg',
+                                                )}
+                                                onClick={() => setEndTarget(s)}
+                                            >
+                                                End session
+                                            </Button>
+                                        </span>
                                     </li>
                                 ))}
                             </ul>
                         </CardContent>
                     </Card>
                 ) : null}
+
+                <ReasonDialog
+                    open={endTarget !== null}
+                    onClose={() => setEndTarget(null)}
+                    title={endTarget?.user_name ? `End ${endTarget.user_name}'s session?` : 'End this session?'}
+                    description="This closes the open attendance session, ends any running break, and syncs a draft timesheet. The reason is recorded in the audit log."
+                    label="Reason"
+                    placeholder="e.g. Missed clock-out on Monday"
+                    confirmLabel="End session"
+                    onConfirm={(reason, done) => {
+                        if (!endTarget) return;
+                        router.post(
+                            `/attendance/sessions/${endTarget.id}/end`,
+                            { reason },
+                            {
+                                preserveScroll: true,
+                                onSuccess: () => setEndTarget(null),
+                                onFinish: done,
+                            },
+                        );
+                    }}
+                />
 
                 {/* Sessions list — mobile cards, desktop table */}
                 <Card>

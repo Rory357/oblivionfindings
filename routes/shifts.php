@@ -102,6 +102,10 @@ Route::middleware(['auth'])->group(function () {
     Route::post('/attendance/clock-out', [AttendanceController::class, 'clockOut'])
         ->middleware('permission:timesheets.create|shifts.viewAssigned|shifts.update|shifts.manageAny')
         ->name('attendance.clockOut');
+    Route::post('/attendance/sessions/{session}/end', [AttendanceController::class, 'endSession'])
+        ->middleware('permission:timesheets.manageAny')
+        ->whereNumber('session')
+        ->name('attendance.sessions.end');
     Route::post('/attendance/break/start', [AttendanceController::class, 'startBreak'])
         ->middleware('permission:timesheets.create|shifts.viewAssigned|shifts.update|shifts.manageAny')
         ->name('attendance.break.start');

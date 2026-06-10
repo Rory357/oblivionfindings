@@ -244,6 +244,37 @@ class AttendanceController extends Controller
         return redirect()->back()->with('success', 'Clocked out successfully.');
     }
 
+    /**
+     * Manager force-close of someone else's open session, from the
+     * "On the clock now" board. Gated by the same permission as the board.
+     */
+    public function endSession(Request $request, HrAttendanceSession $session)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('timesheets.manageAny'), 403);
+
+        $data = $request->validate([
+            'reason' => ['required', 'string', 'max:1000'],
+        ]);
+
+        if ($session->status !== 'open' || $session->clock_out_at) {
+            return redirect()->back()->with('info', 'This session was already closed.');
+        }
+
+        try {
+            $closed = $this->attendanceService->adminEndSession($auth, $session, trim($data['reason']));
+        } catch (\LogicException $exception) {
+            return redirect()->back()->withErrors(['end_session' => $exception->getMessage()]);
+        }
+
+        $name = $closed->user?->name ?? 'staff member';
+        if ($closed->timesheet) {
+            return redirect()->back()->with('success', "Session ended for {$name}. Draft timesheet #{$closed->timesheet->id} synced.");
+        }
+
+        return redirect()->back()->with('success', "Session ended for {$name}.");
+    }
+
     public function startBreak(Request $request)
     {
         $auth = $request->user();

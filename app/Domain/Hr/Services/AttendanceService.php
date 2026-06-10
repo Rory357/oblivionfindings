@@ -212,6 +212,102 @@ class AttendanceService
         return $closedSession;
     }
 
+    /**
+     * Force-close another user's open session — the manager action behind the
+     * "On the clock now" board (missed clock-outs, wrong clock-ins). Skips the
+     * end-of-shift checklist blockers (the worker isn't here to answer them)
+     * but records who closed it, why, and an audit-log row.
+     *
+     * Caller is responsible for authorization (timesheets.manageAny — the same
+     * permission that gates the board itself).
+     *
+     * @throws \LogicException
+     */
+    public function adminEndSession(User $admin, HrAttendanceSession $session, string $reason, ?Carbon $endAt = null): HrAttendanceSession
+    {
+        return DB::transaction(function () use ($admin, $session, $reason, $endAt) {
+            $session = HrAttendanceSession::query()
+                ->with(['shift'])
+                ->lockForUpdate()
+                ->findOrFail($session->id);
+
+            if ($session->status !== 'open' || $session->clock_out_at) {
+                throw new \LogicException('This attendance session has already been closed.');
+            }
+
+            $wasStale = $session->clock_in_at !== null
+                && $session->clock_in_at->lt(now()->subHours(16));
+
+            // Close at the rostered end when it has already passed (accurate
+            // hours for abandoned sessions); otherwise close now. Never before
+            // clock-in — the safety invariant requires a positive duration.
+            $shiftEnd = $session->shift?->ends_at;
+            $endAt = $endAt
+                ?? ($shiftEnd && $shiftEnd->gt($session->clock_in_at) && $shiftEnd->lte(now())
+                    ? $shiftEnd->copy()
+                    : now());
+            if ($endAt->lessThanOrEqualTo($session->clock_in_at)) {
+                $endAt = $session->clock_in_at->copy()->addMinute();
+            }
+
+            // Accumulate any open break, but clamp below the elapsed time — a
+            // days-old open break would otherwise violate the session invariant
+            // and make the stuck session unclosable (the exact case this
+            // action exists for).
+            $openBreakStartedAt = $session->break_started_at?->copy();
+            $openBreakMinutes = $openBreakStartedAt
+                ? max(0, (int) $openBreakStartedAt->diffInMinutes($endAt))
+                : 0;
+            $elapsedMinutes = (int) $session->clock_in_at->diffInMinutes($endAt);
+            $breakMinutes = min(
+                (int) ($session->break_minutes ?? 0) + $openBreakMinutes,
+                max($elapsedMinutes - 1, 0),
+            );
+
+            $session->update([
+                'clock_out_at' => $endAt,
+                'break_minutes' => $breakMinutes,
+                'break_started_at' => null,
+                'status' => 'closed',
+                'closed_by' => $admin->id,
+                'meta' => array_merge((array) $session->meta, [
+                    'admin_ended' => true,
+                    'admin_end_reason' => $reason,
+                ]),
+            ]);
+
+            $this->closeOpenBreakEvent($session, $endAt, $openBreakStartedAt);
+
+            if ($session->shift && in_array($session->shift->status, ['in_progress', 'active', 'clocked_in', 'started'], true)) {
+                app(ShiftLifecycleService::class)->complete(
+                    $session->shift,
+                    $admin,
+                    CompleteShiftData::fromClockOutSession(
+                        $session->fresh(['shift']) ?? $session,
+                        true,
+                        $reason,
+                        ['admin_ended' => true],
+                    ),
+                );
+            }
+
+            // Same principle as clockOut: shift or no shift, their time is
+            // logged — the draft stays editable/archivable by the team.
+            app(DraftTimesheetService::class)->fromAttendanceSession($session->fresh(['shift']), $admin->id, []);
+
+            AuditLogger::log('attendance.session.adminEnded', $session, [
+                'attendance_session_id' => $session->id,
+                'session_user_id' => $session->user_id,
+                'shift_id' => $session->shift_id,
+                'reason' => $reason,
+                'clock_out_at' => $endAt->toDateTimeString(),
+                'was_stale' => $wasStale,
+            ]);
+
+            return $session->fresh(['shift.client', 'timesheet', 'user']);
+        });
+    }
+
     public function eligibleShiftsForUser(User $user, ?Carbon $clockInAt = null): Collection
     {
         $clockInAt = ($clockInAt ?: now())->copy()->utc();
