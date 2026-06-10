@@ -27,13 +27,13 @@ test.describe('operations rostering — publish flow', () => {
         await loginAsStaff(page);
         await publishCurrentWeek(page, ROSTERING_DEMO_PUBLISH_TARGET);
 
+        // The rostering index redesign renamed the testid and made it the
+        // anchor itself (`rostering-operations-report-link`), so click it
+        // directly instead of a descendant role=link.
         await expect(
-            page.getByTestId('rostering-published-report-link'),
+            page.getByTestId('rostering-operations-report-link'),
         ).toBeVisible();
-        await page
-            .getByTestId('rostering-published-report-link')
-            .getByRole('link')
-            .click();
+        await page.getByTestId('rostering-operations-report-link').click();
         await expect(page).toHaveURL(/\/operations\/reports\/shifts/);
         await expect(
             page.getByRole('heading', { name: /Shift Operations Reports/i }),

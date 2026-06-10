@@ -20,7 +20,7 @@ php artisan migrate --seed
 npm run build
 ```
 
-On this Windows/Herd setup, PHP may be available through `C:\Users\steph\.config\herd\bin\php.bat` even when `php` is not on `PATH`. The Playwright helpers already look there first.
+On this Windows/Herd setup, PHP may be available through `C:\Users\steph\.config\herd\bin\php.bat` even when `php` is not on `PATH`. The Playwright helpers look there first and resolve the `.bat` shim to the `php.exe` it wraps (`tests/e2e/php-binary.ts`) — spawning the `.bat` needs a cmd.exe shell, which joins arguments unquoted and mangles anything containing spaces or `%`/`^`, surfacing as opaque `Command failed: …\php.bat artisan db:seed …` errors during Playwright global setup.
 
 ## Local Development
 
