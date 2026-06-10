@@ -842,9 +842,11 @@ function ActivityCard({
 function RoundsTab({
     rounds,
     schedule,
+    clientById,
 }: {
     rounds: RoundInfo[];
     schedule: ScheduleRow[];
+    clientById: Map<number, ClientInfo>;
 }) {
     return (
         <Card>
@@ -956,8 +958,10 @@ function RoundsTab({
                                                 clientId={d.client_id}
                                                 className="h-4 w-4 text-[7px]"
                                             />
-                                            {d.client_name.split(' ')[0]} ·{' '}
-                                            {d.time}
+                                            {clientById.get(d.client_id)
+                                                ?.preferred ??
+                                                d.client_name.split(' ')[0]}{' '}
+                                            · {d.time}
                                             <StatusPill status={d.status} />
                                         </span>
                                     ))}
@@ -1158,6 +1162,7 @@ export default function MedsToday(props: MedsTodayProps) {
     const [clientFilter, setClientFilter] = useState<number | null>(null);
     const [wizard, setWizard] = useState<WizardState>(null);
     const [ctxMenu, setCtxMenu] = useState<ShiftCtxState | null>(null);
+    const [ctxRow, setCtxRow] = useState<ScheduleRow | null>(null);
     const [effectFollowUp, setEffectFollowUp] = useState<PrnFollowUp | null>(
         null,
     );
@@ -1241,12 +1246,28 @@ export default function MedsToday(props: MedsTodayProps) {
         return `${d.getFullYear()}-${String(d.getMonth() + 1).padStart(2, '0')}-${String(d.getDate()).padStart(2, '0')}`;
     }
 
+    const copyNhi = (row: ScheduleRow) => {
+        const nhi = clientById.get(row.client_id)?.nhi;
+        if (!nhi) return;
+        try {
+            void navigator.clipboard.writeText(nhi);
+            toast.success('NHI copied', {
+                description: `${row.client_name} · ${nhi}`,
+            });
+        } catch {
+            /* clipboard unavailable */
+        }
+    };
+
     const openDoseCtx = (e: ReactMouseEvent, row: ScheduleRow) => {
         e.preventDefault();
         const client = clientById.get(row.client_id);
         const meta = DOSE_STATUS_META[row.status] ?? DOSE_STATUS_META.upcoming;
         const actionable = row.recorded === null;
         const preferred = client?.preferred ?? row.client_name.split(' ')[0];
+        const isMac =
+            typeof navigator !== 'undefined' &&
+            navigator.platform.toUpperCase().includes('MAC');
 
         const common: ShiftCtxItem[] = [
             {
@@ -1267,18 +1288,8 @@ export default function MedsToday(props: MedsTodayProps) {
                           icon: <Copy className="h-3.5 w-3.5" />,
                           label: 'Copy NHI',
                           sub: client.nhi,
-                          onClick: () => {
-                              try {
-                                  void navigator.clipboard.writeText(
-                                      client.nhi!,
-                                  );
-                                  toast.success('NHI copied', {
-                                      description: `${row.client_name} · ${client.nhi}`,
-                                  });
-                              } catch {
-                                  /* clipboard unavailable */
-                              }
-                          },
+                          kbd: isMac ? '⌘C' : 'Ctrl C',
+                          onClick: () => copyNhi(row),
                       } satisfies ShiftCtxItem,
                   ]
                 : []),
@@ -1290,6 +1301,7 @@ export default function MedsToday(props: MedsTodayProps) {
                       icon: <Check className="h-3.5 w-3.5" />,
                       label: 'Record dose now',
                       sub: 'Safety checks → sign to MAR',
+                      kbd: 'R',
                       tone: 'primary',
                       onClick: () => setWizard({ type: 'dose', row }),
                   },
@@ -1326,6 +1338,7 @@ export default function MedsToday(props: MedsTodayProps) {
                   ...common,
               ];
 
+        setCtxRow(row);
         setCtxMenu({
             x: e.clientX,
             y: e.clientY,
@@ -1336,6 +1349,40 @@ export default function MedsToday(props: MedsTodayProps) {
             items,
         });
     };
+
+    const closeCtx = () => {
+        setCtxMenu(null);
+        setCtxRow(null);
+    };
+
+    // The context menu's kbd hints are real shortcuts: R records the dose,
+    // Ctrl/⌘+C copies the NHI — both only while the menu is open.
+    useEffect(() => {
+        if (!ctxMenu || !ctxRow) return;
+        const handler = (event: KeyboardEvent) => {
+            if (
+                event.key.toLowerCase() === 'r' &&
+                !event.ctrlKey &&
+                !event.metaKey &&
+                !event.altKey &&
+                ctxRow.recorded === null
+            ) {
+                event.preventDefault();
+                setWizard({ type: 'dose', row: ctxRow });
+                closeCtx();
+            } else if (
+                event.key.toLowerCase() === 'c' &&
+                (event.ctrlKey || event.metaKey)
+            ) {
+                event.preventDefault();
+                copyNhi(ctxRow);
+                closeCtx();
+            }
+        };
+        document.addEventListener('keydown', handler);
+        return () => document.removeEventListener('keydown', handler);
+        // eslint-disable-next-line react-hooks/exhaustive-deps -- copyNhi/closeCtx are stable per render; ctxMenu+ctxRow gate the listener.
+    }, [ctxMenu, ctxRow]);
 
     /* ── Hero content ────────────────────────────────────────────── */
 
@@ -1710,7 +1757,11 @@ export default function MedsToday(props: MedsTodayProps) {
                 ) : null}
 
                 {tab === 'rounds' ? (
-                    <RoundsTab rounds={rounds} schedule={schedule} />
+                    <RoundsTab
+                        rounds={rounds}
+                        schedule={schedule}
+                        clientById={clientById}
+                    />
                 ) : null}
                 {tab === 'prn' ? (
                     <PrnTab
@@ -1833,10 +1884,7 @@ export default function MedsToday(props: MedsTodayProps) {
                 />
             ) : null}
             {ctxMenu ? (
-                <ShiftContextMenu
-                    ctx={ctxMenu}
-                    onClose={() => setCtxMenu(null)}
-                />
+                <ShiftContextMenu ctx={ctxMenu} onClose={closeCtx} />
             ) : null}
         </AppLayout>
     );
