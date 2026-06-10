@@ -1108,8 +1108,21 @@ export default function LeaveIndex({
                                     <SelectItem value="bereavement">
                                         Bereavement
                                     </SelectItem>
+                                    <SelectItem value="family_violence">
+                                        Family Violence
+                                    </SelectItem>
                                     <SelectItem value="parental">
                                         Parental
+                                    </SelectItem>
+                                    <SelectItem value="alternative">
+                                        Alternative Holiday
+                                    </SelectItem>
+                                    <SelectItem value="public_holiday">
+                                        Public Holiday
+                                    </SelectItem>
+                                    <SelectItem value="toil">TOIL</SelectItem>
+                                    <SelectItem value="unpaid">
+                                        Unpaid
                                     </SelectItem>
                                     <SelectItem value="other">Other</SelectItem>
                                 </SelectContent>

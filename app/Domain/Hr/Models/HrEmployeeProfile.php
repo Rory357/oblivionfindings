@@ -28,6 +28,9 @@ class HrEmployeeProfile extends Model
         'date_of_birth',
         'gender',
         'ethnicity',
+        'work_rights_status',
+        'visa_type',
+        'visa_expires_at',
         'personal_email',
         'personal_phone',
         'home_address',
@@ -75,6 +78,7 @@ class HrEmployeeProfile extends Model
 
     protected $casts = [
         'date_of_birth' => 'encrypted',
+        'visa_expires_at' => 'date',
         'start_date' => 'date',
         'end_date' => 'date',
         'probation_end_date' => 'date',

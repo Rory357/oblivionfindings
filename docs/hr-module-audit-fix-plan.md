@@ -342,3 +342,47 @@ Results:
 
 - Live deployment and the deploy runbook in §6 are not executed in this worktree.
 - The statutory/regulatory gaps listed in §5A remain future work unless separately requested.
+
+---
+
+## §10 NZ statutory gap round (Claude, 2026-06-11)
+
+§5A gaps implemented after the P0–P2 round merged (details + legal references in
+`docs/hr-nz-statutory-notes.md`):
+
+- **G-1** `family_violence` and `alternative` leave types across the engine
+  (LEAVE_TYPES, config labels/entitlements/accrual, seeded balances, frontend
+  filter + colour maps).
+- **G-2** Public-holiday awareness end-to-end: `PublicHolidayCalendar` (national
+  + region-matched anniversary days), draft timesheets auto-flag
+  `public_holiday` on all three creation paths, and `AlternativeHolidayService`
+  credits one alternative-holiday day on approval of a worked public holiday
+  (ledger-deduped per timesheet; casual/contractor excluded).
+- **G-4** Right-to-work tracking: `work_rights_status` / `visa_type` /
+  `visa_expires_at` on profiles (edit + show UI with expiry warning),
+  `SendExpiryRemindersJob` notifies worker **and manager** at the standard
+  reminder intervals (`VisaExpiryNotification`).
+- **G-5** Vetting label modernised to "Children's Act Safety Check" (stored
+  value unchanged).
+- **G-6** `HrPayEquityBandsSeeder` — Care & Support Worker settlement band
+  structure (rates are editable defaults), wired into `DatabaseSeeder`.
+- **G-7** Confirmed export-to-provider boundary covers ESCT/KiwiSaver needs
+  (documented; no schema change).
+- **G-8** `hr_time_entries.user_id` now `restrictOnDelete`
+  (migration `2026_06_11_000002`), completing the retention FK set.
+
+**Incidental fixes found while implementing:**
+- `work_date` on attendance- and shift-generated timesheets was the **UTC**
+  date — NZ morning shifts were dated one day early. Now derived in
+  `app.worker_timezone` (`DraftTimesheetService`).
+- Approving any **shift-less** timesheet 500'd: `snapshotForTimesheet`
+  regenerated `shift_type_snapshot` to null and `syncToHr` persisted it before
+  the billing snapshot guard ran. Fixed with a draft-value fallback
+  (`ShiftOperationalSnapshotService`).
+- People edit page selects (`employmentTypes` etc.) received plain strings but
+  rendered `{value,label}` objects — selects were broken. Controller now sends
+  objects.
+
+**New tests:** `tests/Feature/Hr/NzStatutoryGapRoundTest.php` (7 tests, 33
+assertions). Deploy note: run `HrPayEquityBandsSeeder` alongside the §6
+runbook seeders; migrations add visa columns + the FK change.

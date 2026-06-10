@@ -23,6 +23,9 @@ interface Profile {
     employment_type: string;
     contract_type: string | null;
     department_id: number | null;
+    work_rights_status: string | null;
+    visa_type: string | null;
+    visa_expires_at: string | null;
     is_active: boolean;
     start_date: string | null;
     end_date: string | null;
@@ -45,6 +48,7 @@ interface Props {
     employmentTypes: Array<{ value: string; label: string }>;
     contractTypes: Array<{ value: string; label: string }>;
     payFrequencies: Array<{ value: string; label: string }>;
+    workRightsStatuses: Array<{ value: string; label: string }>;
 }
 
 export default function EmployeeEdit({
@@ -54,6 +58,7 @@ export default function EmployeeEdit({
     employmentTypes,
     contractTypes,
     payFrequencies,
+    workRightsStatuses,
 }: Props) {
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'HR', href: '/hr/people' },
@@ -84,6 +89,9 @@ export default function EmployeeEdit({
         emergency_contact_phone: profile.emergency_contact_phone || '',
         emergency_contact_relationship:
             profile.emergency_contact_relationship || '',
+        work_rights_status: profile.work_rights_status || '',
+        visa_type: profile.visa_type || '',
+        visa_expires_at: profile.visa_expires_at || '',
         notes: profile.notes || '',
     });
 
@@ -158,6 +166,89 @@ export default function EmployeeEdit({
                                     {form.errors.employee_number && (
                                         <p className="mt-1 text-sm text-destructive">
                                             {form.errors.employee_number}
+                                        </p>
+                                    )}
+                                </div>
+                                <div>
+                                    <Label>Work Rights</Label>
+                                    <Select
+                                        value={
+                                            form.data.work_rights_status ||
+                                            '__none__'
+                                        }
+                                        onValueChange={(v) =>
+                                            form.setData(
+                                                'work_rights_status',
+                                                v === '__none__' ? '' : v,
+                                            )
+                                        }
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue placeholder="Select work rights" />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="__none__">
+                                                Not recorded
+                                            </SelectItem>
+                                            {workRightsStatuses.map((s) => (
+                                                <SelectItem
+                                                    key={s.value}
+                                                    value={s.value}
+                                                >
+                                                    {s.label}
+                                                </SelectItem>
+                                            ))}
+                                        </SelectContent>
+                                    </Select>
+                                    {form.errors.work_rights_status && (
+                                        <p className="mt-1 text-sm text-destructive">
+                                            {form.errors.work_rights_status}
+                                        </p>
+                                    )}
+                                </div>
+                                <div>
+                                    <Label htmlFor="visa_type">
+                                        Visa Type
+                                    </Label>
+                                    <Input
+                                        id="visa_type"
+                                        value={form.data.visa_type}
+                                        placeholder="e.g. Accredited Employer Work Visa"
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'visa_type',
+                                                e.target.value,
+                                            )
+                                        }
+                                    />
+                                    {form.errors.visa_type && (
+                                        <p className="mt-1 text-sm text-destructive">
+                                            {form.errors.visa_type}
+                                        </p>
+                                    )}
+                                </div>
+                                <div>
+                                    <Label htmlFor="visa_expires_at">
+                                        Visa Expiry
+                                    </Label>
+                                    <Input
+                                        id="visa_expires_at"
+                                        type="date"
+                                        value={form.data.visa_expires_at}
+                                        onChange={(e) =>
+                                            form.setData(
+                                                'visa_expires_at',
+                                                e.target.value,
+                                            )
+                                        }
+                                    />
+                                    <p className="mt-1 text-xs text-muted-foreground">
+                                        Expiry reminders are sent at 90, 60,
+                                        30, 14 and 7 days
+                                    </p>
+                                    {form.errors.visa_expires_at && (
+                                        <p className="mt-1 text-sm text-destructive">
+                                            {form.errors.visa_expires_at}
                                         </p>
                                     )}
                                 </div>

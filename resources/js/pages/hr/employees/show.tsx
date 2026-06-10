@@ -80,6 +80,9 @@ interface Profile {
     is_first_aider: boolean;
     is_fire_warden: boolean;
     can_drive_clients: boolean;
+    work_rights_status: string | null;
+    visa_type: string | null;
+    visa_expires_at: string | null;
     notes: string | null;
     emergency_contact_name: string | null;
     emergency_contact_phone: string | null;
@@ -343,6 +346,26 @@ function formatDate(v?: string | null): string {
 
 function formatLabel(s: string) {
     return s.replace(/_/g, ' ').replace(/\b\w/g, (c) => c.toUpperCase());
+}
+
+function daysUntil(date: string): number {
+    return Math.ceil(
+        (new Date(date).getTime() - Date.now()) / (1000 * 60 * 60 * 24),
+    );
+}
+
+function visaExpiryTone(date: string): string {
+    const days = daysUntil(date);
+    if (days < 0) return 'font-medium text-status-critical';
+    if (days <= 90) return 'font-medium text-status-warning';
+    return '';
+}
+
+function visaExpiryNote(date: string): string {
+    const days = daysUntil(date);
+    if (days < 0) return ' (expired)';
+    if (days <= 90) return ` (${days}d)`;
+    return '';
 }
 
 function StatusBadge({ status }: { status: string }) {
@@ -774,6 +797,41 @@ export default function EmployeeShow({
                                                 value={formatDate(
                                                     p.probation_end_date,
                                                 )}
+                                            />
+                                        )}
+                                        {p.work_rights_status && (
+                                            <InfoRow
+                                                label="Work Rights"
+                                                value={formatLabel(
+                                                    p.work_rights_status,
+                                                )}
+                                            />
+                                        )}
+                                        {p.visa_type && (
+                                            <InfoRow
+                                                label="Visa"
+                                                value={p.visa_type}
+                                            />
+                                        )}
+                                        {p.visa_expires_at && (
+                                            <InfoRow
+                                                label="Visa Expiry"
+                                                value={
+                                                    <span
+                                                        className={
+                                                            visaExpiryTone(
+                                                                p.visa_expires_at,
+                                                            )
+                                                        }
+                                                    >
+                                                        {formatDate(
+                                                            p.visa_expires_at,
+                                                        )}
+                                                        {visaExpiryNote(
+                                                            p.visa_expires_at,
+                                                        )}
+                                                    </span>
+                                                }
                                             />
                                         )}
                                     </CardContent>
@@ -2419,7 +2477,10 @@ export default function EmployeeShow({
                                             personal: 'bg-primary',
                                             bereavement:
                                                 'bg-muted-foreground/80',
+                                            family_violence:
+                                                'bg-status-critical',
                                             parental: 'bg-status-critical',
+                                            alternative: 'bg-status-success',
                                         };
                                         return (
                                             <Card key={lb.id}>
