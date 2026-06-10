@@ -42,7 +42,6 @@ import {
     formatTime,
 } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
-import { edit as editTimesheet } from '@/routes/operations/timesheets';
 import { type BreadcrumbItem, type SharedData } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
@@ -127,6 +126,12 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const ANY = '__any__';
+
+/** Timesheets are viewed in the redesigned index's ViewTimesheetDialog —
+ *  deep-linked via ?view= (the full edit page is reserved for editing). */
+function timesheetViewUrl(id: number): string {
+    return `/operations/timesheets?view=${id}`;
+}
 
 /** "8 Jun → 14 Jun" for the week stepper centre button. */
 function weekCompactRange(weekStart: Date): string {
@@ -250,7 +255,7 @@ function SessionsCard({
                                     <span>Break {session.break_minutes}m</span>
                                     {session.timesheet_id ? (
                                         <Link
-                                            href={editTimesheet.url(
+                                            href={timesheetViewUrl(
                                                 session.timesheet_id,
                                             )}
                                             className="inline-flex items-center gap-1.5"
@@ -338,7 +343,7 @@ function SessionsCard({
                                         {session.timesheet_id ? (
                                             <Link
                                                 className="inline-flex items-center gap-1.5"
-                                                href={editTimesheet.url(
+                                                href={timesheetViewUrl(
                                                     session.timesheet_id,
                                                 )}
                                             >
@@ -935,7 +940,7 @@ export default function AttendanceIndex({
                       icon: <FileText className="h-3.5 w-3.5" />,
                       label: `View timesheet #${timesheetId}`,
                       onClick: () =>
-                          router.visit(editTimesheet.url(timesheetId)),
+                          router.visit(timesheetViewUrl(timesheetId)),
                   }
                 : {
                       icon: <FileText className="h-3.5 w-3.5" />,

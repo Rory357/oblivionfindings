@@ -225,16 +225,18 @@ class TimesheetController extends Controller
         $staffId = $request->query('staff_id');
         $search = $request->query('search');
 
+        $rowEagerLoads = [
+            'client:id,first_name,last_name',
+            'staff:id,name,email',
+            'shift:id,client_id,service_context_id,starts_at,ends_at,location,shift_type,is_sleepover,is_on_call,expected_break_minutes,status',
+            'shift.serviceContext:id,name',
+            'shift.tasks:id,shift_id,is_completed',
+            'site:id,name',
+            'clientAllocations.client:id,first_name,last_name',
+        ];
+
         $q = Timesheet::query()
-            ->with([
-                'client:id,first_name,last_name',
-                'staff:id,name,email',
-                'shift:id,client_id,service_context_id,starts_at,ends_at,location,shift_type,is_sleepover,is_on_call,expected_break_minutes,status',
-                'shift.serviceContext:id,name',
-                'shift.tasks:id,shift_id,is_completed',
-                'site:id,name',
-                'clientAllocations.client:id,first_name,last_name',
-            ])
+            ->with($rowEagerLoads)
             ->orderByDesc('work_date');
 
         $this->siteAccess()->applyTimesheetScope($q, $auth, $this->timesheetBypassPermissions());
@@ -278,6 +280,28 @@ class TimesheetController extends Controller
         }
 
         $timesheets = $q->paginate(50)->withQueryString();
+
+        // `?view={id}` deep links (attendance sessions, dashboards) open the
+        // ViewTimesheetDialog client-side by finding the row in the current
+        // page. Guarantee the target is present even when filters/pagination
+        // would hide it — same site scope and visibility rules as the list.
+        $viewId = (int) $request->query('view');
+        if ($viewId && ! $timesheets->getCollection()->contains(fn (Timesheet $ts) => (int) $ts->id === $viewId)) {
+            $extraQuery = Timesheet::query()->with($rowEagerLoads)->whereKey($viewId);
+            $this->siteAccess()->applyTimesheetScope($extraQuery, $auth, $this->timesheetBypassPermissions());
+            $extra = $extraQuery->first();
+
+            $visible = $extra && (
+                $auth->canDo('timesheets.manageAny')
+                || (int) $extra->user_id === (int) $auth->id
+                || ($canApprove && $extra->status === 'submitted')
+            );
+
+            if ($visible) {
+                $timesheets->setCollection($timesheets->getCollection()->prepend($extra));
+            }
+        }
+
         $timesheets = $timesheets->through(fn (Timesheet $ts) => $this->serializeTimesheetRow($ts));
 
         // Single scoped status histogram shared by the tab strip and the hero

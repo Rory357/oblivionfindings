@@ -139,4 +139,57 @@ class TimesheetUnifiedIndexTest extends TestCase
         $timesheet->refresh();
         $this->assertNull($timesheet->archived_at);
     }
+
+    /**
+     * `?view={id}` deep links (attendance sessions, dashboards) open the
+     * ViewTimesheetDialog by finding the row client-side — the controller must
+     * guarantee the target row is in the payload even when the default tab
+     * would hide it (archived here; same path covers pagination).
+     */
+    public function test_view_deep_link_includes_hidden_target_row(): void
+    {
+        $timesheet = Timesheet::factory()->create([
+            'user_id' => $this->admin->id,
+            'shift_id' => null,
+            'activity_type' => 'admin',
+            'status' => 'approved',
+            'archived_at' => now(),
+        ]);
+
+        $response = $this->actingAs($this->admin)
+            ->get("/operations/timesheets?view={$timesheet->id}");
+
+        $response->assertOk();
+        $ids = collect($response->viewData('page')['props']['timesheets']['data'])
+            ->pluck('id');
+        $this->assertTrue($ids->contains($timesheet->id));
+    }
+
+    public function test_view_deep_link_does_not_leak_foreign_timesheets(): void
+    {
+        $worker = User::factory()->create([
+            'role' => 'support_worker',
+            'approved_at' => now(),
+        ]);
+        $supportRole = Role::where('name', 'support_worker')->first();
+        if ($supportRole) {
+            $worker->roles()->attach($supportRole);
+        }
+
+        $otherUser = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+        $foreign = Timesheet::factory()->create([
+            'user_id' => $otherUser->id,
+            'shift_id' => null,
+            'activity_type' => 'admin',
+            'status' => 'draft',
+        ]);
+
+        $response = $this->actingAs($worker)
+            ->get("/operations/timesheets?view={$foreign->id}");
+
+        $response->assertOk();
+        $ids = collect($response->viewData('page')['props']['timesheets']['data'])
+            ->pluck('id');
+        $this->assertFalse($ids->contains($foreign->id));
+    }
 }
