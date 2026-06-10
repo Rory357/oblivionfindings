@@ -288,8 +288,9 @@ class TimesheetController extends Controller
         // Tab counts — derived from the shared histogram (+ one archived count).
         $tabCounts = $this->computeTabCounts($auth, $statusCounts);
 
-        // Hero summary
-        $heroSummary = $this->computeHeroSummary($auth, $statusCounts);
+        // Hero summary — week-aware when the list is scoped to an exact
+        // Mon–Sun pair (the hero week-stepper writes from/to).
+        $heroSummary = $this->computeHeroSummary($auth, $statusCounts, $from, $to);
 
         // Clients / sites / shifts for the Create dialog and filters.
         $clientScope = $this->siteAccess()->applyClientScope(Client::query(), $auth, $this->timesheetBypassPermissions());
@@ -420,12 +421,39 @@ class TimesheetController extends Controller
     }
 
     /**
+     * The week the hero summarises. Defaults to the current week; when the
+     * list's from/to filters describe an exact Mon–Sun pair (what the hero
+     * week-stepper writes), the summary follows that week instead. Any other
+     * from/to range keeps the current-week summary — the approval queue must
+     * never week-hide by default, so this is purely an explicit-filter echo.
+     *
+     * @return array{0: \Illuminate\Support\Carbon, 1: \Illuminate\Support\Carbon}
+     */
+    protected function resolveSummaryWeek(?string $from, ?string $to): array
+    {
+        if ($from && $to) {
+            try {
+                $f = \Illuminate\Support\Carbon::parse($from)->startOfDay();
+                $t = \Illuminate\Support\Carbon::parse($to)->startOfDay();
+
+                if ($f->isSameDay($f->copy()->startOfWeek()) && $t->isSameDay($f->copy()->addDays(6))) {
+                    return [$f->copy()->startOfDay(), $f->copy()->addDays(6)->endOfDay()];
+                }
+            } catch (\Throwable) {
+                // fall through to the current week
+            }
+        }
+
+        return [now()->startOfWeek(), now()->endOfWeek()];
+    }
+
+    /**
      * Hero summary block — pending/returned/approved counts plus hours-vs-rostered.
      *
      * @param  array<string, int>  $statusCounts  non-archived status histogram
      * @return array<string, mixed>
      */
-    protected function computeHeroSummary(User $auth, array $statusCounts): array
+    protected function computeHeroSummary(User $auth, array $statusCounts, ?string $from = null, ?string $to = null): array
     {
         $base = Timesheet::query();
         $this->siteAccess()->applyTimesheetScope($base, $auth, $this->timesheetBypassPermissions());
@@ -434,8 +462,7 @@ class TimesheetController extends Controller
             $base->where('user_id', $auth->id);
         }
 
-        $weekStart = now()->startOfWeek();
-        $weekEnd = now()->endOfWeek();
+        [$weekStart, $weekEnd] = $this->resolveSummaryWeek($from, $to);
 
         $thisWeek = (clone $base)
             ->whereBetween('work_date', [$weekStart->toDateString(), $weekEnd->toDateString()])

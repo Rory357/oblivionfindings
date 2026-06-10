@@ -378,6 +378,31 @@ function ContextMenu({
 }
 
 // ─────────────────────────────────────────────────────────────────────
+// Week helpers (same local-date arithmetic as the Shifts page — avoid
+// toISOString(), which rolls back a day east of UTC).
+// ─────────────────────────────────────────────────────────────────────
+function toLocalIsoDate(d: Date): string {
+    const yyyy = d.getFullYear();
+    const mm = String(d.getMonth() + 1).padStart(2, '0');
+    const dd = String(d.getDate()).padStart(2, '0');
+    return `${yyyy}-${mm}-${dd}`;
+}
+
+function addDaysIso(iso: string, days: number): string {
+    const d = new Date(iso + 'T00:00:00');
+    d.setDate(d.getDate() + days);
+    return toLocalIsoDate(d);
+}
+
+function weekStartFor(iso: string): string {
+    const d = new Date(iso + 'T00:00:00');
+    const dow = d.getDay(); // 0=Sun..6=Sat
+    const monOffset = dow === 0 ? -6 : 1 - dow;
+    d.setDate(d.getDate() + monOffset);
+    return toLocalIsoDate(d);
+}
+
+// ─────────────────────────────────────────────────────────────────────
 // Page
 // ─────────────────────────────────────────────────────────────────────
 export default function TimesheetsIndex({
@@ -435,6 +460,33 @@ export default function TimesheetsIndex({
         router.get(
             '/operations/timesheets',
             { ...filters, tab, search: search || undefined },
+            { preserveScroll: true, preserveState: true, replace: true },
+        );
+    }
+
+    // Week stepper — writes the existing from/to filters (one source of
+    // truth); the default view stays unfiltered so the approval queue never
+    // week-hides unless the user explicitly steps into a week.
+    const weekFilterActive = Boolean(
+        filters.from &&
+            filters.to &&
+            weekStartFor(filters.from) === filters.from &&
+            addDaysIso(filters.from, 6) === filters.to,
+    );
+
+    function gotoWeek(iso: string) {
+        const start = weekStartFor(iso);
+        router.get(
+            '/operations/timesheets',
+            { ...filters, tab, search: search || undefined, from: start, to: addDaysIso(start, 6) },
+            { preserveScroll: true, preserveState: true, replace: true },
+        );
+    }
+
+    function clearWeek() {
+        router.get(
+            '/operations/timesheets',
+            { ...filters, tab, search: search || undefined, from: undefined, to: undefined },
             { preserveScroll: true, preserveState: true, replace: true },
         );
     }
@@ -498,6 +550,11 @@ export default function TimesheetsIndex({
                         setInitialShiftId(null);
                         setCreateOpen(true);
                     }}
+                    onPrevWeek={() => gotoWeek(addDaysIso(heroSummary.week_start, -7))}
+                    onNextWeek={() => gotoWeek(addDaysIso(heroSummary.week_start, 7))}
+                    onPickWeek={(d) => gotoWeek(toLocalIsoDate(d))}
+                    onClearWeek={weekFilterActive ? clearWeek : undefined}
+                    weekFilterActive={weekFilterActive}
                 />
 
                 {/* KPI strip */}

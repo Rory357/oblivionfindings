@@ -1,4 +1,5 @@
 import { PageHero, type PageHeroBadge } from '@/components/page';
+import { WeekPicker } from '@/components/rostering/week-picker';
 import { Button } from '@/components/ui/button';
 import { cn } from '@/lib/utils';
 import {
@@ -15,8 +16,9 @@ import {
     MoreHorizontal,
     Send,
     Users,
+    X,
 } from 'lucide-react';
-import { type ReactNode } from 'react';
+import { useRef, useState, type ReactNode, type RefObject } from 'react';
 
 export type TimesheetsHeroSummary = {
     firstName: string;
@@ -54,18 +56,27 @@ function WeekChip({
     onClick,
     solid,
     title,
+    buttonRef,
+    ariaHasPopup,
+    ariaExpanded,
 }: {
     children: ReactNode;
     onClick?: () => void;
     solid?: boolean;
     title?: string;
+    buttonRef?: RefObject<HTMLButtonElement | null>;
+    ariaHasPopup?: 'dialog';
+    ariaExpanded?: boolean;
 }) {
     return (
         // eslint-disable-next-line no-restricted-syntax -- segmented week-stepper on dark hero; not a shadcn Button.
         <button
             type="button"
+            ref={buttonRef}
             onClick={onClick}
             title={title}
+            aria-haspopup={ariaHasPopup}
+            aria-expanded={ariaExpanded}
             className={cn(
                 'inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs font-semibold text-primary-foreground transition-colors',
                 solid
@@ -90,6 +101,8 @@ export default function TimesheetsHero({
     onPrevWeek,
     onNextWeek,
     onPickWeek,
+    onClearWeek,
+    weekFilterActive = false,
     onMore,
     canCreate,
     sitesCount,
@@ -99,12 +112,17 @@ export default function TimesheetsHero({
     onCreateTimesheet: () => void;
     onPrevWeek?: () => void;
     onNextWeek?: () => void;
-    onPickWeek?: () => void;
+    onPickWeek?: (weekStart: Date) => void;
+    /** Shown as an "All weeks" chip when the list is scoped to one week. */
+    onClearWeek?: () => void;
+    weekFilterActive?: boolean;
     onMore?: () => void;
     canCreate: boolean;
     sitesCount?: number;
     staffCount?: number;
 }) {
+    const weekBtnRef = useRef<HTMLButtonElement | null>(null);
+    const [pickerOpen, setPickerOpen] = useState(false);
     const coveragePct =
         summary.hours_target > 0
             ? Math.min(100, Math.round((summary.hours_this_week / summary.hours_target) * 100))
@@ -131,6 +149,7 @@ export default function TimesheetsHero({
     const hasWeekNav = Boolean(onPrevWeek || onNextWeek || onPickWeek);
 
     return (
+        <>
         <PageHero
             category="ops"
             icon={FileText}
@@ -249,7 +268,13 @@ export default function TimesheetsHero({
                                 </WeekChip>
                             ) : null}
                             {onPickWeek ? (
-                                <WeekChip solid onClick={onPickWeek}>
+                                <WeekChip
+                                    solid
+                                    buttonRef={weekBtnRef}
+                                    ariaHasPopup="dialog"
+                                    ariaExpanded={pickerOpen}
+                                    onClick={() => setPickerOpen((v) => !v)}
+                                >
                                     <CalendarRange className="h-3.5 w-3.5" />
                                     Wk {summary.week_number} · {fmtMonthDay(summary.week_start)} →{' '}
                                     {fmtMonthDay(summary.week_end)} · pick week
@@ -262,10 +287,30 @@ export default function TimesheetsHero({
                                     <ChevronRight className="h-3.5 w-3.5" />
                                 </WeekChip>
                             ) : null}
+                            {weekFilterActive && onClearWeek ? (
+                                <WeekChip onClick={onClearWeek} title="Show every week">
+                                    <X className="h-3.5 w-3.5" />
+                                    All weeks
+                                </WeekChip>
+                            ) : null}
                         </div>
                     </div>
                 ) : undefined
             }
         />
+
+        {pickerOpen && onPickWeek ? (
+            <WeekPicker
+                selectedWeekStart={new Date(summary.week_start + 'T00:00:00')}
+                anchorRef={weekBtnRef}
+                showContextMenu={false}
+                onSelect={(next) => {
+                    setPickerOpen(false);
+                    onPickWeek(next);
+                }}
+                onClose={() => setPickerOpen(false)}
+            />
+        ) : null}
+        </>
     );
 }
