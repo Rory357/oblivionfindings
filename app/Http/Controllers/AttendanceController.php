@@ -75,6 +75,36 @@ class AttendanceController extends Controller
             ->get()
             ->sum(fn (HrAttendanceSession $session) => $session->worked_hours);
 
+        $weekHours = HrAttendanceSession::query()
+            ->where('user_id', $targetUserId)
+            ->whereBetween('clock_in_at', [now()->startOfWeek(), now()->endOfWeek()])
+            ->get()
+            ->sum(fn (HrAttendanceSession $session) => $session->worked_hours);
+
+        // Managers get a live "who is on the clock now" board — open sessions
+        // across the staff they can already see in the picker. Sessions open
+        // for 16h+ are flagged as likely missed clock-outs.
+        $staleCutoff = now()->subHours(16);
+        $onClockNow = $canManageAny
+            ? HrAttendanceSession::query()
+                ->with(['user:id,name', 'shift:id,client_id,location,ends_at'])
+                ->whereIn('user_id', User::staff()->select('id'))
+                ->open()
+                ->latest('clock_in_at')
+                ->limit(50)
+                ->get()
+                ->map(fn (HrAttendanceSession $session) => [
+                    'id' => $session->id,
+                    'user_id' => $session->user_id,
+                    'user_name' => $session->user?->name,
+                    'clock_in_at' => optional($session->clock_in_at)->toDateTimeString(),
+                    'shift_id' => $session->shift_id,
+                    'shift_location' => $session->shift?->location,
+                    'shift_ends_at' => optional($session->shift?->ends_at)->toDateTimeString(),
+                    'is_stale' => $session->clock_in_at !== null && $session->clock_in_at->lt($staleCutoff),
+                ])->values()
+            : collect();
+
         return Inertia::render('attendance/index', [
             'sessions' => $sessions,
             'openSession' => $openSession ? [
@@ -105,6 +135,8 @@ class AttendanceController extends Controller
                 'user_id' => $canManageAny ? $targetUserId : null,
             ],
             'todayHours' => round((float) $todayHours, 2),
+            'weekHours' => round((float) $weekHours, 2),
+            'onClockNow' => $onClockNow,
             'canManageAny' => $canManageAny,
             'canClock' => $this->canClock($auth),
         ]);

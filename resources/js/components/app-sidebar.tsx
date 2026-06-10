@@ -83,6 +83,7 @@ import {
     Smartphone,
     Stethoscope,
     Target,
+    Timer,
     Trash2,
     TrendingUp,
     Truck,
@@ -210,6 +211,7 @@ const WORKFORCE_ROUTE_PREFIXES = [
     '/operations/handovers',
     '/operations/shift-notes',
     '/operations/timesheets',
+    '/attendance',
 ];
 
 function isWorkforceUrl(url: string): boolean {
@@ -985,6 +987,20 @@ function buildWorkforceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             title: 'Timesheets',
             href: '/operations/timesheets',
             icon: Clock,
+        });
+    // Attendance (clock sessions ↔ timesheet sync) sits between Shifts and
+    // Timesheets in the workflow; the route also admits frontline workers
+    // (own clock history), who additionally reach it via StaffPageShell.
+    if (
+        can?.timesheets?.viewAny ||
+        can?.timesheets?.viewAssigned ||
+        can?.shifts?.viewAssigned ||
+        can?.shifts?.manageAny
+    )
+        workforce.push({
+            title: 'Attendance',
+            href: '/attendance',
+            icon: Timer,
         });
     if (can?.rostering?.viewAny)
         workforce.push({

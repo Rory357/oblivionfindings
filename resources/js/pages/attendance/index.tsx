@@ -1,5 +1,4 @@
-import { PageHero } from '@/components/page';
-import { OpsStatCard } from '@/components/ops-stat-card';
+import { PageHero, type PageHeroBadge } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { TimesheetStatusBadge } from '@/components/timesheet-status-badge';
 import { Button } from '@/components/ui/button';
@@ -19,10 +18,20 @@ import {
     TooltipTrigger,
 } from '@/components/ui/tooltip';
 import AppLayout from '@/layouts/app-layout';
+import { formatDate, formatDateTime, formatTime } from '@/lib/datetime';
+import { cn } from '@/lib/utils';
 import { edit as editTimesheet } from '@/routes/operations/timesheets';
-import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router } from '@inertiajs/react';
-import { Activity, CalendarDays, Clock, Info, Timer } from 'lucide-react';
+import { type BreadcrumbItem, type SharedData } from '@/types';
+import { Head, Link, router, usePage } from '@inertiajs/react';
+import {
+    AlertTriangle,
+    CalendarDays,
+    CheckCircle2,
+    Info,
+    Link2,
+    Timer,
+    UserCheck,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 type Session = {
@@ -75,6 +84,17 @@ type Props = {
     staff: Array<{ id: number; name: string; email: string }>;
     filters: { user_id?: number | null };
     todayHours: number;
+    weekHours: number;
+    onClockNow: Array<{
+        id: number;
+        user_id: number;
+        user_name: string | null;
+        clock_in_at: string;
+        shift_id: number | null;
+        shift_location: string | null;
+        shift_ends_at: string | null;
+        is_stale: boolean;
+    }>;
     canManageAny: boolean;
     canClock: boolean;
 };
@@ -85,17 +105,15 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const ANY = '__any__';
 
+// Worker-facing timestamps — one locale (en-NZ), one timezone
+// (Pacific/Auckland) via the shared datetime helpers, so session rows read
+// the same as shift times everywhere else in the app.
 function toLocal(dateString: string | null): string {
-    if (!dateString) return '—';
-    return new Date(dateString).toLocaleString();
+    return formatDateTime(dateString);
 }
 
 function toTime(dateString: string | null): string {
-    if (!dateString) return '—';
-    return new Date(dateString).toLocaleTimeString([], {
-        hour: '2-digit',
-        minute: '2-digit',
-    });
+    return formatTime(dateString);
 }
 
 export default function AttendanceIndex({
@@ -106,6 +124,8 @@ export default function AttendanceIndex({
     staff,
     filters,
     todayHours,
+    weekHours,
+    onClockNow,
     canManageAny,
     canClock,
 }: Props) {
@@ -118,13 +138,64 @@ export default function AttendanceIndex({
               : '',
     );
 
-    const selectedUserId = filters.user_id ?? null;
+    const { auth } = usePage<SharedData>().props;
+    const firstName = (auth?.user?.name ?? '').split(' ')[0] || 'there';
 
-    const sessionCount = sessions.data.length;
-    const syncedCount = useMemo(
-        () => sessions.data.filter((s) => s.timesheet_id).length,
-        [sessions.data],
+    const selectedUserId = filters.user_id ?? null;
+    // "Viewing X" treatment only when a manager filters to someone ELSE —
+    // your own sessions read as the personal greeting, even though the
+    // controller echoes your id back in filters.user_id.
+    const viewedStaff = useMemo(
+        () =>
+            canManageAny && selectedUserId && selectedUserId !== auth?.user?.id
+                ? (staff.find((member) => member.id === selectedUserId) ?? null)
+                : null,
+        [auth?.user?.id, canManageAny, selectedUserId, staff],
     );
+
+    const totalSessions = sessions.total;
+    const eligibleCount = eligibleShifts.length;
+
+    const heroBadges: PageHeroBadge[] = [
+        openSession
+            ? {
+                  icon: CheckCircle2,
+                  label: `On the clock since ${toTime(openSession.clock_in_at)}`,
+                  tone: 'success' as const,
+              }
+            : {
+                  label: 'Not clocked in',
+                  tone: 'default' as const,
+                  dot: true,
+              },
+        ...(eligibleCount > 0
+            ? [
+                  {
+                      icon: CalendarDays,
+                      label: `${eligibleCount} eligible shift${eligibleCount === 1 ? '' : 's'} in the clock-in window`,
+                      tone: 'info' as const,
+                  },
+              ]
+            : []),
+        ...(openSession?.timesheet_id
+            ? [
+                  {
+                      icon: Link2,
+                      label: `Synced to timesheet #${openSession.timesheet_id}`,
+                      tone: 'default' as const,
+                  },
+              ]
+            : []),
+        ...(viewedStaff
+            ? [
+                  {
+                      icon: UserCheck,
+                      label: `Viewing ${viewedStaff.name}`,
+                      tone: 'warning' as const,
+                  },
+              ]
+            : []),
+    ];
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -132,9 +203,79 @@ export default function AttendanceIndex({
 
             <PageShell>
                 <PageHero
-                    title="Attendance"
-                    description="Clock in and out of shifts, and track attendance sessions."
-                    icon={<Timer className="h-7 w-7 text-white" />}
+                    category="ops"
+                    icon={Timer}
+                    title={
+                        <span>
+                            <span className="mb-2 flex items-center gap-2 text-[10.5px] font-semibold tracking-wider text-primary-foreground/80 uppercase">
+                                <span
+                                    aria-hidden="true"
+                                    className="relative inline-flex h-2 w-2"
+                                >
+                                    <span className="absolute inset-0 inline-flex h-full w-full animate-ping rounded-full bg-status-success/70" />
+                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success ring-2 ring-status-success/30" />
+                                </span>
+                                Live attendance · synced to timesheets
+                            </span>
+                            <span className="block">
+                                <span className="font-normal text-primary-foreground/80">
+                                    {viewedStaff
+                                        ? `${viewedStaff.name}'s attendance —`
+                                        : `Kia ora ${firstName}, your attendance —`}
+                                </span>{' '}
+                                <span className="border-b-2 border-primary-foreground/40 pb-0.5">
+                                    {formatDate(new Date())}
+                                </span>
+                            </span>
+                        </span>
+                    }
+                    description={
+                        openSession ? (
+                            <span>
+                                Clocked in since {toTime(openSession.clock_in_at)}
+                                {openSession.shift_id
+                                    ? ` on shift #${openSession.shift_id}`
+                                    : ''}
+                                . {todayHours.toFixed(1)}h logged today across{' '}
+                                {totalSessions} session
+                                {totalSessions === 1 ? '' : 's'} on record.
+                            </span>
+                        ) : (
+                            <span>
+                                Not on the clock. {todayHours.toFixed(1)}h logged
+                                today, {eligibleCount} eligible shift
+                                {eligibleCount === 1 ? '' : 's'} in the clock-in
+                                window, and {totalSessions} session
+                                {totalSessions === 1 ? '' : 's'} on record.
+                            </span>
+                        )
+                    }
+                    meta={[
+                        { icon: CalendarDays, label: formatDate(new Date()) },
+                        {
+                            icon: Timer,
+                            label: `${totalSessions} session${totalSessions === 1 ? '' : 's'} on record`,
+                        },
+                        {
+                            icon: Link2,
+                            label: 'Sessions sync to timesheets',
+                        },
+                    ]}
+                    badges={heroBadges}
+                    stats={[
+                        { label: 'Today', value: `${todayHours.toFixed(1)}h` },
+                        { label: 'This week', value: `${weekHours.toFixed(1)}h` },
+                        {
+                            label: 'On the clock',
+                            value: openSession ? 'Yes' : 'No',
+                            tone: openSession ? 'success' : undefined,
+                        },
+                        {
+                            label: 'Eligible',
+                            value: eligibleCount,
+                            tone: eligibleCount > 0 ? 'info' : undefined,
+                        },
+                    ]}
                     actions={
                         canManageAny ? (
                             <Select
@@ -151,7 +292,7 @@ export default function AttendanceIndex({
                                     );
                                 }}
                             >
-                                <SelectTrigger className="w-56 border-white/30 bg-white/10 text-white shadow-none hover:bg-white/20 [&_[data-slot=select-value]]:text-white">
+                                <SelectTrigger className="w-56 border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground shadow-none hover:bg-primary-foreground/20 [&_[data-slot=select-value]]:text-primary-foreground">
                                     <SelectValue placeholder="My sessions" />
                                 </SelectTrigger>
                                 <SelectContent>
@@ -171,43 +312,6 @@ export default function AttendanceIndex({
                         ) : null
                     }
                 />
-
-                {/* Stat cards */}
-                <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-4">
-                    <OpsStatCard
-                        label="Today's Hours"
-                        value={`${todayHours.toFixed(1)}h`}
-                        icon={Clock}
-                        color="indigo"
-                    />
-                    <OpsStatCard
-                        label="Status"
-                        value={openSession ? 'Clocked In' : 'Clocked Out'}
-                        icon={Activity}
-                        color={openSession ? 'emerald' : 'slate'}
-                    />
-                    <OpsStatCard
-                        label="Sessions"
-                        value={sessionCount}
-                        icon={Timer}
-                        color="blue"
-                    />
-                    <Tooltip>
-                        <TooltipTrigger asChild>
-                            <div>
-                                <OpsStatCard
-                                    label="Eligible Shifts"
-                                    value={eligibleShifts.length}
-                                    icon={CalendarDays}
-                                    color="violet"
-                                />
-                            </div>
-                        </TooltipTrigger>
-                        <TooltipContent>
-                            Assigned shifts within the clock-in window
-                        </TooltipContent>
-                    </Tooltip>
-                </div>
 
                 {/* Clock action card */}
                 {canClock ? (
@@ -235,13 +339,29 @@ export default function AttendanceIndex({
                                         </span>
                                     </div>
                                     {openSession ? (
-                                        <p className="mt-1 text-sm text-muted-foreground">
-                                            Since{' '}
-                                            {toTime(openSession.clock_in_at)}
-                                            {openSession.shift_id
-                                                ? ` · Shift #${openSession.shift_id}`
-                                                : ''}
-                                        </p>
+                                        <>
+                                            <p className="mt-1 text-sm text-muted-foreground">
+                                                Since{' '}
+                                                {toTime(openSession.clock_in_at)}
+                                                {openSession.shift_id
+                                                    ? ` · Shift #${openSession.shift_id}`
+                                                    : ''}
+                                            </p>
+                                            {Date.now() -
+                                                new Date(
+                                                    openSession.clock_in_at,
+                                                ).getTime() >
+                                            16 * 60 * 60 * 1000 ? (
+                                                <p className="mt-1.5 inline-flex items-center gap-1.5 rounded-md bg-status-warning-bg px-2 py-1 text-xs text-status-warning">
+                                                    <AlertTriangle className="h-3.5 w-3.5 shrink-0" />
+                                                    Open for more than 16 hours
+                                                    — likely a missed
+                                                    clock-out. Clock out and
+                                                    correct the times, or ask a
+                                                    coordinator.
+                                                </p>
+                                            ) : null}
+                                        </>
                                     ) : eligibleShifts.length > 0 ? (
                                         <p className="mt-1 text-sm text-muted-foreground">
                                             {eligibleShifts.length} eligible
@@ -375,6 +495,105 @@ export default function AttendanceIndex({
                                     )}
                                 </div>
                             </div>
+                        </CardContent>
+                    </Card>
+                ) : null}
+
+                {/* Manager live board — who is on the clock right now. */}
+                {canManageAny && onClockNow.length > 0 ? (
+                    <Card>
+                        <CardHeader className="flex-row items-center justify-between space-y-0">
+                            <CardTitle className="text-base">
+                                On the clock now
+                                <span className="ml-2 text-sm font-normal text-muted-foreground">
+                                    {onClockNow.length} open session
+                                    {onClockNow.length === 1 ? '' : 's'}
+                                </span>
+                            </CardTitle>
+                            {onClockNow.some((s) => s.is_stale) ? (
+                                <span className="inline-flex items-center gap-1.5 rounded-full border border-status-warning/30 bg-status-warning-bg px-2.5 py-1 text-xs font-medium text-status-warning">
+                                    <AlertTriangle className="h-3.5 w-3.5" />
+                                    {
+                                        onClockNow.filter((s) => s.is_stale)
+                                            .length
+                                    }{' '}
+                                    likely missed clock-out
+                                    {onClockNow.filter((s) => s.is_stale)
+                                        .length === 1
+                                        ? ''
+                                        : 's'}
+                                </span>
+                            ) : null}
+                        </CardHeader>
+                        <CardContent className="p-0">
+                            <ul className="divide-y">
+                                {onClockNow.map((s) => (
+                                    <li
+                                        key={s.id}
+                                        className="flex flex-wrap items-center gap-x-4 gap-y-1 px-4 py-2.5 text-sm"
+                                    >
+                                        <span className="relative flex h-2 w-2 shrink-0">
+                                            <span
+                                                className={cn(
+                                                    'absolute inline-flex h-full w-full rounded-full opacity-75',
+                                                    s.is_stale
+                                                        ? 'bg-status-warning'
+                                                        : 'animate-ping bg-status-success',
+                                                )}
+                                            />
+                                            <span
+                                                className={cn(
+                                                    'relative inline-flex h-2 w-2 rounded-full',
+                                                    s.is_stale
+                                                        ? 'bg-status-warning'
+                                                        : 'bg-status-success',
+                                                )}
+                                            />
+                                        </span>
+                                        {/* eslint-disable-next-line no-restricted-syntax -- inline text link inside a list row; a shadcn Button would add box chrome. */}
+                                        <button
+                                            type="button"
+                                            onClick={() =>
+                                                router.get(
+                                                    '/attendance',
+                                                    { user_id: s.user_id },
+                                                    {
+                                                        preserveState: true,
+                                                        replace: true,
+                                                    },
+                                                )
+                                            }
+                                            className="min-w-0 truncate font-medium hover:text-primary hover:underline"
+                                        >
+                                            {s.user_name ?? `User #${s.user_id}`}
+                                        </button>
+                                        <span className="text-muted-foreground">
+                                            since {toLocal(s.clock_in_at)}
+                                        </span>
+                                        {s.shift_id ? (
+                                            <span className="text-muted-foreground">
+                                                Shift #{s.shift_id}
+                                                {s.shift_location
+                                                    ? ` · ${s.shift_location}`
+                                                    : ''}
+                                                {s.shift_ends_at
+                                                    ? ` · ends ${toTime(s.shift_ends_at)}`
+                                                    : ''}
+                                            </span>
+                                        ) : (
+                                            <span className="text-muted-foreground">
+                                                No shift linked
+                                            </span>
+                                        )}
+                                        {s.is_stale ? (
+                                            <span className="ml-auto inline-flex items-center gap-1 rounded-full bg-status-warning-bg px-2 py-0.5 text-xs font-medium text-status-warning">
+                                                <AlertTriangle className="h-3 w-3" />
+                                                16h+ open
+                                            </span>
+                                        ) : null}
+                                    </li>
+                                ))}
+                            </ul>
                         </CardContent>
                     </Card>
                 ) : null}

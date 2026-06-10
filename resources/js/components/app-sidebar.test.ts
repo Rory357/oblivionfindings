@@ -64,6 +64,7 @@ describe('app sidebar workforce navigation', () => {
             'Handovers',
             'Shift Notes',
             'Timesheets',
+            'Attendance',
             'Conflict Queue',
         ];
 
@@ -104,6 +105,11 @@ describe('app sidebar workforce navigation', () => {
             catalog.find((item) => item.label === 'Conflict Queue'),
         ).toMatchObject({
             href: '/operations/rostering/conflicts',
+        });
+        expect(
+            catalog.find((item) => item.label === 'Attendance'),
+        ).toMatchObject({
+            href: '/attendance',
         });
 
         const sectionOrder = [...new Set(catalog.map((item) => item.section))];
