@@ -73,6 +73,7 @@ import {
 import { useEffect, useMemo, useRef, useState } from 'react';
 import { toast } from 'sonner';
 
+import { HandoverDetailDialog } from '@/pages/operations/handovers/components/handover-detail-dialog';
 import { HandoverWizard } from '@/pages/operations/handovers/components/handover-wizard';
 import {
     clientName,
@@ -491,14 +492,19 @@ function OnClockBoard({
 function HandoversList({
     rows,
     currentUserId,
+    viewingSelf,
     canCreate,
+    onOpen,
     onAcknowledge,
     onNew,
     onContext,
 }: {
     rows: AttendanceHandover[];
     currentUserId: number;
+    /** False when a manager has the staff filter on someone else. */
+    viewingSelf: boolean;
     canCreate: boolean;
+    onOpen: (h: AttendanceHandover) => void;
     onAcknowledge: (h: AttendanceHandover) => void;
     onNew: () => void;
     onContext: (e: React.MouseEvent, h: AttendanceHandover) => void;
@@ -509,6 +515,16 @@ function HandoversList({
         fallback: string,
     ) =>
         staff ? (staff.id === currentUserId ? 'You' : staff.name) : fallback;
+
+    // Actionable first: your pending acknowledgements, then other pending,
+    // then acknowledged — newest within each group.
+    const sorted = [...rows].sort((a, b) => {
+        const rank = (h: AttendanceHandover) =>
+            h.status === 'submitted' ? (h.incoming ? 0 : 1) : 2;
+        const ts = (h: AttendanceHandover) =>
+            new Date(h.submitted_at ?? h.created_at ?? 0).getTime();
+        return rank(a) - rank(b) || ts(b) - ts(a);
+    });
 
     return (
         <Card>
@@ -540,7 +556,7 @@ function HandoversList({
                     </SectionEmpty>
                 ) : (
                     <ul className="divide-y">
-                        {rows.map((h) => {
+                        {sorted.map((h) => {
                             const tasks = [
                                 ...(h.follow_up_items ?? []),
                                 ...(h.tasks_pending ?? []),
@@ -549,8 +565,18 @@ function HandoversList({
                             return (
                                 <li
                                     key={h.id}
+                                    role="button"
+                                    tabIndex={0}
+                                    aria-label={`Open handover for ${clientName(h.client)}`}
+                                    onClick={() => onOpen(h)}
+                                    onKeyDown={(e) => {
+                                        if (e.key === 'Enter' || e.key === ' ') {
+                                            e.preventDefault();
+                                            onOpen(h);
+                                        }
+                                    }}
                                     onContextMenu={(e) => onContext(e, h)}
-                                    className="flex flex-col gap-2 px-4 py-3 text-sm sm:flex-row sm:items-start"
+                                    className="flex cursor-pointer flex-col gap-2 px-4 py-3 text-sm transition-colors hover:bg-muted/20 focus-visible:bg-muted/20 focus-visible:outline-none sm:flex-row sm:items-start"
                                 >
                                     <span
                                         className={cn(
@@ -584,7 +610,7 @@ function HandoversList({
                                             </span>
                                             {pendingRow ? (
                                                 <StatusPill variant="warning">
-                                                    {h.incoming
+                                                    {viewingSelf && h.incoming
                                                         ? 'Awaiting your acknowledgement'
                                                         : 'Awaiting acknowledgement'}
                                                 </StatusPill>
@@ -624,13 +650,17 @@ function HandoversList({
                                             </div>
                                         ) : null}
                                     </div>
-                                    {pendingRow &&
+                                    {viewingSelf &&
+                                    pendingRow &&
                                     h.incoming &&
                                     h.can_acknowledge ? (
                                         <Button
                                             size="sm"
                                             className="shrink-0"
-                                            onClick={() => onAcknowledge(h)}
+                                            onClick={(e) => {
+                                                e.stopPropagation();
+                                                onAcknowledge(h);
+                                            }}
                                             data-test="attendance-acknowledge-handover"
                                         >
                                             <Check className="h-4 w-4" />{' '}
@@ -679,6 +709,10 @@ export default function AttendanceIndex({
     const [clockOutOpen, setClockOutOpen] = useState(false);
     const [fixSessions, setFixSessions] = useState<FixCandidate[] | null>(null);
     const [handoverOpen, setHandoverOpen] = useState(false);
+    const [editingHandover, setEditingHandover] = useState<Handover | null>(
+        null,
+    );
+    const [detailId, setDetailId] = useState<number | null>(null);
     const [addClientOpen, setAddClientOpen] = useState(false);
     const [pendingClientId, setPendingClientId] = useState<number | null>(null);
     const [endTarget, setEndTarget] = useState<OnClockRow | null>(null);
@@ -844,17 +878,22 @@ export default function AttendanceIndex({
         );
     };
 
-    const openHandoverWizard = () => {
-        if (!canCreateHandovers) return;
-        if (catalogue) {
+    const openHandoverWizard = (editing: Handover | null = null) => {
+        if (!editing && !canCreateHandovers) return;
+        setDetailId(null);
+        const launch = () => {
+            setEditingHandover(editing);
             setHandoverOpen(true);
+        };
+        if (catalogue) {
+            launch();
             return;
         }
-        router.reload({
-            only: ['catalogue'],
-            onSuccess: () => setHandoverOpen(true),
-        });
+        router.reload({ only: ['catalogue'], onSuccess: launch });
     };
+
+    const detailHandover =
+        handovers.find((h) => h.id === detailId) ?? null;
 
     /* ── context menus (ShiftContextMenu host) ── */
     const openCtx = (
@@ -881,7 +920,7 @@ export default function AttendanceIndex({
               {
                   icon: <ArrowLeftRight className="h-3.5 w-3.5" />,
                   label: 'New handover…',
-                  onClick: openHandoverWizard,
+                  onClick: () => openHandoverWizard(),
               },
           ]
         : [];
@@ -976,7 +1015,15 @@ export default function AttendanceIndex({
 
     const handoverCtx = (e: React.MouseEvent, h: AttendanceHandover) =>
         openCtx(e, 'Handover', clientName(h.client), [
-            ...(h.status === 'submitted' && h.incoming && h.can_acknowledge
+            {
+                icon: <FileText className="h-3.5 w-3.5" />,
+                label: 'View details',
+                onClick: () => setDetailId(h.id),
+            },
+            ...(!viewedStaff &&
+            h.status === 'submitted' &&
+            h.incoming &&
+            h.can_acknowledge
                 ? [
                       {
                           icon: <Check className="h-3.5 w-3.5" />,
@@ -1236,7 +1283,9 @@ export default function AttendanceIndex({
                                                 size="sm"
                                                 variant="outline"
                                                 className="border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10"
-                                                onClick={openHandoverWizard}
+                                                onClick={() =>
+                                                    openHandoverWizard()
+                                                }
                                                 data-test="attendance-handover"
                                             >
                                                 <ArrowLeftRight className="mr-1 h-4 w-4" />
@@ -1387,9 +1436,11 @@ export default function AttendanceIndex({
                     <HandoversList
                         rows={handovers}
                         currentUserId={currentUser.id}
+                        viewingSelf={!viewedStaff}
                         canCreate={canCreateHandovers}
+                        onOpen={(h) => setDetailId(h.id)}
                         onAcknowledge={acknowledgeHandover}
-                        onNew={openHandoverWizard}
+                        onNew={() => openHandoverWizard()}
                         onContext={handoverCtx}
                     />
                 ) : null}
@@ -1412,11 +1463,38 @@ export default function AttendanceIndex({
                 sessions={fixSessions ?? []}
             />
 
+            {/* Full handover record — the same detail pop-up as Shift Handovers. */}
+            <HandoverDetailDialog
+                handover={detailHandover}
+                open={detailId != null}
+                onOpenChange={(open) => !open && setDetailId(null)}
+                onEdit={(h) => openHandoverWizard(h)}
+                onSubmit={(h) =>
+                    router.patch(
+                        `/operations/handovers/${h.id}/submit`,
+                        {},
+                        {
+                            preserveScroll: true,
+                            onSuccess: () => setDetailId(null),
+                        },
+                    )
+                }
+                onAcknowledge={(h) => {
+                    setDetailId(null);
+                    acknowledgeHandover(h as AttendanceHandover);
+                }}
+            />
+
             {handoverOpen && catalogue ? (
                 <HandoverWizard
                     open={handoverOpen}
-                    onOpenChange={(open) => !open && setHandoverOpen(false)}
-                    editing={null}
+                    onOpenChange={(open) => {
+                        if (!open) {
+                            setHandoverOpen(false);
+                            setEditingHandover(null);
+                        }
+                    }}
+                    editing={editingHandover}
                     catalogue={catalogue}
                     currentUser={currentUser}
                     preselectClientId={pendingClientId ?? openSession?.client_id ?? null}
