@@ -1,7 +1,6 @@
 import { Link, router, usePage } from '@inertiajs/react';
 import {
     AlertTriangle,
-    Building2,
     CalendarDays,
     ChevronDown,
     ChevronLeft,
@@ -68,14 +67,19 @@ type RawCalendarEvent = {
 
 export type CalendarPaneProps = ShiftActionCallbacks & {
     canManageAny: boolean;
-    staff: Array<{ id: number; name: string; email?: string }>;
-    clients: Array<{
-        id: number;
-        first_name?: string | null;
-        last_name?: string | null;
-        name?: string | null;
-    }>;
-    sites?: Array<{ id: number; name: string; type?: string | null }>;
+    /**
+     * The rostering workspace's hero-banner filters (staff/client/site). The
+     * calendar deliberately has no filter controls of its own — the hero is
+     * the single source of truth, so the month obeys the same scoping as
+     * every other tab. staff_id/client_id are forwarded to the events
+     * endpoint; site_ids are applied client-side (the feed carries site_id
+     * per shift but the endpoint has no site param).
+     */
+    filters?: {
+        staff_id?: number | null;
+        client_id?: number | null;
+        site_ids?: number[];
+    };
     onCreateShift?: (ctx?: { day?: Date }) => void;
 };
 
@@ -935,59 +939,29 @@ function MiniCalendar({
 
 /* ── filter select ──────────────────────────────────────────────────────── */
 
-function FilterSelect({
-    icon,
-    value,
-    onChange,
-    label,
-    options,
-}: {
-    icon: React.ReactNode;
-    value: string;
-    onChange: (v: string) => void;
-    label: string;
-    options: Array<{ value: string; label: string }>;
-}) {
-    return (
-        <label className="inline-flex h-9 cursor-pointer items-center gap-1.5 rounded-[10px] border border-border bg-card px-2.5 transition-colors hover:border-primary/40">
-            <span className="text-muted-foreground">{icon}</span>
-            <select
-                value={value}
-                onChange={(e) => onChange(e.target.value)}
-                aria-label={label}
-                className="max-w-[130px] cursor-pointer appearance-none bg-transparent text-[13px] font-medium text-foreground outline-none"
-            >
-                {options.map((o) => (
-                    <option key={o.value} value={o.value}>
-                        {o.label}
-                    </option>
-                ))}
-            </select>
-            <ChevronDown className="h-3 w-3 text-muted-foreground" />
-        </label>
-    );
-}
-
 /* ── pane ───────────────────────────────────────────────────────────────── */
 
 export function CalendarPane(props: CalendarPaneProps) {
     const { onCreateShift } = props;
     const page = usePage();
     const auth = (page.props as any)?.auth;
-    const labels = (page.props as any)?.labels;
     const canManageAny = !!(props.canManageAny && auth?.can?.shifts?.manageAny);
     const canCreate = !!auth?.can?.shifts?.create && !!onCreateShift;
     const canUpdate = !!auth?.can?.shifts?.update;
     const canViewSiteCalendar = !!auth?.can?.calendar?.viewAny;
-    const clientPlural = (labels?.['client.plural'] ?? 'Clients') as string;
 
     const today = useMemo(() => new Date(), []);
     const [cursor, setCursor] = useState(
         () => new Date(today.getFullYear(), today.getMonth(), 1),
     );
-    const [staffFilter, setStaffFilter] = useState('all');
-    const [clientFilter, setClientFilter] = useState('all');
-    const [siteFilter, setSiteFilter] = useState('all');
+    // Hero-banner filter values (see CalendarPaneProps.filters). Staff/client
+    // scoping mirrors the old embed's rule: only managers may scope to other
+    // people; everyone else is already scoped server-side to their own shifts.
+    const staffIdFilter = canManageAny ? (props.filters?.staff_id ?? null) : null;
+    const clientIdFilter = canManageAny
+        ? (props.filters?.client_id ?? null)
+        : null;
+    const siteIdsKey = (props.filters?.site_ids ?? []).join(',');
 
     const [events, setEvents] = useState<RawCalendarEvent[]>([]);
     const [loading, setLoading] = useState(true);
@@ -1035,11 +1009,11 @@ export function CalendarPane(props: CalendarPaneProps) {
                     start: rangeStartKey,
                     end: rangeEndKey,
                 });
-                if (canManageAny && staffFilter !== 'all') {
-                    params.set('staff_id', staffFilter);
+                if (staffIdFilter != null) {
+                    params.set('staff_id', String(staffIdFilter));
                 }
-                if (canManageAny && clientFilter !== 'all') {
-                    params.set('client_id', clientFilter);
+                if (clientIdFilter != null) {
+                    params.set('client_id', String(clientIdFilter));
                 }
                 const res = await fetch(
                     `/operations/rostering/calendar/events?${params.toString()}`,
@@ -1071,7 +1045,7 @@ export function CalendarPane(props: CalendarPaneProps) {
             cancelled = true;
             controller.abort();
         };
-    }, [rangeStartKey, rangeEndKey, canManageAny, staffFilter, clientFilter, refreshTick]);
+    }, [rangeStartKey, rangeEndKey, staffIdFilter, clientIdFilter, refreshTick]);
 
     // Every shift mutation in this workspace goes through Inertia
     // (assign/unassign/cancel/duplicate/publish/… and the shared
@@ -1095,36 +1069,17 @@ export function CalendarPane(props: CalendarPaneProps) {
         [events],
     );
 
-    const siteOptions = useMemo(() => {
-        if (props.sites?.length) {
-            return props.sites.map((s) => ({
-                value: String(s.id),
-                label: s.name,
-            }));
-        }
-        const seen = new Map<number, string>();
-        for (const s of allShifts) {
-            if (s.siteId && s.siteName && !seen.has(s.siteId)) {
-                seen.set(s.siteId, s.siteName);
-            }
-        }
-        return Array.from(seen.entries()).map(([id, name]) => ({
-            value: String(id),
-            label: name,
-        }));
-    }, [props.sites, allShifts]);
-
     const shifts = useMemo(() => {
-        if (siteFilter === 'all') return allShifts;
-        const id = Number(siteFilter);
-        return allShifts.filter((s) => s.siteId === id);
-    }, [allShifts, siteFilter]);
+        if (!siteIdsKey) return allShifts;
+        const ids = new Set(siteIdsKey.split(',').map(Number));
+        return allShifts.filter((s) => s.siteId != null && ids.has(s.siteId));
+    }, [allShifts, siteIdsKey]);
 
     const visibleGaps = useMemo(() => {
-        if (siteFilter === 'all') return gaps;
-        const id = Number(siteFilter);
-        return gaps.filter((g) => g.siteId === id);
-    }, [gaps, siteFilter]);
+        if (!siteIdsKey) return gaps;
+        const ids = new Set(siteIdsKey.split(',').map(Number));
+        return gaps.filter((g) => g.siteId != null && ids.has(g.siteId));
+    }, [gaps, siteIdsKey]);
 
     const byDay = useMemo(() => {
         const m = new Map<string, CalendarShift[]>();
@@ -1522,54 +1477,10 @@ export function CalendarPane(props: CalendarPaneProps) {
                     </div>
                 </div>
 
+                {/* Staff/client/site scoping lives in the page hero (the same
+                    filters every rostering tab obeys) — the toolbar keeps only
+                    calendar-specific tools. */}
                 <div className="flex flex-wrap items-center gap-2">
-                    {canManageAny ? (
-                        <>
-                            <FilterSelect
-                                icon={<Users className="h-3.5 w-3.5" />}
-                                value={staffFilter}
-                                onChange={setStaffFilter}
-                                label="Filter by staff"
-                                options={[
-                                    { value: 'all', label: 'All staff' },
-                                    ...props.staff.map((s) => ({
-                                        value: String(s.id),
-                                        label: s.name,
-                                    })),
-                                ]}
-                            />
-                            <FilterSelect
-                                icon={<MapPin className="h-3.5 w-3.5" />}
-                                value={clientFilter}
-                                onChange={setClientFilter}
-                                label="Filter by client"
-                                options={[
-                                    {
-                                        value: 'all',
-                                        label: `All ${clientPlural.toLowerCase()}`,
-                                    },
-                                    ...props.clients.map((c) => ({
-                                        value: String(c.id),
-                                        label:
-                                            c.name ??
-                                            `${c.first_name ?? ''} ${c.last_name ?? ''}`.trim(),
-                                    })),
-                                ]}
-                            />
-                            {siteOptions.length > 0 ? (
-                                <FilterSelect
-                                    icon={<Building2 className="h-3.5 w-3.5" />}
-                                    value={siteFilter}
-                                    onChange={setSiteFilter}
-                                    label="Filter by site"
-                                    options={[
-                                        { value: 'all', label: 'All sites' },
-                                        ...siteOptions,
-                                    ]}
-                                />
-                            ) : null}
-                        </>
-                    ) : null}
                     <div className="relative">
                         <Button
                             variant="outline"

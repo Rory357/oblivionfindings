@@ -717,6 +717,10 @@ export default function RosteringIndex(props: Props) {
                     ? overrides.client_id
                     : props.filters.client_id) ?? undefined,
             site_id: siteIds.length > 0 ? siteIds : undefined,
+            // Keep the active tab in the URL across filter/week navigations so
+            // a refresh (or share) after filtering doesn't bounce to Shifts.
+            // Callers that switch tabs (handleTabChange) override this key.
+            ...(tab !== 'shifts' ? { tab } : {}),
         };
     };
 
@@ -2619,9 +2623,7 @@ export default function RosteringIndex(props: Props) {
                         {tab === 'calendar' ? (
                             <CalendarPane
                                 canManageAny={props.canManageAny}
-                                staff={props.staff ?? []}
-                                clients={props.clients ?? []}
-                                sites={props.sites ?? []}
+                                filters={props.filters}
                                 onUnassign={openUnassignMakeOpenDialog}
                                 onCancelShift={(s) => cancelShift(s.id)}
                                 onCreateShift={openCreateShift}
