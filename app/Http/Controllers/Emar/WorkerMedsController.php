@@ -17,6 +17,7 @@ use App\Models\User;
 use App\Services\EnhancedMarService;
 use App\Services\GuidedRoundService;
 use App\Services\MarScheduleService;
+use App\Services\Timeline\TimelineEmitter;
 use App\Support\EmarUrl;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
@@ -251,6 +252,8 @@ class WorkerMedsController extends Controller
                 return back()->with('warning', 'This dose was already recorded — no changes made.');
             }
 
+            $this->emitMedicationTimelineEvent($result['administration'], $medication, $user, $shiftId);
+
             $outcome = match ($data['status']) {
                 'refused' => 'recorded as refused',
                 'withheld' => 'recorded as withheld',
@@ -334,6 +337,8 @@ class WorkerMedsController extends Controller
                     $field => $result['error'] ?? 'Could not record this PRN dose.',
                 ]);
             }
+
+            $this->emitMedicationTimelineEvent($result['administration'], $medication, $user, $shiftId);
 
             return back()->with(
                 'success',
@@ -451,6 +456,46 @@ class WorkerMedsController extends Controller
             ->whereNull('actual_ends_at')
             ->latest('actual_starts_at')
             ->value('id');
+    }
+
+    /**
+     * Mirror the guided-round controller's timeline emission so worker-board
+     * recordings (scheduled doses and PRNs) appear in client timelines and
+     * the board's activity feed. Best-effort: the administration is already
+     * saved, so a timeline failure must never fail the request.
+     */
+    private function emitMedicationTimelineEvent(
+        ClientMedicationAdministration $administration,
+        ClientMedication $medication,
+        User $user,
+        ?int $shiftId,
+    ): void {
+        try {
+            $statusLabel = ucfirst(str_replace('_', ' ', (string) $administration->status));
+
+            app(TimelineEmitter::class)->record([
+                'source_type' => ClientMedicationAdministration::class,
+                'source_id' => $administration->id,
+                'occurred_at' => $administration->administered_at ?? now(),
+                'type' => 'medication_' . $administration->status,
+                'actor_user_id' => $user->id,
+                'client_id' => $medication->client_id,
+                'shift_id' => $shiftId,
+                'site_id' => $medication->client?->site_id,
+                'subject' => $statusLabel . ': ' . $medication->name . ($medication->dosage ? ' ' . $medication->dosage : ''),
+                'body' => null,
+                'meta' => array_filter([
+                    'medication_name' => $medication->name,
+                    'dosage' => $medication->dosage,
+                    'status' => $administration->status,
+                    'reason' => $administration->reason,
+                    'witnessed_by' => $administration->witnessed_by,
+                    'is_prn' => $medication->is_prn ? true : null,
+                ]),
+            ]);
+        } catch (\Throwable $e) {
+            report($e);
+        }
     }
 
     /**

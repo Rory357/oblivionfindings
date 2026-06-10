@@ -100,13 +100,26 @@ class WorkerMedsRecordDoseTest extends TestCase
             Carbon::parse((string) $administration->getRawOriginal('scheduled_for'), 'UTC')->format('Y-m-d H:i'),
         );
 
-        // The board now shows the slot as recorded.
+        // The recording lands on the client timeline (same emission as the
+        // guided round path), which also feeds the board's activity feed.
+        $this->assertDatabaseHas('timeline_events', [
+            'type' => 'medication_given',
+            'source_type' => ClientMedicationAdministration::class,
+            'source_id' => $administration->id,
+            'client_id' => $this->client->id,
+            'actor_user_id' => $this->worker->id,
+        ]);
+
+        // The board now shows the slot as recorded and the activity feed
+        // carries the event.
         $this->actingAs($this->worker)
             ->get('/meds/today')
             ->assertOk()
             ->assertInertia(fn (Assert $page) => $page
                 ->where('schedule.0.status', 'given')
                 ->where('schedule.0.recorded.by', $this->worker->name)
+                ->count('activity', 1)
+                ->where('activity.0.icon', 'check')
             );
     }
 
