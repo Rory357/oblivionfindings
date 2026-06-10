@@ -60,10 +60,13 @@ export function DonutCard({
 }: DonutCardProps): ReactNode {
     const t = TONE_STYLES[tone];
     return (
+        // eslint-disable-next-line no-restricted-syntax -- bespoke donut stat-card selector, not a shadcn Button.
         <button
             type="button"
-            role="tab"
-            aria-selected={active}
+            // Toggle-button semantics (not role="tab"): these stat cards sit
+            // outside the TabStrip's tablist, and a lone role="tab" without a
+            // tablist parent is an axe critical (aria-required-parent).
+            aria-pressed={active}
             aria-controls={ariaControls}
             data-active={active}
             onClick={onClick}

@@ -6,6 +6,16 @@ export {
     type ShiftTypeSlice,
 } from './analytics-pane';
 export { avatarHueStyle } from './avatar-hue';
+export { CalendarPane, type CalendarPaneProps } from './calendar-pane';
+export {
+    calendarStatusMeta,
+    type CalendarGap,
+    type CalendarShift,
+} from './calendar-shared';
+export {
+    DayDetailDialog,
+    type DayDetailDialogProps,
+} from './day-detail-dialog';
 export {
     AvailabilityPane,
     type AvailabilityLeaveRequest,
@@ -124,11 +134,13 @@ export {
     type UnassignMakeOpenShift,
 } from './unassign-make-open-dialog';
 export {
+    buildShiftActions,
     WeekGridPane,
     type GridConflictPeer,
     type GridShift,
     type GridShiftStatus,
     type GridStaffRow,
+    type ShiftActionCallbacks,
 } from './week-grid-pane';
 export {
     WeekPicker,

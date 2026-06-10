@@ -72,7 +72,7 @@ export function ShiftContextMenu({
     return createPortal(
         <div
             ref={ref}
-            className="fixed z-50 w-[280px] rounded-[12px] border border-border bg-popover p-1.5 text-popover-foreground shadow-lg animate-in fade-in-0 zoom-in-95 duration-100"
+            className="pointer-events-auto fixed z-[60] w-[280px] rounded-[12px] border border-border bg-popover p-1.5 text-popover-foreground shadow-lg animate-in fade-in-0 zoom-in-95 duration-100"
             style={{ top: pos.top, left: pos.left }}
             role="menu"
         >

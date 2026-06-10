@@ -150,7 +150,7 @@ const STATUS_CLASS: Record<GridShiftStatus, string> = {
     cancelled: 'bg-muted text-muted-foreground border-border line-through',
 };
 
-const STATUS_LABELS: Record<GridShiftStatus, string> = {
+export const STATUS_LABELS: Record<GridShiftStatus, string> = {
     scheduled: 'Scheduled',
     in_progress: 'In progress',
     completed: 'Completed',
@@ -160,7 +160,10 @@ const STATUS_LABELS: Record<GridShiftStatus, string> = {
     cancelled: 'Cancelled',
 };
 
-const STATUS_CTX_TONE: Record<GridShiftStatus, { bg: string; color: string }> =
+export const STATUS_CTX_TONE: Record<
+    GridShiftStatus,
+    { bg: string; color: string }
+> =
     {
         scheduled: {
             bg: 'color-mix(in oklch, var(--primary) 15%, transparent)',
@@ -183,7 +186,28 @@ const STATUS_CTX_TONE: Record<GridShiftStatus, { bg: string; color: string }> =
         cancelled: { bg: 'var(--muted)', color: 'var(--muted-foreground)' },
     };
 
-function buildShiftActions(
+export type ShiftActionCallbacks = {
+    onAssignOpen?: (s: GridShift) => void;
+    onUnassign?: (s: GridShift) => void;
+    onCancelShift?: (s: GridShift) => void;
+    onResolveConflict?: (s: GridShift) => void;
+    onReassign?: (s: GridShift) => void;
+    onDuplicateShift?: (s: GridShift) => void;
+    onCopyShiftToDay?: (s: GridShift) => void;
+    onReopenShift?: (s: GridShift) => void;
+    onMarkEndedEarly?: (s: GridShift) => void;
+    onAutoFillShift?: (s: GridShift) => void;
+    onReopenCompletedForCorrection?: (s: GridShift) => void;
+    onPublishShift?: (s: GridShift) => void;
+    onMakeRecurring?: (s: GridShift) => void;
+    onBroadcastShift?: (s: GridShift) => void;
+    onRequestReplacement?: (s: GridShift) => void;
+    onEditShift?: (s: GridShift) => void;
+    onReportIncident?: (s: GridShift) => void;
+    onViewTimesheet?: (s: GridShift) => void;
+};
+
+export function buildShiftActions(
     shift: GridShift,
     callbacks: {
         onAssignOpen?: (s: GridShift) => void;

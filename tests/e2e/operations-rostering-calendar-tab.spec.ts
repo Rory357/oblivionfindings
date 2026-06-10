@@ -7,14 +7,13 @@ import {
 } from './helpers';
 
 /**
- * The standalone /scheduling FullCalendar was consolidated into the Rostering
- * workspace as a "Calendar" tab (data/writes re-homed under
- * operations.rostering.calendar.*). These cover the two contracts that the
- * consolidation depends on: the tab renders + loads from the new endpoint, and
- * the retired /scheduling URL redirects into the tab.
+ * The Rostering "Calendar" tab is the custom month grid (CalendarPane), fed by
+ * operations.rostering.calendar.events. These cover the contracts the tab
+ * depends on: it renders + loads from the endpoint, and the retired
+ * /scheduling URL redirects into the tab.
  */
 test.describe('Rostering Calendar tab', () => {
-    test('renders the FullCalendar and loads events from the rostering calendar endpoint', async ({
+    test('renders the month grid and loads events from the rostering calendar endpoint', async ({
         page,
     }) => {
         const consoleErrors = collectConsoleErrors(page);
@@ -26,13 +25,19 @@ test.describe('Rostering Calendar tab', () => {
 
         await page.goto('/operations/rostering?tab=calendar');
 
-        // FullCalendar mounts its `.fc` root only when the Calendar tab is the
-        // active tab — proves ?tab=calendar selected it and the embedded view
-        // rendered without the old AppLayout chrome.
-        await expect(page.locator('.fc').first()).toBeVisible({
-            timeout: 15000,
-        });
+        // CalendarPane mounts only when the Calendar tab is the active tab —
+        // proves ?tab=calendar selected it and the month grid rendered.
+        await expect(
+            page.locator('[data-testid="rostering-calendar"]'),
+        ).toBeVisible({ timeout: 15000 });
         await eventsRequest;
+
+        // The summary ribbon + weekday header are part of the new grid.
+        await expect(
+            page
+                .locator('[data-testid="rostering-calendar"]')
+                .getByText('Coverage gaps'),
+        ).toBeVisible();
 
         expectNoConsoleErrors(consoleErrors);
     });

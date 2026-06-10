@@ -31,7 +31,6 @@ import {
     Briefcase,
     Building2,
     CalendarDays,
-    CalendarRange,
     Car,
     Cctv,
     CheckCircle2,
@@ -398,7 +397,9 @@ function buildIconNavItems({
         {
             id: 'my-calendar',
             icon: CalendarDays,
-            label: 'Calendar',
+            // "My Calendar" (personal shifts), to disambiguate from the
+            // Rostering Calendar tab and the Site Calendar.
+            label: 'My Calendar',
             href: '/my-calendar',
             dividerAfter: true,
         },
@@ -952,17 +953,13 @@ function buildWorkforceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             icon: ClipboardList,
             badge: can?.job_board?.open_count,
         });
+    // Rostering's own TabStrip is the navigation for its Calendar tab
+    // (/operations/rostering?tab=calendar) — no separate sidebar item.
     if (can?.rostering?.viewAny)
         workforce.push({
             title: 'Rostering',
             href: '/operations/rostering',
             icon: CalendarDays,
-        });
-    if (can?.rostering?.viewAny)
-        workforce.push({
-            title: 'Calendar',
-            href: '/operations/rostering?tab=calendar',
-            icon: CalendarRange,
         });
     if (can?.rostering?.viewAny)
         workforce.push({

@@ -7,6 +7,7 @@ import {
     type AvailabilityStaffMember,
     BroadcastDialog,
     type BroadcastShift,
+    CalendarPane,
     CapacityHeatmapPane,
     CopyToDayDialog,
     type CopyToDayShift,
@@ -88,9 +89,6 @@ import {
     Zap,
 } from 'lucide-react';
 
-// The scheduling FullCalendar, re-homed from the retired /scheduling page and
-// rendered as the "Calendar" tab below.
-import RosteringCalendarView from '@/pages/calendar/index';
 import { useEffect, useMemo, useRef, useState } from 'react';
 import {
     CreateShiftDialog,
@@ -2399,11 +2397,11 @@ export default function RosteringIndex(props: Props) {
                     }
                 />
 
-                {/* The summary donuts double as tab switchers (role="tab"), so
-                    they need a tablist parent to satisfy WCAG 4.1.2 (axe
-                    aria-required-parent). */}
+                {/* The summary donuts are aria-pressed toggle buttons (the real
+                    tablist is the TabStrip below) — a role="tablist" here with
+                    no role="tab" children would be an axe critical
+                    (aria-required-children). */}
                 <div
-                    role="tablist"
                     aria-label="Roster summary views"
                     className="grid grid-cols-1 gap-3 lg:grid-cols-3"
                 >
@@ -2619,14 +2617,132 @@ export default function RosteringIndex(props: Props) {
                             />
                         ) : null}
                         {tab === 'calendar' ? (
-                            <RosteringCalendarView
+                            <CalendarPane
                                 canManageAny={props.canManageAny}
                                 staff={props.staff ?? []}
                                 clients={props.clients ?? []}
-                                serviceContexts={props.serviceContexts ?? []}
-                                defaultServiceContextId={
-                                    props.defaultServiceContextId ?? null
+                                sites={props.sites ?? []}
+                                onUnassign={openUnassignMakeOpenDialog}
+                                onCancelShift={(s) => cancelShift(s.id)}
+                                onCreateShift={openCreateShift}
+                                onAssignOpen={(s) =>
+                                    setReassignShift({
+                                        id: s.id,
+                                        starts_at: s.starts_at,
+                                        ends_at: s.ends_at,
+                                        client: s.client,
+                                        staff: s.staff ?? null,
+                                        isOpen: true,
+                                    })
                                 }
+                                onReassign={(s) =>
+                                    setReassignShift({
+                                        id: s.id,
+                                        starts_at: s.starts_at,
+                                        ends_at: s.ends_at,
+                                        client: s.client,
+                                        staff: s.staff ?? null,
+                                        isOpen: false,
+                                    })
+                                }
+                                onResolveConflict={(s) =>
+                                    setResolveConflictShift(s)
+                                }
+                                onDuplicateShift={
+                                    props.canManageAny
+                                        ? (s) => duplicateShift(s.id)
+                                        : undefined
+                                }
+                                onEditShift={
+                                    props.canManageAny
+                                        ? openEditShift
+                                        : undefined
+                                }
+                                onCopyShiftToDay={
+                                    props.canManageAny
+                                        ? (s) =>
+                                              setCopyToDayShift({
+                                                  id: s.id,
+                                                  starts_at: s.starts_at,
+                                                  client: s.client,
+                                              })
+                                        : undefined
+                                }
+                                onMarkEndedEarly={
+                                    props.canManageAny
+                                        ? (s) =>
+                                              setMarkEndedEarlyShift({
+                                                  id: s.id,
+                                                  starts_at: s.starts_at,
+                                                  client: s.client,
+                                                  staff: s.staff ?? null,
+                                              })
+                                        : undefined
+                                }
+                                onAutoFillShift={
+                                    props.canManageAny
+                                        ? (s) => autoFillShift(s.id)
+                                        : undefined
+                                }
+                                onReopenCompletedForCorrection={
+                                    props.canManageAny
+                                        ? (s) =>
+                                              setReopenForCorrectionShift({
+                                                  id: s.id,
+                                                  starts_at: s.starts_at,
+                                                  client: s.client,
+                                                  staff: s.staff ?? null,
+                                              })
+                                        : undefined
+                                }
+                                onPublishShift={
+                                    props.canManageAny
+                                        ? (s) => publishShift(s.id)
+                                        : undefined
+                                }
+                                onMakeRecurring={
+                                    props.canManageAny
+                                        ? (s) =>
+                                              setMakeRecurringShift({
+                                                  id: s.id,
+                                                  starts_at: s.starts_at,
+                                                  client: s.client,
+                                              })
+                                        : undefined
+                                }
+                                onBroadcastShift={
+                                    props.canManageAny
+                                        ? (s) =>
+                                              setBroadcastShift({
+                                                  id: s.id,
+                                                  starts_at: s.starts_at,
+                                                  client: s.client,
+                                                  site: null,
+                                              })
+                                        : undefined
+                                }
+                                onRequestReplacement={
+                                    props.canManageAny
+                                        ? (s) =>
+                                              setRequestReplacementShift({
+                                                  id: s.id,
+                                                  starts_at: s.starts_at,
+                                                  client: s.client,
+                                                  staff: s.staff ?? null,
+                                              })
+                                        : undefined
+                                }
+                                onReopenShift={
+                                    props.canManageAny
+                                        ? (s) => reopenShift(s.id)
+                                        : undefined
+                                }
+                                onReportIncident={(s) =>
+                                    router.visit(
+                                        `/incidents/create?shift_id=${s.id}`,
+                                    )
+                                }
+                                onViewTimesheet={openTimesheet}
                             />
                         ) : null}
                         {tab === 'open' ? (
