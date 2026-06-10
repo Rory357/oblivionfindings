@@ -254,3 +254,13 @@ Question raised: the nav group says **Workforce** but the URLs live under `/oper
 | My Day | PageHero avatar variant — **intentionally personal** (worker home: avatar stack, resident pills, quick actions) | shift-state badges instead of greeting line | ✅ | n/a (day-scoped) | popup-guide dialogs ✅ | ✅ |
 
 Navigation: all ten surfaces (+ Attendance) live in the one **Workforce** sidebar group with permission gates that are subsets of their route gates.
+
+## Addendum — follow-up batch `de39e0c3..9dee2740` (2026-06-10, same day)
+
+The handoff's outstanding list was completed end-to-end (see `docs/workforce-outstanding-handoff-2026-06-10.md` for per-item detail). Two rows of the matrix above changed, and one tab-idiom note is superseded:
+
+- **Shifts → wizard/dialog pattern:** CreateShiftDialog is no longer the deferred single-pane — it now follows the handover-wizard chrome (rail + free-jump steps, progress strip, review recap). The I-3 deferral was reopened with explicit user approval and shipped (`7e33a3ca`).
+- **Timesheets → week-stepper:** now wired (`d1045193`). The stepper writes the existing `from`/`to` filters; the hero summary follows an exact Mon–Sun pair, otherwise it stays "this week". The audit's guardrail holds: the DEFAULT view remains unfiltered, so the approval worklist never week-hides unless a manager explicitly steps into a week (`TimesheetHeroWeekScopeTest`).
+- **Tab idiom (body-idiom note in §5):** harmonized (`9dee2740`). The shared `components/rostering/tab-strip.tsx` is now the one tab control across Rostering, Shifts, Handovers, Shift Notes and Timesheets (new `ariaLabel` prop per surface). DonutCards remain as data-viz selector cards on Rostering/Shifts.
+- **§6 follow-ups closed:** `RosterPeriodPublished` now writes an audit row via `RecordRosterPeriodPublishedAudit` (`27eb28a5`, audit-log not client-timeline, per the recorded decision), and `SuggestionEndToEndTest` covers suggest → accept → apply over HTTP (`f33ff25b`).
+- **Stuck demo sessions:** closed on the live demo via the new manager **End session** board action (`1c8795f5` — `adminEndSession` service + `POST /attendance/sessions/{session}/end`, gated by the board's own `timesheets.manageAny`).
