@@ -3,6 +3,7 @@
  * computed avatar hues, white glyphs on solid status dots — the established
  * avatar/timeline idiom). All status colours are semantic tokens, per
  * docs/DESIGN_TOKENS.md. */
+import { ReasonDialog } from '@/components/reason-dialog';
 import { TimesheetStatusBadge } from '@/components/timesheet-status-badge';
 import { Button } from '@/components/ui/button';
 import {
@@ -158,6 +159,7 @@ export default function ViewTimesheetDialog({
     canApprove?: boolean;
 }) {
     const [busy, setBusy] = useState(false);
+    const [reasonAction, setReasonAction] = useState<'reject' | 'return' | null>(null);
 
     if (!timesheet) return null;
     const t = timesheet;
@@ -496,11 +498,7 @@ export default function ViewTimesheetDialog({
                                         variant="outline"
                                         size="sm"
                                         className="gap-1.5 border-status-critical/30 text-status-critical hover:bg-status-critical-bg"
-                                        onClick={() => {
-                                            const reason = window.prompt('Reason for rejection:');
-                                            if (!reason) return;
-                                            call('post', `/operations/timesheets/${t.id}/reject`, { decision_notes: reason });
-                                        }}
+                                        onClick={() => setReasonAction('reject')}
                                         disabled={busy}
                                     >
                                         <XCircle className="h-4 w-4" /> Reject
@@ -509,11 +507,7 @@ export default function ViewTimesheetDialog({
                                         variant="outline"
                                         size="sm"
                                         className="gap-1.5 border-status-warning/30 text-status-warning hover:bg-status-warning-bg"
-                                        onClick={() => {
-                                            const reason = window.prompt('What needs changing?');
-                                            if (!reason) return;
-                                            call('post', `/operations/timesheets/${t.id}/return`, { returned_notes: reason });
-                                        }}
+                                        onClick={() => setReasonAction('return')}
                                         disabled={busy}
                                     >
                                         <RotateCcw className="h-4 w-4" /> Return for changes
@@ -545,6 +539,28 @@ export default function ViewTimesheetDialog({
                     </div>
                 </footer>
             </DialogContent>
+
+            <ReasonDialog
+                open={reasonAction !== null}
+                onClose={() => setReasonAction(null)}
+                title={reasonAction === 'reject' ? 'Reject timesheet?' : 'Return for changes?'}
+                description={
+                    reasonAction === 'reject'
+                        ? 'The staff member will see this timesheet as rejected, with your reason.'
+                        : 'The timesheet goes back to the staff member to fix and resubmit.'
+                }
+                label={reasonAction === 'reject' ? 'Reason for rejection' : 'What needs changing?'}
+                confirmLabel={reasonAction === 'reject' ? 'Reject timesheet' : 'Return to staff'}
+                destructive={reasonAction === 'reject'}
+                onConfirm={(reason) => {
+                    if (reasonAction === 'reject') {
+                        call('post', `/operations/timesheets/${t.id}/reject`, { decision_notes: reason });
+                    } else {
+                        call('post', `/operations/timesheets/${t.id}/return`, { returned_notes: reason });
+                    }
+                    setReasonAction(null);
+                }}
+            />
         </Dialog>
     );
 }

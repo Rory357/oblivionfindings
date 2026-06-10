@@ -1,14 +1,15 @@
 /**
- * A small reusable "capture a reason, then confirm" pop-up — used for the
- * destructive / with-reason pipeline actions (decline a referral, reject a
- * request, discharge a stay). The caller's onConfirm fires the request and
- * closes the dialog on success.
+ * A small reusable "capture a reason, then confirm" pop-up — used for
+ * destructive / with-reason actions (reject a timesheet, decline a referral,
+ * end an attendance session). The reason is required; the caller's onConfirm
+ * fires the request and closes the dialog on success.
  */
 import { Button } from '@/components/ui/button';
 import { Dialog, DialogContent, DialogDescription, DialogTitle } from '@/components/ui/dialog';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
-import { useEffect, useState } from 'react';
+import { Loader2 } from 'lucide-react';
+import { useEffect, useId, useState } from 'react';
 
 export function ReasonDialog({
     open,
@@ -32,6 +33,7 @@ export function ReasonDialog({
     /** Fire the request; call `done` when it settles (to re-enable the button on failure). */
     onConfirm: (reason: string, done: () => void) => void;
 }) {
+    const fieldId = useId();
     const [reason, setReason] = useState('');
     const [submitting, setSubmitting] = useState(false);
 
@@ -54,9 +56,9 @@ export function ReasonDialog({
                 <DialogTitle className="text-left text-lg">{title}</DialogTitle>
                 {description ? <DialogDescription className="text-left">{description}</DialogDescription> : null}
                 <div className="grid gap-1.5">
-                    <Label htmlFor="respite-reason">{label}</Label>
+                    <Label htmlFor={fieldId}>{label}</Label>
                     <Textarea
-                        id="respite-reason"
+                        id={fieldId}
                         value={reason}
                         onChange={(e) => setReason(e.target.value)}
                         placeholder={placeholder}
@@ -73,6 +75,7 @@ export function ReasonDialog({
                         onClick={submit}
                         disabled={submitting || !reason.trim()}
                     >
+                        {submitting ? <Loader2 className="h-4 w-4 animate-spin" /> : null}
                         {confirmLabel}
                     </Button>
                 </div>

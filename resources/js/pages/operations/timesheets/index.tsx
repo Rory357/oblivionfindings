@@ -1,5 +1,6 @@
 import { OpsStatCard } from '@/components/ops-stat-card';
 import PageShell from '@/components/page-shell';
+import { ReasonDialog } from '@/components/reason-dialog';
 import { TimesheetStatusBadge } from '@/components/timesheet-status-badge';
 import CreateTimesheetDialog, {
     type ClientOption,
@@ -397,6 +398,7 @@ export default function TimesheetsIndex({
     const [menu, setMenu] = useState<{ x: number; y: number; row: TimesheetRow } | null>(null);
     const [hover, setHover] = useState<{ row: TimesheetRow; rect: DOMRect } | null>(null);
     const [viewing, setViewing] = useState<TimesheetRow | null>(null);
+    const [reasonTarget, setReasonTarget] = useState<{ action: 'reject' | 'return'; row: TimesheetRow } | null>(null);
     const [createOpen, setCreateOpen] = useState(false);
     const [initialShiftId, setInitialShiftId] = useState<number | null>(null);
     const hoverTimer = useRef<number | null>(null);
@@ -460,18 +462,12 @@ export default function TimesheetsIndex({
             case 'approve':
                 router.post(`/operations/timesheets/${row.id}/approve`, {}, { preserveScroll: true });
                 return;
-            case 'return': {
-                const reason = window.prompt('What needs changing?');
-                if (!reason) return;
-                router.post(`/operations/timesheets/${row.id}/return`, { returned_notes: reason }, { preserveScroll: true });
+            case 'return':
+                setReasonTarget({ action: 'return', row });
                 return;
-            }
-            case 'reject': {
-                const reason = window.prompt('Reason for rejection:');
-                if (!reason) return;
-                router.post(`/operations/timesheets/${row.id}/reject`, { decision_notes: reason }, { preserveScroll: true });
+            case 'reject':
+                setReasonTarget({ action: 'reject', row });
                 return;
-            }
             case 'archive':
                 router.post(`/operations/timesheets/${row.id}/archive`, {}, { preserveScroll: true });
                 return;
@@ -760,6 +756,29 @@ export default function TimesheetsIndex({
                 clients={clients}
                 sites={sites}
                 initialShiftId={initialShiftId}
+            />
+            <ReasonDialog
+                open={reasonTarget !== null}
+                onClose={() => setReasonTarget(null)}
+                title={reasonTarget?.action === 'reject' ? 'Reject timesheet?' : 'Return for changes?'}
+                description={
+                    reasonTarget?.action === 'reject'
+                        ? 'The staff member will see this timesheet as rejected, with your reason.'
+                        : 'The timesheet goes back to the staff member to fix and resubmit.'
+                }
+                label={reasonTarget?.action === 'reject' ? 'Reason for rejection' : 'What needs changing?'}
+                confirmLabel={reasonTarget?.action === 'reject' ? 'Reject timesheet' : 'Return to staff'}
+                destructive={reasonTarget?.action === 'reject'}
+                onConfirm={(reason) => {
+                    if (!reasonTarget) return;
+                    const { action, row } = reasonTarget;
+                    router.post(
+                        `/operations/timesheets/${row.id}/${action}`,
+                        action === 'reject' ? { decision_notes: reason } : { returned_notes: reason },
+                        { preserveScroll: true },
+                    );
+                    setReasonTarget(null);
+                }}
             />
         </AppLayout>
     );

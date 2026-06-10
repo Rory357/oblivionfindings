@@ -35,7 +35,7 @@ import { respiteActions } from './actions';
 import { RespiteDetailModal, type RespiteDetail } from './detail-modal';
 import { ConfirmBookingModal } from './modals/booking-confirm';
 import { OnboardModal } from './modals/onboard';
-import { ReasonDialog } from './modals/reason-dialog';
+import { ReasonDialog } from '@/components/reason-dialog';
 import { ReferralIntakeModal } from './modals/referral-intake';
 import { RequestIntakeModal } from './modals/request-intake';
 import {
