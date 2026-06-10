@@ -549,7 +549,9 @@ function HandoversList({
             <CardContent className="p-0">
                 {rows.length === 0 ? (
                     <SectionEmpty>
-                        No handovers involving you
+                        {viewingSelf
+                            ? 'No handovers involving you'
+                            : 'No handovers involving this staff member'}
                         {canCreate
                             ? ' — use “New handover” to brief the next shift.'
                             : '.'}
