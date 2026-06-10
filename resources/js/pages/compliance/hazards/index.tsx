@@ -13,7 +13,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
-import { formatDateTime } from '@/lib/date-format';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     DropdownMenu,
@@ -413,7 +413,7 @@ export default function GlobalHazards({ sites, hazards, filters, severityOptions
                                             <div className="mt-1.5 flex flex-wrap items-center gap-x-3 gap-y-1 text-xs text-muted-foreground">
                                                 <span className="flex items-center gap-1">
                                                     <Calendar className="h-3 w-3" />
-                                                    {formatDateTime(hazard.created_at)}
+                                                    {formatDateTimeLong(hazard.created_at)}
                                                 </span>
                                                 {hazard.assigned_to_name && (
                                                     <span className="flex items-center gap-1">

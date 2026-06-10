@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import RespiteSubnav from '@/components/respite-subnav';
-import { formatDateTime } from '@/lib/date-format';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, Link, router } from '@inertiajs/react';
 import { AlertTriangle } from 'lucide-react';
 
@@ -51,7 +51,7 @@ export default function DailyNotesWithIncidents({ notes }: Props) {
                                                 <Badge variant="outline">Incident</Badge>
                                             </div>
                                             <div className="mt-2 text-xs text-muted-foreground">
-                                                {formatDateTime(note.note_date)}
+                                                {formatDateTimeLong(note.note_date)}
                                             </div>
                                         </div>
                                         <Link href={`/respite/daily-notes/${note.id}`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted">

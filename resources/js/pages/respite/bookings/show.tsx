@@ -4,7 +4,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateTime } from '@/lib/date-format';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { show as showShift } from '@/routes/operations/shifts';
 import { Head, Link, router } from '@inertiajs/react';
 
@@ -50,8 +50,8 @@ export default function RespiteBookingShow({ booking }: Props) {
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-2 text-sm text-muted-foreground">
-                        <div>Start: {formatDateTime(booking.start_at)}</div>
-                        <div>End: {formatDateTime(booking.end_at)}</div>
+                        <div>Start: {formatDateTimeLong(booking.start_at)}</div>
+                        <div>End: {formatDateTimeLong(booking.end_at)}</div>
                         <div>
                             Hours:{' '}
                             {hoursBetween(booking.start_at, booking.end_at)}

@@ -3,7 +3,7 @@ import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import RespiteSubnav from '@/components/respite-subnav';
-import { formatDateTime } from '@/lib/date-format';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, Link } from '@inertiajs/react';
 import { Home } from 'lucide-react';
 
@@ -49,8 +49,8 @@ export default function RespiteStaysIndex({ stays }: Props) {
                                                 <Badge variant="outline">{s.status}</Badge>
                                             </div>
                                             <div className="mt-2 text-xs text-muted-foreground">
-                                                {s.actual_start && <>Started: {formatDateTime(s.actual_start)}</>}
-                                                {s.actual_end && <> — Ended: {formatDateTime(s.actual_end)}</>}
+                                                {s.actual_start && <>Started: {formatDateTimeLong(s.actual_start)}</>}
+                                                {s.actual_end && <> — Ended: {formatDateTimeLong(s.actual_end)}</>}
                                             </div>
                                         </div>
                                         <Link href={`/respite/stays/${s.id}`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted">

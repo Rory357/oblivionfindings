@@ -6,7 +6,7 @@ import { Card, CardContent } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { LaravelPagination } from '@/components/ui/laravel-pagination';
-import { formatDateTime } from '@/lib/date-format';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     DropdownMenu,
@@ -280,7 +280,7 @@ export default function SafeguardingIndex({ filters, concerns, stats }: Props) {
                                                             <span className="flex items-center gap-1"><User className="h-3 w-3" />{subjectName}</span>
                                                         )}
                                                         {concern.occurred_at && (
-                                                            <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{formatDateTime(concern.occurred_at)}</span>
+                                                            <span className="flex items-center gap-1"><Calendar className="h-3 w-3" />{formatDateTimeLong(concern.occurred_at)}</span>
                                                         )}
                                                         {concern.site?.name && (
                                                             <span className="flex items-center gap-1"><MapPin className="h-3 w-3" />{concern.site.name}</span>

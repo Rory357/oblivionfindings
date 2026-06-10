@@ -3,7 +3,7 @@ import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { formatDate } from '@/lib/date-format';
+import { formatDateLong } from '@/lib/datetime';
 import { Head, Link, router } from '@inertiajs/react';
 import { FileText, CheckCircle, Clock, AlertTriangle, History, HardHat, Shield } from 'lucide-react';
 
@@ -255,7 +255,7 @@ export default function ProcedureShow({ procedure, versions, canApprove, canEdit
                                 <span>
                                     Approved by <span className="font-medium">{procedure.approved_by.name}</span>
                                     {procedure.approved_at && (
-                                        <> on {formatDate(procedure.approved_at)}</>
+                                        <> on {formatDateLong(procedure.approved_at)}</>
                                     )}
                                 </span>
                             </div>
@@ -288,7 +288,7 @@ export default function ProcedureShow({ procedure, versions, canApprove, canEdit
                                             <td className="py-2 font-medium">v{v.version}</td>
                                             <td className="py-2">{v.change_summary ?? '-'}</td>
                                             <td className="py-2">{v.changed_by?.name ?? '-'}</td>
-                                            <td className="py-2">{formatDate(v.created_at)}</td>
+                                            <td className="py-2">{formatDateLong(v.created_at)}</td>
                                         </tr>
                                     ))}
                                     {!versions.length && (

@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import RespiteSubnav from '@/components/respite-subnav';
-import { formatDateTime } from '@/lib/date-format';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, Link, router } from '@inertiajs/react';
 import { useState } from 'react';
 import { NotebookPen, Plus } from 'lucide-react';
@@ -149,7 +149,7 @@ export default function DailyNotesIndex({ notes, filters, shiftPeriods }: Props)
                                                 {note.incident_occurred && <Badge variant="outline">Incident</Badge>}
                                             </div>
                                             <div className="mt-2 text-xs text-muted-foreground">
-                                                {formatDateTime(note.note_date)}
+                                                {formatDateTimeLong(note.note_date)}
                                             </div>
                                         </div>
                                         <Link href={`/respite/daily-notes/${note.id}`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted">

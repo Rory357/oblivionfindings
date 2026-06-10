@@ -20,7 +20,7 @@ import {
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateTime } from '@/lib/date-format';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, router, useForm } from '@inertiajs/react';
 import { Heart, Plus } from 'lucide-react';
 import { useState } from 'react';
@@ -476,7 +476,7 @@ export default function FirstAidIndex({
                                             className="border-b last:border-0"
                                         >
                                             <td className="py-2 whitespace-nowrap">
-                                                {formatDateTime(
+                                                {formatDateTimeLong(
                                                     r.treatment_date,
                                                 )}
                                             </td>

@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import RespiteSubnav from '@/components/respite-subnav';
-import { formatDateTime } from '@/lib/date-format';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, Link } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
 
@@ -51,7 +51,7 @@ export default function HandoverNotesForStay({ stay, notes }: Props) {
                                                 {n.acknowledged_at && <Badge className="bg-status-success-bg text-status-success">Acknowledged</Badge>}
                                             </div>
                                             <div className="mt-2 text-xs text-muted-foreground line-clamp-2">{n.notes}</div>
-                                            <div className="mt-1 text-xs text-muted-foreground">{formatDateTime(n.created_at)}</div>
+                                            <div className="mt-1 text-xs text-muted-foreground">{formatDateTimeLong(n.created_at)}</div>
                                         </div>
                                         <Link href={`/respite/handover-notes/${n.id}`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
                                             View

@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import RespiteSubnav from '@/components/respite-subnav';
-import { formatDateTime } from '@/lib/date-format';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, Link, router } from '@inertiajs/react';
 import { ListChecks } from 'lucide-react';
 
@@ -120,7 +120,7 @@ export default function TasksIndex({ tasks, staff, filters }: Props) {
                                                 <div className="mt-2 text-xs text-muted-foreground">Assigned to: {t.assigned_to?.name}</div>
                                             )}
                                             {t.due_at && (
-                                                <div className="mt-1 text-xs text-muted-foreground">Due: {formatDateTime(t.due_at)}</div>
+                                                <div className="mt-1 text-xs text-muted-foreground">Due: {formatDateTimeLong(t.due_at)}</div>
                                             )}
                                             {t.procedure_run && (
                                                 <div className="mt-1">

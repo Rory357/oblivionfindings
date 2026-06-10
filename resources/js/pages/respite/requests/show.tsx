@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { PageHero, PageLayout } from '@/components/page';
 import RespiteSubnav from '@/components/respite-subnav';
-import { formatDateTime } from '@/lib/date-format';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, Link, router } from '@inertiajs/react';
 
 type Props = {
@@ -37,7 +37,7 @@ export default function RespiteRequestShow({ request, booking }: Props) {
                         <CardTitle className="text-base">Request Details</CardTitle>
                     </CardHeader>
                     <CardContent className="text-sm text-muted-foreground space-y-2">
-                        <div>Requested: {formatDateTime(request.requested_start)} → {formatDateTime(request.requested_end)}</div>
+                        <div>Requested: {formatDateTimeLong(request.requested_start)} → {formatDateTimeLong(request.requested_end)}</div>
                         <div>Funding: {request.funding_reference || 'Not set'}</div>
                         <div>Notes: {request.preference_notes || 'None'}</div>
                     </CardContent>

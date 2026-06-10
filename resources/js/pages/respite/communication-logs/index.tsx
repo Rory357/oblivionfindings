@@ -7,7 +7,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import RespiteSubnav from '@/components/respite-subnav';
-import { formatDateTime } from '@/lib/date-format';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, Link, router } from '@inertiajs/react';
 import { useState } from 'react';
 import { MessageSquare, Plus } from 'lucide-react';
@@ -111,7 +111,7 @@ export default function CommunicationLogsIndex({ logs, filters, channels }: Prop
                                                 )}
                                             </div>
                                             <div className="mt-2 text-xs text-muted-foreground">
-                                                {formatDateTime(log.occurred_at)}
+                                                {formatDateTimeLong(log.occurred_at)}
                                             </div>
                                             {log.summary && (
                                                 <div className="mt-1 text-xs text-muted-foreground">

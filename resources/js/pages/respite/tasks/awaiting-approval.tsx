@@ -6,7 +6,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { Textarea } from '@/components/ui/textarea';
 import RespiteSubnav from '@/components/respite-subnav';
-import { formatDateTime } from '@/lib/date-format';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, Link, router } from '@inertiajs/react';
 import { ListChecks } from 'lucide-react';
 
@@ -58,7 +58,7 @@ export default function TasksAwaitingApproval({ tasks }: Props) {
                                                 <div className="mt-2 text-xs text-muted-foreground">Submitted by: {t.assigned_to?.name}</div>
                                             )}
                                             {t.due_at && (
-                                                <div className="mt-1 text-xs text-muted-foreground">Due: {formatDateTime(t.due_at)}</div>
+                                                <div className="mt-1 text-xs text-muted-foreground">Due: {formatDateTimeLong(t.due_at)}</div>
                                             )}
                                         </div>
                                         <Link href={`/respite/tasks/${t.id}`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted">

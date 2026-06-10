@@ -3,7 +3,7 @@ import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import RespiteSubnav from '@/components/respite-subnav';
-import { formatDateTime } from '@/lib/date-format';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, Link } from '@inertiajs/react';
 import { CalendarCheck } from 'lucide-react';
 
@@ -53,7 +53,7 @@ export default function RespiteBookingsIndex({ bookings }: Props) {
                                                 <Badge variant="outline">{b.status}</Badge>
                                             </div>
                                             <div className="mt-2 text-xs text-muted-foreground">
-                                                {formatDateTime(b.start_at)} → {formatDateTime(b.end_at)}
+                                                {formatDateTimeLong(b.start_at)} → {formatDateTimeLong(b.end_at)}
                                             </div>
                                         </div>
                                         <Link href={`/respite/bookings/${b.id}`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted">

@@ -3,7 +3,7 @@ import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import RespiteSubnav from '@/components/respite-subnav';
-import { formatDateTime } from '@/lib/date-format';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, Link } from '@inertiajs/react';
 import { ListChecks } from 'lucide-react';
 
@@ -63,7 +63,7 @@ export default function MyTasks({ tasks }: Props) {
                                                 <Badge className={statusColors[t.status] || ''}>{t.status?.replace(/_/g, ' ')}</Badge>
                                             </div>
                                             {t.due_at && (
-                                                <div className="mt-2 text-xs text-muted-foreground">Due: {formatDateTime(t.due_at)}</div>
+                                                <div className="mt-2 text-xs text-muted-foreground">Due: {formatDateTimeLong(t.due_at)}</div>
                                             )}
                                             {t.procedure_run && (
                                                 <div className="mt-1">

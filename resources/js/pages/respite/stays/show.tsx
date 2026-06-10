@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { PageHero, PageLayout } from '@/components/page';
 import RespiteSubnav from '@/components/respite-subnav';
-import { formatDateTime } from '@/lib/date-format';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, Link, router } from '@inertiajs/react';
 import { useState } from 'react';
 import { Dialog, DialogContent, DialogHeader, DialogTitle, DialogFooter } from '@/components/ui/dialog';
@@ -99,9 +99,9 @@ export default function RespiteStayShow({ stay }: Props) {
                                 <span className="text-muted-foreground">Status</span>
                                 <span className="capitalize">{stay.status}</span>
                                 <span className="text-muted-foreground">Admitted</span>
-                                <span>{formatDateTime(stay.actual_start) || '—'}</span>
+                                <span>{formatDateTimeLong(stay.actual_start) || '—'}</span>
                                 <span className="text-muted-foreground">End</span>
-                                <span>{formatDateTime(stay.actual_end) || '—'}</span>
+                                <span>{formatDateTimeLong(stay.actual_end) || '—'}</span>
                                 <span className="text-muted-foreground">Created by</span>
                                 <span>{stay.created_by_user?.name || '—'}</span>
                             </div>
@@ -133,9 +133,9 @@ export default function RespiteStayShow({ stay }: Props) {
                                         #{stay.booking.id}
                                     </Link>
                                     <span className="text-muted-foreground">Booked Start</span>
-                                    <span>{formatDateTime(stay.booking.start_at) || '—'}</span>
+                                    <span>{formatDateTimeLong(stay.booking.start_at) || '—'}</span>
                                     <span className="text-muted-foreground">Booked End</span>
-                                    <span>{formatDateTime(stay.booking.end_at) || '—'}</span>
+                                    <span>{formatDateTimeLong(stay.booking.end_at) || '—'}</span>
                                     <span className="text-muted-foreground">Coordinator</span>
                                     <span>{stay.booking.coordinator?.name || 'Unassigned'}</span>
                                     <span className="text-muted-foreground">Status</span>
@@ -322,11 +322,11 @@ export default function RespiteStayShow({ stay }: Props) {
                                                 <Badge variant="outline" className="text-xs capitalize">{h.handover_type?.replace('_', ' ')}</Badge>
                                                 {h.sensitive_flag && <Badge className="bg-status-critical-bg text-status-critical">Sensitive</Badge>}
                                             </div>
-                                            <span className="text-xs text-muted-foreground">{formatDateTime(h.created_at)}</span>
+                                            <span className="text-xs text-muted-foreground">{formatDateTimeLong(h.created_at)}</span>
                                         </div>
                                         <p className="mt-2">{h.notes}</p>
                                         {h.acknowledged_at && (
-                                            <p className="mt-1 text-xs text-status-success">Acknowledged {formatDateTime(h.acknowledged_at)}</p>
+                                            <p className="mt-1 text-xs text-status-success">Acknowledged {formatDateTimeLong(h.acknowledged_at)}</p>
                                         )}
                                     </div>
                                 ))}
@@ -357,7 +357,7 @@ export default function RespiteStayShow({ stay }: Props) {
                                     <div key={c.id} className="rounded border p-3 text-sm">
                                         <div className="flex items-center justify-between">
                                             <Badge variant="outline" className="text-xs capitalize">{c.channel?.replace('_', ' ')}</Badge>
-                                            <span className="text-xs text-muted-foreground">{formatDateTime(c.occurred_at)}</span>
+                                            <span className="text-xs text-muted-foreground">{formatDateTimeLong(c.occurred_at)}</span>
                                         </div>
                                         <p className="mt-2">{c.summary}</p>
                                         {c.participants?.length > 0 && (
@@ -402,7 +402,7 @@ export default function RespiteStayShow({ stay }: Props) {
                                         {rpa.triggers && <p className="mt-2 text-muted-foreground"><span className="font-medium">Triggers:</span> {rpa.triggers}</p>}
                                         {rpa.interventions && <p className="mt-1 text-muted-foreground"><span className="font-medium">Interventions:</span> {rpa.interventions}</p>}
                                         {rpa.activated_at && (
-                                            <p className="mt-1 text-xs text-muted-foreground">Activated: {formatDateTime(rpa.activated_at)}</p>
+                                            <p className="mt-1 text-xs text-muted-foreground">Activated: {formatDateTimeLong(rpa.activated_at)}</p>
                                         )}
                                     </div>
                                 ))}

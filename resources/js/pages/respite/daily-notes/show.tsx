@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { PageHero, PageLayout } from '@/components/page';
 import RespiteSubnav from '@/components/respite-subnav';
-import { formatDateTime } from '@/lib/date-format';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, Link } from '@inertiajs/react';
 
 type Props = {
@@ -119,7 +119,7 @@ export default function DailyNoteShow({ note, wellbeingSummary, wellbeingScore }
                     </CardHeader>
                     <CardContent className="space-y-2 text-sm text-muted-foreground">
                         <div>Shift Period: <Badge variant="outline">{note.shift_period}</Badge></div>
-                        <div>Note Date: {formatDateTime(note.note_date)}</div>
+                        <div>Note Date: {formatDateTimeLong(note.note_date)}</div>
                         {note.created_by && <div>Created by: {note.created_by.name || note.created_by}</div>}
                         {note.incident_occurred && note.linked_incident && (
                             <div>

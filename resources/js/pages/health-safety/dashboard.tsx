@@ -3,7 +3,7 @@ import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import AppLayout from '@/layouts/app-layout';
-import { formatDate } from '@/lib/date-format';
+import { formatDateLong } from '@/lib/datetime';
 import { Head, Link } from '@inertiajs/react';
 import {
     Activity,
@@ -1338,7 +1338,7 @@ export default function HealthSafetyDashboard({
                                                     </td>
                                                     <td className="py-2 text-muted-foreground">
                                                         {site.last_drill_date ? (
-                                                            formatDate(
+                                                            formatDateLong(
                                                                 site.last_drill_date,
                                                             )
                                                         ) : (
@@ -1509,7 +1509,7 @@ export default function HealthSafetyDashboard({
                                             {inc.status.replace(/_/g, ' ')}
                                         </Badge>
                                         <span className="hidden text-xs text-muted-foreground sm:inline">
-                                            {formatDate(inc.occurred_at)}
+                                            {formatDateLong(inc.occurred_at)}
                                         </span>
                                         <ChevronRight className="h-3.5 w-3.5 text-muted-foreground opacity-0 transition-opacity group-hover/item:opacity-100" />
                                     </div>

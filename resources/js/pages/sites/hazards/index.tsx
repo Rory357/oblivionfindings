@@ -19,7 +19,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateTime } from '@/lib/date-format';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -459,7 +459,7 @@ export default function SiteHazards({
                                                 </span>
                                                 <span className="flex items-center gap-1">
                                                     <Calendar className="h-3 w-3" />
-                                                    {formatDateTime(
+                                                    {formatDateTimeLong(
                                                         hazard.created_at,
                                                     )}
                                                 </span>

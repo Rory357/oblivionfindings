@@ -6,7 +6,7 @@ import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import RespiteSubnav from '@/components/respite-subnav';
-import { formatDateTime } from '@/lib/date-format';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, router, useForm } from '@inertiajs/react';
 import { Folder } from 'lucide-react';
 
@@ -143,7 +143,7 @@ export default function RespiteResourcesIndex({ allocations, filters, assets }: 
                                 </CardTitle>
                             </CardHeader>
                             <CardContent className="text-sm text-muted-foreground space-y-1">
-                                <div>{formatDateTime(a.start_at)} → {formatDateTime(a.end_at)}</div>
+                                <div>{formatDateTimeLong(a.start_at)} → {formatDateTimeLong(a.end_at)}</div>
                                 <div>Status: {a.status}</div>
                             </CardContent>
                         </Card>

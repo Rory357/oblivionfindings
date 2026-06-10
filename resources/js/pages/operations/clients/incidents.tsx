@@ -21,7 +21,7 @@ import {
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
-import { formatDateTime } from '@/lib/date-format';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import {
     Activity,
@@ -514,7 +514,7 @@ export default function ClientIncidents({
                                                 {i.occurred_at && (
                                                     <span className="flex items-center gap-1">
                                                         <Calendar className="h-3 w-3" />
-                                                        {formatDateTime(
+                                                        {formatDateTimeLong(
                                                             i.occurred_at,
                                                         )}
                                                     </span>

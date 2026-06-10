@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import RespiteSubnav from '@/components/respite-subnav';
-import { formatDateTime } from '@/lib/date-format';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, Link, router } from '@inertiajs/react';
 import { useState } from 'react';
 import { Files, Plus } from 'lucide-react';
@@ -102,7 +102,7 @@ export default function EvidencePacksIndex({ packs, filters }: Props) {
                                                 {pack.sealed_at && <Badge variant="outline">Sealed</Badge>}
                                             </div>
                                             <div className="mt-2 text-xs text-muted-foreground">
-                                                {formatDateTime(pack.created_at)}
+                                                {formatDateTimeLong(pack.created_at)}
                                             </div>
                                         </div>
                                         <Link href={`/respite/evidence-packs/${pack.id}`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted">

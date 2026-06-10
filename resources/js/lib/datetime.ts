@@ -81,6 +81,28 @@ export function formatDateTime(value: DateInput, fallback: string = DEFAULT_FALL
 }
 
 /**
+ * "17 April 2026" — long-form date for records, registers and audit views
+ * where the year matters (incident logs, hazard registers, respite stays).
+ */
+export function formatDateLong(value: DateInput, fallback: string = DEFAULT_FALLBACK): string {
+    const d = toDate(value);
+    if (!d) return fallback;
+    return d.toLocaleDateString(WORKER_LOCALE, {
+        timeZone: WORKER_TIMEZONE,
+        day: 'numeric',
+        month: 'long',
+        year: 'numeric',
+    });
+}
+
+/** "17 April 2026, 8:00 pm" — long-form timestamp for record views. */
+export function formatDateTimeLong(value: DateInput, fallback: string = DEFAULT_FALLBACK): string {
+    const d = toDate(value);
+    if (!d) return fallback;
+    return `${formatDateLong(d)}, ${formatTime(d)}`;
+}
+
+/**
  * "12m ago" / "in 15m" / "2h ago" / "3d ago" — calm relative phrasing for
  * freshness chips, alert rows, handover submitted, draft saved.
  *

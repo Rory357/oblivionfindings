@@ -7,7 +7,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Badge } from '@/components/ui/badge';
 import RespiteSubnav from '@/components/respite-subnav';
-import { formatDateTime } from '@/lib/date-format';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { Inbox, Plus } from 'lucide-react';
 
@@ -120,7 +120,7 @@ export default function RespiteRequestsIndex({ requests, filters, stats }: Props
                                                 )}
                                             </div>
                                             <div className="mt-2 text-xs text-muted-foreground">
-                                                Requested: {formatDateTime(r.requested_start)} → {formatDateTime(r.requested_end)}
+                                                Requested: {formatDateTimeLong(r.requested_start)} → {formatDateTimeLong(r.requested_end)}
                                             </div>
                                         </div>
                                         <Link href={`/respite/requests/${r.id}`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted">

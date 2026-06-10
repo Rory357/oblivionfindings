@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import RespiteSubnav from '@/components/respite-subnav';
-import { formatDateTime } from '@/lib/date-format';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, Link } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
 
@@ -30,7 +30,7 @@ export default function DailyNotesForStay({ stay, notes, wellbeingTrend }: Props
                         variant="compact"
                         backHref={`/respite/stays/${stay.id}`}
                         title={`Daily Notes for ${stay.client?.first_name ?? ''} ${stay.client?.last_name ?? ''}`.trim()}
-                        description={`${formatDateTime(stay.start_date)} — ${formatDateTime(stay.end_date)}`}
+                        description={`${formatDateTimeLong(stay.start_date)} — ${formatDateTimeLong(stay.end_date)}`}
                         actions={
                             <Link href={`/respite/daily-notes/create?stay_id=${stay.id}`}>
                                 <Button size="sm" variant="outline">
@@ -63,7 +63,7 @@ export default function DailyNotesForStay({ stay, notes, wellbeingTrend }: Props
                                     <tbody>
                                         {wellbeingTrend.map((entry: any, i: number) => (
                                             <tr key={i} className="border-b last:border-0">
-                                                <td className="py-2 pr-4">{formatDateTime(entry.date)}</td>
+                                                <td className="py-2 pr-4">{formatDateTimeLong(entry.date)}</td>
                                                 <td className="py-2 pr-4"><Badge variant="outline">{entry.shift}</Badge></td>
                                                 <td className="py-2 pr-4">{entry.score}</td>
                                                 <td className="py-2"><Badge variant="outline">{entry.mood}</Badge></td>
@@ -90,7 +90,7 @@ export default function DailyNotesForStay({ stay, notes, wellbeingTrend }: Props
                                                 {note.incident_occurred && <Badge variant="outline">Incident</Badge>}
                                             </div>
                                             <div className="mt-2 text-xs text-muted-foreground">
-                                                {formatDateTime(note.note_date)}
+                                                {formatDateTimeLong(note.note_date)}
                                             </div>
                                         </div>
                                         <Link href={`/respite/daily-notes/${note.id}`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted">

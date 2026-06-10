@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import RespiteSubnav from '@/components/respite-subnav';
-import { formatDateTime } from '@/lib/date-format';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, Link, router } from '@inertiajs/react';
 import { Activity, Plus } from 'lucide-react';
 
@@ -108,7 +108,7 @@ export default function ProcedureRunsIndex({ runs, templates, filters }: Props) 
                                             </div>
                                             {r.sla_deadline && (
                                                 <div className="mt-1 text-xs text-muted-foreground">
-                                                    SLA Deadline: {formatDateTime(r.sla_deadline)}
+                                                    SLA Deadline: {formatDateTimeLong(r.sla_deadline)}
                                                 </div>
                                             )}
                                             <div className="mt-1 text-xs text-muted-foreground">

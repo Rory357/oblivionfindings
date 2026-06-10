@@ -8,7 +8,7 @@ import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import RespiteSubnav from '@/components/respite-subnav';
-import { formatDateTime } from '@/lib/date-format';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, Link, router, useForm } from '@inertiajs/react';
 import { useState } from 'react';
 
@@ -64,7 +64,7 @@ export default function EvidencePackForStay({ stay, pack }: Props) {
                         variant="compact"
                         backHref={`/respite/stays/${stay.id}`}
                         title={`Evidence Pack for ${stay.client?.first_name ?? ''} ${stay.client?.last_name ?? ''}`.trim()}
-                        description={`${formatDateTime(stay.start_date)} — ${formatDateTime(stay.end_date)}`}
+                        description={`${formatDateTimeLong(stay.start_date)} — ${formatDateTimeLong(stay.end_date)}`}
                     />
                 }
             >
@@ -99,7 +99,7 @@ export default function EvidencePackForStay({ stay, pack }: Props) {
                                 </div>
                                 {isSealed && (
                                     <>
-                                        <div>Sealed at: {formatDateTime(pack.sealed_at)}</div>
+                                        <div>Sealed at: {formatDateTimeLong(pack.sealed_at)}</div>
                                         {pack.sealed_by && <div>Sealed by: {pack.sealed_by.name || pack.sealed_by}</div>}
                                     </>
                                 )}
@@ -124,7 +124,7 @@ export default function EvidencePackForStay({ stay, pack }: Props) {
                                                         <div className="mt-1 text-xs text-muted-foreground">{item.description}</div>
                                                     )}
                                                     {item.added_at && (
-                                                        <div className="mt-1 text-xs text-muted-foreground">{formatDateTime(item.added_at)}</div>
+                                                        <div className="mt-1 text-xs text-muted-foreground">{formatDateTimeLong(item.added_at)}</div>
                                                     )}
                                                 </div>
                                                 {!isSealed && (

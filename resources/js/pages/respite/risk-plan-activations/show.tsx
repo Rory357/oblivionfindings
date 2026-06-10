@@ -7,7 +7,7 @@ import { PageHero, PageLayout } from '@/components/page';
 import { Textarea } from '@/components/ui/textarea';
 import { Label } from '@/components/ui/label';
 import RespiteSubnav from '@/components/respite-subnav';
-import { formatDateTime } from '@/lib/date-format';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, router } from '@inertiajs/react';
 
 type Props = {
@@ -130,7 +130,7 @@ export default function RiskPlanActivationShow({ activation, hasAcknowledged }: 
                                     {activation.acknowledgments.map((ack: any, i: number) => (
                                         <li key={i} className="flex justify-between">
                                             <span>{ack.user?.name || 'Unknown'}</span>
-                                            <span className="text-xs text-muted-foreground">{formatDateTime(ack.acknowledged_at)}</span>
+                                            <span className="text-xs text-muted-foreground">{formatDateTimeLong(ack.acknowledged_at)}</span>
                                         </li>
                                     ))}
                                 </ul>

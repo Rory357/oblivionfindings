@@ -38,7 +38,7 @@ import {
 import { Separator } from '@/components/ui/separator';
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
-import { formatDateTime } from '@/lib/date-format';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { formatDateTime as formatDT } from '@/lib/fleet-utils';
 import { DailyNoteWizard } from '@/pages/operations/clients/dialogs/daily-note-wizard';
 import { QuickNoteDialog } from '@/pages/operations/clients/dialogs/quick-note-dialog';
@@ -721,7 +721,7 @@ export default function ClientShow({
                 id: Number(shift.id),
                 label: [
                     shift.starts_at
-                        ? formatDateTime(shift.starts_at)
+                        ? formatDateTimeLong(shift.starts_at)
                         : shift.starts_time,
                     shift.shift_type
                         ? shiftTypeLabel(shift.shift_type)
@@ -5363,7 +5363,7 @@ export default function ClientShow({
                             (incident: any) => [
                                 incident.title ?? incident.type ?? 'Incident',
                                 incident.occurred_at
-                                    ? formatDateTime(incident.occurred_at)
+                                    ? formatDateTimeLong(incident.occurred_at)
                                     : (incident.status ?? 'Recorded'),
                             ],
                         )}
@@ -6377,11 +6377,11 @@ export default function ClientShow({
                                             <div className="flex items-start justify-between gap-3">
                                                 <div>
                                                     <div className="text-sm font-medium">
-                                                        {formatDateTime(
+                                                        {formatDateTimeLong(
                                                             b.start_at,
                                                         )}{' '}
                                                         -{' '}
-                                                        {formatDateTime(
+                                                        {formatDateTimeLong(
                                                             b.end_at,
                                                         )}
                                                     </div>
@@ -6435,11 +6435,11 @@ export default function ClientShow({
                                             <div className="flex items-start justify-between gap-3">
                                                 <div>
                                                     <div className="text-sm font-medium">
-                                                        {formatDateTime(
+                                                        {formatDateTimeLong(
                                                             r.requested_start,
                                                         )}{' '}
                                                         -{' '}
-                                                        {formatDateTime(
+                                                        {formatDateTimeLong(
                                                             r.requested_end,
                                                         )}
                                                     </div>

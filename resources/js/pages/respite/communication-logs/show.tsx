@@ -3,7 +3,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { PageHero, PageLayout } from '@/components/page';
 import RespiteSubnav from '@/components/respite-subnav';
-import { formatDateTime } from '@/lib/date-format';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, Link } from '@inertiajs/react';
 
 type Props = {
@@ -47,7 +47,7 @@ export default function CommunicationLogShow({ log }: Props) {
                             )}
                         </div>
                         <div>Channel: <Badge variant="outline">{log.channel}</Badge></div>
-                        <div>Occurred: {formatDateTime(log.occurred_at)}</div>
+                        <div>Occurred: {formatDateTimeLong(log.occurred_at)}</div>
                         {log.created_by && <div>Created by: {log.created_by.name || log.created_by}</div>}
                         {log.summary && (
                             <div className="mt-3">
@@ -91,7 +91,7 @@ export default function CommunicationLogShow({ log }: Props) {
                                             <Badge variant="outline">{e.type}</Badge>
                                             <span className="ml-2">{e.description}</span>
                                         </div>
-                                        <div className="text-xs text-muted-foreground">{formatDateTime(e.added_at)}</div>
+                                        <div className="text-xs text-muted-foreground">{formatDateTimeLong(e.added_at)}</div>
                                     </div>
                                 ))}
                             </div>

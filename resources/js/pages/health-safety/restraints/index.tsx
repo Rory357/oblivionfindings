@@ -27,7 +27,7 @@ import {
 } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
-import { formatDate, formatDateTime } from '@/lib/date-format';
+import { formatDateLong, formatDateTimeLong } from '@/lib/datetime';
 import { Head, router, useForm } from '@inertiajs/react';
 import { Check, FileEdit, Plus, ShieldAlert, X } from 'lucide-react';
 import { useState } from 'react';
@@ -797,7 +797,7 @@ export default function RestraintsIndex({
                                                         className="border-b last:border-0"
                                                     >
                                                         <td className="py-2 whitespace-nowrap">
-                                                            {formatDateTime(
+                                                            {formatDateTimeLong(
                                                                 ev.started_at,
                                                             )}
                                                         </td>
@@ -1237,7 +1237,7 @@ export default function RestraintsIndex({
                                                         : ''
                                                 }
                                             >
-                                                {formatDate(plan.review_date)}
+                                                {formatDateLong(plan.review_date)}
                                             </span>
                                         </div>
                                         {plan.de_escalation_strategies && (

@@ -2,7 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import RespiteSubnav from '@/components/respite-subnav';
-import { formatDateTime } from '@/lib/date-format';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { Head } from '@inertiajs/react';
 import { Calendar } from 'lucide-react';
 
@@ -42,7 +42,7 @@ export default function RespiteCalendar({ events, bookings }: Props) {
                         {events.map((event) => (
                             <div key={event.id} className="rounded-md border px-3 py-2">
                                 <div className="font-medium">{event.event_type}</div>
-                                <div>{formatDateTime(event.start_at)} → {formatDateTime(event.end_at)}</div>
+                                <div>{formatDateTimeLong(event.start_at)} → {formatDateTimeLong(event.end_at)}</div>
                             </div>
                         ))}
                         {!events.length && (
@@ -60,7 +60,7 @@ export default function RespiteCalendar({ events, bookings }: Props) {
                             {bookings.map((booking) => (
                                 <div key={booking.id} className="rounded-md border px-3 py-2">
                                     <div className="font-medium">Booking #{booking.id}</div>
-                                    <div>{formatDateTime(booking.start_at)} → {formatDateTime(booking.end_at)}</div>
+                                    <div>{formatDateTimeLong(booking.start_at)} → {formatDateTimeLong(booking.end_at)}</div>
                                 </div>
                             ))}
                         </CardContent>

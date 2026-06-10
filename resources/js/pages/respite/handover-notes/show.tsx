@@ -4,7 +4,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import { PageHero, PageLayout } from '@/components/page';
 import RespiteSubnav from '@/components/respite-subnav';
-import { formatDateTime } from '@/lib/date-format';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, router } from '@inertiajs/react';
 
 type Props = {
@@ -38,7 +38,7 @@ export default function HandoverNoteShow({ note }: Props) {
                             {note.sensitive_flag && <Badge className="bg-status-critical-bg text-status-critical">Sensitive</Badge>}
                         </div>
                         <div className="whitespace-pre-wrap">{note.notes}</div>
-                        <div className="text-xs text-muted-foreground">Created: {formatDateTime(note.created_at)}</div>
+                        <div className="text-xs text-muted-foreground">Created: {formatDateTimeLong(note.created_at)}</div>
                     </CardContent>
                 </Card>
 
@@ -50,7 +50,7 @@ export default function HandoverNoteShow({ note }: Props) {
                         {note.acknowledged_at ? (
                             <div className="space-y-1">
                                 <div>Acknowledged by: {note.acknowledged_by?.name || 'Unknown'}</div>
-                                <div>Acknowledged at: {formatDateTime(note.acknowledged_at)}</div>
+                                <div>Acknowledged at: {formatDateTimeLong(note.acknowledged_at)}</div>
                             </div>
                         ) : (
                             <div className="space-y-3">

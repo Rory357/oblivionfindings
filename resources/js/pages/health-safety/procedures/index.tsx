@@ -11,7 +11,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
-import { formatDate } from '@/lib/date-format';
+import { formatDateLong } from '@/lib/datetime';
 import { Head, Link, router } from '@inertiajs/react';
 import { FileText, Plus } from 'lucide-react';
 
@@ -281,7 +281,7 @@ export default function ProceduresIndex({ procedures, stats, filters }: Props) {
                                                                 : ''
                                                         }
                                                     >
-                                                        {formatDate(
+                                                        {formatDateLong(
                                                             p.review_date,
                                                         )}
                                                     </span>

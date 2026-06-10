@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import RespiteSubnav from '@/components/respite-subnav';
-import { formatDateTime } from '@/lib/date-format';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, Link } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
 
@@ -41,7 +41,7 @@ export default function RiskPlanActivationsForStay({ stay, activations, planType
                         variant="compact"
                         backHref={`/respite/stays/${stay.id}`}
                         title={`Risk Plans for ${stay.client?.first_name ?? ''} ${stay.client?.last_name ?? ''}`.trim()}
-                        description={`Stay #${stay.id} — ${formatDateTime(stay.check_in)} to ${formatDateTime(stay.check_out)}`}
+                        description={`Stay #${stay.id} — ${formatDateTimeLong(stay.check_in)} to ${formatDateTimeLong(stay.check_out)}`}
                         actions={
                             <Link href={`/respite/risk-plan-activations/create?stay_id=${stay.id}`}>
                                 <Button size="sm" variant="outline">
@@ -67,7 +67,7 @@ export default function RiskPlanActivationsForStay({ stay, activations, planType
                                                 <Badge className={typeColors[a.plan_type] || ''}>{a.plan_type?.replace(/_/g, ' ')}</Badge>
                                                 <Badge className={statusColors[a.status] || ''}>{a.status?.replace(/_/g, ' ')}</Badge>
                                             </div>
-                                            <div className="mt-1 text-xs text-muted-foreground">{formatDateTime(a.created_at)}</div>
+                                            <div className="mt-1 text-xs text-muted-foreground">{formatDateTimeLong(a.created_at)}</div>
                                         </div>
                                         <Link href={`/respite/risk-plan-activations/${a.id}`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
                                             View

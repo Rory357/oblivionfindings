@@ -6,7 +6,7 @@ import { Badge } from '@/components/ui/badge';
 import { Label } from '@/components/ui/label';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import RespiteSubnav from '@/components/respite-subnav';
-import { formatDateTime } from '@/lib/date-format';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, Link, router } from '@inertiajs/react';
 import { ShieldAlert, Plus } from 'lucide-react';
 
@@ -118,7 +118,7 @@ export default function RiskPlanActivationsIndex({ activations, filters, planTyp
                                             {a.stay && (
                                                 <div className="mt-1 text-xs text-muted-foreground">Stay #{a.stay.id}</div>
                                             )}
-                                            <div className="mt-1 text-xs text-muted-foreground">{formatDateTime(a.created_at)}</div>
+                                            <div className="mt-1 text-xs text-muted-foreground">{formatDateTimeLong(a.created_at)}</div>
                                         </div>
                                         <Link href={`/respite/risk-plan-activations/${a.id}`} className="rounded-md border px-3 py-2 text-xs hover:bg-muted">
                                             View

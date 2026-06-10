@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import RespiteSubnav from '@/components/respite-subnav';
-import { formatDateTime } from '@/lib/date-format';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, Link, router } from '@inertiajs/react';
 import { AlertTriangle } from 'lucide-react';
 
@@ -47,7 +47,7 @@ export default function OverdueProcedureRuns({ runs }: Props) {
                                                 Progress: {r.current_step || 0}/{r.total_steps || 0} steps
                                             </div>
                                             <div className="mt-1 text-xs text-status-critical font-medium">
-                                                SLA Deadline: {formatDateTime(r.sla_deadline)}
+                                                SLA Deadline: {formatDateTimeLong(r.sla_deadline)}
                                             </div>
                                             <div className="mt-1 text-xs text-muted-foreground">
                                                 Initiated by: {r.initiated_by?.name || 'Unknown'}

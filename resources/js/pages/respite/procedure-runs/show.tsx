@@ -9,7 +9,7 @@ import { PageHero, PageLayout } from '@/components/page';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import RespiteSubnav from '@/components/respite-subnav';
-import { formatDateTime } from '@/lib/date-format';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, router } from '@inertiajs/react';
 
 type Props = {
@@ -61,7 +61,7 @@ export default function ProcedureRunShow({ run, staff }: Props) {
                         <div>Progress: {run.current_step || 0}/{run.total_steps || 0} steps</div>
                         {run.sla_deadline && (
                             <div className={run.sla_breached ? 'text-status-critical font-medium' : ''}>
-                                SLA Deadline: {formatDateTime(run.sla_deadline)}
+                                SLA Deadline: {formatDateTimeLong(run.sla_deadline)}
                                 {run.sla_breached && ' (BREACHED)'}
                             </div>
                         )}

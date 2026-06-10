@@ -4,7 +4,7 @@ import { Button } from '@/components/ui/button';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import RespiteSubnav from '@/components/respite-subnav';
-import { formatDateTime } from '@/lib/date-format';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, Link } from '@inertiajs/react';
 import { Plus } from 'lucide-react';
 
@@ -30,7 +30,7 @@ export default function CommunicationLogsForStay({ stay, logs, channels }: Props
                         variant="compact"
                         backHref={`/respite/stays/${stay.id}`}
                         title={`Communication Logs for ${stay.client?.first_name ?? ''} ${stay.client?.last_name ?? ''}`.trim()}
-                        description={`${formatDateTime(stay.start_date)} — ${formatDateTime(stay.end_date)}`}
+                        description={`${formatDateTimeLong(stay.start_date)} — ${formatDateTimeLong(stay.end_date)}`}
                         actions={
                             <Link href={`/respite/communication-logs/create?stay_id=${stay.id}`}>
                                 <Button size="sm" variant="outline">
@@ -58,7 +58,7 @@ export default function CommunicationLogsForStay({ stay, logs, channels }: Props
                                                 )}
                                             </div>
                                             <div className="mt-2 text-xs text-muted-foreground">
-                                                {formatDateTime(log.occurred_at)}
+                                                {formatDateTimeLong(log.occurred_at)}
                                             </div>
                                             {log.summary && (
                                                 <div className="mt-1 text-xs text-muted-foreground">

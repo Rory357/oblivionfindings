@@ -8,7 +8,7 @@ import { PageHero, PageLayout } from '@/components/page';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
 import RespiteSubnav from '@/components/respite-subnav';
-import { formatDateTime } from '@/lib/date-format';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, Link, router } from '@inertiajs/react';
 
 type Props = {
@@ -67,7 +67,7 @@ export default function TaskShow({ task, staff }: Props) {
                             <Badge className={statusColors[task.status] || ''}>{task.status?.replace(/_/g, ' ')}</Badge>
                             {task.type && <Badge variant="outline">{task.type}</Badge>}
                         </div>
-                        {task.due_at && <div>Due: {formatDateTime(task.due_at)}</div>}
+                        {task.due_at && <div>Due: {formatDateTimeLong(task.due_at)}</div>}
                         {task.assigned_to && <div>Assigned to: {task.assigned_to?.name}</div>}
                         {task.assigned_by && <div>Assigned by: {task.assigned_by?.name}</div>}
                         {task.completed_by && <div>Completed by: {task.completed_by?.name}</div>}

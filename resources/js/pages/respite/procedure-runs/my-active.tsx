@@ -3,7 +3,7 @@ import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardHeader, CardTitle } from '@/components/ui/card';
 import { Badge } from '@/components/ui/badge';
 import RespiteSubnav from '@/components/respite-subnav';
-import { formatDateTime } from '@/lib/date-format';
+import { formatDateTimeLong } from '@/lib/datetime';
 import { Head, Link } from '@inertiajs/react';
 import { BookOpen } from 'lucide-react';
 
@@ -54,7 +54,7 @@ export default function MyActiveProcedureRuns({ runs }: Props) {
                                             </div>
                                             {r.sla_deadline && (
                                                 <div className={`mt-1 text-xs ${r.sla_breached ? 'text-status-critical font-medium' : 'text-muted-foreground'}`}>
-                                                    SLA Deadline: {formatDateTime(r.sla_deadline)}
+                                                    SLA Deadline: {formatDateTimeLong(r.sla_deadline)}
                                                     {r.sla_breached && ' (BREACHED)'}
                                                 </div>
                                             )}
