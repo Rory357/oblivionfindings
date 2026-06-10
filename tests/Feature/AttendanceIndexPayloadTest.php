@@ -171,6 +171,27 @@ test('handovers involving the user are listed with an incoming flag', function (
         ->and($handovers[0]['status'])->toBe('submitted');
 });
 
+test('handovers follow the viewed staff member when a manager filters', function () {
+    $workerHandover = ShiftHandover::factory()->create([
+        'incoming_staff_id' => $this->worker->id,
+        'incoming_shift_id' => null,
+    ]);
+    // The manager's own handover must NOT appear while viewing the worker.
+    ShiftHandover::factory()->create([
+        'outgoing_staff_id' => $this->manager->id,
+    ]);
+
+    $response = $this->actingAs($this->manager)
+        ->get('/attendance?user_id='.$this->worker->id);
+
+    $response->assertOk();
+    $handovers = collect($response->viewData('page')['props']['handovers']);
+    expect($handovers)->toHaveCount(1)
+        ->and($handovers[0]['id'])->toBe($workerHandover->id)
+        // `incoming` is relative to the viewed user, not the manager.
+        ->and($handovers[0]['incoming'])->toBeTrue();
+});
+
 test('week hours sum the viewed user sessions for the current week only', function () {
     // 3h closed session yesterday-ish (within this week guaranteed by using today).
     HrAttendanceSession::query()->create([

@@ -129,26 +129,30 @@ class AttendanceController extends Controller
                 ])->values()
             : collect();
 
-        // Handovers involving the signed-in user (both directions) feed the
-        // Handovers tab — same row shape as the Shift Handovers workspace, plus
-        // an `incoming` flag for the "awaiting YOUR acknowledgement" treatment.
+        // Handovers involving the VIEWED user (both directions) feed the
+        // Handovers tab — same row shape as the Shift Handovers workspace.
+        // Workers always view themselves; a manager filtering to a staff
+        // member sees that person's handovers (page is person-centric).
+        // Action flags (can_acknowledge/can_edit) stay relative to the
+        // signed-in user, as does the `incoming` treatment only when viewing
+        // yourself.
         $handovers = ShiftHandover::query()
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->whereIn('status', [ShiftHandoverService::STATUS_SUBMITTED, ShiftHandoverService::STATUS_ACKNOWLEDGED])
-            ->where(function ($involving) use ($auth) {
-                $involving->where('outgoing_staff_id', $auth->id)
-                    ->orWhere('incoming_staff_id', $auth->id)
-                    ->orWhereHas('outgoingShift', fn ($shift) => $shift->where('user_id', $auth->id))
-                    ->orWhereHas('incomingShift', fn ($shift) => $shift->where('user_id', $auth->id));
+            ->where(function ($involving) use ($targetUserId) {
+                $involving->where('outgoing_staff_id', $targetUserId)
+                    ->orWhere('incoming_staff_id', $targetUserId)
+                    ->orWhereHas('outgoingShift', fn ($shift) => $shift->where('user_id', $targetUserId))
+                    ->orWhereHas('incomingShift', fn ($shift) => $shift->where('user_id', $targetUserId));
             })
             ->with($this->handoverPresenter->mapEagerLoads())
             ->orderByDesc('created_at')
             ->limit(50)
             ->get()
-            ->map(function (ShiftHandover $handover) use ($auth) {
+            ->map(function (ShiftHandover $handover) use ($auth, $targetUserId) {
                 $mapped = $this->handoverPresenter->mapHandover($handover, $auth);
-                $mapped['incoming'] = (int) $handover->incoming_staff_id === (int) $auth->id
-                    || (int) ($handover->incomingShift?->user_id ?? 0) === (int) $auth->id;
+                $mapped['incoming'] = (int) $handover->incoming_staff_id === (int) $targetUserId
+                    || (int) ($handover->incomingShift?->user_id ?? 0) === (int) $targetUserId;
 
                 return $mapped;
             })->values();
