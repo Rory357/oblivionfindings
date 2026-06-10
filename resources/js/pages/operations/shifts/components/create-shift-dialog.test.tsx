@@ -135,10 +135,19 @@ describe('CreateShiftDialog edit mode', () => {
         expect(
             screen.getByRole('heading', { name: 'Edit shift' }),
         ).toBeVisible();
+
+        // Wizard: fields live on their steps now — navigate via the rail.
+        fireEvent.click(screen.getByRole('button', { name: /Who & where/ }));
         expect(screen.getByLabelText(/Client/)).toHaveValue('10');
         expect(screen.getByLabelText(/Staff/)).toHaveValue('7');
         expect(screen.getByLabelText(/Location/)).toHaveValue('Kowhai House');
+
+        fireEvent.click(
+            screen.getByRole('button', { name: /Schedule.*Times, break/ }),
+        );
         expect(screen.getByLabelText(/Break/)).toHaveValue(45);
+
+        fireEvent.click(screen.getByRole('button', { name: /Tasks & notes/ }));
         expect(screen.getByLabelText(/Handover notes/i)).toHaveValue(
             'Bring medication folder.',
         );
@@ -150,6 +159,7 @@ describe('CreateShiftDialog edit mode', () => {
             target: { value: '11:15' },
         });
 
+        fireEvent.click(screen.getByRole('button', { name: /Review/ }));
         fireEvent.click(screen.getByRole('button', { name: /Save changes/i }));
 
         expect(inertiaSpies.put).toHaveBeenCalledWith(
@@ -168,5 +178,90 @@ describe('CreateShiftDialog edit mode', () => {
             }),
         );
         expect(onClose).toHaveBeenCalled();
+    });
+
+    it('edit mode has no Repeat step in the rail', () => {
+        render(
+            <CreateShiftDialog
+                open
+                onClose={vi.fn()}
+                clients={[
+                    { id: 10, first_name: 'Ari', last_name: 'Kauri' },
+                ]}
+                staff={[]}
+                initialShift={{
+                    id: 44,
+                    starts_at: '2026-05-04T09:00:00+12:00',
+                    ends_at: '2026-05-04T13:00:00+12:00',
+                    status: 'scheduled',
+                    client: { id: 10 },
+                }}
+            />,
+        );
+
+        expect(screen.getByText(/Step 1 of 5/)).toBeVisible();
+        expect(
+            screen.queryByRole('button', { name: /Repeat weekly/ }),
+        ).toBeNull();
+    });
+});
+
+describe('CreateShiftDialog create mode wizard', () => {
+    beforeEach(() => {
+        inertiaSpies.put.mockClear();
+        inertiaSpies.post.mockClear();
+        inertiaSpies.routerPost.mockClear();
+    });
+
+    function renderCreate() {
+        render(
+            <CreateShiftDialog
+                open
+                onClose={vi.fn()}
+                clients={[
+                    { id: 10, first_name: 'Ari', last_name: 'Kauri' },
+                ]}
+                staff={[{ id: 7, name: 'Aroha King' }]}
+            />,
+        );
+    }
+
+    it('shows all six steps and Continue advances', () => {
+        renderCreate();
+
+        // Two headings carry the name: the sr-only DialogTitle + the rail h2.
+        expect(
+            screen.getAllByRole('heading', { name: 'Create shift' }).length,
+        ).toBeGreaterThan(0);
+        expect(screen.getByText(/Step 1 of 6/)).toBeVisible();
+        expect(
+            screen.getByRole('button', { name: /Repeat weekly/ }),
+        ).toBeVisible();
+        // Create shift submit only exists on the review step.
+        expect(
+            screen.queryByRole('button', { name: /Create shift$/ }),
+        ).toBeNull();
+
+        fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
+        expect(screen.getByText(/Step 2 of 6/)).toBeVisible();
+    });
+
+    it('blocks the schedule step when the end is not after the start', () => {
+        renderCreate();
+
+        fireEvent.click(
+            screen.getByRole('button', { name: /Schedule.*Times, break/ }),
+        );
+        fireEvent.change(screen.getByLabelText(/Start/), {
+            target: { value: '2026-06-15T10:00' },
+        });
+        fireEvent.change(screen.getByLabelText(/End/), {
+            target: { value: '2026-06-15T09:00' },
+        });
+
+        fireEvent.click(screen.getByRole('button', { name: /Continue/ }));
+
+        expect(screen.getByText('End must be after the start')).toBeVisible();
+        expect(screen.getByText(/Step 3 of 6/)).toBeVisible();
     });
 });

@@ -3,6 +3,8 @@ import {
     CalendarClock,
     Check,
     CheckCircle2,
+    ChevronLeft,
+    ChevronRight,
     Clock,
     LayoutGrid,
     Loader2,
@@ -38,6 +40,7 @@ import {
     SHIFT_TYPE_ACCENT_CLASSES,
     type ShiftTypeKey,
 } from '@/lib/shift-types';
+import { cn } from '@/lib/utils';
 import {
     eligibility_preview as eligibilityPreview,
     store as storeShift,
@@ -72,6 +75,8 @@ type LockedContext = {
         missing?: number | string | null;
     }>;
 } | null;
+
+type WizStepKey = 'type' | 'people' | 'schedule' | 'repeat' | 'tasks' | 'review';
 
 type Weekday = 'mon' | 'tue' | 'wed' | 'thu' | 'fri' | 'sat' | 'sun';
 const WEEKDAYS: Weekday[] = ['mon', 'tue', 'wed', 'thu', 'fri', 'sat', 'sun'];
@@ -303,6 +308,36 @@ export function CreateShiftDialog({
         override_reason: '' as string,
     });
 
+    // ── Wizard step machinery (Add Client / handover-wizard chrome) ──
+    const WIZ_STEPS = useMemo(
+        () =>
+            (
+                [
+                    { key: 'type', label: 'Shift type', blurb: 'What kind of shift', icon: LayoutGrid },
+                    { key: 'people', label: 'Who & where', blurb: 'Client, location, staff', icon: Users },
+                    { key: 'schedule', label: 'Schedule', blurb: 'Times, break, publish', icon: Clock },
+                    { key: 'repeat', label: 'Repeat weekly', blurb: 'Optional recurring series', icon: Repeat },
+                    { key: 'tasks', label: 'Tasks & notes', blurb: 'Worker checklist', icon: Pencil },
+                    {
+                        key: 'review',
+                        label: 'Review',
+                        blurb: isEdit ? 'Confirm and save' : 'Confirm and create',
+                        icon: CheckCircle2,
+                    },
+                ] as { key: WizStepKey; label: string; blurb: string; icon: LucideIcon }[]
+            ).filter((s) => !(isEdit && s.key === 'repeat')),
+        [isEdit],
+    );
+    const [stepIndex, setStepIndex] = useState(0);
+    const [stepErrors, setStepErrors] = useState<Record<string, string>>({});
+    const cur = WIZ_STEPS[Math.min(stepIndex, WIZ_STEPS.length - 1)];
+
+    function jumpTo(key: WizStepKey) {
+        setStepErrors({});
+        const i = WIZ_STEPS.findIndex((s) => s.key === key);
+        if (i >= 0) setStepIndex(i);
+    }
+
     // Reset form when dialog opens with new defaults. Run only on the open→true
     // transition — re-running on every form mutation restarts the dialog entry
     // animation, which keeps the dialog at opacity 0. In edit mode we let the
@@ -316,6 +351,8 @@ export function CreateShiftDialog({
         }
         if (wasOpenRef.current) return; // already initialised this open
         wasOpenRef.current = true;
+        setStepIndex(0);
+        setStepErrors({});
         if (isEdit) return; // useForm initialiser handled edit-mode hydration
         form.setData({
             ...form.data,
@@ -638,8 +675,90 @@ export function CreateShiftDialog({
         );
     }
 
+    // Per-step client-side gates — the server stays authoritative; these only
+    // stop an obviously-incomplete step from advancing.
+    function validateStep(key: WizStepKey): boolean {
+        const errs: Record<string, string> = {};
+        if (key === 'people' && !form.data.client_id) {
+            errs.client_id = 'Choose a client';
+        }
+        if (key === 'schedule') {
+            if (!form.data.starts_at) errs.starts_at = 'Start time is required';
+            if (!form.data.ends_at) errs.ends_at = 'End time is required';
+            if (
+                form.data.starts_at &&
+                form.data.ends_at &&
+                new Date(form.data.ends_at).getTime() <=
+                    new Date(form.data.starts_at).getTime()
+            ) {
+                errs.ends_at = 'End must be after the start';
+            }
+        }
+        if (key === 'repeat' && form.data.repeat_weekly) {
+            if (form.data.repeat_by_weekday.length === 0) {
+                errs.repeat_by_weekday = 'Pick at least one weekday';
+            }
+            if (!form.data.repeat_end_date) {
+                errs.repeat_end_date = 'Pick a repeat end date';
+            } else if (
+                form.data.repeat_end_date < form.data.starts_at.slice(0, 10)
+            ) {
+                errs.repeat_end_date =
+                    'End date must be on or after the first shift';
+            }
+        }
+        setStepErrors(errs);
+        return Object.keys(errs).length === 0;
+    }
+
+    const goNext = () => {
+        if (!validateStep(cur.key)) return;
+        setStepErrors({});
+        setStepIndex((i) => Math.min(i + 1, WIZ_STEPS.length - 1));
+    };
+    const goBack = () => {
+        setStepErrors({});
+        setStepIndex((i) => Math.max(i - 1, 0));
+    };
+
+    const readinessPct = useMemo(() => {
+        let have = 0;
+        if (form.data.shift_type) have++;
+        if (form.data.client_id) have++;
+        if (
+            form.data.starts_at &&
+            form.data.ends_at &&
+            new Date(form.data.ends_at).getTime() >
+                new Date(form.data.starts_at).getTime()
+        ) {
+            have++;
+        }
+        if (
+            !form.data.repeat_weekly ||
+            (form.data.repeat_by_weekday.length > 0 &&
+                !!form.data.repeat_end_date)
+        ) {
+            have++;
+        }
+        return Math.round((have / 4) * 100);
+    }, [
+        form.data.shift_type,
+        form.data.client_id,
+        form.data.starts_at,
+        form.data.ends_at,
+        form.data.repeat_weekly,
+        form.data.repeat_by_weekday,
+        form.data.repeat_end_date,
+    ]);
+
     function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
+        // On every step except review, the primary action advances the
+        // wizard — this also keeps Cmd/Ctrl+Enter working per step.
+        if (cur.key !== 'review') {
+            goNext();
+            return;
+        }
         if (isEdit && eligibilityStatus?.status === 'blocked') {
             return;
         }
@@ -658,7 +777,7 @@ export function CreateShiftDialog({
         <>
             <Dialog open={open} onOpenChange={(o) => (!o ? onClose() : null)}>
                 <DialogContent
-                    className="max-h-[90vh] !w-full !max-w-[min(94vw,1080px)] overflow-hidden !rounded-2xl !p-0 [&>button:last-child]:hidden"
+                    className="flex h-[min(820px,92vh)] !w-full !max-w-[min(96vw,1080px)] flex-col gap-0 overflow-hidden !rounded-2xl !p-0 md:flex-row [&>button]:hidden"
                     onInteractOutside={(e) => e.preventDefault()}
                 >
                     <VisuallyHidden.Root>
@@ -673,53 +792,126 @@ export function CreateShiftDialog({
                                 : 'Schedule an appointment or rostered shift. Add tasks and optionally repeat weekly.'}
                         </DialogDescription>
                     </VisuallyHidden.Root>
+
+                    {/* Stepper rail */}
+                    <aside className="hidden w-[248px] shrink-0 flex-col border-r border-sidebar-border bg-sidebar p-4 md:flex">
+                        <div className="mb-4 flex items-center gap-2.5">
+                            <span className="flex h-9 w-9 items-center justify-center rounded-xl bg-primary/15 text-primary">
+                                <CalendarClock className="h-4.5 w-4.5" />
+                            </span>
+                            <div className="min-w-0">
+                                <h2 className="text-sm font-bold">
+                                    {isEdit ? 'Edit shift' : 'Create shift'}
+                                </h2>
+                                <div className="truncate text-[11.5px] text-muted-foreground">
+                                    {isEdit
+                                        ? `Shift #${initialShift?.id}`
+                                        : 'Roster a new shift'}
+                                </div>
+                            </div>
+                        </div>
+                        <div className="flex flex-1 flex-col gap-1">
+                            {WIZ_STEPS.map((s, i) => {
+                                const Icon = s.icon;
+                                const active = i === stepIndex;
+                                const done = i < stepIndex;
+                                return (
+                                    <button
+                                        key={s.key}
+                                        type="button"
+                                        onClick={() => {
+                                            setStepErrors({});
+                                            setStepIndex(i);
+                                        }}
+                                        className={cn(
+                                            'flex items-start gap-2.5 rounded-lg px-2.5 py-2 text-left transition-colors',
+                                            active
+                                                ? 'bg-primary/10'
+                                                : 'hover:bg-accent',
+                                        )}
+                                    >
+                                        <span
+                                            className={cn(
+                                                'flex h-6 w-6 shrink-0 items-center justify-center rounded-full text-[11px] font-bold',
+                                                active
+                                                    ? 'bg-primary text-primary-foreground'
+                                                    : done
+                                                      ? 'bg-status-success-bg text-status-success'
+                                                      : 'bg-muted text-muted-foreground',
+                                            )}
+                                        >
+                                            {done ? (
+                                                <Check className="h-3.5 w-3.5" />
+                                            ) : (
+                                                <Icon className="h-3.5 w-3.5" />
+                                            )}
+                                        </span>
+                                        <span className="min-w-0">
+                                            <span className="block text-[13px] leading-tight font-semibold">
+                                                {s.label}
+                                            </span>
+                                            <span className="block text-[11px] text-muted-foreground">
+                                                {s.blurb}
+                                            </span>
+                                        </span>
+                                    </button>
+                                );
+                            })}
+                        </div>
+                        <div className="mt-3 rounded-lg border border-border bg-card p-3">
+                            <div className="flex items-center justify-between text-[11.5px] font-semibold">
+                                <span>Shift readiness</span>
+                                <span className="tabular-nums">
+                                    {readinessPct}%
+                                </span>
+                            </div>
+                            <div className="mt-1.5 h-1.5 overflow-hidden rounded-full bg-muted">
+                                <div
+                                    className="h-full rounded-full bg-primary transition-all"
+                                    style={{ width: `${readinessPct}%` }}
+                                />
+                            </div>
+                        </div>
+                    </aside>
+
+                    {/* Main panel */}
                     <form
                         data-shifts-create
                         onSubmit={handleSubmit}
-                        className="flex h-full max-h-[90vh] flex-col"
+                        className="flex min-w-0 flex-1 flex-col"
                     >
-                        {/* Header */}
-                        <div className="relative overflow-hidden rounded-t-2xl">
-                            <div className="absolute -top-12 -right-12 h-40 w-40 rounded-full bg-primary/10 blur-2xl" />
-                            <div className="relative flex items-start gap-4 border-b border-border px-6 pt-5 pb-4">
-                                <span className="inline-flex h-11 w-11 shrink-0 items-center justify-center rounded-xl bg-primary/10 ring-1 ring-primary/20">
-                                    <CalendarClock className="h-5 w-5 text-primary" />
-                                </span>
-                                <div className="min-w-0 flex-1">
-                                    <div className="text-[10.5px] font-semibold tracking-wider text-primary uppercase">
-                                        {isEdit
-                                            ? `Edit · Shift #${initialShift?.id}`
-                                            : 'New shift'}
-                                    </div>
-                                    <h2 className="mt-0.5 text-xl font-bold tracking-tight text-foreground">
-                                        {isEdit ? 'Edit shift' : 'Create shift'}
-                                    </h2>
-                                    <p className="mt-0.5 text-sm text-muted-foreground">
-                                        {isEdit
-                                            ? 'Update the schedule, staff, tasks or notes. Changes are saved on submit.'
-                                            : 'Schedule an appointment or rostered shift. Add tasks and optionally repeat weekly.'}
-                                    </p>
-                                </div>
-                                <div className="flex shrink-0 items-center gap-2">
-                                    <span className="hidden items-center gap-1 rounded-md border border-border px-1.5 py-1 text-[10.5px] text-muted-foreground sm:inline-flex">
-                                        <kbd className="font-sans font-semibold">
-                                            ⌘
-                                        </kbd>
-                                        <kbd className="font-sans font-semibold">
-                                            ↵
-                                        </kbd>
-                                        <span>to save</span>
-                                    </span>
-                                    <button
-                                        type="button"
-                                        onClick={onClose}
-                                        aria-label="Close dialog"
-                                        className="inline-flex h-9 w-9 items-center justify-center rounded-md text-muted-foreground hover:bg-muted hover:text-foreground"
-                                    >
-                                        <X className="h-4 w-4" />
-                                    </button>
-                                </div>
+                        <header className="flex items-center justify-between border-b border-border px-5 py-3">
+                            <div className="text-[12.5px] text-muted-foreground">
+                                Step {stepIndex + 1} of {WIZ_STEPS.length} ·{' '}
+                                <b className="text-foreground">{cur.label}</b>
                             </div>
+                            <div className="flex shrink-0 items-center gap-2">
+                                <span className="hidden items-center gap-1 rounded-md border border-border px-1.5 py-1 text-[10.5px] text-muted-foreground sm:inline-flex">
+                                    <kbd className="font-sans font-semibold">
+                                        ⌘
+                                    </kbd>
+                                    <kbd className="font-sans font-semibold">
+                                        ↵
+                                    </kbd>
+                                    <span>to continue</span>
+                                </span>
+                                <button
+                                    type="button"
+                                    onClick={onClose}
+                                    aria-label="Close dialog"
+                                    className="rounded-md p-1 text-muted-foreground hover:bg-accent hover:text-foreground"
+                                >
+                                    <X className="h-4.5 w-4.5" />
+                                </button>
+                            </div>
+                        </header>
+                        <div className="h-[3px] shrink-0 bg-muted">
+                            <div
+                                className="h-full bg-primary transition-all"
+                                style={{
+                                    width: `${((stepIndex + 1) / WIZ_STEPS.length) * 100}%`,
+                                }}
+                            />
                         </div>
 
                         {/* Body */}
@@ -728,7 +920,8 @@ export function CreateShiftDialog({
                                 <LockedContextCard context={lockedContext} />
                             ) : null}
 
-                            {form.data.user_id ? (
+                            {(cur.key === 'people' || cur.key === 'review') &&
+                            form.data.user_id ? (
                                 <div className="mb-4 space-y-2 rounded-xl border border-border bg-card p-3">
                                     <div className="flex flex-wrap items-center justify-between gap-2">
                                         <div>
@@ -776,20 +969,25 @@ export function CreateShiftDialog({
                                 </div>
                             ) : null}
 
-                            <Section
-                                first
-                                icon={LayoutGrid}
-                                title="Shift type"
-                                hint="What kind of shift is this?"
-                            >
-                                <ShiftTypePicker
-                                    value={form.data.shift_type}
-                                    onChange={setShiftType}
-                                />
-                                <FieldError message={form.errors.shift_type} />
-                            </Section>
+                            {cur.key === 'type' ? (
+                                <Section
+                                    first
+                                    icon={LayoutGrid}
+                                    title="Shift type"
+                                    hint="What kind of shift is this?"
+                                >
+                                    <ShiftTypePicker
+                                        value={form.data.shift_type}
+                                        onChange={setShiftType}
+                                    />
+                                    <FieldError
+                                        message={form.errors.shift_type}
+                                    />
+                                </Section>
+                            ) : null}
 
-                            <Section icon={Users} title="Who & where">
+                            {cur.key === 'people' ? (
+                            <Section first icon={Users} title="Who & where">
                                 <div className="grid gap-3 sm:grid-cols-2">
                                     <div>
                                         <Label htmlFor="csd-client" required>
@@ -819,6 +1017,9 @@ export function CreateShiftDialog({
                                         ) : null}
                                         <FieldError
                                             message={form.errors.client_id}
+                                        />
+                                        <FieldError
+                                            message={stepErrors.client_id}
                                         />
                                     </div>
 
@@ -896,8 +1097,11 @@ export function CreateShiftDialog({
                                     </div>
                                 </div>
                             </Section>
+                            ) : null}
 
+                            {cur.key === 'schedule' ? (
                             <Section
+                                first
                                 icon={Clock}
                                 title="Schedule"
                                 hint={
@@ -937,10 +1141,14 @@ export function CreateShiftDialog({
                                 </div>
                                 <FieldError message={form.errors.starts_at} />
                                 <FieldError message={form.errors.ends_at} />
+                                <FieldError message={stepErrors.starts_at} />
+                                <FieldError message={stepErrors.ends_at} />
                             </Section>
+                            ) : null}
 
-                            {isEdit ? null : (
+                            {cur.key === 'repeat' && !isEdit ? (
                                 <Section
+                                    first
                                     icon={Repeat}
                                     title="Repeat weekly"
                                     hint={
@@ -993,6 +1201,11 @@ export function CreateShiftDialog({
                                                         );
                                                     })}
                                                 </div>
+                                                <FieldError
+                                                    message={
+                                                        stepErrors.repeat_by_weekday
+                                                    }
+                                                />
                                             </div>
                                             <div className="grid items-end gap-3 sm:grid-cols-[1fr_auto]">
                                                 <div>
@@ -1014,6 +1227,11 @@ export function CreateShiftDialog({
                                                             )
                                                         }
                                                     />
+                                                    <FieldError
+                                                        message={
+                                                            stepErrors.repeat_end_date
+                                                        }
+                                                    />
                                                 </div>
                                                 <div className="inline-flex h-9 items-center gap-2 self-end rounded-lg border border-primary/20 bg-primary/10 px-3 py-2 text-xs text-foreground">
                                                     <Sparkles className="h-3.5 w-3.5 text-primary" />
@@ -1027,9 +1245,11 @@ export function CreateShiftDialog({
                                         </div>
                                     ) : null}
                                 </Section>
-                            )}
+                            ) : null}
 
+                            {cur.key === 'tasks' ? (
                             <Section
+                                first
                                 icon={Pencil}
                                 title="Tasks & notes"
                                 hint="What the worker needs to know"
@@ -1170,52 +1390,202 @@ export function CreateShiftDialog({
                                     </div>
                                 </div>
                             </Section>
+                            ) : null}
+
+                            {cur.key === 'review' ? (
+                                <Section
+                                    first
+                                    icon={CheckCircle2}
+                                    title="Review"
+                                    hint={
+                                        isEdit
+                                            ? 'Confirm and save'
+                                            : 'Confirm and create'
+                                    }
+                                >
+                                    <div className="space-y-3">
+                                        <div className="flex items-center gap-2.5 rounded-xl border border-primary/20 bg-primary/5 p-3">
+                                            <span className="inline-flex h-8 w-8 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
+                                                <CalendarClock className="h-4 w-4" />
+                                            </span>
+                                            <div className="min-w-0">
+                                                <div className="text-[10.5px] font-semibold tracking-wider text-muted-foreground uppercase">
+                                                    {isEdit
+                                                        ? 'Will update'
+                                                        : 'Will create'}
+                                                </div>
+                                                <div className="truncate text-sm font-medium text-foreground">
+                                                    {summary}
+                                                </div>
+                                            </div>
+                                        </div>
+
+                                        <dl className="grid gap-x-6 gap-y-3 rounded-xl border border-border bg-card p-4 sm:grid-cols-2">
+                                            <ReviewRow
+                                                label="Shift type"
+                                                value={
+                                                    SHIFT_TYPES.find(
+                                                        (t) =>
+                                                            t.key ===
+                                                            form.data
+                                                                .shift_type,
+                                                    )?.label ??
+                                                    form.data.shift_type
+                                                }
+                                                onEdit={() => jumpTo('type')}
+                                            />
+                                            <ReviewRow
+                                                label="Client"
+                                                value={
+                                                    selectedClient
+                                                        ? `${selectedClient.first_name} ${selectedClient.last_name}`.trim()
+                                                        : '—'
+                                                }
+                                                onEdit={() => jumpTo('people')}
+                                            />
+                                            <ReviewRow
+                                                label="Staff"
+                                                value={
+                                                    selectedStaff?.name ??
+                                                    'Open shift (unassigned)'
+                                                }
+                                                onEdit={() => jumpTo('people')}
+                                            />
+                                            <ReviewRow
+                                                label="Location"
+                                                value={
+                                                    form.data.location || '—'
+                                                }
+                                                onEdit={() => jumpTo('people')}
+                                            />
+                                            <ReviewRow
+                                                label="Schedule"
+                                                value={`${form.data.starts_at.replace('T', ' ')} → ${form.data.ends_at.replace('T', ' ')} · ${durationLabel}`}
+                                                onEdit={() =>
+                                                    jumpTo('schedule')
+                                                }
+                                            />
+                                            <ReviewRow
+                                                label="Break · publish"
+                                                value={`${form.data.expected_break_minutes || 0} min · ${form.data.status === 'draft' ? 'Draft' : 'Scheduled'}`}
+                                                onEdit={() =>
+                                                    jumpTo('schedule')
+                                                }
+                                            />
+                                            {!isEdit ? (
+                                                <ReviewRow
+                                                    label="Repeat"
+                                                    value={
+                                                        form.data.repeat_weekly
+                                                            ? `Weekly on ${form.data.repeat_by_weekday.map((d) => WEEKDAY_LABEL[d]).join(', ')} until ${form.data.repeat_end_date || '—'}`
+                                                            : 'One-off shift'
+                                                    }
+                                                    onEdit={() =>
+                                                        jumpTo('repeat')
+                                                    }
+                                                />
+                                            ) : null}
+                                            <ReviewRow
+                                                label="Tasks · notes"
+                                                value={`${
+                                                    form.data.tasks.filter(
+                                                        (t) =>
+                                                            t.label.trim() !==
+                                                            '',
+                                                    ).length
+                                                } task${form.data.tasks.filter((t) => t.label.trim() !== '').length === 1 ? '' : 's'}${form.data.notes ? ' · has handover notes' : ''}`}
+                                                onEdit={() => jumpTo('tasks')}
+                                            />
+                                        </dl>
+
+                                        {Object.keys(form.errors).length >
+                                        0 ? (
+                                            <div className="rounded-lg border border-status-critical/35 bg-status-critical-bg p-3 text-xs">
+                                                <div className="mb-1 font-semibold text-status-critical">
+                                                    Fix before saving:
+                                                </div>
+                                                <ul className="list-inside list-disc space-y-0.5 text-foreground">
+                                                    {Object.entries(
+                                                        form.errors,
+                                                    ).map(
+                                                        ([field, message]) => (
+                                                            <li key={field}>
+                                                                {String(
+                                                                    message,
+                                                                )}
+                                                            </li>
+                                                        ),
+                                                    )}
+                                                </ul>
+                                            </div>
+                                        ) : null}
+
+                                        {isEdit &&
+                                        eligibilityStatus?.status ===
+                                            'blocked' ? (
+                                            <p className="text-xs text-status-critical">
+                                                Resolve the eligibility
+                                                blockers above before saving.
+                                            </p>
+                                        ) : null}
+                                    </div>
+                                </Section>
+                            ) : null}
                         </div>
 
                         {/* Footer */}
-                        <div className="flex flex-col gap-3 border-t border-border bg-card px-6 py-3.5 sm:flex-row sm:items-center sm:justify-between">
-                            <div className="flex min-w-0 items-center gap-2">
-                                <span className="inline-flex h-7 w-7 shrink-0 items-center justify-center rounded-full bg-primary/10 text-primary">
-                                    <CalendarClock className="h-3.5 w-3.5" />
-                                </span>
-                                <div className="min-w-0">
-                                    <div className="text-[10.5px] font-semibold tracking-wider text-muted-foreground uppercase">
-                                        {isEdit ? 'Will update' : 'Will create'}
-                                    </div>
-                                    <div className="truncate text-xs text-foreground">
-                                        {summary}
-                                    </div>
-                                </div>
+                        <footer className="flex items-center justify-between gap-2 border-t border-border bg-muted/30 px-5 py-3.5">
+                            <div>
+                                {stepIndex > 0 ? (
+                                    <button
+                                        type="button"
+                                        onClick={goBack}
+                                        className="inline-flex items-center gap-1 rounded-lg px-3 py-2 text-xs font-semibold text-muted-foreground hover:bg-accent hover:text-foreground"
+                                    >
+                                        <ChevronLeft className="h-4 w-4" />
+                                        Back
+                                    </button>
+                                ) : null}
                             </div>
                             <div className="flex shrink-0 items-center gap-2">
                                 <button
                                     type="button"
                                     onClick={onClose}
-                                    className="inline-flex items-center gap-1.5 rounded-md border border-border bg-transparent px-3 py-1.5 text-sm font-medium text-foreground hover:bg-muted"
+                                    className="rounded-lg border border-border bg-background px-3 py-2 text-xs font-semibold transition-colors hover:bg-accent"
                                 >
                                     Cancel
                                 </button>
-                                <button
-                                    type="submit"
-                                    disabled={form.processing}
-                                    className="inline-flex items-center gap-1.5 rounded-md bg-primary px-3 py-1.5 text-sm font-medium text-primary-foreground transition hover:brightness-95 disabled:cursor-not-allowed disabled:opacity-70"
-                                >
-                                    {form.processing ? (
-                                        <>
-                                            <Loader2 className="h-4 w-4 animate-spin" />
-                                            Saving…
-                                        </>
-                                    ) : (
-                                        <>
-                                            <Check className="h-4 w-4" />
-                                            {isEdit
-                                                ? 'Save changes'
-                                                : 'Create shift'}
-                                        </>
-                                    )}
-                                </button>
+                                {cur.key === 'review' ? (
+                                    <button
+                                        type="submit"
+                                        disabled={form.processing}
+                                        className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90 disabled:cursor-not-allowed disabled:opacity-70"
+                                    >
+                                        {form.processing ? (
+                                            <>
+                                                <Loader2 className="h-3.5 w-3.5 animate-spin" />
+                                                Saving…
+                                            </>
+                                        ) : (
+                                            <>
+                                                <Check className="h-3.5 w-3.5" />
+                                                {isEdit
+                                                    ? 'Save changes'
+                                                    : 'Create shift'}
+                                            </>
+                                        )}
+                                    </button>
+                                ) : (
+                                    <button
+                                        type="submit"
+                                        className="inline-flex items-center gap-1.5 rounded-lg bg-primary px-3.5 py-2 text-xs font-semibold text-primary-foreground transition-colors hover:bg-primary/90"
+                                    >
+                                        Continue
+                                        <ChevronRight className="h-4 w-4" />
+                                    </button>
+                                )}
                             </div>
-                        </div>
+                        </footer>
                     </form>
                 </DialogContent>
             </Dialog>
@@ -1295,6 +1665,34 @@ function Label({
 function FieldError({ message }: { message?: string }) {
     if (!message) return null;
     return <p className="mt-1 text-xs text-status-critical">{message}</p>;
+}
+
+function ReviewRow({
+    label,
+    value,
+    onEdit,
+}: {
+    label: string;
+    value: string;
+    onEdit: () => void;
+}) {
+    return (
+        <div className="flex items-start justify-between gap-3">
+            <div className="min-w-0">
+                <dt className="text-[10.5px] font-semibold tracking-wider text-muted-foreground uppercase">
+                    {label}
+                </dt>
+                <dd className="mt-0.5 text-[13px] text-foreground">{value}</dd>
+            </div>
+            <button
+                type="button"
+                onClick={onEdit}
+                className="shrink-0 rounded-md px-1.5 py-0.5 text-xs font-medium text-primary hover:bg-primary/5"
+            >
+                Edit
+            </button>
+        </div>
+    );
 }
 
 function ShiftTypePicker({
