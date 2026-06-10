@@ -1,4 +1,4 @@
-import { useEffect, useMemo, useState, type KeyboardEvent } from 'react';
+import { useEffect, useMemo, useState } from 'react';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import {
     AlertCircle,
@@ -15,6 +15,7 @@ import {
 } from 'lucide-react';
 
 import PageShell from '@/components/page-shell';
+import { TabStrip } from '@/components/rostering/tab-strip';
 import AppLayout from '@/layouts/app-layout';
 import {
     cancel as cancelShift,
@@ -695,37 +696,44 @@ export default function ShiftsIndex({
                     <div className="flex items-center justify-between px-2">
                         <TabStrip
                             value={tab}
-                            onChange={setTab}
+                            onChange={(next) => setTab(next as TabKey)}
+                            ariaLabel="Shift views"
+                            className="border-0 bg-transparent shadow-none"
                             items={[
                                 {
-                                    key: 'all',
+                                    id: 'all',
                                     label: 'All shifts',
                                     icon: List,
-                                    count: stats.total,
+                                    tone: 'primary',
+                                    badge: stats.total,
                                 },
                                 {
-                                    key: 'open',
+                                    id: 'open',
                                     label: 'Open',
                                     icon: AlertCircle,
-                                    count: stats.open,
+                                    tone: 'warning',
+                                    badge: stats.open,
                                 },
                                 {
-                                    key: 'today',
+                                    id: 'today',
                                     label: 'Today',
                                     icon: Clock,
-                                    count: stats.today,
+                                    tone: 'success',
+                                    badge: stats.today,
                                 },
                                 {
-                                    key: 'unassigned',
+                                    id: 'unassigned',
                                     label: 'Unassigned',
                                     icon: UserPlus,
-                                    count: stats.unassigned,
+                                    tone: 'info',
+                                    badge: stats.unassigned,
                                 },
                                 {
-                                    key: 'completed',
+                                    id: 'completed',
                                     label: 'Completed',
                                     icon: CheckCircle,
-                                    count: stats.completed,
+                                    tone: 'success',
+                                    badge: stats.completed,
                                 },
                             ]}
                         />
@@ -945,98 +953,3 @@ export default function ShiftsIndex({
     );
 }
 
-function TabStrip({
-    value,
-    onChange,
-    items,
-}: {
-    value: TabKey;
-    onChange: (key: TabKey) => void;
-    items: Array<{
-        key: TabKey;
-        label: string;
-        icon: typeof List;
-        count: number;
-    }>;
-}) {
-    const handleKeyDown = (
-        event: KeyboardEvent<HTMLButtonElement>,
-        currentKey: TabKey,
-    ) => {
-        const currentIndex = items.findIndex((it) => it.key === currentKey);
-        if (currentIndex < 0) {
-            return;
-        }
-
-        let nextIndex: number | null = null;
-        if (event.key === 'ArrowRight') {
-            nextIndex = (currentIndex + 1) % items.length;
-        } else if (event.key === 'ArrowLeft') {
-            nextIndex = (currentIndex - 1 + items.length) % items.length;
-        } else if (event.key === 'Home') {
-            nextIndex = 0;
-        } else if (event.key === 'End') {
-            nextIndex = items.length - 1;
-        }
-
-        if (nextIndex === null) {
-            return;
-        }
-
-        event.preventDefault();
-        onChange(items[nextIndex].key);
-        const tabs =
-            event.currentTarget.parentElement?.querySelectorAll<HTMLButtonElement>(
-                '[role="tab"]',
-            );
-        tabs?.[nextIndex]?.focus();
-    };
-
-    return (
-        <div className="border-b border-border">
-            <div
-                role="tablist"
-                aria-label="Shift views"
-                className="flex items-center gap-1 overflow-x-auto"
-            >
-                {items.map((it) => {
-                    const active = it.key === value;
-                    const Icon = it.icon;
-                    return (
-                        <button
-                            key={it.key}
-                            type="button"
-                            role="tab"
-                            aria-selected={active}
-                            tabIndex={active ? 0 : -1}
-                            onClick={() => onChange(it.key)}
-                            onKeyDown={(event) =>
-                                handleKeyDown(event, it.key)
-                            }
-                            className={[
-                                'inline-flex items-center gap-2 whitespace-nowrap border-b-2 px-3.5 py-2.5 text-sm font-medium transition-colors',
-                                'focus-visible:outline-none focus-visible:ring-2 focus-visible:ring-ring focus-visible:ring-offset-2',
-                                active
-                                    ? 'border-primary text-foreground'
-                                    : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground',
-                            ].join(' ')}
-                        >
-                            <Icon className="h-4 w-4" />
-                            {it.label}
-                            <span
-                                className={[
-                                    'inline-flex h-[20px] min-w-[20px] items-center justify-center rounded-full px-1.5 text-[10.5px] font-semibold tabular-nums',
-                                    active
-                                        ? 'bg-primary/15 text-primary'
-                                        : 'bg-muted text-muted-foreground',
-                                ].join(' ')}
-                            >
-                                {it.count}
-                            </span>
-                        </button>
-                    );
-                })}
-            </div>
-        </div>
-    );
-}

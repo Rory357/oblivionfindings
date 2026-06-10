@@ -1,6 +1,14 @@
 /* Status tabs + clear-filters + shown count + Cards/List view switcher. */
+import { TabStrip, type RosterTabItem } from '@/components/rostering/tab-strip';
 import { cn } from '@/lib/utils';
-import { LayoutGrid, ListChecks, X } from 'lucide-react';
+import {
+    CheckCircle2,
+    Clock,
+    Flag,
+    LayoutGrid,
+    ListChecks,
+    X,
+} from 'lucide-react';
 
 import type { StatusTab, ViewMode } from './shared';
 
@@ -11,11 +19,35 @@ export type TabCounts = {
     reviewed: number;
 };
 
-const TABS: { id: StatusTab; label: string; key: keyof TabCounts }[] = [
-    { id: 'all', label: 'All', key: 'all' },
-    { id: 'flagged', label: 'Flagged', key: 'flagged' },
-    { id: 'awaiting', label: 'Awaiting review', key: 'awaiting' },
-    { id: 'reviewed', label: 'Reviewed', key: 'reviewed' },
+const TABS: {
+    id: StatusTab;
+    label: string;
+    key: keyof TabCounts;
+    icon: RosterTabItem['icon'];
+    tone: RosterTabItem['tone'];
+}[] = [
+    { id: 'all', label: 'All', key: 'all', icon: ListChecks, tone: 'primary' },
+    {
+        id: 'flagged',
+        label: 'Flagged',
+        key: 'flagged',
+        icon: Flag,
+        tone: 'critical',
+    },
+    {
+        id: 'awaiting',
+        label: 'Awaiting review',
+        key: 'awaiting',
+        icon: Clock,
+        tone: 'warning',
+    },
+    {
+        id: 'reviewed',
+        label: 'Reviewed',
+        key: 'reviewed',
+        icon: CheckCircle2,
+        tone: 'success',
+    },
 ];
 
 const VIEWS: { id: ViewMode; label: string; icon: typeof LayoutGrid }[] = [
@@ -46,39 +78,18 @@ export function Toolbar({
 }) {
     return (
         <div className="flex flex-wrap items-center gap-3">
-            <div
-                className="flex flex-wrap items-center gap-1 rounded-xl border border-border bg-card p-1"
-                role="tablist"
-                aria-label="Filter by status"
-            >
-                {TABS.map((t) => (
-                    <button
-                        key={t.id}
-                        type="button"
-                        role="tab"
-                        aria-selected={tab === t.id}
-                        onClick={() => onTab(t.id)}
-                        className={cn(
-                            'inline-flex items-center gap-1.5 rounded-lg px-3 py-1.5 text-[13px] font-semibold transition-colors',
-                            tab === t.id
-                                ? 'bg-primary text-primary-foreground'
-                                : 'text-muted-foreground hover:bg-accent hover:text-foreground',
-                        )}
-                    >
-                        {t.label}
-                        <span
-                            className={cn(
-                                'rounded-full px-1.5 text-[11px] tabular-nums',
-                                tab === t.id
-                                    ? 'bg-primary-foreground/20'
-                                    : 'bg-muted text-muted-foreground',
-                            )}
-                        >
-                            {counts[t.key]}
-                        </span>
-                    </button>
-                ))}
-            </div>
+            <TabStrip
+                value={tab}
+                onChange={(next) => onTab(next as StatusTab)}
+                ariaLabel="Shift note status"
+                items={TABS.map((t) => ({
+                    id: t.id,
+                    label: t.label,
+                    icon: t.icon,
+                    tone: t.tone,
+                    badge: counts[t.key],
+                }))}
+            />
 
             <div className="ml-auto flex flex-wrap items-center gap-3">
                 {hasFilters ? (

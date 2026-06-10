@@ -1,6 +1,7 @@
 import { OpsStatCard } from '@/components/ops-stat-card';
 import PageShell from '@/components/page-shell';
 import { ReasonDialog } from '@/components/reason-dialog';
+import { TabStrip, type RosterTabItem } from '@/components/rostering/tab-strip';
 import { TimesheetStatusBadge } from '@/components/timesheet-status-badge';
 import CreateTimesheetDialog, {
     type ClientOption,
@@ -18,6 +19,7 @@ import {
     AlertTriangle,
     Archive,
     ArchiveRestore,
+    Banknote,
     CalendarDays,
     Car,
     CheckCircle2,
@@ -30,6 +32,7 @@ import {
     FileText,
     Filter,
     Link2,
+    ListChecks,
     MapPin,
     MessageSquareWarning,
     Moon,
@@ -92,14 +95,19 @@ type Props = {
     canCreate: boolean;
 };
 
-const TABS: Array<{ key: string; label: string }> = [
-    { key: 'all', label: 'All' },
-    { key: 'draft', label: 'Drafts' },
-    { key: 'submitted', label: 'Pending' },
-    { key: 'returned', label: 'Returned' },
-    { key: 'approved', label: 'Approved' },
-    { key: 'paid', label: 'Paid' },
-    { key: 'archived', label: 'Archive' },
+const TABS: Array<{
+    key: string;
+    label: string;
+    icon: RosterTabItem['icon'];
+    tone: RosterTabItem['tone'];
+}> = [
+    { key: 'all', label: 'All', icon: ListChecks, tone: 'primary' },
+    { key: 'draft', label: 'Drafts', icon: Pencil, tone: 'info' },
+    { key: 'submitted', label: 'Pending', icon: ClipboardCheck, tone: 'warning' },
+    { key: 'returned', label: 'Returned', icon: RotateCcw, tone: 'critical' },
+    { key: 'approved', label: 'Approved', icon: CheckCircle2, tone: 'success' },
+    { key: 'paid', label: 'Paid', icon: Banknote, tone: 'success' },
+    { key: 'archived', label: 'Archive', icon: Archive, tone: 'primary' },
 ];
 
 // Preserved export — index.test.ts references this constant.
@@ -568,32 +576,21 @@ export default function TimesheetsIndex({
                 {/* Table */}
                 <section className="rounded-2xl border border-border bg-card shadow-sm">
                     {/* Tab strip */}
-                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 pt-3 pb-0">
-                        <div className="-mb-px flex flex-wrap items-center gap-1">
-                            {TABS.map((tabDef) => (
-                                <button
-                                    key={tabDef.key}
-                                    onClick={() => switchTab(tabDef.key)}
-                                    className={cn(
-                                        'inline-flex items-center gap-1.5 border-b-2 px-3 py-2 text-[12.5px] font-semibold transition',
-                                        tab === tabDef.key
-                                            ? 'border-primary text-primary'
-                                            : 'border-transparent text-muted-foreground hover:text-foreground',
-                                    )}
-                                >
-                                    {tabDef.label}
-                                    <span
-                                        className={cn(
-                                            'rounded-full px-1.5 text-[10.5px] font-semibold tabular-nums',
-                                            tab === tabDef.key ? 'bg-status-info-bg text-primary' : 'bg-muted text-muted-foreground',
-                                        )}
-                                    >
-                                        {tabCounts[tabDef.key] ?? 0}
-                                    </span>
-                                </button>
-                            ))}
-                        </div>
-                        <div className="flex items-center gap-2 pb-2">
+                    <div className="flex flex-wrap items-center justify-between gap-2 border-b border-border px-4 py-2">
+                        <TabStrip
+                            value={tab}
+                            onChange={switchTab}
+                            ariaLabel="Timesheet status"
+                            className="border-0 bg-transparent p-0 shadow-none"
+                            items={TABS.map((tabDef) => ({
+                                id: tabDef.key,
+                                label: tabDef.label,
+                                icon: tabDef.icon,
+                                tone: tabDef.tone,
+                                badge: tabCounts[tabDef.key] ?? 0,
+                            }))}
+                        />
+                        <div className="flex items-center gap-2">
                             <div className="relative">
                                 <Search className="absolute left-2.5 top-1/2 h-3.5 w-3.5 -translate-y-1/2 text-muted-foreground" />
                                 <Input

@@ -38,11 +38,13 @@ export function TabStrip({
     onChange,
     items,
     className,
+    ariaLabel = 'Roster views',
 }: {
     value: string;
     onChange: (next: string) => void;
     items: RosterTabItem[];
     className?: string;
+    ariaLabel?: string;
 }) {
     const handleKeyDown = (
         event: KeyboardEvent<HTMLButtonElement>,
@@ -81,7 +83,7 @@ export function TabStrip({
     return (
         <div
             role="tablist"
-            aria-label="Roster views"
+            aria-label={ariaLabel}
             className={cn(
                 'flex flex-wrap items-center gap-1 rounded-[14px] border border-border bg-card p-1.5 shadow-sm',
                 className,
