@@ -182,6 +182,16 @@ export default function GuidedRound({ round, items, progress }: Props) {
         const payload = {
             status: pendingAction,
             reason: pendingAction === 'given' ? '' : reason.trim(),
+            // The MAR pipeline requires a coded not-given reason
+            // (NotGivenReason); in this quick round flow the action itself is
+            // the code — the typed text stays as the free-form detail. Finer
+            // codes live in the desktop Record Dose wizard.
+            reason_code:
+                pendingAction === 'given'
+                    ? null
+                    : pendingAction === 'refused'
+                      ? 'refused'
+                      : 'withheld',
             scheduled_for: current.scheduled_for,
         };
 

@@ -20,6 +20,7 @@ function expectNoUnexpectedConsoleErrors(errors: string[]) {
     ).toEqual([]);
 }
 
+/** Open the PRN wizard and advance past the "Choose med" step. */
 async function openPrnSheetFor(
     page: Page,
     medicationName: string,
@@ -30,10 +31,14 @@ async function openPrnSheetFor(
             name: new RegExp(`Record as-needed dose of ${medicationName}`, 'i'),
         })
         .click();
+    await page.getByTestId('meds-prn-continue').click();
 }
 
+/** Pick a reason chip, walk the remaining wizard steps, and sign. */
 async function recordPrnReason(page: Page, reason: string) {
-    await page.getByRole('radio', { name: reason }).click();
+    await page.getByRole('button', { name: reason, exact: true }).click();
+    await page.getByTestId('meds-prn-continue').click(); // → Dose & time
+    await page.getByTestId('meds-prn-continue').click(); // → Review & sign
     await page.getByTestId('meds-prn-submit').click();
 }
 
@@ -47,6 +52,9 @@ async function openGuidedRound(page: Page) {
         })
         .first()
         .click();
+    // The meds board also names fixture meds (overdue strip, schedule rows),
+    // so wait for the guided page before asserting on medication names.
+    await page.waitForURL(/\/emar\/rounds\/\d+\/guided/);
 }
 
 async function recordCurrentRoundItem(
@@ -101,7 +109,11 @@ test.describe('meds readiness workflows', () => {
         await page.goto('/meds/today');
 
         await expect(page.getByTestId('meds-due-row').first()).toBeVisible();
-        await expect(page.getByText('PW Meds Morning Tablets')).toBeVisible();
+        // The med name can appear in both the overdue strip and the schedule
+        // table — any visible mention satisfies this readiness check.
+        await expect(
+            page.getByText('PW Meds Morning Tablets').first(),
+        ).toBeVisible();
         await expect(page.getByTestId('meds-prn-button')).toBeEnabled();
         await expect(
             page
@@ -193,6 +205,7 @@ test.describe('meds readiness workflows', () => {
             })
             .first()
             .click();
+        await page.waitForURL(/\/emar\/rounds\/\d+\/guided/);
 
         await expect(page.getByText('PW Meds Morning Tablets')).toBeVisible();
         await expect(page.getByTestId('meds-round-given')).toBeVisible();
@@ -347,6 +360,9 @@ test.describe('meds readiness workflows', () => {
         await page
             .getByRole('option', { name: /Medication Demo Witness/i })
             .click();
+        // The second checker confirms with their own password before the
+        // dose can be saved (EnhancedMarService witness credential rule).
+        await dialog.locator('input[type="password"]').fill('password');
         await expect(submitButton).toBeEnabled();
         await submitButton.click();
 
