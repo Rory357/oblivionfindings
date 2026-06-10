@@ -102,7 +102,7 @@ test.describe('meds readiness workflows', () => {
 
     test('worker meds home exposes due rows, PRN, and guided round entry', async ({
         page,
-    }) => {
+    }, testInfo) => {
         const consoleErrors = collectConsoleErrors(page);
 
         await loginAsMedsDemoWorker(page);
@@ -114,6 +114,13 @@ test.describe('meds readiness workflows', () => {
         await expect(
             page.getByText('PW Meds Morning Tablets').first(),
         ).toBeVisible();
+        // The fixtures seed overdue doses, so the sidebar "Meds today" item
+        // carries its critical overdue badge (sidebar is desktop chrome).
+        if (!testInfo.project.name.includes('mobile')) {
+            await expect(
+                page.getByTestId('sidebar-badge-meds-today'),
+            ).toBeVisible();
+        }
         await expect(page.getByTestId('meds-prn-button')).toBeEnabled();
         await expect(
             page

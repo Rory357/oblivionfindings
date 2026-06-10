@@ -500,6 +500,9 @@ function buildIconNavItems({
             icon: Pill,
             label: 'Meds today',
             href: '/meds/today',
+            // Overdue doses for the worker's shift clients (shared by
+            // HandleInertiaRequests, 60s cache) — the design's critical chip.
+            badge: can?.medications?.overdueTodayCount,
         });
     }
 
@@ -2944,6 +2947,7 @@ export function AppSidebar({
                                                 {item.badge != null &&
                                                     item.badge > 0 && (
                                                         <span
+                                                            data-test={`sidebar-badge-${item.id}`}
                                                             className={cn(
                                                                 'flex h-5 min-w-5 items-center justify-center rounded-full bg-status-critical px-1 text-[10px] leading-none font-bold text-white',
                                                                 isCollapsed

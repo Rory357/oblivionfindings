@@ -4,9 +4,13 @@ namespace App\Http\Middleware;
 
 use App\Models\Announcement;
 use App\Models\AppSetting;
+use App\Models\ClientMedication;
 use App\Models\OpsMessage;
+use App\Models\Shift;
 use App\Models\ShiftOpenPosition;
 use App\Models\User;
+use App\Services\MarScheduleService;
+use Carbon\Carbon;
 use Illuminate\Foundation\Inspiring;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
@@ -48,6 +52,25 @@ class HandleInertiaRequests extends Middleware
             $can = $this->getUserPermissions($user);
             if (isset($can['job_board'])) {
                 $can['job_board']['open_count'] = $this->jobBoardOpenCount($user);
+            }
+
+            // Overdue-meds badge for the sidebar "Meds today" item. Only
+            // computed for users who actually see that item (frontline
+            // workers — managers get the eMAR sub-panel instead), and cached
+            // briefly because the dose-slot maths isn't free.
+            $showsWorkerMedsItem = ! (
+                ($can['medications']['ordersManage'] ?? false)
+                || ($can['medications']['auditView'] ?? false)
+                || ($can['medications']['reportsExport'] ?? false)
+                || ($can['reports']['viewAny'] ?? false)
+            ) && (
+                ($can['medications']['administerRecord'] ?? false)
+                || ($can['medications']['view'] ?? false)
+                || ($can['clients']['update'] ?? false)
+            );
+
+            if ($showsWorkerMedsItem && isset($can['medications'])) {
+                $can['medications']['overdueTodayCount'] = $this->medsOverdueTodayCount($user);
             }
         }
 
@@ -955,6 +978,92 @@ class HandleInertiaRequests extends Middleware
                         ->orWhere('expires_at', '>', now());
                 })
                 ->count();
+        } catch (\Throwable) {
+            return 0;
+        }
+    }
+
+    /**
+     * Today's overdue (scheduled-before-now, unrecorded) doses for the
+     * worker's shift clients — the sidebar "Meds today" badge. Same overdue
+     * semantics as the /meds/today board hero. Cached for 60s per user/day;
+     * WorkerMedsController busts the cache when a dose is recorded.
+     */
+    public static function medsOverdueBadgeCacheKey(int $userId, string $localDate): string
+    {
+        return 'meds:overdue-badge:'.$userId.':'.$localDate;
+    }
+
+    protected function medsOverdueTodayCount($user): int
+    {
+        if (! Schema::hasTable('client_medications')) {
+            return 0;
+        }
+
+        try {
+            $schedule = app(MarScheduleService::class);
+            $now = Carbon::now($schedule->workerTimezone());
+
+            return (int) Cache::remember(
+                self::medsOverdueBadgeCacheKey((int) $user->id, $now->toDateString()),
+                now()->addSeconds(60),
+                function () use ($user, $schedule, $now): int {
+                    $clientIds = Shift::query()
+                        ->where('user_id', $user->id)
+                        ->whereBetween('starts_at', [
+                            $now->copy()->startOfDay()->utc(),
+                            $now->copy()->addDay()->endOfDay()->utc(),
+                        ])
+                        ->pluck('client_id')
+                        ->filter()
+                        ->unique()
+                        ->values()
+                        ->all();
+
+                    if (empty($clientIds)) {
+                        return 0;
+                    }
+
+                    $medications = ClientMedication::whereIn('client_id', $clientIds)
+                        ->active()
+                        ->where('is_prn', false)
+                        ->where(function ($query) {
+                            $query->whereNotNull('dose_times')
+                                ->orWhereNotNull('frequency');
+                        })
+                        ->get();
+
+                    if ($medications->isEmpty()) {
+                        return 0;
+                    }
+
+                    $dayStart = $now->copy()->startOfDay();
+                    $administrations = $schedule->administrationsForWindow($clientIds, $dayStart, $now);
+
+                    $count = 0;
+                    foreach ($medications as $medication) {
+                        foreach ($schedule->scheduledTimesForDate($medication, $dayStart) as $scheduled) {
+                            if ($scheduled->gte($now)) {
+                                continue;
+                            }
+
+                            $administration = $administrations->get($schedule->slotKey(
+                                (int) $medication->client_id,
+                                (int) $medication->id,
+                                $scheduled,
+                            ));
+
+                            if ($administration && in_array($administration->status, ['given', 'refused', 'withheld', 'missed'], true)) {
+                                continue;
+                            }
+
+                            $count++;
+                        }
+                    }
+
+                    return $count;
+                },
+            );
         } catch (\Throwable) {
             return 0;
         }

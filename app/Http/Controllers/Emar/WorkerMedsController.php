@@ -19,10 +19,12 @@ use App\Services\GuidedRoundService;
 use App\Services\MarScheduleService;
 use App\Services\Timeline\TimelineEmitter;
 use App\Support\EmarUrl;
+use App\Http\Middleware\HandleInertiaRequests;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Cache;
 use Illuminate\Support\Str;
 use Inertia\Inertia;
 use Inertia\Response;
@@ -253,6 +255,13 @@ class WorkerMedsController extends Controller
             }
 
             $this->emitMedicationTimelineEvent($result['administration'], $medication, $user, $shiftId);
+
+            // The sidebar overdue badge caches for 60s — recording a dose is
+            // the one action that should drop it immediately.
+            Cache::forget(HandleInertiaRequests::medsOverdueBadgeCacheKey(
+                (int) $user->id,
+                Carbon::now($this->scheduleService->workerTimezone())->toDateString(),
+            ));
 
             $outcome = match ($data['status']) {
                 'refused' => 'recorded as refused',

@@ -110,8 +110,8 @@ class WorkerMedsRecordDoseTest extends TestCase
             'actor_user_id' => $this->worker->id,
         ]);
 
-        // The board now shows the slot as recorded and the activity feed
-        // carries the event.
+        // The board now shows the slot as recorded, the activity feed
+        // carries the event, and the sidebar overdue badge reads zero.
         $this->actingAs($this->worker)
             ->get('/meds/today')
             ->assertOk()
@@ -120,6 +120,7 @@ class WorkerMedsRecordDoseTest extends TestCase
                 ->where('schedule.0.recorded.by', $this->worker->name)
                 ->count('activity', 1)
                 ->where('activity.0.icon', 'check')
+                ->where('auth.can.medications.overdueTodayCount', 0)
             );
     }
 
@@ -331,6 +332,9 @@ class WorkerMedsRecordDoseTest extends TestCase
                 ->where('clients.0.name', 'Aroha Ngata')
                 ->where('witnesses.0.id', $witness->id)
                 ->where('has_shift_context', true)
+                // Sidebar badge shared prop: the 08:00 slot is overdue at
+                // 09:30, the 16:00 one isn't.
+                ->where('auth.can.medications.overdueTodayCount', 1)
             );
 
         // Day navigation: a shift tomorrow gives the worker tomorrow's board.

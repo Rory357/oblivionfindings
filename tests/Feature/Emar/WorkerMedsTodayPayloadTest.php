@@ -163,7 +163,12 @@ class WorkerMedsTodayPayloadTest extends TestCase
 
         DB::disableQueryLog();
 
-        $this->assertSame(1, $adminQueries);
+        // Exactly two fixed administration queries, regardless of how many
+        // dose slots exist: the board's day query (slot matching + PRN
+        // follow-ups) and the sidebar overdue-badge window query in
+        // HandleInertiaRequests (cached for 60s after this first load).
+        // Before F1 the list issued one administration query PER SLOT.
+        $this->assertSame(2, $adminQueries);
     }
 
     protected function makeRoleUser(string $roleName): User
