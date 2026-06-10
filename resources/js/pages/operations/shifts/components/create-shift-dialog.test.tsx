@@ -246,6 +246,44 @@ describe('CreateShiftDialog create mode wizard', () => {
         expect(screen.getByText(/Step 2 of 6/)).toBeVisible();
     });
 
+    it("prefills location from the client's site and follows client changes", () => {
+        render(
+            <CreateShiftDialog
+                open
+                onClose={vi.fn()}
+                clients={[
+                    { id: 10, first_name: 'Ari', last_name: 'Kauri', site_id: 2 },
+                    { id: 11, first_name: 'Mere', last_name: 'Pono', site_id: 3 },
+                ]}
+                staff={[]}
+                sites={[
+                    { id: 2, name: 'Kowhai House' },
+                    { id: 3, name: 'Aroha Respite' },
+                ]}
+            />,
+        );
+
+        fireEvent.click(screen.getByRole('button', { name: /Who & where/ }));
+        expect(screen.getByLabelText(/Location/)).toHaveValue('Kowhai House');
+
+        // Changing the client follows their site…
+        fireEvent.change(screen.getByLabelText(/Client/), {
+            target: { value: '11' },
+        });
+        expect(screen.getByLabelText(/Location/)).toHaveValue('Aroha Respite');
+
+        // …but a custom location typed by the coordinator is kept.
+        fireEvent.change(screen.getByLabelText(/Location/), {
+            target: { value: 'Te Papa community outing' },
+        });
+        fireEvent.change(screen.getByLabelText(/Client/), {
+            target: { value: '10' },
+        });
+        expect(screen.getByLabelText(/Location/)).toHaveValue(
+            'Te Papa community outing',
+        );
+    });
+
     it('blocks the schedule step when the end is not after the start', () => {
         renderCreate();
 

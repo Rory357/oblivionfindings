@@ -253,6 +253,11 @@ export function CreateShiftDialog({
         return clients[0] ?? null;
     }, [clients, defaultClientId, defaultSiteId]);
 
+    // Every client lives at a site — the location field follows it (the
+    // coordinator can still type a custom location for community shifts).
+    const siteNameFor = (siteId?: number | null) =>
+        sites.find((s) => s.id === siteId)?.name ?? '';
+
     const form = useForm({
         client_id: (initialShift?.client?.id ?? initialClient?.id ?? '') as
             | number
@@ -270,7 +275,9 @@ export function CreateShiftDialog({
         ends_at:
             toLocalDatetimeInput(initialShift?.ends_at ?? defaultEndsAt) ||
             defaultEndForToday(),
-        location: (initialShift?.location ?? '') as string,
+        location: (initialShift
+            ? (initialShift.location ?? '')
+            : siteNameFor(initialClient?.site_id)) as string,
         notes: (initialShift?.notes ?? '') as string,
         status:
             initialShift?.status === 'draft'
@@ -362,6 +369,7 @@ export function CreateShiftDialog({
                 defaultServiceContextId ??
                 '',
             user_id: defaultUserId ?? '',
+            location: siteNameFor(initialClient?.site_id),
             coverage_roles: defaultCoverageRoles ?? [],
             coverage_rule_id: coverageRuleId ?? '',
             coverage_reservation_token: coverageReservationToken ?? '',
@@ -431,10 +439,21 @@ export function CreateShiftDialog({
 
     function selectClient(idStr: string) {
         const id = Number(idStr) || '';
+        const previous = clients.find(
+            (x) => x.id === Number(form.data.client_id),
+        );
         form.setData('client_id', id as number | '');
         const c = clients.find((x) => x.id === id);
         if (c?.service_context_id != null) {
             form.setData('service_context_id', c.service_context_id);
+        }
+        // Follow the client's home site into the location field — unless the
+        // coordinator typed a custom location, which we keep.
+        const wasAutoFilled =
+            !form.data.location ||
+            form.data.location === siteNameFor(previous?.site_id);
+        if (wasAutoFilled) {
+            form.setData('location', siteNameFor(c?.site_id));
         }
     }
 
@@ -1025,7 +1044,10 @@ export function CreateShiftDialog({
 
                                     <div>
                                         <Label htmlFor="csd-location">
-                                            Location
+                                            Location{' '}
+                                            <span className="font-normal text-muted-foreground">
+                                                · follows the client's site
+                                            </span>
                                         </Label>
                                         <input
                                             id="csd-location"
@@ -1037,11 +1059,7 @@ export function CreateShiftDialog({
                                                     e.target.value,
                                                 )
                                             }
-                                            placeholder={
-                                                sites.length
-                                                    ? sites[0].name
-                                                    : "e.g. Client's home"
-                                            }
+                                            placeholder="e.g. Client's home or community venue"
                                             list="csd-locations"
                                         />
                                         <datalist id="csd-locations">
