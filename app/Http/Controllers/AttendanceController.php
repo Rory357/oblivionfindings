@@ -9,7 +9,9 @@ use App\Models\Shift;
 use App\Models\ShiftHandover;
 use App\Models\User;
 use App\Services\AuditLogger;
+use App\Services\Operations\HandoverPresenter;
 use App\Services\ShiftHandoverService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -18,6 +20,7 @@ class AttendanceController extends Controller
     public function __construct(
         protected AttendanceService $attendanceService,
         protected ShiftHandoverService $handoverService,
+        protected HandoverPresenter $handoverPresenter,
     ) {}
 
     public function index(Request $request)
@@ -25,21 +28,57 @@ class AttendanceController extends Controller
         $auth = $request->user();
         abort_unless($auth && $this->canViewAttendance($auth), 403);
 
+        $request->validate([
+            'week' => ['nullable', 'date'],
+            'user_id' => ['nullable', 'integer'],
+        ]);
+
         $canManageAny = $auth->canDo('timesheets.manageAny');
         $targetUserId = $canManageAny ? (int) ($request->integer('user_id') ?: $auth->id) : $auth->id;
         $targetUser = $targetUserId === $auth->id
             ? $auth
             : User::query()->find($targetUserId);
 
-        $query = HrAttendanceSession::query()
+        // Week is the unit of navigation for the sessions list (Mon–Sun, hero
+        // week stepper). Compute the window in the worker timezone, then query
+        // the UTC-stored clock_in_at column with UTC bounds.
+        $tz = config('app.worker_timezone') ?: config('app.timezone', 'UTC');
+        $weekStart = $request->filled('week')
+            ? Carbon::parse($request->string('week'), $tz)->startOfWeek(Carbon::MONDAY)
+            : Carbon::now($tz)->startOfWeek(Carbon::MONDAY);
+        $weekEnd = $weekStart->copy()->endOfWeek(Carbon::SUNDAY);
+
+        $sessions = HrAttendanceSession::query()
             ->with(['timesheet:id,attendance_session_id,status'])
             ->where('user_id', $targetUserId)
-            ->orderByDesc('clock_in_at');
+            ->whereBetween('clock_in_at', [$weekStart->copy()->utc(), $weekEnd->copy()->utc()])
+            ->orderByDesc('clock_in_at')
+            ->limit(100)
+            ->get()
+            ->map(fn (HrAttendanceSession $session) => [
+                'id' => $session->id,
+                'clock_in_at' => optional($session->clock_in_at)->toIso8601String(),
+                'clock_out_at' => optional($session->clock_out_at)->toIso8601String(),
+                'break_minutes' => (int) $session->break_minutes,
+                'status' => $session->status,
+                'source' => $session->source,
+                'location' => $session->location,
+                'worked_hours' => $session->worked_hours,
+                'timesheet_id' => $session->timesheet?->id,
+                'timesheet_status' => $session->timesheet?->status,
+            ])->values();
 
-        $sessions = $query->paginate(20)->withQueryString();
+        $totalSessions = HrAttendanceSession::query()
+            ->where('user_id', $targetUserId)
+            ->count();
 
         $openSession = HrAttendanceSession::query()
-            ->with(['shift:id,client_id,starts_at,ends_at', 'timesheet:id,attendance_session_id,status'])
+            ->with([
+                'shift:id,client_id,starts_at,ends_at,location',
+                'shift.client:id,first_name,last_name',
+                'timesheet:id,attendance_session_id,status',
+                'breakEvents' => fn ($query) => $query->orderBy('started_at'),
+            ])
             ->where('user_id', $targetUserId)
             ->open()
             ->latest('clock_in_at')
@@ -53,21 +92,6 @@ class AttendanceController extends Controller
         $staff = $canManageAny
             ? User::query()->staff()->orderBy('name')->get(['id', 'name', 'email'])
             : collect();
-
-        $sessions->through(function (HrAttendanceSession $session) {
-            return [
-                'id' => $session->id,
-                'clock_in_at' => optional($session->clock_in_at)->toIso8601String(),
-                'clock_out_at' => optional($session->clock_out_at)->toIso8601String(),
-                'break_minutes' => (int) $session->break_minutes,
-                'status' => $session->status,
-                'source' => $session->source,
-                'location' => $session->location,
-                'worked_hours' => $session->worked_hours,
-                'timesheet_id' => $session->timesheet?->id,
-                'timesheet_status' => $session->timesheet?->status,
-            ];
-        });
 
         $todayHours = HrAttendanceSession::query()
             ->where('user_id', $targetUserId)
@@ -105,15 +129,52 @@ class AttendanceController extends Controller
                 ])->values()
             : collect();
 
+        // Handovers involving the signed-in user (both directions) feed the
+        // Handovers tab — same row shape as the Shift Handovers workspace, plus
+        // an `incoming` flag for the "awaiting YOUR acknowledgement" treatment.
+        $handovers = ShiftHandover::query()
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->whereIn('status', [ShiftHandoverService::STATUS_SUBMITTED, ShiftHandoverService::STATUS_ACKNOWLEDGED])
+            ->where(function ($involving) use ($auth) {
+                $involving->where('outgoing_staff_id', $auth->id)
+                    ->orWhere('incoming_staff_id', $auth->id)
+                    ->orWhereHas('outgoingShift', fn ($shift) => $shift->where('user_id', $auth->id))
+                    ->orWhereHas('incomingShift', fn ($shift) => $shift->where('user_id', $auth->id));
+            })
+            ->with($this->handoverPresenter->mapEagerLoads())
+            ->orderByDesc('created_at')
+            ->limit(50)
+            ->get()
+            ->map(function (ShiftHandover $handover) use ($auth) {
+                $mapped = $this->handoverPresenter->mapHandover($handover, $auth);
+                $mapped['incoming'] = (int) $handover->incoming_staff_id === (int) $auth->id
+                    || (int) ($handover->incomingShift?->user_id ?? 0) === (int) $auth->id;
+
+                return $mapped;
+            })->values();
+
         return Inertia::render('attendance/index', [
             'sessions' => $sessions,
+            'totalSessions' => $totalSessions,
             'openSession' => $openSession ? [
                 'id' => $openSession->id,
                 'clock_in_at' => optional($openSession->clock_in_at)->toIso8601String(),
                 'shift_id' => $openSession->shift_id,
                 'shift_starts_at' => optional($openSession->shift?->starts_at)->toIso8601String(),
                 'shift_ends_at' => optional($openSession->shift?->ends_at)->toIso8601String(),
+                'shift_location' => $openSession->shift?->location,
+                'client_name' => trim((string) ($openSession->shift?->client?->first_name.' '.$openSession->shift?->client?->last_name)) ?: null,
+                'client_id' => $openSession->shift?->client_id,
                 'timesheet_id' => $openSession->timesheet?->id,
+                'on_break' => $openSession->break_started_at !== null,
+                'break_started_at' => optional($openSession->break_started_at)->toIso8601String(),
+                'break_minutes' => (int) $openSession->break_minutes,
+                'breaks' => $openSession->breakEvents->map(fn ($event) => [
+                    'id' => $event->id,
+                    'started_at' => optional($event->started_at)->toIso8601String(),
+                    'ended_at' => optional($event->ended_at)->toIso8601String(),
+                    'minutes' => $event->minutes !== null ? (int) $event->minutes : null,
+                ])->values(),
             ] : null,
             'activeShift' => $activeShift ? [
                 'id' => $activeShift->id,
@@ -133,13 +194,61 @@ class AttendanceController extends Controller
             'staff' => $staff,
             'filters' => [
                 'user_id' => $canManageAny ? $targetUserId : null,
+                'week' => $weekStart->toDateString(),
             ],
             'todayHours' => round((float) $todayHours, 2),
             'weekHours' => round((float) $weekHours, 2),
             'onClockNow' => $onClockNow,
+            'handovers' => $handovers,
             'canManageAny' => $canManageAny,
             'canClock' => $this->canClock($auth),
+            'canCreateHandovers' => $this->canCreateHandovers($auth),
+            'currentUser' => ['id' => $auth->id, 'name' => $auth->name],
+            // Heavy wizard catalogue — loaded on demand the first time the
+            // Handover wizard opens (router.reload only:['catalogue']).
+            'catalogue' => Inertia::optional(fn () => $this->handoverPresenter->catalogue($auth)),
         ]);
+    }
+
+    /**
+     * Correct a session's clock-out (the "fix a missed clock-out" wizard).
+     * Managers may correct anyone's session; workers only their own. The
+     * required reason lands in the audit log and the linked timesheet is
+     * recalculated (submitted ones return to draft).
+     */
+    public function correctSession(Request $request, HrAttendanceSession $session)
+    {
+        $auth = $request->user();
+        $ownSession = $auth && (int) $session->user_id === (int) $auth->id;
+        abort_unless(
+            $auth && ($auth->canDo('timesheets.manageAny') || ($ownSession && $this->canClock($auth))),
+            403,
+        );
+
+        $data = $request->validate([
+            'clock_out_at' => ['required', 'date'],
+            'break_minutes' => ['nullable', 'integer', 'min:0', 'max:240'],
+            'reason' => ['required', 'string', 'max:1000'],
+        ]);
+
+        try {
+            $corrected = $this->attendanceService->correctSession(
+                $auth,
+                $session,
+                Carbon::parse($data['clock_out_at']),
+                (int) ($data['break_minutes'] ?? 0),
+                trim($data['reason']),
+            );
+        } catch (\LogicException $exception) {
+            return redirect()->back()->withErrors(['correct_session' => $exception->getMessage()]);
+        }
+
+        $name = $ownSession ? 'Session' : "Session for {$corrected->user?->name}";
+        if ($corrected->timesheet) {
+            return redirect()->back()->with('success', "{$name} corrected. Timesheet #{$corrected->timesheet->id} recalculated.");
+        }
+
+        return redirect()->back()->with('success', "{$name} corrected. The reason was recorded in the audit log.");
     }
 
     public function clockIn(Request $request)
@@ -183,6 +292,7 @@ class AttendanceController extends Controller
 
         $data = $request->validate([
             'session_id' => ['nullable', 'integer', 'exists:hr_attendance_sessions,id'],
+            'clock_out_at' => ['nullable', 'date'],
             'break_minutes' => ['nullable', 'integer', 'min:0', 'max:240'],
             'notes' => ['nullable', 'string', 'max:2000'],
             'client_id' => ['nullable', 'integer', 'exists:clients,id'],
@@ -193,6 +303,8 @@ class AttendanceController extends Controller
             'handover.shift_rating' => ['nullable', 'string', 'in:calm,mixed,challenging'],
             'handover.handover_notes' => ['nullable', 'string', 'max:2000'],
             'handover.follow_up_needed' => ['required_with:handover', 'boolean'],
+            'handover.tasks_pending' => ['nullable', 'array', 'max:20'],
+            'handover.tasks_pending.*' => ['string', 'max:255'],
             'task_updates' => ['nullable', 'array'],
             'task_updates.*.id' => ['required', 'integer', 'distinct', 'exists:shift_tasks,id'],
             'task_updates.*.is_completed' => ['required', 'boolean'],
@@ -337,6 +449,20 @@ class AttendanceController extends Controller
             $auth->canDo('timesheets.viewAssigned')
             || $auth->canDo('timesheets.viewAny')
             || $this->canClock($auth)
+        );
+    }
+
+    /**
+     * Mirrors Operations\HandoverController::canCreateHandovers — gates the
+     * "New handover" wizard entry points on this page (the wizard posts to the
+     * operations route, so the same permission set must hold).
+     */
+    protected function canCreateHandovers(?User $auth): bool
+    {
+        return (bool) $auth && (
+            $auth->canDo('handovers.create')
+            || $auth->canDo('shifts.update')
+            || $auth->canDo('shifts.manageAny')
         );
     }
 

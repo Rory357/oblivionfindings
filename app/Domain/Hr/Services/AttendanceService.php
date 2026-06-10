@@ -15,6 +15,7 @@ use App\Models\ClientMedicationAdministration;
 use App\Models\Shift;
 use App\Models\ShiftHandover;
 use App\Models\ShiftTask;
+use App\Models\Timesheet;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\MarScheduleService;
@@ -122,6 +123,12 @@ class AttendanceService
 
             if ($clockOutAt->lessThanOrEqualTo($session->clock_in_at)) {
                 throw new \LogicException('Clock-out time must be after clock-in time.');
+            }
+
+            // Workers can adjust the clock-out time (wizard time field), but
+            // never into the future — sessions record what already happened.
+            if ($clockOutAt->gt(now()->addMinutes(2))) {
+                throw new \LogicException('Clock-out time cannot be in the future.');
             }
 
             $openBreakStartedAt = $session->break_started_at?->copy();
@@ -302,6 +309,126 @@ class AttendanceService
                 'reason' => $reason,
                 'clock_out_at' => $endAt->toDateTimeString(),
                 'was_stale' => $wasStale,
+            ]);
+
+            return $session->fresh(['shift.client', 'timesheet', 'user']);
+        });
+    }
+
+    /**
+     * Correct a session's clock-out time and breaks — the "fix a missed
+     * clock-out" wizard. Works on open sessions (closes them at the corrected
+     * time) and already-closed ones (rewrites the times). Always carries a
+     * reason into the audit log; a submitted timesheet returns to draft so the
+     * corrected hours go back through approval.
+     *
+     * Caller is responsible for authorization (timesheets.manageAny, or the
+     * worker correcting their own session).
+     *
+     * @throws \LogicException
+     */
+    public function correctSession(User $actor, HrAttendanceSession $session, Carbon $clockOutAt, int $breakMinutes, string $reason): HrAttendanceSession
+    {
+        return DB::transaction(function () use ($actor, $session, $clockOutAt, $breakMinutes, $reason) {
+            $session = HrAttendanceSession::query()
+                ->with(['shift'])
+                ->lockForUpdate()
+                ->findOrFail($session->id);
+
+            if (! $session->clock_in_at) {
+                throw new \LogicException('This session has no clock-in time to correct against.');
+            }
+
+            if ($clockOutAt->lessThanOrEqualTo($session->clock_in_at)) {
+                throw new \LogicException('Clock-out time must be after clock-in time.');
+            }
+
+            if ($clockOutAt->gt(now()->addMinutes(2))) {
+                throw new \LogicException('Clock-out time cannot be in the future.');
+            }
+
+            $elapsedMinutes = (int) $session->clock_in_at->diffInMinutes($clockOutAt);
+            if ($breakMinutes > 0 && $breakMinutes >= $elapsedMinutes) {
+                throw new \LogicException(sprintf(
+                    'Break duration (%d min) must be less than the session duration (%d min).',
+                    $breakMinutes,
+                    $elapsedMinutes,
+                ));
+            }
+
+            // Same timesheet lookup as the draft sync: by session link first,
+            // then by the shift/user pair.
+            $timesheet = Timesheet::query()
+                ->where('attendance_session_id', $session->id)
+                ->first();
+            if (! $timesheet && $session->shift_id) {
+                $timesheet = Timesheet::query()
+                    ->where('shift_id', $session->shift_id)
+                    ->where('user_id', $session->user_id)
+                    ->first();
+            }
+
+            if ($timesheet && $timesheet->status === 'approved') {
+                throw new \LogicException('The linked timesheet has already been approved — adjust the hours through a timesheet amendment instead.');
+            }
+
+            $wasOpen = $session->status === 'open' && ! $session->clock_out_at;
+            $openBreakStartedAt = $session->break_started_at?->copy();
+            $before = [
+                'clock_out_at' => optional($session->clock_out_at)->toDateTimeString(),
+                'break_minutes' => (int) $session->break_minutes,
+                'status' => $session->status,
+            ];
+
+            $session->update([
+                'clock_out_at' => $clockOutAt,
+                'break_minutes' => $breakMinutes,
+                'break_started_at' => null,
+                'status' => 'closed',
+                'closed_by' => $wasOpen ? $actor->id : ($session->closed_by ?? $actor->id),
+                'meta' => array_merge((array) $session->meta, [
+                    'corrected' => true,
+                    'correction_reason' => $reason,
+                ]),
+            ]);
+
+            if ($wasOpen) {
+                $this->closeOpenBreakEvent($session, $clockOutAt, $openBreakStartedAt);
+
+                if ($session->shift && in_array($session->shift->status, ['in_progress', 'active', 'clocked_in', 'started'], true)) {
+                    app(ShiftLifecycleService::class)->complete(
+                        $session->shift,
+                        $actor,
+                        CompleteShiftData::fromClockOutSession(
+                            $session->fresh(['shift']) ?? $session,
+                            true,
+                            $reason,
+                            ['corrected' => true],
+                        ),
+                    );
+                }
+            }
+
+            // A submitted timesheet returns to draft so fromAttendanceSession
+            // rewrites its hours and the approval starts over on real numbers.
+            if ($timesheet && $timesheet->status === 'submitted') {
+                $timesheet->update(['status' => 'draft']);
+            }
+
+            app(DraftTimesheetService::class)->fromAttendanceSession($session->fresh(['shift']), $actor->id, []);
+
+            AuditLogger::log('attendance.session.corrected', $session, [
+                'attendance_session_id' => $session->id,
+                'session_user_id' => $session->user_id,
+                'shift_id' => $session->shift_id,
+                'reason' => $reason,
+                'was_open' => $wasOpen,
+                'before' => $before,
+                'after' => [
+                    'clock_out_at' => $clockOutAt->toDateTimeString(),
+                    'break_minutes' => $breakMinutes,
+                    'status' => 'closed',
+                ],
             ]);
 
             return $session->fresh(['shift.client', 'timesheet', 'user']);
@@ -665,6 +792,15 @@ class AttendanceService
                 : 'Medications were not fully completed - please review on arrival.';
         }
 
+        // Optional task list from the clock-out wizard — discrete items the
+        // incoming shift must action, same shape the Shift Handover wizard files.
+        $tasksPending = collect(is_array($handover['tasks_pending'] ?? null) ? $handover['tasks_pending'] : [])
+            ->map(fn ($task) => trim((string) $task))
+            ->filter(fn ($task) => $task !== '')
+            ->map(fn ($task) => ['label' => $task])
+            ->values()
+            ->all();
+
         app(ShiftHandoverService::class)->save($shift, $user, [
             'handover_notes' => $notes,
             'client_mood' => $handover['shift_rating'] ?? null,
@@ -680,6 +816,7 @@ class AttendanceService
                     'priority' => 'medium',
                 ]]
                 : null,
+            'tasks_pending' => $tasksPending !== [] ? $tasksPending : null,
             'submit' => true,
         ]);
     }
