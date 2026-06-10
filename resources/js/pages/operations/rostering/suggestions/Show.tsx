@@ -138,6 +138,7 @@ export default function Show({ run, suggestions }: Props) {
             <PageLayout
                 hero={
                     <PageHero
+                        category="ops"
                         icon={CalendarCheck}
                         title={t(
                             'rostering.suggestions.head_title',

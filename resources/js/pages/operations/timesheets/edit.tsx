@@ -115,9 +115,10 @@ export default function TimesheetEdit({
 
             <PageShell>
                 <PageHero
+                    category="ops"
                     title={clientName}
                     description={`${timesheetLabel} #${timesheet.id} — ${timesheet.work_date}`}
-                    icon={<FileText className="h-7 w-7 text-white" />}
+                    icon={FileText}
                     backHref={timesheetsIndex.url()}
                     backLabel="All timesheets"
                     stats={[

@@ -190,6 +190,7 @@ export function ShiftNotesHero({
                     <ChevronLeft className="h-3.5 w-3.5" />
                     Wk {weekNumberISO(prevWeek)}
                 </WeekNavButton>
+                {/* eslint-disable-next-line no-restricted-syntax -- segmented week-stepper on dark hero; not a shadcn Button. */}
                 <button
                     ref={weekBtnRef}
                     type="button"
@@ -280,6 +281,7 @@ export function ShiftNotesHero({
 
     return (
         <PageHero
+            category="ops"
             icon={NotebookPen}
             title={title}
             description={description}
@@ -293,6 +295,7 @@ export function ShiftNotesHero({
                             <Plus className="mr-1.5 h-4 w-4" />
                             Add shift note
                         </Button>
+                        {/* eslint-disable-next-line no-restricted-syntax -- icon-only export chip styled for the dark hero; not a shadcn Button. */}
                         <button
                             type="button"
                             onClick={onExport}

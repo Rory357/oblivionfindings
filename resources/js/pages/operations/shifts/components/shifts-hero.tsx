@@ -11,13 +11,12 @@ import {
     ChevronRight,
     Clock,
     Download,
+    FileText,
     Filter,
-    MoreHorizontal,
     Plus,
     Search,
     Users,
     X,
-    Zap,
 } from 'lucide-react';
 
 import {
@@ -33,6 +32,8 @@ import {
     PopoverContent,
     PopoverTrigger,
 } from '@/components/ui/popover';
+import { PageHero, type PageHeroBadge } from '@/components/page';
+import { Button } from '@/components/ui/button';
 import { MultiEntityFilter } from '@/components/rostering/multi-entity-filter';
 import {
     WeekPicker,
@@ -107,32 +108,49 @@ export function ShiftsHero({
     const weekBtnRef = useRef<HTMLButtonElement | null>(null);
     const [pickerOpen, setPickerOpen] = useState(false);
     const pickerLabel = `${isoWeekLabel(weekStart)} · ${weekLabel}`;
+
+    const draftCount = Math.max(0, stats.unassigned - stats.open);
+    const badges: PageHeroBadge[] = [
+        stats.open > 0
+            ? {
+                  icon: AlertTriangle,
+                  label: `${stats.open} open`,
+                  tone: 'warning' as const,
+              }
+            : {
+                  icon: CheckCircle2,
+                  label: 'Week covered',
+                  tone: 'success' as const,
+              },
+        ...(draftCount > 0
+            ? [
+                  {
+                      icon: FileText,
+                      label: `${draftCount} unassigned draft${draftCount === 1 ? '' : 's'}`,
+                      tone: 'default' as const,
+                  },
+              ]
+            : []),
+    ];
+
     return (
-        <div
-            className="relative overflow-hidden rounded-2xl text-primary-foreground"
-            style={{
-                background:
-                    'linear-gradient(135deg, color-mix(in oklch, var(--primary) 92%, transparent), var(--primary) 52%, oklch(from var(--primary) calc(l - 0.08) c h))',
-            }}
-        >
-            <div className="pointer-events-none absolute inset-0">
-                <div className="absolute -right-16 -top-16 h-64 w-64 rounded-full bg-primary-foreground/5" />
-                <div className="absolute -bottom-20 -left-20 h-48 w-48 rounded-full bg-primary-foreground/5" />
-                <div className="absolute right-1/3 top-1/4 h-24 w-24 rounded-full bg-primary-foreground/5" />
-            </div>
-
-            <div className="relative p-6 md:p-8">
-                <div className="flex flex-col gap-5 md:flex-row md:items-start md:gap-6">
-                    <div className="hidden h-24 w-24 shrink-0 items-center justify-center rounded-full border-4 border-primary-foreground/20 bg-primary-foreground/10 shadow-xl md:flex">
-                        <CalendarDays className="h-12 w-12 text-primary-foreground" />
-                    </div>
-
-                    <div className="min-w-0 flex-1">
-                        <div className="mb-2 flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-wider text-primary-foreground/80">
-                            <LiveDot />
+        <>
+            <PageHero
+                category="ops"
+                icon={CalendarDays}
+                title={
+                    <span>
+                        <span className="mb-2 flex items-center gap-2 text-[10.5px] font-semibold tracking-wider text-primary-foreground/80 uppercase">
+                            <span
+                                aria-hidden="true"
+                                className="relative inline-flex h-2 w-2"
+                            >
+                                <span className="absolute inset-0 inline-flex h-full w-full animate-ping rounded-full bg-status-success/70" />
+                                <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success ring-2 ring-status-success/30" />
+                            </span>
                             Live shifts · refreshed just now
-                        </div>
-                        <h1 className="text-2xl font-bold tracking-tight md:text-3xl">
+                        </span>
+                        <span className="block">
                             <span className="font-normal text-primary-foreground/80">
                                 {greetingName
                                     ? `Kia ora ${greetingName}, your shifts —`
@@ -141,161 +159,139 @@ export function ShiftsHero({
                             <span className="border-b-2 border-primary-foreground/40 pb-0.5">
                                 {weekLabel}
                             </span>
-                        </h1>
-                        <p className="mt-1 text-sm text-primary-foreground/70">
-                            {stats.total} shifts across {stats.sites} site
-                            {stats.sites === 1 ? '' : 's'}.{' '}
-                            {stats.open > 0 ? (
-                                <>
-                                    {stats.open} need cover
-                                    {stats.unassigned > stats.open
-                                        ? `, ${stats.unassigned - stats.open} unassigned drafts`
-                                        : ''}
-                                    .
-                                </>
-                            ) : (
-                                'No open shifts — week is fully covered.'
-                            )}
-                        </p>
-                        <div className="mt-3 flex flex-wrap gap-x-4 gap-y-2 text-xs text-primary-foreground/80">
-                            <span className="inline-flex items-center gap-1.5">
-                                <CalendarDays className="h-3.5 w-3.5" />
-                                {weekLabel}
-                            </span>
-                            <span className="inline-flex items-center gap-1.5">
-                                <Building className="h-3.5 w-3.5" />
-                                {stats.sites} sites
-                            </span>
-                            <span className="inline-flex items-center gap-1.5">
-                                <Users className="h-3.5 w-3.5" />
-                                {stats.staff} staff rostered
-                            </span>
-                            <span className="inline-flex items-center gap-1.5">
-                                <Clock className="h-3.5 w-3.5" />
-                                {stats.hours}h scheduled
-                            </span>
+                        </span>
+                    </span>
+                }
+                description={
+                    <span>
+                        {stats.total} shift{stats.total === 1 ? '' : 's'} across{' '}
+                        {stats.sites} site{stats.sites === 1 ? '' : 's'}.{' '}
+                        {stats.open > 0 ? (
+                            <>
+                                {stats.open} need cover
+                                {draftCount > 0
+                                    ? `, ${draftCount} unassigned drafts`
+                                    : ''}
+                                .
+                            </>
+                        ) : (
+                            'No open shifts — week is fully covered.'
+                        )}
+                    </span>
+                }
+                meta={[
+                    { icon: CalendarDays, label: weekLabel },
+                    {
+                        icon: Building,
+                        label: `${stats.sites} site${stats.sites === 1 ? '' : 's'}`,
+                    },
+                    { icon: Users, label: `${stats.staff} staff rostered` },
+                    { icon: Clock, label: `${stats.hours}h scheduled` },
+                ]}
+                badges={badges}
+                stats={[
+                    { label: 'Total', value: stats.total },
+                    {
+                        label: 'Open',
+                        value: stats.open,
+                        tone: stats.open > 0 ? 'warning' : undefined,
+                    },
+                    { label: 'Today', value: stats.today },
+                    { label: 'On now', value: stats.in_progress },
+                ]}
+                actions={
+                    <>
+                        {onExport ? (
+                            <Button
+                                size="sm"
+                                variant="outline"
+                                className="border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10"
+                                onClick={onExport}
+                            >
+                                <Download className="mr-1 h-3.5 w-3.5" /> Export
+                            </Button>
+                        ) : null}
+                        {canCreate ? (
+                            <Button
+                                size="sm"
+                                className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                                onClick={onCreate}
+                            >
+                                <Plus className="mr-1 h-4 w-4" /> Create shift
+                            </Button>
+                        ) : null}
+                    </>
+                }
+                footer={
+                    <div className="flex flex-col gap-2 py-3 md:flex-row md:items-center md:justify-between">
+                        <div className="flex flex-wrap items-center gap-1.5">
+                            <HeroPillBtn onClick={onPrevWeek}>
+                                <ChevronLeft className="h-3.5 w-3.5" /> Prev
+                                week
+                            </HeroPillBtn>
+                            <HeroPillBtn
+                                buttonRef={weekBtnRef}
+                                onClick={() => setPickerOpen((v) => !v)}
+                                solid
+                                ariaHasPopup="dialog"
+                                ariaExpanded={pickerOpen}
+                            >
+                                <CalendarRange className="h-3.5 w-3.5" />{' '}
+                                {pickerLabel} · pick week
+                                <ChevronDown className="h-3 w-3" />
+                            </HeroPillBtn>
+                            <HeroPillBtn onClick={onNextWeek}>
+                                Next week{' '}
+                                <ChevronRight className="h-3.5 w-3.5" />
+                            </HeroPillBtn>
                         </div>
-
-                        <div className="mt-3 flex flex-wrap gap-2">
-                            {stats.open > 0 ? (
-                                <Pill tone="warning">
-                                    <AlertTriangle className="h-3 w-3" /> {stats.open} open
-                                </Pill>
-                            ) : (
-                                <Pill tone="success">
-                                    <CheckCircle2 className="h-3 w-3" /> Week covered
-                                </Pill>
-                            )}
-                            <Pill tone="info">
-                                <Zap className="h-3 w-3" /> Auto-schedule ready
-                            </Pill>
-                            <Pill tone="default">
-                                <CheckCircle2 className="h-3 w-3" /> Week published
-                            </Pill>
-                        </div>
-                    </div>
-
-                    {/* Right column: actions + stats */}
-                    <div className="flex w-full flex-col items-stretch gap-3 md:w-auto md:items-end">
                         <div className="flex flex-wrap items-center justify-end gap-2">
-                            {onExport ? (
-                                <button
-                                    type="button"
-                                    onClick={onExport}
-                                    className="inline-flex items-center gap-1.5 rounded-md border border-primary-foreground/30 px-3 py-1.5 text-xs font-semibold text-primary-foreground transition hover:bg-primary-foreground/10"
-                                >
-                                    <Download className="h-3.5 w-3.5" /> Export
-                                </button>
-                            ) : null}
-                            {canCreate ? (
-                                <button
-                                    type="button"
-                                    onClick={onCreate}
-                                    className="inline-flex items-center gap-1.5 rounded-md bg-primary-foreground px-3 py-1.5 text-xs font-semibold text-primary transition hover:bg-primary-foreground/90"
-                                >
-                                    <Plus className="h-4 w-4" /> Create shift
-                                </button>
-                            ) : null}
-                        </div>
-
-                        <div className="grid grid-cols-4 gap-3 text-right md:gap-5">
-                            {[
-                                { label: 'Total', value: stats.total },
-                                { label: 'Open', value: stats.open },
-                                { label: 'Today', value: stats.today },
-                                { label: 'On now', value: stats.in_progress },
-                            ].map((s) => (
-                                <div key={s.label}>
-                                    <div className="text-2xl font-bold leading-none tabular-nums md:text-[28px]">
-                                        {s.value}
-                                    </div>
-                                    <div className="mt-1 text-[10.5px] font-medium uppercase tracking-wider text-primary-foreground/70">
-                                        {s.label}
-                                    </div>
-                                </div>
-                            ))}
+                            <HeroSearchBox
+                                value={filters.q}
+                                onChange={(v) => onChangeFilter('q', v)}
+                            />
+                            <StatusChip
+                                value={filters.statuses}
+                                options={statusOptions}
+                                onChange={(next) =>
+                                    onChangeFilter('statuses', next)
+                                }
+                            />
+                            <MultiEntityFilter
+                                onDark
+                                label="Staff"
+                                pluralLabel="staff"
+                                allLabel="All staff"
+                                items={staffItems}
+                                value={filters.user_ids}
+                                onChange={(next) =>
+                                    onChangeFilter('user_ids', next)
+                                }
+                            />
+                            <MultiEntityFilter
+                                onDark
+                                label="Client"
+                                allLabel="All clients"
+                                items={clientItems}
+                                value={filters.client_ids}
+                                onChange={(next) =>
+                                    onChangeFilter('client_ids', next)
+                                }
+                            />
+                            <MultiEntityFilter
+                                onDark
+                                label="Site"
+                                allLabel="All sites"
+                                items={siteItems}
+                                value={filters.site_ids}
+                                onChange={(next) =>
+                                    onChangeFilter('site_ids', next)
+                                }
+                            />
                         </div>
                     </div>
-                </div>
-            </div>
-
-            {/* Footer: week picker + filters */}
-            <div className="relative flex flex-col gap-2 border-t border-primary-foreground/20 px-4 py-3 md:flex-row md:items-center md:justify-between md:px-6">
-                <div className="flex flex-wrap items-center gap-1.5">
-                    <HeroPillBtn onClick={onPrevWeek}>
-                        <ChevronLeft className="h-3.5 w-3.5" /> Prev week
-                    </HeroPillBtn>
-                    <HeroPillBtn
-                        buttonRef={weekBtnRef}
-                        onClick={() => setPickerOpen((v) => !v)}
-                        solid
-                        ariaHasPopup="dialog"
-                        ariaExpanded={pickerOpen}
-                    >
-                        <CalendarRange className="h-3.5 w-3.5" /> {pickerLabel} · pick week
-                        <ChevronDown className="h-3 w-3" />
-                    </HeroPillBtn>
-                    <HeroPillBtn onClick={onNextWeek}>
-                        Next week <ChevronRight className="h-3.5 w-3.5" />
-                    </HeroPillBtn>
-                </div>
-                <div className="flex flex-wrap items-center justify-end gap-2">
-                    <HeroSearchBox
-                        value={filters.q}
-                        onChange={(v) => onChangeFilter('q', v)}
-                    />
-                    <StatusChip
-                        value={filters.statuses}
-                        options={statusOptions}
-                        onChange={(next) => onChangeFilter('statuses', next)}
-                    />
-                    <MultiEntityFilter
-                        onDark
-                        label="Staff"
-                        pluralLabel="staff"
-                        allLabel="All staff"
-                        items={staffItems}
-                        value={filters.user_ids}
-                        onChange={(next) => onChangeFilter('user_ids', next)}
-                    />
-                    <MultiEntityFilter
-                        onDark
-                        label="Client"
-                        allLabel="All clients"
-                        items={clientItems}
-                        value={filters.client_ids}
-                        onChange={(next) => onChangeFilter('client_ids', next)}
-                    />
-                    <MultiEntityFilter
-                        onDark
-                        label="Site"
-                        allLabel="All sites"
-                        items={siteItems}
-                        value={filters.site_ids}
-                        onChange={(next) => onChangeFilter('site_ids', next)}
-                    />
-                </div>
-            </div>
+                }
+            />
 
             {pickerOpen ? (
                 <WeekPicker
@@ -307,56 +303,7 @@ export function ShiftsHero({
                     onClose={() => setPickerOpen(false)}
                 />
             ) : null}
-        </div>
-    );
-}
-
-function LiveDot() {
-    return (
-        <span className="relative inline-flex h-2 w-2">
-            <span
-                className="absolute inset-0 rounded-full opacity-60"
-                style={{
-                    background: 'oklch(0.85 0.18 150)',
-                    animation: 'shifts-ping 1.6s cubic-bezier(0,0,0.2,1) infinite',
-                }}
-            />
-            <span
-                className="relative h-2 w-2 rounded-full"
-                style={{
-                    background: 'oklch(0.78 0.18 150)',
-                    boxShadow: '0 0 0 3px oklch(0.78 0.18 150 / 0.25)',
-                }}
-            />
-            <style>{`@keyframes shifts-ping { 75%,100% { transform: scale(2.2); opacity: 0; } }`}</style>
-        </span>
-    );
-}
-
-function Pill({
-    tone,
-    children,
-}: {
-    tone: 'default' | 'info' | 'warning' | 'success' | 'critical';
-    children: React.ReactNode;
-}) {
-    const map: Record<typeof tone, string> = {
-        default:
-            'bg-primary-foreground/10 border border-primary-foreground/20 text-primary-foreground',
-        info: 'bg-primary-foreground/10 border border-primary-foreground/20 text-primary-foreground',
-        warning:
-            'bg-status-warning/15 border border-status-warning/30 text-primary-foreground',
-        success:
-            'bg-status-success/15 border border-status-success/30 text-primary-foreground',
-        critical:
-            'bg-status-critical/15 border border-status-critical/30 text-primary-foreground',
-    };
-    return (
-        <span
-            className={`inline-flex items-center gap-1 rounded-full px-2.5 py-0.5 text-[11px] font-medium ${map[tone]}`}
-        >
-            {children}
-        </span>
+        </>
     );
 }
 
@@ -376,6 +323,7 @@ function HeroPillBtn({
     ariaExpanded?: boolean;
 }) {
     return (
+        // eslint-disable-next-line no-restricted-syntax -- segmented week-stepper on dark hero; not a shadcn Button.
         <button
             ref={buttonRef}
             type="button"
@@ -477,6 +425,7 @@ function StatusChip({
                         </button>
                     </PopoverTrigger>
                     {!allSelected ? (
+                        // eslint-disable-next-line no-restricted-syntax -- tiny clear affordance nested beside the popover trigger; a shadcn Button would nest invalid markup.
                         <button
                             type="button"
                             aria-label="Clear status filter"

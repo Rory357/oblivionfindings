@@ -154,6 +154,7 @@ export function HandoversHero({
                     <ChevronLeft className="h-3.5 w-3.5" />
                     Wk {weekNumberISO(prevWeek)}
                 </WeekNavButton>
+                {/* eslint-disable-next-line no-restricted-syntax -- segmented week-stepper on dark hero; not a shadcn Button. */}
                 <button
                     ref={weekBtnRef}
                     type="button"
@@ -237,6 +238,7 @@ export function HandoversHero({
 
     return (
         <PageHero
+            category="ops"
             icon={ArrowLeftRight}
             title={title}
             description={description}

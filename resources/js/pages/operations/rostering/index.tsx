@@ -81,7 +81,6 @@ import {
     LayoutGrid,
     LayoutTemplate,
     LineChart,
-    MoreHorizontal,
     PieChart,
     Plane,
     Repeat,
@@ -2322,9 +2321,10 @@ export default function RosteringIndex(props: Props) {
                                     size="icon"
                                     variant="outline"
                                     aria-label="Conflict queue"
+                                    title="Conflict queue"
                                     className="border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10"
                                 >
-                                    <MoreHorizontal className="h-4 w-4" />
+                                    <AlertTriangle className="h-4 w-4" />
                                 </Button>
                             </Link>
                         </>
