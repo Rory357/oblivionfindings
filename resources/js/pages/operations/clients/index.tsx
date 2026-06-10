@@ -6,7 +6,7 @@
  * PageHeroActions' `[data-slot=button]` colour overrides. They are therefore built as styled
  * native elements rather than design-system components, sourcing every colour from semantic
  * tokens (never hardcoded hex). */
-import { AddDailyNoteDialog } from '@/components/add-daily-note-dialog';
+import { DailyNoteWizard } from '@/pages/operations/clients/dialogs/daily-note-wizard';
 import { AssignWorkerDialog } from '@/components/assign-worker-dialog';
 import { ClientEditDialog } from '@/components/client-edit-dialog';
 import {
@@ -1698,13 +1698,15 @@ export default function ClientsIndex() {
                 }}
             />
 
-            <AddDailyNoteDialog
-                client={noteClient}
-                open={noteClient !== null}
-                onOpenChange={(isOpen) => {
-                    if (!isOpen) setNoteClient(null);
-                }}
-            />
+            {noteClient ? (
+                <DailyNoteWizard
+                    clientId={noteClient.id}
+                    open
+                    onOpenChange={(isOpen) => {
+                        if (!isOpen) setNoteClient(null);
+                    }}
+                />
+            ) : null}
 
             <AddClientDialog
                 isOpen={addOpen}
