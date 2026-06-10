@@ -50,6 +50,7 @@ class OperationsPermissionsSeeder extends Seeder
             ['key' => 'funding.viewAny', 'description' => 'View Funding'],
             ['key' => 'funding.claims.create', 'description' => 'Create Funding Claims'],
             ['key' => 'funding.claims.submit', 'description' => 'Submit Funding Claims'],
+            ['key' => 'funding.claims.approve', 'description' => 'Approve Funding Claims'],
 
             // Messages
             ['key' => 'messages.viewAny', 'description' => 'View Messages'],

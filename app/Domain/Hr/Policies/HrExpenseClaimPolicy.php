@@ -9,12 +9,12 @@ class HrExpenseClaimPolicy
 {
     public function viewAny(User $user): bool
     {
-        return $user->canDo('hr.expenses.viewAny');
+        return $user->canDo('hr.expenses.view');
     }
 
     public function view(User $user, HrExpenseClaim $claim): bool
     {
-        return $user->canDo('hr.expenses.viewAny')
+        return $user->canDo('hr.expenses.view')
             || $user->id === $claim->user_id;
     }
 

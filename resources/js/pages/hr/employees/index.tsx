@@ -230,6 +230,36 @@ export default function EmployeesIndex({
         router.get('/hr/people', {}, { preserveState: true, replace: true });
     }
 
+    function submitExport() {
+        const token =
+            document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')
+                ?.content ?? '';
+        const form = document.createElement('form');
+        form.action = '/hr/import-export/export';
+        form.method = 'POST';
+        form.style.display = 'none';
+
+        const csrfInput = document.createElement('input');
+        csrfInput.type = 'hidden';
+        csrfInput.name = '_token';
+        csrfInput.value = token;
+        form.appendChild(csrfInput);
+
+        Object.entries(filters).forEach(([key, value]) => {
+            if (!value) return;
+
+            const input = document.createElement('input');
+            input.type = 'hidden';
+            input.name = key;
+            input.value = value;
+            form.appendChild(input);
+        });
+
+        document.body.appendChild(form);
+        form.submit();
+        form.remove();
+    }
+
     const hasFilters = !!(
         filters.q ||
         filters.status ||
@@ -257,12 +287,17 @@ export default function EmployeesIndex({
                             { label: 'On probation', value: summary.on_probation },
                             { label: 'Compliance alerts', value: summary.compliance_alerts },
                         ]}
-                        actions={
-                            <Button variant="outline" size="sm" className="gap-1.5 border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
+                        actions={can.manage ? (
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                onClick={submitExport}
+                                className="gap-1.5 border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                            >
                                 <Download className="h-4 w-4" />
                                 Export
                             </Button>
-                        }
+                        ) : null}
                     />
                 }
             >

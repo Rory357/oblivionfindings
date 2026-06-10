@@ -5,6 +5,8 @@ namespace App\Domain\Hr\Services;
 use App\Domain\Hr\Models\HrCourse;
 use App\Domain\Hr\Models\HrCourseEnrollment;
 use App\Domain\Hr\Models\HrCourseSession;
+use App\Models\StaffTrainingRecord;
+use App\Models\TrainingCourse;
 use Illuminate\Support\Facades\DB;
 
 class TrainingService
@@ -65,8 +67,51 @@ class TrainingService
                 'notes' => $data['notes'] ?? $enrollment->notes,
             ]);
 
-            return $enrollment->fresh();
+            $freshEnrollment = $enrollment->fresh();
+            $this->syncComplianceTrainingRecord($freshEnrollment);
+
+            return $freshEnrollment;
         });
+    }
+
+    private function syncComplianceTrainingRecord(HrCourseEnrollment $enrollment): void
+    {
+        $enrollment->loadMissing('course.complianceRequirement');
+        $course = $enrollment->course;
+        $requirement = $course?->complianceRequirement;
+
+        if (! $course || ! $requirement || $requirement->check_type !== 'training_course' || ! $requirement->reference_id) {
+            return;
+        }
+
+        $legacyCourse = TrainingCourse::query()->find($requirement->reference_id);
+        if (! $legacyCourse) {
+            return;
+        }
+
+        $completedAt = $enrollment->completed_at ?? now();
+        $validityMonths = $requirement->validity_months ?: $legacyCourse->validity_period_months;
+        $expiresAt = $validityMonths ? $completedAt->copy()->addMonths((int) $validityMonths) : null;
+
+        StaffTrainingRecord::query()->updateOrCreate(
+            [
+                'user_id' => $enrollment->user_id,
+                'training_course_id' => $legacyCourse->id,
+            ],
+            [
+                'status' => 'completed',
+                'enrolled_at' => $enrollment->enrolled_at,
+                'completed_at' => $completedAt,
+                'completion_date' => $completedAt->toDateString(),
+                'expires_at' => $expiresAt,
+                'assessment_score' => $enrollment->score,
+                'assessment_passed' => true,
+                'certificate_path' => $enrollment->certificate_path,
+                'provider' => $course->provider ?? $legacyCourse->provider,
+                'notes' => $enrollment->notes,
+                'updated_by' => $enrollment->user_id,
+            ]
+        );
     }
 
     /**

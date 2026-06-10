@@ -2,15 +2,20 @@
 
 namespace App\Http\Controllers\Hr;
 
-use App\Http\Controllers\Controller;
 use App\Domain\Hr\Models\HrDepartment;
-use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrLeaveRequest;
+use App\Domain\Hr\Models\HrPublicHoliday;
+use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class TimeOffCalendarController extends Controller
 {
+    use ResolvesHrTenant;
+
     /**
      * Show time-off calendar with leave data filterable by team/department/site.
      */
@@ -19,12 +24,13 @@ class TimeOffCalendarController extends Controller
         $user = $request->user();
         abort_unless($user, 403);
 
+        $tenantId = $this->resolveHrTenantIdForUser($user);
         $month = $request->query('month', now()->format('Y-m'));
-        $startOfMonth = \Carbon\Carbon::parse($month . '-01')->startOfMonth();
+        $startOfMonth = Carbon::parse($month.'-01')->startOfMonth();
         $endOfMonth = $startOfMonth->copy()->endOfMonth();
 
         $leaveQuery = HrLeaveRequest::query()
-            ->forTenant($user->tenant_id)
+            ->forTenant($tenantId)
             ->approved()
             ->where('starts_at', '<=', $endOfMonth)
             ->where('ends_at', '>=', $startOfMonth)
@@ -33,7 +39,7 @@ class TimeOffCalendarController extends Controller
         // Filter by department/team/site if provided
         if ($request->query('department') || $request->query('team') || $request->query('site_id')) {
             $profileUserIds = HrEmployeeProfile::query()
-                ->where('tenant_id', $user->tenant_id)
+                ->where('tenant_id', $tenantId)
                 ->where('is_active', true)
                 ->when($request->query('department'), fn ($q, $dept) => $q->where('department_id', (int) $dept))
                 ->when($request->query('team'), fn ($q, $team) => $q->where('team', $team))
@@ -44,6 +50,16 @@ class TimeOffCalendarController extends Controller
         }
 
         $leaveRequests = $leaveQuery->get();
+        $holidaysByDate = HrPublicHoliday::query()
+            ->where(function ($query) use ($tenantId) {
+                $query->whereNull('tenant_id')
+                    ->orWhere('tenant_id', $tenantId);
+            })
+            ->whereBetween('date', [$startOfMonth->toDateString(), $endOfMonth->toDateString()])
+            ->orderBy('date')
+            ->orderByDesc('is_national')
+            ->get()
+            ->groupBy(fn (HrPublicHoliday $holiday) => $holiday->date->toDateString());
 
         // Build calendar data: array of days with who's off
         $calendarDays = [];
@@ -65,6 +81,14 @@ class TimeOffCalendarController extends Controller
                 'day_of_week' => $current->dayOfWeek,
                 'is_weekend' => $current->isWeekend(),
                 'leave' => $dayLeave,
+                'public_holidays' => ($holidaysByDate->get($dateStr) ?? collect())
+                    ->map(fn (HrPublicHoliday $holiday) => [
+                        'id' => $holiday->id,
+                        'name' => $holiday->name,
+                        'region' => $holiday->region,
+                        'is_national' => (bool) $holiday->is_national,
+                    ])
+                    ->values(),
             ];
 
             $current->addDay();
@@ -72,13 +96,13 @@ class TimeOffCalendarController extends Controller
 
         // Get filter options
         $departments = HrDepartment::query()
-            ->where(fn ($q) => $q->where('tenant_id', $user->tenant_id)->orWhereNull('tenant_id'))
+            ->where(fn ($q) => $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id'))
             ->where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name']);
 
         $teams = HrEmployeeProfile::query()
-            ->where('tenant_id', $user->tenant_id)
+            ->where('tenant_id', $tenantId)
             ->where('is_active', true)
             ->whereNotNull('team')
             ->distinct()

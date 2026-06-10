@@ -44,14 +44,12 @@ import {
     Loader2,
     Pencil,
     Play,
-    RotateCcw,
     Search,
     Square,
     Timer,
     TrendingUp,
     UserPlus,
     Users,
-    XCircle,
 } from 'lucide-react';
 import { useState } from 'react';
 
@@ -88,10 +86,13 @@ interface TimeEntry {
 
 interface TimesheetRow {
     id: number;
+    source: 'operations';
     user_name: string;
     user_id: number;
     period_start: string;
     period_end: string;
+    work_date: string | null;
+    client_name: string | null;
     status: string;
     total_hours: number | null;
     submitted_at: string | null;
@@ -100,10 +101,13 @@ interface TimesheetRow {
     rejection_reason: string | null;
     returned_notes: string | null;
     returned_at: string | null;
+    module_url: string;
+    edit_url: string;
 }
 
 interface ApprovalTimesheet {
     id: number;
+    source: 'operations';
     user_name: string;
     user_id: number;
     period_start: string;
@@ -111,6 +115,7 @@ interface ApprovalTimesheet {
     total_hours: number | null;
     submitted_at: string | null;
     hours_waiting: number;
+    module_url: string;
 }
 
 interface WeeklySummary {
@@ -298,24 +303,6 @@ export default function TimeIndex({
         reason: '',
     });
 
-    // Return / reject dialog state
-    const [returnTimesheetId, setReturnTimesheetId] = useState<number | null>(
-        null,
-    );
-    const [returnNotes, setReturnNotes] = useState('');
-    const [rejectTimesheetId, setRejectTimesheetId] = useState<number | null>(
-        null,
-    );
-    const [rejectReason, setRejectReason] = useState('');
-
-    // Bulk selection
-    const [selectedApprovalIds, setSelectedApprovalIds] = useState<number[]>(
-        [],
-    );
-    const [bulkNotes, setBulkNotes] = useState('');
-    const [showBulkReject, setShowBulkReject] = useState(false);
-    const [showBulkReturn, setShowBulkReturn] = useState(false);
-
     function updateFilter(key: string, value: string | null) {
         const newFilters = { ...filters, [key]: value };
         if (value === null || value === NONE)
@@ -380,116 +367,6 @@ export default function TimeIndex({
             },
             onError: () => setProcessing(null),
         });
-    }
-
-    // --- Single timesheet actions ---
-    function handleApprove(id: number) {
-        setProcessing(id);
-        router.post(
-            `/hr/time/timesheets/${id}/approve`,
-            {},
-            { preserveScroll: true, onFinish: () => setProcessing(null) },
-        );
-    }
-    function submitReturn() {
-        if (!returnTimesheetId || !returnNotes.trim()) return;
-        setProcessing(returnTimesheetId);
-        router.post(
-            `/hr/time/timesheets/${returnTimesheetId}/return`,
-            { notes: returnNotes },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setReturnTimesheetId(null);
-                    setReturnNotes('');
-                    setProcessing(null);
-                },
-                onError: () => setProcessing(null),
-            },
-        );
-    }
-    function submitReject() {
-        if (!rejectTimesheetId || !rejectReason.trim()) return;
-        setProcessing(rejectTimesheetId);
-        router.post(
-            `/hr/time/timesheets/${rejectTimesheetId}/reject`,
-            { rejection_reason: rejectReason },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setRejectTimesheetId(null);
-                    setRejectReason('');
-                    setProcessing(null);
-                },
-                onError: () => setProcessing(null),
-            },
-        );
-    }
-
-    // --- Bulk actions ---
-    function toggleApprovalSelect(id: number) {
-        setSelectedApprovalIds((prev) =>
-            prev.includes(id) ? prev.filter((i) => i !== id) : [...prev, id],
-        );
-    }
-    function toggleAllApprovals() {
-        if (selectedApprovalIds.length === approvalTimesheets.length) {
-            setSelectedApprovalIds([]);
-        } else {
-            setSelectedApprovalIds(approvalTimesheets.map((t) => t.id));
-        }
-    }
-    function bulkApprove() {
-        if (selectedApprovalIds.length === 0) return;
-        setProcessing('bulk');
-        router.post(
-            '/hr/time/timesheets/bulk-approve',
-            { ids: selectedApprovalIds },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setSelectedApprovalIds([]);
-                    setProcessing(null);
-                },
-                onError: () => setProcessing(null),
-            },
-        );
-    }
-    function submitBulkReject() {
-        if (!bulkNotes.trim()) return;
-        setProcessing('bulk');
-        router.post(
-            '/hr/time/timesheets/bulk-reject',
-            { ids: selectedApprovalIds, reason: bulkNotes },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setSelectedApprovalIds([]);
-                    setBulkNotes('');
-                    setShowBulkReject(false);
-                    setProcessing(null);
-                },
-                onError: () => setProcessing(null),
-            },
-        );
-    }
-    function submitBulkReturn() {
-        if (!bulkNotes.trim()) return;
-        setProcessing('bulk');
-        router.post(
-            '/hr/time/timesheets/bulk-return',
-            { ids: selectedApprovalIds, notes: bulkNotes },
-            {
-                preserveScroll: true,
-                onSuccess: () => {
-                    setSelectedApprovalIds([]);
-                    setBulkNotes('');
-                    setShowBulkReturn(false);
-                    setProcessing(null);
-                },
-                onError: () => setProcessing(null),
-            },
-        );
     }
 
     return (
@@ -1120,11 +997,9 @@ export default function TimeIndex({
                                             <th className="px-4 py-3 text-left font-medium">
                                                 Submitted
                                             </th>
-                                            {can.approveAny && (
-                                                <th className="px-4 py-3 text-right font-medium">
-                                                    Actions
-                                                </th>
-                                            )}
+                                            <th className="px-4 py-3 text-right font-medium">
+                                                Actions
+                                            </th>
                                         </tr>
                                     </thead>
                                     <tbody>
@@ -1168,64 +1043,27 @@ export default function TimeIndex({
                                                             10,
                                                         ) ?? '-'}
                                                     </td>
-                                                    {can.approveAny && (
-                                                        <td className="px-4 py-3 text-right">
-                                                            {ts.status ===
-                                                                'submitted' && (
-                                                                <div className="flex justify-end gap-1">
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="sm"
-                                                                        className="h-7 text-status-success"
-                                                                        onClick={() =>
-                                                                            handleApprove(
-                                                                                ts.id,
-                                                                            )
-                                                                        }
-                                                                        disabled={
-                                                                            processing ===
-                                                                            ts.id
-                                                                        }
-                                                                    >
-                                                                        <CheckCircle className="mr-1 h-3 w-3" />{' '}
-                                                                        Approve
-                                                                    </Button>
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="sm"
-                                                                        className="h-7 text-status-warning"
-                                                                        onClick={() => {
-                                                                            setReturnTimesheetId(
-                                                                                ts.id,
-                                                                            );
-                                                                            setReturnNotes(
-                                                                                '',
-                                                                            );
-                                                                        }}
-                                                                    >
-                                                                        <RotateCcw className="mr-1 h-3 w-3" />{' '}
-                                                                        Return
-                                                                    </Button>
-                                                                    <Button
-                                                                        variant="ghost"
-                                                                        size="sm"
-                                                                        className="h-7 text-status-critical"
-                                                                        onClick={() => {
-                                                                            setRejectTimesheetId(
-                                                                                ts.id,
-                                                                            );
-                                                                            setRejectReason(
-                                                                                '',
-                                                                            );
-                                                                        }}
-                                                                    >
-                                                                        <XCircle className="mr-1 h-3 w-3" />{' '}
-                                                                        Reject
-                                                                    </Button>
-                                                                </div>
-                                                            )}
-                                                        </td>
-                                                    )}
+                                                    <td className="px-4 py-3 text-right">
+                                                        <Button
+                                                            variant="outline"
+                                                            size="sm"
+                                                            className="h-7"
+                                                            asChild
+                                                        >
+                                                            <a
+                                                                href={
+                                                                    ts.module_url
+                                                                }
+                                                            >
+                                                                <FileText className="mr-1 h-3 w-3" />{' '}
+                                                                {ts.status ===
+                                                                    'submitted' &&
+                                                                can.approveAny
+                                                                    ? 'Review'
+                                                                    : 'Open'}
+                                                            </a>
+                                                        </Button>
+                                                    </td>
                                                 </tr>
                                             );
                                         })}
@@ -1249,223 +1087,109 @@ export default function TimeIndex({
                                     </p>
                                 </div>
                             ) : (
-                                <>
-                                    {/* Bulk actions */}
-                                    {selectedApprovalIds.length > 0 && (
-                                        <div className="flex items-center gap-2 rounded-lg border border-status-warning/20 bg-status-warning p-3">
-                                            <span className="text-sm font-medium">
-                                                {selectedApprovalIds.length}{' '}
-                                                selected
-                                            </span>
-                                            <Button
-                                                size="sm"
-                                                className="bg-status-success hover:bg-status-success"
-                                                onClick={bulkApprove}
-                                                disabled={processing === 'bulk'}
-                                            >
-                                                {processing === 'bulk' ? (
-                                                    <Loader2 className="mr-1 h-3 w-3 animate-spin" />
-                                                ) : (
-                                                    <CheckCircle className="mr-1 h-3 w-3" />
-                                                )}{' '}
-                                                Approve Selected
-                                            </Button>
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                className="text-status-warning"
-                                                onClick={() => {
-                                                    setBulkNotes('');
-                                                    setShowBulkReturn(true);
-                                                }}
-                                            >
-                                                <RotateCcw className="mr-1 h-3 w-3" />{' '}
-                                                Return Selected
-                                            </Button>
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                className="text-status-critical"
-                                                onClick={() => {
-                                                    setBulkNotes('');
-                                                    setShowBulkReject(true);
-                                                }}
-                                            >
-                                                <XCircle className="mr-1 h-3 w-3" />{' '}
-                                                Reject Selected
-                                            </Button>
-                                        </div>
-                                    )}
-
-                                    <Card className="border-status-warning/20 bg-status-warning">
-                                        <CardHeader className="pb-3">
-                                            <CardTitle className="text-base">
-                                                Pending Approval (
-                                                {approvalTimesheets.length})
-                                            </CardTitle>
-                                        </CardHeader>
-                                        <CardContent className="p-0">
-                                            <div className="overflow-hidden rounded-b-xl">
-                                                <table className="w-full text-sm">
-                                                    <thead className="border-b bg-muted/50">
-                                                        <tr>
-                                                            <th className="w-10 px-4 py-3">
-                                                                <input
-                                                                    type="checkbox"
-                                                                    checked={
-                                                                        selectedApprovalIds.length ===
-                                                                            approvalTimesheets.length &&
-                                                                        approvalTimesheets.length >
-                                                                            0
+                                <Card className="border-status-warning/20 bg-status-warning">
+                                    <CardHeader className="pb-3">
+                                        <CardTitle className="text-base">
+                                            Pending Approval (
+                                            {approvalTimesheets.length})
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent className="p-0">
+                                        <div className="overflow-hidden rounded-b-xl">
+                                            <table className="w-full text-sm">
+                                                <thead className="border-b bg-muted/50">
+                                                    <tr>
+                                                        <th className="px-4 py-3 text-left font-medium">
+                                                            Staff
+                                                        </th>
+                                                        <th className="px-4 py-3 text-left font-medium">
+                                                            Period
+                                                        </th>
+                                                        <th className="px-4 py-3 text-right font-medium">
+                                                            Hours
+                                                        </th>
+                                                        <th className="px-4 py-3 text-left font-medium">
+                                                            Waiting
+                                                        </th>
+                                                        <th className="px-4 py-3 text-right font-medium">
+                                                            Actions
+                                                        </th>
+                                                    </tr>
+                                                </thead>
+                                                <tbody>
+                                                    {approvalTimesheets.map(
+                                                        (ts) => (
+                                                            <tr
+                                                                key={ts.id}
+                                                                className="border-b last:border-b-0 hover:bg-muted/50"
+                                                            >
+                                                                <td className="px-4 py-3 font-medium">
+                                                                    {
+                                                                        ts.user_name
                                                                     }
-                                                                    onChange={
-                                                                        toggleAllApprovals
+                                                                </td>
+                                                                <td className="px-4 py-3">
+                                                                    {
+                                                                        ts.period_start
+                                                                    }{' '}
+                                                                    <ArrowRight className="mx-1 inline h-3 w-3" />{' '}
+                                                                    {
+                                                                        ts.period_end
                                                                     }
-                                                                    className="h-4 w-4 rounded border-border"
-                                                                />
-                                                            </th>
-                                                            <th className="px-4 py-3 text-left font-medium">
-                                                                Staff
-                                                            </th>
-                                                            <th className="px-4 py-3 text-left font-medium">
-                                                                Period
-                                                            </th>
-                                                            <th className="px-4 py-3 text-right font-medium">
-                                                                Hours
-                                                            </th>
-                                                            <th className="px-4 py-3 text-left font-medium">
-                                                                Waiting
-                                                            </th>
-                                                            <th className="px-4 py-3 text-right font-medium">
-                                                                Actions
-                                                            </th>
-                                                        </tr>
-                                                    </thead>
-                                                    <tbody>
-                                                        {approvalTimesheets.map(
-                                                            (ts) => (
-                                                                <tr
-                                                                    key={ts.id}
-                                                                    className="border-b last:border-b-0 hover:bg-muted/50"
-                                                                >
-                                                                    <td className="px-4 py-3">
-                                                                        <input
-                                                                            type="checkbox"
-                                                                            checked={selectedApprovalIds.includes(
-                                                                                ts.id,
-                                                                            )}
-                                                                            onChange={() =>
-                                                                                toggleApprovalSelect(
-                                                                                    ts.id,
-                                                                                )
-                                                                            }
-                                                                            className="h-4 w-4 rounded border-border"
-                                                                        />
-                                                                    </td>
-                                                                    <td className="px-4 py-3 font-medium">
-                                                                        {
-                                                                            ts.user_name
-                                                                        }
-                                                                    </td>
-                                                                    <td className="px-4 py-3">
-                                                                        {
-                                                                            ts.period_start
-                                                                        }{' '}
-                                                                        <ArrowRight className="mx-1 inline h-3 w-3" />{' '}
-                                                                        {
-                                                                            ts.period_end
-                                                                        }
-                                                                    </td>
-                                                                    <td className="px-4 py-3 text-right font-medium">
-                                                                        {ts.total_hours !=
-                                                                        null
-                                                                            ? `${ts.total_hours}h`
-                                                                            : '-'}
-                                                                    </td>
-                                                                    <td className="px-4 py-3">
-                                                                        <Badge
-                                                                            variant="outline"
-                                                                            className={
-                                                                                ts.hours_waiting >
-                                                                                48
-                                                                                    ? 'border-status-critical/30 bg-status-critical text-status-critical'
-                                                                                    : ts.hours_waiting >
-                                                                                        24
-                                                                                      ? 'border-status-warning/30 bg-status-warning text-status-warning'
-                                                                                      : 'border-status-info/30 bg-status-info text-status-info'
-                                                                            }
-                                                                        >
-                                                                            {ts.hours_waiting >
+                                                                </td>
+                                                                <td className="px-4 py-3 text-right font-medium">
+                                                                    {ts.total_hours !=
+                                                                    null
+                                                                        ? `${ts.total_hours}h`
+                                                                        : '-'}
+                                                                </td>
+                                                                <td className="px-4 py-3">
+                                                                    <Badge
+                                                                        variant="outline"
+                                                                        className={
+                                                                            ts.hours_waiting >
                                                                             48
-                                                                                ? `${Math.round(ts.hours_waiting)}h overdue`
+                                                                                ? 'border-status-critical/30 bg-status-critical text-status-critical'
                                                                                 : ts.hours_waiting >
                                                                                     24
-                                                                                  ? 'Due soon'
-                                                                                  : `${Math.round(ts.hours_waiting)}h`}
-                                                                        </Badge>
-                                                                    </td>
-                                                                    <td className="px-4 py-3 text-right">
-                                                                        <div className="flex justify-end gap-1">
-                                                                            <Button
-                                                                                variant="ghost"
-                                                                                size="sm"
-                                                                                className="h-7 text-status-success"
-                                                                                onClick={() =>
-                                                                                    handleApprove(
-                                                                                        ts.id,
-                                                                                    )
-                                                                                }
-                                                                                disabled={
-                                                                                    processing ===
-                                                                                    ts.id
-                                                                                }
-                                                                            >
-                                                                                <CheckCircle className="mr-1 h-3 w-3" />{' '}
-                                                                                Approve
-                                                                            </Button>
-                                                                            <Button
-                                                                                variant="ghost"
-                                                                                size="sm"
-                                                                                className="h-7 text-status-warning"
-                                                                                onClick={() => {
-                                                                                    setReturnTimesheetId(
-                                                                                        ts.id,
-                                                                                    );
-                                                                                    setReturnNotes(
-                                                                                        '',
-                                                                                    );
-                                                                                }}
-                                                                            >
-                                                                                <RotateCcw className="mr-1 h-3 w-3" />{' '}
-                                                                                Return
-                                                                            </Button>
-                                                                            <Button
-                                                                                variant="ghost"
-                                                                                size="sm"
-                                                                                className="h-7 text-status-critical"
-                                                                                onClick={() => {
-                                                                                    setRejectTimesheetId(
-                                                                                        ts.id,
-                                                                                    );
-                                                                                    setRejectReason(
-                                                                                        '',
-                                                                                    );
-                                                                                }}
-                                                                            >
-                                                                                <XCircle className="mr-1 h-3 w-3" />{' '}
-                                                                                Reject
-                                                                            </Button>
-                                                                        </div>
-                                                                    </td>
-                                                                </tr>
-                                                            ),
-                                                        )}
-                                                    </tbody>
-                                                </table>
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                </>
+                                                                                  ? 'border-status-warning/30 bg-status-warning text-status-warning'
+                                                                                  : 'border-status-info/30 bg-status-info text-status-info'
+                                                                        }
+                                                                    >
+                                                                        {ts.hours_waiting >
+                                                                        48
+                                                                            ? `${Math.round(ts.hours_waiting)}h overdue`
+                                                                            : ts.hours_waiting >
+                                                                                24
+                                                                              ? 'Due soon'
+                                                                              : `${Math.round(ts.hours_waiting)}h`}
+                                                                    </Badge>
+                                                                </td>
+                                                                <td className="px-4 py-3 text-right">
+                                                                    <Button
+                                                                        variant="outline"
+                                                                        size="sm"
+                                                                        className="h-7"
+                                                                        asChild
+                                                                    >
+                                                                        <a
+                                                                            href={
+                                                                                ts.module_url
+                                                                            }
+                                                                        >
+                                                                            <FileText className="mr-1 h-3 w-3" />{' '}
+                                                                            Review
+                                                                        </a>
+                                                                    </Button>
+                                                                </td>
+                                                            </tr>
+                                                        ),
+                                                    )}
+                                                </tbody>
+                                            </table>
+                                        </div>
+                                    </CardContent>
+                                </Card>
                             )}
                         </TabsContent>
                     )}
@@ -1884,155 +1608,6 @@ export default function TimeIndex({
                 </DialogContent>
             </Dialog>
 
-            {/* Return Dialog */}
-            <Dialog
-                open={!!returnTimesheetId}
-                onOpenChange={(open) => !open && setReturnTimesheetId(null)}
-            >
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Return Timesheet for Changes</DialogTitle>
-                        <DialogDescription>
-                            The timesheet will be returned for the staff member
-                            to correct and resubmit.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div>
-                        <Label>Return Notes *</Label>
-                        <Textarea
-                            placeholder="What needs to be corrected?"
-                            value={returnNotes}
-                            onChange={(e) => setReturnNotes(e.target.value)}
-                        />
-                    </div>
-                    <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => setReturnTimesheetId(null)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            className="bg-status-warning hover:bg-status-warning"
-                            onClick={submitReturn}
-                            disabled={!returnNotes.trim()}
-                        >
-                            <RotateCcw className="mr-2 h-4 w-4" /> Return for
-                            Changes
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            {/* Reject Dialog */}
-            <Dialog
-                open={!!rejectTimesheetId}
-                onOpenChange={(open) => !open && setRejectTimesheetId(null)}
-            >
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>Reject Timesheet</DialogTitle>
-                        <DialogDescription>
-                            This timesheet will be permanently rejected.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div>
-                        <Label>Rejection Reason *</Label>
-                        <Textarea
-                            placeholder="Why is this timesheet being rejected?"
-                            value={rejectReason}
-                            onChange={(e) => setRejectReason(e.target.value)}
-                        />
-                    </div>
-                    <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => setRejectTimesheetId(null)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            variant="destructive"
-                            onClick={submitReject}
-                            disabled={!rejectReason.trim()}
-                        >
-                            <XCircle className="mr-2 h-4 w-4" /> Reject
-                            Timesheet
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            {/* Bulk Reject Dialog */}
-            <Dialog open={showBulkReject} onOpenChange={setShowBulkReject}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>
-                            Reject {selectedApprovalIds.length} Timesheet(s)
-                        </DialogTitle>
-                    </DialogHeader>
-                    <div>
-                        <Label>Rejection Reason *</Label>
-                        <Textarea
-                            value={bulkNotes}
-                            onChange={(e) => setBulkNotes(e.target.value)}
-                        />
-                    </div>
-                    <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => setShowBulkReject(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            variant="destructive"
-                            onClick={submitBulkReject}
-                            disabled={
-                                !bulkNotes.trim() || processing === 'bulk'
-                            }
-                        >
-                            Reject All
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
-
-            {/* Bulk Return Dialog */}
-            <Dialog open={showBulkReturn} onOpenChange={setShowBulkReturn}>
-                <DialogContent>
-                    <DialogHeader>
-                        <DialogTitle>
-                            Return {selectedApprovalIds.length} Timesheet(s) for
-                            Changes
-                        </DialogTitle>
-                    </DialogHeader>
-                    <div>
-                        <Label>Return Notes *</Label>
-                        <Textarea
-                            value={bulkNotes}
-                            onChange={(e) => setBulkNotes(e.target.value)}
-                        />
-                    </div>
-                    <DialogFooter>
-                        <Button
-                            variant="outline"
-                            onClick={() => setShowBulkReturn(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            className="bg-status-warning hover:bg-status-warning"
-                            onClick={submitBulkReturn}
-                            disabled={
-                                !bulkNotes.trim() || processing === 'bulk'
-                            }
-                        >
-                            Return All
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
         </AppLayout>
     );
 }

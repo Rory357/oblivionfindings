@@ -21,12 +21,20 @@ interface LeaveEntry {
     status: string;
 }
 
+interface PublicHoliday {
+    id: number;
+    name: string;
+    region: string | null;
+    is_national: boolean;
+}
+
 interface CalendarDay {
     date: string;
     day: number;
     day_of_week: number;
     is_weekend: boolean;
     leave: LeaveEntry[];
+    public_holidays: PublicHoliday[];
 }
 
 interface Props {
@@ -105,6 +113,10 @@ export default function TimeOffCalendar({
     const today = new Date().toISOString().split('T')[0];
 
     const totalOff = calendarDays.reduce((sum, d) => sum + d.leave.length, 0);
+    const totalHolidays = calendarDays.reduce(
+        (sum, d) => sum + d.public_holidays.length,
+        0,
+    );
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -119,6 +131,7 @@ export default function TimeOffCalendar({
                         stats={[
                             { label: 'Month', value: monthLabel },
                             { label: 'Off this month', value: totalOff },
+                            { label: 'Public holidays', value: totalHolidays },
                         ]}
                         actions={
                             <div className="flex items-center gap-2">
@@ -280,6 +293,17 @@ export default function TimeOffCalendar({
                                                 {day.day}
                                             </div>
                                             <div className="space-y-0.5">
+                                                {day.public_holidays.map(
+                                                    (holiday) => (
+                                                        <div
+                                                            key={`holiday-${holiday.id}`}
+                                                            className="truncate rounded bg-status-success-bg px-1 py-0.5 text-[10px] leading-tight text-status-success"
+                                                            title={`${holiday.name} - ${holiday.region ?? 'national'}`}
+                                                        >
+                                                            {holiday.name}
+                                                        </div>
+                                                    ),
+                                                )}
                                                 {day.leave.map((entry) => (
                                                     <div
                                                         key={entry.id}

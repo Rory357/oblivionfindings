@@ -17,7 +17,7 @@ test('hr timesheets page loads', function () {
     $this->browse(function (Browser $browser) {
         $user = User::where('email', 'admin@test.com')->first();
         $browser->loginAs($user)
-            ->visit('/hr/time/timesheets')
+            ->visit('/hr/time?tab=timesheets')
             ->waitForText('Timesheet', 10)
             ->assertPathIs('/hr/time');
     });

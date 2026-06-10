@@ -4,6 +4,7 @@ namespace App\Domain\Hr\Models;
 
 use App\Models\Concerns\AuditableChanges;
 use App\Models\Site;
+use Database\Factories\Hr\HrApplicationFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,7 +13,12 @@ use Illuminate\Database\Eloquent\Relations\HasOne;
 
 class HrApplication extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory;
+
+    protected static function newFactory()
+    {
+        return HrApplicationFactory::new();
+    }
 
     protected $fillable = [
         'tenant_id',
@@ -39,7 +45,7 @@ class HrApplication extends Model
     ];
 
     /* ------------------------------------------------------------------ */
-    /*  Relationships                                                      */
+    /*  Relationships */
     /* ------------------------------------------------------------------ */
 
     public function candidate(): BelongsTo

@@ -51,6 +51,7 @@ use App\Http\Controllers\Hr\PipController;
 use App\Http\Controllers\Hr\PolicyAttestationController;
 use App\Http\Controllers\Hr\PolicyController;
 use App\Http\Controllers\Hr\PositionController;
+use App\Http\Controllers\Hr\PublicHolidayController;
 use App\Http\Controllers\Hr\RecruitmentController;
 use App\Http\Controllers\Hr\RecruitmentJobController;
 use App\Http\Controllers\Hr\ReportBuilderController;
@@ -85,6 +86,8 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::get('/leave', [MyHrController::class, 'leave'])->name('leave');
         Route::post('/leave', [MyHrController::class, 'submitLeave'])->name('leave.store');
         Route::delete('/leave/{leaveRequest}', [MyHrController::class, 'cancelLeave'])->name('leave.cancel');
+        Route::get('/expenses', [MyHrController::class, 'expenses'])->name('expenses');
+        Route::post('/expenses', [MyHrController::class, 'submitExpense'])->name('expenses.store');
         Route::get('/training', [MyHrController::class, 'training'])->name('training');
         Route::get('/policies', [MyHrController::class, 'policies'])->name('policies');
         Route::post('/policies/{policy}/attest', [MyHrController::class, 'attestPolicy'])->name('policies.attest');
@@ -286,10 +289,14 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::get('/leave', [LeaveController::class, 'index'])->name('leave.index');
         Route::get('/leave/balances', [LeaveController::class, 'balances'])->name('leave.balances');
         Route::get('/leave/reports', [LeaveReportController::class, 'index'])->name('leave.reports');
+        Route::get('/leave/holidays', [PublicHolidayController::class, 'index'])->name('leave.holidays.index');
 
         Route::middleware('permission:hr.leave.manage')->group(function () {
             Route::get('/leave/create', [LeaveController::class, 'create'])->name('leave.create');
             Route::post('/leave', [LeaveController::class, 'store'])->name('leave.store');
+            Route::post('/leave/holidays', [PublicHolidayController::class, 'store'])->name('leave.holidays.store');
+            Route::put('/leave/holidays/{holiday}', [PublicHolidayController::class, 'update'])->name('leave.holidays.update');
+            Route::delete('/leave/holidays/{holiday}', [PublicHolidayController::class, 'destroy'])->name('leave.holidays.destroy');
         });
 
         Route::middleware('permission:hr.leave.approve')->group(function () {
@@ -716,13 +723,15 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     */
     Route::middleware('permission:hr.performance.view')->group(function () {
         Route::get('/performance/competencies', [CompetencyController::class, 'index'])->name('competencies.index');
-        Route::get('/performance/competencies/{profile}', [CompetencyController::class, 'employeeProfile'])->name('competencies.profile');
 
         Route::middleware('permission:hr.performance.manage')->group(function () {
+            Route::get('/performance/competencies/assess', [CompetencyController::class, 'createAssessment'])->name('competencies.assess.create');
             Route::post('/performance/competencies', [CompetencyController::class, 'store'])->name('competencies.store');
             Route::put('/performance/competencies/{competency}', [CompetencyController::class, 'update'])->name('competencies.update');
             Route::post('/performance/competencies/assess', [CompetencyController::class, 'assess'])->name('competencies.assess');
         });
+
+        Route::get('/performance/competencies/{profile}', [CompetencyController::class, 'employeeProfile'])->name('competencies.profile');
     });
 
     /*
@@ -911,7 +920,9 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::get('/{signature}', [ESignatureController::class, 'show'])->name('show');
         Route::post('/{signature}/sign', [ESignatureController::class, 'sign'])->name('sign');
         Route::post('/{signature}/decline', [ESignatureController::class, 'decline'])->name('decline');
-        Route::post('/request', [ESignatureController::class, 'request'])->name('request');
+        Route::post('/request', [ESignatureController::class, 'request'])
+            ->middleware('permission:hr.signatures.manage|hr.documents.manage')
+            ->name('request');
     });
 
     /*
@@ -919,12 +930,12 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     | Payslips
     |--------------------------------------------------------------------------
     */
-    Route::middleware('permission:hr.payroll.view')->group(function () {
+    Route::middleware('permission:hr.payslips.view')->group(function () {
         Route::get('/payroll/payslips', [PayslipController::class, 'index'])->name('payslips.index');
         Route::get('/payroll/payslips/{payslip}', [PayslipController::class, 'show'])->name('payslips.show');
         Route::get('/payroll/payslips/{payslip}/download', [PayslipController::class, 'download'])->name('payslips.download');
 
-        Route::middleware('permission:hr.payroll.export')->group(function () {
+        Route::middleware('permission:hr.payslips.generate')->group(function () {
             Route::post('/payroll/payslips/generate', [PayslipController::class, 'generate'])->name('payslips.generate');
         });
     });
@@ -937,11 +948,11 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     | Exit Interviews
     |--------------------------------------------------------------------------
     */
-    Route::middleware('permission:hr.exit-interviews.view|hr.exit-interviews.manage|hr.onboarding.view|hr.onboarding.manage')->prefix('exit-interviews')->name('exit-interviews.')->group(function () {
+    Route::middleware('permission:hr.exit-interviews.view|hr.exit-interviews.manage')->prefix('exit-interviews')->name('exit-interviews.')->group(function () {
         Route::get('/', [ExitInterviewController::class, 'index'])->name('index');
         Route::get('/trends', [ExitInterviewController::class, 'trends'])->name('trends');
 
-        Route::middleware('permission:hr.exit-interviews.manage|hr.onboarding.manage')->group(function () {
+        Route::middleware('permission:hr.exit-interviews.manage')->group(function () {
             Route::get('/create', [ExitInterviewController::class, 'create'])->name('create');
             Route::post('/', [ExitInterviewController::class, 'store'])->name('store');
         });
@@ -961,17 +972,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::post('/entries', [TimeTrackingController::class, 'store'])->name('entries.store');
         Route::get('/timesheets', [TimeTrackingController::class, 'timesheets'])->name('timesheets');
 
-        // Staff can submit their own timesheets (controller checks ownership)
-        Route::post('/timesheets/{timesheet}/submit', [TimeTrackingController::class, 'submitTimesheet'])->name('timesheets.submit');
-
-        // Manager / Team Leader actions
         Route::middleware('permission:timesheets.manageAny|timesheets.approve')->group(function () {
-            Route::post('/timesheets/{timesheet}/approve', [TimeTrackingController::class, 'approveTimesheet'])->name('timesheets.approve');
-            Route::post('/timesheets/{timesheet}/reject', [TimeTrackingController::class, 'rejectTimesheet'])->name('timesheets.reject');
-            Route::post('/timesheets/{timesheet}/return', [TimeTrackingController::class, 'returnTimesheet'])->name('timesheets.return');
-            Route::post('/timesheets/bulk-approve', [TimeTrackingController::class, 'bulkApproveTimesheets'])->name('timesheets.bulk-approve');
-            Route::post('/timesheets/bulk-reject', [TimeTrackingController::class, 'bulkRejectTimesheets'])->name('timesheets.bulk-reject');
-            Route::post('/timesheets/bulk-return', [TimeTrackingController::class, 'bulkReturnTimesheets'])->name('timesheets.bulk-return');
             Route::put('/entries/{entry}', [TimeTrackingController::class, 'updateEntry'])->name('entries.update');
             Route::get('/entries/{entry}/amendments', [TimeTrackingController::class, 'entryAmendments'])->name('entries.amendments');
             Route::post('/clock-on-behalf', [TimeTrackingController::class, 'clockOnBehalf'])->name('clock-on-behalf');

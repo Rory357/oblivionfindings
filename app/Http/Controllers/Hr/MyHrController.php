@@ -19,10 +19,12 @@ use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Domain\Hr\Models\HrTimeEntry;
 use App\Domain\Hr\Services\AttendanceService;
 use App\Domain\Hr\Services\EngagementService;
+use App\Domain\Hr\Services\ExpenseService;
 use App\Domain\Hr\Services\LeaveService;
 use App\Domain\Hr\Services\TimeTrackingService;
 use App\Http\Controllers\Controller;
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
+use App\Http\Requests\Hr\StoreExpenseClaimRequest;
 use App\Models\Shift;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
@@ -38,6 +40,7 @@ class MyHrController extends Controller
         private readonly EngagementService $engagementService,
         private readonly TimeTrackingService $timeTrackingService,
         private readonly AttendanceService $attendanceService,
+        private readonly ExpenseService $expenseService,
     ) {}
 
     public function index(Request $request)
@@ -225,6 +228,48 @@ class MyHrController extends Controller
         }
 
         return redirect()->back()->with('success', 'Leave request submitted.');
+    }
+
+    public function expenses(Request $request)
+    {
+        $user = $request->user();
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        $claims = HrExpenseClaim::query()
+            ->where('tenant_id', $tenantId)
+            ->where('user_id', $user->id)
+            ->withCount('items')
+            ->orderByDesc('created_at')
+            ->paginate(20)
+            ->withQueryString();
+
+        $claims->through(fn (HrExpenseClaim $claim) => [
+            'id' => $claim->id,
+            'claim_number' => $claim->claim_number,
+            'title' => $claim->title,
+            'status' => $claim->status,
+            'total_amount' => (float) $claim->total_amount,
+            'currency' => $claim->currency,
+            'items_count' => $claim->items_count,
+            'submitted_at' => $claim->submitted_at?->toDateString(),
+            'created_at' => $claim->created_at?->toDateString(),
+        ]);
+
+        return Inertia::render('hr/my/expenses', [
+            'claims' => $claims,
+            'categories' => ExpenseService::CATEGORIES,
+        ]);
+    }
+
+    public function submitExpense(StoreExpenseClaimRequest $request)
+    {
+        try {
+            $this->expenseService->createClaim($request->user(), $request->validated());
+        } catch (\Throwable $exception) {
+            return redirect()->back()->with('error', $exception->getMessage());
+        }
+
+        return redirect()->route('hr.my.expenses')->with('success', 'Expense claim created.');
     }
 
     public function cancelLeave(Request $request, HrLeaveRequest $leaveRequest)

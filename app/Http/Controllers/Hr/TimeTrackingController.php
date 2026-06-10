@@ -4,22 +4,23 @@ namespace App\Http\Controllers\Hr;
 
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrTimeEntry;
-use App\Domain\Hr\Models\HrTimesheet;
-use App\Domain\Hr\Services\HrTimesheetApprovalService;
 use App\Domain\Hr\Services\TimeTrackingService;
 use App\Http\Controllers\Controller;
-use App\Http\Requests\Hr\BulkTimesheetActionRequest;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Requests\Hr\ClockOnBehalfRequest;
 use App\Http\Requests\Hr\StoreTimesheetRequest;
 use App\Http\Requests\Hr\UpdateTimeEntryRequest;
+use App\Models\Timesheet;
+use App\Models\User;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class TimeTrackingController extends Controller
 {
+    use ResolvesHrTenant;
+
     public function __construct(
         private readonly TimeTrackingService $timeTrackingService,
-        private readonly HrTimesheetApprovalService $timesheetApprovals,
     ) {}
 
     /* ------------------------------------------------------------------ */
@@ -56,6 +57,67 @@ class TimeTrackingController extends Controller
         return $query->forUser($user->id);
     }
 
+    private function operationsTimesheetQuery(int $tenantId, User $user, array $access)
+    {
+        $staffUserIds = $this->hrStaffUserIdsForTenant($tenantId);
+
+        if (empty($staffUserIds)) {
+            return Timesheet::query()->whereRaw('1 = 0');
+        }
+
+        $query = Timesheet::query()
+            ->with('staff:id,name,email', 'approver:id,name', 'client:id,first_name,last_name')
+            ->whereIn('user_id', $staffUserIds)
+            ->whereNull('archived_at');
+
+        if ($access['canManage']) {
+            return $query;
+        }
+
+        if ($access['canApproveTeam']) {
+            return $query->whereIn('user_id', array_values(array_unique(array_merge([$user->id], $access['teamUserIds']))));
+        }
+
+        return $query->where('user_id', $user->id);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function serializeOperationsTimesheet(Timesheet $timesheet, bool $approvalQueue = false): array
+    {
+        $workDate = $timesheet->work_date ?? $timesheet->starts_at ?? now();
+        $periodStart = $workDate->copy()->startOfWeek()->toDateString();
+        $periodEnd = $workDate->copy()->endOfWeek()->toDateString();
+        $moduleUrl = $approvalQueue
+            ? route('operations.timesheets.index', ['tab' => 'submitted', 'view' => $timesheet->id], false)
+            : route('operations.timesheets.index', ['view' => $timesheet->id], false);
+
+        return [
+            'id' => $timesheet->id,
+            'source' => 'operations',
+            'user_name' => $timesheet->staff?->name ?? $timesheet->staff_name_snapshot ?? 'Unknown',
+            'user_id' => $timesheet->user_id,
+            'period_start' => $periodStart,
+            'period_end' => $periodEnd,
+            'work_date' => $timesheet->work_date?->toDateString(),
+            'client_name' => $timesheet->client_name_snapshot ?: ($timesheet->client
+                ? trim(($timesheet->client->first_name ?? '').' '.($timesheet->client->last_name ?? ''))
+                : null),
+            'status' => $timesheet->status,
+            'total_hours' => (float) $timesheet->total_hours,
+            'submitted_at' => $timesheet->submitted_at?->toDateTimeString(),
+            'approved_by' => $timesheet->approver?->name,
+            'approved_at' => $timesheet->approved_at?->toDateTimeString(),
+            'rejection_reason' => $timesheet->status === 'rejected' ? $timesheet->decision_notes : null,
+            'returned_notes' => $timesheet->returned_notes,
+            'returned_at' => $timesheet->returned_at?->toDateTimeString(),
+            'module_url' => $moduleUrl,
+            'edit_url' => route('operations.timesheets.edit', $timesheet, false),
+            'hours_waiting' => $timesheet->submitted_at ? round($timesheet->submitted_at->diffInHours(now()), 1) : 0,
+        ];
+    }
+
     /* ------------------------------------------------------------------ */
     /*  Index — timekeeping dashboard */
     /* ------------------------------------------------------------------ */
@@ -65,7 +127,7 @@ class TimeTrackingController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('timesheets.viewAny'), 403);
 
-        $tenantId = $user->tenant_id;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
         $access = $this->resolveAccess($user);
         $status = $request->query('status');
         $search = trim((string) $request->query('q', ''));
@@ -110,9 +172,9 @@ class TimeTrackingController extends Controller
             ->distinct('user_id')
             ->count('user_id');
 
-        $pendingTimesheetQuery = HrTimesheet::forTenant($tenantId)->where('status', 'submitted');
-        $this->applyAccessScope($pendingTimesheetQuery, $user, $access);
-        $pendingTimesheets = $pendingTimesheetQuery->count();
+        $pendingTimesheets = (clone $this->operationsTimesheetQuery($tenantId, $user, $access))
+            ->where('status', 'submitted')
+            ->count();
 
         // Overtime
         $overtimeHours = 0;
@@ -192,54 +254,27 @@ class TimeTrackingController extends Controller
         ]);
 
         // --- Timesheets ---
-        $timesheetsQuery = HrTimesheet::forTenant($tenantId);
-        $this->applyAccessScope($timesheetsQuery, $user, $access);
-
-        $timesheets = (clone $timesheetsQuery)
-            ->with('user:id,name,email', 'approver:id,name')
-            ->orderByDesc('period_start')
+        $timesheets = (clone $this->operationsTimesheetQuery($tenantId, $user, $access))
+            ->orderByDesc('work_date')
+            ->orderByDesc('starts_at')
             ->paginate(20, ['*'], 'ts_page')
             ->withQueryString();
 
-        $timesheets->through(fn ($ts) => [
-            'id' => $ts->id,
-            'user_name' => $ts->user?->name ?? 'Unknown',
-            'user_id' => $ts->user_id,
-            'period_start' => $ts->period_start->toDateString(),
-            'period_end' => $ts->period_end->toDateString(),
-            'status' => $ts->status,
-            'total_hours' => $ts->total_hours,
-            'submitted_at' => $ts->submitted_at?->toDateTimeString(),
-            'approved_by' => $ts->approver?->name,
-            'approved_at' => $ts->approved_at?->toDateTimeString(),
-            'rejection_reason' => $ts->rejection_reason,
-            'returned_notes' => $ts->returned_notes,
-            'returned_at' => $ts->returned_at?->toDateTimeString(),
-        ]);
+        $timesheets->through(fn (Timesheet $ts) => $this->serializeOperationsTimesheet($ts));
 
         // --- Approval queue (submitted timesheets from team) ---
         $approvalTimesheets = [];
         $pendingApprovalCount = 0;
         if ($access['canApproveAny']) {
-            $approvalQuery = HrTimesheet::forTenant($tenantId)->where('status', 'submitted');
-            $this->applyAccessScope($approvalQuery, $user, $access);
+            $approvalQuery = (clone $this->operationsTimesheetQuery($tenantId, $user, $access))
+                ->where('status', 'submitted');
             $pendingApprovalCount = (clone $approvalQuery)->count();
 
             $approvalTimesheets = (clone $approvalQuery)
-                ->with('user:id,name,email')
                 ->orderBy('submitted_at')
                 ->limit(50)
                 ->get()
-                ->map(fn ($ts) => [
-                    'id' => $ts->id,
-                    'user_name' => $ts->user?->name ?? 'Unknown',
-                    'user_id' => $ts->user_id,
-                    'period_start' => $ts->period_start->toDateString(),
-                    'period_end' => $ts->period_end->toDateString(),
-                    'total_hours' => $ts->total_hours,
-                    'submitted_at' => $ts->submitted_at?->toDateTimeString(),
-                    'hours_waiting' => $ts->submitted_at ? round($ts->submitted_at->diffInHours(now()), 1) : 0,
-                ]);
+                ->map(fn (Timesheet $ts) => $this->serializeOperationsTimesheet($ts, true));
         }
 
         // Active clock-in for current user
@@ -450,173 +485,5 @@ class TimeTrackingController extends Controller
 
         // Redirect to main page with timesheets tab
         return redirect()->route('hr.time.index', ['tab' => 'timesheets']);
-    }
-
-    /* ------------------------------------------------------------------ */
-    /*  Submit Timesheet */
-    /* ------------------------------------------------------------------ */
-
-    public function submitTimesheet(Request $request, HrTimesheet $timesheet)
-    {
-        $user = $request->user();
-        abort_unless($user && $user->id === $timesheet->user_id, 403);
-
-        try {
-            $this->timesheetApprovals->submit($timesheet, $user);
-        } catch (\LogicException $e) {
-            return redirect()->back()->with('error', $e->getMessage());
-        }
-
-        return redirect()->back()->with('success', 'Timesheet submitted.');
-    }
-
-    /* ------------------------------------------------------------------ */
-    /*  Approve Timesheet */
-    /* ------------------------------------------------------------------ */
-
-    public function approveTimesheet(Request $request, HrTimesheet $timesheet)
-    {
-        $user = $request->user();
-        abort_unless($user, 403);
-        $this->assertCanReviewTimesheet($timesheet, $user);
-
-        try {
-            $this->timesheetApprovals->approve($timesheet, $user, $request->input('notes'));
-        } catch (\LogicException $e) {
-            return redirect()->back()->with('error', $e->getMessage());
-        }
-
-        return redirect()->back()->with('success', 'Timesheet approved.');
-    }
-
-    /* ------------------------------------------------------------------ */
-    /*  Reject Timesheet */
-    /* ------------------------------------------------------------------ */
-
-    public function rejectTimesheet(Request $request, HrTimesheet $timesheet)
-    {
-        $user = $request->user();
-        abort_unless($user, 403);
-
-        $validated = $request->validate([
-            'rejection_reason' => ['required', 'string', 'max:2000'],
-        ]);
-
-        try {
-            $this->assertCanReviewTimesheet($timesheet, $user);
-            $this->timesheetApprovals->reject(
-                $timesheet,
-                $user,
-                $validated['rejection_reason'],
-            );
-        } catch (\LogicException $e) {
-            return redirect()->back()->with('error', $e->getMessage());
-        }
-
-        return redirect()->back()->with('success', 'Timesheet rejected.');
-    }
-
-    /* ------------------------------------------------------------------ */
-    /*  Return Timesheet for Changes */
-    /* ------------------------------------------------------------------ */
-
-    public function returnTimesheet(Request $request, HrTimesheet $timesheet)
-    {
-        $user = $request->user();
-        abort_unless($user, 403);
-
-        $validated = $request->validate([
-            'notes' => ['required', 'string', 'max:2000'],
-        ]);
-
-        try {
-            $this->assertCanReviewTimesheet($timesheet, $user);
-            $this->timesheetApprovals->returnForChanges($timesheet, $user, $validated['notes']);
-        } catch (\LogicException $e) {
-            return redirect()->back()->with('error', $e->getMessage());
-        }
-
-        return redirect()->back()->with('success', 'Timesheet returned for changes.');
-    }
-
-    /* ------------------------------------------------------------------ */
-    /*  Bulk Timesheet Actions */
-    /* ------------------------------------------------------------------ */
-
-    public function bulkApproveTimesheets(BulkTimesheetActionRequest $request)
-    {
-        $user = $request->user();
-        $validated = $request->validated();
-
-        $timesheets = $this->reviewableTimesheets($validated['ids'], $user);
-        $count = $this->timesheetApprovals
-            ->bulkApprove($timesheets, $user, $validated['notes'] ?? null)
-            ->changedCount();
-
-        return redirect()->back()->with('success', "{$count} timesheet(s) approved.");
-    }
-
-    public function bulkRejectTimesheets(BulkTimesheetActionRequest $request)
-    {
-        $user = $request->user();
-        $validated = $request->validated();
-
-        abort_unless(! empty($validated['reason']), 422, 'Rejection reason is required.');
-
-        $timesheets = $this->reviewableTimesheets($validated['ids'], $user);
-        $count = $this->timesheetApprovals
-            ->bulkReject($timesheets, $user, $validated['reason'])
-            ->changedCount();
-
-        return redirect()->back()->with('success', "{$count} timesheet(s) rejected.");
-    }
-
-    public function bulkReturnTimesheets(BulkTimesheetActionRequest $request)
-    {
-        $user = $request->user();
-        $validated = $request->validated();
-
-        abort_unless(! empty($validated['notes']), 422, 'Return notes are required.');
-
-        $timesheets = $this->reviewableTimesheets($validated['ids'], $user);
-        $count = $this->timesheetApprovals
-            ->bulkReturn($timesheets, $user, $validated['notes'])
-            ->changedCount();
-
-        return redirect()->back()->with('success', "{$count} timesheet(s) returned for changes.");
-    }
-
-    private function assertCanReviewTimesheet(HrTimesheet $timesheet, $user): void
-    {
-        $access = $this->resolveAccess($user);
-
-        abort_unless($access['canApproveAny'], 403);
-
-        $allowed = HrTimesheet::query()
-            ->whereKey($timesheet->id)
-            ->tap(fn ($query) => $this->applyAccessScope($query, $user, $access))
-            ->exists();
-
-        abort_unless($allowed, 403);
-    }
-
-    /**
-     * @param  array<int, int>  $ids
-     * @return \Illuminate\Support\Collection<int, HrTimesheet>
-     */
-    private function reviewableTimesheets(array $ids, $user)
-    {
-        $access = $this->resolveAccess($user);
-
-        abort_unless($access['canApproveAny'], 403);
-
-        $timesheets = HrTimesheet::query()
-            ->whereIn('id', $ids)
-            ->tap(fn ($query) => $this->applyAccessScope($query, $user, $access))
-            ->get();
-
-        abort_if($timesheets->count() !== count(array_unique($ids)), 403, 'You are not authorized to review one or more selected timesheets.');
-
-        return $timesheets;
     }
 }

@@ -4,12 +4,15 @@ namespace App\Http\Controllers\Hr;
 
 use App\Domain\Hr\Services\EmployeeImportExportService;
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 use Symfony\Component\HttpFoundation\StreamedResponse;
 
 class ImportExportController extends Controller
 {
+    use ResolvesHrTenant;
+
     public function __construct(
         private readonly EmployeeImportExportService $service,
     ) {}
@@ -33,9 +36,9 @@ class ImportExportController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.employees.manage'), 403);
 
-        $tenantId = null;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
         $csv = $this->service->exportToCsv($tenantId);
-        $filename = 'employees_' . date('Y-m-d_His') . '.csv';
+        $filename = 'employees_'.date('Y-m-d_His').'.csv';
 
         return response()->streamDownload(function () use ($csv) {
             echo $csv;
@@ -74,7 +77,7 @@ class ImportExportController extends Controller
         ]);
 
         $csvContent = file_get_contents($request->file('file')->getRealPath());
-        $tenantId = null;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $result = $this->service->importFromCsv($csvContent, $tenantId, $user->id);
 

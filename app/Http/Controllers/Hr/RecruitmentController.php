@@ -2,15 +2,13 @@
 
 namespace App\Http\Controllers\Hr;
 
-use App\Http\Controllers\Controller;
-use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrCandidate;
 use App\Domain\Hr\Models\HrInterview;
 use App\Domain\Hr\Models\HrOffer;
 use App\Domain\Hr\Services\RecruitmentAnalyticsService;
-use App\Domain\Hr\Services\RecruitmentService;
+use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use Illuminate\Http\Request;
-use Illuminate\Support\Facades\DB;
 use Inertia\Inertia;
 
 class RecruitmentController extends Controller
@@ -64,7 +62,6 @@ class RecruitmentController extends Controller
             'candidates' => $candidates,
             'pipeline' => $pipeline,
             'sourceBreakdown' => $sourceBreakdown,
-            'stages' => RecruitmentService::STAGES,
             'todayStats' => $todayStats,
             'recentActivity' => $recentActivity,
             'urgentItems' => $urgentItems,
@@ -150,7 +147,7 @@ class RecruitmentController extends Controller
     }
 
     /* ------------------------------------------------------------------ */
-    /* Private helpers                                                     */
+    /* Private helpers */
     /* ------------------------------------------------------------------ */
 
     private function getTodayStats(?int $tenantId): array
@@ -204,6 +201,7 @@ class RecruitmentController extends Controller
 
         return $candidates->map(function ($candidate) {
             $position = $candidate->applications->first()?->position_title ?? 'Unknown position';
+
             return [
                 'type' => 'status_change',
                 'description' => "{$candidate->full_name} is at {$candidate->status} stage for {$position}",
@@ -230,8 +228,8 @@ class RecruitmentController extends Controller
             $items[] = [
                 'type' => 'interview',
                 'severity' => 'warning',
-                'description' => ($candidate ? $candidate->full_name : 'Unknown') . ' interview ' .
-                    ($interview->scheduled_at->isToday() ? 'today at ' : 'tomorrow at ') .
+                'description' => ($candidate ? $candidate->full_name : 'Unknown').' interview '.
+                    ($interview->scheduled_at->isToday() ? 'today at ' : 'tomorrow at ').
                     $interview->scheduled_at->format('g:i A'),
             ];
         }
@@ -268,7 +266,7 @@ class RecruitmentController extends Controller
             $items[] = [
                 'type' => 'offer',
                 'severity' => 'warning',
-                'description' => ($candidate ? $candidate->full_name : 'Unknown') . ' offer expires ' .
+                'description' => ($candidate ? $candidate->full_name : 'Unknown').' offer expires '.
                     $offer->portal_expires_at->diffForHumans(),
             ];
         }

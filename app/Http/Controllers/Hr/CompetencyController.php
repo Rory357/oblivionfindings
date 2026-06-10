@@ -2,10 +2,11 @@
 
 namespace App\Http\Controllers\Hr;
 
-use App\Http\Controllers\Controller;
 use App\Domain\Hr\Models\HrCompetency;
 use App\Domain\Hr\Models\HrCompetencyAssessment;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -13,6 +14,8 @@ use Inertia\Inertia;
 
 class CompetencyController extends Controller
 {
+    use ResolvesHrTenant;
+
     /**
      * List competencies grouped by category.
      */
@@ -93,6 +96,38 @@ class CompetencyController extends Controller
         $competency->update($data);
 
         return redirect()->back()->with('success', 'Competency updated.');
+    }
+
+    public function createAssessment(Request $request)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.performance.manage'), 403);
+
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        $competencies = HrCompetency::query()
+            ->forTenant($tenantId)
+            ->active()
+            ->orderBy('category')
+            ->orderBy('sort_order')
+            ->get();
+
+        $staffUserIds = HrEmployeeProfile::query()
+            ->where('tenant_id', $tenantId)
+            ->pluck('user_id')
+            ->filter(fn ($id) => is_numeric($id))
+            ->map(fn ($id) => (int) $id)
+            ->values();
+
+        $staff = User::query()
+            ->whereIn('id', $staffUserIds)
+            ->orderBy('name')
+            ->get(['id', 'name', 'email']);
+
+        return Inertia::render('hr/performance/competencies/assess', [
+            'competencies' => $competencies,
+            'staff' => $staff,
+        ]);
     }
 
     /**

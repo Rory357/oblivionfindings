@@ -65,7 +65,7 @@ export default function ShowReview({ review, can }: Props) {
         const d = new Date(value);
         return Number.isNaN(d.getTime())
             ? value
-            : d.toLocaleDateString('en-GB', {
+            : d.toLocaleDateString('en-NZ', {
                   day: '2-digit',
                   month: 'short',
                   year: 'numeric',
