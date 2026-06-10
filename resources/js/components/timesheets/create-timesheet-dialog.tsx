@@ -1,3 +1,8 @@
+/* eslint-disable no-restricted-syntax -- The create-timesheet wizard mirrors the
+ * bespoke Add-client modal surface (step header + scroll-contained body + custom
+ * footer) and intentionally uses styled native controls for its shift/activity
+ * tile pickers. Every colour is a semantic design token, per
+ * docs/DESIGN_TOKENS.md. */
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -9,12 +14,11 @@ import {
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
 import { Textarea } from '@/components/ui/textarea';
+import { StepHead } from '@/components/wizard/primitives';
 import { cn } from '@/lib/utils';
 import { router, useForm } from '@inertiajs/react';
 import {
-    ArrowLeft,
     ArrowLeftRight,
-    ArrowRight,
     BookOpen,
     Calendar as CalendarIcon,
     CalendarDays,
@@ -22,6 +26,8 @@ import {
     Check,
     CheckCircle2,
     ChevronDown,
+    ChevronLeft,
+    ChevronRight,
     CircleEllipsis,
     ClipboardList,
     Clock,
@@ -556,77 +562,81 @@ export default function CreateTimesheetDialog({
                 : ''
             : activityMeta?.label ?? '';
 
+    const stepLabel = done
+        ? 'Saved'
+        : step === 1
+          ? mode === 'shift'
+              ? 'Pick shift'
+              : 'Choose activity'
+          : mode === 'shift'
+            ? 'Confirm hours & tasks'
+            : 'Log hours & details';
+
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="flex max-h-[92vh] w-[min(96vw,920px)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[920px]">
-                {/* Purple gradient header */}
-                <DialogHeader className="relative shrink-0 rounded-t-lg bg-gradient-to-br from-primary/90 via-primary to-primary/80 text-primary-foreground">
-                    <div className="flex items-start gap-4 p-5">
-                        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-white/20 bg-white/15">
-                            <FilePlus2 className="h-5 w-5 text-white" />
-                        </div>
-                        <div className="min-w-0 flex-1">
-                            <DialogTitle className="text-lg font-semibold tracking-tight text-white">
-                                {done
-                                    ? 'Timesheet saved'
-                                    : step === 1
-                                        ? 'Create timesheet — pick what to log'
-                                        : mode === 'shift'
-                                            ? 'Create timesheet — confirm hours & tasks'
-                                            : `Create timesheet — log ${activityMeta?.label ?? 'activity'}`}
-                            </DialogTitle>
-                            <DialogDescription className="mt-0.5 text-[12.5px] text-white/80">
-                                {done
-                                    ? `Timesheet created${subjectLabel ? ' for ' + subjectLabel : ''}.`
-                                    : step === 1
-                                        ? 'Timesheets normally start from a real shift, but you can also log training, meetings, travel or other non-shift time.'
-                                        : mode === 'shift' && shift
-                                            ? `Linked to shift #${shift.id} · ${shift.client?.first_name} ${shift.client?.last_name} · ${shift.location ?? ''}`
-                                            : `No shift attached · ${fmtDate(workDate)} · type "${activityMeta?.label ?? ''}"`}
-                            </DialogDescription>
-                        </div>
-                    </div>
+            <DialogContent
+                className="flex max-h-[92vh] flex-col gap-0 overflow-hidden p-0 [&>button]:hidden"
+                style={{ maxWidth: 'min(94vw, 920px)', width: 'min(94vw, 920px)' }}
+            >
+                <DialogTitle className="sr-only">Create timesheet</DialogTitle>
+                <DialogDescription className="sr-only">
+                    A guided two-step flow to log shift or activity time for
+                    approval.
+                </DialogDescription>
 
-                    {!done ? (
-                        <div className="flex items-center gap-2 border-t border-white/15 bg-black/10 px-5 py-2.5 text-[11.5px] font-semibold uppercase tracking-wider">
-                            <span className={cn('flex items-center gap-1.5', step >= 1 ? 'text-white' : 'text-white/50')}>
-                                <span
-                                    className={cn(
-                                        'grid h-5 w-5 place-items-center rounded-full text-[10px]',
-                                        step > 1 ? 'bg-emerald-400 text-emerald-950' : step === 1 ? 'bg-white text-primary' : 'bg-white/15',
-                                    )}
-                                >
-                                    {step > 1 ? '✓' : '1'}
-                                </span>
-                                {mode === 'shift' ? 'Pick shift' : 'Choose activity'}
-                            </span>
-                            <span className="mx-1 h-px w-6 bg-white/30" />
-                            <span className={cn('flex items-center gap-1.5', step >= 2 ? 'text-white' : 'text-white/50')}>
-                                <span
-                                    className={cn(
-                                        'grid h-5 w-5 place-items-center rounded-full text-[10px]',
-                                        step === 2 ? 'bg-white text-primary' : 'bg-white/15',
-                                    )}
-                                >
-                                    2
-                                </span>
-                                {mode === 'shift' ? 'Tasks pull through' : 'Log hours & details'}
-                            </span>
-                            <span className="mx-1 h-px w-6 bg-white/30" />
-                            <span className="flex items-center gap-1.5 text-white/50">
-                                <span className="grid h-5 w-5 place-items-center rounded-full bg-white/15 text-[10px]">3</span>
-                                Submit
-                            </span>
+                {/* Wizard header — matches the Add Client chrome. */}
+                <DialogHeader className="shrink-0 space-y-0">
+                    <div className="flex items-center justify-between border-b border-border px-5 py-3.5">
+                        <div className="text-[13px] font-semibold text-muted-foreground">
+                            Step {done ? 2 : step} of 2 ·{' '}
+                            <span className="text-foreground">{stepLabel}</span>
                         </div>
-                    ) : null}
+                        {/* eslint-disable-next-line no-restricted-syntax -- compact icon close matching the wizard header chrome. */}
+                        <button
+                            type="button"
+                            onClick={() => onOpenChange(false)}
+                            aria-label="Close"
+                            className="grid h-8 w-8 place-items-center rounded-md text-muted-foreground hover:bg-muted"
+                        >
+                            <X className="h-5 w-5" />
+                        </button>
+                    </div>
+                    <div className="h-[3px] shrink-0 bg-muted">
+                        <div
+                            className="h-full bg-primary transition-[width] duration-300"
+                            style={{ width: done ? '100%' : `${(step / 2) * 100}%` }}
+                        />
+                    </div>
                 </DialogHeader>
+
+                {!done ? (
+                    <div className="shrink-0 px-5 pt-4">
+                        <StepHead
+                            icon={FilePlus2}
+                            title={
+                                step === 1
+                                    ? 'Pick what to log'
+                                    : mode === 'shift'
+                                      ? 'Confirm hours & tasks'
+                                      : `Log ${activityMeta?.label ?? 'activity'}`
+                            }
+                            blurb={
+                                step === 1
+                                    ? 'Timesheets normally start from a real shift, but you can also log training, meetings, travel or other non-shift time.'
+                                    : mode === 'shift' && shift
+                                      ? `Linked to shift #${shift.id} · ${shift.client?.first_name} ${shift.client?.last_name} · ${shift.location ?? ''}`
+                                      : `No shift attached · ${fmtDate(workDate)} · type "${activityMeta?.label ?? ''}"`
+                            }
+                        />
+                    </div>
+                ) : null}
 
                 {/* Body */}
                 <div className="min-h-0 flex-1 overflow-y-auto bg-muted/30">
                     {done ? (
                         <div className="grid place-items-center px-6 py-14 text-center">
-                            <div className="grid h-14 w-14 place-items-center rounded-full bg-emerald-100">
-                                <CheckCircle2 className="h-7 w-7 text-emerald-600" />
+                            <div className="grid h-14 w-14 place-items-center rounded-full bg-status-success-bg">
+                                <CheckCircle2 className="h-7 w-7 text-status-success" />
                             </div>
                             <div className="mt-3 text-base font-semibold">Timesheet created</div>
                             <p className="mt-1 max-w-md text-[12.5px] text-muted-foreground">
@@ -699,7 +709,7 @@ export default function CreateTimesheetDialog({
                                 </>
                             ) : (
                                 <>
-                                    <div className="mb-3 rounded-lg border border-amber-200 bg-amber-50/60 px-3 py-2.5 text-[12px] text-amber-900 dark:border-amber-900/40 dark:bg-amber-950/30 dark:text-amber-200">
+                                    <div className="mb-3 rounded-lg border border-status-warning/30 bg-status-warning-bg px-3 py-2.5 text-[12px] text-status-warning">
                                         <strong>Manual entry.</strong> Use this for time worked that isn't tied to a rostered shift — training,
                                         meetings, travel between sites, etc. Approval still flows through your manager and lands in payroll the same
                                         way.
@@ -895,7 +905,7 @@ export default function CreateTimesheetDialog({
                                                     onClick={() =>
                                                         setTasks(tasks.map((x, i) => (i === idx ? { ...x, included: !x.included } : x)))
                                                     }
-                                                    className="text-[11px] font-medium text-muted-foreground hover:text-rose-600"
+                                                    className="text-[11px] font-medium text-muted-foreground hover:text-status-critical"
                                                 >
                                                     {t.included ? 'exclude' : 'include'}
                                                 </button>
@@ -1029,7 +1039,7 @@ export default function CreateTimesheetDialog({
                                                         type="button"
                                                         onClick={() => setActivityItems(activityItems.filter((_, i) => i !== idx))}
                                                         aria-label="Remove item"
-                                                        className="grid h-6 w-6 place-items-center rounded text-muted-foreground hover:bg-rose-50 hover:text-rose-600"
+                                                        className="grid h-6 w-6 place-items-center rounded text-muted-foreground hover:bg-status-critical-bg hover:text-status-critical"
                                                     >
                                                         <X className="h-3 w-3" />
                                                     </button>
@@ -1073,7 +1083,7 @@ export default function CreateTimesheetDialog({
                     )}
 
                     {Object.keys(errors).length > 0 ? (
-                        <div className="border-t border-rose-200 bg-rose-50 p-3 text-[12px] text-rose-700">
+                        <div className="border-t border-status-critical/30 bg-status-critical-bg p-3 text-[12px] text-status-critical">
                             {Object.entries(errors).map(([field, msg]) => (
                                 <div key={field}>
                                     <strong>{field}:</strong> {msg}
@@ -1083,42 +1093,46 @@ export default function CreateTimesheetDialog({
                     ) : null}
                 </div>
 
-                {/* Footer */}
+                {/* Footer — wizard contract: ghost Back left; Cancel + primary right. */}
                 {!done ? (
-                    <footer className="shrink-0 border-t border-border bg-background p-3.5">
-                        <div className="flex items-center justify-between gap-2">
-                            <Button
-                                variant="ghost"
-                                size="sm"
-                                onClick={() => (step === 2 ? setStep(1) : onOpenChange(false))}
-                                className="gap-1.5"
-                            >
-                                <ArrowLeft className="h-3.5 w-3.5" />
-                                {step === 2 ? (mode === 'shift' ? 'Back to shifts' : 'Back to activity type') : 'Cancel'}
+                    <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border bg-muted/30 px-5 py-3.5">
+                        <div>
+                            {step === 2 ? (
+                                <Button
+                                    variant="ghost"
+                                    onClick={() => setStep(1)}
+                                    className="gap-1.5"
+                                >
+                                    <ChevronLeft className="h-4 w-4" />
+                                    {mode === 'shift' ? 'Back to shifts' : 'Back to activity type'}
+                                </Button>
+                            ) : null}
+                        </div>
+                        <div className="flex items-center gap-2.5">
+                            <Button variant="outline" onClick={() => onOpenChange(false)}>
+                                Cancel
                             </Button>
-                            <div className="flex items-center gap-2">
-                                {step === 1 ? (
-                                    <Button disabled={!canAdvanceFromStep1} onClick={() => setStep(2)} className="gap-1.5">
-                                        {mode === 'shift' ? 'Pull tasks & continue' : 'Continue to hours'}
-                                        <ArrowRight className="h-3.5 w-3.5" />
+                            {step === 1 ? (
+                                <Button disabled={!canAdvanceFromStep1} onClick={() => setStep(2)} className="gap-1.5">
+                                    {mode === 'shift' ? 'Pull tasks & continue' : 'Continue to hours'}
+                                    <ChevronRight className="h-4 w-4" />
+                                </Button>
+                            ) : (
+                                <>
+                                    <Button variant="secondary" onClick={() => submit(true)} disabled={submitting} className="gap-1.5">
+                                        {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
+                                        Save as draft
                                     </Button>
-                                ) : (
-                                    <>
-                                        <Button variant="outline" onClick={() => submit(true)} disabled={submitting} className="gap-1.5">
-                                            {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Save className="h-3.5 w-3.5" />}
-                                            Save as draft
-                                        </Button>
-                                        <Button onClick={() => submit(false)} disabled={submitting} className="gap-1.5">
-                                            {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
-                                            Submit for approval
-                                        </Button>
-                                    </>
-                                )}
-                            </div>
+                                    <Button onClick={() => submit(false)} disabled={submitting} className="gap-1.5">
+                                        {submitting ? <Loader2 className="h-3.5 w-3.5 animate-spin" /> : <Send className="h-3.5 w-3.5" />}
+                                        Submit for approval
+                                    </Button>
+                                </>
+                            )}
                         </div>
                     </footer>
                 ) : (
-                    <footer className="shrink-0 border-t border-border bg-background p-3.5 text-right">
+                    <footer className="shrink-0 border-t border-border bg-muted/30 px-5 py-3.5 text-right">
                         <Button onClick={() => onOpenChange(false)}>Done</Button>
                     </footer>
                 )}

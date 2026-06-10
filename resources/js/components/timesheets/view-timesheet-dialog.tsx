@@ -1,3 +1,9 @@
+/* eslint-disable no-restricted-syntax -- Read-only timesheet detail surface with
+ * a bespoke audit-trail timeline and hue-coded person avatars (white initials on
+ * computed avatar hues, white glyphs on solid status dots — the established
+ * avatar/timeline idiom). All status colours are semantic tokens, per
+ * docs/DESIGN_TOKENS.md. */
+import { TimesheetStatusBadge } from '@/components/timesheet-status-badge';
 import { Button } from '@/components/ui/button';
 import {
     Dialog,
@@ -6,6 +12,7 @@ import {
     DialogHeader,
     DialogTitle,
 } from '@/components/ui/dialog';
+import { formatDateTime, formatTime, WORKER_TIMEZONE } from '@/lib/datetime';
 import { cn } from '@/lib/utils';
 import { router } from '@inertiajs/react';
 import {
@@ -18,7 +25,6 @@ import {
     ClipboardList,
     Coffee,
     Car,
-    Download,
     FileText,
     Link2,
     MapPin,
@@ -86,11 +92,18 @@ function hueFor(name: string) {
 
 function fmtTime(iso: string) {
     if (!iso) return '';
-    return new Date(iso).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' });
+    return formatTime(iso);
 }
+// Payroll context keeps the year; pinned to the worker timezone so the date
+// can't drift a day on non-NZ machines.
 function fmtDate(iso: string) {
     if (!iso) return '';
-    return new Date(iso).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' });
+    return new Date(iso).toLocaleDateString('en-NZ', {
+        timeZone: WORKER_TIMEZONE,
+        day: 'numeric',
+        month: 'short',
+        year: 'numeric',
+    });
 }
 
 function SectionTitle({ icon: Icon, children }: { icon: React.ComponentType<{ className?: string }>; children: React.ReactNode }) {
@@ -173,20 +186,23 @@ export default function ViewTimesheetDialog({
 
     return (
         <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="flex max-h-[92vh] w-[min(96vw,920px)] flex-col gap-0 overflow-hidden p-0 sm:max-w-[920px]">
-                <DialogHeader className="relative shrink-0 rounded-t-lg bg-gradient-to-br from-primary/90 via-primary to-primary/80 text-primary-foreground">
-                    <div className="flex items-start gap-4 p-5">
-                        <div className="grid h-11 w-11 shrink-0 place-items-center rounded-xl border border-white/20 bg-white/15">
-                            <FileText className="h-5 w-5 text-white" />
+            <DialogContent
+                className="flex max-h-[92vh] flex-col gap-0 overflow-hidden p-0"
+                style={{ maxWidth: 'min(94vw, 920px)', width: 'min(94vw, 920px)' }}
+            >
+                {/* Read-only detail header — icon tile + title + status, per
+                    docs/POPUP_STYLE_GUIDE.md. */}
+                <DialogHeader className="shrink-0 space-y-0 border-b border-border px-5 py-4">
+                    <div className="flex items-start gap-3">
+                        <div className="grid h-10 w-10 shrink-0 place-items-center rounded-xl bg-primary/10">
+                            <FileText className="h-5 w-5 text-primary" />
                         </div>
                         <div className="min-w-0 flex-1">
-                            <DialogTitle className="inline-flex items-center gap-2 text-lg font-semibold tracking-tight text-white">
+                            <DialogTitle className="inline-flex items-center gap-2 text-lg font-semibold tracking-tight">
                                 Timesheet #{t.id}
-                                <span className="rounded-full bg-white/15 px-2 py-0.5 text-[10.5px] font-semibold uppercase tracking-wider text-white">
-                                    {t.status}
-                                </span>
+                                <TimesheetStatusBadge status={t.status} />
                             </DialogTitle>
-                            <DialogDescription className="mt-0.5 text-[12.5px] text-white/80">
+                            <DialogDescription className="mt-0.5 text-[12.5px] text-muted-foreground">
                                 {t.staff?.name ?? 'Staff'} →{' '}
                                 {t.client ? `${t.client.first_name} ${t.client.last_name}` : t.activity_type ?? 'Activity'} ·{' '}
                                 {fmtDate(t.work_date)} · {hours.toFixed(2)}h
@@ -197,8 +213,8 @@ export default function ViewTimesheetDialog({
 
                 <div className="min-h-0 flex-1 overflow-y-auto bg-muted/30">
                     {t.status === 'returned' && t.returned_notes ? (
-                        <div className="border-b border-rose-200 bg-rose-50 px-5 py-3 dark:border-rose-900/40 dark:bg-rose-950/30">
-                            <div className="flex items-start gap-2 text-rose-800 dark:text-rose-200">
+                        <div className="border-b border-status-critical/30 bg-status-critical-bg px-5 py-3">
+                            <div className="flex items-start gap-2 text-status-critical">
                                 <AlertTriangle className="mt-0.5 h-4 w-4 shrink-0" />
                                 <div className="min-w-0">
                                     <div className="text-[12.5px] font-semibold">Returned to {t.staff?.name ?? 'staff'} for changes</div>
@@ -274,7 +290,7 @@ export default function ViewTimesheetDialog({
                                                 <div
                                                     className={cn(
                                                         'h-full rounded-full',
-                                                        (t.tasks_completed ?? 0) === (t.tasks_total ?? 0) ? 'bg-emerald-500' : 'bg-primary',
+                                                        (t.tasks_completed ?? 0) === (t.tasks_total ?? 0) ? 'bg-status-success' : 'bg-primary',
                                                     )}
                                                     style={{ width: ((t.tasks_completed ?? 0) / Math.max(t.tasks_total ?? 1, 1)) * 100 + '%' }}
                                                 />
@@ -318,7 +334,7 @@ export default function ViewTimesheetDialog({
                             <section className="rounded-xl border border-border bg-card p-4">
                                 <SectionTitle icon={Pencil}>Staff notes</SectionTitle>
                                 {t.notes ? (
-                                    <div className="mt-3 rounded-lg border border-amber-200 bg-amber-50/40 px-3 py-2.5 text-[13px] leading-relaxed dark:border-amber-900/40 dark:bg-amber-950/20">
+                                    <div className="mt-3 rounded-lg border border-status-warning/30 bg-status-warning-bg px-3 py-2.5 text-[13px] leading-relaxed">
                                         <p className="whitespace-pre-line">{t.notes}</p>
                                         <div className="mt-2 text-[10.5px] uppercase tracking-wider text-muted-foreground">
                                             Logged by {t.staff?.name ?? 'staff'} on {fmtDate(t.work_date)}
@@ -376,9 +392,9 @@ export default function ViewTimesheetDialog({
                                     <SectionTitle icon={Banknote}>Payroll</SectionTitle>
                                     <div className="mt-3 space-y-2">
                                         {t.exported_to_payroll_at ? (
-                                            <div className="flex items-center justify-between rounded-lg border border-emerald-200 bg-emerald-50/50 px-3 py-2 text-[12.5px] dark:border-emerald-900/40 dark:bg-emerald-950/20">
-                                                <span className="font-medium text-emerald-800 dark:text-emerald-200">Exported</span>
-                                                <span className="tabular-nums text-emerald-700 dark:text-emerald-300">
+                                            <div className="flex items-center justify-between rounded-lg border border-status-success/30 bg-status-success-bg px-3 py-2 text-[12.5px]">
+                                                <span className="font-medium text-status-success">Exported</span>
+                                                <span className="tabular-nums text-status-success">
                                                     {fmtDate(t.exported_to_payroll_at)}
                                                 </span>
                                             </div>
@@ -397,7 +413,7 @@ export default function ViewTimesheetDialog({
                                 <SectionTitle icon={CalendarDays}>Audit trail</SectionTitle>
                                 <ol className="mt-3 space-y-3 border-l-2 border-border pl-4">
                                     <li className="relative">
-                                        <span className="absolute -left-[22px] grid h-4 w-4 place-items-center rounded-full bg-slate-400 text-white shadow">
+                                        <span className="absolute -left-[22px] grid h-4 w-4 place-items-center rounded-full bg-muted-foreground text-white shadow">
                                             <Pencil className="h-2.5 w-2.5" />
                                         </span>
                                         <div className="text-[12.5px] font-semibold">Timesheet drafted</div>
@@ -407,29 +423,24 @@ export default function ViewTimesheetDialog({
                                     </li>
                                     {t.submitted_at ? (
                                         <li className="relative">
-                                            <span className="absolute -left-[22px] grid h-4 w-4 place-items-center rounded-full bg-amber-500 text-white shadow">
+                                            <span className="absolute -left-[22px] grid h-4 w-4 place-items-center rounded-full bg-status-warning text-white shadow">
                                                 <Send className="h-2.5 w-2.5" />
                                             </span>
                                             <div className="text-[12.5px] font-semibold">Submitted for approval</div>
                                             <div className="text-[11px] text-muted-foreground">
                                                 {t.staff?.name ?? 'Staff'} ·{' '}
-                                                {new Date(t.submitted_at).toLocaleString('en-NZ', {
-                                                    day: 'numeric',
-                                                    month: 'short',
-                                                    hour: '2-digit',
-                                                    minute: '2-digit',
-                                                })}
+                                                {formatDateTime(t.submitted_at)}
                                             </div>
                                         </li>
                                     ) : null}
                                     {t.status === 'returned' ? (
                                         <li className="relative">
-                                            <span className="absolute -left-[22px] grid h-4 w-4 place-items-center rounded-full bg-rose-500 text-white shadow">
+                                            <span className="absolute -left-[22px] grid h-4 w-4 place-items-center rounded-full bg-status-critical text-white shadow">
                                                 <RotateCcw className="h-2.5 w-2.5" />
                                             </span>
                                             <div className="text-[12.5px] font-semibold">Returned for changes</div>
                                             {t.returned_notes ? (
-                                                <div className="mt-1 rounded-md bg-rose-50 px-2 py-1 text-[11.5px] text-rose-700 dark:bg-rose-950/30 dark:text-rose-200">
+                                                <div className="mt-1 rounded-md bg-status-critical-bg px-2 py-1 text-[11.5px] text-status-critical">
                                                     {t.returned_notes}
                                                 </div>
                                             ) : null}
@@ -437,23 +448,18 @@ export default function ViewTimesheetDialog({
                                     ) : null}
                                     {t.approved_at ? (
                                         <li className="relative">
-                                            <span className="absolute -left-[22px] grid h-4 w-4 place-items-center rounded-full bg-emerald-500 text-white shadow">
+                                            <span className="absolute -left-[22px] grid h-4 w-4 place-items-center rounded-full bg-status-success text-white shadow">
                                                 <CheckCircle2 className="h-2.5 w-2.5" />
                                             </span>
                                             <div className="text-[12.5px] font-semibold">Approved</div>
                                             <div className="text-[11px] text-muted-foreground">
-                                                {new Date(t.approved_at).toLocaleString('en-NZ', {
-                                                    day: 'numeric',
-                                                    month: 'short',
-                                                    hour: '2-digit',
-                                                    minute: '2-digit',
-                                                })}
+                                                {formatDateTime(t.approved_at)}
                                             </div>
                                         </li>
                                     ) : null}
                                     {t.archived_at ? (
                                         <li className="relative">
-                                            <span className="absolute -left-[22px] grid h-4 w-4 place-items-center rounded-full bg-slate-500 text-white shadow">
+                                            <span className="absolute -left-[22px] grid h-4 w-4 place-items-center rounded-full bg-muted-foreground text-white shadow">
                                                 <MessageSquareWarning className="h-2.5 w-2.5" />
                                             </span>
                                             <div className="text-[12.5px] font-semibold">Archived</div>
@@ -471,9 +477,6 @@ export default function ViewTimesheetDialog({
                 <footer className="shrink-0 border-t border-border bg-background p-3.5">
                     <div className="flex flex-wrap items-center justify-between gap-2">
                         <div className="flex flex-wrap items-center gap-2">
-                            <Button variant="outline" size="sm" className="gap-1.5" disabled>
-                                <Download className="h-3.5 w-3.5" /> Export PDF
-                            </Button>
                             <Button
                                 variant="outline"
                                 size="sm"
@@ -492,7 +495,7 @@ export default function ViewTimesheetDialog({
                                     <Button
                                         variant="outline"
                                         size="sm"
-                                        className="gap-1.5 border-rose-200 text-rose-700 hover:bg-rose-50"
+                                        className="gap-1.5 border-status-critical/30 text-status-critical hover:bg-status-critical-bg"
                                         onClick={() => {
                                             const reason = window.prompt('Reason for rejection:');
                                             if (!reason) return;
@@ -505,7 +508,7 @@ export default function ViewTimesheetDialog({
                                     <Button
                                         variant="outline"
                                         size="sm"
-                                        className="gap-1.5 border-amber-200 text-amber-700 hover:bg-amber-50"
+                                        className="gap-1.5 border-status-warning/30 text-status-warning hover:bg-status-warning-bg"
                                         onClick={() => {
                                             const reason = window.prompt('What needs changing?');
                                             if (!reason) return;
@@ -517,7 +520,7 @@ export default function ViewTimesheetDialog({
                                     </Button>
                                     <Button
                                         size="sm"
-                                        className="gap-1.5 bg-emerald-600 hover:bg-emerald-700"
+                                        className="gap-1.5 bg-status-success text-white hover:bg-status-success/90"
                                         onClick={() => call('post', `/operations/timesheets/${t.id}/approve`, {})}
                                         disabled={busy}
                                     >
