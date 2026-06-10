@@ -4,10 +4,12 @@ namespace App\Providers;
 
 use App\Domain\SecurityDevices\Events\DeviceSignalPublished;
 use App\Events\CoverageSupplyAdded;
+use App\Events\RosterPeriodPublished;
 use App\Listeners\Care\NotifyOnBedExit;
 use App\Listeners\Care\NotifyOnFallDetected;
 use App\Listeners\Care\NotifyOnMedicationCabinetOpen;
 use App\Listeners\ResolveCoverageAlertForAddedSupply;
+use App\Listeners\Rostering\RecordRosterPeriodPublishedAudit;
 use Illuminate\Foundation\Support\Providers\EventServiceProvider as ServiceProvider;
 
 /**
@@ -34,6 +36,9 @@ class EventServiceProvider extends ServiceProvider
         ],
         CoverageSupplyAdded::class => [
             ResolveCoverageAlertForAddedSupply::class,
+        ],
+        RosterPeriodPublished::class => [
+            RecordRosterPeriodPublishedAudit::class,
         ],
     ];
 
