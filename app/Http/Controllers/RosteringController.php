@@ -553,8 +553,13 @@ class RosteringController extends Controller
             'weekEnd' => $weekEnd->toDateString(),
             'filters' => [
                 'week' => $weekStart->toDateString(),
-                'staff_id' => $data['staff_id'] ?? null,
-                'client_id' => $data['client_id'] ?? null,
+                // Cast to int: the 'integer' rule validates but does not cast,
+                // so query-string values arrive as strings — and the hero
+                // EntityFilter pills match items with a strict ===, so a
+                // string id renders as "All staff/clients" while the data is
+                // actually filtered.
+                'staff_id' => isset($data['staff_id']) ? (int) $data['staff_id'] : null,
+                'client_id' => isset($data['client_id']) ? (int) $data['client_id'] : null,
                 // Single int when one site is selected (back-compat for publish/auto-schedule),
                 // null when none.
                 'site_id' => $selectedSiteId,

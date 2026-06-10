@@ -9,10 +9,11 @@ use Inertia\Testing\AssertableInertia as Assert;
 function userWithRosteringLeavePermissions(): User
 {
     $manager = User::factory()->create([
+        // Leave queries scope by the leave-record user's organization
+        // (scopeHrRecordOrganization → whereHas user.organization_id), so the
+        // manager must share the leave users' organization. users has no
+        // tenant_id column — passing one here makes the factory INSERT fail.
         'organization_id' => 1,
-        // Leave queries scope by tenant via forTenant($auth->tenant_id),
-        // so the manager must share the leave records' tenant.
-        'tenant_id' => 1,
         'approved_at' => now(),
     ]);
 
