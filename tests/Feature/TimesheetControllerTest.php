@@ -660,18 +660,25 @@ class TimesheetControllerTest extends TestCase
             ->assertForbidden();
     }
 
-    public function test_show_without_modal_still_renders_edit_page(): void
+    public function test_show_without_modal_redirects_to_unified_view_dialog(): void
     {
-        // Regression: normal navigation to the show route keeps the full edit
-        // page; the JSON branch only triggers for modal/JSON requests.
+        // The standalone edit page is retired: normal navigation to the show
+        // route lands on the unified index with the View dialog deep-linked;
+        // the JSON branch still serves the inline modal payload.
         $timesheet = $this->makeDraftTimesheet($this->staff);
 
         $this->actingAs($this->staff)
             ->get(route('operations.timesheets.show', $timesheet))
-            ->assertOk()
-            ->assertInertia(fn (Assert $page) => $page
-                ->component('operations/timesheets/edit')
-            );
+            ->assertRedirect("/operations/timesheets?view={$timesheet->id}");
+    }
+
+    public function test_edit_route_redirects_to_unified_edit_dialog(): void
+    {
+        $timesheet = $this->makeDraftTimesheet($this->staff);
+
+        $this->actingAs($this->staff)
+            ->get(route('operations.timesheets.edit', $timesheet))
+            ->assertRedirect("/operations/timesheets?edit={$timesheet->id}");
     }
 
     protected function makeRoleUser(string $roleName): User

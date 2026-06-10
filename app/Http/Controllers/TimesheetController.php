@@ -281,11 +281,12 @@ class TimesheetController extends Controller
 
         $timesheets = $q->paginate(50)->withQueryString();
 
-        // `?view={id}` deep links (attendance sessions, dashboards) open the
-        // ViewTimesheetDialog client-side by finding the row in the current
-        // page. Guarantee the target is present even when filters/pagination
-        // would hide it — same site scope and visibility rules as the list.
-        $viewId = (int) $request->query('view');
+        // `?view={id}` / `?edit={id}` deep links (attendance sessions,
+        // dashboards, the legacy edit-page redirect) open the View/Edit
+        // dialogs client-side by finding the row in the current page.
+        // Guarantee the target is present even when filters/pagination would
+        // hide it — same site scope and visibility rules as the list.
+        $viewId = (int) ($request->query('view') ?: $request->query('edit'));
         if ($viewId && ! $timesheets->getCollection()->contains(fn (Timesheet $ts) => (int) $ts->id === $viewId)) {
             $extraQuery = Timesheet::query()->with($rowEagerLoads)->whereKey($viewId);
             $this->siteAccess()->applyTimesheetScope($extraQuery, $auth, $this->timesheetBypassPermissions());
@@ -600,13 +601,13 @@ class TimesheetController extends Controller
     {
         // The roster grid (and any other surface) opens the read-only
         // ViewTimesheetDialog inline. It fetches the same row payload the index
-        // table feeds that modal, so serve JSON for those requests and keep the
-        // full edit page for normal navigation.
+        // table feeds that modal, so serve JSON for those requests; normal
+        // navigation lands on the unified index with the dialog deep-linked.
         if ($request->wantsJson() || $request->boolean('modal')) {
             return $this->showTimesheetCard($request, $timesheet);
         }
 
-        return $this->edit($request, $timesheet);
+        return redirect()->to("/operations/timesheets?view={$timesheet->id}");
     }
 
     /**
@@ -895,50 +896,15 @@ class TimesheetController extends Controller
         return back()->with('success', 'Timesheet restored.');
     }
 
+    /**
+     * The standalone edit page is retired — editing lives in the unified
+     * index's EditTimesheetDialog. Old deep links (notifications, bookmarks)
+     * land on the index with the dialog deep-linked; the index applies the
+     * same scoping + visibility rules when materialising the target row.
+     */
     public function edit(Request $request, Timesheet $timesheet)
     {
-        $auth = $request->user();
-        abort_unless($auth && ($auth->canDo('timesheets.viewAny') || $auth->canDo('timesheets.viewAssigned')), 403);
-
-        if (! $auth->canDo('timesheets.manageAny') && ! $this->canReviewTimesheets($auth) && $timesheet->user_id !== $auth->id) {
-            abort(403);
-        }
-
-        $this->assertCanAccessTimesheet($auth, $timesheet);
-
-        $timesheet->load([
-            'client:id,first_name,last_name',
-            'staff:id,name,email',
-            'shift:id,client_id,service_context_id,starts_at,ends_at,location,shift_type,is_sleepover,is_on_call,expected_break_minutes,status,user_id',
-            'shift.serviceContext:id,name',
-            'shift.staff:id,name,email',
-            // PR — per-client allocation breakdown shown read-only in the
-            // approver UI. See `Timesheet::effectiveClientAllocations()`.
-            'clientAllocations.client:id,first_name,last_name',
-            'shift.site.clients:id,site_id,first_name,last_name',
-        ]);
-        $clients = $this->siteAccess()->applyClientScope(
-            Client::query(),
-            $auth,
-            $this->timesheetBypassPermissions(),
-        )->orderBy('first_name')->get(['id', 'first_name', 'last_name']);
-
-        $timesheetPayload = array_merge($timesheet->toArray(), [
-            'total_hours' => (float) $timesheet->total_hours,
-            'client_allocations' => $timesheet->effectiveClientAllocations()->all(),
-            'allocation_method' => $timesheet->dominantAllocationMethod(),
-            'clients_candidates' => $this->buildAllocationCandidates($timesheet),
-        ]);
-
-        return inertia('operations/timesheets/edit', [
-            'timesheet' => $timesheetPayload,
-            'clients' => $clients,
-            'canApprove' => $this->canReviewTimesheets($auth),
-            'canSubmit' => $auth->canDo('timesheets.submit') && ($auth->canDo('timesheets.manageAny') || $timesheet->user_id === $auth->id),
-            'canEdit' => $auth->canDo('timesheets.update')
-                && ($auth->canDo('timesheets.manageAny') || $timesheet->user_id === $auth->id)
-                && in_array($timesheet->status, ['draft', 'returned'], true),
-        ]);
+        return redirect()->to("/operations/timesheets?edit={$timesheet->id}");
     }
 
     public function update(Request $request, Timesheet $timesheet)

@@ -165,6 +165,25 @@ class TimesheetUnifiedIndexTest extends TestCase
         $this->assertTrue($ids->contains($timesheet->id));
     }
 
+    public function test_edit_deep_link_also_materialises_the_target_row(): void
+    {
+        $timesheet = Timesheet::factory()->create([
+            'user_id' => $this->admin->id,
+            'shift_id' => null,
+            'activity_type' => 'admin',
+            'status' => 'returned',
+            'archived_at' => now(),
+        ]);
+
+        $response = $this->actingAs($this->admin)
+            ->get("/operations/timesheets?edit={$timesheet->id}");
+
+        $response->assertOk();
+        $ids = collect($response->viewData('page')['props']['timesheets']['data'])
+            ->pluck('id');
+        $this->assertTrue($ids->contains($timesheet->id));
+    }
+
     public function test_view_deep_link_does_not_leak_foreign_timesheets(): void
     {
         $worker = User::factory()->create([

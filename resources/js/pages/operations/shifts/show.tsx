@@ -980,7 +980,7 @@ export default function ShiftShow({
                             {linkedTimesheet ? (
                                 <Button asChild size="sm" variant="secondary">
                                     <Link
-                                        href={`/operations/timesheets/${linkedTimesheet.id}/edit`}
+                                        href={`/operations/timesheets?view=${linkedTimesheet.id}`}
                                         className="gap-1.5"
                                     >
                                         <FileText className="h-4 w-4" />
@@ -1087,7 +1087,7 @@ export default function ShiftShow({
                                         className={heroGhostButton}
                                     >
                                         <Link
-                                            href={`/operations/timesheets/${linkedTimesheet.id}/edit`}
+                                            href={`/operations/timesheets?view=${linkedTimesheet.id}`}
                                             className="gap-1.5"
                                         >
                                             <FileText className="h-4 w-4" />

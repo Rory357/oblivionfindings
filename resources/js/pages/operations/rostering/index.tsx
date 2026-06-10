@@ -1938,7 +1938,7 @@ export default function RosteringIndex(props: Props) {
             setCanApproveTimesheet(Boolean(json.can_approve));
             setViewingTimesheet(json.timesheet as ViewTimesheetRow);
         } catch {
-            window.location.href = `/operations/timesheets/${shift.timesheet_id}/edit`;
+            window.location.href = `/operations/timesheets?view=${shift.timesheet_id}`;
         }
     };
 

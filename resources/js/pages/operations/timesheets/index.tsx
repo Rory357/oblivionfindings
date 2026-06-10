@@ -8,6 +8,9 @@ import CreateTimesheetDialog, {
     type ShiftOption,
     type SiteOption,
 } from '@/components/timesheets/create-timesheet-dialog';
+import EditTimesheetDialog, {
+    type EditTimesheetRow,
+} from '@/components/timesheets/edit-timesheet-dialog';
 import TimesheetsHero from '@/components/timesheets/timesheets-hero';
 import ViewTimesheetDialog, { type ViewTimesheetRow } from '@/components/timesheets/view-timesheet-dialog';
 import { Button } from '@/components/ui/button';
@@ -431,12 +434,14 @@ export default function TimesheetsIndex({
     const [menu, setMenu] = useState<{ x: number; y: number; row: TimesheetRow } | null>(null);
     const [hover, setHover] = useState<{ row: TimesheetRow; rect: DOMRect } | null>(null);
     const [viewing, setViewing] = useState<TimesheetRow | null>(null);
+    const [editing, setEditing] = useState<TimesheetRow | null>(null);
     const [reasonTarget, setReasonTarget] = useState<{ action: 'reject' | 'return'; row: TimesheetRow } | null>(null);
     const [createOpen, setCreateOpen] = useState(false);
     const [initialShiftId, setInitialShiftId] = useState<number | null>(null);
     const hoverTimer = useRef<number | null>(null);
 
-    // Open Create dialog when the URL has ?create=1 (e.g. shift detail page deep link).
+    // Dialog deep links: ?create=1 (shift detail), ?view={id} (attendance,
+    // dashboards), ?edit={id} (return banners, legacy /edit page redirect).
     useEffect(() => {
         const params = new URLSearchParams(window.location.search);
         if (params.get('create') === '1') {
@@ -448,6 +453,11 @@ export default function TimesheetsIndex({
         if (viewId) {
             const row = timesheets.data.find((r) => String(r.id) === viewId);
             if (row) setViewing(row);
+        }
+        const editId = params.get('edit');
+        if (editId) {
+            const row = timesheets.data.find((r) => String(r.id) === editId);
+            if (row) setEditing(row);
         }
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, []);
@@ -505,7 +515,7 @@ export default function TimesheetsIndex({
                 setViewing(row);
                 return;
             case 'edit':
-                router.visit(`/operations/timesheets/${row.id}/edit`);
+                setEditing(row);
                 return;
             case 'shift':
                 if (row.shift) router.visit(`/operations/shifts/${row.shift.id}`);
@@ -802,6 +812,12 @@ export default function TimesheetsIndex({
                 timesheet={viewing}
                 onOpenChange={(o) => !o && setViewing(null)}
                 canApprove={canApprove}
+            />
+            <EditTimesheetDialog
+                open={!!editing}
+                timesheet={editing as EditTimesheetRow | null}
+                onOpenChange={(o) => !o && setEditing(null)}
+                clients={clients}
             />
             <CreateTimesheetDialog
                 open={createOpen}
