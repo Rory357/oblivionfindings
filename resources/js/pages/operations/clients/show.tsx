@@ -1467,11 +1467,20 @@ export default function ClientShow({
                     ).length;
                     const mealLogsPayload = (pageProps as any).meal_logs ?? {};
                     const mealSummary = mealLogsPayload.summary ?? {};
+                    const mealsEaten =
+                        mealSummary.eaten_today != null
+                            ? Number(mealSummary.eaten_today)
+                            : null;
+                    const mealsExpected = Number(
+                        mealSummary.expected_today ?? 3,
+                    );
+                    const mealsOnTrack =
+                        mealsEaten != null && mealsEaten >= mealsExpected;
                     const sleepSummary =
                         (healthMonitoring as any)?.sleep_summary ?? {};
                     const sleepAverage =
-                        sleepSummary.average_hours != null
-                            ? Number(sleepSummary.average_hours)
+                        sleepSummary.average_7_nights != null
+                            ? Number(sleepSummary.average_7_nights)
                             : null;
                     const sleepTarget = Number(
                         sleepSummary.target_hours ??
@@ -1484,19 +1493,23 @@ export default function ClientShow({
                             key: 'meals',
                             label: 'Meals',
                             value:
-                                mealSummary.eaten != null
-                                    ? `${mealSummary.eaten}/${mealSummary.expected ?? 3}`
+                                mealsEaten != null
+                                    ? `${mealsEaten}/${mealsExpected}`
                                     : '—',
                             trend:
-                                mealSummary.status === 'on_track'
-                                    ? 'up'
-                                    : mealSummary.eaten > 0
-                                      ? 'flat'
-                                      : 'down',
+                                mealsEaten == null
+                                    ? 'flat'
+                                    : mealsOnTrack
+                                      ? 'up'
+                                      : mealsEaten > 0
+                                        ? 'flat'
+                                        : 'down',
                             detail:
-                                mealSummary.status === 'on_track'
-                                    ? 'On track today'
-                                    : 'Meal logs today',
+                                mealsEaten == null
+                                    ? 'No meals logged today'
+                                    : mealsOnTrack
+                                      ? 'On track today'
+                                      : 'Meals logged today',
                         },
                         {
                             key: 'sleep',

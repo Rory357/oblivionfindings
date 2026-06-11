@@ -29,11 +29,12 @@ type MealLog = {
 
 type MealLogPayload = {
     today?: MealLog[];
-    history?: MealLog[];
+    last_7_days?: MealLog[];
     summary?: {
-        eaten?: number;
-        expected?: number;
-        status?: string;
+        eaten_today?: number;
+        expected_today?: number;
+        partial_today?: number;
+        refused_today?: number;
     };
 };
 
@@ -72,11 +73,13 @@ export function FoodMealTab({
     });
 
     const today = useMemo(() => mealLogs?.today ?? [], [mealLogs?.today]);
-    const history = useMemo(() => mealLogs?.history ?? [], [mealLogs?.history]);
+    const history = useMemo(
+        () => mealLogs?.last_7_days ?? [],
+        [mealLogs?.last_7_days],
+    );
     const summary = mealLogs?.summary ?? {
-        eaten: 0,
-        expected: 3,
-        status: 'not_started',
+        eaten_today: 0,
+        expected_today: 3,
     };
     const mealsByType = useMemo(
         () => new Map(today.map((entry) => [entry.meal_type, entry])),
@@ -173,11 +176,12 @@ export function FoodMealTab({
 
                         <div className="rounded-lg border bg-muted/30 p-3">
                             <p className="text-sm font-semibold">
-                                Meals {summary.eaten ?? 0}/
-                                {summary.expected ?? 3}
+                                Meals {summary.eaten_today ?? 0}/
+                                {summary.expected_today ?? 3}
                             </p>
                             <p className="mt-1 text-xs text-muted-foreground">
-                                {summary.status === 'on_track'
+                                {(summary.eaten_today ?? 0) >=
+                                (summary.expected_today ?? 3)
                                     ? 'On track today.'
                                     : 'Log meals as they happen so handover has the current picture.'}
                             </p>

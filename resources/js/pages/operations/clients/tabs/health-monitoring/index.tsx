@@ -94,8 +94,8 @@ export type HealthMonitoringData = {
     sleep?: SleepEntry[];
     sleep_summary?: {
         target_hours?: number | null;
-        average_hours?: number | null;
-        entries_count?: number;
+        average_7_nights?: number | null;
+        below_target?: boolean | null;
     };
 };
 
@@ -393,12 +393,12 @@ export function HealthMonitoringTab({
                     label="Sleep avg"
                     value={
                         Math.round(
-                            Number(sleepSummary.average_hours ?? 0) * 10,
+                            Number(sleepSummary.average_7_nights ?? 0) * 10,
                         ) / 10
                     }
                     icon={Moon}
                     tone={
-                        Number(sleepSummary.average_hours ?? 0) >=
+                        Number(sleepSummary.average_7_nights ?? 0) >=
                         Number(sleepSummary.target_hours ?? 7)
                             ? 'bg-status-success-bg text-status-success'
                             : 'bg-status-warning-bg text-status-warning'
