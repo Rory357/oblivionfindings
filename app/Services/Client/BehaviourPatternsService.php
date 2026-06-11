@@ -9,6 +9,7 @@ use App\Models\ClientNote;
 use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
+use Illuminate\Support\Facades\Schema;
 
 /**
  * Positive Behaviour Support insights for the Behaviour / ABC tab. Aggregates
@@ -26,6 +27,12 @@ class BehaviourPatternsService
         if ($user !== null && ! $user->canDo('observations.viewAny')
             && ! $user->canDo('clients.viewAny')
             && ! $user->canDo('clients.viewAssigned')) {
+            return $this->emptyPayload($days);
+        }
+
+        // Guard the window between deploy and migration — this runs on every
+        // client-profile load, so a missing table must not 500 the page.
+        if (! Schema::hasTable('behaviour_abc_entries')) {
             return $this->emptyPayload($days);
         }
 
