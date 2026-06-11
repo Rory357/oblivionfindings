@@ -1,18 +1,7 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import {
     Select,
     SelectContent,
@@ -20,7 +9,6 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 import { router } from '@inertiajs/react';
 import {
@@ -49,6 +37,10 @@ type RiskManagementTabProps = {
     canCreate?: boolean;
     canUpdate?: boolean;
     canDelete?: boolean;
+    /** Open the Add-Client-style risk wizard (add new risk). */
+    onAddRisk?: () => void;
+    /** Open the Add-Client-style risk wizard pre-filled to edit a risk. */
+    onEditRisk?: (risk: ClientRiskItem) => void;
 };
 
 const SEVERITY_ORDER = ['critical', 'high', 'medium', 'low'] as const;
@@ -105,30 +97,14 @@ function reviewLabel(value?: string | null): string {
     }
 }
 
-type EditorMode = 'create' | 'edit' | null;
-
-type FormState = {
-    label: string;
-    severity: string;
-    controls: string;
-    review_date: string;
-    active: boolean;
-};
-
-const EMPTY_FORM: FormState = {
-    label: '',
-    severity: 'medium',
-    controls: '',
-    review_date: '',
-    active: true,
-};
-
 export function RiskManagementTab({
     clientId,
     risks,
     canCreate = false,
     canUpdate = false,
     canDelete = false,
+    onAddRisk,
+    onEditRisk,
 }: RiskManagementTabProps) {
     const list = useMemo(() => risks ?? [], [risks]);
 
@@ -136,11 +112,6 @@ export function RiskManagementTab({
         'all' | 'active' | 'inactive'
     >('active');
     const [severityFilter, setSeverityFilter] = useState<string>('all');
-
-    const [editorMode, setEditorMode] = useState<EditorMode>(null);
-    const [editingId, setEditingId] = useState<number | null>(null);
-    const [form, setForm] = useState<FormState>(EMPTY_FORM);
-    const [submitting, setSubmitting] = useState(false);
     const [deletingId, setDeletingId] = useState<number | null>(null);
 
     const filtered = useMemo(() => {
@@ -185,58 +156,6 @@ export function RiskManagementTab({
     const reviewSoon = activeRisks.filter(
         (r) => reviewState(r.review_date) === 'soon',
     );
-
-    const openCreate = () => {
-        setEditingId(null);
-        setForm(EMPTY_FORM);
-        setEditorMode('create');
-    };
-
-    const openEdit = (risk: ClientRiskItem) => {
-        setEditingId(risk.id);
-        setForm({
-            label: risk.label ?? '',
-            severity: String(risk.severity ?? 'medium').toLowerCase(),
-            controls: risk.controls ?? '',
-            review_date: risk.review_date ?? '',
-            active: Boolean(risk.active),
-        });
-        setEditorMode('edit');
-    };
-
-    const closeEditor = () => {
-        setEditorMode(null);
-        setEditingId(null);
-        setForm(EMPTY_FORM);
-        setSubmitting(false);
-    };
-
-    const submit = () => {
-        if (submitting) return;
-        if (!form.label.trim()) return;
-        setSubmitting(true);
-        const payload = {
-            label: form.label.trim(),
-            severity: form.severity,
-            controls: form.controls,
-            review_date: form.review_date || null,
-            active: form.active,
-        };
-        const opts = {
-            preserveScroll: true,
-            onFinish: () => setSubmitting(false),
-            onSuccess: closeEditor,
-        };
-        if (editorMode === 'create') {
-            router.post(`/operations/clients/${clientId}/risks`, payload, opts);
-        } else if (editorMode === 'edit' && editingId) {
-            router.put(
-                `/operations/clients/${clientId}/risks/${editingId}`,
-                payload,
-                opts,
-            );
-        }
-    };
 
     const remove = (risk: ClientRiskItem) => {
         if (deletingId) return;
@@ -330,7 +249,8 @@ export function RiskManagementTab({
                     <Button
                         size="sm"
                         className="gap-1.5"
-                        onClick={openCreate}
+                        onClick={() => onAddRisk?.()}
+                        data-test="risk-add"
                     >
                         <Plus className="h-4 w-4" />
                         Add risk
@@ -354,7 +274,7 @@ export function RiskManagementTab({
                     }
                     action={
                         list.length === 0 && canCreate ? (
-                            <Button size="sm" onClick={openCreate}>
+                            <Button size="sm" onClick={() => onAddRisk?.()}>
                                 <Plus className="mr-1 h-4 w-4" />
                                 Add risk
                             </Button>
@@ -428,7 +348,7 @@ export function RiskManagementTab({
                                                         variant="outline"
                                                         size="sm"
                                                         onClick={() =>
-                                                            openEdit(risk)
+                                                            onEditRisk?.(risk)
                                                         }
                                                     >
                                                         <Pencil className="mr-1 h-3 w-3" />
@@ -469,133 +389,6 @@ export function RiskManagementTab({
                     })}
                 </div>
             )}
-
-            <Dialog
-                open={editorMode !== null}
-                onOpenChange={(open) => {
-                    if (!open) closeEditor();
-                }}
-            >
-                <DialogContent className="max-w-lg">
-                    <DialogHeader>
-                        <DialogTitle>
-                            {editorMode === 'create'
-                                ? 'Add risk'
-                                : 'Edit risk'}
-                        </DialogTitle>
-                        <DialogDescription>
-                            Capture the hazard, severity, mitigating controls,
-                            and the next scheduled review.
-                        </DialogDescription>
-                    </DialogHeader>
-                    <div className="space-y-3">
-                        <div className="space-y-1">
-                            <Label htmlFor="risk-label">Label</Label>
-                            <Input
-                                id="risk-label"
-                                value={form.label}
-                                onChange={(e) =>
-                                    setForm((f) => ({
-                                        ...f,
-                                        label: e.target.value,
-                                    }))
-                                }
-                                placeholder="e.g. Falls risk in bathroom"
-                            />
-                        </div>
-                        <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
-                            <div className="space-y-1">
-                                <Label htmlFor="risk-severity">Severity</Label>
-                                <Select
-                                    value={form.severity}
-                                    onValueChange={(v) =>
-                                        setForm((f) => ({
-                                            ...f,
-                                            severity: v,
-                                        }))
-                                    }
-                                >
-                                    <SelectTrigger id="risk-severity">
-                                        <SelectValue />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {SEVERITY_ORDER.map((s) => (
-                                            <SelectItem key={s} value={s}>
-                                                {s.charAt(0).toUpperCase() +
-                                                    s.slice(1)}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                            </div>
-                            <div className="space-y-1">
-                                <Label htmlFor="risk-review-date">
-                                    Next review date
-                                </Label>
-                                <Input
-                                    id="risk-review-date"
-                                    type="date"
-                                    value={form.review_date}
-                                    onChange={(e) =>
-                                        setForm((f) => ({
-                                            ...f,
-                                            review_date: e.target.value,
-                                        }))
-                                    }
-                                />
-                            </div>
-                        </div>
-                        <div className="space-y-1">
-                            <Label htmlFor="risk-controls">Controls</Label>
-                            <Textarea
-                                id="risk-controls"
-                                rows={4}
-                                value={form.controls}
-                                onChange={(e) =>
-                                    setForm((f) => ({
-                                        ...f,
-                                        controls: e.target.value,
-                                    }))
-                                }
-                                placeholder="Equipment, staff training, environmental adjustments…"
-                            />
-                        </div>
-                        <div className="flex items-center gap-2">
-                            <Checkbox
-                                id="risk-active"
-                                checked={form.active}
-                                onCheckedChange={(v) =>
-                                    setForm((f) => ({
-                                        ...f,
-                                        active: Boolean(v),
-                                    }))
-                                }
-                            />
-                            <Label
-                                htmlFor="risk-active"
-                                className="text-sm font-normal"
-                            >
-                                Active
-                            </Label>
-                        </div>
-                    </div>
-                    <DialogFooter>
-                        <Button variant="outline" onClick={closeEditor}>
-                            Cancel
-                        </Button>
-                        <Button
-                            onClick={submit}
-                            disabled={submitting || !form.label.trim()}
-                        >
-                            {submitting
-                                ? 'Saving…'
-                                : editorMode === 'create'
-                                  ? 'Add risk'
-                                  : 'Save risk'}
-                        </Button>
-                    </DialogFooter>
-                </DialogContent>
-            </Dialog>
         </div>
     );
 }

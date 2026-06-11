@@ -315,6 +315,7 @@ const addRisk: FlowFactory = (ctx) => {
         severity?: string;
         controls?: string;
         review_date?: string;
+        active?: boolean;
     } | null;
     const editing = Boolean(prefill?.id);
 
@@ -330,6 +331,7 @@ const addRisk: FlowFactory = (ctx) => {
                   label: prefill.label,
                   controls: prefill.controls,
                   review_date: prefill.review_date?.slice(0, 10),
+                  active: prefill.active ?? true,
               }
             : undefined,
         steps: [
@@ -379,6 +381,14 @@ const addRisk: FlowFactory = (ctx) => {
                         type: 'date',
                         required: true,
                     },
+                    {
+                        key: 'active',
+                        label: 'Risk is active',
+                        type: 'checkbox',
+                        desc: 'Uncheck to retire this risk from the active register.',
+                        full: true,
+                        when: () => editing,
+                    },
                 ],
                 info: 'The review date feeds the Actions & Reviews queue — overdue reviews surface on the Overview.',
                 infoIcon: CalendarClock,
@@ -390,7 +400,7 @@ const addRisk: FlowFactory = (ctx) => {
                 severity: str(values.severity) || 'medium',
                 controls: opt(values.controls),
                 review_date: opt(values.review_date),
-                active: true,
+                active: editing ? Boolean(values.active) : true,
             };
             if (editing && prefill?.id) {
                 submitInertia(
