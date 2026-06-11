@@ -123,6 +123,35 @@ class ClientOnboardingWorkflowController extends Controller
         return redirect()->back()->with('success', 'Onboarding workflow created.');
     }
 
+    public function storeStep(Request $request, $workflow)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $this->canManageWorkflows($auth), 403);
+
+        $workflowModel = ClientOnboardingWorkflow::query()
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->findOrFail($workflow);
+
+        $data = $request->validate([
+            'step_name' => ['required', 'string', 'max:255'],
+            'category' => ['nullable', 'string', 'max:60'],
+            'assigned_to' => ['nullable', 'integer', 'exists:users,id'],
+            'due_date' => ['nullable', 'date'],
+            'is_required' => ['nullable', 'boolean'],
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $workflowModel->steps()->create([
+            ...$data,
+            'organization_id' => $workflowModel->organization_id,
+            'step_order' => ((int) $workflowModel->steps()->max('step_order')) + 1,
+            'is_required' => $data['is_required'] ?? true,
+            'status' => 'pending',
+        ]);
+
+        return redirect()->back()->with('success', 'Onboarding step added.');
+    }
+
     public function updateStep(Request $request, $workflow, $step)
     {
         $auth = $request->user();
@@ -132,7 +161,7 @@ class ClientOnboardingWorkflowController extends Controller
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($workflow);
 
-        $step = ClientOnboardingStep::where('client_onboarding_workflow_id', $workflow)->findOrFail($step);
+        $step = ClientOnboardingStep::where('workflow_id', $workflow)->findOrFail($step);
 
         $data = $request->validate([
             'status' => ['required', 'string', 'in:pending,completed,skipped'],

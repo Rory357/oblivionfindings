@@ -163,6 +163,14 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
                     ->name('operations.clients.consent-requests.cancel');
             });
 
+        // Family chat (staff side of the portal whānau thread)
+        Route::get('/clients/{client}/family-chat', [\App\Http\Controllers\Operations\ClientFamilyChatController::class, 'show'])
+            ->whereNumber('client')
+            ->name('operations.clients.family-chat.show');
+        Route::post('/clients/{client}/family-chat', [\App\Http\Controllers\Operations\ClientFamilyChatController::class, 'store'])
+            ->whereNumber('client')
+            ->name('operations.clients.family-chat.store');
+
         // PR 14 — Consolidated frontline client care page
         // Worker-facing landing for a single client. Uses StaffPageShell,
         // ClientSafetyRibbon and the shared PRN sheet; admin show/medical/
@@ -211,6 +219,17 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
             ->name('operations.clients.gallery-photos.store');
         Route::delete('/clients/{client}/gallery-photos/{photo}', [ClientController::class, 'destroyGalleryPhoto'])
             ->name('operations.clients.gallery-photos.destroy');
+
+        // Transport bookings (client profile Transport tab)
+        Route::post('/clients/{client}/transport-bookings', [\App\Http\Controllers\Operations\ClientTransportBookingController::class, 'store'])
+            ->whereNumber('client')
+            ->name('operations.clients.transport-bookings.store');
+        Route::put('/clients/{client}/transport-bookings/{booking}', [\App\Http\Controllers\Operations\ClientTransportBookingController::class, 'update'])
+            ->whereNumber('client')
+            ->name('operations.clients.transport-bookings.update');
+        Route::delete('/clients/{client}/transport-bookings/{booking}', [\App\Http\Controllers\Operations\ClientTransportBookingController::class, 'destroy'])
+            ->whereNumber('client')
+            ->name('operations.clients.transport-bookings.destroy');
 
         // Personal assets
         Route::post('/clients/{client}/personal-assets', [ClientPersonalAssetController::class, 'store'])
@@ -602,12 +621,19 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     });
 
     // -------------------------------------------------------------------------
-    // Progress Notes (NEW)
+    // Progress Notes — the standalone index page is retired (client-profile
+    // redesign): progress notes live on each client profile's Daily Notes tab
+    // with a type filter. Old links/bookmarks land on the clients index; the
+    // write endpoints below stay (used by care-plan quick notes).
     // -------------------------------------------------------------------------
 
-    Route::get('/progress-notes', [ProgressNoteController::class, 'index'])
-        ->middleware('permission:progress_notes.viewAny')
-        ->name('operations.progress_notes.index');
+    Route::get('/progress-notes', function (\Illuminate\Http\Request $request) {
+        if ($client = $request->query('client_id')) {
+            return redirect("/operations/clients/{$client}?tab=progress_notes&type=progress", 301);
+        }
+
+        return redirect('/operations/clients', 301);
+    })->name('operations.progress_notes.index');
     Route::post('/progress-notes', [ProgressNoteController::class, 'store'])
         ->middleware('permission:progress_notes.create')
         ->name('operations.progress_notes.store');
@@ -1024,6 +1050,7 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     Route::middleware('permission:clients.create')->group(function () {
         Route::get('/onboarding/create', [ClientOnboardingWorkflowController::class, 'create'])->name('operations.onboarding.create');
         Route::post('/onboarding', [ClientOnboardingWorkflowController::class, 'store'])->name('operations.onboarding.store');
+        Route::post('/onboarding/{workflow}/steps', [ClientOnboardingWorkflowController::class, 'storeStep'])->name('operations.onboarding.steps.store');
         Route::patch('/onboarding/{workflow}/steps/{step}', [ClientOnboardingWorkflowController::class, 'updateStep'])->name('operations.onboarding.steps.update');
         Route::post('/onboarding/{workflow}/complete', [ClientOnboardingWorkflowController::class, 'complete'])->name('operations.onboarding.complete');
     });

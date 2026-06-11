@@ -45,10 +45,10 @@ export function ModulesGrid({
         },
         {
             title: 'Progress notes',
-            href: '/operations/progress-notes',
+            href: '/operations/clients',
             icon: FileText,
             badge: { text: `${progressNotesToday} today`, tone: 'muted' },
-            description: 'Daily logs · PRN · templates · audit trail',
+            description: 'Daily & progress notes live on each client profile',
         },
         {
             title: 'Job board',

@@ -4,76 +4,20 @@ namespace App\Http\Controllers\Operations;
 
 use App\Http\Controllers\Concerns\HandlesOfflineSubmission;
 use App\Http\Controllers\Controller;
-use App\Models\Client;
 use App\Models\ProgressNote;
-use App\Models\User;
 use Illuminate\Http\Request;
 
 class ProgressNoteController extends Controller
 {
     use HandlesOfflineSubmission;
 
-    public function index(Request $request)
-    {
-        $auth = $request->user();
-        abort_unless($auth && $auth->canDo('progress_notes.viewAny'), 403);
-
-        $data = $request->validate([
-            'client_id' => ['nullable', 'integer', 'exists:clients,id'],
-            'note_type' => ['nullable', 'string'],
-            'author_id' => ['nullable', 'integer', 'exists:users,id'],
-            'date_from' => ['nullable', 'date'],
-            'date_to' => ['nullable', 'date', 'after_or_equal:date_from'],
-            'emotion' => ['nullable', 'string', 'in:happy,calm,anxious,sad,frustrated,excited,tired,confused'],
-            'flagged' => ['nullable', 'boolean'],
-        ]);
-
-        $notes = ProgressNote::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->with([
-                'client:id,first_name,last_name',
-                'author:id,name',
-                'shift:id,starts_at,ends_at',
-                'goal:id,title,care_plan_id',
-            ])
-            ->when(! empty($data['client_id']), fn ($q) => $q->where('client_id', $data['client_id']))
-            ->when(! empty($data['note_type']), fn ($q) => $q->where('note_type', $data['note_type']))
-            ->when(! empty($data['author_id']), fn ($q) => $q->where('author_id', $data['author_id']))
-            ->when(! empty($data['date_from']), fn ($q) => $q->whereDate('created_at', '>=', $data['date_from']))
-            ->when(! empty($data['date_to']), fn ($q) => $q->whereDate('created_at', '<=', $data['date_to']))
-            ->when(! empty($data['emotion']), fn ($q) => $q->whereJsonContains('emotions', $data['emotion']))
-            ->when(isset($data['flagged']) && $data['flagged'], fn ($q) => $q->flagged())
-            ->orderByDesc('created_at')
-            ->paginate(20)
-            ->withQueryString();
-
-        $clients = Client::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->orderBy('first_name')
-            ->get(['id', 'first_name', 'last_name']);
-
-        $authors = User::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
-            ->orderBy('name')
-            ->get(['id', 'name']);
-
-        $statsBase = ProgressNote::query()
-            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id));
-
-        $stats = [
-            'total' => (clone $statsBase)->count(),
-            'this_week' => (clone $statsBase)->where('created_at', '>=', now()->startOfWeek())->count(),
-            'flagged' => (clone $statsBase)->where('is_flagged', true)->count(),
-        ];
-
-        return inertia('operations/progress-notes/Index', [
-            'notes' => $notes,
-            'clients' => $clients,
-            'authors' => $authors,
-            'stats' => $stats,
-            'filters' => $request->only(['client_id', 'note_type', 'author_id', 'date_from', 'date_to', 'emotion', 'flagged', 'q']),
-        ]);
-    }
+    /*
+     * The standalone progress-notes index page was retired in the client
+     * profile redesign — progress notes live on each client profile's Daily
+     * Notes tab (type filter). The old route now redirects (see
+     * routes/operations.php); store/update/destroy below remain in use
+     * (care-plan goal quick notes).
+     */
 
     public function store(Request $request)
     {

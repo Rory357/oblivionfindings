@@ -836,12 +836,8 @@ function buildOperationsSubPanelGroups({
             href: '/operations/service-agreements',
             icon: FileText,
         });
-    if (can?.progress_notes?.viewAny || can?.progress_notes?.create)
-        clientMgmt.push({
-            title: 'Progress Notes',
-            href: '/operations/progress-notes',
-            icon: MessageSquareText,
-        });
+    // Progress notes retired as a standalone page — they live in each client
+    // profile's Daily Notes tab (type filter) since the profile redesign.
     if (can?.progress_notes?.review)
         clientMgmt.push({
             title: 'Review Queue',

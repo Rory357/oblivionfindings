@@ -1040,6 +1040,29 @@ class ClientController extends Controller
                     'capacity_outcome' => $c->capacity_outcome,
                     'best_interests_decision' => $c->best_interests_decision,
                 ]),
+            'consent_type_options' => ($request->user()?->canDo('consents.viewAny') ?? false)
+                ? \App\Models\ConsentType::query()
+                    ->orderBy('name')
+                    ->get(['id', 'name'])
+                    ->map(fn ($t) => ['id' => $t->id, 'name' => $t->name])
+                    ->values()
+                : [],
+            'consent_request_list' => ($request->user()?->canDo('consents.viewAny') ?? false)
+                ? \App\Models\ConsentRequest::where('client_id', $client->id)
+                    ->with(['consentType:id,name', 'recipient:id,name'])
+                    ->orderByDesc('created_at')
+                    ->limit(50)
+                    ->get()
+                    ->map(fn ($r) => [
+                        'id' => $r->id,
+                        'consent_type' => $r->consentType?->name ?? 'Consent',
+                        'recipient' => $r->recipient?->name,
+                        'recipient_relationship' => $r->recipient_relationship,
+                        'status' => $r->status,
+                        'created_at' => $r->created_at?->toISOString(),
+                        'expires_at' => $r->expires_at?->toISOString(),
+                    ])->values()
+                : [],
             'health_summary' => $this->buildHealthSummary($client),
             'can' => [
                 'edit' => $request->user()?->canDo('clients.update') ?? false,
@@ -2274,6 +2297,30 @@ class ClientController extends Controller
                 ->values()
             : collect();
 
+        // Client-scoped transport bookings (Book transport workflow)
+        $bookings = Schema::hasTable('client_transport_bookings')
+            ? \App\Models\ClientTransportBooking::query()
+                ->where('client_id', $client->id)
+                ->whereIn('status', ['requested', 'confirmed'])
+                ->with('driver:id,name')
+                ->orderBy('scheduled_at')
+                ->limit(20)
+                ->get()
+                ->map(fn ($b) => [
+                    'id' => $b->id,
+                    'purpose' => $b->purpose,
+                    'destination' => $b->destination,
+                    'scheduled_at' => optional($b->scheduled_at)->toISOString(),
+                    'vehicle' => $b->vehicle,
+                    'driver' => $b->driver ? ['id' => $b->driver->id, 'name' => $b->driver->name] : null,
+                    'escort_required' => (bool) $b->escort_required,
+                    'return_trip' => (bool) $b->return_trip,
+                    'status' => $b->status,
+                    'notes' => $b->notes,
+                ])
+                ->values()
+            : collect();
+
         return [
             'stats' => [
                 'transports_30d' => $transportCount30d,
@@ -2283,6 +2330,7 @@ class ClientController extends Controller
             'upcoming_outings' => $upcomingOutings,
             'transport_history' => $transports,
             'medication_logs' => $medicationLogs,
+            'bookings' => $bookings,
         ];
     }
 

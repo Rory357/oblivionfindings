@@ -3,9 +3,26 @@ import ClientLocationTab, {
     type ClientLocationData,
 } from '@/components/client-location-tab';
 import RecentClientsStrip from '@/components/client-profile/recent-clients-strip';
-import ClientSafetyRibbon, {
-    type ClientSafety,
-} from '@/components/client-safety-ribbon';
+import { type ClientSafety } from '@/components/client-safety-ribbon';
+import {
+    ProfileDialogs,
+    type ProfileDialogState,
+} from '@/components/clients/profile/dialog-host';
+import {
+    AlertRibbon,
+    ClientProfileHero,
+    type HeroAlert,
+    type HeroBadge,
+    type HeroNextShift,
+    type HeroVital,
+    type MoreMenuItem,
+} from '@/components/clients/profile/hero';
+import {
+    GroupPillRail,
+    TabSearchPalette,
+    TierTwoTabs,
+    type ProfileNavGroup,
+} from '@/components/clients/profile/nav';
 import ClientObservationsTab from '@/components/clinical/client-observations-tab';
 import HealthSummaryCard, {
     type HealthSummary,
@@ -58,6 +75,7 @@ import {
     PersonalAssetsTab,
     PhotoGalleryTab,
 } from '@/pages/operations/clients/tabs/legacy-profile-sections';
+import { MarTab } from '@/pages/operations/clients/tabs/mar';
 import { RhythmsRoutinesTab } from '@/pages/operations/clients/tabs/rhythms-routines';
 import { ClientTimelineTab } from '@/pages/operations/clients/tabs/timeline-tab';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
@@ -74,6 +92,7 @@ import {
     Clock,
     DollarSign,
     FileText,
+    Flag,
     FolderOpen,
     Globe,
     GraduationCap,
@@ -503,6 +522,7 @@ type TabKey =
     | 'documents'
     | 'photos'
     | 'consents'
+    | 'consent-requests'
     | 'portal'
     | 'family_notes'
     | 'respite'
@@ -515,66 +535,8 @@ type TabKey =
 
 type DailyNotesFilter = 'all' | 'flagged' | 'follow_up' | 'drafts';
 
-const CLIENT_PROFILE_TOP_TAB_KEYS = [
-    'profile',
-    'personal_details',
-    'progress_notes',
-    'timeline',
-    'communication_notes',
-    'rhythms_routines',
-    'care_plans',
-    'goals_path',
-    'observations',
-    'health_monitoring',
-    'incidents_accidents',
-    'risk_management',
-    'calendar',
-    'leave_excursions',
-    'personal_assets',
-    'finance',
-    'documents',
-    'family_tree',
-    'actions_reviews',
-    'audit_history',
-] satisfies TabKey[];
-const CLIENT_PROFILE_TOP_TAB_KEY_SET = new Set<string>(
-    CLIENT_PROFILE_TOP_TAB_KEYS,
-);
-
-const CLIENT_PROFILE_FOLDED_TAB_PARENTS: Partial<Record<string, TabKey>> = {
-    onboarding: 'personal_details',
-    location: 'personal_details',
-    assignments: 'personal_details',
-    family_notes: 'communication_notes',
-    meal_prefs: 'rhythms_routines',
-    assessments: 'care_plans',
-    medical: 'health_monitoring',
-    mar: 'health_monitoring',
-    transport: 'calendar',
-    respite: 'leave_excursions',
-    service_agreements: 'finance',
-    photos: 'documents',
-    consents: 'family_tree',
-    portal: 'family_tree',
-};
-
-const CLIENT_PROFILE_FOLDED_TAB_SETS: Partial<Record<TabKey, string[]>> = {
-    personal_details: [
-        'personal_details',
-        'onboarding',
-        'location',
-        'assignments',
-    ],
-    communication_notes: ['communication_notes', 'family_notes'],
-    rhythms_routines: ['rhythms_routines', 'meal_prefs'],
-    care_plans: ['care_plans', 'assessments'],
-    health_monitoring: ['health_monitoring', 'medical', 'mar'],
-    calendar: ['calendar', 'transport'],
-    leave_excursions: ['leave_excursions', 'respite'],
-    finance: ['finance', 'service_agreements'],
-    documents: ['documents', 'photos'],
-    family_tree: ['family_tree', 'portal', 'consents', 'consent-requests'],
-};
+/* Folded sub-tab constants removed in the profile redesign — every tab is
+ * now first-class inside its group (see tabs/_groups.ts). */
 
 type GalleryPhoto = {
     id: number;
@@ -665,7 +627,10 @@ export default function ClientShow({
     const safety = pageProps.safety as ClientSafety | null | undefined;
     const createShiftLauncher = useCreateShiftLauncher();
     const nextShiftSummary = shifts_summary?.next ?? null;
-    const recurringShiftSeries = shifts_summary?.recurring ?? [];
+    const recurringShiftSeries = useMemo(
+        () => shifts_summary?.recurring ?? [],
+        [shifts_summary?.recurring],
+    );
     const siteCoverageSummary = site_coverage ?? null;
     const nextShiftTypeLabel = String(
         nextShiftSummary?.shift_type ?? 'standard',
@@ -713,7 +678,10 @@ export default function ClientShow({
         pageProps.pending_consent_requests_count ?? 0;
     const emarSummary = pageProps.emar_summary ?? null;
     const carePlansSummary = pageProps.care_plans_summary ?? {};
-    const carePlanGoals = carePlansSummary?.active_plan?.goals ?? [];
+    const carePlanGoals = useMemo(
+        () => carePlansSummary?.active_plan?.goals ?? [],
+        [carePlansSummary?.active_plan?.goals],
+    );
     const dailyNoteShiftOptions = useMemo(() => {
         return [nextShiftSummary, ...(recurringShiftSeries ?? [])]
             .filter((shift: any) => shift?.id)
@@ -764,7 +732,10 @@ export default function ClientShow({
     const dailyNotesSummary = pageProps.daily_notes_summary ?? {};
     const communicationNotes = pageProps.communication_notes ?? [];
     const healthMonitoring = pageProps.health_monitoring ?? {};
-    const clientRoutines = pageProps.client_routines ?? [];
+    const clientRoutines = useMemo(
+        () => pageProps.client_routines ?? [],
+        [pageProps.client_routines],
+    );
     const actionsReviews = pageProps.actions_reviews ?? [];
     const actionsReviewsSummary = pageProps.actions_reviews_summary ?? {};
     const progressNotesCan = auth?.can?.progress_notes ?? {};
@@ -834,7 +805,7 @@ export default function ClientShow({
             },
             {
                 key: 'communication_notes',
-                label: 'Communication Notes',
+                label: 'Communication',
                 icon: MsgIcon,
                 show: true,
                 count: communicationNotes.length || undefined,
@@ -964,7 +935,6 @@ export default function ClientShow({
                 icon: Send,
                 show: Boolean(consentsCan?.viewAny),
                 count: pendingConsentRequestsCount || undefined,
-                href: `/operations/clients/${client.id}/consent-requests`,
             },
             {
                 key: 'location',
@@ -1004,9 +974,9 @@ export default function ClientShow({
             communicationNotes.length,
             dailyNotesSummary?.drafts,
             dailyNotesSummary?.flagged_open,
-            client.id,
             client.status,
             actionsReviewsSummary?.open,
+            consentsCan?.viewAny,
             respiteCan?.viewAny,
             documents?.length,
             photos?.length,
@@ -1037,6 +1007,30 @@ export default function ClientShow({
     const [dailyNotesFilter, setDailyNotesFilter] = useState<DailyNotesFilter>(
         () => initialDailyNotesFilter(),
     );
+
+    // ── Redesign shell state: grouped two-tier nav + dialog host ──
+    const [openGroup, setOpenGroup] = useState<ClientTabGroupKey>(() =>
+        groupForTab(initialTab),
+    );
+    const [paletteOpen, setPaletteOpen] = useState(false);
+    const [profileDialog, setProfileDialog] =
+        useState<ProfileDialogState>(null);
+
+    const openProfileDialog = useCallback(
+        (key: string, ctx?: Record<string, unknown>) => {
+            // Keys owned by pre-existing dialogs keep their bespoke flows.
+            if (key === 'daily_note') return setDailyNoteOpen(true);
+            if (key === 'quick_note') return setQuickNoteOpen(true);
+            if (key === 'comm_note') return setCommunicationNoteOpen(true);
+            if (key === 'edit_profile') return setEditDialogOpen(true);
+            setProfileDialog({ key, ctx });
+        },
+        [],
+    );
+
+    useEffect(() => {
+        setOpenGroup(groupForTab(tab));
+    }, [tab]);
 
     // Lazy-load transport data when tab is first opened
     const [transportLoaded, setTransportLoaded] = useState(!!transport);
@@ -1095,18 +1089,6 @@ export default function ClientShow({
         },
         [updateProfileQuery],
     );
-    const activeTabParent = CLIENT_PROFILE_FOLDED_TAB_PARENTS[tab] ?? tab;
-    const relatedTabs = useMemo(() => {
-        const relatedKeys =
-            CLIENT_PROFILE_FOLDED_TAB_SETS[activeTabParent] ?? [];
-
-        return relatedKeys
-            .map((key) => tabs.find((candidate) => candidate.key === key))
-            .filter((candidate): candidate is ClientTab =>
-                Boolean(candidate?.show),
-            );
-    }, [activeTabParent, tabs]);
-
     useEffect(() => {
         let chordReset: number | undefined;
         let waitingForDailyChord = false;
@@ -1162,6 +1144,119 @@ export default function ClientShow({
     const respiteBookings = respite?.bookings ?? [];
     const respiteRequests = respite?.requests ?? [];
 
+    // ── Wizard flow context (flows.tsx submits to real endpoints) ──
+    const preferredName = client.preferred_name || client.first_name;
+    const flowContext = useMemo(() => {
+        const staff = new globalThis.Map<string, string>();
+        if (client.key_worker?.id) {
+            staff.set(String(client.key_worker.id), client.key_worker.name);
+        }
+        (client.support_workers ?? []).forEach(
+            (w: { id: number; name: string }) =>
+                staff.set(String(w.id), w.name),
+        );
+        return {
+            clientId: client.id,
+            clientLabel: client.site ? `${name} · ${client.site.name}` : name,
+            preferredName,
+            staffOptions: Array.from(staff, ([value, label]) => ({
+                value,
+                label,
+            })),
+            goalOptions: dailyNoteGoalOptions.map(
+                (g: { id: number; label: string }) => ({
+                    value: String(g.id),
+                    label: g.label,
+                }),
+            ),
+            consentTypeOptions: (
+                (pageProps.consent_type_options ?? []) as {
+                    id: number;
+                    name: string;
+                }[]
+            ).map((t) => ({ value: String(t.id), label: t.name })),
+            fundOptions: (
+                (pageProps.client_finance?.funds ?? []) as {
+                    id: number;
+                    name?: string | null;
+                    purpose?: string | null;
+                }[]
+            ).map((f) => ({
+                value: String(f.id),
+                label: f.name ?? f.purpose ?? `Fund #${f.id}`,
+            })),
+            carePlanId: carePlansSummary?.active_plan?.id ?? null,
+            carePlanTitle: carePlansSummary?.active_plan?.title ?? null,
+            onboardingWorkflowId: onboarding?.workflow?.id ?? null,
+        };
+    }, [
+        client.id,
+        client.key_worker,
+        client.site,
+        client.support_workers,
+        name,
+        preferredName,
+        dailyNoteGoalOptions,
+        pageProps.consent_type_options,
+        pageProps.client_finance?.funds,
+        carePlansSummary?.active_plan?.id,
+        carePlansSummary?.active_plan?.title,
+        onboarding?.workflow?.id,
+    ]);
+
+    // ── Grouped nav registry: 6 groups × first-class tabs ──
+    const visibleGroups = useMemo<ProfileNavGroup[]>(() => {
+        const groupIcons: Record<
+            ClientTabGroupKey,
+            React.ComponentType<{ className?: string }>
+        > = {
+            snapshot: User,
+            daily: ClipboardList,
+            plans: Target,
+            health: Heart,
+            operations: Calendar,
+            governance: Users,
+            other: User,
+        };
+        return CLIENT_TAB_GROUPS.map((group) => ({
+            key: group.key,
+            label: group.label,
+            icon: groupIcons[group.key],
+            tabs: group.tabKeys
+                .map((key) => tabs.find((t) => t.key === key))
+                .filter((t): t is ClientTab => Boolean(t?.show))
+                .map((t) => ({
+                    key: t.key,
+                    label: t.label,
+                    icon: t.icon,
+                    count: t.count ?? undefined,
+                    href: isClientNavigationTab(t) ? undefined : t.href,
+                })),
+        })).filter((group) => group.tabs.length > 0);
+    }, [tabs]);
+
+    const activeGroup =
+        visibleGroups.find((g) => g.key === openGroup) ?? visibleGroups[0];
+
+    // "/" or ⌘K opens the tab search palette.
+    useEffect(() => {
+        const onKey = (event: KeyboardEvent) => {
+            if (
+                (event.key === '/' &&
+                    !event.metaKey &&
+                    !event.ctrlKey &&
+                    !isEditableShortcutTarget(event.target)) ||
+                (event.key.toLowerCase() === 'k' &&
+                    (event.metaKey || event.ctrlKey))
+            ) {
+                event.preventDefault();
+                setPaletteOpen(true);
+            }
+        };
+        window.addEventListener('keydown', onKey);
+        return () => window.removeEventListener('keydown', onKey);
+    }, []);
+
     const [showApptForm, setShowApptForm] = useState(false);
     const [respondingId, setRespondingId] = useState<number | null>(null);
     const [responseText, setResponseText] = useState('');
@@ -1193,73 +1288,26 @@ export default function ClientShow({
             <PageShell>
                 {/* ── Hero Header ──────────────────────────────── */}
                 {(() => {
-                    const heroBadges: PageHeroBadge[] = [
-                        {
-                            label: client.status,
-                            tone:
-                                client.status === 'active'
-                                    ? 'success'
-                                    : client.status === 'onboarding'
-                                      ? 'warning'
-                                      : 'default',
-                        },
-                    ];
-                    if (client.funding_type)
-                        heroBadges.push({ label: client.funding_type });
-                    if (client.service_context)
-                        heroBadges.push({ label: client.service_context.name });
-                    if (client.site)
-                        heroBadges.push({
-                            label: client.site.name,
-                            icon: Home,
-                            href: `/sites/${client.site.id}`,
-                            'aria-label': `Open ${client.site.name}`,
-                        });
-                    if (client.risk_level && client.risk_level !== 'low')
-                        heroBadges.push({
-                            label: `${client.risk_level} risk`,
-                            icon: ShieldAlert,
-                            tone:
-                                client.risk_level === 'critical'
-                                    ? 'critical'
-                                    : 'warning',
-                        });
-                    if (client.safeguarding_flag)
-                        heroBadges.push({
-                            label: 'Safeguarding',
-                            icon: Shield,
-                            tone: 'critical',
-                        });
-                    if (
-                        progressNotesCan.review &&
-                        (dailyNotesSummary.flagged_open ?? 0) > 0
-                    )
-                        heroBadges.push({
-                            label: `${dailyNotesSummary.flagged_open} notes need review`,
-                            icon: AlertTriangle,
-                            tone: 'warning',
-                            onClick: () => openDailyNotes('flagged'),
-                            'aria-label': 'Open daily notes review queue',
-                        });
-                    if ((actionsReviewsSummary.open ?? 0) > 0)
-                        heroBadges.push({
-                            label: `${actionsReviewsSummary.open} open actions`,
-                            icon: ListTodo,
-                            tone:
-                                (actionsReviewsSummary.critical ?? 0) > 0
-                                    ? 'critical'
-                                    : 'warning',
-                        });
-
-                    const heroMeta: PageHeroMetaItem[] = [];
-                    if (client.preferred_name && client.preferred_name !== name)
-                        heroMeta.push({
-                            label: `Preferred: ${client.preferred_name}`,
-                        });
+                    // ── Identity chips ──
+                    const heroChips: {
+                        key: string;
+                        icon?: React.ComponentType<{ className?: string }>;
+                        label: string;
+                    }[] = [];
                     if (client.nhi_number)
-                        heroMeta.push({ label: `NHI: ${client.nhi_number}` });
+                        heroChips.push({
+                            key: 'nhi',
+                            label: `NHI ${client.nhi_number}`,
+                        });
+                    if (client.site)
+                        heroChips.push({
+                            key: 'site',
+                            icon: Home,
+                            label: client.site.name,
+                        });
                     if (client.service_start_date)
-                        heroMeta.push({
+                        heroChips.push({
+                            key: 'since',
                             icon: Clock,
                             label: `Since ${new Date(
                                 client.service_start_date,
@@ -1267,6 +1315,46 @@ export default function ClientShow({
                                 month: 'short',
                                 year: 'numeric',
                             })}`,
+                        });
+                    if (client.key_worker?.name)
+                        heroChips.push({
+                            key: 'keyworker',
+                            icon: User,
+                            label: client.key_worker.name,
+                        });
+                    if (client.funding_type)
+                        heroChips.push({
+                            key: 'funding',
+                            label: client.funding_type,
+                        });
+                    if (client.service_context)
+                        heroChips.push({
+                            key: 'service',
+                            label: client.service_context.name,
+                        });
+
+                    // ── Status badges ──
+                    const heroBadges: HeroBadge[] = [];
+                    if (client.risk_level)
+                        heroBadges.push({
+                            key: 'risk',
+                            label: `${client.risk_level} risk`,
+                            icon: ShieldAlert,
+                            tone:
+                                client.risk_level === 'critical'
+                                    ? 'critical'
+                                    : client.risk_level === 'high'
+                                      ? 'warning'
+                                      : client.risk_level === 'medium'
+                                        ? 'info'
+                                        : 'success',
+                        });
+                    if (client.safeguarding_flag)
+                        heroBadges.push({
+                            key: 'safeguarding',
+                            label: 'Safeguarding',
+                            icon: Shield,
+                            tone: 'critical',
                         });
 
                     const carePlanSummary =
@@ -1276,28 +1364,367 @@ export default function ClientShow({
                     const carePlanDone = carePlanGoals.filter(
                         (g: any) => g.status === 'completed',
                     ).length;
+                    if (carePlanSummary.active_plan)
+                        heroBadges.push({
+                            key: 'plan',
+                            label: 'Care plan active',
+                            icon: Target,
+                            tone: 'info',
+                        });
+
+                    // ── Identity line ──
+                    const age = client.date_of_birth
+                        ? Math.floor(
+                              (Date.now() -
+                                  new Date(client.date_of_birth).getTime()) /
+                                  31557600000,
+                          )
+                        : null;
+                    const identityLine = [
+                        client.preferred_name &&
+                        client.preferred_name !== name
+                            ? `“${client.preferred_name}”`
+                            : null,
+                        client.preferred_pronouns,
+                        age != null ? `${age}y` : null,
+                        client.ethnicity,
+                    ]
+                        .filter(Boolean)
+                        .join(' · ');
+
+                    // ── Vitals strip (real chart data) ──
+                    const now = Date.now();
+                    const weekAgo = now - 7 * 86400000;
+                    const moodRatings = (clientDailyNotes as any[])
+                        .filter(
+                            (n) =>
+                                n.mood_rating != null &&
+                                n.occurred_at &&
+                                new Date(n.occurred_at).getTime() >= weekAgo,
+                        )
+                        .map((n) => Number(n.mood_rating));
+                    const moodAvg = moodRatings.length
+                        ? moodRatings.reduce((a, b) => a + b, 0) /
+                          moodRatings.length
+                        : null;
+                    const seizureEntries =
+                        (healthMonitoring?.seizure as any[]) ?? [];
+                    const lastSeizure = seizureEntries[0]?.occurred_at
+                        ? new Date(seizureEntries[0].occurred_at).getTime()
+                        : null;
+                    const seizureFreeDays = lastSeizure
+                        ? Math.max(
+                              0,
+                              Math.floor((now - lastSeizure) / 86400000),
+                          )
+                        : null;
+                    const fluidToday = (
+                        (healthMonitoring?.fluid as any[]) ?? []
+                    )
+                        .filter(
+                            (e) =>
+                                e.direction !== 'out' &&
+                                e.occurred_at &&
+                                new Date(e.occurred_at).toDateString() ===
+                                    new Date().toDateString(),
+                        )
+                        .reduce((sum, e) => sum + (e.volume_ml ?? 0), 0);
+                    const fluidTarget =
+                        ((client as any).fluid_intake_min_ml as
+                            | number
+                            | null) ?? null;
+                    const notesThisWeek = (clientDailyNotes as any[]).filter(
+                        (n) =>
+                            (n.occurred_at ?? n.created_at) &&
+                            new Date(
+                                n.occurred_at ?? n.created_at,
+                            ).getTime() >= weekAgo,
+                    ).length;
+
+                    const heroVitals: HeroVital[] = [
+                        {
+                            key: 'mood',
+                            label: 'Mood',
+                            value:
+                                moodAvg != null
+                                    ? `${moodAvg.toFixed(1)}/10`
+                                    : '—',
+                            trend:
+                                moodAvg == null
+                                    ? 'flat'
+                                    : moodAvg >= 6
+                                      ? 'up'
+                                      : moodAvg >= 4
+                                        ? 'flat'
+                                        : 'down',
+                            detail: moodRatings.length
+                                ? `${moodRatings.length} rating${moodRatings.length > 1 ? 's' : ''} this week`
+                                : 'No mood ratings this week',
+                        },
+                        {
+                            key: 'seizures',
+                            label: 'Seizures',
+                            value:
+                                seizureFreeDays != null
+                                    ? `${seizureFreeDays}d`
+                                    : '—',
+                            trend:
+                                seizureFreeDays != null &&
+                                seizureFreeDays >= 14
+                                    ? 'up'
+                                    : 'flat',
+                            detail:
+                                seizureFreeDays != null
+                                    ? 'days since last seizure'
+                                    : 'No seizures recorded',
+                        },
+                        {
+                            key: 'fluids',
+                            label: 'Fluids today',
+                            value: fluidToday
+                                ? `${(fluidToday / 1000).toFixed(1)}L`
+                                : '—',
+                            trend:
+                                fluidTarget && fluidToday
+                                    ? fluidToday >= fluidTarget
+                                        ? 'up'
+                                        : 'down'
+                                    : 'flat',
+                            detail: fluidTarget
+                                ? `Target ${(fluidTarget / 1000).toFixed(1)}L+`
+                                : 'No target set',
+                        },
+                        {
+                            key: 'notes',
+                            label: 'Notes',
+                            value: String(notesThisWeek),
+                            trend: notesThisWeek > 0 ? 'up' : 'flat',
+                            detail: 'daily notes this week',
+                        },
+                    ];
+
+                    // ── Next shift tile ──
+                    const ns = nextShiftSummary as any;
+                    const handoverEvents = (handover as any[]) ?? [];
+                    const handoverSnippet =
+                        handoverEvents[0]?.body ??
+                        handoverEvents[0]?.subject ??
+                        null;
+                    const heroNextShift: HeroNextShift | null = ns
+                        ? (() => {
+                              const starts = ns.starts_at
+                                  ? new Date(ns.starts_at)
+                                  : null;
+                              const ends = ns.ends_at
+                                  ? new Date(ns.ends_at)
+                                  : null;
+                              const hoursAway = starts
+                                  ? (starts.getTime() - now) / 3600000
+                                  : null;
+                              return {
+                                  when: starts
+                                      ? `${starts.toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric', month: 'short' })} ${starts.toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit' })}${ends ? ` – ${ends.toLocaleTimeString('en-NZ', { hour: 'numeric', minute: '2-digit' })}` : ''}`
+                                      : 'Scheduled',
+                                  countdown:
+                                      hoursAway != null && hoursAway > 0
+                                          ? hoursAway < 1
+                                              ? 'soon'
+                                              : hoursAway < 24
+                                                ? `in ${Math.round(hoursAway)}h`
+                                                : null
+                                          : hoursAway != null &&
+                                              hoursAway > -12
+                                            ? 'now'
+                                            : null,
+                                  staffName: ns.staff?.name ?? null,
+                                  typeLabel: nextShiftTypeLabel,
+                                  tasksTotal: ns.task_count ?? 0,
+                                  tasksDone: Math.max(
+                                      0,
+                                      (ns.task_count ?? 0) -
+                                          (ns.incomplete_task_count ?? 0),
+                                  ),
+                                  location:
+                                      ns.location ??
+                                      client.site?.name ??
+                                      null,
+                                  breakLabel: ns.expected_break_minutes
+                                      ? `${ns.expected_break_minutes} min expected`
+                                      : null,
+                                  medsLabel:
+                                      (emarSummary?.active_medications_count ??
+                                          0) > 0
+                                          ? `${emarSummary.active_medications_count} active med${emarSummary.active_medications_count > 1 ? 's' : ''}`
+                                          : null,
+                                  handoverSnippet,
+                              };
+                          })()
+                        : null;
+
+                    // ── Safety strip (allergies + critical risks + care flags) ──
+                    const heroSafety = {
+                        allergies: (safety?.allergies ?? []).map(
+                            (a) => a.label,
+                        ),
+                        alerts: [
+                            ...(safety?.critical_risks ?? []).map(
+                                (r) => r.label,
+                            ),
+                            ...(safety?.care_flags ?? []).map((f) => f.label),
+                        ],
+                    };
+
+                    // ── "Needs attention" ribbon ──
+                    const heroAlerts: HeroAlert[] = [];
+                    if (
+                        progressNotesCan.review &&
+                        (dailyNotesSummary.flagged_open ?? 0) > 0
+                    )
+                        heroAlerts.push({
+                            key: 'flagged-notes',
+                            tone: 'warning',
+                            icon: Flag,
+                            label: `${dailyNotesSummary.flagged_open} note${dailyNotesSummary.flagged_open > 1 ? 's' : ''} need review`,
+                            onClick: () => openDailyNotes('flagged'),
+                        });
+                    if ((actionsReviewsSummary.open ?? 0) > 0)
+                        heroAlerts.push({
+                            key: 'open-actions',
+                            tone:
+                                (actionsReviewsSummary.critical ?? 0) > 0
+                                    ? 'critical'
+                                    : 'warning',
+                            icon: ListTodo,
+                            label: `${actionsReviewsSummary.open} open action${actionsReviewsSummary.open > 1 ? 's' : ''}`,
+                            detail:
+                                (actionsReviewsSummary.critical ?? 0) > 0
+                                    ? `${actionsReviewsSummary.critical} critical`
+                                    : undefined,
+                            onClick: () =>
+                                handleTabChange('actions_reviews'),
+                        });
+                    if ((emarSummary?.pending_alerts_count ?? 0) > 0)
+                        heroAlerts.push({
+                            key: 'med-alerts',
+                            tone: 'warning',
+                            icon: Pill,
+                            label: `${emarSummary.pending_alerts_count} medication alert${emarSummary.pending_alerts_count > 1 ? 's' : ''}`,
+                            onClick: () => handleTabChange('mar'),
+                        });
+                    if (pendingVisitCount > 0)
+                        heroAlerts.push({
+                            key: 'visits',
+                            tone: 'warning',
+                            icon: Users,
+                            label: `${pendingVisitCount} visit request${pendingVisitCount > 1 ? 's' : ''} pending`,
+                            onClick: () =>
+                                router.visit(
+                                    `/operations/clients/${client.id}/visit-requests`,
+                                ),
+                        });
+
+                    // ── More menu ──
+                    const moreItems: MoreMenuItem[] = [];
+                    if (client.phone)
+                        moreItems.push({
+                            key: 'call',
+                            label: 'Call',
+                            icon: Phone,
+                            detail: client.phone,
+                            onSelect: () => {
+                                window.location.href = `tel:${client.phone}`;
+                            },
+                        });
+                    moreItems.push({
+                        key: 'visits',
+                        label: 'Visit requests',
+                        icon: Users,
+                        detail: pendingVisitCount
+                            ? `${pendingVisitCount} pending`
+                            : undefined,
+                        onSelect: () =>
+                            router.visit(
+                                `/operations/clients/${client.id}/visit-requests`,
+                            ),
+                    });
+                    moreItems.push({
+                        key: 'mar',
+                        label: 'Full MAR chart',
+                        icon: Pill,
+                        onSelect: () =>
+                            router.visit(
+                                `/operations/clients/${client.id}/mar`,
+                            ),
+                    });
+                    moreItems.push({
+                        key: 'medical',
+                        label: 'Medical record',
+                        icon: Heart,
+                        onSelect: () =>
+                            router.visit(
+                                `/operations/clients/${client.id}/medical`,
+                            ),
+                    });
+                    if (can.assign_workers || can.edit)
+                        moreItems.push({
+                            key: 'workers',
+                            label: 'Manage workers',
+                            icon: Users,
+                            onSelect: () => handleTabChange('assignments'),
+                        });
+                    const clientSite = client.site;
+                    if (clientSite)
+                        moreItems.push({
+                            key: 'site',
+                            label: `Open ${clientSite.name}`,
+                            icon: Home,
+                            onSelect: () =>
+                                router.visit(`/sites/${clientSite.id}`),
+                        });
+                    moreItems.push({
+                        key: 'print',
+                        label: 'Print profile',
+                        icon: FileText,
+                        onSelect: () => window.print(),
+                    });
 
                     return (
                         <>
-                            <PageHero
-                                avatar={{
-                                    src:
-                                        client.avatar ??
-                                        client.profile_photo_url ??
-                                        undefined,
-                                    fallback: getInitials(name),
-                                }}
-                                title={name}
-                                meta={heroMeta}
+                            <ClientProfileHero
+                                clientId={client.id}
+                                name={name}
+                                photoUrl={
+                                    client.avatar ??
+                                    client.profile_photo_url ??
+                                    null
+                                }
+                                initials={getInitials(name)}
+                                statusLabel={client.status}
+                                statusTone={
+                                    client.status === 'active'
+                                        ? 'success'
+                                        : client.status === 'onboarding'
+                                          ? 'warning'
+                                          : 'neutral'
+                                }
+                                identityLine={identityLine}
+                                chips={heroChips}
                                 badges={heroBadges}
+                                vitals={heroVitals}
+                                nextShift={heroNextShift}
+                                safety={heroSafety}
                                 stats={[
                                     {
-                                        label: 'Care Plan',
+                                        key: 'plan',
+                                        icon: Target,
+                                        label: 'Care plan',
                                         value: carePlanSummary.active_plan
                                             ? 'Active'
                                             : '—',
                                     },
                                     {
+                                        key: 'goals',
+                                        icon: CheckCircle2,
                                         label: 'Goals',
                                         value:
                                             carePlanGoals.length > 0
@@ -1305,100 +1732,45 @@ export default function ClientShow({
                                                 : '—',
                                     },
                                     {
-                                        label: 'Next Shift',
+                                        key: 'shift',
+                                        icon: Clock,
+                                        label: 'Next shift',
                                         value: shifts_summary?.next
                                             ? 'Yes'
                                             : '—',
                                     },
                                 ]}
-                                actions={
-                                    <>
-                                        <Button
-                                            type="button"
-                                            size="sm"
-                                            variant="outline"
-                                            className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                            onClick={() =>
-                                                setDailyNoteOpen(true)
-                                            }
-                                            data-test="client-profile-daily-note-button"
-                                        >
-                                            <ClipboardList className="mr-1.5 h-3.5 w-3.5" />
-                                            Daily Note
-                                        </Button>
-                                        <Button
-                                            type="button"
-                                            size="sm"
-                                            variant="outline"
-                                            className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                            onClick={() =>
-                                                setQuickNoteOpen(true)
-                                            }
-                                            data-test="client-profile-quick-note-button"
-                                        >
-                                            <Plus className="mr-1.5 h-3.5 w-3.5" />
-                                            Quick Note
-                                        </Button>
-                                        <Button
-                                            type="button"
-                                            size="sm"
-                                            variant="outline"
-                                            className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                            onClick={() =>
-                                                setCommunicationNoteOpen(true)
-                                            }
-                                            data-test="client-profile-communication-note-button"
-                                        >
-                                            <MsgIcon className="mr-1.5 h-3.5 w-3.5" />
-                                            Communication
-                                        </Button>
-                                        {client.phone && (
-                                            <a href={`tel:${client.phone}`}>
-                                                <Button
-                                                    size="sm"
-                                                    variant="outline"
-                                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                                >
-                                                    <Phone className="mr-1.5 h-3.5 w-3.5" />
-                                                    Call
-                                                </Button>
-                                            </a>
-                                        )}
-                                        <Button
-                                            size="sm"
-                                            variant="outline"
-                                            className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                            asChild
-                                        >
-                                            <Link
-                                                href={`/operations/clients/${client.id}/visit-requests`}
-                                            >
-                                                <Users className="mr-1.5 h-3.5 w-3.5" />
-                                                Visits
-                                                {pendingVisitCount > 0 ? (
-                                                    <span className="ml-1 rounded-full bg-status-warning-bg px-1.5 py-0.5 text-[10px] font-bold text-status-warning">
-                                                        {pendingVisitCount}
-                                                    </span>
-                                                ) : null}
-                                            </Link>
-                                        </Button>
-                                        {can.edit && (
-                                            <Button
-                                                type="button"
-                                                size="sm"
-                                                variant="outline"
-                                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                                onClick={() =>
-                                                    setEditDialogOpen(true)
-                                                }
-                                            >
-                                                <Pencil className="mr-1.5 h-3.5 w-3.5" />
-                                                Edit
-                                            </Button>
-                                        )}
-                                    </>
+                                canEdit={Boolean(can.edit)}
+                                onAddNote={(key) => openProfileDialog(key)}
+                                onChat={() =>
+                                    openProfileDialog('family_chat')
+                                }
+                                onEdit={() => setEditDialogOpen(true)}
+                                onOpenShift={() =>
+                                    handleTabChange('calendar')
+                                }
+                                onOpenSafety={() =>
+                                    handleTabChange('risk_management')
+                                }
+                                moreItems={moreItems}
+                                backLabel={
+                                    labels?.['client.plural'] ?? 'Clients'
+                                }
+                                footer={
+                                    <GroupPillRail
+                                        groups={visibleGroups}
+                                        openGroup={openGroup}
+                                        activeTab={tab}
+                                        onOpenGroup={(key) =>
+                                            setOpenGroup(
+                                                key as ClientTabGroupKey,
+                                            )
+                                        }
+                                        onSearch={() => setPaletteOpen(true)}
+                                    />
                                 }
                             />
+                            <AlertRibbon alerts={heroAlerts} />
 
                             {/* Hidden photo upload form */}
                             {can.edit && (
@@ -1460,8 +1832,6 @@ export default function ClientShow({
                     }}
                 />
 
-                <ClientSafetyRibbon safety={safety} className="mt-4" />
-
                 <div className="mt-3">
                     <RecentClientsStrip
                         currentClient={{
@@ -1474,172 +1844,47 @@ export default function ClientShow({
                     />
                 </div>
 
-                <div className="scrollbar-pretty -mx-4 mt-3 overflow-x-auto border-b px-4">
-                    <div className="flex w-max items-center gap-1 pb-0">
-                        {(() => {
-                            const groupOrder: Record<
-                                ClientTabGroupKey,
-                                number
-                            > = {
-                                snapshot: 0,
-                                daily: 1,
-                                plans: 2,
-                                health: 3,
-                                operations: 4,
-                                governance: 5,
-                                other: 6,
-                            };
-                            const visibleTabs = tabs
-                                .filter(
-                                    (t) =>
-                                        t.show &&
-                                        CLIENT_PROFILE_TOP_TAB_KEY_SET.has(
-                                            t.key,
-                                        ),
-                                )
-                                .slice()
-                                .sort((a, b) => {
-                                    const groupDiff =
-                                        groupOrder[groupForTab(a.key)] -
-                                        groupOrder[groupForTab(b.key)];
-                                    return groupDiff !== 0 ? groupDiff : 0;
-                                });
-                            const elements: React.ReactNode[] = [];
-                            let lastGroup: ClientTabGroupKey | null = null;
-
-                            for (const t of visibleTabs) {
-                                const group = groupForTab(t.key);
-                                if (group !== lastGroup) {
-                                    const groupMeta = CLIENT_TAB_GROUPS.find(
-                                        (g) => g.key === group,
-                                    );
-                                    if (lastGroup !== null) {
-                                        elements.push(
-                                            <span
-                                                key={`sep-${group}`}
-                                                aria-hidden
-                                                title={groupMeta?.label}
-                                                className="mx-2 h-4 w-px shrink-0 bg-border/80"
-                                            />,
-                                        );
-                                    }
-                                    lastGroup = group;
-                                }
-
-                                const Icon = t.icon;
-                                const isActive = activeTabParent === t.key;
-                                const className = `inline-flex h-auto items-center gap-1.5 border-b-2 px-3 py-2.5 text-sm font-medium transition-colors ${
-                                    isActive
-                                        ? 'border-primary text-primary'
-                                        : 'border-transparent text-muted-foreground hover:border-border hover:text-foreground'
-                                }`;
-                                const inner = (
-                                    <>
-                                        <Icon className="h-3.5 w-3.5" />
-                                        {t.label}
-                                        {t.count != null && t.count > 0 && (
-                                            <span
-                                                className={`ml-0.5 rounded-full px-1.5 py-0.5 text-[10px] leading-none font-semibold ${
-                                                    isActive
-                                                        ? 'bg-primary/10 text-primary'
-                                                        : 'bg-muted text-muted-foreground'
-                                                }`}
-                                            >
-                                                {t.count}
-                                            </span>
-                                        )}
-                                    </>
-                                );
-
-                                if (!isClientNavigationTab(t)) {
-                                    elements.push(
-                                        <Link
-                                            key={t.key}
-                                            href={t.href}
-                                            className={className}
-                                        >
-                                            {inner}
-                                        </Link>,
-                                    );
-                                } else {
-                                    elements.push(
-                                        <Button
-                                            key={t.key}
-                                            type="button"
-                                            variant="ghost"
-                                            onClick={() =>
-                                                handleTabChange(t.key)
-                                            }
-                                            aria-pressed={isActive}
-                                            data-test={`client-tab-${t.key}`}
-                                            className={className}
-                                        >
-                                            {inner}
-                                        </Button>,
-                                    );
-                                }
-                            }
-
-                            return elements;
-                        })()}
-                    </div>
+                {/* Tier-2 tabs for the open group (group pills live in the hero footer) */}
+                <div className="mt-3">
+                    <TierTwoTabs
+                        tabs={activeGroup?.tabs ?? []}
+                        activeTab={tab}
+                        onTab={(key) => handleTabChange(key as TabKey)}
+                        renderLink={(t, className, inner) => (
+                            <Link
+                                key={t.key}
+                                href={t.href!}
+                                className={className}
+                                data-test={`client-tab-${t.key}`}
+                            >
+                                {inner}
+                            </Link>
+                        )}
+                    />
                 </div>
 
-                {relatedTabs.length > 1 && (
-                    <div className="mt-3 flex flex-wrap items-center gap-2 border-b pb-3">
-                        <span className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                            Related
-                        </span>
-                        {relatedTabs.map((related) => {
-                            const Icon = related.icon;
-                            const isActive = tab === related.key;
-                            const className = `inline-flex h-8 items-center gap-1.5 rounded-md border px-2.5 text-xs font-medium transition-colors ${
-                                isActive
-                                    ? 'border-primary bg-primary/10 text-primary'
-                                    : 'border-border bg-background text-muted-foreground hover:bg-muted hover:text-foreground'
-                            }`;
-                            const inner = (
-                                <>
-                                    <Icon className="h-3.5 w-3.5" />
-                                    {related.label}
-                                    {related.count != null &&
-                                        related.count > 0 && (
-                                            <span className="rounded-full bg-muted px-1.5 py-0.5 text-[10px] leading-none text-muted-foreground">
-                                                {related.count}
-                                            </span>
-                                        )}
-                                </>
-                            );
+                <TabSearchPalette
+                    open={paletteOpen}
+                    onClose={() => setPaletteOpen(false)}
+                    groups={visibleGroups}
+                    onTab={(key) => {
+                        const target = visibleGroups
+                            .flatMap((g) => g.tabs)
+                            .find((t) => t.key === key);
+                        if (target?.href) {
+                            router.visit(target.href);
+                        } else {
+                            handleTabChange(key as TabKey);
+                        }
+                    }}
+                />
 
-                            if (!isClientNavigationTab(related)) {
-                                return (
-                                    <Link
-                                        key={related.key}
-                                        href={related.href}
-                                        className={className}
-                                        data-test={`client-related-tab-${related.key}`}
-                                    >
-                                        {inner}
-                                    </Link>
-                                );
-                            }
-
-                            return (
-                                <Button
-                                    key={related.key}
-                                    type="button"
-                                    variant="ghost"
-                                    onClick={() => handleTabChange(related.key)}
-                                    aria-pressed={isActive}
-                                    data-test={`client-related-tab-${related.key}`}
-                                    className={className}
-                                >
-                                    {inner}
-                                </Button>
-                            );
-                        })}
-                    </div>
-                )}
+                <ProfileDialogs
+                    dialog={profileDialog}
+                    onClose={() => setProfileDialog(null)}
+                    flowContext={flowContext}
+                    medications={(medical?.medications ?? []) as any[]}
+                />
 
                 {tab === 'profile' &&
                     (() => {
@@ -3280,20 +3525,39 @@ export default function ClientShow({
                                         <CardTitle className="text-base">
                                             Onboarding Workflow
                                         </CardTitle>
-                                        <Badge
-                                            variant={
-                                                onboarding.workflow.status ===
-                                                'completed'
-                                                    ? 'secondary'
-                                                    : 'default'
-                                            }
-                                            className="capitalize"
-                                        >
-                                            {onboarding.workflow.status?.replace(
-                                                '_',
-                                                ' ',
-                                            )}
-                                        </Badge>
+                                        <div className="flex items-center gap-2">
+                                            {(can.manage_onboarding ||
+                                                can.edit) &&
+                                            onboarding.workflow.status !==
+                                                'completed' ? (
+                                                <Button
+                                                    size="sm"
+                                                    onClick={() =>
+                                                        openProfileDialog(
+                                                            'add_onboarding_step',
+                                                        )
+                                                    }
+                                                    data-test="onboarding-add-step"
+                                                >
+                                                    <Plus className="mr-1.5 h-3.5 w-3.5" />
+                                                    Add step
+                                                </Button>
+                                            ) : null}
+                                            <Badge
+                                                variant={
+                                                    onboarding.workflow
+                                                        .status === 'completed'
+                                                        ? 'secondary'
+                                                        : 'default'
+                                                }
+                                                className="capitalize"
+                                            >
+                                                {onboarding.workflow.status?.replace(
+                                                    '_',
+                                                    ' ',
+                                                )}
+                                            </Badge>
+                                        </div>
                                     </div>
                                 </CardHeader>
                                 <CardContent>
@@ -4182,469 +4446,55 @@ export default function ClientShow({
                     </div>
                 )}
 
-                {tab === 'mar' &&
-                    (() => {
-                        const meds = medical?.medications ?? [];
-                        const activeMeds = meds.filter(
-                            (m: any) => m.active !== false,
-                        );
-                        const ceasedMeds = meds.filter(
-                            (m: any) => m.active === false,
-                        );
-                        const prnMeds = activeMeds.filter((m: any) => m.is_prn);
-                        const scheduledMeds = activeMeds.filter(
-                            (m: any) => !m.is_prn,
-                        );
-                        const controlledMeds = activeMeds.filter(
-                            (m: any) => m.controlled_drug,
-                        );
-                        const allergies = medical?.profile?.allergies ?? [];
-                        const hasAllergies =
-                            Array.isArray(allergies) && allergies.length > 0;
-
-                        return (
-                            <div className="space-y-4">
-                                {/* Allergy Banner */}
-                                {hasAllergies && (
-                                    <div className="flex items-center gap-3 rounded-xl border-2 border-status-critical/30 bg-status-critical-bg p-4">
-                                        <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-status-critical-bg text-status-critical">
-                                            <AlertTriangle className="h-5 w-5" />
-                                        </div>
-                                        <div className="flex-1">
-                                            <p className="text-sm font-semibold text-status-critical">
-                                                Allergies
-                                            </p>
-                                            <div className="mt-1 flex flex-wrap gap-1.5">
-                                                {allergies.map((a: string) => (
-                                                    <Badge
-                                                        key={a}
-                                                        className="border-0 bg-status-critical-bg text-xs font-semibold text-status-critical"
-                                                    >
-                                                        {a}
-                                                    </Badge>
-                                                ))}
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Alerts Banner */}
-                                {emarSummary &&
-                                    emarSummary.pending_alerts_count > 0 && (
-                                        <div className="flex items-center gap-3 rounded-xl border-2 border-status-warning/30 bg-status-warning-bg p-4">
-                                            <div className="flex h-9 w-9 shrink-0 items-center justify-center rounded-lg bg-status-warning-bg text-status-warning">
-                                                <AlertTriangle className="h-5 w-5" />
-                                            </div>
-                                            <div className="flex-1">
-                                                <p className="text-sm font-semibold text-status-warning">
-                                                    {
-                                                        emarSummary.pending_alerts_count
-                                                    }{' '}
-                                                    Active Medication Alert
-                                                    {emarSummary.pending_alerts_count !==
-                                                    1
-                                                        ? 's'
-                                                        : ''}
-                                                </p>
-                                                <p className="text-xs text-status-warning">
-                                                    Review alerts in the full
-                                                    eMAR dashboard.
-                                                </p>
-                                            </div>
-                                            <Button
-                                                size="sm"
-                                                className="bg-status-warning text-primary-foreground hover:bg-status-warning"
-                                                asChild
-                                            >
-                                                <Link
-                                                    href={`/operations/clients/${client.id}/mar`}
-                                                >
-                                                    Review
-                                                </Link>
-                                            </Button>
-                                        </div>
-                                    )}
-
-                                {/* Stats */}
-                                {emarSummary && (
-                                    <div className="grid grid-cols-2 gap-3 sm:grid-cols-4">
-                                        <div className="rounded-xl border bg-status-info-bg p-4 text-center">
-                                            <div className="text-3xl font-bold text-status-info">
-                                                {
-                                                    emarSummary.active_medications_count
-                                                }
-                                            </div>
-                                            <div className="text-[10px] tracking-wider text-status-info uppercase">
-                                                Active Medications
-                                            </div>
-                                        </div>
-                                        <div className="rounded-xl border bg-status-success-bg p-4 text-center">
-                                            <div className="text-sm font-bold text-status-success">
-                                                {emarSummary.last_administration
-                                                    ? new Date(
-                                                          emarSummary.last_administration,
-                                                      ).toLocaleDateString(
-                                                          'en-NZ',
-                                                          {
-                                                              day: 'numeric',
-                                                              month: 'short',
-                                                              hour: '2-digit',
-                                                              minute: '2-digit',
-                                                          },
-                                                      )
-                                                    : '—'}
-                                            </div>
-                                            <div className="text-[10px] tracking-wider text-status-success uppercase">
-                                                Last Administration
-                                            </div>
-                                        </div>
-                                        <div
-                                            className={`rounded-xl border p-4 text-center ${controlledMeds.length > 0 ? 'bg-status-critical-bg' : ''}`}
-                                        >
-                                            <div
-                                                className={`text-3xl font-bold ${controlledMeds.length > 0 ? 'text-status-critical' : 'text-muted-foreground'}`}
-                                            >
-                                                {controlledMeds.length}
-                                            </div>
-                                            <div className="text-[10px] tracking-wider text-muted-foreground uppercase">
-                                                Controlled Drugs
-                                            </div>
-                                        </div>
-                                        <div className="rounded-xl border bg-primary/10 p-4 text-center">
-                                            <div className="text-sm font-bold text-primary">
-                                                {emarSummary.next_review_date
-                                                    ? new Date(
-                                                          emarSummary.next_review_date,
-                                                      ).toLocaleDateString(
-                                                          'en-NZ',
-                                                          {
-                                                              day: 'numeric',
-                                                              month: 'short',
-                                                              year: 'numeric',
-                                                          },
-                                                      )
-                                                    : 'Not scheduled'}
-                                            </div>
-                                            <div className="text-[10px] tracking-wider text-primary uppercase">
-                                                Next Review
-                                            </div>
-                                        </div>
-                                    </div>
-                                )}
-
-                                {/* Action Buttons */}
-                                <div className="flex flex-wrap gap-2">
-                                    <Button
-                                        className="gap-1.5 bg-status-info hover:bg-status-info"
-                                        asChild
-                                    >
-                                        <Link
-                                            href={`/operations/clients/${client.id}/mar`}
-                                        >
-                                            <Pill className="h-3.5 w-3.5" />
-                                            Daily MAR
-                                        </Link>
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        className="gap-1.5"
-                                        asChild
-                                    >
-                                        <Link
-                                            href={`/emar/mar?client_id=${client.id}`}
-                                        >
-                                            <ClipboardList className="h-3.5 w-3.5" />
-                                            eMAR Dashboard
-                                        </Link>
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        className="gap-1.5"
-                                        asChild
-                                    >
-                                        <Link
-                                            href={`/emar/controlled?client_id=${client.id}`}
-                                        >
-                                            <Shield className="h-3.5 w-3.5" />
-                                            Controlled Drugs
-                                        </Link>
-                                    </Button>
-                                    <Button
-                                        variant="outline"
-                                        className="gap-1.5"
-                                        asChild
-                                    >
-                                        <Link
-                                            href={`/emar/reviews?client_id=${client.id}`}
-                                        >
-                                            <BookOpen className="h-3.5 w-3.5" />
-                                            Reviews
-                                        </Link>
-                                    </Button>
-                                </div>
-
-                                {/* Scheduled Medications */}
-                                {scheduledMeds.length > 0 && (
-                                    <Card className="overflow-hidden">
-                                        <div className="bg-gradient-to-r from-status-info to-primary px-5 py-3">
-                                            <div className="flex items-center justify-between">
-                                                <div>
-                                                    <h3 className="text-sm font-semibold text-primary-foreground">
-                                                        Scheduled Medications
-                                                    </h3>
-                                                    <p className="text-xs text-status-info">
-                                                        {scheduledMeds.length}{' '}
-                                                        medication
-                                                        {scheduledMeds.length !==
-                                                        1
-                                                            ? 's'
-                                                            : ''}{' '}
-                                                        on regular schedule
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <CardContent className="p-0">
-                                            <div className="divide-y">
-                                                {scheduledMeds.map((m: any) => (
-                                                    <div
-                                                        key={m.id}
-                                                        className="flex items-center gap-4 px-5 py-3.5 transition-colors hover:bg-muted/30"
-                                                    >
-                                                        <div
-                                                            className={`flex h-10 w-10 shrink-0 items-center justify-center rounded-xl ${m.controlled_drug ? 'bg-status-critical-bg text-status-critical' : 'bg-status-info-bg text-status-info'}`}
-                                                        >
-                                                            <Pill className="h-5 w-5" />
-                                                        </div>
-                                                        <div className="min-w-0 flex-1">
-                                                            <div className="flex flex-wrap items-center gap-2">
-                                                                <span className="text-sm font-semibold">
-                                                                    {m.name}
-                                                                </span>
-                                                                {m.controlled_drug && (
-                                                                    <Badge className="gap-0.5 border-0 bg-status-critical-bg text-[9px] text-status-critical">
-                                                                        <Shield className="h-2.5 w-2.5" />
-                                                                        Controlled
-                                                                    </Badge>
-                                                                )}
-                                                            </div>
-                                                            <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-                                                                {m.dosage && (
-                                                                    <span className="font-medium text-foreground/70">
-                                                                        {
-                                                                            m.dosage
-                                                                        }
-                                                                    </span>
-                                                                )}
-                                                                {m.route && (
-                                                                    <span>
-                                                                        {
-                                                                            m.route
-                                                                        }
-                                                                    </span>
-                                                                )}
-                                                                {m.form && (
-                                                                    <span>
-                                                                        {m.form}
-                                                                    </span>
-                                                                )}
-                                                                {m.frequency && (
-                                                                    <span className="text-status-info">
-                                                                        {
-                                                                            m.frequency
-                                                                        }
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            {m.instructions && (
-                                                                <p className="mt-1 line-clamp-1 text-xs text-muted-foreground">
-                                                                    {
-                                                                        m.instructions
-                                                                    }
-                                                                </p>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                )}
-
-                                {/* PRN Medications */}
-                                {prnMeds.length > 0 && (
-                                    <Card className="overflow-hidden">
-                                        <div className="bg-primary px-5 py-3">
-                                            <div className="flex items-center justify-between">
-                                                <div>
-                                                    <h3 className="text-sm font-semibold text-primary-foreground">
-                                                        PRN (As Needed)
-                                                    </h3>
-                                                    <p className="text-xs text-primary/70">
-                                                        {prnMeds.length}{' '}
-                                                        medication
-                                                        {prnMeds.length !== 1
-                                                            ? 's'
-                                                            : ''}{' '}
-                                                        available as needed
-                                                    </p>
-                                                </div>
-                                            </div>
-                                        </div>
-                                        <CardContent className="p-0">
-                                            <div className="divide-y">
-                                                {prnMeds.map((m: any) => (
-                                                    <div
-                                                        key={m.id}
-                                                        className="flex items-center gap-4 px-5 py-3.5 transition-colors hover:bg-muted/30"
-                                                    >
-                                                        <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-xl bg-primary/10 text-primary">
-                                                            <Pill className="h-5 w-5" />
-                                                        </div>
-                                                        <div className="min-w-0 flex-1">
-                                                            <div className="flex flex-wrap items-center gap-2">
-                                                                <span className="text-sm font-semibold">
-                                                                    {m.name}
-                                                                </span>
-                                                                <Badge className="border-0 bg-primary/10 text-[9px] text-primary">
-                                                                    PRN
-                                                                </Badge>
-                                                                {m.controlled_drug && (
-                                                                    <Badge className="gap-0.5 border-0 bg-status-critical-bg text-[9px] text-status-critical">
-                                                                        <Shield className="h-2.5 w-2.5" />
-                                                                        Controlled
-                                                                    </Badge>
-                                                                )}
-                                                            </div>
-                                                            <div className="mt-0.5 flex flex-wrap gap-x-3 gap-y-0.5 text-xs text-muted-foreground">
-                                                                {m.dosage && (
-                                                                    <span className="font-medium text-foreground/70">
-                                                                        {
-                                                                            m.dosage
-                                                                        }
-                                                                    </span>
-                                                                )}
-                                                                {m.route && (
-                                                                    <span>
-                                                                        {
-                                                                            m.route
-                                                                        }
-                                                                    </span>
-                                                                )}
-                                                                {m.form && (
-                                                                    <span>
-                                                                        {m.form}
-                                                                    </span>
-                                                                )}
-                                                            </div>
-                                                            {m.prn_reason && (
-                                                                <p className="mt-1 text-xs text-primary">
-                                                                    Indication:{' '}
-                                                                    {
-                                                                        m.prn_reason
-                                                                    }
-                                                                </p>
-                                                            )}
-                                                            {m.instructions && (
-                                                                <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
-                                                                    {
-                                                                        m.instructions
-                                                                    }
-                                                                </p>
-                                                            )}
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                )}
-
-                                {/* Ceased Medications */}
-                                {ceasedMeds.length > 0 && (
-                                    <Card>
-                                        <CardHeader className="pb-2">
-                                            <CardTitle className="text-sm text-muted-foreground">
-                                                Ceased Medications (
-                                                {ceasedMeds.length})
-                                            </CardTitle>
-                                        </CardHeader>
-                                        <CardContent className="p-0">
-                                            <div className="divide-y">
-                                                {ceasedMeds.map((m: any) => (
-                                                    <div
-                                                        key={m.id}
-                                                        className="flex items-center gap-4 px-5 py-2.5 opacity-50"
-                                                    >
-                                                        <div className="flex h-8 w-8 shrink-0 items-center justify-center rounded-lg bg-muted text-muted-foreground">
-                                                            <Pill className="h-4 w-4" />
-                                                        </div>
-                                                        <div className="min-w-0 flex-1">
-                                                            <div className="flex items-center gap-2">
-                                                                <span className="text-sm font-medium line-through">
-                                                                    {m.name}
-                                                                </span>
-                                                                <Badge className="border-0 bg-muted text-[9px] text-muted-foreground">
-                                                                    Ceased
-                                                                </Badge>
-                                                            </div>
-                                                            <div className="mt-0.5 text-xs text-muted-foreground">
-                                                                {[
-                                                                    m.dosage,
-                                                                    m.route,
-                                                                    m.form,
-                                                                ]
-                                                                    .filter(
-                                                                        Boolean,
-                                                                    )
-                                                                    .join(
-                                                                        ' · ',
-                                                                    )}
-                                                            </div>
-                                                        </div>
-                                                    </div>
-                                                ))}
-                                            </div>
-                                        </CardContent>
-                                    </Card>
-                                )}
-
-                                {/* Empty state */}
-                                {meds.length === 0 && (
-                                    <Card className="border-dashed">
-                                        <CardContent className="flex flex-col items-center justify-center py-16">
-                                            <div className="mb-4 flex h-16 w-16 items-center justify-center rounded-2xl bg-status-info-bg">
-                                                <Pill className="h-8 w-8 text-status-info" />
-                                            </div>
-                                            <p className="font-medium">
-                                                No Medications
-                                            </p>
-                                            <p className="mt-1 max-w-sm text-center text-sm text-muted-foreground">
-                                                No medications recorded for{' '}
-                                                {client.first_name}. Add
-                                                medications through the medical
-                                                tab or eMAR system.
-                                            </p>
-                                            <Button
-                                                size="sm"
-                                                className="mt-4"
-                                                asChild
-                                            >
-                                                <Link
-                                                    href={`/emar/medications?client_id=${client.id}`}
-                                                >
-                                                    Add Medication
-                                                </Link>
-                                            </Button>
-                                        </CardContent>
-                                    </Card>
-                                )}
-                            </div>
-                        );
-                    })()}
+                {tab === 'mar' && (
+                    <MarTab
+                        clientId={client.id}
+                        clientFirstName={client.first_name}
+                        siteName={client.site?.name ?? null}
+                        medications={(medical?.medications ?? []) as any[]}
+                        allergies={
+                            Array.isArray(medical?.profile?.allergies)
+                                ? (medical.profile.allergies as string[])
+                                : []
+                        }
+                        emarSummary={emarSummary}
+                        onRecordDose={(medicationId) =>
+                            openProfileDialog(
+                                'emar',
+                                medicationId ? { medicationId } : undefined,
+                            )
+                        }
+                    />
+                )}
 
                 {tab === 'meal_prefs' && (
                     <div className="space-y-4">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-primary">
+                                    <Utensils className="h-[19px] w-[19px]" />
+                                </span>
+                                <div>
+                                    <h2 className="text-lg leading-tight font-semibold">
+                                        Food & meal preferences
+                                    </h2>
+                                    <p className="text-sm text-muted-foreground">
+                                        Texture safety, likes & mealtime
+                                        support
+                                    </p>
+                                </div>
+                            </div>
+                            {can.edit ? (
+                                <Button
+                                    onClick={() =>
+                                        openProfileDialog('meal_pref')
+                                    }
+                                >
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    Add preference
+                                </Button>
+                            ) : null}
+                        </div>
                         <FoodMealPreferences
                             clientId={client.id}
                             canEdit={!!can?.edit}
@@ -4654,6 +4504,46 @@ export default function ClientShow({
 
                 {tab === 'observations' && (
                     <div className="space-y-6">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-primary">
+                                    <Stethoscope className="h-[19px] w-[19px]" />
+                                </span>
+                                <div>
+                                    <h2 className="text-lg leading-tight font-semibold">
+                                        Behaviour observations
+                                    </h2>
+                                    <p className="text-sm text-muted-foreground">
+                                        ABC charting & clinical observations
+                                    </p>
+                                </div>
+                            </div>
+                            <div className="flex items-center gap-2">
+                                {can.record_observation ||
+                                can.record_clinical_observation ? (
+                                    <Button
+                                        variant="outline"
+                                        onClick={() =>
+                                            openProfileDialog('record_obs')
+                                        }
+                                    >
+                                        <Activity className="mr-1.5 h-4 w-4" />
+                                        Record observation
+                                    </Button>
+                                ) : null}
+                                {can.record_event ? (
+                                    <Button
+                                        onClick={() =>
+                                            openProfileDialog('abc_entry')
+                                        }
+                                        data-test="observations-abc-entry"
+                                    >
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        New ABC entry
+                                    </Button>
+                                ) : null}
+                            </div>
+                        </div>
                         <BehaviourInsightsCard
                             patterns={
                                 (pageProps as any).behaviour_patterns as any
@@ -4736,6 +4626,53 @@ export default function ClientShow({
 
                         return (
                             <div className="space-y-4">
+                                {/* Care plan header + review/goal workflows */}
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                    <div className="flex items-center gap-3">
+                                        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-primary">
+                                            <Target className="h-[19px] w-[19px]" />
+                                        </span>
+                                        <div>
+                                            <h2 className="text-lg leading-tight font-semibold">
+                                                Care & support plan
+                                            </h2>
+                                            <p className="text-sm text-muted-foreground">
+                                                {activePlan
+                                                    ? (activePlan.title ??
+                                                      'Active plan')
+                                                    : 'No active plan yet'}
+                                            </p>
+                                        </div>
+                                    </div>
+                                    {activePlan ? (
+                                        <div className="flex items-center gap-2">
+                                            <Button
+                                                variant="outline"
+                                                onClick={() =>
+                                                    openProfileDialog(
+                                                        'add_goal',
+                                                    )
+                                                }
+                                                data-test="careplan-add-goal"
+                                            >
+                                                <Plus className="mr-1.5 h-4 w-4" />
+                                                Add goal
+                                            </Button>
+                                            <Button
+                                                onClick={() =>
+                                                    openProfileDialog(
+                                                        'plan_review',
+                                                    )
+                                                }
+                                                data-test="careplan-start-review"
+                                            >
+                                                <Clock className="mr-1.5 h-4 w-4" />
+                                                Start review
+                                            </Button>
+                                        </div>
+                                    ) : null}
+                                </div>
+
                                 {/* Review Due Alert */}
                                 {reviewDue && activePlan && (
                                     <div className="flex items-center gap-3 rounded-xl border-2 border-status-warning/30 bg-status-warning-bg p-4">
@@ -4755,13 +4692,13 @@ export default function ClientShow({
                                         <Button
                                             size="sm"
                                             className="bg-status-warning text-primary-foreground hover:bg-status-warning"
-                                            asChild
+                                            onClick={() =>
+                                                openProfileDialog(
+                                                    'plan_review',
+                                                )
+                                            }
                                         >
-                                            <Link
-                                                href={`/operations/care-plans/${activePlan.id}`}
-                                            >
-                                                Start Review
-                                            </Link>
+                                            Start Review
                                         </Button>
                                     </div>
                                 )}
@@ -5237,11 +5174,39 @@ export default function ClientShow({
                     })()}
 
                 {tab === 'calendar' && (
-                    <ClientCalendarTab
-                        clientId={client.id}
-                        clientFirstName={client.first_name}
-                        initialEvents={(pageProps as any).calendar_events ?? []}
-                    />
+                    <div className="space-y-4">
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-primary">
+                                    <Calendar className="h-[19px] w-[19px]" />
+                                </span>
+                                <div>
+                                    <h2 className="text-lg leading-tight font-semibold">
+                                        Appointments
+                                    </h2>
+                                    <p className="text-sm text-muted-foreground">
+                                        Appointments, shifts & reminders
+                                    </p>
+                                </div>
+                            </div>
+                            <Button
+                                onClick={() =>
+                                    openProfileDialog('appointment')
+                                }
+                                data-test="calendar-new-appointment"
+                            >
+                                <Plus className="mr-1.5 h-4 w-4" />
+                                New appointment
+                            </Button>
+                        </div>
+                        <ClientCalendarTab
+                            clientId={client.id}
+                            clientFirstName={client.first_name}
+                            initialEvents={
+                                (pageProps as any).calendar_events ?? []
+                            }
+                        />
+                    </div>
                 )}
 
                 {tab === 'progress_notes' && (
@@ -5289,20 +5254,49 @@ export default function ClientShow({
                 )}
 
                 {tab === 'health_monitoring' && (
-                    <HealthMonitoringTab
-                        clientId={client.id}
-                        data={healthMonitoring}
-                        isLoading={!hasHealthMonitoringProp}
-                    />
+                    <div className="space-y-4">
+                        <div className="flex flex-wrap items-center justify-end gap-2">
+                            <Button
+                                variant="outline"
+                                onClick={() =>
+                                    openProfileDialog('record_obs')
+                                }
+                                data-test="health-record-observation"
+                            >
+                                <Plus className="mr-1.5 h-4 w-4" />
+                                Record observation
+                            </Button>
+                        </div>
+                        <HealthMonitoringTab
+                            clientId={client.id}
+                            data={healthMonitoring}
+                            isLoading={!hasHealthMonitoringProp}
+                        />
+                    </div>
                 )}
 
                 {tab === 'rhythms_routines' && (
-                    <RhythmsRoutinesTab
-                        clientId={client.id}
-                        routines={clientRoutines}
-                        canEdit={can.edit}
-                        isLoading={!hasClientRoutinesProp}
-                    />
+                    <div className="space-y-4">
+                        {can.edit ? (
+                            <div className="flex flex-wrap items-center justify-end gap-2">
+                                <Button
+                                    onClick={() =>
+                                        openProfileDialog('edit_rhythms')
+                                    }
+                                    data-test="rhythms-update-guidance"
+                                >
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    Update guidance
+                                </Button>
+                            </div>
+                        ) : null}
+                        <RhythmsRoutinesTab
+                            clientId={client.id}
+                            routines={clientRoutines}
+                            canEdit={can.edit}
+                            isLoading={!hasClientRoutinesProp}
+                        />
+                    </div>
                 )}
 
                 {tab === 'actions_reviews' && (
@@ -5356,6 +5350,38 @@ export default function ClientShow({
                 )}
 
                 {tab === 'incidents_accidents' && (
+                    <div className="mb-4 flex flex-wrap items-center justify-between gap-3">
+                        <div className="flex items-center gap-3">
+                            <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-primary">
+                                <AlertTriangle className="h-[19px] w-[19px]" />
+                            </span>
+                            <div>
+                                <h2 className="text-lg leading-tight font-semibold">
+                                    Incidents & accidents
+                                </h2>
+                                <p className="text-sm text-muted-foreground">
+                                    {
+                                        (pageProps.client_incidents ?? [])
+                                            .length
+                                    }{' '}
+                                    recent incident
+                                    {(pageProps.client_incidents ?? [])
+                                        .length === 1
+                                        ? ''
+                                        : 's'}
+                                </p>
+                            </div>
+                        </div>
+                        <Button
+                            onClick={() => openProfileDialog('log_incident')}
+                            data-test="incidents-log-incident"
+                        >
+                            <Plus className="mr-1.5 h-4 w-4" />
+                            Log incident
+                        </Button>
+                    </div>
+                )}
+                {tab === 'incidents_accidents' && (
                     <ClientProfilePlaceholder
                         title="Incidents & Accidents"
                         description="Recent incident records are shown here while the existing timeline and incident workflows remain intact."
@@ -5372,15 +5398,40 @@ export default function ClientShow({
                 )}
 
                 {tab === 'family_tree' && (
-                    <FamilyTreeTab
-                        clientName={name}
-                        nextOfKins={((pageProps as any).next_of_kins ?? []) as any}
-                        portalUsers={(portal_users ?? []) as any}
-                        emergencyContacts={
-                            ((pageProps as any).medical?.emergency_contacts ??
-                                []) as any
-                        }
-                    />
+                    <div className="space-y-4">
+                        {can.edit ? (
+                            <div className="flex flex-wrap items-center justify-end gap-2">
+                                <Button
+                                    variant="outline"
+                                    onClick={() =>
+                                        openProfileDialog('portal_invite')
+                                    }
+                                >
+                                    <Globe className="mr-1.5 h-4 w-4" />
+                                    Invite to portal
+                                </Button>
+                                <Button
+                                    onClick={() =>
+                                        openProfileDialog('add_relationship')
+                                    }
+                                    data-test="family-add-relationship"
+                                >
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    Add relationship
+                                </Button>
+                            </div>
+                        ) : null}
+                        <FamilyTreeTab
+                            clientName={name}
+                            nextOfKins={
+                                ((pageProps as any).next_of_kins ?? []) as any
+                            }
+                            portalUsers={(portal_users ?? []) as any}
+                            emergencyContacts={
+                                (medical?.emergency_contacts ?? []) as any
+                            }
+                        />
+                    </div>
                 )}
 
                 {tab === 'audit_history' && (
@@ -5394,10 +5445,25 @@ export default function ClientShow({
                 )}
 
                 {tab === 'finance' && (
-                    <FinanceTab
-                        clientId={client.id}
-                        finance={(pageProps as any).client_finance ?? {}}
-                    />
+                    <div className="space-y-4">
+                        {flowContext.fundOptions.length > 0 ? (
+                            <div className="flex flex-wrap items-center justify-end gap-2">
+                                <Button
+                                    onClick={() =>
+                                        openProfileDialog('transaction')
+                                    }
+                                    data-test="finance-new-transaction"
+                                >
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    New transaction
+                                </Button>
+                            </div>
+                        ) : null}
+                        <FinanceTab
+                            clientId={client.id}
+                            finance={(pageProps as any).client_finance ?? {}}
+                        />
+                    </div>
                 )}
 
                 {tab === 'leave_excursions' && (
@@ -5743,22 +5809,54 @@ export default function ClientShow({
                 {/* Support Plan merged into Care Plans tab */}
 
                 {tab === 'assessments' && (
-                    <AssessmentsTab
-                        clientId={client.id}
-                        assessments={assessments}
-                        canEdit={can.edit}
-                    />
+                    <div className="space-y-4">
+                        {can.edit ? (
+                            <div className="flex flex-wrap items-center justify-end gap-2">
+                                <Button
+                                    onClick={() =>
+                                        openProfileDialog('add_assessment')
+                                    }
+                                    data-test="assessments-add"
+                                >
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    Add assessment
+                                </Button>
+                            </div>
+                        ) : null}
+                        <AssessmentsTab
+                            clientId={client.id}
+                            assessments={assessments}
+                            canEdit={can.edit}
+                        />
+                    </div>
                 )}
 
                 {tab === 'timeline' && (
-                    <ClientTimelineTab
-                        clientId={client.id}
-                        events={events}
-                        handover={handover}
-                        canCreateNote={Boolean(can.create_note)}
-                        canPinHandover={Boolean(can.pin_handover)}
-                        auth={auth}
-                    />
+                    <div className="space-y-4">
+                        {can.create_note ? (
+                            <div className="flex flex-wrap items-center justify-end gap-2">
+                                <Button
+                                    onClick={() =>
+                                        openProfileDialog('add_note', {
+                                            title: 'Add timeline note',
+                                        })
+                                    }
+                                    data-test="timeline-add-note"
+                                >
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    Add note
+                                </Button>
+                            </div>
+                        ) : null}
+                        <ClientTimelineTab
+                            clientId={client.id}
+                            events={events}
+                            handover={handover}
+                            canCreateNote={Boolean(can.create_note)}
+                            canPinHandover={Boolean(can.pin_handover)}
+                            auth={auth}
+                        />
+                    </div>
                 )}
 
                 {tab === 'documents' && (
@@ -6340,11 +6438,25 @@ export default function ClientShow({
                         <CardContent className="space-y-4">
                             <div className="flex flex-wrap items-center gap-2">
                                 {respiteCan?.create ? (
-                                    <Button size="sm" asChild>
+                                    <Button
+                                        size="sm"
+                                        onClick={() =>
+                                            openProfileDialog(
+                                                'respite_booking',
+                                            )
+                                        }
+                                        data-test="respite-new-booking"
+                                    >
+                                        <Plus className="mr-1.5 h-3.5 w-3.5" />
+                                        New booking
+                                    </Button>
+                                ) : null}
+                                {respiteCan?.create ? (
+                                    <Button size="sm" variant="outline" asChild>
                                         <Link
                                             href={`/respite/requests/create?client_id=${client.id}`}
                                         >
-                                            New booking request
+                                            Full intake wizard
                                         </Link>
                                     </Button>
                                 ) : null}
@@ -6544,13 +6656,33 @@ export default function ClientShow({
                                     <CardHeader>
                                         <CardTitle className="flex items-center justify-between text-base">
                                             <span>Consent Records</span>
-                                            <Button size="sm" asChild>
-                                                <Link
-                                                    href={`/operations/clients/${client.id}/consents`}
+                                            <div className="flex items-center gap-2">
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    asChild
                                                 >
-                                                    Manage Consents
-                                                </Link>
-                                            </Button>
+                                                    <Link
+                                                        href={`/operations/clients/${client.id}/consents`}
+                                                    >
+                                                        Manage Consents
+                                                    </Link>
+                                                </Button>
+                                                {can.edit ? (
+                                                    <Button
+                                                        size="sm"
+                                                        onClick={() =>
+                                                            openProfileDialog(
+                                                                'consent_record',
+                                                            )
+                                                        }
+                                                        data-test="consents-record"
+                                                    >
+                                                        <Plus className="mr-1.5 h-3.5 w-3.5" />
+                                                        Record consent
+                                                    </Button>
+                                                ) : null}
+                                            </div>
                                         </CardTitle>
                                     </CardHeader>
                                     <CardContent>
@@ -6643,6 +6775,135 @@ export default function ClientShow({
                         );
                     })()}
 
+                {tab === 'consent-requests' &&
+                    (() => {
+                        const requests = ((pageProps as any)
+                            .consent_request_list ?? []) as any[];
+                        const pending = requests.filter(
+                            (r) => r.status === 'pending',
+                        ).length;
+                        const approved = requests.filter(
+                            (r) => r.status === 'approved',
+                        ).length;
+                        const declined = requests.filter(
+                            (r) => r.status === 'declined',
+                        ).length;
+                        const REQ_TONES: Record<string, string> = {
+                            pending:
+                                'bg-status-warning-bg text-status-warning',
+                            approved:
+                                'bg-status-success-bg text-status-success',
+                            declined:
+                                'bg-status-critical-bg text-status-critical',
+                            cancelled: 'bg-muted text-muted-foreground',
+                            expired: 'bg-muted text-muted-foreground',
+                        };
+                        return (
+                            <div className="space-y-4">
+                                <div className="grid grid-cols-4 gap-3">
+                                    {[
+                                        ['Total', requests.length, ''],
+                                        [
+                                            'Pending',
+                                            pending,
+                                            'text-status-warning',
+                                        ],
+                                        [
+                                            'Approved',
+                                            approved,
+                                            'text-status-success',
+                                        ],
+                                        [
+                                            'Declined',
+                                            declined,
+                                            'text-status-critical',
+                                        ],
+                                    ].map(([label, value, tone]) => (
+                                        <div
+                                            key={String(label)}
+                                            className="rounded-lg border p-3 text-center"
+                                        >
+                                            <div
+                                                className={`text-lg font-bold ${tone || 'text-primary'}`}
+                                            >
+                                                {value}
+                                            </div>
+                                            <div className="text-[10px] tracking-wide text-muted-foreground uppercase">
+                                                {label}
+                                            </div>
+                                        </div>
+                                    ))}
+                                </div>
+                                <Card>
+                                    <CardHeader>
+                                        <CardTitle className="flex items-center justify-between text-base">
+                                            <span>
+                                                Consent requests sent to whānau
+                                            </span>
+                                            {(auth?.can?.consents?.request ??
+                                                false) && (
+                                                <Button size="sm" asChild>
+                                                    <Link
+                                                        href={`/operations/clients/${client.id}/consent-requests/create`}
+                                                    >
+                                                        <Plus className="mr-1.5 h-3.5 w-3.5" />
+                                                        New request
+                                                    </Link>
+                                                </Button>
+                                            )}
+                                        </CardTitle>
+                                    </CardHeader>
+                                    <CardContent>
+                                        {requests.length === 0 ? (
+                                            <p className="py-8 text-center text-sm text-muted-foreground">
+                                                No consent requests yet — send
+                                                one to whānau for a decision on
+                                                the portal.
+                                            </p>
+                                        ) : (
+                                            <div className="space-y-2">
+                                                {requests.map((r) => (
+                                                    <Link
+                                                        key={r.id}
+                                                        href={`/operations/clients/${client.id}/consent-requests/${r.id}`}
+                                                        className="flex items-center justify-between gap-3 rounded-lg border p-3 transition-colors hover:bg-muted/40"
+                                                    >
+                                                        <div className="min-w-0">
+                                                            <div className="truncate text-sm font-semibold">
+                                                                {r.consent_type}
+                                                            </div>
+                                                            <div className="mt-0.5 text-xs text-muted-foreground">
+                                                                To{' '}
+                                                                {r.recipient ??
+                                                                    '—'}
+                                                                {r.recipient_relationship
+                                                                    ? ` (${r.recipient_relationship})`
+                                                                    : ''}
+                                                                {r.created_at
+                                                                    ? ` · sent ${new Date(r.created_at).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}`
+                                                                    : ''}
+                                                                {r.status ===
+                                                                    'pending' &&
+                                                                r.expires_at
+                                                                    ? ` · expires ${new Date(r.expires_at).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' })}`
+                                                                    : ''}
+                                                            </div>
+                                                        </div>
+                                                        <span
+                                                            className={`rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize ${REQ_TONES[r.status] ?? 'bg-muted text-muted-foreground'}`}
+                                                        >
+                                                            {r.status}
+                                                        </span>
+                                                    </Link>
+                                                ))}
+                                            </div>
+                                        )}
+                                    </CardContent>
+                                </Card>
+                            </div>
+                        );
+                    })()}
+
                 {tab === 'portal' && (
                     <Card>
                         <CardHeader>
@@ -6659,13 +6920,27 @@ export default function ClientShow({
                                     </span>
                                 </div>
                                 {can.edit && (
-                                    <Button size="sm" asChild>
-                                        <Link
-                                            href={`/operations/clients/${client.id}/portal-users`}
+                                    <div className="flex items-center gap-2">
+                                        <Button size="sm" variant="outline" asChild>
+                                            <Link
+                                                href={`/operations/clients/${client.id}/portal-users`}
+                                            >
+                                                Manage access
+                                            </Link>
+                                        </Button>
+                                        <Button
+                                            size="sm"
+                                            onClick={() =>
+                                                openProfileDialog(
+                                                    'portal_invite',
+                                                )
+                                            }
+                                            data-test="portal-invite"
                                         >
-                                            Quick Add
-                                        </Link>
-                                    </Button>
+                                            <Plus className="mr-1.5 h-3.5 w-3.5" />
+                                            Invite
+                                        </Button>
+                                    </div>
                                 )}
                             </CardTitle>
                         </CardHeader>
@@ -6734,17 +7009,32 @@ export default function ClientShow({
                 )}
 
                 {tab === 'personal_assets' && (
-                    <PersonalAssetsTab
-                        clientId={client.id}
-                        assets={personal_assets}
-                        canEdit={can.edit}
-                        firstName={client.first_name}
-                        locations={(pageProps as any).asset_locations ?? []}
-                        clientSiteId={client.site?.id ?? null}
-                        availableTrackers={
-                            (pageProps as any).available_trackers ?? []
-                        }
-                    />
+                    <div className="space-y-4">
+                        {can.edit ? (
+                            <div className="flex flex-wrap items-center justify-end gap-2">
+                                <Button
+                                    onClick={() =>
+                                        openProfileDialog('add_asset')
+                                    }
+                                    data-test="assets-add-item"
+                                >
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    Add item
+                                </Button>
+                            </div>
+                        ) : null}
+                        <PersonalAssetsTab
+                            clientId={client.id}
+                            assets={personal_assets}
+                            canEdit={can.edit}
+                            firstName={client.first_name}
+                            locations={(pageProps as any).asset_locations ?? []}
+                            clientSiteId={client.site?.id ?? null}
+                            availableTrackers={
+                                (pageProps as any).available_trackers ?? []
+                            }
+                        />
+                    </div>
                 )}
 
                 {tab === 'transport' &&
@@ -6757,9 +7047,160 @@ export default function ClientShow({
                         const upcoming = transport?.upcoming_outings ?? [];
                         const history = transport?.transport_history ?? [];
                         const medLogs = transport?.medication_logs ?? [];
+                        const bookings =
+                            ((transport as any)?.bookings ?? []) as any[];
 
                         return (
                             <div className="space-y-6">
+                                {/* Header + book-transport workflow */}
+                                <div className="flex flex-wrap items-center justify-between gap-3">
+                                    <div className="flex items-center gap-3">
+                                        <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-primary">
+                                            <Truck className="h-[19px] w-[19px]" />
+                                        </span>
+                                        <div>
+                                            <h2 className="text-lg leading-tight font-semibold">
+                                                Transport
+                                            </h2>
+                                            <p className="text-sm text-muted-foreground">
+                                                Bookings, outings & trip log
+                                            </p>
+                                        </div>
+                                    </div>
+                                    {can.edit ? (
+                                        <Button
+                                            onClick={() =>
+                                                openProfileDialog(
+                                                    'transport_booking',
+                                                )
+                                            }
+                                            data-test="transport-book"
+                                        >
+                                            <Plus className="mr-1.5 h-4 w-4" />
+                                            Book transport
+                                        </Button>
+                                    ) : null}
+                                </div>
+
+                                {/* Scheduled bookings (Book transport workflow) */}
+                                {bookings.length > 0 && (
+                                    <Card>
+                                        <CardHeader className="pb-2">
+                                            <CardTitle className="flex items-center gap-2 text-base">
+                                                <Truck className="h-4 w-4" />{' '}
+                                                Scheduled transport
+                                            </CardTitle>
+                                        </CardHeader>
+                                        <CardContent>
+                                            <div className="space-y-2">
+                                                {bookings.map((b: any) => (
+                                                    <div
+                                                        key={b.id}
+                                                        className="flex items-center justify-between gap-3 rounded-lg border p-3 text-sm"
+                                                    >
+                                                        <div className="min-w-0 flex-1">
+                                                            <div className="flex flex-wrap items-center gap-2">
+                                                                <span className="truncate font-semibold">
+                                                                    {b.purpose}
+                                                                </span>
+                                                                <Badge
+                                                                    variant={
+                                                                        b.status ===
+                                                                        'confirmed'
+                                                                            ? 'default'
+                                                                            : 'outline'
+                                                                    }
+                                                                    className="shrink-0 text-[10px] capitalize"
+                                                                >
+                                                                    {b.status}
+                                                                </Badge>
+                                                                {b.escort_required ? (
+                                                                    <Badge
+                                                                        variant="outline"
+                                                                        className="shrink-0 text-[10px]"
+                                                                    >
+                                                                        Escort
+                                                                    </Badge>
+                                                                ) : null}
+                                                                {b.return_trip ? (
+                                                                    <Badge
+                                                                        variant="outline"
+                                                                        className="shrink-0 text-[10px]"
+                                                                    >
+                                                                        Return
+                                                                    </Badge>
+                                                                ) : null}
+                                                            </div>
+                                                            <div className="mt-0.5 flex flex-wrap items-center gap-x-2 text-xs text-muted-foreground">
+                                                                {b.scheduled_at ? (
+                                                                    <span>
+                                                                        {formatDateTimeLong(
+                                                                            b.scheduled_at,
+                                                                        )}
+                                                                    </span>
+                                                                ) : null}
+                                                                {b.destination ? (
+                                                                    <span>
+                                                                        ·{' '}
+                                                                        {
+                                                                            b.destination
+                                                                        }
+                                                                    </span>
+                                                                ) : null}
+                                                                {b.vehicle ? (
+                                                                    <span>
+                                                                        ·{' '}
+                                                                        {
+                                                                            b.vehicle
+                                                                        }
+                                                                    </span>
+                                                                ) : null}
+                                                                {b.driver
+                                                                    ?.name ? (
+                                                                    <span>
+                                                                        ·{' '}
+                                                                        {
+                                                                            b
+                                                                                .driver
+                                                                                .name
+                                                                        }
+                                                                    </span>
+                                                                ) : null}
+                                                            </div>
+                                                        </div>
+                                                        {can.edit ? (
+                                                            <Button
+                                                                size="sm"
+                                                                variant="ghost"
+                                                                className="shrink-0 text-status-critical hover:bg-status-critical-bg hover:text-status-critical"
+                                                                onClick={() =>
+                                                                    router.delete(
+                                                                        `/operations/clients/${client.id}/transport-bookings/${b.id}`,
+                                                                        {
+                                                                            preserveScroll: true,
+                                                                            onSuccess:
+                                                                                () =>
+                                                                                    router.reload(
+                                                                                        {
+                                                                                            only: [
+                                                                                                'transport',
+                                                                                            ],
+                                                                                        },
+                                                                                    ),
+                                                                        },
+                                                                    )
+                                                                }
+                                                            >
+                                                                Cancel
+                                                            </Button>
+                                                        ) : null}
+                                                    </div>
+                                                ))}
+                                            </div>
+                                        </CardContent>
+                                    </Card>
+                                )}
+
                                 {/* Stats */}
                                 <div className="grid gap-3 sm:grid-cols-3">
                                     <Card className="border bg-status-info-bg">

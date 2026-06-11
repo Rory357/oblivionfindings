@@ -59,6 +59,26 @@ function categoryLabel(value?: string | null) {
     return String(value ?? 'other').replace(/_/g, ' ');
 }
 
+/** Note-type badge meta — progress notes & handovers carry their own tone so
+ * the type reads at a glance in the Daily Notes feed. */
+const NOTE_TYPE_META: Record<string, { label: string; className: string }> = {
+    daily_note: { label: 'Daily note', className: 'bg-muted text-muted-foreground' },
+    quick: { label: 'Quick note', className: 'bg-muted text-muted-foreground' },
+    note: { label: 'Note', className: 'bg-muted text-muted-foreground' },
+    progress_note: {
+        label: 'Progress note',
+        className: 'bg-status-info-bg text-status-info',
+    },
+    handover: {
+        label: 'Handover',
+        className: 'bg-status-warning-bg text-status-warning',
+    },
+    communication: {
+        label: 'Communication',
+        className: 'bg-status-info-bg text-status-info',
+    },
+};
+
 const CONTACT_METHOD_ICONS: Record<
     string,
     ComponentType<{ className?: string }>
@@ -117,6 +137,16 @@ export function DailyNoteEntry({
             <div className="flex flex-col gap-3 sm:flex-row sm:items-start sm:justify-between">
                 <div className="min-w-0 space-y-2">
                     <div className="flex flex-wrap items-center gap-2">
+                        {note.type && NOTE_TYPE_META[note.type] ? (
+                            <Badge
+                                className={cn(
+                                    'border-0',
+                                    NOTE_TYPE_META[note.type].className,
+                                )}
+                            >
+                                {NOTE_TYPE_META[note.type].label}
+                            </Badge>
+                        ) : null}
                         <Badge variant="secondary">
                             {categoryLabel(note.category)}
                         </Badge>

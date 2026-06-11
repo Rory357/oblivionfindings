@@ -115,6 +115,31 @@ function filterFromQuery(): DailyNotesFilter {
     return 'all';
 }
 
+/** Note-type buckets — progress notes & handovers are first-class note types
+ * on this feed since the standalone progress-note page was retired. */
+type NoteTypeFilter = 'all' | 'daily' | 'progress' | 'handover';
+
+const NOTE_TYPE_BUCKET: Record<string, Exclude<NoteTypeFilter, 'all'>> = {
+    daily_note: 'daily',
+    quick: 'daily',
+    note: 'daily',
+    progress_note: 'progress',
+    handover: 'handover',
+};
+
+function noteTypeBucket(type?: string | null): Exclude<NoteTypeFilter, 'all'> {
+    return NOTE_TYPE_BUCKET[type ?? 'daily_note'] ?? 'daily';
+}
+
+function noteTypeFromQuery(): NoteTypeFilter {
+    if (typeof window === 'undefined') return 'all';
+    const value = new URLSearchParams(window.location.search).get('type');
+    if (value === 'progress' || value === 'handover' || value === 'daily') {
+        return value;
+    }
+    return 'all';
+}
+
 export function DailyNotesTab({
     clientId,
     notes,
@@ -133,6 +158,9 @@ export function DailyNotesTab({
     const [query, setQuery] = useState('');
     const [filter, setFilter] = useState<DailyNotesFilter>(
         () => filterPreset ?? filterFromQuery(),
+    );
+    const [noteType, setNoteType] = useState<NoteTypeFilter>(() =>
+        noteTypeFromQuery(),
     );
     const [category, setCategory] = useState<string>('all');
     const [mineOnly, setMineOnly] = useState(false);
@@ -155,6 +183,7 @@ export function DailyNotesTab({
     const clearFilters = () => {
         setQuery('');
         setFilter('all');
+        setNoteType('all');
         setCategory('all');
         setMineOnly(false);
         setFamilyVisibleOnly(false);
@@ -167,6 +196,7 @@ export function DailyNotesTab({
         let count = 0;
         if (query.trim()) count += 1;
         if (filter !== 'all') count += 1;
+        if (noteType !== 'all') count += 1;
         if (category !== 'all') count += 1;
         if (mineOnly) count += 1;
         if (familyVisibleOnly) count += 1;
@@ -176,6 +206,7 @@ export function DailyNotesTab({
     }, [
         query,
         filter,
+        noteType,
         category,
         mineOnly,
         familyVisibleOnly,
@@ -194,6 +225,9 @@ export function DailyNotesTab({
             if (filter === 'flagged' && !note.is_flagged) return false;
             if (filter === 'drafts' && !note.is_draft) return false;
             if (filter === 'follow_up' && !note.follow_up_action?.trim()) {
+                return false;
+            }
+            if (noteType !== 'all' && noteTypeBucket(note.type) !== noteType) {
                 return false;
             }
             if (category !== 'all' && (note.category ?? 'other') !== category) {
@@ -238,9 +272,22 @@ export function DailyNotesTab({
         familyVisibleOnly,
         filter,
         mineOnly,
+        noteType,
         notes,
         query,
     ]);
+
+    const noteTypeCounts = useMemo(() => {
+        const counts: Record<Exclude<NoteTypeFilter, 'all'>, number> = {
+            daily: 0,
+            progress: 0,
+            handover: 0,
+        };
+        notes.forEach((note) => {
+            counts[noteTypeBucket(note.type)] += 1;
+        });
+        return counts;
+    }, [notes]);
 
     const reviewQueue = notes.filter(
         (note) => note.is_flagged && !note.reviewed_at,
@@ -307,6 +354,7 @@ export function DailyNotesTab({
                         summary[stat.key as keyof DailyNotesSummary] ?? 0;
 
                     return (
+                        // eslint-disable-next-line no-restricted-syntax -- MiniStat tile per the profile pattern language, not a Card
                         <div
                             key={stat.key}
                             className="rounded-lg border bg-card p-4"
@@ -408,6 +456,57 @@ export function DailyNotesTab({
                             Daily Note
                         </Button>
                     </div>
+                </div>
+
+                {/* Note-type filter — progress notes & handovers are first-class
+                    here since the standalone progress-note page was retired. */}
+                <div className="flex flex-wrap items-center gap-1.5">
+                    {(
+                        [
+                            ['all', 'All', notes.length],
+                            ['daily', 'Daily notes', noteTypeCounts.daily],
+                            [
+                                'progress',
+                                'Progress notes',
+                                noteTypeCounts.progress,
+                            ],
+                            [
+                                'handover',
+                                'Handovers',
+                                noteTypeCounts.handover,
+                            ],
+                        ] as [NoteTypeFilter, string, number][]
+                    ).map(([key, label, count]) => {
+                        const active = noteType === key;
+                        return (
+                            // eslint-disable-next-line no-restricted-syntax -- filter chip pill, not a standard button
+                            <button
+                                key={key}
+                                type="button"
+                                aria-pressed={active}
+                                onClick={() => setNoteType(key)}
+                                data-test={`client-daily-notes-type-${key}`}
+                                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full px-3 py-1.5 text-sm font-medium transition-colors ${
+                                    active
+                                        ? 'bg-primary text-primary-foreground'
+                                        : 'bg-muted text-muted-foreground hover:text-foreground'
+                                }`}
+                            >
+                                {label}
+                                {count > 0 ? (
+                                    <span
+                                        className={`rounded-full px-1.5 text-[10px] font-bold ${
+                                            active
+                                                ? 'bg-primary-foreground/20'
+                                                : 'bg-card'
+                                        }`}
+                                    >
+                                        {count}
+                                    </span>
+                                ) : null}
+                            </button>
+                        );
+                    })}
                 </div>
 
                 <div className="flex flex-wrap items-end gap-3">

@@ -13,11 +13,13 @@ class ClientOnboardingStep extends Model
         'organization_id',
         'workflow_id',
         'step_name',
+        'category',
         'step_order',
         'is_required',
         'status',
         'completed_at',
         'completed_by',
+        'assigned_to',
         'notes',
         'due_date',
     ];
@@ -36,5 +38,10 @@ class ClientOnboardingStep extends Model
     public function completer()
     {
         return $this->belongsTo(User::class, 'completed_by');
+    }
+
+    public function assignee()
+    {
+        return $this->belongsTo(User::class, 'assigned_to');
     }
 }

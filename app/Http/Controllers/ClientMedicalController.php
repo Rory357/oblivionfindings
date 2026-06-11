@@ -779,7 +779,16 @@ class ClientMedicalController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'relationship' => ['nullable', 'string', 'max:255'],
             'phone' => ['nullable', 'string', 'max:255'],
+            'alternate_phone' => ['nullable', 'string', 'max:255'],
             'email' => ['nullable', 'string', 'max:255'],
+            'address' => ['nullable', 'string', 'max:500'],
+            'preferred_method' => ['nullable', 'string', 'in:phone,text,email'],
+            'availability' => ['nullable', 'string', 'max:255'],
+            'is_primary_contact' => ['nullable', 'boolean'],
+            'can_view_medical' => ['nullable', 'boolean'],
+            'can_view_medications' => ['nullable', 'boolean'],
+            'can_view_incidents' => ['nullable', 'boolean'],
+            'can_receive_updates' => ['nullable', 'boolean'],
             'notes' => ['nullable', 'string'],
         ]);
 
@@ -811,7 +820,16 @@ class ClientMedicalController extends Controller
             'name' => ['required', 'string', 'max:255'],
             'relationship' => ['nullable', 'string', 'max:255'],
             'phone' => ['nullable', 'string', 'max:255'],
+            'alternate_phone' => ['nullable', 'string', 'max:255'],
             'email' => ['nullable', 'string', 'max:255'],
+            'address' => ['nullable', 'string', 'max:500'],
+            'preferred_method' => ['nullable', 'string', 'in:phone,text,email'],
+            'availability' => ['nullable', 'string', 'max:255'],
+            'is_primary_contact' => ['nullable', 'boolean'],
+            'can_view_medical' => ['nullable', 'boolean'],
+            'can_view_medications' => ['nullable', 'boolean'],
+            'can_view_incidents' => ['nullable', 'boolean'],
+            'can_receive_updates' => ['nullable', 'boolean'],
             'notes' => ['nullable', 'string'],
         ]);
 

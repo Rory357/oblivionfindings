@@ -74,6 +74,11 @@ export function DailyNoteWizard({
         mode === 'communication' ? 'communication' : 'daily_note',
     );
     const [step, setStep] = useState(0);
+    // Note type is first-class since the standalone progress-note page was
+    // retired — progress notes & handovers are written from this wizard.
+    const [noteType, setNoteType] = useState<
+        'daily_note' | 'progress_note' | 'handover'
+    >('daily_note');
     const [tagText, setTagText] = useState('');
     const [concernText, setConcernText] = useState('');
     const [processing, setProcessing] = useState(false);
@@ -94,6 +99,7 @@ export function DailyNoteWizard({
                 ),
             );
             setStep(0);
+            setNoteType('daily_note');
             setTagText('');
             setConcernText('');
             setProcessing(false);
@@ -133,7 +139,7 @@ export function DailyNoteWizard({
         const concernFlags = splitTags(concernText);
         const payload = {
             ...form.data,
-            type: isCommunication ? 'communication' : 'daily_note',
+            type: isCommunication ? 'communication' : noteType,
             behaviour_tags: behaviourTags,
             concerns_flags: concernFlags,
             mood_rating:
@@ -227,6 +233,59 @@ export function DailyNoteWizard({
                         className="space-y-4"
                         data-test="daily-note-step-category"
                     >
+                        {!isCommunication ? (
+                            <div className="space-y-2">
+                                <Label>Note type</Label>
+                                <div className="grid gap-2 sm:grid-cols-3">
+                                    {(
+                                        [
+                                            [
+                                                'daily_note',
+                                                'Daily note',
+                                                'What happened on shift',
+                                            ],
+                                            [
+                                                'progress_note',
+                                                'Progress note',
+                                                'Movement on a goal or plan',
+                                            ],
+                                            [
+                                                'handover',
+                                                'Handover',
+                                                'Brief the next shift',
+                                            ],
+                                        ] as const
+                                    ).map(([key, label, desc]) => {
+                                        const active = noteType === key;
+                                        return (
+                                            // eslint-disable-next-line no-restricted-syntax -- selector tile card, not a standard button
+                                            <button
+                                                key={key}
+                                                type="button"
+                                                aria-pressed={active}
+                                                onClick={() =>
+                                                    setNoteType(key)
+                                                }
+                                                data-test={`daily-note-type-${key}`}
+                                                className={cn(
+                                                    'flex flex-col gap-0.5 rounded-lg border p-3 text-left transition-all hover:border-primary/50',
+                                                    active
+                                                        ? 'border-primary bg-primary/10 ring-1 ring-primary/40'
+                                                        : 'border-border bg-card/50',
+                                                )}
+                                            >
+                                                <span className="text-sm font-semibold">
+                                                    {label}
+                                                </span>
+                                                <span className="text-xs text-muted-foreground">
+                                                    {desc}
+                                                </span>
+                                            </button>
+                                        );
+                                    })}
+                                </div>
+                            </div>
+                        ) : null}
                         <NoteCategoryPicker
                             value={form.data.category}
                             onChange={(value: NoteCategoryKey) =>
