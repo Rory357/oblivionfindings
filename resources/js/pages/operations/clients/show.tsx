@@ -1,4 +1,3 @@
-import { BehaviourInsightsCard } from '@/components/behaviour-insights-card';
 import { ClientEditDialog } from '@/components/client-edit-dialog';
 import ClientLocationTab, {
     type ClientLocationData,
@@ -28,7 +27,8 @@ import {
     OverviewDesignGrid,
     buildAboutTiles,
 } from '@/components/clients/profile/overview-grid';
-import ClientObservationsTab from '@/components/clinical/client-observations-tab';
+import { BehaviourAbcTab } from '@/components/clients/profile/tabs/behaviour-abc';
+import type { AbcEntryRow } from '@/components/clients/profile/abc-dialog';
 import { type HealthSummary } from '@/components/clinical/health-summary-card';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
@@ -1006,6 +1006,8 @@ export default function ClientShow({
     const [paletteOpen, setPaletteOpen] = useState(false);
     const [profileDialog, setProfileDialog] =
         useState<ProfileDialogState>(null);
+    // Bumped when the ABC dialog closes so the lazy-fetched ABC log re-fetches.
+    const [abcRefreshToken, setAbcRefreshToken] = useState(0);
 
     const openProfileDialog = useCallback(
         (key: string, ctx?: Record<string, unknown>) => {
@@ -1922,7 +1924,17 @@ export default function ClientShow({
 
                 <ProfileDialogs
                     dialog={profileDialog}
-                    onClose={() => setProfileDialog(null)}
+                    onClose={() => {
+                        if (profileDialog?.key === 'abc') {
+                            setAbcRefreshToken((t) => t + 1);
+                            router.reload({
+                                only: ['behaviour_patterns'],
+                                preserveScroll: true,
+                                preserveState: true,
+                            });
+                        }
+                        setProfileDialog(null);
+                    }}
                     flowContext={flowContext}
                     medications={(medical?.medications ?? []) as any[]}
                 />
@@ -3040,51 +3052,16 @@ export default function ClientShow({
                 )}
 
                 {tab === 'observations' && (
-                    <div className="space-y-6">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div className="flex items-center gap-3">
-                                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-primary">
-                                    <Stethoscope className="h-[19px] w-[19px]" />
-                                </span>
-                                <div>
-                                    <h2 className="text-lg leading-tight font-semibold">
-                                        Behaviour observations
-                                    </h2>
-                                    <p className="text-sm text-muted-foreground">
-                                        ABC charting & clinical observations
-                                    </p>
-                                </div>
-                            </div>
-                            {can.record_event ? (
-                                <Button
-                                    onClick={() =>
-                                        openProfileDialog('abc_entry')
-                                    }
-                                    data-test="observations-abc-entry"
-                                >
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    New ABC entry
-                                </Button>
-                            ) : null}
-                        </div>
-                        <BehaviourInsightsCard
-                            patterns={
-                                (pageProps as any).behaviour_patterns as any
-                            }
-                            description="Rolled-up trends from clinical observations and flagged daily notes for this client."
-                        />
-                        <ClientObservationsTab
-                            clientId={client.id}
-                            canRecordObservation={Boolean(
-                                can.record_observation ||
-                                can.record_clinical_observation,
-                            )}
-                            canRecordClinical={Boolean(
-                                can.record_clinical_observation,
-                            )}
-                            canRecordEvent={Boolean(can.record_event)}
-                        />
-                    </div>
+                    <BehaviourAbcTab
+                        clientId={client.id}
+                        patterns={(pageProps as any).behaviour_patterns as any}
+                        canRecord={Boolean(can.record_event)}
+                        onNewEntry={() => openProfileDialog('abc')}
+                        onOpenEntry={(entry: AbcEntryRow) =>
+                            openProfileDialog('abc', { entry })
+                        }
+                        refreshToken={abcRefreshToken}
+                    />
                 )}
 
                 {tab === 'care_plans' && (

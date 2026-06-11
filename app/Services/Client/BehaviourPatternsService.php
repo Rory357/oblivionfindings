@@ -2,17 +2,19 @@
 
 namespace App\Services\Client;
 
-use App\Domain\Clinical\Models\ClinicalObservation;
+use App\Domain\Clinical\Enums\BehaviourFunction;
+use App\Models\BehaviourAbcEntry;
 use App\Models\Client;
 use App\Models\ClientNote;
 use App\Models\User;
 use Carbon\Carbon;
+use Illuminate\Support\Collection;
 
 /**
- * Phase 3 behaviour pattern insights: aggregates clinical_observations and
- * concern-flagged ClientNote rows to surface top triggers, common
- * antecedents, recurring concerns, and a simple frequency-over-time curve.
- * Read-only — feeds the Observations and Actions-and-Reviews tabs.
+ * Positive Behaviour Support insights for the Behaviour / ABC tab. Aggregates
+ * structured behaviour_abc_entries (function breakdown, intensity mix, settings,
+ * behaviour tags, a frequency curve) plus concern-flagged ClientNote rows as a
+ * secondary signal. Read-only — feeds the `behaviour_patterns` prop.
  */
 class BehaviourPatternsService
 {
@@ -29,10 +31,10 @@ class BehaviourPatternsService
 
         $since = Carbon::now()->subDays($days);
 
-        $observations = ClinicalObservation::query()
-            ->where('client_id', $client->id)
-            ->where('recorded_at', '>=', $since)
-            ->orderByDesc('recorded_at')
+        $entries = BehaviourAbcEntry::query()
+            ->forClient($client->id)
+            ->since($since)
+            ->recent()
             ->get();
 
         $concernNotes = ClientNote::query()
@@ -46,29 +48,18 @@ class BehaviourPatternsService
             ->orderByDesc('created_at')
             ->get();
 
-        $byDay = $this->buildDailySeries($observations, $concernNotes, $days);
-        $topTriggers = $this->topValues($observations, 'trigger', 5);
-        $topAntecedents = $this->topValues($observations, 'antecedent', 5);
-        $topResponses = $this->topValues($observations, 'response', 5);
-
-        $behaviourTags = $concernNotes
-            ->flatMap(fn ($note) => $note->behaviour_tags ?? [])
-            ->countBy()
-            ->sortDesc()
-            ->take(8)
-            ->map(fn ($count, $tag) => ['label' => (string) $tag, 'count' => $count])
-            ->values()
-            ->all();
-
         return [
             'window_days' => $days,
-            'observation_count' => $observations->count(),
+            'entry_count' => $entries->count(),
             'concern_note_count' => $concernNotes->count(),
-            'top_triggers' => $topTriggers,
-            'top_antecedents' => $topAntecedents,
-            'top_responses' => $topResponses,
-            'top_behaviour_tags' => $behaviourTags,
-            'daily_series' => $byDay,
+            'escalated_count' => $entries->where('escalated', true)->count(),
+            'with_harm_count' => $entries->where('harm_occurred', true)->count(),
+            'function_breakdown' => $this->functionBreakdown($entries),
+            'intensity_mix' => $this->intensityMix($entries),
+            'top_settings' => $this->topValues($entries, fn ($e) => $e->setting, 5),
+            'top_strategies' => $this->topValues($entries, fn ($e) => $e->strategies_used, 5),
+            'top_behaviour_tags' => $this->topBehaviourTags($entries, $concernNotes),
+            'daily_series' => $this->buildDailySeries($entries, $concernNotes, $days),
         ];
     }
 
@@ -79,37 +70,95 @@ class BehaviourPatternsService
     {
         return [
             'window_days' => $days,
-            'observation_count' => 0,
+            'entry_count' => 0,
             'concern_note_count' => 0,
-            'top_triggers' => [],
-            'top_antecedents' => [],
-            'top_responses' => [],
+            'escalated_count' => 0,
+            'with_harm_count' => 0,
+            'function_breakdown' => [],
+            'intensity_mix' => ['low' => 0, 'medium' => 0, 'high' => 0],
+            'top_settings' => [],
+            'top_strategies' => [],
             'top_behaviour_tags' => [],
             'daily_series' => [],
         ];
     }
 
     /**
+     * Count entries per hypothesised function, ordered by the enum so the
+     * breakdown is stable. Always emits a row per function (zeroes included)
+     * so the chart axis is consistent.
+     *
+     * @param  Collection<int, BehaviourAbcEntry>  $entries
+     * @return array<int, array{key: string, label: string, count: int}>
+     */
+    private function functionBreakdown(Collection $entries): array
+    {
+        $counts = $entries
+            ->filter(fn ($e) => $e->behaviour_function !== null)
+            ->countBy(fn ($e) => $e->behaviour_function->value);
+
+        return collect(BehaviourFunction::cases())
+            ->map(fn (BehaviourFunction $f) => [
+                'key' => $f->value,
+                'label' => $f->label(),
+                'count' => (int) ($counts[$f->value] ?? 0),
+            ])
+            ->filter(fn ($row) => $row['count'] > 0)
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  Collection<int, BehaviourAbcEntry>  $entries
+     * @return array{low: int, medium: int, high: int}
+     */
+    private function intensityMix(Collection $entries): array
+    {
+        return [
+            'low' => $entries->where('intensity', 'low')->count(),
+            'medium' => $entries->where('intensity', 'medium')->count(),
+            'high' => $entries->where('intensity', 'high')->count(),
+        ];
+    }
+
+    /**
+     * Recurring behaviour tags, merged from ABC entries and concern-flagged
+     * notes (both are behaviour signals).
+     *
+     * @param  Collection<int, BehaviourAbcEntry>  $entries
+     * @param  Collection<int, ClientNote>  $concernNotes
      * @return array<int, array<string, mixed>>
      */
-    private function buildDailySeries($observations, $concernNotes, int $days): array
+    private function topBehaviourTags(Collection $entries, Collection $concernNotes): array
+    {
+        return $entries
+            ->flatMap(fn ($e) => $e->behaviour_tags ?? [])
+            ->merge($concernNotes->flatMap(fn ($note) => $note->behaviour_tags ?? []))
+            ->countBy()
+            ->sortDesc()
+            ->take(8)
+            ->map(fn ($count, $tag) => ['label' => (string) $tag, 'count' => $count])
+            ->values()
+            ->all();
+    }
+
+    /**
+     * @param  Collection<int, BehaviourAbcEntry>  $entries
+     * @return array<int, array<string, mixed>>
+     */
+    private function buildDailySeries(Collection $entries, Collection $concernNotes, int $days): array
     {
         $series = [];
         $today = Carbon::today();
         for ($i = $days - 1; $i >= 0; $i--) {
-            $day = $today->copy()->subDays($i);
-            $key = $day->toDateString();
-            $series[$key] = [
-                'date' => $key,
-                'observations' => 0,
-                'concerns' => 0,
-            ];
+            $key = $today->copy()->subDays($i)->toDateString();
+            $series[$key] = ['date' => $key, 'entries' => 0, 'concerns' => 0];
         }
 
-        foreach ($observations as $observation) {
-            $date = $observation->recorded_at?->toDateString();
+        foreach ($entries as $entry) {
+            $date = $entry->occurred_at?->toDateString();
             if ($date && isset($series[$date])) {
-                $series[$date]['observations']++;
+                $series[$date]['entries']++;
             }
         }
         foreach ($concernNotes as $note) {
@@ -123,23 +172,18 @@ class BehaviourPatternsService
     }
 
     /**
+     * Best-effort frequency clustering of a short free-text field (setting,
+     * strategy). Clusters identical entries — useful for short, repeated values.
+     *
+     * @param  Collection<int, BehaviourAbcEntry>  $entries
+     * @param  callable(BehaviourAbcEntry): ?string  $accessor
      * @return array<int, array<string, mixed>>
      */
-    private function topValues($observations, string $key, int $limit = 5): array
+    private function topValues(Collection $entries, callable $accessor, int $limit = 5): array
     {
-        return $observations
-            ->pluck('data')
-            ->map(function ($data) use ($key) {
-                if (! is_array($data)) {
-                    return null;
-                }
-                $value = $data[$key] ?? null;
-                if (is_string($value) && trim($value) !== '') {
-                    return trim($value);
-                }
-
-                return null;
-            })
+        return $entries
+            ->map($accessor)
+            ->map(fn ($v) => is_string($v) && trim($v) !== '' ? trim($v) : null)
             ->filter()
             ->countBy()
             ->sortDesc()

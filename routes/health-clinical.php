@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Clinical\BehaviourAbcController;
 use App\Http\Controllers\Clinical\ClientClinicalController;
 use App\Http\Controllers\Clinical\HealthClinicalClientTrendsController;
 use App\Http\Controllers\Clinical\HealthClinicalDashboardController;
@@ -69,6 +70,15 @@ Route::middleware(['auth'])->group(function () {
         Route::get('observations', [ClientClinicalController::class, 'observations'])->name('observations.index');
         Route::post('observations', [ClientClinicalController::class, 'store'])->name('observations.store');
         Route::post('events', [ClientClinicalController::class, 'storeEvent'])->name('events.store');
+    });
+
+    // ── Client-scoped Behaviour / ABC charting ────────────────────────────
+    Route::prefix('clients/{client}/behaviour/abc')->name('clients.behaviour.abc.')->group(function () {
+        Route::get('/', [BehaviourAbcController::class, 'index'])->name('index');
+        Route::post('/', [BehaviourAbcController::class, 'store'])->name('store');
+        Route::get('/{abc}', [BehaviourAbcController::class, 'show'])->name('show');
+        Route::put('/{abc}', [BehaviourAbcController::class, 'update'])->name('update');
+        Route::delete('/{abc}', [BehaviourAbcController::class, 'destroy'])->name('destroy');
     });
 
     // ── Shift-scoped clinical routes ───────────────────────────────────

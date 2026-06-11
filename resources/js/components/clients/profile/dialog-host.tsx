@@ -4,6 +4,7 @@
  * their own components. Keys owned by show.tsx's pre-existing dialogs
  * (daily/quick/communication note, edit profile) are delegated before this
  * component is reached. */
+import { AbcEntryDialog, type AbcEntryRow } from './abc-dialog';
 import { CarePlanWizardDialog, type CarePlanForEdit } from './care-plan-dialog';
 import { EmarRecordDialog, type EmarMedication } from './emar-dialog';
 import { FamilyChatPopup } from './family-chat';
@@ -52,6 +53,21 @@ export function ProfileDialogs({
                 carePlanId={flowContext.carePlanId}
                 clientLabel={flowContext.clientLabel}
                 goal={(dialog.ctx?.goal as GoalCard | undefined) ?? null}
+            />
+        );
+    }
+
+    if (dialog.key === 'abc') {
+        return (
+            <AbcEntryDialog
+                open
+                onClose={onClose}
+                clientId={flowContext.clientId}
+                clientLabel={flowContext.clientLabel}
+                preferredName={flowContext.preferredName}
+                entry={(dialog.ctx?.entry as AbcEntryRow | undefined) ?? null}
+                carePlanId={flowContext.carePlanId}
+                carePlanTitle={flowContext.carePlanTitle}
             />
         );
     }

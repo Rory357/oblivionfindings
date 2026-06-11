@@ -56,6 +56,8 @@ const TYPE_LABELS: Record<string, string> = {
     shift: 'Shift',
     medication: 'Medication',
     assessment: 'Assessment',
+    clinical_event: 'Clinical event',
+    behaviour_abc_entry: 'ABC entry',
 };
 
 function typeLabel(type: string): string {
