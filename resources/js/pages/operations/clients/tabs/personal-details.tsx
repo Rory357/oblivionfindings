@@ -1,4 +1,5 @@
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { EmptyState } from '@/components/ui/empty-state';
 import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
@@ -21,6 +22,7 @@ import {
     Languages,
     Mail,
     MapPin,
+    Pencil,
     Phone,
     Shield,
     ShieldAlert,
@@ -98,10 +100,14 @@ type PersonRecord = {
 };
 
 type PersonalDetailsTabProps = {
-    client: ClientPersonalDetailsClient;
+    client: ClientPersonalDetailsClient & {
+        service_context?: { id: number; name?: string | null } | null;
+    };
     supportWorkers?: { id: number; name?: string | null }[];
     emergencyContacts?: PersonRecord[];
     nextOfKins?: PersonRecord[];
+    /** Opens the Complete-profile wizard (design: header Edit button). */
+    onEdit?: () => void;
 };
 
 function formatDate(value?: string | null) {
@@ -161,12 +167,13 @@ function fluidTarget(client: ClientPersonalDetailsClient): string | null {
     return `${min ?? '?'}–${max ?? '?'} ml / day`;
 }
 
+/* Design contract (tabs-misc.jsx PersonalTab): clean uppercase label over the
+ * value — no per-row icon chips. Icon prop kept for call-site compatibility. */
 function DetailRow({
-    icon: Icon,
     label,
     value,
 }: {
-    icon: ComponentType<{ className?: string }>;
+    icon?: ComponentType<{ className?: string }>;
     label: string;
     value: React.ReactNode;
 }) {
@@ -174,21 +181,18 @@ function DetailRow({
     const empty = display === '' || display == null || display === '—';
 
     return (
-        <div className="flex items-start gap-3 py-2">
-            <span className="mt-0.5 rounded-md bg-muted p-1.5">
-                <Icon className="h-3.5 w-3.5 text-muted-foreground" />
-            </span>
-            <div className="min-w-0 flex-1">
-                <p className="text-xs text-muted-foreground">{label}</p>
-                <p
-                    className={cn(
-                        'mt-0.5 text-sm',
-                        empty ? 'italic text-muted-foreground' : 'font-medium',
-                    )}
-                >
-                    {empty ? 'Not recorded' : display}
-                </p>
-            </div>
+        <div className="py-2">
+            <p className="text-[11px] tracking-wide text-muted-foreground uppercase">
+                {label}
+            </p>
+            <p
+                className={cn(
+                    'mt-0.5 text-sm',
+                    empty ? 'text-muted-foreground italic' : 'font-medium',
+                )}
+            >
+                {empty ? 'Not recorded' : display}
+            </p>
         </div>
     );
 }
@@ -198,6 +202,7 @@ export function PersonalDetailsTab({
     supportWorkers = [],
     emergencyContacts = [],
     nextOfKins = [],
+    onEdit,
 }: PersonalDetailsTabProps) {
     const name = [client.first_name, client.last_name]
         .filter(Boolean)
@@ -208,6 +213,29 @@ export function PersonalDetailsTab({
 
     return (
         <div className="space-y-6" data-test="client-personal-details-tab">
+            {/* Design header: icon tile + title/sub + Edit (tabs-misc.jsx PersonalTab) */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-primary">
+                        <UserCircle2 className="h-[19px] w-[19px]" />
+                    </span>
+                    <div>
+                        <h2 className="text-lg leading-tight font-semibold">
+                            Personal details
+                        </h2>
+                        <p className="text-sm text-muted-foreground">
+                            Identity, contact & service information
+                        </p>
+                    </div>
+                </div>
+                {onEdit ? (
+                    <Button onClick={onEdit} data-test="personal-details-edit">
+                        <Pencil className="mr-1.5 h-4 w-4" />
+                        Edit
+                    </Button>
+                ) : null}
+            </div>
+
             <div className="grid gap-4 md:grid-cols-2 xl:grid-cols-3">
                 <Card>
                     <CardHeader>
@@ -308,6 +336,58 @@ export function PersonalDetailsTab({
                 <Card>
                     <CardHeader>
                         <CardTitle className="flex items-center gap-2 text-base">
+                            <Home className="h-4 w-4 text-primary" />
+                            Service
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="divide-y">
+                        <DetailRow label="Site" value={client.site?.name} />
+                        <DetailRow
+                            label="Service"
+                            value={client.service_context?.name}
+                        />
+                        <DetailRow
+                            label="Funding"
+                            value={
+                                client.funding_type ? (
+                                    <span>
+                                        {client.funding_type}
+                                        {client.funding_notes ? (
+                                            <span className="ml-1 text-muted-foreground">
+                                                · {client.funding_notes}
+                                            </span>
+                                        ) : null}
+                                    </span>
+                                ) : null
+                            }
+                        />
+                        <DetailRow
+                            label="Key worker"
+                            value={client.key_worker?.name}
+                        />
+                        <DetailRow
+                            label="Since"
+                            value={formatDate(client.service_start_date)}
+                        />
+                        <DetailRow
+                            label="Status"
+                            value={
+                                client.status ? (
+                                    <Badge
+                                        variant="outline"
+                                        className="capitalize"
+                                    >
+                                        {client.status}
+                                    </Badge>
+                                ) : null
+                            }
+                        />
+                    </CardContent>
+                </Card>
+
+                <Card>
+                    <CardHeader>
+                        <CardTitle className="flex items-center gap-2 text-base">
                             <Globe2 className="h-4 w-4 text-primary" />
                             Cultural identity
                         </CardTitle>
@@ -340,62 +420,6 @@ export function PersonalDetailsTab({
                             icon={Heart}
                             label="Religion"
                             value={client.religion}
-                        />
-                    </CardContent>
-                </Card>
-
-                <Card>
-                    <CardHeader>
-                        <CardTitle className="flex items-center gap-2 text-base">
-                            <Home className="h-4 w-4 text-primary" />
-                            Service context
-                        </CardTitle>
-                    </CardHeader>
-                    <CardContent className="divide-y">
-                        <DetailRow
-                            icon={Home}
-                            label="Site"
-                            value={client.site?.name}
-                        />
-                        <DetailRow
-                            icon={UserCircle2}
-                            label="Key worker"
-                            value={client.key_worker?.name}
-                        />
-                        <DetailRow
-                            icon={Cake}
-                            label="Service started"
-                            value={formatDate(client.service_start_date)}
-                        />
-                        <DetailRow
-                            icon={UserCircle2}
-                            label="Status"
-                            value={
-                                client.status ? (
-                                    <Badge
-                                        variant="outline"
-                                        className="capitalize"
-                                    >
-                                        {client.status}
-                                    </Badge>
-                                ) : null
-                            }
-                        />
-                        <DetailRow
-                            icon={Sparkles}
-                            label="Funding"
-                            value={
-                                client.funding_type ? (
-                                    <span>
-                                        {client.funding_type}
-                                        {client.funding_notes ? (
-                                            <span className="ml-1 text-muted-foreground">
-                                                · {client.funding_notes}
-                                            </span>
-                                        ) : null}
-                                    </span>
-                                ) : null
-                            }
                         />
                     </CardContent>
                 </Card>

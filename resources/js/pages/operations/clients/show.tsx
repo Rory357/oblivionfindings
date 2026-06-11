@@ -9,6 +9,10 @@ import {
     type ProfileDialogState,
 } from '@/components/clients/profile/dialog-host';
 import {
+    OverviewDesignGrid,
+    buildAboutTiles,
+} from '@/components/clients/profile/overview-grid';
+import {
     AlertRibbon,
     ClientProfileHero,
     type HeroAlert,
@@ -75,6 +79,7 @@ import {
     PersonalAssetsTab,
     PhotoGalleryTab,
 } from '@/pages/operations/clients/tabs/legacy-profile-sections';
+import { IncidentsTab } from '@/pages/operations/clients/tabs/incidents-tab';
 import { MarTab } from '@/pages/operations/clients/tabs/mar';
 import { RhythmsRoutinesTab } from '@/pages/operations/clients/tabs/rhythms-routines';
 import { ClientTimelineTab } from '@/pages/operations/clients/tabs/timeline-tab';
@@ -1987,168 +1992,98 @@ export default function ClientShow({
                                     </div>
                                 )}
 
-                                {/* Row 1: Quick Stats */}
-                                <div className="grid grid-cols-2 gap-3 lg:grid-cols-4">
-                                    {/* Care Plan Status */}
-                                    <div className="rounded-xl border bg-primary/10 p-4">
-                                        <p className="text-[10px] font-semibold tracking-wider text-primary uppercase">
-                                            Care Plan
-                                        </p>
-                                        <p className="mt-1 text-lg font-bold text-primary">
-                                            {activePlan ? 'Active' : 'None'}
-                                        </p>
-                                        {reviewDays !== null && (
-                                            <p
-                                                className={`mt-0.5 text-xs ${reviewDays < 0 ? 'font-semibold text-status-critical' : 'text-primary'}`}
-                                            >
-                                                Review:{' '}
-                                                {reviewDays < 0
-                                                    ? `${Math.abs(reviewDays)}d overdue`
-                                                    : `${reviewDays}d`}
-                                            </p>
-                                        )}
-                                    </div>
-
-                                    {/* Goals */}
-                                    <div className="rounded-xl border bg-primary/10 p-4">
-                                        <p className="text-[10px] font-semibold tracking-wider text-primary uppercase">
-                                            Goals
-                                        </p>
-                                        <p className="mt-1 text-lg font-bold text-primary">
-                                            {goalsCompleted}/{goals.length}
-                                        </p>
-                                        <div className="mt-1 h-1.5 w-full overflow-hidden rounded-full bg-primary/20">
-                                            <div
-                                                className="h-full rounded-full bg-primary transition-all"
-                                                style={{
-                                                    width: `${goalsPct}%`,
-                                                }}
-                                            />
-                                        </div>
-                                    </div>
-
-                                    {/* Shifts */}
-                                    <div className="rounded-xl border bg-primary/10 p-4">
-                                        <p className="text-[10px] font-semibold tracking-wider text-primary uppercase">
-                                            Shifts
-                                        </p>
-                                        <p className="mt-1 text-lg font-bold text-primary">
-                                            {nextShiftSummary
-                                                ? 'Upcoming'
-                                                : 'None'}
-                                        </p>
-                                        {nextShiftSummary?.starts_at && (
-                                            <p className="mt-0.5 text-xs text-primary">
-                                                {new Date(
-                                                    nextShiftSummary.starts_at,
-                                                ).toLocaleDateString('en-NZ', {
-                                                    weekday: 'short',
-                                                    day: 'numeric',
-                                                    month: 'short',
-                                                })}
-                                            </p>
-                                        )}
-                                        {nextShiftSummary && (
-                                            <div className="mt-2 space-y-1 text-xs text-primary">
-                                                <p className="font-medium capitalize">
-                                                    {nextShiftTypeLabel}
-                                                    {nextShiftSummary
-                                                        .service_context?.name
-                                                        ? ` • ${nextShiftSummary.service_context.name}`
-                                                        : ''}
-                                                </p>
-                                                {nextShiftSummary.staff
-                                                    ?.name && (
-                                                    <p>
-                                                        {
-                                                            nextShiftSummary
-                                                                .staff.name
-                                                        }
-                                                    </p>
-                                                )}
-                                                {nextShiftSummary.location && (
-                                                    <p>
-                                                        {
-                                                            nextShiftSummary.location
-                                                        }
-                                                    </p>
-                                                )}
-                                                <p>
-                                                    {nextShiftSummary.incomplete_task_count ??
-                                                        0}{' '}
-                                                    incomplete tasks
-                                                    {' • '}
-                                                    {nextShiftSummary.medication_administration_count ??
-                                                        0}{' '}
-                                                    meds
-                                                    {' • '}
-                                                    {nextShiftSummary.form_submission_count ??
-                                                        0}{' '}
-                                                    forms
-                                                </p>
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    {/* Risk Level — clickable dropdown */}
-                                    <div className="rounded-xl border bg-primary/10 p-4">
-                                        <p className="text-[10px] font-semibold tracking-wider text-primary uppercase">
-                                            Risk Level
-                                        </p>
-                                        <div className="mt-1">
-                                            <Select
-                                                value={client.risk_level ?? ''}
-                                                onValueChange={(v) =>
-                                                    router.patch(
-                                                        `/operations/clients/${client.id}/quick-update`,
-                                                        { risk_level: v },
-                                                        {
-                                                            preserveScroll: true,
-                                                        },
-                                                    )
-                                                }
-                                            >
-                                                <SelectTrigger
-                                                    className={`h-8 w-full border-0 text-sm font-bold shadow-none ${
-                                                        client.risk_level ===
-                                                        'critical'
-                                                            ? 'bg-status-critical-bg text-status-critical'
+                                {/* Overview board — design composition (tabs-core OverviewTab).
+                                    Legacy depth widgets (house coverage, health summary, …)
+                                    continue below so nothing is lost. */}
+                                <OverviewDesignGrid
+                                    preferredName={preferredName}
+                                    aboutTiles={buildAboutTiles(
+                                        aboutMe ?? {},
+                                        client as any,
+                                    )}
+                                    notes={clientDailyNotes as any[]}
+                                    goals={goals as any[]}
+                                    risks={risks as any[]}
+                                    activePlan={activePlan ?? null}
+                                    reviewDays={reviewDays}
+                                    emarSummary={emarSummary}
+                                    events={
+                                        ((pageProps as any).calendar_events ??
+                                            []) as any[]
+                                    }
+                                    team={
+                                        ((client as any).support_workers ??
+                                            []) as any[]
+                                    }
+                                    keyWorkerId={
+                                        (client as any).key_worker?.id ?? null
+                                    }
+                                    keyWorkerName={
+                                        (client as any).key_worker?.name ??
+                                        null
+                                    }
+                                    canEdit={Boolean(can.edit)}
+                                    onTab={(key) =>
+                                        handleTabChange(key as TabKey)
+                                    }
+                                    onEditAbout={() =>
+                                        setEditDialogOpen(true)
+                                    }
+                                    onRecordDose={() =>
+                                        openProfileDialog('emar')
+                                    }
+                                    onManageWorkers={() =>
+                                        handleTabChange('assignments')
+                                    }
+                                    riskLevelControl={
+                                        <Select
+                                            value={client.risk_level ?? ''}
+                                            onValueChange={(v) =>
+                                                router.patch(
+                                                    `/operations/clients/${client.id}/quick-update`,
+                                                    { risk_level: v },
+                                                    {
+                                                        preserveScroll: true,
+                                                    },
+                                                )
+                                            }
+                                        >
+                                            <SelectTrigger
+                                                className={`h-8 w-full border-0 text-sm font-bold shadow-none ${
+                                                    client.risk_level ===
+                                                    'critical'
+                                                        ? 'bg-status-critical-bg text-status-critical'
+                                                        : client.risk_level ===
+                                                            'high'
+                                                          ? 'bg-status-critical-bg text-status-critical'
+                                                          : client.risk_level ===
+                                                              'medium'
+                                                            ? 'bg-status-warning-bg text-status-warning'
                                                             : client.risk_level ===
-                                                                'high'
-                                                              ? 'bg-status-critical-bg text-status-critical'
-                                                              : client.risk_level ===
-                                                                  'medium'
-                                                                ? 'bg-status-warning-bg text-status-warning'
-                                                                : client.risk_level ===
-                                                                    'low'
-                                                                  ? 'bg-status-success-bg text-status-success'
-                                                                  : 'bg-muted text-muted-foreground'
-                                                    } rounded-full px-3`}
-                                                >
-                                                    <SelectValue placeholder="Set level..." />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="low">
-                                                        Low
-                                                    </SelectItem>
-                                                    <SelectItem value="medium">
-                                                        Medium
-                                                    </SelectItem>
-                                                    <SelectItem value="high">
-                                                        High
-                                                    </SelectItem>
-                                                    <SelectItem value="critical">
-                                                        Critical
-                                                    </SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                        </div>
-                                        <p className="mt-0.5 text-xs text-primary">
-                                            {risks.length} active risk
-                                            {risks.length !== 1 ? 's' : ''}
-                                        </p>
-                                    </div>
-                                </div>
+                                                                'low'
+                                                              ? 'bg-status-success-bg text-status-success'
+                                                              : 'bg-muted text-muted-foreground'
+                                                } rounded-full px-3`}
+                                            >
+                                                <SelectValue placeholder="Set level..." />
+                                            </SelectTrigger>
+                                            <SelectContent>
+                                                <SelectItem value="low">
+                                                    Low
+                                                </SelectItem>
+                                                <SelectItem value="medium">
+                                                    Medium
+                                                </SelectItem>
+                                                <SelectItem value="high">
+                                                    High
+                                                </SelectItem>
+                                                <SelectItem value="critical">
+                                                    Critical
+                                                </SelectItem>
+                                            </SelectContent>
+                                        </Select>
+                                    }
+                                />
 
                                 {client.site && siteCoverageSummary ? (
                                     <Card className="via-primary/10/80 mt-4 overflow-hidden border-primary/70 bg-gradient-to-br from-white to-status-info-bg/70">
@@ -5318,6 +5253,11 @@ export default function ClientShow({
                         nextOfKins={
                             ((pageProps as any).next_of_kins ?? []) as any
                         }
+                        onEdit={
+                            can.edit
+                                ? () => setEditDialogOpen(true)
+                                : undefined
+                        }
                     />
                 )}
 
@@ -5382,18 +5322,8 @@ export default function ClientShow({
                     </div>
                 )}
                 {tab === 'incidents_accidents' && (
-                    <ClientProfilePlaceholder
-                        title="Incidents & Accidents"
-                        description="Recent incident records are shown here while the existing timeline and incident workflows remain intact."
-                        items={(pageProps.client_incidents ?? []).map(
-                            (incident: any) => [
-                                incident.title ?? incident.type ?? 'Incident',
-                                incident.occurred_at
-                                    ? formatDateTimeLong(incident.occurred_at)
-                                    : (incident.status ?? 'Recorded'),
-                            ],
-                        )}
-                        emptyLabel="No recent incidents are shown for this client."
+                    <IncidentsTab
+                        incidents={(pageProps.client_incidents ?? []) as any[]}
                     />
                 )}
 
