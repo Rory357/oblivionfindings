@@ -1,3 +1,4 @@
+import { BehaviourInsightsCard } from '@/components/behaviour-insights-card';
 import { ClientEditDialog } from '@/components/client-edit-dialog';
 import ClientLocationTab, {
     type ClientLocationData,
@@ -8,11 +9,6 @@ import {
     ProfileDialogs,
     type ProfileDialogState,
 } from '@/components/clients/profile/dialog-host';
-import {
-    OverviewDesignGrid,
-    buildAboutTiles,
-} from '@/components/clients/profile/overview-grid';
-import { Ring } from '@/components/wizard/primitives';
 import {
     AlertRibbon,
     ClientProfileHero,
@@ -28,6 +24,10 @@ import {
     TierTwoTabs,
     type ProfileNavGroup,
 } from '@/components/clients/profile/nav';
+import {
+    OverviewDesignGrid,
+    buildAboutTiles,
+} from '@/components/clients/profile/overview-grid';
 import ClientObservationsTab from '@/components/clinical/client-observations-tab';
 import HealthSummaryCard, {
     type HealthSummary,
@@ -38,13 +38,7 @@ import {
     ProgressRing,
 } from '@/components/fleet-charts';
 import { DonutChart } from '@/components/ops-stat-card';
-import {
-    PageHero,
-    type PageHeroBadge,
-    type PageHeroMetaItem,
-} from '@/components/page';
 import PageShell from '@/components/page-shell';
-import { Avatar, AvatarFallback } from '@/components/ui/avatar';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -58,32 +52,34 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Separator } from '@/components/ui/separator';
+import { Ring } from '@/components/wizard/primitives';
 import { useInitials } from '@/hooks/use-initials';
 import AppLayout from '@/layouts/app-layout';
 import { formatDateTimeLong } from '@/lib/datetime';
 import { formatDateTime as formatDT } from '@/lib/fleet-utils';
 import { DailyNoteWizard } from '@/pages/operations/clients/dialogs/daily-note-wizard';
 import { QuickNoteDialog } from '@/pages/operations/clients/dialogs/quick-note-dialog';
-import { useCreateShiftLauncher } from '@/pages/operations/shifts/components/use-create-shift-launcher';
 import {
     CLIENT_TAB_GROUPS,
     groupForTab,
     type ClientTabGroupKey,
 } from '@/pages/operations/clients/tabs/_groups';
 import { ActionsReviewsTab } from '@/pages/operations/clients/tabs/actions-reviews';
+import { CarePlanDomains } from '@/pages/operations/clients/tabs/care-plan-domains';
 import { CommunicationNotesTab } from '@/pages/operations/clients/tabs/communication-notes';
 import { DailyNotesTab } from '@/pages/operations/clients/tabs/daily-notes';
 import { HealthMonitoringTab } from '@/pages/operations/clients/tabs/health-monitoring';
+import { IncidentsTab } from '@/pages/operations/clients/tabs/incidents-tab';
 import {
     AssessmentsTab,
     ClientCalendarTab,
     PersonalAssetsTab,
     PhotoGalleryTab,
 } from '@/pages/operations/clients/tabs/legacy-profile-sections';
-import { IncidentsTab } from '@/pages/operations/clients/tabs/incidents-tab';
 import { MarTab } from '@/pages/operations/clients/tabs/mar';
 import { RhythmsRoutinesTab } from '@/pages/operations/clients/tabs/rhythms-routines';
 import { ClientTimelineTab } from '@/pages/operations/clients/tabs/timeline-tab';
+import { useCreateShiftLauncher } from '@/pages/operations/shifts/components/use-create-shift-launcher';
 import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
 import {
     Activity,
@@ -108,7 +104,6 @@ import {
     MessageSquare as MsgIcon,
     Navigation,
     Package,
-    Pencil,
     Phone,
     Pill,
     Plus,
@@ -124,16 +119,17 @@ import {
 } from 'lucide-react';
 import type { ReactNode } from 'react';
 import { useCallback, useEffect, useMemo, useState } from 'react';
-import { FoodMealPreferences } from './_food-meal-preferences';
-import { BehaviourInsightsCard } from '@/components/behaviour-insights-card';
 import { AuditHistoryTab } from './tabs/audit-history';
 import { DocumentsTab } from './tabs/documents';
 import { FamilyTreeTab } from './tabs/family-tree';
 import { FinanceTab } from './tabs/finance';
+import { FoodMealTab } from './tabs/food-meal';
 import { GoalsPathTab } from './tabs/goals-path';
 import { LeaveExcursionsTab } from './tabs/leave-excursions';
 import { PersonalDetailsTab } from './tabs/personal-details';
+import { RespiteTab } from './tabs/respite';
 import { RiskManagementTab } from './tabs/risk-management';
+import { WorkersTab } from './tabs/workers';
 
 function Field({ label, value }: { label: string; value: string }) {
     return (
@@ -379,6 +375,8 @@ type Props = {
         safeguarding_flag?: boolean | null;
         key_worker?: { id: number; name: string } | null;
         site: { id: number; name: string } | null;
+        room?: { id: number; name: string; notes?: string | null } | null;
+        sleep_target_hours?: number | string | null;
         service_context?: {
             id: number;
             type: string | null;
@@ -423,7 +421,29 @@ type Props = {
             requested_end?: string | null;
             status: string;
         }>;
+        allocation?: {
+            allocated?: number;
+            used?: number;
+            booked?: number;
+            remaining?: number;
+            period_label?: string | null;
+            funding_source?: string | null;
+        } | null;
     };
+    meal_logs?: {
+        today?: Array<any>;
+        history?: Array<any>;
+        summary?: {
+            eaten?: number;
+            expected?: number;
+            status?: string;
+        };
+    };
+    assignable_workers?: Array<{
+        id: number;
+        name: string;
+        email?: string | null;
+    }>;
     health_summary?: HealthSummary | null;
     onboarding: {
         items: Array<{
@@ -838,9 +858,8 @@ export default function ClientShow({
                 icon: ShieldAlert,
                 show: true,
                 count:
-                    (pageProps.client_risks ?? []).filter(
-                        (r: any) => r.active,
-                    ).length || undefined,
+                    (pageProps.client_risks ?? []).filter((r: any) => r.active)
+                        .length || undefined,
             },
             {
                 key: 'incidents_accidents',
@@ -1309,7 +1328,9 @@ export default function ClientShow({
                         heroChips.push({
                             key: 'site',
                             icon: Home,
-                            label: client.site.name,
+                            label: client.room?.name
+                                ? `${client.site.name} · ${client.room.name}`
+                                : client.site.name,
                         });
                     if (client.service_start_date)
                         heroChips.push({
@@ -1387,8 +1408,7 @@ export default function ClientShow({
                           )
                         : null;
                     const identityLine = [
-                        client.preferred_name &&
-                        client.preferred_name !== name
+                        client.preferred_name && client.preferred_name !== name
                             ? `“${client.preferred_name}”`
                             : null,
                         client.preferred_pronouns,
@@ -1442,12 +1462,57 @@ export default function ClientShow({
                     const notesThisWeek = (clientDailyNotes as any[]).filter(
                         (n) =>
                             (n.occurred_at ?? n.created_at) &&
-                            new Date(
-                                n.occurred_at ?? n.created_at,
-                            ).getTime() >= weekAgo,
+                            new Date(n.occurred_at ?? n.created_at).getTime() >=
+                                weekAgo,
                     ).length;
+                    const mealLogsPayload = (pageProps as any).meal_logs ?? {};
+                    const mealSummary = mealLogsPayload.summary ?? {};
+                    const sleepSummary =
+                        (healthMonitoring as any)?.sleep_summary ?? {};
+                    const sleepAverage =
+                        sleepSummary.average_hours != null
+                            ? Number(sleepSummary.average_hours)
+                            : null;
+                    const sleepTarget = Number(
+                        sleepSummary.target_hours ??
+                            (client as any).sleep_target_hours ??
+                            7,
+                    );
 
                     const heroVitals: HeroVital[] = [
+                        {
+                            key: 'meals',
+                            label: 'Meals',
+                            value:
+                                mealSummary.eaten != null
+                                    ? `${mealSummary.eaten}/${mealSummary.expected ?? 3}`
+                                    : '—',
+                            trend:
+                                mealSummary.status === 'on_track'
+                                    ? 'up'
+                                    : mealSummary.eaten > 0
+                                      ? 'flat'
+                                      : 'down',
+                            detail:
+                                mealSummary.status === 'on_track'
+                                    ? 'On track today'
+                                    : 'Meal logs today',
+                        },
+                        {
+                            key: 'sleep',
+                            label: 'Sleep',
+                            value:
+                                sleepAverage != null
+                                    ? `${sleepAverage.toFixed(1)}h`
+                                    : '—',
+                            trend:
+                                sleepAverage == null
+                                    ? 'flat'
+                                    : sleepAverage >= sleepTarget
+                                      ? 'up'
+                                      : 'down',
+                            detail: `Target ${sleepTarget}h`,
+                        },
                         {
                             key: 'mood',
                             label: 'Mood',
@@ -1475,8 +1540,7 @@ export default function ClientShow({
                                     ? `${seizureFreeDays}d`
                                     : '—',
                             trend:
-                                seizureFreeDays != null &&
-                                seizureFreeDays >= 14
+                                seizureFreeDays != null && seizureFreeDays >= 14
                                     ? 'up'
                                     : 'flat',
                             detail:
@@ -1538,8 +1602,7 @@ export default function ClientShow({
                                               : hoursAway < 24
                                                 ? `in ${Math.round(hoursAway)}h`
                                                 : null
-                                          : hoursAway != null &&
-                                              hoursAway > -12
+                                          : hoursAway != null && hoursAway > -12
                                             ? 'now'
                                             : null,
                                   staffName: ns.staff?.name ?? null,
@@ -1551,9 +1614,7 @@ export default function ClientShow({
                                           (ns.incomplete_task_count ?? 0),
                                   ),
                                   location:
-                                      ns.location ??
-                                      client.site?.name ??
-                                      null,
+                                      ns.location ?? client.site?.name ?? null,
                                   breakLabel: ns.expected_break_minutes
                                       ? `${ns.expected_break_minutes} min expected`
                                       : null,
@@ -1606,8 +1667,7 @@ export default function ClientShow({
                                 (actionsReviewsSummary.critical ?? 0) > 0
                                     ? `${actionsReviewsSummary.critical} critical`
                                     : undefined,
-                            onClick: () =>
-                                handleTabChange('actions_reviews'),
+                            onClick: () => handleTabChange('actions_reviews'),
                         });
                     if ((emarSummary?.pending_alerts_count ?? 0) > 0)
                         heroAlerts.push({
@@ -1748,13 +1808,9 @@ export default function ClientShow({
                                 ]}
                                 canEdit={Boolean(can.edit)}
                                 onAddNote={(key) => openProfileDialog(key)}
-                                onChat={() =>
-                                    openProfileDialog('family_chat')
-                                }
+                                onChat={() => openProfileDialog('family_chat')}
                                 onEdit={() => setEditDialogOpen(true)}
-                                onOpenShift={() =>
-                                    handleTabChange('calendar')
-                                }
+                                onOpenShift={() => handleTabChange('calendar')}
                                 onOpenSafety={() =>
                                     handleTabChange('risk_management')
                                 }
@@ -2020,16 +2076,13 @@ export default function ClientShow({
                                         (client as any).key_worker?.id ?? null
                                     }
                                     keyWorkerName={
-                                        (client as any).key_worker?.name ??
-                                        null
+                                        (client as any).key_worker?.name ?? null
                                     }
                                     canEdit={Boolean(can.edit)}
                                     onTab={(key) =>
                                         handleTabChange(key as TabKey)
                                     }
-                                    onEditAbout={() =>
-                                        setEditDialogOpen(true)
-                                    }
+                                    onEditAbout={() => setEditDialogOpen(true)}
                                     onRecordDose={() =>
                                         openProfileDialog('emar')
                                     }
@@ -2339,9 +2392,12 @@ export default function ClientShow({
                                                                                 onClick={() =>
                                                                                     createShiftLauncher.openWith(
                                                                                         {
-                                                                                            site_id: siteCoverageSummary.site_id,
-                                                                                            starts_at: alert.starts_at,
-                                                                                            ends_at: alert.ends_at,
+                                                                                            site_id:
+                                                                                                siteCoverageSummary.site_id,
+                                                                                            starts_at:
+                                                                                                alert.starts_at,
+                                                                                            ends_at:
+                                                                                                alert.ends_at,
                                                                                         },
                                                                                     )
                                                                                 }
@@ -3539,15 +3595,11 @@ export default function ClientShow({
                                                           100,
                                                   )
                                                 : 0;
-                                        const remaining =
-                                            steps.length - done;
+                                        const remaining = steps.length - done;
                                         return (
                                             <div className="mt-3 flex flex-wrap items-center gap-5">
                                                 {/* Completeness ring (design tabs-daily OnboardingTab) */}
-                                                <Ring
-                                                    pct={pct}
-                                                    size={96}
-                                                />
+                                                <Ring pct={pct} size={96} />
                                                 <div className="min-w-0 flex-1">
                                                     <div className="text-sm font-semibold">
                                                         {pct === 100
@@ -4420,38 +4472,12 @@ export default function ClientShow({
                 )}
 
                 {tab === 'meal_prefs' && (
-                    <div className="space-y-4">
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div className="flex items-center gap-3">
-                                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-primary">
-                                    <Utensils className="h-[19px] w-[19px]" />
-                                </span>
-                                <div>
-                                    <h2 className="text-lg leading-tight font-semibold">
-                                        Food & meal preferences
-                                    </h2>
-                                    <p className="text-sm text-muted-foreground">
-                                        Texture safety, likes & mealtime
-                                        support
-                                    </p>
-                                </div>
-                            </div>
-                            {can.edit ? (
-                                <Button
-                                    onClick={() =>
-                                        openProfileDialog('meal_pref')
-                                    }
-                                >
-                                    <Plus className="mr-1.5 h-4 w-4" />
-                                    Add preference
-                                </Button>
-                            ) : null}
-                        </div>
-                        <FoodMealPreferences
-                            clientId={client.id}
-                            canEdit={!!can?.edit}
-                        />
-                    </div>
+                    <FoodMealTab
+                        clientId={client.id}
+                        canEdit={!!can?.edit}
+                        mealLogs={(pageProps as any).meal_logs}
+                        onAddPreference={() => openProfileDialog('meal_pref')}
+                    />
                 )}
 
                 {tab === 'observations' && (
@@ -4631,9 +4657,7 @@ export default function ClientShow({
                                             size="sm"
                                             className="bg-status-warning text-primary-foreground hover:bg-status-warning"
                                             onClick={() =>
-                                                openProfileDialog(
-                                                    'plan_review',
-                                                )
+                                                openProfileDialog('plan_review')
                                             }
                                         >
                                             Start Review
@@ -4688,6 +4712,10 @@ export default function ClientShow({
                                                 </div>
                                             </div>
                                         </div>
+
+                                        <CarePlanDomains
+                                            domains={content.domains ?? []}
+                                        />
 
                                         {/* Main Grid */}
                                         <div className="grid gap-4 lg:grid-cols-3">
@@ -5128,9 +5156,7 @@ export default function ClientShow({
                                 </div>
                             </div>
                             <Button
-                                onClick={() =>
-                                    openProfileDialog('appointment')
-                                }
+                                onClick={() => openProfileDialog('appointment')}
                                 data-test="calendar-new-appointment"
                             >
                                 <Plus className="mr-1.5 h-4 w-4" />
@@ -5196,9 +5222,7 @@ export default function ClientShow({
                         <div className="flex flex-wrap items-center justify-end gap-2">
                             <Button
                                 variant="outline"
-                                onClick={() =>
-                                    openProfileDialog('record_obs')
-                                }
+                                onClick={() => openProfileDialog('record_obs')}
                                 data-test="health-record-observation"
                             >
                                 <Plus className="mr-1.5 h-4 w-4" />
@@ -5257,9 +5281,7 @@ export default function ClientShow({
                             ((pageProps as any).next_of_kins ?? []) as any
                         }
                         onEdit={
-                            can.edit
-                                ? () => setEditDialogOpen(true)
-                                : undefined
+                            can.edit ? () => setEditDialogOpen(true) : undefined
                         }
                     />
                 )}
@@ -5268,14 +5290,10 @@ export default function ClientShow({
                     <GoalsPathTab
                         clientId={client.id}
                         clientName={name}
-                        activePlanId={
-                            carePlansSummary?.active_plan?.id ?? null
-                        }
+                        activePlanId={carePlansSummary?.active_plan?.id ?? null}
                         goals={carePlansSummary?.active_plan?.goals ?? []}
                         lifeStory={(client as any).life_story}
-                        strengthsAbilities={
-                            (client as any).strengths_abilities
-                        }
+                        strengthsAbilities={(client as any).strengths_abilities}
                         interestsHobbies={(client as any).interests_hobbies}
                         pathPlan={(pageProps as any).path_plan ?? null}
                         canEdit={can.edit}
@@ -5303,10 +5321,7 @@ export default function ClientShow({
                                     Incidents & accidents
                                 </h2>
                                 <p className="text-sm text-muted-foreground">
-                                    {
-                                        (pageProps.client_incidents ?? [])
-                                            .length
-                                    }{' '}
+                                    {(pageProps.client_incidents ?? []).length}{' '}
                                     recent incident
                                     {(pageProps.client_incidents ?? [])
                                         .length === 1
@@ -5369,10 +5384,12 @@ export default function ClientShow({
 
                 {tab === 'audit_history' && (
                     <AuditHistoryTab
-                        entries={((pageProps as any).audit_history ?? []) as any}
+                        entries={
+                            ((pageProps as any).audit_history ?? []) as any
+                        }
                         canView={Boolean(
-                            ((pageProps as any).audit_history ?? []).length > 0
-                                || progressNotesCan.update,
+                            ((pageProps as any).audit_history ?? []).length >
+                                0 || progressNotesCan.update,
                         )}
                     />
                 )}
@@ -5799,7 +5816,6 @@ export default function ClientShow({
                         documents={(documents ?? []) as any}
                     />
                 )}
-
 
                 {tab === 'photos' && (
                     <PhotoGalleryTab
@@ -6360,156 +6376,16 @@ export default function ClientShow({
                     })()}
 
                 {tab === 'respite' && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="text-base">Respite</CardTitle>
-                            <p className="text-sm text-muted-foreground">
-                                Bookings and requests shown here follow the
-                                respite permission scope for this client.
-                            </p>
-                        </CardHeader>
-                        <CardContent className="space-y-4">
-                            <div className="flex flex-wrap items-center gap-2">
-                                {respiteCan?.create ? (
-                                    <Button
-                                        size="sm"
-                                        onClick={() =>
-                                            openProfileDialog(
-                                                'respite_booking',
-                                            )
-                                        }
-                                        data-test="respite-new-booking"
-                                    >
-                                        <Plus className="mr-1.5 h-3.5 w-3.5" />
-                                        New booking
-                                    </Button>
-                                ) : null}
-                                {respiteCan?.create ? (
-                                    <Button size="sm" variant="outline" asChild>
-                                        <Link
-                                            href={`/respite/requests/create?client_id=${client.id}`}
-                                        >
-                                            Full intake wizard
-                                        </Link>
-                                    </Button>
-                                ) : null}
-                                <Link
-                                    href="/respite/requests"
-                                    className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
-                                >
-                                    View booking requests
-                                </Link>
-                                <Link
-                                    href="/respite/bookings"
-                                    className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
-                                >
-                                    View approved bookings
-                                </Link>
-                            </div>
-
-                            <Separator />
-
-                            <div>
-                                <div className="text-sm font-medium">
-                                    Bookings
-                                </div>
-                                <div className="mt-2 space-y-2">
-                                    {respiteBookings.map((b) => (
-                                        <div
-                                            key={b.id}
-                                            className="rounded-md border p-3"
-                                        >
-                                            <div className="flex items-start justify-between gap-3">
-                                                <div>
-                                                    <div className="text-sm font-medium">
-                                                        {formatDateTimeLong(
-                                                            b.start_at,
-                                                        )}{' '}
-                                                        -{' '}
-                                                        {formatDateTimeLong(
-                                                            b.end_at,
-                                                        )}
-                                                    </div>
-                                                    <div className="mt-1 text-xs text-muted-foreground">
-                                                        Status: {b.status}
-                                                        {b.coordinator?.name
-                                                            ? ` | Coordinator: ${b.coordinator.name}`
-                                                            : ''}
-                                                    </div>
-                                                    {b.shift_id ? (
-                                                        <div className="mt-1 text-xs text-muted-foreground">
-                                                            Shift:{' '}
-                                                            <Link
-                                                                href={`/operations/shifts/${b.shift_id}`}
-                                                                className="text-primary hover:text-primary"
-                                                            >
-                                                                View shift
-                                                            </Link>
-                                                        </div>
-                                                    ) : null}
-                                                </div>
-                                                <Link
-                                                    href={`/respite/bookings/${b.id}`}
-                                                    className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
-                                                >
-                                                    View
-                                                </Link>
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {!respiteBookings.length && (
-                                        <div className="text-sm text-muted-foreground">
-                                            No respite bookings yet.
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-
-                            <Separator />
-
-                            <div>
-                                <div className="text-sm font-medium">
-                                    Booking Requests
-                                </div>
-                                <div className="mt-2 space-y-2">
-                                    {respiteRequests.map((r) => (
-                                        <div
-                                            key={r.id}
-                                            className="rounded-md border p-3"
-                                        >
-                                            <div className="flex items-start justify-between gap-3">
-                                                <div>
-                                                    <div className="text-sm font-medium">
-                                                        {formatDateTimeLong(
-                                                            r.requested_start,
-                                                        )}{' '}
-                                                        -{' '}
-                                                        {formatDateTimeLong(
-                                                            r.requested_end,
-                                                        )}
-                                                    </div>
-                                                    <div className="mt-1 text-xs text-muted-foreground">
-                                                        Status: {r.status}
-                                                    </div>
-                                                </div>
-                                                <Link
-                                                    href={`/respite/requests/${r.id}`}
-                                                    className="rounded-md border px-3 py-2 text-xs hover:bg-muted"
-                                                >
-                                                    View
-                                                </Link>
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {!respiteRequests.length && (
-                                        <div className="text-sm text-muted-foreground">
-                                            No respite booking requests yet.
-                                        </div>
-                                    )}
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
+                    <RespiteTab
+                        clientId={client.id}
+                        canCreate={Boolean(respiteCan?.create)}
+                        bookings={respiteBookings}
+                        requests={respiteRequests}
+                        allocation={respite?.allocation ?? null}
+                        onNewBooking={() =>
+                            openProfileDialog('respite_booking')
+                        }
+                    />
                 )}
 
                 {tab === 'location' && location && (
@@ -6722,8 +6598,7 @@ export default function ClientShow({
                             (r) => r.status === 'declined',
                         ).length;
                         const REQ_TONES: Record<string, string> = {
-                            pending:
-                                'bg-status-warning-bg text-status-warning',
+                            pending: 'bg-status-warning-bg text-status-warning',
                             approved:
                                 'bg-status-success-bg text-status-success',
                             declined:
@@ -6854,7 +6729,11 @@ export default function ClientShow({
                                 </div>
                                 {can.edit && (
                                     <div className="flex items-center gap-2">
-                                        <Button size="sm" variant="outline" asChild>
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            asChild
+                                        >
                                             <Link
                                                 href={`/operations/clients/${client.id}/portal-users`}
                                             >
@@ -6980,8 +6859,8 @@ export default function ClientShow({
                         const upcoming = transport?.upcoming_outings ?? [];
                         const history = transport?.transport_history ?? [];
                         const medLogs = transport?.medication_logs ?? [];
-                        const bookings =
-                            ((transport as any)?.bookings ?? []) as any[];
+                        const bookings = ((transport as any)?.bookings ??
+                            []) as any[];
 
                         return (
                             <div className="space-y-6">
@@ -7548,129 +7427,13 @@ export default function ClientShow({
                     })()}
 
                 {tab === 'assignments' && (
-                    <div className="space-y-4">
-                        {/* Design header (tab-workers.jsx WorkersTab) */}
-                        <div className="flex flex-wrap items-center justify-between gap-3">
-                            <div className="flex items-center gap-3">
-                                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-primary">
-                                    <Users className="h-[19px] w-[19px]" />
-                                </span>
-                                <div>
-                                    <h2 className="text-lg leading-tight font-semibold">
-                                        Workers
-                                    </h2>
-                                    <p className="text-sm text-muted-foreground">
-                                        Support team assigned to{' '}
-                                        {preferredName}
-                                    </p>
-                                </div>
-                            </div>
-                            {can.assign_workers && (
-                                <Button asChild data-test="workers-assign">
-                                    <Link
-                                        href={`/operations/clients/${client.id}/assignments`}
-                                    >
-                                        <Plus className="mr-1.5 h-4 w-4" />
-                                        Assign workers
-                                    </Link>
-                                </Button>
-                            )}
-                        </div>
-
-                        {/* Stat strip */}
-                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
-                            {/* eslint-disable-next-line no-restricted-syntax -- MiniStat tile per the profile pattern language */}
-                            <div className="rounded-xl border bg-card px-4 py-3">
-                                <div className="text-xl font-bold text-status-info">
-                                    {client.support_workers?.length ?? 0}
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                    Assigned workers
-                                </div>
-                            </div>
-                            {/* eslint-disable-next-line no-restricted-syntax -- MiniStat tile per the profile pattern language */}
-                            <div className="rounded-xl border bg-card px-4 py-3">
-                                <div className="truncate text-xl font-bold text-primary">
-                                    {client.key_worker?.name ?? '—'}
-                                </div>
-                                <div className="text-xs text-muted-foreground">
-                                    Key worker
-                                </div>
-                            </div>
-                            {/* eslint-disable-next-line no-restricted-syntax -- MiniStat tile per the profile pattern language */}
-                            <div className="col-span-2 rounded-xl border bg-card px-4 py-3 sm:col-span-1">
-                                <div className="text-sm font-medium text-foreground/80">
-                                    Assigned workers see this profile, get
-                                    rostered, and receive handovers.
-                                </div>
-                            </div>
-                        </div>
-
-                        {/* Assigned workers — design AssignedRow styling */}
-                        <Card className="gap-0 py-0">
-                            <CardHeader className="px-5 pt-4 pb-0">
-                                <CardTitle className="flex items-center gap-2 text-[15px]">
-                                    <Users className="h-4 w-4 text-primary" />
-                                    Assigned workers
-                                    <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground tabular-nums">
-                                        {client.support_workers?.length ?? 0}
-                                    </span>
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-1.5 px-5 pt-3 pb-5">
-                                {(client.support_workers ?? []).length > 0 ? (
-                                    client.support_workers.map((w) => {
-                                        const isKey =
-                                            client.key_worker?.id === w.id;
-                                        return (
-                                            <div
-                                                key={w.id}
-                                                className={`flex items-center gap-2.5 rounded-lg border px-2.5 py-2 ${
-                                                    isKey
-                                                        ? 'border-primary/30 bg-accent'
-                                                        : 'border-border'
-                                                }`}
-                                            >
-                                                <Avatar className="h-[34px] w-[34px]">
-                                                    <AvatarFallback className="text-xs">
-                                                        {getInitials(w.name)}
-                                                    </AvatarFallback>
-                                                </Avatar>
-                                                <div className="min-w-0 flex-1">
-                                                    <div className="flex flex-wrap items-center gap-1.5">
-                                                        <span className="truncate text-sm font-medium">
-                                                            {w.name}
-                                                        </span>
-                                                        {isKey && (
-                                                            <span className="inline-flex items-center gap-0.5 rounded-full bg-status-warning-bg px-1.5 py-0.5 text-[10px] font-medium text-status-warning">
-                                                                ★ Key worker
-                                                            </span>
-                                                        )}
-                                                    </div>
-                                                    {w.email && (
-                                                        <p className="truncate text-xs text-muted-foreground">
-                                                            {w.email}
-                                                        </p>
-                                                    )}
-                                                </div>
-                                            </div>
-                                        );
-                                    })
-                                ) : (
-                                    <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed py-10 text-center">
-                                        <Users className="h-6 w-6 text-muted-foreground" />
-                                        <p className="text-sm font-medium">
-                                            No workers assigned yet
-                                        </p>
-                                        <p className="text-xs text-muted-foreground">
-                                            Use Assign workers to build the
-                                            support team.
-                                        </p>
-                                    </div>
-                                )}
-                            </CardContent>
-                        </Card>
-                    </div>
+                    <WorkersTab
+                        client={client}
+                        assignableWorkers={
+                            (pageProps as any).assignable_workers ?? []
+                        }
+                        canAssign={Boolean(can.assign_workers)}
+                    />
                 )}
             </PageShell>
 

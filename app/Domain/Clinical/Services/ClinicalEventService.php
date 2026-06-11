@@ -12,6 +12,7 @@ use App\Models\Shift;
 use App\Models\TimelineEvent;
 use App\Models\User;
 use App\Services\HealthSafety\HsEventService;
+use App\Support\WorkerClock;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 
@@ -58,7 +59,7 @@ class ClinicalEventService
             'reported_by' => $reporter->id,
             'event_type' => $type,
             'severity' => $severity,
-            'occurred_at' => $input['occurred_at'] ?? now(),
+            'occurred_at' => WorkerClock::toUtc($input['occurred_at'] ?? null) ?? now(),
             'reported_at' => now(),
             'description' => $input['description'],
             'immediate_action_taken' => $input['immediate_action_taken'] ?? null,

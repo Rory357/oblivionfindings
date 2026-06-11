@@ -5,8 +5,8 @@ namespace App\Http\Controllers\Clinical;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientSeizureEntry;
+use App\Support\WorkerClock;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 
 class ClientSeizureChartController extends Controller
 {
@@ -36,7 +36,7 @@ class ClientSeizureChartController extends Controller
             ...$data,
             'client_id' => $client->id,
             'organization_id' => $request->user()?->organization_id ?? $client->organization_id,
-            'occurred_at' => isset($data['occurred_at']) ? Carbon::parse($data['occurred_at']) : now(),
+            'occurred_at' => WorkerClock::toUtc($data['occurred_at'] ?? null) ?? now(),
             'escalated' => (bool) ($data['escalated'] ?? false) || $duration > 300,
             'recorded_by' => $request->user()?->id,
         ]);
@@ -52,7 +52,7 @@ class ClientSeizureChartController extends Controller
 
         $data = $this->validatedPayload($request);
         if (array_key_exists('occurred_at', $data) && $data['occurred_at'] !== null) {
-            $data['occurred_at'] = Carbon::parse($data['occurred_at']);
+            $data['occurred_at'] = WorkerClock::toUtc($data['occurred_at']);
         }
         $duration = (int) ($data['duration_seconds'] ?? $entry->duration_seconds ?? 0);
         if (($data['escalated'] ?? false) || $duration > 300) {

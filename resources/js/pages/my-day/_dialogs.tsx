@@ -3,8 +3,8 @@ import {
     Activity,
     AlertTriangle,
     CheckCircle2,
-    Clock,
     ClipboardList,
+    Clock,
     Droplet,
     FileText,
     Heart,
@@ -14,8 +14,9 @@ import {
     Moon,
     Scale,
     Stethoscope,
-    Users,
     UserRound,
+    Users,
+    Utensils,
 } from 'lucide-react';
 import {
     type ComponentType,
@@ -50,17 +51,22 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
-import { TabsContent, TabsList, TabsRoot, TabsTrigger } from '@/components/ui/tabs';
+import {
+    TabsContent,
+    TabsList,
+    TabsRoot,
+    TabsTrigger,
+} from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
 
+import { ResidentDot } from './components/resident-dot';
 import { residentHue, residentInitials } from './lib/resident-hue';
 import {
     allocationErrorForRow,
     isAllocationBalanced,
     splitHoursEvenly,
 } from './lib/timesheet-allocation';
-import { ResidentDot } from './components/resident-dot';
 import type {
     MyDayResident,
     MyDayTimesheet,
@@ -161,7 +167,9 @@ export const OBS_TYPES: ObsTypeDef[] = [
 ];
 
 function getObsType(key: ObsTypeKey): ObsTypeDef {
-    return OBS_TYPES.find((t) => t.key === key) ?? OBS_TYPES[OBS_TYPES.length - 1];
+    return (
+        OBS_TYPES.find((t) => t.key === key) ?? OBS_TYPES[OBS_TYPES.length - 1]
+    );
 }
 
 const INITIAL_DATA: Record<ObsTypeKey, Record<string, string>> = {
@@ -175,7 +183,14 @@ const INITIAL_DATA: Record<ObsTypeKey, Record<string, string>> = {
     },
     weight: { weight_kg: '' },
     bowel: { bristol_type: '' },
-    sleep: { bed_time: '', wake_time: '', quality: 'good', interruptions: '0' },
+    sleep: {
+        slept_at: new Date().toISOString().slice(0, 10),
+        hours_slept: '',
+        bed_time: '',
+        wake_time: '',
+        quality: 'good',
+        interruptions: '0',
+    },
     fluid_intake: { amount_ml: '', fluid_type: 'water' },
     pain: { score: '', location: '' },
     general: {},
@@ -328,10 +343,16 @@ export type RecordObservationDialogProps = {
 export function RecordObservationDialog(props: RecordObservationDialogProps) {
     const { open, onOpenChange } = props;
     return (
-        <Dialog open={open} onOpenChange={(next) => !next && onOpenChange(false)}>
+        <Dialog
+            open={open}
+            onOpenChange={(next) => !next && onOpenChange(false)}
+        >
             <DialogContent
                 className="max-h-[90vh] overflow-y-auto"
-                style={{ maxWidth: 'min(92vw, 720px)', width: 'min(92vw, 720px)' }}
+                style={{
+                    maxWidth: 'min(92vw, 720px)',
+                    width: 'min(92vw, 720px)',
+                }}
             >
                 {open ? <RecordObservationBody {...props} /> : null}
             </DialogContent>
@@ -350,7 +371,9 @@ function RecordObservationBody({
     onRecorded,
 }: RecordObservationDialogProps) {
     const [type, setType] = useState<ObsTypeKey>(
-        defaultType === 'vitals' && !canRecordClinical ? 'general' : defaultType,
+        defaultType === 'vitals' && !canRecordClinical
+            ? 'general'
+            : defaultType,
     );
     const [data, setData] = useState<Record<string, string>>({
         ...INITIAL_DATA[type],
@@ -381,9 +404,38 @@ function RecordObservationBody({
             for (const [k, v] of Object.entries(data)) {
                 if (v === '' || v == null) continue;
                 cleaned[k] =
-                    typeof v === 'string' && v.trim() !== '' && !isNaN(Number(v))
+                    typeof v === 'string' &&
+                    v.trim() !== '' &&
+                    !isNaN(Number(v))
                         ? Number(v)
                         : v;
+            }
+
+            if (type === 'sleep') {
+                router.post(
+                    `/operations/clients/${resident.id}/health/sleep`,
+                    {
+                        slept_at: cleaned.slept_at,
+                        hours_slept: cleaned.hours_slept,
+                        quality: cleaned.quality,
+                        interruptions: cleaned.interruptions,
+                        settled_by: cleaned.bed_time,
+                        woke_at: cleaned.wake_time,
+                        notes: notes || undefined,
+                    },
+                    {
+                        preserveScroll: true,
+                        preserveState: true,
+                        onSuccess: () => {
+                            onRecorded?.();
+                            onOpenChange(false);
+                        },
+                        onError: (errs) =>
+                            setErrors(errs as Record<string, string>),
+                        onFinish: () => setSubmitting(false),
+                    },
+                );
+                return;
             }
 
             // Shift-scoped endpoint links the observation to today's shift in
@@ -411,7 +463,8 @@ function RecordObservationBody({
                         onRecorded?.();
                         onOpenChange(false);
                     },
-                    onError: (errs) => setErrors(errs as Record<string, string>),
+                    onError: (errs) =>
+                        setErrors(errs as Record<string, string>),
                     onFinish: () => setSubmitting(false),
                 },
             );
@@ -509,7 +562,9 @@ function RecordObservationBody({
                     {submitting ? (
                         <Loader2 className="mr-2 h-4 w-4 animate-spin" />
                     ) : (
-                        <SelectedIcon className={cn('mr-2 h-4 w-4', selected.accent)} />
+                        <SelectedIcon
+                            className={cn('mr-2 h-4 w-4', selected.accent)}
+                        />
                     )}
                     Save {selected.label.toLowerCase()}
                 </Button>
@@ -629,6 +684,23 @@ function ObsTypeFields({
     if (type === 'sleep') {
         return fieldGrid(
             <>
+                <div>
+                    <Label className="mb-1 block">Night</Label>
+                    <Input
+                        type="date"
+                        value={data.slept_at}
+                        onChange={(e) => onChange('slept_at', e.target.value)}
+                    />
+                    <FieldError message={errors.slept_at} />
+                </div>
+                <NumberField
+                    label="Hours slept"
+                    value={data.hours_slept}
+                    onChange={(v) => onChange('hours_slept', v)}
+                    placeholder="7.0"
+                    step="0.1"
+                    error={errors.hours_slept}
+                />
                 <div>
                     <Label className="mb-1 block">Bed time</Label>
                     <Input
@@ -814,7 +886,10 @@ export function VitalsRecordDialog({
                 onOpenChange={(next) => !next && onOpenChange(false)}
             >
                 <DialogContent
-                    style={{ maxWidth: 'min(92vw, 720px)', width: 'min(92vw, 720px)' }}
+                    style={{
+                        maxWidth: 'min(92vw, 720px)',
+                        width: 'min(92vw, 720px)',
+                    }}
                     data-test="my-day-vitals-picker"
                 >
                     {showPicker ? (
@@ -825,7 +900,8 @@ export function VitalsRecordDialog({
                                     Record vitals & observations
                                 </DialogTitle>
                                 <DialogDescription>
-                                    Choose a resident to record an observation for.
+                                    Choose a resident to record an observation
+                                    for.
                                 </DialogDescription>
                             </DialogHeader>
                             <div className="mt-3">
@@ -878,12 +954,17 @@ export function VitalsRecordDialog({
                 onOpenChange={(next) => !next && onOpenChange(false)}
             >
                 <DialogContent
-                    style={{ maxWidth: 'min(92vw, 480px)', width: 'min(92vw, 480px)' }}
+                    style={{
+                        maxWidth: 'min(92vw, 480px)',
+                        width: 'min(92vw, 480px)',
+                    }}
                 >
                     {showNoPerm ? (
                         <>
                             <DialogHeader>
-                                <DialogTitle>Recording not available</DialogTitle>
+                                <DialogTitle>
+                                    Recording not available
+                                </DialogTitle>
                                 <DialogDescription>
                                     You don&rsquo;t have permission to record
                                     observations. Ask your manager for the
@@ -911,6 +992,282 @@ export function VitalsRecordDialog({
     );
 }
 
+export function MealLogDialog({
+    residents,
+    open,
+    onOpenChange,
+}: {
+    residents: MyDayResident[];
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+}) {
+    const [selected, setSelected] = useState<MyDayResident | null>(null);
+
+    useEffect(() => {
+        if (!open) {
+            setSelected(null);
+            return;
+        }
+        if (residents.length === 1 && selected == null) {
+            setSelected(residents[0]);
+        }
+    }, [open, residents, selected]);
+
+    const showPicker = open && selected == null;
+
+    return (
+        <>
+            <Dialog
+                open={showPicker}
+                onOpenChange={(next) => !next && onOpenChange(false)}
+            >
+                <DialogContent
+                    style={{
+                        maxWidth: 'min(92vw, 720px)',
+                        width: 'min(92vw, 720px)',
+                    }}
+                    data-test="my-day-meal-picker"
+                >
+                    {showPicker ? (
+                        <>
+                            <DialogHeader>
+                                <DialogTitle className="flex items-center gap-2">
+                                    <Utensils className="h-4 w-4 text-primary" />
+                                    Log meal
+                                </DialogTitle>
+                                <DialogDescription>
+                                    Choose a resident to record meal intake for.
+                                </DialogDescription>
+                            </DialogHeader>
+                            <div className="mt-3">
+                                <ResidentTilePicker
+                                    residents={residents}
+                                    onPick={setSelected}
+                                />
+                            </div>
+                            <DialogFooter className="mt-4">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => onOpenChange(false)}
+                                >
+                                    Cancel
+                                </Button>
+                            </DialogFooter>
+                        </>
+                    ) : null}
+                </DialogContent>
+            </Dialog>
+
+            {selected ? (
+                <MealLogRecordDialog
+                    resident={selected}
+                    showBack={residents.length > 1}
+                    onBack={() => setSelected(null)}
+                    open={open && selected != null}
+                    onOpenChange={(next) => {
+                        if (!next) {
+                            if (residents.length > 1) {
+                                setSelected(null);
+                            } else {
+                                onOpenChange(false);
+                            }
+                        }
+                    }}
+                    onRecorded={() => onOpenChange(false)}
+                />
+            ) : null}
+        </>
+    );
+}
+
+function MealLogRecordDialog({
+    resident,
+    showBack = false,
+    onBack,
+    open,
+    onOpenChange,
+    onRecorded,
+}: {
+    resident: MyDayResident;
+    showBack?: boolean;
+    onBack?: () => void;
+    open: boolean;
+    onOpenChange: (open: boolean) => void;
+    onRecorded?: () => void;
+}) {
+    const [mealType, setMealType] = useState('breakfast');
+    const [status, setStatus] = useState('eaten');
+    const [occurredAt, setOccurredAt] = useState(() => {
+        const now = new Date();
+        now.setMinutes(now.getMinutes() - now.getTimezoneOffset());
+        return now.toISOString().slice(0, 16);
+    });
+    const [portionNote, setPortionNote] = useState('');
+    const [notes, setNotes] = useState('');
+    const [errors, setErrors] = useState<Record<string, string>>({});
+
+    const submit = () => {
+        router.post(
+            `/operations/clients/${resident.id}/meal-logs`,
+            {
+                meal_type: mealType,
+                status,
+                occurred_at: occurredAt,
+                portion_note: portionNote || null,
+                notes: notes || null,
+            },
+            {
+                preserveScroll: true,
+                preserveState: true,
+                onSuccess: () => onRecorded?.(),
+                onError: (errs) => setErrors(errs as Record<string, string>),
+            },
+        );
+    };
+
+    return (
+        <Dialog open={open} onOpenChange={onOpenChange}>
+            <DialogContent
+                className="max-h-[90vh] overflow-y-auto"
+                style={{
+                    maxWidth: 'min(92vw, 560px)',
+                    width: 'min(92vw, 560px)',
+                }}
+            >
+                {open ? (
+                    <>
+                        <DialogHeader>
+                            <DialogTitle className="flex items-center gap-2">
+                                <Utensils className="h-4 w-4 text-primary" />
+                                Log meal
+                            </DialogTitle>
+                            <DialogDescription>
+                                {resident.name}
+                            </DialogDescription>
+                        </DialogHeader>
+                        <div className="mt-3 space-y-4">
+                            <ResidentLockedCard resident={resident} />
+                            <div className="grid gap-3 sm:grid-cols-2">
+                                <div>
+                                    <Label className="mb-1 block">Meal</Label>
+                                    <Select
+                                        value={mealType}
+                                        onValueChange={setMealType}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="breakfast">
+                                                Breakfast
+                                            </SelectItem>
+                                            <SelectItem value="lunch">
+                                                Lunch
+                                            </SelectItem>
+                                            <SelectItem value="dinner">
+                                                Dinner
+                                            </SelectItem>
+                                            <SelectItem value="snack">
+                                                Snack
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <FieldError message={errors.meal_type} />
+                                </div>
+                                <div>
+                                    <Label className="mb-1 block">Status</Label>
+                                    <Select
+                                        value={status}
+                                        onValueChange={setStatus}
+                                    >
+                                        <SelectTrigger>
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="eaten">
+                                                Eaten
+                                            </SelectItem>
+                                            <SelectItem value="partial">
+                                                Partial
+                                            </SelectItem>
+                                            <SelectItem value="refused">
+                                                Refused
+                                            </SelectItem>
+                                            <SelectItem value="declined">
+                                                Declined
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                    <FieldError message={errors.status} />
+                                </div>
+                            </div>
+                            <div>
+                                <Label className="mb-1 block">Time</Label>
+                                <Input
+                                    type="datetime-local"
+                                    value={occurredAt}
+                                    onChange={(event) =>
+                                        setOccurredAt(event.target.value)
+                                    }
+                                />
+                                <FieldError message={errors.occurred_at} />
+                            </div>
+                            <div>
+                                <Label className="mb-1 block">
+                                    Portion note
+                                </Label>
+                                <Input
+                                    value={portionNote}
+                                    onChange={(event) =>
+                                        setPortionNote(event.target.value)
+                                    }
+                                    placeholder="e.g. most of meal"
+                                />
+                            </div>
+                            <div>
+                                <Label className="mb-1 block">Notes</Label>
+                                <Textarea
+                                    value={notes}
+                                    onChange={(event) =>
+                                        setNotes(event.target.value)
+                                    }
+                                    rows={3}
+                                />
+                            </div>
+                        </div>
+                        <DialogFooter className="mt-4">
+                            {showBack ? (
+                                <Button
+                                    type="button"
+                                    variant="ghost"
+                                    onClick={onBack}
+                                >
+                                    Back
+                                </Button>
+                            ) : null}
+                            <Button
+                                type="button"
+                                variant="outline"
+                                onClick={() => onOpenChange(false)}
+                            >
+                                Cancel
+                            </Button>
+                            <Button
+                                type="button"
+                                onClick={submit}
+                                disabled={!occurredAt}
+                            >
+                                Save meal log
+                            </Button>
+                        </DialogFooter>
+                    </>
+                ) : null}
+            </DialogContent>
+        </Dialog>
+    );
+}
+
 // ─── Write Handover dialog ───────────────────────────────────────────────────
 
 export type WriteHandoverDialogProps = {
@@ -927,10 +1284,16 @@ export type WriteHandoverDialogProps = {
 export function WriteHandoverDialog(props: WriteHandoverDialogProps) {
     const { open, onOpenChange } = props;
     return (
-        <Dialog open={open} onOpenChange={(next) => !next && onOpenChange(false)}>
+        <Dialog
+            open={open}
+            onOpenChange={(next) => !next && onOpenChange(false)}
+        >
             <DialogContent
                 className="max-h-[90vh] overflow-y-auto"
-                style={{ maxWidth: 'min(92vw, 720px)', width: 'min(92vw, 720px)' }}
+                style={{
+                    maxWidth: 'min(92vw, 720px)',
+                    width: 'min(92vw, 720px)',
+                }}
             >
                 {open ? <WriteHandoverBody {...props} /> : null}
             </DialogContent>
@@ -943,7 +1306,9 @@ function WriteHandoverBody({
     alreadySubmitted,
     onOpenChange,
 }: WriteHandoverDialogProps) {
-    const [value, setValue] = useState<HandoverWriteValue>(emptyHandoverWriteValue);
+    const [value, setValue] = useState<HandoverWriteValue>(
+        emptyHandoverWriteValue,
+    );
     const [submitting, setSubmitting] = useState(false);
     const [errors, setErrors] = useState<Record<string, string>>({});
 
@@ -1078,8 +1443,12 @@ const ALLOCATION_METHODS: AllocationMethodDef[] = [
     },
 ];
 
-function getAllocationMethod(key: TimesheetAllocationMethod): AllocationMethodDef {
-    return ALLOCATION_METHODS.find((m) => m.key === key) ?? ALLOCATION_METHODS[0];
+function getAllocationMethod(
+    key: TimesheetAllocationMethod,
+): AllocationMethodDef {
+    return (
+        ALLOCATION_METHODS.find((m) => m.key === key) ?? ALLOCATION_METHODS[0]
+    );
 }
 
 // Local editable row — shape mirrors MyDayTimesheetClientAllocation but with
@@ -1148,10 +1517,16 @@ export type TimesheetReviewDialogProps = {
 export function TimesheetReviewDialog(props: TimesheetReviewDialogProps) {
     const { timesheet, open, onOpenChange } = props;
     return (
-        <Dialog open={open && !!timesheet} onOpenChange={(next) => !next && onOpenChange(false)}>
+        <Dialog
+            open={open && !!timesheet}
+            onOpenChange={(next) => !next && onOpenChange(false)}
+        >
             <DialogContent
                 className="max-h-[90vh] overflow-y-auto"
-                style={{ maxWidth: 'min(92vw, 900px)', width: 'min(92vw, 900px)' }}
+                style={{
+                    maxWidth: 'min(92vw, 900px)',
+                    width: 'min(92vw, 900px)',
+                }}
             >
                 {open && timesheet ? (
                     <TimesheetReviewBody
@@ -1178,14 +1553,15 @@ function TimesheetReviewBody({
     // "single" for legacy 1:1 timesheets, "residential_house" when the site
     // already flags it, etc.
     const initialMethod: TimesheetAllocationMethod =
-        timesheet.allocation_method
-        ?? (timesheet.is_residential_billable
+        timesheet.allocation_method ??
+        (timesheet.is_residential_billable
             ? 'residential_house'
             : candidates.length > 1
               ? 'equal_split'
               : 'single');
 
-    const [method, setMethod] = useState<TimesheetAllocationMethod>(initialMethod);
+    const [method, setMethod] =
+        useState<TimesheetAllocationMethod>(initialMethod);
 
     // Seed the editable rows from the server payload. For methods that
     // require every candidate to appear (residential, equal_split,
@@ -1198,14 +1574,20 @@ function TimesheetReviewBody({
         );
 
         if (m === 'single') {
-            const primary = candidates.find((c) => c.is_primary) ?? candidates[0];
+            const primary =
+                candidates.find((c) => c.is_primary) ?? candidates[0];
             if (!primary) return existing;
             return [
-                existing.find((e) => e.client_id === primary.id) ?? rowFromCandidate(primary, totalHours),
+                existing.find((e) => e.client_id === primary.id) ??
+                    rowFromCandidate(primary, totalHours),
             ];
         }
 
-        if (m === 'residential_house' || m === 'equal_split' || m === 'time_segmented') {
+        if (
+            m === 'residential_house' ||
+            m === 'equal_split' ||
+            m === 'time_segmented'
+        ) {
             const splits = splitHoursEvenly(totalHours, candidates.length);
             return candidates.map((c, index) => {
                 const found = existing.find((e) => e.client_id === c.id);
@@ -1218,7 +1600,10 @@ function TimesheetReviewBody({
                                 : found.hours_text,
                     };
                 }
-                return rowFromCandidate(c, Number.parseFloat(splits[index] ?? '0'));
+                return rowFromCandidate(
+                    c,
+                    Number.parseFloat(splits[index] ?? '0'),
+                );
             });
         }
 
@@ -1229,7 +1614,9 @@ function TimesheetReviewBody({
         return primary ? [rowFromCandidate(primary, totalHours)] : [];
     };
 
-    const [rows, setRows] = useState<AllocationRow[]>(() => seedRows(initialMethod));
+    const [rows, setRows] = useState<AllocationRow[]>(() =>
+        seedRows(initialMethod),
+    );
     const [activeTab, setActiveTab] = useState<string>(
         rows[0] ? String(rows[0].client_id) : '',
     );
@@ -1253,7 +1640,9 @@ function TimesheetReviewBody({
     const updateRow = useCallback(
         (clientId: number, patch: Partial<AllocationRow>) => {
             setRows((prev) =>
-                prev.map((r) => (r.client_id === clientId ? { ...r, ...patch } : r)),
+                prev.map((r) =>
+                    r.client_id === clientId ? { ...r, ...patch } : r,
+                ),
             );
         },
         [],
@@ -1263,7 +1652,8 @@ function TimesheetReviewBody({
         setRows((prev) =>
             prev.map((r, index) => ({
                 ...r,
-                hours_text: splitHoursEvenly(totalHours, prev.length)[index] ?? '0.00',
+                hours_text:
+                    splitHoursEvenly(totalHours, prev.length)[index] ?? '0.00',
             })),
         );
     }, [totalHours]);
@@ -1289,11 +1679,15 @@ function TimesheetReviewBody({
             hours: Number.parseFloat(r.hours_text) || 0,
             allocation_method: method,
             starts_at:
-                method === 'time_segmented' && r.starts_at && timesheet.work_date_iso
+                method === 'time_segmented' &&
+                r.starts_at &&
+                timesheet.work_date_iso
                     ? `${timesheet.work_date_iso}T${r.starts_at}:00`
                     : null,
             ends_at:
-                method === 'time_segmented' && r.ends_at && timesheet.work_date_iso
+                method === 'time_segmented' &&
+                r.ends_at &&
+                timesheet.work_date_iso
                     ? `${timesheet.work_date_iso}T${r.ends_at}:00`
                     : null,
             notes: r.notes || null,
@@ -1346,7 +1740,8 @@ function TimesheetReviewBody({
                                 : ''}
                         </div>
                     </div>
-                    {timesheet.status === 'returned' && timesheet.return_notes ? (
+                    {timesheet.status === 'returned' &&
+                    timesheet.return_notes ? (
                         <Badge
                             variant="outline"
                             className="border-status-warning/30 bg-status-warning-bg text-[10px] text-status-warning"
@@ -1390,7 +1785,9 @@ function TimesheetReviewBody({
                                 : `${allocatedTotal.toFixed(2)}h allocated of ${totalHours.toFixed(2)}h — ${remaining > 0 ? `${remaining.toFixed(2)}h left` : `${Math.abs(remaining).toFixed(2)}h over`}.`}
                         </span>
                     </div>
-                    {(method === 'equal_split' || method === 'residential_house') && rows.length > 1 ? (
+                    {(method === 'equal_split' ||
+                        method === 'residential_house') &&
+                    rows.length > 1 ? (
                         <Button
                             type="button"
                             variant="ghost"
@@ -1415,12 +1812,19 @@ function TimesheetReviewBody({
                                     <span>
                                         <ResidentDot
                                             hue={residentHue(r.client_id)}
-                                            initials={initialsFor(r.client_name)}
+                                            initials={initialsFor(
+                                                r.client_name,
+                                            )}
                                         />
                                     </span>
-                                    <span className="truncate">{r.client_name}</span>
+                                    <span className="truncate">
+                                        {r.client_name}
+                                    </span>
                                     <span className="ml-1 text-[10px] text-muted-foreground">
-                                        {(Number.parseFloat(r.hours_text) || 0).toFixed(2)}h
+                                        {(
+                                            Number.parseFloat(r.hours_text) || 0
+                                        ).toFixed(2)}
+                                        h
                                     </span>
                                 </TabsTrigger>
                             ))}
@@ -1435,7 +1839,9 @@ function TimesheetReviewBody({
                                     index={index}
                                     row={r}
                                     method={method}
-                                    onChange={(patch) => updateRow(r.client_id, patch)}
+                                    onChange={(patch) =>
+                                        updateRow(r.client_id, patch)
+                                    }
                                     errors={errors}
                                 />
                             </TabsContent>
@@ -1448,7 +1854,9 @@ function TimesheetReviewBody({
                         index={0}
                         row={rows[0]}
                         method={method}
-                        onChange={(patch) => updateRow(rows[0].client_id, patch)}
+                        onChange={(patch) =>
+                            updateRow(rows[0].client_id, patch)
+                        }
                         errors={errors}
                     />
                 ) : (
@@ -1487,7 +1895,9 @@ function TimesheetReviewBody({
                     ) : (
                         <CheckCircle2 className="mr-2 h-4 w-4" />
                     )}
-                    {timesheet.status === 'returned' ? 'Save and resubmit' : 'Submit timesheet'}
+                    {timesheet.status === 'returned'
+                        ? 'Save and resubmit'
+                        : 'Submit timesheet'}
                 </Button>
             </DialogFooter>
         </>
@@ -1523,7 +1933,8 @@ function AllocationMethodPicker({
                             active
                                 ? 'border-primary bg-primary/10 ring-1 ring-primary/40'
                                 : 'border-border',
-                            disabled && 'cursor-not-allowed opacity-50 hover:bg-card/40 hover:border-border',
+                            disabled &&
+                                'cursor-not-allowed opacity-50 hover:border-border hover:bg-card/40',
                         )}
                     >
                         <span className="mt-0.5 shrink-0 rounded-lg bg-background/60 p-1.5">
@@ -1557,7 +1968,8 @@ function AllocationRowEditor({
     onChange: (patch: Partial<AllocationRow>) => void;
     errors: Record<string, string>;
 }) {
-    const hoursLocked = method === 'residential_house' || method === 'equal_split';
+    const hoursLocked =
+        method === 'residential_house' || method === 'equal_split';
     const hoursError = allocationErrorForRow(
         errors,
         index,
@@ -1582,8 +1994,7 @@ function AllocationRowEditor({
             <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                 <div>
                     <Label className="mb-1 block">
-                        Hours{' '}
-                        <span className="text-status-critical">*</span>
+                        Hours <span className="text-status-critical">*</span>
                     </Label>
                     <Input
                         type="number"
@@ -1591,7 +2002,9 @@ function AllocationRowEditor({
                         min="0"
                         max="24"
                         value={row.hours_text}
-                        onChange={(e) => onChange({ hours_text: e.target.value })}
+                        onChange={(e) =>
+                            onChange({ hours_text: e.target.value })
+                        }
                         disabled={hoursLocked}
                         placeholder="0.00"
                     />
@@ -1611,7 +2024,9 @@ function AllocationRowEditor({
                             <Input
                                 type="time"
                                 value={row.starts_at}
-                                onChange={(e) => onChange({ starts_at: e.target.value })}
+                                onChange={(e) =>
+                                    onChange({ starts_at: e.target.value })
+                                }
                             />
                             <FieldError message={startsAtError} />
                         </div>
@@ -1620,7 +2035,9 @@ function AllocationRowEditor({
                             <Input
                                 type="time"
                                 value={row.ends_at}
-                                onChange={(e) => onChange({ ends_at: e.target.value })}
+                                onChange={(e) =>
+                                    onChange({ ends_at: e.target.value })
+                                }
                             />
                             <FieldError message={endsAtError} />
                         </div>
@@ -1642,7 +2059,6 @@ function AllocationRowEditor({
                     placeholder={`Anything to note about ${row.client_name.split(' ')[0]}'s support?`}
                 />
             </div>
-
         </div>
     );
 }

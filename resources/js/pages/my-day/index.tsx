@@ -15,18 +15,23 @@ import { toast } from 'sonner';
 import { ChecklistConfigProvider } from '@/components/checklists/context';
 import { CategoryIcon, StatusBadge } from '@/components/checklists/primitives';
 import { RunModal } from '@/components/checklists/run-modal';
-import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import EndOfShiftChecklist, {
     type EndOfShiftBlocker,
 } from '@/components/end-of-shift-checklist';
+import { StaffHeader } from '@/components/staff-header';
+import { Button } from '@/components/ui/button';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import useLiveRefresh from '@/hooks/use-live-refresh';
 import { useMyDayLabels } from '@/hooks/use-my-day-labels';
 import { useUndoableAction } from '@/hooks/use-undoable-action';
 import AppLayout from '@/layouts/app-layout';
-import { StaffHeader } from '@/components/staff-header';
 
-import { TimesheetReviewDialog, VitalsRecordDialog, WriteHandoverDialog } from './_dialogs';
+import {
+    MealLogDialog,
+    TimesheetReviewDialog,
+    VitalsRecordDialog,
+    WriteHandoverDialog,
+} from './_dialogs';
 
 import { DatePopover } from './components/date-popover';
 import { DigestPanel } from './components/digest-panel';
@@ -42,8 +47,8 @@ import {
     type StreamItem,
 } from './lib/stream-grouping';
 import type {
-    MyDayActiveSite,
     MyDayActiveRound,
+    MyDayActiveSite,
     MyDayHandover,
     MyDayHrTask,
     MyDayMedDue,
@@ -113,7 +118,8 @@ export default function MyDay() {
     const auth = props.auth;
     const t = useMyDayLabels();
 
-    const workerFirstName = auth?.user?.first_name ?? auth?.user?.name?.split(' ')[0] ?? 'there';
+    const workerFirstName =
+        auth?.user?.first_name ?? auth?.user?.name?.split(' ')[0] ?? 'there';
     const availabilityHref =
         auth?.user?.id && auth?.can?.staff?.availabilityUpdateSelf
             ? `/staff/${auth.user.id}/availability`
@@ -123,13 +129,21 @@ export default function MyDay() {
     const [dateOpen, setDateOpen] = useState(false);
 
     // Active resident filter (multi-resident sites only).
-    const [activeResidentId, setActiveResidentId] = useState<'all' | number>('all');
+    const [activeResidentId, setActiveResidentId] = useState<'all' | number>(
+        'all',
+    );
 
     // Digest panel tab.
-    const [digestTab, setDigestTab] = useState<'handover' | 'alerts' | 'notifs'>('handover');
+    const [digestTab, setDigestTab] = useState<
+        'handover' | 'alerts' | 'notifs'
+    >('handover');
 
     // Right-click context menu.
-    const [ctxMenu, setCtxMenu] = useState<{ item: StreamItem; x: number; y: number } | null>(null);
+    const [ctxMenu, setCtxMenu] = useState<{
+        item: StreamItem;
+        x: number;
+        y: number;
+    } | null>(null);
 
     // End-of-shift + outgoing-handover sheets — both reuse the existing
     // components already shipped for the legacy clock-in/active-shift cards.
@@ -138,16 +152,21 @@ export default function MyDay() {
 
     // Vitals & obs picker flow.
     const [vitalsOpen, setVitalsOpen] = useState(false);
+    const [mealLogOpen, setMealLogOpen] = useState(false);
 
     // Site checklist run modal launched from the active shift.
-    const [activeChecklistRun, setActiveChecklistRun] = useState<number | null>(null);
+    const [activeChecklistRun, setActiveChecklistRun] = useState<number | null>(
+        null,
+    );
 
     // Per-client timesheet review popup.
     const [timesheetUnderReview, setTimesheetUnderReview] =
         useState<MyDayTimesheet | null>(null);
 
     // Live refresh — Inertia partial reload every 60s (unless guarded).
-    const { lastUpdatedAt, isRefreshing, refreshNow } = useLiveRefresh({ intervalMs: 60_000 });
+    const { lastUpdatedAt, isRefreshing, refreshNow } = useLiveRefresh({
+        intervalMs: 60_000,
+    });
 
     // Wall-clock tick that drives the live CLOCKED counter in the hero. The
     // backend never sends an elapsed-minutes figure, so the headline is
@@ -165,7 +184,10 @@ export default function MyDay() {
     const shiftChecklists = props.shiftChecklists ?? [];
     const canViewShiftChecklists = !!props.checklistConfig?.can.view;
     const canRunShiftChecklists = !!props.checklistConfig?.can.run;
-    const residents: MyDayResident[] = useMemo(() => site?.residents ?? [], [site]);
+    const residents: MyDayResident[] = useMemo(
+        () => site?.residents ?? [],
+        [site],
+    );
     const singleResident: MyDayResident | null = useMemo(() => {
         if (residents.length === 1) return residents[0];
         if (activeShift?.client) {
@@ -189,7 +211,8 @@ export default function MyDay() {
     // no active shift we fall back to today's shifts' first one.
     const visibleTasks: MyDayShiftTask[] = useMemo(() => {
         const tasks = activeShift?.tasks ?? props.shifts?.[0]?.tasks ?? [];
-        const fallbackClientId = activeShift?.client?.id ?? props.shifts?.[0]?.client?.id ?? null;
+        const fallbackClientId =
+            activeShift?.client?.id ?? props.shifts?.[0]?.client?.id ?? null;
         return tasks.map((task) => ({
             ...task,
             client_id: task.client_id ?? fallbackClientId ?? undefined,
@@ -202,8 +225,13 @@ export default function MyDay() {
     );
 
     const residentTaskCounts = useMemo(() => {
-        const m = new Map<number, { tasks: number; meds: number; medsOverdue: number }>();
-        residents.forEach((r) => m.set(r.id, { tasks: 0, meds: 0, medsOverdue: 0 }));
+        const m = new Map<
+            number,
+            { tasks: number; meds: number; medsOverdue: number }
+        >();
+        residents.forEach((r) =>
+            m.set(r.id, { tasks: 0, meds: 0, medsOverdue: 0 }),
+        );
         visibleTasks.forEach((task) => {
             if (task.client_id == null) return;
             const entry = m.get(task.client_id);
@@ -234,7 +262,8 @@ export default function MyDay() {
             buildStream({
                 tasks: filteredTasks,
                 meds: filteredMeds,
-                residentFilter: activeResidentId === 'all' ? null : activeResidentId,
+                residentFilter:
+                    activeResidentId === 'all' ? null : activeResidentId,
                 fallbackClientId: singleResident?.id ?? null,
             }),
         [filteredTasks, filteredMeds, activeResidentId, singleResident],
@@ -248,7 +277,9 @@ export default function MyDay() {
 
     const tasksDone = filteredTasks.filter((t) => t.is_completed).length;
     const medsGiven = filteredMeds.filter((m) => m.status === 'given').length;
-    const medsOverdue = filteredMeds.filter((m) => m.status === 'overdue').length;
+    const medsOverdue = filteredMeds.filter(
+        (m) => m.status === 'overdue',
+    ).length;
     const overdueMeds = visibleMeds.filter((m) => m.status === 'overdue');
     const openItemTasks = (props.tasks ?? []).filter((t) =>
         ['alert', 'incident', 'followup', 'note_followup'].includes(t.type),
@@ -273,7 +304,10 @@ export default function MyDay() {
         return () => clearInterval(id);
     }, [clockInAt]);
     const clockedMinutes = clockInAt
-        ? Math.max(0, Math.floor((now - new Date(clockInAt).getTime()) / 60_000))
+        ? Math.max(
+              0,
+              Math.floor((now - new Date(clockInAt).getTime()) / 60_000),
+          )
         : 0;
     const clockedLabel = `${Math.floor(clockedMinutes / 60)}h ${clockedMinutes % 60}m`;
     const shiftStartLabel = isoToHourMinute(activeShift?.starts_at);
@@ -294,7 +328,9 @@ export default function MyDay() {
     // clock_in_at and only fall back to actual_starts_at when the session
     // hasn't reported one yet.
     const liveSinceTime = clockedIn
-        ? isoToHourMinute(openSession?.clock_in_at ?? activeShift?.actual_starts_at)
+        ? isoToHourMinute(
+              openSession?.clock_in_at ?? activeShift?.actual_starts_at,
+          )
         : '';
     const liveSinceLabel = !clockedIn
         ? t('hero_not_clocked_in')
@@ -303,7 +339,10 @@ export default function MyDay() {
           : t('hero_live_shift');
     const clockedSubLabel = `of ${shiftDurationHours}h`;
 
-    const today = useMemo(() => parsePageDate(props.today ?? props.today_iso ?? null), [props.today, props.today_iso]);
+    const today = useMemo(
+        () => parsePageDate(props.today ?? props.today_iso ?? null),
+        [props.today, props.today_iso],
+    );
     const shiftIsoDates = useMemo(
         () => (props.shifts ?? []).map((s) => s.starts_at.slice(0, 10)),
         [props.shifts],
@@ -397,8 +436,8 @@ export default function MyDay() {
         return (
             (props.timesheets ?? []).find(
                 (ts) =>
-                    ts.work_date_iso === todayIso
-                    && (ts.status === 'draft' || ts.status === 'returned'),
+                    ts.work_date_iso === todayIso &&
+                    (ts.status === 'draft' || ts.status === 'returned'),
             ) ?? null
         );
     }, [props.timesheets, props.today_iso]) as MyDayTimesheet | null;
@@ -408,14 +447,20 @@ export default function MyDay() {
             setTimesheetUnderReview(todaysTimesheet);
             return;
         }
-        router.post('/my-tasks/timesheet/ensure-today', {}, {
-            preserveScroll: true,
-            // ensure-today returns `back()->withErrors(['timesheet' => …])` when
-            // there's no shift today. Without this the button looked dead.
-            onError: (errors) => {
-                toast.error(errors.timesheet ?? 'No timesheet to open for today.');
+        router.post(
+            '/my-tasks/timesheet/ensure-today',
+            {},
+            {
+                preserveScroll: true,
+                // ensure-today returns `back()->withErrors(['timesheet' => …])` when
+                // there's no shift today. Without this the button looked dead.
+                onError: (errors) => {
+                    toast.error(
+                        errors.timesheet ?? 'No timesheet to open for today.',
+                    );
+                },
             },
-        });
+        );
     }, [todaysTimesheet]);
 
     // Inertia flash `open_timesheet_id` is set by /ensure-today after it
@@ -465,84 +510,101 @@ export default function MyDay() {
     }, []);
 
     const handleToggleTask = useCallback((taskId: number) => {
-        router.post(`/my-tasks/shift-task/${taskId}/complete`, {}, { preserveScroll: true });
+        router.post(
+            `/my-tasks/shift-task/${taskId}/complete`,
+            {},
+            { preserveScroll: true },
+        );
     }, []);
 
     // A medications_due row addresses a single dose occurrence by medication id
     // (the route-model-bound URL param) + scheduled_for (the slot). The same
     // ClientMedication can appear twice in the rail (e.g. 09:00 + 13:00), so
     // scheduled_for is what tells the endpoint which dose was acted on.
-    const handleGiveMed = useCallback((medicationId: number, scheduledFor: string) => {
-        runUndoable({
-            message: t('toast_marking_dose_given'),
-            durationMs: 5_000,
-            onCommit: () => {
-                router.post(
-                    `/my-day/medications/${medicationId}/administer`,
-                    { scheduled_for: scheduledFor },
-                    {
-                        preserveScroll: true,
-                        only: ['medications_due', 'stats'] as never,
-                        // Surface a server rejection (e.g. controlled drug needs a
-                        // witness, or the dose is outside its time window) instead
-                        // of silently leaving the row unchanged.
-                        onError: (errors) => {
-                            const message = Object.values(errors)[0];
-                            toast.error(
-                                typeof message === 'string'
-                                    ? message
-                                    : t('toast_dose_record_failed'),
-                            );
+    const handleGiveMed = useCallback(
+        (medicationId: number, scheduledFor: string) => {
+            runUndoable({
+                message: t('toast_marking_dose_given'),
+                durationMs: 5_000,
+                onCommit: () => {
+                    router.post(
+                        `/my-day/medications/${medicationId}/administer`,
+                        { scheduled_for: scheduledFor },
+                        {
+                            preserveScroll: true,
+                            only: ['medications_due', 'stats'] as never,
+                            // Surface a server rejection (e.g. controlled drug needs a
+                            // witness, or the dose is outside its time window) instead
+                            // of silently leaving the row unchanged.
+                            onError: (errors) => {
+                                const message = Object.values(errors)[0];
+                                toast.error(
+                                    typeof message === 'string'
+                                        ? message
+                                        : t('toast_dose_record_failed'),
+                                );
+                            },
                         },
-                    },
-                );
-            },
-            undoneMessage: t('toast_dose_left_as_due'),
-        });
-    }, [runUndoable, t]);
-
-    const handleRefuseMed = useCallback((medicationId: number, scheduledFor: string) => {
-        if (!confirm(t('confirm_refuse_dose'))) return;
-        const reason = window.prompt(
-            t('prompt_refuse_dose_reason'),
-            t('default_refuse_dose_reason'),
-        );
-        if (reason === null) return;
-        const trimmedReason = reason.trim();
-        if (!trimmedReason) return;
-        router.post(
-            `/my-day/medications/${medicationId}/refuse`,
-            {
-                scheduled_for: scheduledFor,
-                reason_code: 'refused',
-                reason: trimmedReason,
-            },
-            {
-                preserveScroll: true,
-                onError: (errors) => {
-                    const message = Object.values(errors)[0];
-                    toast.error(
-                        typeof message === 'string'
-                            ? message
-                            : t('toast_dose_record_failed'),
                     );
                 },
-            },
-        );
-    }, [t]);
+                undoneMessage: t('toast_dose_left_as_due'),
+            });
+        },
+        [runUndoable, t],
+    );
 
-    const handleSnoozeMed = useCallback((medicationId: number, scheduledFor: string) => {
-        router.post(
-            `/my-day/medications/${medicationId}/snooze`,
-            { minutes: 15, scheduled_for: scheduledFor },
-            { preserveScroll: true },
-        );
-    }, []);
+    const handleRefuseMed = useCallback(
+        (medicationId: number, scheduledFor: string) => {
+            if (!confirm(t('confirm_refuse_dose'))) return;
+            const reason = window.prompt(
+                t('prompt_refuse_dose_reason'),
+                t('default_refuse_dose_reason'),
+            );
+            if (reason === null) return;
+            const trimmedReason = reason.trim();
+            if (!trimmedReason) return;
+            router.post(
+                `/my-day/medications/${medicationId}/refuse`,
+                {
+                    scheduled_for: scheduledFor,
+                    reason_code: 'refused',
+                    reason: trimmedReason,
+                },
+                {
+                    preserveScroll: true,
+                    onError: (errors) => {
+                        const message = Object.values(errors)[0];
+                        toast.error(
+                            typeof message === 'string'
+                                ? message
+                                : t('toast_dose_record_failed'),
+                        );
+                    },
+                },
+            );
+        },
+        [t],
+    );
+
+    const handleSnoozeMed = useCallback(
+        (medicationId: number, scheduledFor: string) => {
+            router.post(
+                `/my-day/medications/${medicationId}/snooze`,
+                { minutes: 15, scheduled_for: scheduledFor },
+                { preserveScroll: true },
+            );
+        },
+        [],
+    );
 
     const handleAckAlert = useCallback((alert: MyDayTaskFollowup) => {
         const alertId = alert.meta?.alert_id;
         if (!alertId) return;
-        router.post(`/my-day/alerts/${alertId}/ack`, {}, { preserveScroll: true });
+        router.post(
+            `/my-day/alerts/${alertId}/ack`,
+            {},
+            { preserveScroll: true },
+        );
     }, []);
 
     const handleSnoozeAlert = useCallback((alert: MyDayTaskFollowup) => {
@@ -572,12 +634,27 @@ export default function MyDay() {
         (action: string) => {
             if (!ctxMenu) return;
             const item = ctxMenu.item;
-            if (action === 'complete-task' && item.kind === 'task') handleToggleTask(item.data.id);
-            if (action === 'give-med' && item.kind === 'med') handleGiveMed(item.data.medication_id, item.data.scheduled_for);
-            if (action === 'snooze-med' && item.kind === 'med') handleSnoozeMed(item.data.medication_id, item.data.scheduled_for);
-            if (action === 'refuse-med' && item.kind === 'med') handleRefuseMed(item.data.medication_id, item.data.scheduled_for);
-            if (action === 'open-emar' && item.kind === 'med') router.visit(item.data.emar_url);
-            if (action === 'open-care-plan' && item.kind === 'task' && item.clientId) {
+            if (action === 'complete-task' && item.kind === 'task')
+                handleToggleTask(item.data.id);
+            if (action === 'give-med' && item.kind === 'med')
+                handleGiveMed(item.data.medication_id, item.data.scheduled_for);
+            if (action === 'snooze-med' && item.kind === 'med')
+                handleSnoozeMed(
+                    item.data.medication_id,
+                    item.data.scheduled_for,
+                );
+            if (action === 'refuse-med' && item.kind === 'med')
+                handleRefuseMed(
+                    item.data.medication_id,
+                    item.data.scheduled_for,
+                );
+            if (action === 'open-emar' && item.kind === 'med')
+                router.visit(item.data.emar_url);
+            if (
+                action === 'open-care-plan' &&
+                item.kind === 'task' &&
+                item.clientId
+            ) {
                 router.visit(`/clients/${item.clientId}/care`);
             }
             if (action === 'add-note') {
@@ -585,7 +662,14 @@ export default function MyDay() {
             }
             setCtxMenu(null);
         },
-        [ctxMenu, handleToggleTask, handleGiveMed, handleSnoozeMed, handleRefuseMed, handleAddNote],
+        [
+            ctxMenu,
+            handleToggleTask,
+            handleGiveMed,
+            handleSnoozeMed,
+            handleRefuseMed,
+            handleAddNote,
+        ],
     );
 
     // ──────────────────────────────────────────────────────────────────────
@@ -613,23 +697,38 @@ export default function MyDay() {
                 { icon: Users, label: 'Clients', href: '/clients' },
                 { icon: Home, label: 'Sites & Locations', href: '/sites' },
                 { icon: Calendar, label: 'My Calendar', href: '/my-calendar' },
-                { icon: FileText, label: 'My Timesheets', href: '/operations/timesheets' },
+                {
+                    icon: FileText,
+                    label: 'My Timesheets',
+                    href: '/operations/timesheets',
+                },
             ]}
             search={{ placeholder: t('staff_header_search'), hint: '⌘K' }}
-            liveIndicator={{ lastUpdatedAt, isRefreshing, onRefresh: refreshNow }}
-            notifications={{ count: props.stats?.notifications_unread ?? 0, href: '/notifications' }}
+            liveIndicator={{
+                lastUpdatedAt,
+                isRefreshing,
+                onRefresh: refreshNow,
+            }}
+            notifications={{
+                count: props.stats?.notifications_unread ?? 0,
+                href: '/notifications',
+            }}
             action={
                 <Button
                     type="button"
                     size="sm"
                     onClick={() => {
-                        const shiftId = activeShift?.id ?? props.shifts?.[0]?.id;
+                        const shiftId =
+                            activeShift?.id ?? props.shifts?.[0]?.id;
                         router.visit(
-                            shiftId ? `/incidents/create?shift_id=${shiftId}` : '/incidents/create',
+                            shiftId
+                                ? `/incidents/create?shift_id=${shiftId}`
+                                : '/incidents/create',
                         );
                     }}
                 >
-                    <AlertTriangle className="h-3.5 w-3.5" /> {t('btn_report_incident')}
+                    <AlertTriangle className="h-3.5 w-3.5" />{' '}
+                    {t('btn_report_incident')}
                 </Button>
             }
         />
@@ -665,6 +764,7 @@ export default function MyDay() {
                 onOpenTimesheet={handleOpenTimesheets}
                 onWriteHandover={handleWriteHandover}
                 onOpenVitals={() => setVitalsOpen(true)}
+                onOpenMeal={() => setMealLogOpen(true)}
                 activeResidentId={activeResidentId}
                 onResidentChange={setActiveResidentId}
                 residentTaskCounts={residentTaskCounts}
@@ -676,20 +776,33 @@ export default function MyDay() {
             <div className="mt-5 grid gap-5 lg:grid-cols-[minmax(0,1.6fr)_minmax(0,1fr)]">
                 <WhatsNextRail
                     stream={stream}
-                    residents={residents.length > 0 ? residents : singleResident ? [singleResident] : []}
+                    residents={
+                        residents.length > 0
+                            ? residents
+                            : singleResident
+                              ? [singleResident]
+                              : []
+                    }
                     activeResidentId={activeResidentId}
                     onToggleTask={handleToggleTask}
                     onGiveMed={handleGiveMed}
                     onSnoozeMed={handleSnoozeMed}
                     onRefuseMed={handleRefuseMed}
                     onAddNote={(item) => handleAddNote(item.clientId ?? null)}
-                    onOpenContextMenu={(item, x, y) => setCtxMenu({ item, x, y })}
+                    onOpenContextMenu={(item, x, y) =>
+                        setCtxMenu({ item, x, y })
+                    }
                 />
 
                 <aside className="flex flex-col gap-4">
-                    {activeRound ? <ActiveRoundBanner round={activeRound} /> : null}
+                    {activeRound ? (
+                        <ActiveRoundBanner round={activeRound} />
+                    ) : null}
 
-                    {activeShift && canViewShiftChecklists && shiftChecklists.length > 0 && checklistProviderValue ? (
+                    {activeShift &&
+                    canViewShiftChecklists &&
+                    shiftChecklists.length > 0 &&
+                    checklistProviderValue ? (
                         <ChecklistConfigProvider value={checklistProviderValue}>
                             <ShiftChecklistsCard
                                 runs={shiftChecklists}
@@ -702,21 +815,30 @@ export default function MyDay() {
                     <DigestPanel
                         tab={digestTab}
                         onTabChange={setDigestTab}
-                        handover={(props.handover ?? null) as MyDayHandover | null}
+                        handover={
+                            (props.handover ?? null) as MyDayHandover | null
+                        }
                         alertTasks={openItemTasks}
                         incidents={props.incidents ?? []}
-                        notifications={(props.notifications ?? []) as MyDayNotification[]}
+                        notifications={
+                            (props.notifications ?? []) as MyDayNotification[]
+                        }
                         onAckAlert={handleAckAlert}
                         onSnoozeAlert={handleSnoozeAlert}
                         onConfirmHandoverRead={handleConfirmHandoverRead}
                     />
                     <PaperworkPanel
-                        timesheets={(props.timesheets ?? []) as MyDayTimesheet[]}
+                        timesheets={
+                            (props.timesheets ?? []) as MyDayTimesheet[]
+                        }
                         hrTasks={(props.hr_tasks ?? []) as MyDayHrTask[]}
                         onSubmitTimesheet={handleTimesheetSubmit}
                     />
                     <TomorrowPanel
-                        briefing={(props.next_shift_briefing ?? null) as MyDayPreShiftBriefing | null}
+                        briefing={
+                            (props.next_shift_briefing ??
+                                null) as MyDayPreShiftBriefing | null
+                        }
                     />
                 </aside>
             </div>
@@ -746,6 +868,18 @@ export default function MyDay() {
                 onOpenChange={setVitalsOpen}
             />
 
+            <MealLogDialog
+                residents={
+                    residents.length > 0
+                        ? residents
+                        : singleResident
+                          ? [singleResident]
+                          : []
+                }
+                open={mealLogOpen}
+                onOpenChange={setMealLogOpen}
+            />
+
             <TimesheetReviewDialog
                 timesheet={timesheetUnderReview}
                 open={timesheetUnderReview !== null}
@@ -761,9 +895,9 @@ export default function MyDay() {
                             id: openSession.id,
                             shift_id: openSession.shift_id,
                             client_name:
-                                openSession.client_name
-                                ?? activeShift?.client?.name
-                                ?? null,
+                                openSession.client_name ??
+                                activeShift?.client?.name ??
+                                null,
                             break_minutes: openSession.break_minutes ?? 0,
                             handover_submitted:
                                 openSession.handover_submitted ?? false,
@@ -777,14 +911,17 @@ export default function MyDay() {
                                 completed_at: task.completed_at ?? null,
                             })),
                             end_of_shift_blockers:
-                                (openSession.end_of_shift_blockers ?? []) as EndOfShiftBlocker[],
+                                (openSession.end_of_shift_blockers ??
+                                    []) as EndOfShiftBlocker[],
                         }}
                         open={endShiftOpen}
                         onOpenChange={setEndShiftOpen}
                     />
                     <WriteHandoverDialog
                         shiftId={openSession.shift_id ?? null}
-                        alreadySubmitted={openSession.handover_submitted ?? false}
+                        alreadySubmitted={
+                            openSession.handover_submitted ?? false
+                        }
                         open={handoverWriteOpen}
                         onOpenChange={setHandoverWriteOpen}
                     />
@@ -823,7 +960,12 @@ function ShiftChecklistsCard({
             </CardHeader>
             <CardContent className="space-y-2">
                 {runs.map((run) => (
-                    <ShiftChecklistRow key={run.id} run={run} canRun={canRun} onOpen={onOpen} />
+                    <ShiftChecklistRow
+                        key={run.id}
+                        run={run}
+                        canRun={canRun}
+                        onOpen={onOpen}
+                    />
                 ))}
             </CardContent>
         </Card>
@@ -846,8 +988,13 @@ function ShiftChecklistRow({
           : { label: 'Due', tone: 'warning' as const };
 
     return (
+        // eslint-disable-next-line no-restricted-syntax -- Checklist row is a compact repeated row inside a Card list.
         <div className="flex items-center gap-3 rounded-lg border bg-card p-3">
-            <CategoryIcon category={run.template?.category ?? null} box={36} size={18} />
+            <CategoryIcon
+                category={run.template?.category ?? null}
+                box={36}
+                size={18}
+            />
             <div className="min-w-0 flex-1">
                 <div className="flex flex-wrap items-center gap-2">
                     <p className="truncate text-sm font-medium">
@@ -861,7 +1008,11 @@ function ShiftChecklistRow({
             </div>
             <Button type="button" size="sm" onClick={() => onOpen(run.id)}>
                 <CheckCircle2 className="h-4 w-4" />
-                {!canRun ? 'View' : run.status === 'in_progress' ? 'Continue' : 'Complete'}
+                {!canRun
+                    ? 'View'
+                    : run.status === 'in_progress'
+                      ? 'Continue'
+                      : 'Complete'}
             </Button>
         </div>
     );
@@ -869,7 +1020,9 @@ function ShiftChecklistRow({
 
 function ActiveRoundBanner({ round }: { round: MyDayActiveRound }) {
     const verb = round.status === 'in_progress' ? 'Resume' : 'Start';
-    const scheduled = round.scheduled_time ? round.scheduled_time.slice(0, 5) : null;
+    const scheduled = round.scheduled_time
+        ? round.scheduled_time.slice(0, 5)
+        : null;
 
     return (
         <a

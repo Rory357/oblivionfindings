@@ -681,18 +681,6 @@ export function AssessmentsTab({
                 <span className="text-sm font-medium">
                     All Assessments ({assessments.length})
                 </span>
-                {canEdit && !showForm && (
-                    <Button
-                        size="sm"
-                        className="gap-1.5 bg-primary text-primary-foreground hover:bg-primary"
-                        onClick={() => {
-                            resetForm();
-                            setShowForm(true);
-                        }}
-                    >
-                        <Plus className="h-3.5 w-3.5" /> New Assessment
-                    </Button>
-                )}
             </div>
 
             {/* List Items or Empty State */}
@@ -706,19 +694,6 @@ export function AssessmentsTab({
                         <p className="mt-1 text-sm text-muted-foreground">
                             Clinical assessments and reviews will appear here.
                         </p>
-                        {canEdit && (
-                            <Button
-                                size="sm"
-                                className="mt-4 gap-1.5"
-                                onClick={() => {
-                                    resetForm();
-                                    setShowForm(true);
-                                }}
-                            >
-                                <Plus className="h-3.5 w-3.5" /> Record First
-                                Assessment
-                            </Button>
-                        )}
                     </CardContent>
                 </Card>
             ) : (

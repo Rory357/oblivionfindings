@@ -1,3 +1,8 @@
+import {
+    CarePlanDomainsBuilder,
+    type CarePlanDomainDraft,
+} from '@/components/care-plan-domains-builder';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -12,7 +17,6 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import { CheckCircle2 } from 'lucide-react';
@@ -52,14 +56,25 @@ function parseContent(raw: any): {
     support_strategies: string;
     communication_preferences: string;
     review_schedule: { frequency_months: number };
+    domains: CarePlanDomainDraft[];
 } {
-    const content = typeof raw === 'string' ? (() => { try { return JSON.parse(raw); } catch { return {}; } })() : (raw ?? {});
+    const content =
+        typeof raw === 'string'
+            ? (() => {
+                  try {
+                      return JSON.parse(raw);
+                  } catch {
+                      return {};
+                  }
+              })()
+            : (raw ?? {});
     return {
         support_needs: content.support_needs ?? {},
         risk_factors: content.risk_factors ?? '',
         support_strategies: content.support_strategies ?? '',
         communication_preferences: content.communication_preferences ?? '',
         review_schedule: content.review_schedule ?? { frequency_months: 3 },
+        domains: content.domains ?? [],
     };
 }
 
@@ -80,7 +95,11 @@ type Props = {
     staff?: { id: number; name: string }[];
 };
 
-export default function CarePlanEdit({ care_plan, clients = [], staff = [] }: Props) {
+export default function CarePlanEdit({
+    care_plan,
+    clients = [],
+    staff = [],
+}: Props) {
     const { labels } = usePage().props as any;
     const clientSingular = labels?.['client.singular'] ?? 'Client';
 
@@ -103,7 +122,11 @@ export default function CarePlanEdit({ care_plan, clients = [], staff = [] }: Pr
     };
 
     const handleCompleteReview = () => {
-        router.post(`/operations/care-plans/${care_plan.id}/complete-review`, {}, { preserveScroll: true });
+        router.post(
+            `/operations/care-plans/${care_plan.id}/complete-review`,
+            {},
+            { preserveScroll: true },
+        );
     };
 
     const toggleSupportNeed = (key: string) => {
@@ -128,7 +151,9 @@ export default function CarePlanEdit({ care_plan, clients = [], staff = [] }: Pr
 
     const handleFrequencyChange = (months: number) => {
         setData((prev: any) => {
-            const nextReview = prev.starts_at ? addMonths(prev.starts_at, months) : prev.next_review_at;
+            const nextReview = prev.starts_at
+                ? addMonths(prev.starts_at, months)
+                : prev.next_review_at;
             return {
                 ...prev,
                 next_review_at: nextReview,
@@ -143,7 +168,8 @@ export default function CarePlanEdit({ care_plan, clients = [], staff = [] }: Pr
     return (
         <AppLayout>
             <Head title={`Edit: ${care_plan?.title ?? 'Care Plan'}`} />
-            <PageHero variant="compact"
+            <PageHero
+                variant="compact"
                 title={`Edit: ${care_plan?.title ?? 'Care Plan'}`}
                 backHref={`/operations/care-plans/${care_plan?.id}`}
             />
@@ -153,12 +179,21 @@ export default function CarePlanEdit({ care_plan, clients = [], staff = [] }: Pr
                     {care_plan?.status === 'review' && (
                         <div className="flex items-center justify-between rounded-lg border border-status-warning/30 bg-status-warning-bg p-4 dark:border-status-warning/30">
                             <div>
-                                <p className="text-sm font-medium text-status-warning dark:text-status-warning">Plan Under Review</p>
+                                <p className="text-sm font-medium text-status-warning dark:text-status-warning">
+                                    Plan Under Review
+                                </p>
                                 <p className="mt-0.5 text-xs text-status-warning dark:text-status-warning">
-                                    This plan is currently under review. Make any updates and complete the review when ready.
+                                    This plan is currently under review. Make
+                                    any updates and complete the review when
+                                    ready.
                                 </p>
                             </div>
-                            <Button type="button" size="sm" onClick={handleCompleteReview} className="gap-1.5">
+                            <Button
+                                type="button"
+                                size="sm"
+                                onClick={handleCompleteReview}
+                                className="gap-1.5"
+                            >
                                 <CheckCircle2 className="h-3.5 w-3.5" />
                                 Complete Review
                             </Button>
@@ -168,37 +203,70 @@ export default function CarePlanEdit({ care_plan, clients = [], staff = [] }: Pr
                     {/* Section 1: Plan Details */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Plan Details</CardTitle>
+                            <CardTitle className="text-base">
+                                Plan Details
+                            </CardTitle>
                         </CardHeader>
                         <CardContent className="space-y-4">
                             <div className="grid gap-4 sm:grid-cols-2">
                                 <div className="space-y-1.5">
-                                    <Label htmlFor="client_id">{clientSingular} *</Label>
-                                    <Select value={data.client_id} onValueChange={(v) => setData('client_id', v)}>
+                                    <Label htmlFor="client_id">
+                                        {clientSingular} *
+                                    </Label>
+                                    <Select
+                                        value={data.client_id}
+                                        onValueChange={(v) =>
+                                            setData('client_id', v)
+                                        }
+                                    >
                                         <SelectTrigger id="client_id">
-                                            <SelectValue placeholder={`Select ${clientSingular.toLowerCase()}`} />
+                                            <SelectValue
+                                                placeholder={`Select ${clientSingular.toLowerCase()}`}
+                                            />
                                         </SelectTrigger>
                                         <SelectContent>
                                             {(clients ?? []).map((c) => (
-                                                <SelectItem key={c.id} value={String(c.id)}>
+                                                <SelectItem
+                                                    key={c.id}
+                                                    value={String(c.id)}
+                                                >
                                                     {c.first_name} {c.last_name}
                                                 </SelectItem>
                                             ))}
                                         </SelectContent>
                                     </Select>
-                                    {errors.client_id && <p className="text-xs text-destructive">{errors.client_id}</p>}
+                                    {errors.client_id && (
+                                        <p className="text-xs text-destructive">
+                                            {errors.client_id}
+                                        </p>
+                                    )}
                                 </div>
                                 <div className="space-y-1.5">
-                                    <Label htmlFor="plan_type">Plan Type *</Label>
-                                    <Select value={data.plan_type} onValueChange={(v) => setData('plan_type', v)}>
+                                    <Label htmlFor="plan_type">
+                                        Plan Type *
+                                    </Label>
+                                    <Select
+                                        value={data.plan_type}
+                                        onValueChange={(v) =>
+                                            setData('plan_type', v)
+                                        }
+                                    >
                                         <SelectTrigger id="plan_type">
                                             <SelectValue />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="support_plan">Support Plan</SelectItem>
-                                            <SelectItem value="behaviour_plan">Behaviour Plan</SelectItem>
-                                            <SelectItem value="health_plan">Health Plan</SelectItem>
-                                            <SelectItem value="transition_plan">Transition Plan</SelectItem>
+                                            <SelectItem value="support_plan">
+                                                Support Plan
+                                            </SelectItem>
+                                            <SelectItem value="behaviour_plan">
+                                                Behaviour Plan
+                                            </SelectItem>
+                                            <SelectItem value="health_plan">
+                                                Health Plan
+                                            </SelectItem>
+                                            <SelectItem value="transition_plan">
+                                                Transition Plan
+                                            </SelectItem>
                                         </SelectContent>
                                     </Select>
                                 </div>
@@ -209,38 +277,86 @@ export default function CarePlanEdit({ care_plan, clients = [], staff = [] }: Pr
                                 <Input
                                     id="title"
                                     value={data.title}
-                                    onChange={(e) => setData('title', e.target.value)}
+                                    onChange={(e) =>
+                                        setData('title', e.target.value)
+                                    }
                                     placeholder="e.g. John's Support Plan 2026"
                                 />
-                                {errors.title && <p className="text-xs text-destructive">{errors.title}</p>}
+                                {errors.title && (
+                                    <p className="text-xs text-destructive">
+                                        {errors.title}
+                                    </p>
+                                )}
                             </div>
 
                             <div className="grid gap-4 sm:grid-cols-3">
                                 <div className="space-y-1.5">
-                                    <Label htmlFor="starts_at">Start Date</Label>
-                                    <Input id="starts_at" type="date" value={data.starts_at} onChange={(e) => setData('starts_at', e.target.value)} />
+                                    <Label htmlFor="starts_at">
+                                        Start Date
+                                    </Label>
+                                    <Input
+                                        id="starts_at"
+                                        type="date"
+                                        value={data.starts_at}
+                                        onChange={(e) =>
+                                            setData('starts_at', e.target.value)
+                                        }
+                                    />
                                 </div>
                                 <div className="space-y-1.5">
                                     <Label htmlFor="ends_at">End Date</Label>
-                                    <Input id="ends_at" type="date" value={data.ends_at} onChange={(e) => setData('ends_at', e.target.value)} />
+                                    <Input
+                                        id="ends_at"
+                                        type="date"
+                                        value={data.ends_at}
+                                        onChange={(e) =>
+                                            setData('ends_at', e.target.value)
+                                        }
+                                    />
                                 </div>
                                 <div className="space-y-1.5">
-                                    <Label htmlFor="next_review_at">Next Review</Label>
-                                    <Input id="next_review_at" type="date" value={data.next_review_at} onChange={(e) => setData('next_review_at', e.target.value)} />
+                                    <Label htmlFor="next_review_at">
+                                        Next Review
+                                    </Label>
+                                    <Input
+                                        id="next_review_at"
+                                        type="date"
+                                        value={data.next_review_at}
+                                        onChange={(e) =>
+                                            setData(
+                                                'next_review_at',
+                                                e.target.value,
+                                            )
+                                        }
+                                    />
                                 </div>
                             </div>
 
                             <div className="space-y-1.5">
                                 <Label htmlFor="status">Status</Label>
-                                <Select value={data.status} onValueChange={(v) => setData('status', v)}>
-                                    <SelectTrigger id="status" className="w-[160px]">
+                                <Select
+                                    value={data.status}
+                                    onValueChange={(v) => setData('status', v)}
+                                >
+                                    <SelectTrigger
+                                        id="status"
+                                        className="w-[160px]"
+                                    >
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
-                                        <SelectItem value="draft">Draft</SelectItem>
-                                        <SelectItem value="active">Active</SelectItem>
-                                        <SelectItem value="review">Review</SelectItem>
-                                        <SelectItem value="archived">Archived</SelectItem>
+                                        <SelectItem value="draft">
+                                            Draft
+                                        </SelectItem>
+                                        <SelectItem value="active">
+                                            Active
+                                        </SelectItem>
+                                        <SelectItem value="review">
+                                            Review
+                                        </SelectItem>
+                                        <SelectItem value="archived">
+                                            Archived
+                                        </SelectItem>
                                     </SelectContent>
                                 </Select>
                             </div>
@@ -250,15 +366,26 @@ export default function CarePlanEdit({ care_plan, clients = [], staff = [] }: Pr
                     {/* Section 2: Support Needs */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Support Needs</CardTitle>
+                            <CardTitle className="text-base">
+                                Support Needs
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
                                 {SUPPORT_NEED_OPTIONS.map((option) => (
-                                    <label key={option.key} className="flex items-center gap-2 text-sm">
+                                    <label
+                                        key={option.key}
+                                        className="flex items-center gap-2 text-sm"
+                                    >
                                         <Checkbox
-                                            checked={!!data.content.support_needs[option.key]}
-                                            onCheckedChange={() => toggleSupportNeed(option.key)}
+                                            checked={
+                                                !!data.content.support_needs[
+                                                    option.key
+                                                ]
+                                            }
+                                            onCheckedChange={() =>
+                                                toggleSupportNeed(option.key)
+                                            }
                                         />
                                         {option.label}
                                     </label>
@@ -270,12 +397,19 @@ export default function CarePlanEdit({ care_plan, clients = [], staff = [] }: Pr
                     {/* Section 3: Risk Factors */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Risk Factors</CardTitle>
+                            <CardTitle className="text-base">
+                                Risk Factors
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
                             <Textarea
                                 value={data.content.risk_factors}
-                                onChange={(e) => setContentField('risk_factors', e.target.value)}
+                                onChange={(e) =>
+                                    setContentField(
+                                        'risk_factors',
+                                        e.target.value,
+                                    )
+                                }
                                 placeholder="Describe any known risk factors, triggers, or safety concerns..."
                                 rows={4}
                             />
@@ -285,12 +419,19 @@ export default function CarePlanEdit({ care_plan, clients = [], staff = [] }: Pr
                     {/* Section 4: Support Strategies */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Support Strategies</CardTitle>
+                            <CardTitle className="text-base">
+                                Support Strategies
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
                             <Textarea
                                 value={data.content.support_strategies}
-                                onChange={(e) => setContentField('support_strategies', e.target.value)}
+                                onChange={(e) =>
+                                    setContentField(
+                                        'support_strategies',
+                                        e.target.value,
+                                    )
+                                }
                                 placeholder="Describe the support strategies and approaches to be used..."
                                 rows={4}
                             />
@@ -300,12 +441,19 @@ export default function CarePlanEdit({ care_plan, clients = [], staff = [] }: Pr
                     {/* Section 5: Communication Preferences */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Communication Preferences</CardTitle>
+                            <CardTitle className="text-base">
+                                Communication Preferences
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
                             <Textarea
                                 value={data.content.communication_preferences}
-                                onChange={(e) => setContentField('communication_preferences', e.target.value)}
+                                onChange={(e) =>
+                                    setContentField(
+                                        'communication_preferences',
+                                        e.target.value,
+                                    )
+                                }
                                 placeholder="Describe the client's communication preferences, methods, and any assistive technology used..."
                                 rows={4}
                             />
@@ -313,30 +461,51 @@ export default function CarePlanEdit({ care_plan, clients = [], staff = [] }: Pr
                     </Card>
 
                     {/* Section 6: Review Schedule */}
+                    <CarePlanDomainsBuilder
+                        domains={data.content.domains}
+                        staff={staff}
+                        errors={errors as Record<string, string>}
+                        onChange={(domains) =>
+                            setContentField('domains', domains)
+                        }
+                    />
+
+                    {/* Section 7: Review Schedule */}
                     <Card>
                         <CardHeader>
-                            <CardTitle className="text-base">Review Schedule</CardTitle>
+                            <CardTitle className="text-base">
+                                Review Schedule
+                            </CardTitle>
                         </CardHeader>
                         <CardContent>
                             <div className="space-y-1.5">
                                 <Label>Review Frequency</Label>
                                 <Select
-                                    value={String(data.content.review_schedule.frequency_months)}
-                                    onValueChange={(v) => handleFrequencyChange(Number(v))}
+                                    value={String(
+                                        data.content.review_schedule
+                                            .frequency_months,
+                                    )}
+                                    onValueChange={(v) =>
+                                        handleFrequencyChange(Number(v))
+                                    }
                                 >
                                     <SelectTrigger className="w-[200px]">
                                         <SelectValue />
                                     </SelectTrigger>
                                     <SelectContent>
                                         {FREQUENCY_OPTIONS.map((opt) => (
-                                            <SelectItem key={opt.value} value={String(opt.value)}>
+                                            <SelectItem
+                                                key={opt.value}
+                                                value={String(opt.value)}
+                                            >
                                                 {opt.label}
                                             </SelectItem>
                                         ))}
                                     </SelectContent>
                                 </Select>
                                 <p className="text-xs text-muted-foreground">
-                                    Next review date will be auto-calculated when a start date and frequency are set.
+                                    Next review date will be auto-calculated
+                                    when a start date and frequency are set.
                                 </p>
                             </div>
                         </CardContent>
@@ -344,7 +513,15 @@ export default function CarePlanEdit({ care_plan, clients = [], staff = [] }: Pr
 
                     {/* Submit */}
                     <div className="flex items-center justify-end gap-2">
-                        <Button type="button" variant="outline" onClick={() => router.get(`/operations/care-plans/${care_plan.id}`)}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={() =>
+                                router.get(
+                                    `/operations/care-plans/${care_plan.id}`,
+                                )
+                            }
+                        >
                             Cancel
                         </Button>
                         <Button type="submit" disabled={processing}>

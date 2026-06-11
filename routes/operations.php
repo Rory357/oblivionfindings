@@ -19,6 +19,7 @@ use App\Http\Controllers\ClientSupportPlanController;
 use App\Http\Controllers\Clinical\ClientBowelChartController;
 use App\Http\Controllers\Clinical\ClientFluidChartController;
 use App\Http\Controllers\Clinical\ClientSeizureChartController;
+use App\Http\Controllers\Clinical\ClientSleepChartController;
 use App\Http\Controllers\CoverageGapController;
 use App\Http\Controllers\CoverageReservationController;
 use App\Http\Controllers\MedicationAdministrationCorrectionController;
@@ -33,6 +34,7 @@ use App\Http\Controllers\Operations\ClientCareController;
 use App\Http\Controllers\Operations\ClientConsentController;
 use App\Http\Controllers\Operations\ClientDailyNoteController;
 use App\Http\Controllers\Operations\ClientFundController;
+use App\Http\Controllers\Operations\ClientMealLogController;
 use App\Http\Controllers\Operations\ClientOnboardingWorkflowController;
 use App\Http\Controllers\Operations\ClientRoutineController;
 use App\Http\Controllers\Operations\ConsentRequestController;
@@ -368,6 +370,21 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         ->whereNumber('note')
         ->name('operations.clients.daily-notes.review');
 
+    Route::post('/clients/{client}/meal-logs', [ClientMealLogController::class, 'store'])
+        ->middleware('permission:medications.administer.record|clients.update')
+        ->whereNumber('client')
+        ->name('operations.clients.meal-logs.store');
+    Route::put('/clients/{client}/meal-logs/{mealLog}', [ClientMealLogController::class, 'update'])
+        ->middleware('permission:medications.administer.record|clients.update')
+        ->whereNumber('client')
+        ->whereNumber('mealLog')
+        ->name('operations.clients.meal-logs.update');
+    Route::delete('/clients/{client}/meal-logs/{mealLog}', [ClientMealLogController::class, 'destroy'])
+        ->middleware('permission:medications.administer.record|clients.update')
+        ->whereNumber('client')
+        ->whereNumber('mealLog')
+        ->name('operations.clients.meal-logs.destroy');
+
     Route::get('/clients/{client}/health/bowel', [ClientBowelChartController::class, 'index'])
         ->middleware('permission:medications.view')
         ->whereNumber('client')
@@ -422,6 +439,24 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
         ->whereNumber('client')
         ->whereNumber('entry')
         ->name('operations.clients.health.seizure.destroy');
+    Route::get('/clients/{client}/health/sleep', [ClientSleepChartController::class, 'index'])
+        ->middleware('permission:medications.view')
+        ->whereNumber('client')
+        ->name('operations.clients.health.sleep.index');
+    Route::post('/clients/{client}/health/sleep', [ClientSleepChartController::class, 'store'])
+        ->middleware('permission:medications.administer.record|clients.update')
+        ->whereNumber('client')
+        ->name('operations.clients.health.sleep.store');
+    Route::put('/clients/{client}/health/sleep/{entry}', [ClientSleepChartController::class, 'update'])
+        ->middleware('permission:medications.administer.record|clients.update')
+        ->whereNumber('client')
+        ->whereNumber('entry')
+        ->name('operations.clients.health.sleep.update');
+    Route::delete('/clients/{client}/health/sleep/{entry}', [ClientSleepChartController::class, 'destroy'])
+        ->middleware('permission:medications.administer.record|clients.update')
+        ->whereNumber('client')
+        ->whereNumber('entry')
+        ->name('operations.clients.health.sleep.destroy');
 
     Route::get('/clients/{client}/routines', [ClientRoutineController::class, 'index'])
         ->whereNumber('client')

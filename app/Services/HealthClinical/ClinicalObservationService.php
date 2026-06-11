@@ -5,6 +5,7 @@ namespace App\Services\HealthClinical;
 use App\Models\ClinicalObservation;
 use App\Models\ClinicalProtocol;
 use App\Models\User;
+use App\Support\WorkerClock;
 use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -31,7 +32,7 @@ class ClinicalObservationService
                 'data' => $attributes['data'],
                 'notes' => $attributes['notes'] ?? null,
                 'recorded_by' => $recorder->id,
-                'recorded_at' => $attributes['recorded_at'] ?? now(),
+                'recorded_at' => WorkerClock::toUtc($attributes['recorded_at'] ?? null) ?? now(),
             ]);
 
             // Update linked protocol if present

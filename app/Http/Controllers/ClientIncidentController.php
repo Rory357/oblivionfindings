@@ -7,6 +7,7 @@ use App\Models\ClientIncident;
 use App\Models\ClientIncidentAttachment;
 use App\Models\IncidentTemplate;
 use App\Services\NotificationService;
+use App\Support\WorkerClock;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Storage;
 
@@ -88,7 +89,7 @@ class ClientIncidentController extends Controller
             'type' => $data['type'],
             'severity' => $data['severity'],
             'status' => 'draft',
-            'occurred_at' => $data['occurred_at'] ?? now(),
+            'occurred_at' => WorkerClock::toUtc($data['occurred_at'] ?? null) ?? now(),
             'description' => $data['description'] ?? null,
             'requires_followup' => (bool) ($data['requires_followup'] ?? false),
             'immediate_action_taken' => $data['immediate_action_taken'] ?? null,

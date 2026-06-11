@@ -3,6 +3,7 @@
 namespace App\Http\Requests;
 
 use App\Models\Client;
+use App\Models\SiteHouseRoom;
 use Illuminate\Foundation\Http\FormRequest;
 use Illuminate\Validation\Validator;
 
@@ -21,6 +22,7 @@ class StoreClientRequest extends FormRequest
             // Add Client wizard client-side, but kept nullable server-side so the
             // legacy create flow and API stay backward-compatible.
             'site_id'    => ['nullable', 'integer', 'exists:sites,id'],
+            'room_id' => ['nullable', 'integer', 'exists:site_house_rooms,id'],
             'service_context_id' => ['nullable', 'integer', 'exists:service_contexts,id'],
             'first_name' => ['required', 'string', 'max:255'],
             'last_name'  => ['required', 'string', 'max:255'],
@@ -162,6 +164,29 @@ class StoreClientRequest extends FormRequest
             }
             if (blank($primary['phone'] ?? null)) {
                 $validator->errors()->add('emergency_contacts.0.phone', 'Primary contact phone is required.');
+            }
+        });
+
+        $validator->after(function (Validator $validator) {
+            $roomId = $this->input('room_id');
+            if (blank($roomId)) {
+                return;
+            }
+
+            $siteId = $this->input('site_id');
+            if (blank($siteId)) {
+                $validator->errors()->add('room_id', 'Choose a site before choosing a room.');
+
+                return;
+            }
+
+            $belongsToSite = SiteHouseRoom::query()
+                ->whereKey($roomId)
+                ->where('site_id', $siteId)
+                ->exists();
+
+            if (! $belongsToSite) {
+                $validator->errors()->add('room_id', 'Selected room does not belong to the chosen site.');
             }
         });
     }

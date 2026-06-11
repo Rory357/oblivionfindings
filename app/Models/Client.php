@@ -20,6 +20,7 @@ class Client extends Model
         'nhi_number',
         'nhi_hash',
         'site_id',
+        'room_id',
         'service_context_id',
         'first_name',
         'last_name',
@@ -59,6 +60,7 @@ class Client extends Model
         'dietary_requirements',
         'cultural_dietary_needs',
         'sleep_preferences',
+        'sleep_target_hours',
         'service_start_date',
         'key_worker_id',
         'risk_level',
@@ -83,6 +85,7 @@ class Client extends Model
         'transport_needs' => 'array',
         'languages' => 'array',
         'service_start_date' => 'date',
+        'sleep_target_hours' => 'decimal:1',
         'safeguarding_flag' => 'boolean',
         'suppress_med_admin_alerts' => 'boolean',
         'med_alerts_suppressed_at' => 'datetime',
@@ -123,6 +126,11 @@ class Client extends Model
     public function site()
     {
         return $this->belongsTo(Site::class);
+    }
+
+    public function room()
+    {
+        return $this->belongsTo(SiteHouseRoom::class, 'room_id');
     }
 
     public function houseGeofence()
@@ -178,6 +186,21 @@ class Client extends Model
     public function medicationAdministrations()
     {
         return $this->hasMany(ClientMedicationAdministration::class);
+    }
+
+    public function mealLogs()
+    {
+        return $this->hasMany(ClientMealLog::class);
+    }
+
+    public function sleepEntries()
+    {
+        return $this->hasMany(ClientSleepEntry::class);
+    }
+
+    public function respiteAllocations()
+    {
+        return $this->hasMany(ClientRespiteAllocation::class);
     }
 
     public function medicationAlerts()

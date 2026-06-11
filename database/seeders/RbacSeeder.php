@@ -238,6 +238,10 @@ class RbacSeeder extends Seeder
             ['key' => 'clients.update', 'description' => 'Update clients', 'group' => 'clients', 'module' => 'Operations'],
             ['key' => 'clients.assignments.update', 'description' => 'Manage client assignments', 'group' => 'clients', 'module' => 'Operations'],
             ['key' => 'clients.onboarding.manage', 'description' => 'Manage client onboarding checklist', 'group' => 'clients', 'module' => 'Operations'],
+            ['key' => 'care_plans.viewAny', 'description' => 'View client care plans', 'group' => 'clients', 'module' => 'Operations'],
+            ['key' => 'care_plans.create', 'description' => 'Create client care plans', 'group' => 'clients', 'module' => 'Operations'],
+            ['key' => 'care_plans.update', 'description' => 'Update client care plans and reviews', 'group' => 'clients', 'module' => 'Operations'],
+            ['key' => 'care_plans.delete', 'description' => 'Delete client care plans', 'group' => 'clients', 'module' => 'Operations'],
             ['key' => 'family_portal.viewAny', 'description' => 'View family portal settings', 'group' => 'family_portal', 'module' => 'Operations'],
             ['key' => 'family_portal.manage', 'description' => 'Manage family portal settings', 'group' => 'family_portal', 'module' => 'Operations'],
 

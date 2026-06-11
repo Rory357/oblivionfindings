@@ -16,6 +16,7 @@ import {
     Stethoscope,
     StickyNote,
     Users,
+    Utensils,
 } from 'lucide-react';
 import { type ReactNode } from 'react';
 
@@ -75,9 +76,13 @@ interface MyDayHeroProps {
      * fall back to the static single-resident href (1:1 shifts).
      */
     onOpenVitals?: () => void;
+    onOpenMeal?: () => void;
     activeResidentId: ResidentTab;
     onResidentChange: (next: ResidentTab) => void;
-    residentTaskCounts: Map<number, { tasks: number; meds: number; medsOverdue: number }>;
+    residentTaskCounts: Map<
+        number,
+        { tasks: number; meds: number; medsOverdue: number }
+    >;
     /** Per-resident note preview for the hover popover. */
     residentNotes?: Map<number, string | null | undefined>;
     /** Live-shift since label, e.g. "Live shift · since 09:04". */
@@ -114,6 +119,7 @@ export function MyDayHero({
     onOpenTimesheet,
     onWriteHandover,
     onOpenVitals,
+    onOpenMeal,
     activeResidentId,
     onResidentChange,
     residentTaskCounts,
@@ -123,7 +129,8 @@ export function MyDayHero({
     availabilityHref,
 }: MyDayHeroProps) {
     const t = useMyDayLabels();
-    const residents = site?.residents ?? (singleResident ? [singleResident] : []);
+    const residents =
+        site?.residents ?? (singleResident ? [singleResident] : []);
     const multiResident = residents.length > 1;
 
     const totalAcrossSite = totalTasks + totalMeds;
@@ -185,7 +192,9 @@ export function MyDayHero({
 
     const heroTitle = site ? (
         <>
-            <span className="font-normal opacity-80">{t('hero_on_shift_at')}</span>{' '}
+            <span className="font-normal opacity-80">
+                {t('hero_on_shift_at')}
+            </span>{' '}
             <a
                 href={site.href}
                 className={
@@ -198,7 +207,9 @@ export function MyDayHero({
         </>
     ) : singleResident ? (
         <>
-            <span className="font-normal opacity-80">{t('hero_on_shift_with')}</span>{' '}
+            <span className="font-normal opacity-80">
+                {t('hero_on_shift_with')}
+            </span>{' '}
             {singleResident.name}
         </>
     ) : (
@@ -212,7 +223,9 @@ export function MyDayHero({
 
     const meta = site
         ? [
-              ...(shiftTimeLabel ? [{ icon: Clock, label: shiftTimeLabel }] : []),
+              ...(shiftTimeLabel
+                  ? [{ icon: Clock, label: shiftTimeLabel }]
+                  : []),
               { icon: MapPin, label: site.address },
               {
                   icon: Users,
@@ -220,7 +233,9 @@ export function MyDayHero({
               },
           ]
         : [
-              ...(shiftTimeLabel ? [{ icon: Clock, label: shiftTimeLabel }] : []),
+              ...(shiftTimeLabel
+                  ? [{ icon: Clock, label: shiftTimeLabel }]
+                  : []),
               { icon: Heart, label: 'Personal care + community' },
           ];
 
@@ -247,7 +262,10 @@ export function MyDayHero({
         {
             label: t('hero_meds'),
             value: `${medsGiven}/${totalMeds}`,
-            sub: medsOverdue > 0 ? `${medsOverdue} ${t('overdue_badge').toLowerCase()}` : t('hero_on_track'),
+            sub:
+                medsOverdue > 0
+                    ? `${medsOverdue} ${t('overdue_badge').toLowerCase()}`
+                    : t('hero_on_track'),
             hideOnMobile: false,
             tone:
                 medsOverdue > 0
@@ -283,7 +301,9 @@ export function MyDayHero({
     const careNoteHref = singleResident
         ? `/clients/${singleResident.id}?tab=progress_notes`
         : '/clients';
-    const carePlanHref = singleResident ? `/clients/${singleResident.id}/care` : null;
+    const carePlanHref = singleResident
+        ? `/clients/${singleResident.id}/care`
+        : null;
     const vitalsFallbackHref =
         !onOpenVitals && singleResident
             ? `/clients/${singleResident.id}?tab=observations`
@@ -293,17 +313,42 @@ export function MyDayHero({
         : '/incidents/create';
 
     const quickActions = [
-        { icon: Pill, label: t('qa_give_medication'), badge: totalMeds - medsGiven > 0 ? totalMeds - medsGiven : undefined, href: '/meds/today' },
+        {
+            icon: Pill,
+            label: t('qa_give_medication'),
+            badge:
+                totalMeds - medsGiven > 0 ? totalMeds - medsGiven : undefined,
+            href: '/meds/today',
+        },
         { icon: StickyNote, label: t('qa_care_note'), href: careNoteHref },
         // Vitals & obs: prefer the picker flow (resolves the right client
         // even on a multi-resident shift); fall back to the single-resident
         // deep-link when no flow handler is wired.
         ...(onOpenVitals
-            ? [{ icon: Stethoscope, label: t('qa_vitals_obs'), onClick: onOpenVitals }]
+            ? [
+                  {
+                      icon: Stethoscope,
+                      label: t('qa_vitals_obs'),
+                      onClick: onOpenVitals,
+                  },
+              ]
             : vitalsFallbackHref
-              ? [{ icon: Stethoscope, label: t('qa_vitals_obs'), href: vitalsFallbackHref }]
+              ? [
+                    {
+                        icon: Stethoscope,
+                        label: t('qa_vitals_obs'),
+                        href: vitalsFallbackHref,
+                    },
+                ]
               : []),
-        { icon: AlertTriangle, label: t('qa_report_incident'), href: incidentHref },
+        ...(onOpenMeal
+            ? [{ icon: Utensils, label: 'Log meal', onClick: onOpenMeal }]
+            : []),
+        {
+            icon: AlertTriangle,
+            label: t('qa_report_incident'),
+            href: incidentHref,
+        },
         ...(availabilityHref
             ? [
                   {
@@ -313,7 +358,15 @@ export function MyDayHero({
                   },
               ]
             : []),
-        ...(carePlanHref ? [{ icon: ShieldCheck, label: t('qa_care_plan'), href: carePlanHref }] : []),
+        ...(carePlanHref
+            ? [
+                  {
+                      icon: ShieldCheck,
+                      label: t('qa_care_plan'),
+                      href: carePlanHref,
+                  },
+              ]
+            : []),
         // "Submit timesheet" used to deep-link to /operations/timesheets,
         // which duplicates the top-right "Today's timesheet" action and
         // bounces the worker out of /my-day to a list view. When the popup
@@ -322,8 +375,16 @@ export function MyDayHero({
         // immediately. The list link remains the fallback for callers that
         // don't wire `onOpenTimesheet`.
         onOpenTimesheet
-            ? { icon: FileText, label: t('qa_submit_timesheet'), onClick: onOpenTimesheet }
-            : { icon: FileText, label: t('qa_submit_timesheet'), href: '/operations/timesheets' },
+            ? {
+                  icon: FileText,
+                  label: t('qa_submit_timesheet'),
+                  onClick: onOpenTimesheet,
+              }
+            : {
+                  icon: FileText,
+                  label: t('qa_submit_timesheet'),
+                  href: '/operations/timesheets',
+              },
         // The "Write handover" button is the worker's outgoing handover — only
         // useful mid-shift (we have an active shift id) and not yet submitted.
         // It opens HandoverWriteSheet via the parent's onWriteHandover.
@@ -347,46 +408,103 @@ export function MyDayHero({
               popover: {
                   title: r.name,
                   subtitle: t('resident_at_site', { site: site?.name ?? '' }),
-                  note: residentNotes?.get(r.id) ?? r.care_note_preview ?? undefined,
-                  primaryAction: { label: t('res_open_profile'), href: `/clients/${r.id}` },
+                  note:
+                      residentNotes?.get(r.id) ??
+                      r.care_note_preview ??
+                      undefined,
+                  primaryAction: {
+                      label: t('res_open_profile'),
+                      href: `/clients/${r.id}`,
+                  },
                   actions: [
-                      { icon: Pill, label: t('res_give_meds'), href: `/meds/today?client=${r.id}` },
-                      { icon: StickyNote, label: t('res_care_note'), href: `/clients/${r.id}?tab=progress_notes` },
-                      { icon: ShieldCheck, label: t('res_care_plan'), href: `/clients/${r.id}/care` },
-                      { icon: Stethoscope, label: t('res_vitals'), href: `/clients/${r.id}?tab=observations` },
-                      { icon: AlertTriangle, label: t('res_incident'), href: `/incidents/create?client_id=${r.id}` },
+                      {
+                          icon: Pill,
+                          label: t('res_give_meds'),
+                          href: `/meds/today?client=${r.id}`,
+                      },
+                      {
+                          icon: StickyNote,
+                          label: t('res_care_note'),
+                          href: `/clients/${r.id}?tab=progress_notes`,
+                      },
+                      {
+                          icon: ShieldCheck,
+                          label: t('res_care_plan'),
+                          href: `/clients/${r.id}/care`,
+                      },
+                      {
+                          icon: Stethoscope,
+                          label: t('res_vitals'),
+                          href: `/clients/${r.id}?tab=observations`,
+                      },
+                      {
+                          icon: AlertTriangle,
+                          label: t('res_incident'),
+                          href: `/incidents/create?client_id=${r.id}`,
+                      },
                   ],
               },
           }))
         : undefined;
 
-    const singleAvatar = !multiResident && singleResident
-        ? {
-              src: singleResident.photo_url ?? null,
-              fallback: singleResident.initials,
-              hue: singleResident.hue,
-              popover: {
-                  title: singleResident.name,
-                  subtitle: site ? t('resident_at_site', { site: site.name }) : undefined,
-                  note: residentNotes?.get(singleResident.id) ?? singleResident.care_note_preview ?? undefined,
-                  primaryAction: { label: t('res_open_profile'), href: `/clients/${singleResident.id}` },
-                  actions: [
-                      { icon: Pill, label: t('res_give_meds'), href: `/meds/today?client=${singleResident.id}` },
-                      { icon: StickyNote, label: t('res_care_note'), href: `/clients/${singleResident.id}?tab=progress_notes` },
-                      { icon: ShieldCheck, label: t('res_care_plan'), href: `/clients/${singleResident.id}/care` },
-                      { icon: Stethoscope, label: t('res_vitals'), href: `/clients/${singleResident.id}?tab=observations` },
-                      { icon: AlertTriangle, label: t('res_incident'), href: `/incidents/create?client_id=${singleResident.id}` },
-                  ],
-              },
-          }
-        : undefined;
+    const singleAvatar =
+        !multiResident && singleResident
+            ? {
+                  src: singleResident.photo_url ?? null,
+                  fallback: singleResident.initials,
+                  hue: singleResident.hue,
+                  popover: {
+                      title: singleResident.name,
+                      subtitle: site
+                          ? t('resident_at_site', { site: site.name })
+                          : undefined,
+                      note:
+                          residentNotes?.get(singleResident.id) ??
+                          singleResident.care_note_preview ??
+                          undefined,
+                      primaryAction: {
+                          label: t('res_open_profile'),
+                          href: `/clients/${singleResident.id}`,
+                      },
+                      actions: [
+                          {
+                              icon: Pill,
+                              label: t('res_give_meds'),
+                              href: `/meds/today?client=${singleResident.id}`,
+                          },
+                          {
+                              icon: StickyNote,
+                              label: t('res_care_note'),
+                              href: `/clients/${singleResident.id}?tab=progress_notes`,
+                          },
+                          {
+                              icon: ShieldCheck,
+                              label: t('res_care_plan'),
+                              href: `/clients/${singleResident.id}/care`,
+                          },
+                          {
+                              icon: Stethoscope,
+                              label: t('res_vitals'),
+                              href: `/clients/${singleResident.id}?tab=observations`,
+                          },
+                          {
+                              icon: AlertTriangle,
+                              label: t('res_incident'),
+                              href: `/incidents/create?client_id=${singleResident.id}`,
+                          },
+                      ],
+                  },
+              }
+            : undefined;
 
     const footer = multiResident ? (
         <PageTabs
             onDark
             dense
             value={String(activeResidentId)}
-            onValueChange={(next) => onResidentChange(next === 'all' ? 'all' : Number(next))}
+            onValueChange={(next) =>
+                onResidentChange(next === 'all' ? 'all' : Number(next))
+            }
             items={[
                 {
                     value: 'all',
@@ -402,7 +520,10 @@ export function MyDayHero({
                         label: r.first_name,
                         icon: (props: { className?: string }) => (
                             <span className={props.className}>
-                                <ResidentDot hue={r.hue} initials={r.initials} />
+                                <ResidentDot
+                                    hue={r.hue}
+                                    initials={r.initials}
+                                />
                             </span>
                         ),
                         badge: total,
@@ -441,7 +562,11 @@ export function MyDayHero({
                         onClick={onClockToggle}
                         className="bg-primary-foreground text-primary hover:bg-primary-foreground/90"
                     >
-                        {clockedIn ? <Square className="h-3.5 w-3.5" /> : <Play className="h-3.5 w-3.5" />}
+                        {clockedIn ? (
+                            <Square className="h-3.5 w-3.5" />
+                        ) : (
+                            <Play className="h-3.5 w-3.5" />
+                        )}
                         {clockedIn ? t('btn_end_shift') : t('btn_clock_in')}
                     </Button>
                     <Button
@@ -451,7 +576,11 @@ export function MyDayHero({
                         onClick={onBreakToggle}
                         disabled={!clockedIn || !onBreakToggle}
                     >
-                        {isOnBreak ? <Pause className="h-3.5 w-3.5" /> : <Coffee className="h-3.5 w-3.5" />}
+                        {isOnBreak ? (
+                            <Pause className="h-3.5 w-3.5" />
+                        ) : (
+                            <Coffee className="h-3.5 w-3.5" />
+                        )}
                         {isOnBreak ? t('btn_end_break') : t('btn_start_break')}
                     </Button>
                     <Button

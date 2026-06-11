@@ -14,8 +14,8 @@ import {
     Clock,
     Droplet,
     Ear,
-    GraduationCap,
     Globe2,
+    GraduationCap,
     HandHeart,
     Heart,
     Home,
@@ -27,7 +27,6 @@ import {
     Shield,
     ShieldAlert,
     Sparkles,
-    Stethoscope,
     UserCircle2,
     Users,
     Utensils,
@@ -78,6 +77,7 @@ type ClientPersonalDetailsClient = {
     safeguarding_flag?: boolean | null;
     house_geofence?: { id: number; name?: string | null } | null;
     site?: { id: number; name?: string | null } | null;
+    room?: { id: number; name?: string | null; notes?: string | null } | null;
     key_worker?: { id: number; name?: string | null } | null;
 };
 
@@ -343,6 +343,21 @@ export function PersonalDetailsTab({
                     <CardContent className="divide-y">
                         <DetailRow label="Site" value={client.site?.name} />
                         <DetailRow
+                            label="Room"
+                            value={
+                                client.room?.name ? (
+                                    <span>
+                                        {client.room.name}
+                                        {client.room.notes ? (
+                                            <span className="ml-1 text-muted-foreground">
+                                                · {client.room.notes}
+                                            </span>
+                                        ) : null}
+                                    </span>
+                                ) : null
+                            }
+                        />
+                        <DetailRow
                             label="Service"
                             value={client.service_context?.name}
                         />
@@ -405,10 +420,7 @@ export function PersonalDetailsTab({
                                 languages.length > 0 ? (
                                     <div className="mt-1 flex flex-wrap gap-1">
                                         {languages.map((lang) => (
-                                            <Badge
-                                                key={lang}
-                                                variant="outline"
-                                            >
+                                            <Badge key={lang} variant="outline">
                                                 {lang}
                                             </Badge>
                                         ))}
@@ -432,9 +444,9 @@ export function PersonalDetailsTab({
                         </CardTitle>
                     </CardHeader>
                     <CardContent className="space-y-3">
-                        {(client.life_story?.trim() ||
-                            client.strengths_abilities?.trim() ||
-                            client.interests_hobbies?.trim()) ? (
+                        {client.life_story?.trim() ||
+                        client.strengths_abilities?.trim() ||
+                        client.interests_hobbies?.trim() ? (
                             <>
                                 {client.life_story?.trim() ? (
                                     <div>
@@ -468,7 +480,7 @@ export function PersonalDetailsTab({
                                 ) : null}
                             </>
                         ) : (
-                            <p className="text-sm italic text-muted-foreground">
+                            <p className="text-sm text-muted-foreground italic">
                                 No story, strengths, or interests captured yet.
                                 Add them from the edit dialog.
                             </p>
@@ -491,7 +503,10 @@ export function PersonalDetailsTab({
                                         key={worker.id}
                                         className="flex items-center justify-between rounded-md border bg-card p-2 text-sm"
                                     >
-                                        <span>{worker.name ?? `User #${worker.id}`}</span>
+                                        <span>
+                                            {worker.name ??
+                                                `User #${worker.id}`}
+                                        </span>
                                         <Badge variant="outline">Support</Badge>
                                     </li>
                                 ))}
@@ -770,7 +785,11 @@ function PersonCard({ person }: { person: PersonRecord }) {
             {consents.length > 0 ? (
                 <div className="mt-2 flex flex-wrap gap-1">
                     {consents.map((c) => (
-                        <Badge key={c} variant="outline" className="text-[10px]">
+                        <Badge
+                            key={c}
+                            variant="outline"
+                            className="text-[10px]"
+                        >
                             {c}
                         </Badge>
                     ))}

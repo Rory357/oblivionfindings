@@ -10,6 +10,7 @@ use App\Models\FamilyNote;
 use App\Models\FamilyVisitRequest;
 use App\Models\Shift;
 use App\Services\Timeline\TimelineEmitter;
+use App\Support\WorkerClock;
 use App\Support\ShiftTaskSupport;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -275,6 +276,8 @@ class ClientCalendarController extends Controller
         $appointment = ClientAppointment::create([
             'client_id' => $client->id,
             ...$data,
+            'starts_at' => WorkerClock::toUtc($data['starts_at']),
+            'ends_at' => WorkerClock::toUtc($data['ends_at'] ?? null),
             'share_with_family' => $data['share_with_family'] ?? true,
             'created_by' => $request->user()->id,
         ]);
@@ -291,7 +294,7 @@ class ClientCalendarController extends Controller
             'body' => $data['description'],
             'meta' => array_filter([
                 'appointment_type' => $data['appointment_type'],
-                'starts_at' => $data['starts_at'],
+                'starts_at' => $appointment->starts_at?->toIso8601String(),
                 'location' => $data['location'] ?? null,
                 'provider_name' => $data['provider_name'] ?? null,
             ]),
@@ -319,6 +322,12 @@ class ClientCalendarController extends Controller
             'status' => 'sometimes|string|in:scheduled,completed,cancelled,no_show',
             'share_with_family' => 'nullable|boolean',
         ]);
+
+        foreach (['starts_at', 'ends_at'] as $field) {
+            if (array_key_exists($field, $data)) {
+                $data[$field] = WorkerClock::toUtc($data[$field]);
+            }
+        }
 
         $appointment->update($data);
 

@@ -7,7 +7,6 @@
 import type { FormDataConvertible } from '@inertiajs/core';
 import { router } from '@inertiajs/react';
 import {
-    Accessibility,
     Activity,
     AlertOctagon,
     AlertTriangle,
@@ -34,7 +33,6 @@ import {
     Flag,
     FolderOpen,
     Gauge,
-    Heart,
     HeartPulse,
     Home,
     LayoutGrid,
@@ -44,12 +42,9 @@ import {
     ListPlus,
     ListTodo,
     MapPin,
-    MessageSquare,
     Moon,
-    PauseCircle,
     Pencil,
     PenLine,
-    Pill,
     Plane,
     RefreshCw,
     Route as RouteIcon,
@@ -60,8 +55,8 @@ import {
     Shield,
     ShieldAlert,
     ShieldCheck,
-    StickyNote,
     Stethoscope,
+    StickyNote,
     Sun,
     Sunrise,
     Thermometer,
@@ -78,7 +73,6 @@ import {
     Utensils,
     Wallet,
     XCircle,
-    Zap,
 } from 'lucide-react';
 import { toast } from 'sonner';
 import type {
@@ -152,7 +146,12 @@ const SEVERITY_PICKER = [
     { key: 'low', label: 'Low', icon: Shield, desc: 'Minor' },
     { key: 'medium', label: 'Medium', icon: ShieldAlert, desc: 'Monitor' },
     { key: 'high', label: 'High', icon: AlertTriangle, desc: 'Serious' },
-    { key: 'critical', label: 'Critical', icon: AlertOctagon, desc: 'Immediate' },
+    {
+        key: 'critical',
+        label: 'Critical',
+        icon: AlertOctagon,
+        desc: 'Immediate',
+    },
 ];
 
 /* -------------------------------------------------------------------- flows */
@@ -173,16 +172,33 @@ const logIncident: FlowFactory = (ctx) => ({
             blurb: 'Type, severity & time',
             heading: 'What happened?',
             desc: 'Severity drives who gets notified automatically.',
-            picker: { key: 'severity', label: 'Severity', options: SEVERITY_PICKER, cols: 2 },
+            picker: {
+                key: 'severity',
+                label: 'Severity',
+                options: SEVERITY_PICKER,
+                cols: 2,
+            },
             fields: [
                 {
                     key: 'type',
                     label: 'Type',
                     type: 'select',
                     required: true,
-                    options: ['Near miss', 'Accident', 'Behaviour', 'Medication', 'Property', 'Absconding'],
+                    options: [
+                        'Near miss',
+                        'Accident',
+                        'Behaviour',
+                        'Medication',
+                        'Property',
+                        'Absconding',
+                    ],
                 },
-                { key: 'occurred_at', label: 'Date & time', type: 'datetime-local', required: true },
+                {
+                    key: 'occurred_at',
+                    label: 'Date & time',
+                    type: 'datetime-local',
+                    required: true,
+                },
                 {
                     key: 'description',
                     label: 'What happened',
@@ -201,8 +217,16 @@ const logIncident: FlowFactory = (ctx) => ({
             blurb: 'Witnesses & injuries',
             heading: 'Who was involved?',
             fields: [
-                { key: 'witnesses', label: 'Witnesses', full: true, placeholder: 'Staff, residents, visitors…' },
-                { key: 'injured_person_name', label: 'Injured person (if any)' },
+                {
+                    key: 'witnesses',
+                    label: 'Witnesses',
+                    full: true,
+                    placeholder: 'Staff, residents, visitors…',
+                },
+                {
+                    key: 'injured_person_name',
+                    label: 'Injured person (if any)',
+                },
                 {
                     key: 'medical_treatment_type',
                     label: 'Injuries / treatment',
@@ -210,7 +234,10 @@ const logIncident: FlowFactory = (ctx) => ({
                     options: [
                         { value: 'none', label: 'None' },
                         { value: 'first_aid', label: 'First aid given' },
-                        { value: 'medical_centre', label: 'Medical attention required' },
+                        {
+                            value: 'medical_centre',
+                            label: 'Medical attention required',
+                        },
                         { value: 'hospital', label: 'Hospitalisation' },
                     ],
                 },
@@ -237,7 +264,8 @@ const logIncident: FlowFactory = (ctx) => ({
                     type: 'textarea',
                     rows: 2,
                     full: true,
-                    placeholder: 'What reduces the chance of this happening again?',
+                    placeholder:
+                        'What reduces the chance of this happening again?',
                 },
                 {
                     key: 'requires_followup',
@@ -260,12 +288,15 @@ const logIncident: FlowFactory = (ctx) => ({
             {
                 type: str(values.type),
                 severity: severity === 'critical' ? 'high' : severity,
-                potential_severity: severity === 'critical' ? 'critical' : undefined,
+                potential_severity:
+                    severity === 'critical' ? 'critical' : undefined,
                 occurred_at: opt(values.occurred_at),
                 description: str(values.description),
                 witnesses: opt(values.witnesses),
                 injured_person_name: opt(values.injured_person_name),
-                injured_person_role: opt(values.injured_person_name) ? 'client' : undefined,
+                injured_person_role: opt(values.injured_person_name)
+                    ? 'client'
+                    : undefined,
                 medical_treatment_type: opt(values.medical_treatment_type),
                 immediate_action_taken: opt(values.immediate_action_taken),
                 potential_consequence: opt(values.potential_consequence),
@@ -308,7 +339,12 @@ const addRisk: FlowFactory = (ctx) => {
                 icon: ShieldAlert,
                 blurb: 'What & how severe',
                 heading: 'What is the risk?',
-                picker: { key: 'severity', label: 'Severity', options: SEVERITY_PICKER, cols: 2 },
+                picker: {
+                    key: 'severity',
+                    label: 'Severity',
+                    options: SEVERITY_PICKER,
+                    cols: 2,
+                },
                 fields: [
                     {
                         key: 'label',
@@ -334,9 +370,15 @@ const addRisk: FlowFactory = (ctx) => {
                         required: true,
                         rows: 4,
                         full: true,
-                        placeholder: 'Two-person assist… non-slip mat… hourly checks…',
+                        placeholder:
+                            'Two-person assist… non-slip mat… hourly checks…',
                     },
-                    { key: 'review_date', label: 'Next review date', type: 'date', required: true },
+                    {
+                        key: 'review_date',
+                        label: 'Next review date',
+                        type: 'date',
+                        required: true,
+                    },
                 ],
                 info: 'The review date feeds the Actions & Reviews queue — overdue reviews surface on the Overview.',
                 infoIcon: CalendarClock,
@@ -396,6 +438,7 @@ const recordObs: FlowFactory = (ctx) => ({
                     { key: 'fluid', label: 'Fluid intake', icon: Droplets },
                     { key: 'bowel', label: 'Bowel', icon: Stethoscope },
                     { key: 'seizure', label: 'Seizure', icon: HeartPulse },
+                    { key: 'sleep', label: 'Sleep', icon: Moon },
                 ],
             },
             fields: [
@@ -466,8 +509,41 @@ const recordObs: FlowFactory = (ctx) => ({
                     full: true,
                     when: (v) => v.obs_type === 'seizure',
                 },
+                {
+                    key: 'slept_at',
+                    label: 'Night',
+                    type: 'date',
+                    required: true,
+                    when: (v) => v.obs_type === 'sleep',
+                },
+                {
+                    key: 'hours_slept',
+                    label: 'Hours slept',
+                    type: 'number',
+                    required: true,
+                    when: (v) => v.obs_type === 'sleep',
+                },
+                {
+                    key: 'quality',
+                    label: 'Quality',
+                    type: 'select',
+                    options: ['good', 'fair', 'poor'],
+                    when: (v) => v.obs_type === 'sleep',
+                },
+                {
+                    key: 'interruptions',
+                    label: 'Interruptions',
+                    type: 'number',
+                    when: (v) => v.obs_type === 'sleep',
+                },
                 { key: 'occurred_at', label: 'Time', type: 'datetime-local' },
-                { key: 'notes', label: 'Notes', type: 'textarea', rows: 2, full: true },
+                {
+                    key: 'notes',
+                    label: 'Notes',
+                    type: 'textarea',
+                    rows: 2,
+                    full: true,
+                },
             ],
         },
     ],
@@ -496,7 +572,11 @@ const recordObs: FlowFactory = (ctx) => ({
             submitInertia(
                 'post',
                 `/operations/clients/${ctx.clientId}/health/bowel`,
-                { occurred_at: when, bristol_type: num(values.bristol_type), notes },
+                {
+                    occurred_at: when,
+                    bristol_type: num(values.bristol_type),
+                    notes,
+                },
                 helpers,
                 'Bowel entry recorded',
             );
@@ -515,6 +595,24 @@ const recordObs: FlowFactory = (ctx) => ({
                 },
                 helpers,
                 'Seizure recorded',
+            );
+            return;
+        }
+        if (type === 'sleep') {
+            submitInertia(
+                'post',
+                `/operations/clients/${ctx.clientId}/health/sleep`,
+                {
+                    slept_at:
+                        opt(values.slept_at) ??
+                        opt(values.occurred_at)?.slice(0, 10),
+                    hours_slept: num(values.hours_slept),
+                    quality: opt(values.quality),
+                    interruptions: num(values.interruptions),
+                    notes,
+                },
+                helpers,
+                'Sleep entry recorded',
             );
             return;
         }
@@ -564,8 +662,17 @@ const abcEntry: FlowFactory = (ctx) => ({
             blurb: 'When, where, who',
             heading: 'Setting the scene',
             fields: [
-                { key: 'occurred_at', label: 'Date & time', type: 'datetime-local', required: true },
-                { key: 'setting', label: 'Setting', placeholder: 'e.g. Dining room at dinner' },
+                {
+                    key: 'occurred_at',
+                    label: 'Date & time',
+                    type: 'datetime-local',
+                    required: true,
+                },
+                {
+                    key: 'setting',
+                    label: 'Setting',
+                    placeholder: 'e.g. Dining room at dinner',
+                },
             ],
         },
         {
@@ -576,9 +683,30 @@ const abcEntry: FlowFactory = (ctx) => ({
             heading: 'Antecedent → Behaviour → Consequence',
             desc: 'Factual, specific, no interpretation.',
             fields: [
-                { key: 'antecedent', label: 'A — What happened before', type: 'textarea', required: true, rows: 2, full: true },
-                { key: 'behaviour', label: `B — What ${ctx.preferredName} did`, type: 'textarea', required: true, rows: 2, full: true },
-                { key: 'consequence', label: 'C — What happened after', type: 'textarea', required: true, rows: 2, full: true },
+                {
+                    key: 'antecedent',
+                    label: 'A — What happened before',
+                    type: 'textarea',
+                    required: true,
+                    rows: 2,
+                    full: true,
+                },
+                {
+                    key: 'behaviour',
+                    label: `B — What ${ctx.preferredName} did`,
+                    type: 'textarea',
+                    required: true,
+                    rows: 2,
+                    full: true,
+                },
+                {
+                    key: 'consequence',
+                    label: 'C — What happened after',
+                    type: 'textarea',
+                    required: true,
+                    rows: 2,
+                    full: true,
+                },
             ],
         },
         {
@@ -591,13 +719,32 @@ const abcEntry: FlowFactory = (ctx) => ({
                 key: 'intensity',
                 label: 'Intensity',
                 options: [
-                    { key: 'low', label: 'Low', icon: Shield, desc: 'Settled quickly' },
-                    { key: 'medium', label: 'Moderate', icon: ShieldAlert, desc: 'Needed support' },
-                    { key: 'high', label: 'High', icon: AlertTriangle, desc: 'Safety affected' },
+                    {
+                        key: 'low',
+                        label: 'Low',
+                        icon: Shield,
+                        desc: 'Settled quickly',
+                    },
+                    {
+                        key: 'medium',
+                        label: 'Moderate',
+                        icon: ShieldAlert,
+                        desc: 'Needed support',
+                    },
+                    {
+                        key: 'high',
+                        label: 'High',
+                        icon: AlertTriangle,
+                        desc: 'Safety affected',
+                    },
                 ],
             },
             fields: [
-                { key: 'duration', label: 'Duration', placeholder: 'e.g. 6 minutes' },
+                {
+                    key: 'duration',
+                    label: 'Duration',
+                    placeholder: 'e.g. 6 minutes',
+                },
                 {
                     key: 'escalated',
                     label: 'Escalated to on-call',
@@ -663,7 +810,15 @@ const addGoal: FlowFactory = (ctx) => ({
                     label: 'Domain',
                     type: 'select',
                     required: true,
-                    options: ['Daily living', 'Community', 'Health', 'Independence', 'Finance', 'Whānau', 'Wellbeing'],
+                    options: [
+                        'Daily living',
+                        'Community',
+                        'Health',
+                        'Independence',
+                        'Finance',
+                        'Whānau',
+                        'Wellbeing',
+                    ],
                 },
                 {
                     key: 'why',
@@ -684,13 +839,35 @@ const addGoal: FlowFactory = (ctx) => ({
                 key: 'priority',
                 label: 'Priority',
                 options: [
-                    { key: 'low', label: 'Low', icon: Circle, desc: 'When capacity allows' },
-                    { key: 'medium', label: 'Medium', icon: Flag, desc: 'Active focus' },
-                    { key: 'high', label: 'High', icon: AlertTriangle, desc: 'Priority this quarter' },
+                    {
+                        key: 'low',
+                        label: 'Low',
+                        icon: Circle,
+                        desc: 'When capacity allows',
+                    },
+                    {
+                        key: 'medium',
+                        label: 'Medium',
+                        icon: Flag,
+                        desc: 'Active focus',
+                    },
+                    {
+                        key: 'high',
+                        label: 'High',
+                        icon: AlertTriangle,
+                        desc: 'Priority this quarter',
+                    },
                 ],
             },
             fields: [
-                { key: 'first_step', label: 'First step', type: 'textarea', required: true, rows: 2, full: true },
+                {
+                    key: 'first_step',
+                    label: 'First step',
+                    type: 'textarea',
+                    required: true,
+                    rows: 2,
+                    full: true,
+                },
                 { key: 'target_date', label: 'Target date', type: 'date' },
             ],
             info: 'Goals link to Care & Support Plan strategies and report progress on the Overview.',
@@ -699,7 +876,9 @@ const addGoal: FlowFactory = (ctx) => ({
     ],
     submit: (values, helpers) => {
         if (!ctx.carePlanId) {
-            toast.error('No active care plan — create one on the Care & Support Plan tab first.');
+            toast.error(
+                'No active care plan — create one on the Care & Support Plan tab first.',
+            );
             helpers.onError();
             return;
         }
@@ -744,12 +923,34 @@ const planReview: FlowFactory = (ctx) => ({
                 key: 'kind',
                 label: 'Review type',
                 options: [
-                    { key: 'scheduled', label: 'Scheduled', icon: CalendarClock, desc: 'Annual / planned' },
-                    { key: 'triggered', label: 'Triggered', icon: AlertTriangle, desc: 'After incident / change' },
-                    { key: 'whanau', label: 'Whānau requested', icon: Users, desc: 'Family-initiated' },
+                    {
+                        key: 'scheduled',
+                        label: 'Scheduled',
+                        icon: CalendarClock,
+                        desc: 'Annual / planned',
+                    },
+                    {
+                        key: 'triggered',
+                        label: 'Triggered',
+                        icon: AlertTriangle,
+                        desc: 'After incident / change',
+                    },
+                    {
+                        key: 'whanau',
+                        label: 'Whānau requested',
+                        icon: Users,
+                        desc: 'Family-initiated',
+                    },
                 ],
             },
-            fields: [{ key: 'facilitator', label: 'Facilitator', type: 'select', options: ctx.staffOptions.map((o) => o.label) }],
+            fields: [
+                {
+                    key: 'facilitator',
+                    label: 'Facilitator',
+                    type: 'select',
+                    options: ctx.staffOptions.map((o) => o.label),
+                },
+            ],
         },
         {
             key: 'findings',
@@ -758,8 +959,22 @@ const planReview: FlowFactory = (ctx) => ({
             blurb: 'Working / not working',
             heading: 'What did the review find?',
             fields: [
-                { key: 'working', label: "What's working", type: 'textarea', required: true, rows: 3, full: true },
-                { key: 'changes', label: 'What needs to change', type: 'textarea', required: true, rows: 3, full: true },
+                {
+                    key: 'working',
+                    label: "What's working",
+                    type: 'textarea',
+                    required: true,
+                    rows: 3,
+                    full: true,
+                },
+                {
+                    key: 'changes',
+                    label: 'What needs to change',
+                    type: 'textarea',
+                    required: true,
+                    rows: 3,
+                    full: true,
+                },
             ],
         },
         {
@@ -773,9 +988,22 @@ const planReview: FlowFactory = (ctx) => ({
                     key: 'attendees',
                     label: 'Attendees',
                     type: 'chips',
-                    options: [ctx.preferredName, 'Whānau', 'Key worker', 'GP', 'NASC', 'Behaviour support'],
+                    options: [
+                        ctx.preferredName,
+                        'Whānau',
+                        'Key worker',
+                        'GP',
+                        'NASC',
+                        'Behaviour support',
+                    ],
                 },
-                { key: 'actions', label: 'Agreed actions', type: 'textarea', rows: 3, full: true },
+                {
+                    key: 'actions',
+                    label: 'Agreed actions',
+                    type: 'textarea',
+                    rows: 3,
+                    full: true,
+                },
             ],
             info: 'Completing the review archives the current version and activates the reviewed plan.',
             infoIcon: CheckCircle2,
@@ -789,13 +1017,17 @@ const planReview: FlowFactory = (ctx) => ({
         }
         const reviewNotes = [
             `Review type: ${str(values.kind) || 'scheduled'}`,
-            opt(values.facilitator) ? `Facilitator: ${str(values.facilitator)}` : null,
+            opt(values.facilitator)
+                ? `Facilitator: ${str(values.facilitator)}`
+                : null,
             `What's working: ${str(values.working)}`,
             `What needs to change: ${str(values.changes)}`,
             Array.isArray(values.attendees) && values.attendees.length
                 ? `Attendees: ${(values.attendees as string[]).join(', ')}`
                 : null,
-            opt(values.actions) ? `Agreed actions: ${str(values.actions)}` : null,
+            opt(values.actions)
+                ? `Agreed actions: ${str(values.actions)}`
+                : null,
         ]
             .filter(Boolean)
             .join('\n');
@@ -816,7 +1048,8 @@ const planReview: FlowFactory = (ctx) => ({
                         'Plan review recorded',
                     );
                 },
-                onError: (errors) => helpers.onError(errors as Record<string, string>),
+                onError: (errors) =>
+                    helpers.onError(errors as Record<string, string>),
             },
         );
     },
@@ -842,16 +1075,34 @@ const uploadDoc: FlowFactory = (ctx) => {
                     label: 'Category',
                     cols: 3,
                     options: [
-                        { key: 'care_plan', label: 'Care plan', icon: FileText },
-                        { key: 'clinical', label: 'Clinical', icon: Stethoscope },
+                        {
+                            key: 'care_plan',
+                            label: 'Care plan',
+                            icon: FileText,
+                        },
+                        {
+                            key: 'clinical',
+                            label: 'Clinical',
+                            icon: Stethoscope,
+                        },
                         { key: 'consent', label: 'Consent', icon: Shield },
-                        { key: 'agreement', label: 'Agreement', icon: FileCheck },
+                        {
+                            key: 'agreement',
+                            label: 'Agreement',
+                            icon: FileCheck,
+                        },
                         { key: 'finance', label: 'Finance', icon: DollarSign },
                         { key: 'admin', label: 'Admin', icon: FolderOpen },
                     ],
                 },
                 fields: [
-                    { key: 'file', label: 'File', type: 'file', required: true, full: true },
+                    {
+                        key: 'file',
+                        label: 'File',
+                        type: 'file',
+                        required: true,
+                        full: true,
+                    },
                     { key: 'title', label: 'Display name', full: true },
                 ],
             },
@@ -866,9 +1117,19 @@ const uploadDoc: FlowFactory = (ctx) => {
                         key: 'folder',
                         label: 'Folder',
                         type: 'select',
-                        options: ['Care planning', 'Clinical', 'Governance', 'Agreements', 'Admin'],
+                        options: [
+                            'Care planning',
+                            'Clinical',
+                            'Governance',
+                            'Agreements',
+                            'Admin',
+                        ],
                     },
-                    { key: 'expiry_date', label: 'Expiry / review date', type: 'date' },
+                    {
+                        key: 'expiry_date',
+                        label: 'Expiry / review date',
+                        type: 'date',
+                    },
                     {
                         key: 'portal_visible',
                         label: 'Visible on family portal',
@@ -876,7 +1137,13 @@ const uploadDoc: FlowFactory = (ctx) => {
                         type: 'checkbox',
                         full: true,
                     },
-                    { key: 'notes', label: 'Notes', type: 'textarea', rows: 2, full: true },
+                    {
+                        key: 'notes',
+                        label: 'Notes',
+                        type: 'textarea',
+                        rows: 2,
+                        full: true,
+                    },
                 ],
             },
         ],
@@ -918,16 +1185,44 @@ const transaction: FlowFactory = (ctx) => ({
                 label: 'Type',
                 cols: 2,
                 options: [
-                    { key: 'credit', label: 'Credit', icon: TrendingUp, desc: 'Money in' },
-                    { key: 'debit', label: 'Debit', icon: TrendingDown, desc: 'Money out' },
+                    {
+                        key: 'credit',
+                        label: 'Credit',
+                        icon: TrendingUp,
+                        desc: 'Money in',
+                    },
+                    {
+                        key: 'debit',
+                        label: 'Debit',
+                        icon: TrendingDown,
+                        desc: 'Money out',
+                    },
                 ],
             },
             fields: [
                 ...(ctx.fundOptions.length > 1
-                    ? [{ key: 'fund_id', label: 'Fund', type: 'select' as const, required: true, options: ctx.fundOptions }]
+                    ? [
+                          {
+                              key: 'fund_id',
+                              label: 'Fund',
+                              type: 'select' as const,
+                              required: true,
+                              options: ctx.fundOptions,
+                          },
+                      ]
                     : []),
-                { key: 'amount', label: 'Amount (NZD)', required: true, placeholder: '0.00' },
-                { key: 'description', label: 'Description', required: true, full: true },
+                {
+                    key: 'amount',
+                    label: 'Amount (NZD)',
+                    required: true,
+                    placeholder: '0.00',
+                },
+                {
+                    key: 'description',
+                    label: 'Description',
+                    required: true,
+                    full: true,
+                },
             ],
         },
         {
@@ -938,14 +1233,21 @@ const transaction: FlowFactory = (ctx) => ({
             heading: 'Evidence',
             desc: 'A reference keeps the next reconciliation painless.',
             fields: [
-                { key: 'reference', label: 'Reference / receipt no.', full: true, placeholder: 'e.g. Receipt #1042' },
+                {
+                    key: 'reference',
+                    label: 'Reference / receipt no.',
+                    full: true,
+                    placeholder: 'e.g. Receipt #1042',
+                },
             ],
         },
     ],
     submit: (values, helpers) => {
         const fundId = str(values.fund_id) || ctx.fundOptions[0]?.value;
         if (!fundId) {
-            toast.error('No personal fund exists for this client yet — create one under Client Funds.');
+            toast.error(
+                'No personal fund exists for this client yet — create one under Client Funds.',
+            );
             helpers.onError();
             return;
         }
@@ -983,10 +1285,30 @@ const addOnboardingStep: FlowFactory = (ctx) => ({
                 label: 'Category',
                 cols: 2,
                 options: [
-                    { key: 'documentation', label: 'Documentation', icon: FileText, desc: 'Agreements, forms' },
-                    { key: 'assessment', label: 'Assessment', icon: ClipboardCheck, desc: 'Risk, medical, needs' },
-                    { key: 'clinical', label: 'Clinical', icon: Stethoscope, desc: 'GP, meds, SLT' },
-                    { key: 'governance', label: 'Governance', icon: Shield, desc: 'Consents, contacts' },
+                    {
+                        key: 'documentation',
+                        label: 'Documentation',
+                        icon: FileText,
+                        desc: 'Agreements, forms',
+                    },
+                    {
+                        key: 'assessment',
+                        label: 'Assessment',
+                        icon: ClipboardCheck,
+                        desc: 'Risk, medical, needs',
+                    },
+                    {
+                        key: 'clinical',
+                        label: 'Clinical',
+                        icon: Stethoscope,
+                        desc: 'GP, meds, SLT',
+                    },
+                    {
+                        key: 'governance',
+                        label: 'Governance',
+                        icon: Shield,
+                        desc: 'Consents, contacts',
+                    },
                 ],
             },
             fields: [
@@ -997,7 +1319,13 @@ const addOnboardingStep: FlowFactory = (ctx) => ({
                     full: true,
                     placeholder: 'e.g. Emergency contacts confirmed',
                 },
-                { key: 'notes', label: 'Notes', type: 'textarea', rows: 2, full: true },
+                {
+                    key: 'notes',
+                    label: 'Notes',
+                    type: 'textarea',
+                    rows: 2,
+                    full: true,
+                },
             ],
         },
         {
@@ -1007,7 +1335,12 @@ const addOnboardingStep: FlowFactory = (ctx) => ({
             blurb: 'Owner & due date',
             heading: 'Who owns it?',
             fields: [
-                { key: 'assigned_to', label: 'Assign to', type: 'select', options: ctx.staffOptions },
+                {
+                    key: 'assigned_to',
+                    label: 'Assign to',
+                    type: 'select',
+                    options: ctx.staffOptions,
+                },
                 { key: 'due_date', label: 'Due date', type: 'date' },
                 {
                     key: 'is_required',
@@ -1074,7 +1407,12 @@ const addAssessment: FlowFactory = (ctx) => ({
                         'Other',
                     ],
                 },
-                { key: 'assessed_at', label: 'Completed date', type: 'date', required: true },
+                {
+                    key: 'assessed_at',
+                    label: 'Completed date',
+                    type: 'date',
+                    required: true,
+                },
             ],
         },
         {
@@ -1086,7 +1424,13 @@ const addAssessment: FlowFactory = (ctx) => ({
             fields: [
                 { key: 'score', label: 'Score / result' },
                 { key: 'next_review_at', label: 'Next review', type: 'date' },
-                { key: 'notes', label: 'Summary', type: 'textarea', rows: 3, full: true },
+                {
+                    key: 'notes',
+                    label: 'Summary',
+                    type: 'textarea',
+                    rows: 3,
+                    full: true,
+                },
             ],
         },
     ],
@@ -1126,10 +1470,30 @@ const addAsset: FlowFactory = (ctx) => ({
                 label: 'Ownership',
                 cols: 2,
                 options: [
-                    { key: 'client', label: 'Client owned', icon: User, desc: `Belongs to ${ctx.preferredName}` },
-                    { key: 'provider', label: 'Provider owned', icon: Building2, desc: 'Service equipment' },
-                    { key: 'funded', label: 'Funded', icon: Wallet, desc: 'MoH / funder purchased' },
-                    { key: 'loaned', label: 'On loan', icon: RefreshCw, desc: 'Temporary' },
+                    {
+                        key: 'client',
+                        label: 'Client owned',
+                        icon: User,
+                        desc: `Belongs to ${ctx.preferredName}`,
+                    },
+                    {
+                        key: 'provider',
+                        label: 'Provider owned',
+                        icon: Building2,
+                        desc: 'Service equipment',
+                    },
+                    {
+                        key: 'funded',
+                        label: 'Funded',
+                        icon: Wallet,
+                        desc: 'MoH / funder purchased',
+                    },
+                    {
+                        key: 'loaned',
+                        label: 'On loan',
+                        icon: RefreshCw,
+                        desc: 'Temporary',
+                    },
                 ],
             },
             fields: [
@@ -1161,7 +1525,11 @@ const addAsset: FlowFactory = (ctx) => ({
             blurb: 'Worth, state & location',
             heading: 'Value & condition',
             fields: [
-                { key: 'estimated_value', label: 'Value (NZD)', placeholder: '0.00' },
+                {
+                    key: 'estimated_value',
+                    label: 'Value (NZD)',
+                    placeholder: '0.00',
+                },
                 {
                     key: 'condition',
                     label: 'Condition',
@@ -1173,9 +1541,19 @@ const addAsset: FlowFactory = (ctx) => ({
                         { value: 'poor', label: 'Needs repair' },
                     ],
                 },
-                { key: 'location', label: 'Kept at', placeholder: 'e.g. Bedroom, West Wing' },
+                {
+                    key: 'location',
+                    label: 'Kept at',
+                    placeholder: 'e.g. Bedroom, West Wing',
+                },
                 { key: 'acquired_at', label: 'Acquired on', type: 'date' },
-                { key: 'notes', label: 'Notes', type: 'textarea', rows: 2, full: true },
+                {
+                    key: 'notes',
+                    label: 'Notes',
+                    type: 'textarea',
+                    rows: 2,
+                    full: true,
+                },
             ],
         },
     ],
@@ -1219,7 +1597,11 @@ const appointment: FlowFactory = (ctx) => ({
                 cols: 3,
                 options: [
                     { key: 'gp_visit', label: 'GP visit', icon: Stethoscope },
-                    { key: 'specialist', label: 'Specialist', icon: HeartPulse },
+                    {
+                        key: 'specialist',
+                        label: 'Specialist',
+                        icon: HeartPulse,
+                    },
                     { key: 'therapy', label: 'Therapy', icon: Activity },
                     { key: 'activity', label: 'Activity', icon: Calendar },
                     { key: 'reminder', label: 'Reminder', icon: Bell },
@@ -1228,7 +1610,11 @@ const appointment: FlowFactory = (ctx) => ({
             },
             fields: [
                 { key: 'title', label: 'Title', required: true, full: true },
-                { key: 'provider_name', label: 'With', placeholder: 'e.g. Dr. Lena Fox' },
+                {
+                    key: 'provider_name',
+                    label: 'With',
+                    placeholder: 'e.g. Dr. Lena Fox',
+                },
             ],
         },
         {
@@ -1238,9 +1624,20 @@ const appointment: FlowFactory = (ctx) => ({
             blurb: 'Time, place & transport',
             heading: 'When and how?',
             fields: [
-                { key: 'starts_at', label: 'Date & time', type: 'datetime-local', required: true },
+                {
+                    key: 'starts_at',
+                    label: 'Date & time',
+                    type: 'datetime-local',
+                    required: true,
+                },
                 { key: 'location', label: 'Location' },
-                { key: 'description', label: 'Notes', type: 'textarea', rows: 2, full: true },
+                {
+                    key: 'description',
+                    label: 'Notes',
+                    type: 'textarea',
+                    rows: 2,
+                    full: true,
+                },
                 {
                     key: 'book_transport',
                     label: 'Book transport',
@@ -1262,24 +1659,30 @@ const appointment: FlowFactory = (ctx) => ({
     submit: async (values, helpers) => {
         try {
             const token =
-                document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')?.content ?? '';
-            const res = await fetch(`/clients/${ctx.clientId}/calendar/appointments`, {
-                method: 'POST',
-                headers: {
-                    'Content-Type': 'application/json',
-                    'X-CSRF-TOKEN': token,
-                    Accept: 'application/json',
+                document.querySelector<HTMLMetaElement>(
+                    'meta[name="csrf-token"]',
+                )?.content ?? '';
+            const res = await fetch(
+                `/clients/${ctx.clientId}/calendar/appointments`,
+                {
+                    method: 'POST',
+                    headers: {
+                        'Content-Type': 'application/json',
+                        'X-CSRF-TOKEN': token,
+                        Accept: 'application/json',
+                    },
+                    body: JSON.stringify({
+                        title: str(values.title),
+                        appointment_type:
+                            str(values.appointment_type) || 'other',
+                        starts_at: str(values.starts_at),
+                        location: opt(values.location),
+                        provider_name: opt(values.provider_name),
+                        description: opt(values.description),
+                        share_with_family: Boolean(values.share_with_family),
+                    }),
                 },
-                body: JSON.stringify({
-                    title: str(values.title),
-                    appointment_type: str(values.appointment_type) || 'other',
-                    starts_at: str(values.starts_at),
-                    location: opt(values.location),
-                    provider_name: opt(values.provider_name),
-                    description: opt(values.description),
-                    share_with_family: Boolean(values.share_with_family),
-                }),
-            });
+            );
             if (!res.ok) throw new Error('Failed to schedule appointment');
 
             if (values.book_transport) {
@@ -1321,16 +1724,46 @@ const requestLeave: FlowFactory = (ctx) => ({
                 label: 'Leave type',
                 cols: 2,
                 options: [
-                    { key: 'Whānau stay', label: 'Whānau stay', icon: Home, desc: 'Overnight with family' },
-                    { key: 'Holiday', label: 'Holiday', icon: Plane, desc: 'Trip away' },
-                    { key: 'Hospital', label: 'Hospital', icon: Stethoscope, desc: 'Planned admission' },
+                    {
+                        key: 'Whānau stay',
+                        label: 'Whānau stay',
+                        icon: Home,
+                        desc: 'Overnight with family',
+                    },
+                    {
+                        key: 'Holiday',
+                        label: 'Holiday',
+                        icon: Plane,
+                        desc: 'Trip away',
+                    },
+                    {
+                        key: 'Hospital',
+                        label: 'Hospital',
+                        icon: Stethoscope,
+                        desc: 'Planned admission',
+                    },
                     { key: 'Other', label: 'Other', icon: Calendar },
                 ],
             },
             fields: [
-                { key: 'starts_on', label: 'Start', type: 'date', required: true },
-                { key: 'ends_on', label: 'Return', type: 'date', required: true },
-                { key: 'emergency_contact', label: 'With / contact while away', required: true, placeholder: 'e.g. Hana Wineera · 021 555 0871' },
+                {
+                    key: 'starts_on',
+                    label: 'Start',
+                    type: 'date',
+                    required: true,
+                },
+                {
+                    key: 'ends_on',
+                    label: 'Return',
+                    type: 'date',
+                    required: true,
+                },
+                {
+                    key: 'emergency_contact',
+                    label: 'With / contact while away',
+                    required: true,
+                    placeholder: 'e.g. Hana Wineera · 021 555 0871',
+                },
                 { key: 'destination', label: 'Location' },
             ],
         },
@@ -1345,10 +1778,28 @@ const requestLeave: FlowFactory = (ctx) => ({
                     key: 'checklist',
                     label: 'Prepared',
                     type: 'chips',
-                    options: ['Meds pack', 'Dietary guidance sent', 'Emergency contacts card', 'Seizure plan copy', 'Spending money'],
+                    options: [
+                        'Meds pack',
+                        'Dietary guidance sent',
+                        'Emergency contacts card',
+                        'Seizure plan copy',
+                        'Spending money',
+                    ],
                 },
-                { key: 'support_required', label: 'Notes for whānau / support required', type: 'textarea', rows: 3, full: true },
-                { key: 'risks_and_mitigations', label: 'Risks & mitigations', type: 'textarea', rows: 2, full: true },
+                {
+                    key: 'support_required',
+                    label: 'Notes for whānau / support required',
+                    type: 'textarea',
+                    rows: 3,
+                    full: true,
+                },
+                {
+                    key: 'risks_and_mitigations',
+                    label: 'Risks & mitigations',
+                    type: 'textarea',
+                    rows: 2,
+                    full: true,
+                },
             ],
             info: 'Approved leave pauses rostered shifts for these dates and notifies the coordinator.',
             infoIcon: CalendarClock,
@@ -1397,10 +1848,26 @@ const planExcursion: FlowFactory = (ctx) => ({
             blurb: 'Where & when',
             heading: 'Where are we going?',
             fields: [
-                { key: 'destination', label: 'Destination', required: true, full: true },
-                { key: 'starts_at', label: 'Date & time', type: 'datetime-local', required: true },
+                {
+                    key: 'destination',
+                    label: 'Destination',
+                    required: true,
+                    full: true,
+                },
+                {
+                    key: 'starts_at',
+                    label: 'Date & time',
+                    type: 'datetime-local',
+                    required: true,
+                },
                 { key: 'ends_at', label: 'Return', type: 'datetime-local' },
-                { key: 'activity_description', label: 'Purpose', type: 'textarea', rows: 2, full: true },
+                {
+                    key: 'activity_description',
+                    label: 'Purpose',
+                    type: 'textarea',
+                    rows: 2,
+                    full: true,
+                },
             ],
         },
         {
@@ -1414,15 +1881,33 @@ const planExcursion: FlowFactory = (ctx) => ({
                     key: 'transport_method',
                     label: 'Transport',
                     type: 'select',
-                    options: ['House van', 'Taxi / Total Mobility', 'Public bus', 'Walking', 'Other'],
+                    options: [
+                        'House van',
+                        'Taxi / Total Mobility',
+                        'Public bus',
+                        'Walking',
+                        'Other',
+                    ],
                 },
                 {
                     key: 'checklist',
                     label: 'Risk checklist',
                     type: 'chips',
-                    options: ['Transport plan', 'Meds carried', 'Dietary plan', 'Communication card', 'Quiet-space plan'],
+                    options: [
+                        'Transport plan',
+                        'Meds carried',
+                        'Dietary plan',
+                        'Communication card',
+                        'Quiet-space plan',
+                    ],
                 },
-                { key: 'risk_assessment', label: 'Risk notes', type: 'textarea', rows: 2, full: true },
+                {
+                    key: 'risk_assessment',
+                    label: 'Risk notes',
+                    type: 'textarea',
+                    rows: 2,
+                    full: true,
+                },
             ],
         },
     ],
@@ -1468,9 +1953,20 @@ const transportBooking: FlowFactory = (ctx) => ({
             blurb: 'Where & when',
             heading: 'Trip details',
             fields: [
-                { key: 'purpose', label: 'Purpose', required: true, full: true, placeholder: 'e.g. GP appointment' },
+                {
+                    key: 'purpose',
+                    label: 'Purpose',
+                    required: true,
+                    full: true,
+                    placeholder: 'e.g. GP appointment',
+                },
                 { key: 'destination', label: 'Destination', required: true },
-                { key: 'scheduled_at', label: 'Date & time', type: 'datetime-local', required: true },
+                {
+                    key: 'scheduled_at',
+                    label: 'Date & time',
+                    type: 'datetime-local',
+                    required: true,
+                },
             ],
         },
         {
@@ -1485,9 +1981,19 @@ const transportBooking: FlowFactory = (ctx) => ({
                     label: 'Vehicle',
                     type: 'select',
                     required: true,
-                    options: ['House van', 'Taxi / Total Mobility', 'Public bus', 'Staff car'],
+                    options: [
+                        'House van',
+                        'Taxi / Total Mobility',
+                        'Public bus',
+                        'Staff car',
+                    ],
                 },
-                { key: 'driver_id', label: 'Driver', type: 'select', options: ctx.staffOptions },
+                {
+                    key: 'driver_id',
+                    label: 'Driver',
+                    type: 'select',
+                    options: ctx.staffOptions,
+                },
                 {
                     key: 'escort_required',
                     label: 'Escort travels',
@@ -1502,7 +2008,13 @@ const transportBooking: FlowFactory = (ctx) => ({
                     type: 'checkbox',
                     full: true,
                 },
-                { key: 'notes', label: 'Notes', type: 'textarea', rows: 2, full: true },
+                {
+                    key: 'notes',
+                    label: 'Notes',
+                    type: 'textarea',
+                    rows: 2,
+                    full: true,
+                },
             ],
         },
     ],
@@ -1541,8 +2053,18 @@ const respiteBooking: FlowFactory = (ctx) => ({
             blurb: 'Dates & requirements',
             heading: 'Booking details',
             fields: [
-                { key: 'requested_start', label: 'Start', type: 'date', required: true },
-                { key: 'requested_end', label: 'End', type: 'date', required: true },
+                {
+                    key: 'requested_start',
+                    label: 'Start',
+                    type: 'date',
+                    required: true,
+                },
+                {
+                    key: 'requested_end',
+                    label: 'End',
+                    type: 'date',
+                    required: true,
+                },
             ],
         },
         {
@@ -1556,9 +2078,21 @@ const respiteBooking: FlowFactory = (ctx) => ({
                     key: 'requirements',
                     label: 'Prepared',
                     type: 'chips',
-                    options: ['Meds pack', 'Dietary guidance', 'Rhythms & routines summary', 'Seizure plan', 'Comfort items'],
+                    options: [
+                        'Meds pack',
+                        'Dietary guidance',
+                        'Rhythms & routines summary',
+                        'Seizure plan',
+                        'Comfort items',
+                    ],
                 },
-                { key: 'preference_notes', label: 'Notes for provider', type: 'textarea', rows: 3, full: true },
+                {
+                    key: 'preference_notes',
+                    label: 'Notes for provider',
+                    type: 'textarea',
+                    rows: 3,
+                    full: true,
+                },
             ],
             info: 'The respite coordinator confirms the booking from the Respite workspace.',
             infoIcon: CalendarClock,
@@ -1572,7 +2106,9 @@ const respiteBooking: FlowFactory = (ctx) => ({
                 client_id: ctx.clientId,
                 requested_start: str(values.requested_start),
                 requested_end: str(values.requested_end),
-                requirements: Array.isArray(values.requirements) ? values.requirements : [],
+                requirements: Array.isArray(values.requirements)
+                    ? values.requirements
+                    : [],
                 preference_notes: opt(values.preference_notes),
             },
             helpers,
@@ -1599,13 +2135,34 @@ const consentRecord: FlowFactory = (ctx) => ({
                 label: 'Decision',
                 cols: 2,
                 options: [
-                    { key: 'given', label: 'Given', icon: CheckCircle2, desc: 'Consent given' },
-                    { key: 'refused', label: 'Refused', icon: XCircle, desc: 'Consent refused' },
+                    {
+                        key: 'given',
+                        label: 'Given',
+                        icon: CheckCircle2,
+                        desc: 'Consent given',
+                    },
+                    {
+                        key: 'refused',
+                        label: 'Refused',
+                        icon: XCircle,
+                        desc: 'Consent refused',
+                    },
                 ],
             },
             fields: [
-                { key: 'consent_type_id', label: 'Consent type', type: 'select', required: true, options: ctx.consentTypeOptions },
-                { key: 'given_by_relationship', label: 'Decision by', required: true, placeholder: 'e.g. Hana Wineera (sister, EPOA)' },
+                {
+                    key: 'consent_type_id',
+                    label: 'Consent type',
+                    type: 'select',
+                    required: true,
+                    options: ctx.consentTypeOptions,
+                },
+                {
+                    key: 'given_by_relationship',
+                    label: 'Decision by',
+                    required: true,
+                    placeholder: 'e.g. Hana Wineera (sister, EPOA)',
+                },
                 {
                     key: 'given_method',
                     label: 'Method',
@@ -1633,7 +2190,12 @@ const consentRecord: FlowFactory = (ctx) => ({
                     type: 'checkbox',
                     full: true,
                 },
-                { key: 'signed_document', label: 'Signed form / evidence', type: 'file', full: true },
+                {
+                    key: 'signed_document',
+                    label: 'Signed form / evidence',
+                    type: 'file',
+                    full: true,
+                },
                 {
                     key: 'special_conditions',
                     label: 'Conditions or limits',
@@ -1651,9 +2213,20 @@ const consentRecord: FlowFactory = (ctx) => ({
             blurb: 'Given & expiry',
             heading: 'Dates',
             fields: [
-                { key: 'given_at', label: 'Given on', type: 'date', required: true },
+                {
+                    key: 'given_at',
+                    label: 'Given on',
+                    type: 'date',
+                    required: true,
+                },
                 { key: 'expires_at', label: 'Expires / review', type: 'date' },
-                { key: 'given_notes', label: 'Notes', type: 'textarea', rows: 2, full: true },
+                {
+                    key: 'given_notes',
+                    label: 'Notes',
+                    type: 'textarea',
+                    rows: 2,
+                    full: true,
+                },
             ],
         },
     ],
@@ -1671,7 +2244,10 @@ const consentRecord: FlowFactory = (ctx) => ({
                 special_conditions: opt(values.special_conditions),
                 expires_at: opt(values.expires_at),
                 capacity_assessed: Boolean(values.capacity_assessed),
-                signed_document: values.signed_document instanceof File ? values.signed_document : undefined,
+                signed_document:
+                    values.signed_document instanceof File
+                        ? values.signed_document
+                        : undefined,
             },
             helpers,
             'Consent recorded',
@@ -1767,7 +2343,13 @@ const addRelationship: FlowFactory = (ctx) => ({
                     desc: 'Summary emails and notices.',
                     type: 'checkbox',
                 },
-                { key: 'notes', label: 'Notes', type: 'textarea', rows: 2, full: true },
+                {
+                    key: 'notes',
+                    label: 'Notes',
+                    type: 'textarea',
+                    rows: 2,
+                    full: true,
+                },
             ],
         },
     ],
@@ -1832,7 +2414,10 @@ const portalInvite: FlowFactory = (ctx) => ({
                         'carer',
                         'friend',
                         'other',
-                    ].map((value) => ({ value, label: value.charAt(0).toUpperCase() + value.slice(1) })),
+                    ].map((value) => ({
+                        value,
+                        label: value.charAt(0).toUpperCase() + value.slice(1),
+                    })),
                 },
                 {
                     key: 'email',
@@ -1880,14 +2465,40 @@ const addAction: FlowFactory = (ctx) => ({
                 key: 'kind',
                 label: 'Type',
                 options: [
-                    { key: 'follow_up', label: 'Follow-up', icon: CornerDownRight, desc: 'From a note / event' },
-                    { key: 'review', label: 'Scheduled review', icon: CalendarClock, desc: 'Risk, plan, document' },
-                    { key: 'task', label: 'Task', icon: CheckSquare, desc: 'One-off to-do' },
+                    {
+                        key: 'follow_up',
+                        label: 'Follow-up',
+                        icon: CornerDownRight,
+                        desc: 'From a note / event',
+                    },
+                    {
+                        key: 'review',
+                        label: 'Scheduled review',
+                        icon: CalendarClock,
+                        desc: 'Risk, plan, document',
+                    },
+                    {
+                        key: 'task',
+                        label: 'Task',
+                        icon: CheckSquare,
+                        desc: 'One-off to-do',
+                    },
                 ],
             },
             fields: [
-                { key: 'summary', label: 'Summary', required: true, full: true },
-                { key: 'detail', label: 'Detail', type: 'textarea', rows: 3, full: true },
+                {
+                    key: 'summary',
+                    label: 'Summary',
+                    required: true,
+                    full: true,
+                },
+                {
+                    key: 'detail',
+                    label: 'Detail',
+                    type: 'textarea',
+                    rows: 3,
+                    full: true,
+                },
             ],
         },
         {
@@ -1900,12 +2511,29 @@ const addAction: FlowFactory = (ctx) => ({
                 key: 'priority',
                 label: 'Priority',
                 options: [
-                    { key: 'normal', label: 'Normal', icon: Circle, desc: 'Routine' },
-                    { key: 'important', label: 'Important', icon: FileWarning, desc: 'Due this week' },
-                    { key: 'critical', label: 'Critical', icon: AlertTriangle, desc: 'Safety-related' },
+                    {
+                        key: 'normal',
+                        label: 'Normal',
+                        icon: Circle,
+                        desc: 'Routine',
+                    },
+                    {
+                        key: 'important',
+                        label: 'Important',
+                        icon: FileWarning,
+                        desc: 'Due this week',
+                    },
+                    {
+                        key: 'critical',
+                        label: 'Critical',
+                        icon: AlertTriangle,
+                        desc: 'Safety-related',
+                    },
                 ],
             },
-            fields: [{ key: 'due', label: 'Due date', type: 'date', required: true }],
+            fields: [
+                { key: 'due', label: 'Due date', type: 'date', required: true },
+            ],
             info: 'Actions appear in Actions & Reviews and on the Overview until completed.',
             infoIcon: ListTodo,
         },
@@ -1923,7 +2551,9 @@ const addAction: FlowFactory = (ctx) => ({
                 follow_up_action: str(values.summary),
                 follow_up_due_at: str(values.due),
                 is_flagged: critical,
-                flagged_reason: critical ? 'Critical action raised from Actions & Reviews' : undefined,
+                flagged_reason: critical
+                    ? 'Critical action raised from Actions & Reviews'
+                    : undefined,
                 appears_on_timeline: false,
                 visibility: 'internal',
             },
@@ -1954,15 +2584,42 @@ const addTimelineNote: FlowFactory = (ctx) => {
                     label: 'Type',
                     cols: 2,
                     options: [
-                        { key: 'note', label: 'Note', icon: StickyNote, desc: 'General note' },
-                        { key: 'progress_note', label: 'Progress', icon: TrendingUp, desc: 'Progress update' },
-                        { key: 'shift_note', label: 'Shift', icon: Clock, desc: 'Shift note' },
-                        { key: 'handover', label: 'Handover', icon: RefreshCw, desc: 'Brief the next shift' },
+                        {
+                            key: 'note',
+                            label: 'Note',
+                            icon: StickyNote,
+                            desc: 'General note',
+                        },
+                        {
+                            key: 'progress_note',
+                            label: 'Progress',
+                            icon: TrendingUp,
+                            desc: 'Progress update',
+                        },
+                        {
+                            key: 'shift_note',
+                            label: 'Shift',
+                            icon: Clock,
+                            desc: 'Shift note',
+                        },
+                        {
+                            key: 'handover',
+                            label: 'Handover',
+                            icon: RefreshCw,
+                            desc: 'Brief the next shift',
+                        },
                     ],
                 },
                 fields: [
                     { key: 'subject', label: 'Short heading', full: true },
-                    { key: 'body', label: 'Detail', type: 'textarea', required: true, rows: 4, full: true },
+                    {
+                        key: 'body',
+                        label: 'Detail',
+                        type: 'textarea',
+                        required: true,
+                        rows: 4,
+                        full: true,
+                    },
                 ],
             },
             {
@@ -1973,13 +2630,20 @@ const addTimelineNote: FlowFactory = (ctx) => {
                 heading: 'Routing',
                 desc: 'When it happened and who can see it.',
                 fields: [
-                    { key: 'occurred_at', label: 'Occurred at', type: 'datetime-local' },
+                    {
+                        key: 'occurred_at',
+                        label: 'Occurred at',
+                        type: 'datetime-local',
+                    },
                     {
                         key: 'visibility',
                         label: 'Visibility',
                         type: 'select',
                         options: [
-                            { value: 'internal', label: 'Internal (staff only)' },
+                            {
+                                value: 'internal',
+                                label: 'Internal (staff only)',
+                            },
                             { value: 'portal', label: 'Family portal' },
                         ],
                     },
@@ -2014,15 +2678,60 @@ const addTimelineNote: FlowFactory = (ctx) => {
 };
 
 const RHYTHM_BLOCK_OPTIONS = [
-    { key: 'morning', label: 'Morning', icon: Sunrise, desc: 'Wake-up, hygiene, meds, breakfast' },
-    { key: 'day', label: 'Day', icon: Sun, desc: 'Activities, appointments, meals' },
-    { key: 'evening', label: 'Evening', icon: Coffee, desc: 'Dinner, wind-down, bedtime prep' },
-    { key: 'overnight', label: 'Overnight', icon: Moon, desc: 'Sleep, checks, escalation' },
-    { key: 'preferences', label: 'Preferences', icon: ThumbsUp, desc: 'How support is offered & paced' },
-    { key: 'triggers', label: 'Triggers', icon: ShieldAlert, desc: 'Stressors & early warning signs' },
-    { key: 'calming', label: 'Calming', icon: TimerReset, desc: 'What settles & reassures' },
-    { key: 'what_works', label: 'What works', icon: CheckCircle2, desc: 'Reliable language & routines' },
-    { key: 'avoid', label: 'Avoid', icon: XCircle, desc: 'What makes support harder' },
+    {
+        key: 'morning',
+        label: 'Morning',
+        icon: Sunrise,
+        desc: 'Wake-up, hygiene, meds, breakfast',
+    },
+    {
+        key: 'day',
+        label: 'Day',
+        icon: Sun,
+        desc: 'Activities, appointments, meals',
+    },
+    {
+        key: 'evening',
+        label: 'Evening',
+        icon: Coffee,
+        desc: 'Dinner, wind-down, bedtime prep',
+    },
+    {
+        key: 'overnight',
+        label: 'Overnight',
+        icon: Moon,
+        desc: 'Sleep, checks, escalation',
+    },
+    {
+        key: 'preferences',
+        label: 'Preferences',
+        icon: ThumbsUp,
+        desc: 'How support is offered & paced',
+    },
+    {
+        key: 'triggers',
+        label: 'Triggers',
+        icon: ShieldAlert,
+        desc: 'Stressors & early warning signs',
+    },
+    {
+        key: 'calming',
+        label: 'Calming',
+        icon: TimerReset,
+        desc: 'What settles & reassures',
+    },
+    {
+        key: 'what_works',
+        label: 'What works',
+        icon: CheckCircle2,
+        desc: 'Reliable language & routines',
+    },
+    {
+        key: 'avoid',
+        label: 'Avoid',
+        icon: XCircle,
+        desc: 'What makes support harder',
+    },
 ];
 
 const editRhythms: FlowFactory = (ctx) => ({
@@ -2041,7 +2750,12 @@ const editRhythms: FlowFactory = (ctx) => ({
             blurb: 'Time of day or guidance',
             heading: 'Which part of the day?',
             desc: 'Each block is a living document — staff read these at handover.',
-            picker: { key: 'block', label: 'Block', options: RHYTHM_BLOCK_OPTIONS, cols: 3 },
+            picker: {
+                key: 'block',
+                label: 'Block',
+                options: RHYTHM_BLOCK_OPTIONS,
+                cols: 3,
+            },
         },
         {
             key: 'guidance',
@@ -2058,7 +2772,8 @@ const editRhythms: FlowFactory = (ctx) => ({
                     required: true,
                     rows: 6,
                     full: true,
-                    placeholder: 'e.g. Wakes naturally ~7:30 — watch for early waking before 6…',
+                    placeholder:
+                        'e.g. Wakes naturally ~7:30 — watch for early waking before 6…',
                 },
             ],
             info: 'Updates are stamped with your name and date, and show in the audit history.',
@@ -2095,12 +2810,27 @@ const mealPref: FlowFactory = (ctx) => ({
                 label: 'Kind',
                 cols: 2,
                 options: [
-                    { key: 'dislike', label: 'Dislike', icon: XCircle, desc: 'Avoid serving' },
-                    { key: 'note', label: 'Dietary note', icon: Leaf, desc: 'Preference / need' },
+                    {
+                        key: 'dislike',
+                        label: 'Dislike',
+                        icon: XCircle,
+                        desc: 'Avoid serving',
+                    },
+                    {
+                        key: 'note',
+                        label: 'Dietary note',
+                        icon: Leaf,
+                        desc: 'Preference / need',
+                    },
                 ],
             },
             fields: [
-                { key: 'free_text_name', label: 'Food / detail', required: true, full: true },
+                {
+                    key: 'free_text_name',
+                    label: 'Food / detail',
+                    required: true,
+                    full: true,
+                },
                 {
                     key: 'notes',
                     label: 'Notes',

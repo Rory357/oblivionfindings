@@ -1,3 +1,8 @@
+import {
+    CarePlanDomainsBuilder,
+    type CarePlanDomainDraft,
+} from '@/components/care-plan-domains-builder';
+import { PageHero } from '@/components/page';
 import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -11,7 +16,6 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm, usePage } from '@inertiajs/react';
 import type { LucideIcon } from 'lucide-react';
@@ -233,6 +237,7 @@ export default function CarePlanCreate({ clients = [], staff = [] }: Props) {
             support_strategies: '',
             communication_preferences: '',
             review_schedule: { frequency_months: 3 },
+            domains: [] as CarePlanDomainDraft[],
         },
         from_onboarding: fromOnboarding ? '1' : '',
     });
@@ -317,7 +322,8 @@ export default function CarePlanCreate({ clients = [], staff = [] }: Props) {
     return (
         <AppLayout>
             <Head title="Create Care Plan" />
-            <PageHero variant="compact"
+            <PageHero
+                variant="compact"
                 title="Create Care Plan"
                 description={`Create a new care plan for a ${clientSingular.toLowerCase()}.`}
                 backHref="/operations/care-plans"
@@ -794,7 +800,17 @@ export default function CarePlanCreate({ clients = [], staff = [] }: Props) {
                         </CardContent>
                     </Card>
 
-                    {/* ─── Section 8: Review Schedule ─── */}
+                    {/* ─── Section 8: Support Domains ─── */}
+                    <CarePlanDomainsBuilder
+                        domains={data.content.domains}
+                        staff={staff}
+                        errors={errors as Record<string, string>}
+                        onChange={(domains) =>
+                            setContentField('domains', domains)
+                        }
+                    />
+
+                    {/* ─── Section 9: Review Schedule ─── */}
                     <Card>
                         <SectionHeader
                             icon={CalendarClock}

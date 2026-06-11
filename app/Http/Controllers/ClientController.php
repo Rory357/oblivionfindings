@@ -35,6 +35,7 @@ use App\Models\ClientFundTransaction;
 use App\Models\ClientIncident;
 use App\Models\ClientLeaveRequest;
 use App\Models\ClientLedgerEntry;
+use App\Models\ClientMealLog;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientNote;
@@ -46,6 +47,7 @@ use App\Models\ClientPurchaseRequest;
 use App\Models\ClientRisk;
 use App\Models\ClientRoutine;
 use App\Models\ClientSeizureEntry;
+use App\Models\ClientSleepEntry;
 use App\Models\ConsentRequest;
 use App\Models\ConsentType;
 use App\Models\ControlRoomAlert;
@@ -69,6 +71,7 @@ use App\Models\ServiceContext;
 use App\Models\Shift;
 use App\Models\ShiftSeries;
 use App\Models\Site;
+use App\Models\SiteHouseRoom;
 use App\Models\TimelineEvent;
 use App\Models\User;
 use App\Services\AuditLogger;
@@ -78,6 +81,7 @@ use App\Services\ConsentValidationService;
 use App\Services\HealthSafety\HsModuleSummaryService;
 use App\Services\Integration\IntegrationEventHistoryService;
 use App\Services\NotificationService;
+use App\Services\Respite\ClientRespiteAllocationSummary;
 use App\Services\Queclink\LocateNowService;
 use App\Services\ShiftCoverageService;
 use App\Services\Tracking\GeofenceStatusService;
@@ -211,8 +215,22 @@ class ClientController extends Controller
         return [
             'sites' => Site::query()
                 ->where('is_active', true)
+                ->with(['houseRooms' => fn ($query) => $query
+                    ->where('is_active', true)
+                    ->where('is_assignable', true)
+                    ->orderBy('sort_order')
+                    ->orderBy('name')])
                 ->orderBy('name')
-                ->get(['id', 'name']),
+                ->get(['id', 'name'])
+                ->map(fn (Site $site) => [
+                    'id' => $site->id,
+                    'name' => $site->name,
+                    'rooms' => $site->houseRooms->map(fn (SiteHouseRoom $room) => [
+                        'id' => $room->id,
+                        'name' => $room->name,
+                        'notes' => $room->notes,
+                    ])->values(),
+                ]),
             'serviceContexts' => ServiceContext::query()
                 ->where('is_active', true)
                 ->orderBy('name')
@@ -327,12 +345,13 @@ class ClientController extends Controller
 
         $client->load([
             'site:id,name',
+            'room:id,site_id,name,notes',
             'serviceContext:id,type,name',
             'keyWorker:id,name',
             'houseGeofence:id,name',
             'supportWorkers:id,name,email',
             'medicalProfile',
-            'medications',
+            'medications.stock',
             'conditions',
             'emergencyContacts',
             'portalUsers:id,name,email',
@@ -359,6 +378,7 @@ class ClientController extends Controller
                             'name' => $client->site->name,
                         ]
                         : null,
+                    'room' => $this->roomPayload($client->room),
                     'support_workers' => $client->supportWorkers->map(fn ($u) => [
                         'id' => $u->id,
                         'name' => $u->name,
@@ -519,6 +539,7 @@ class ClientController extends Controller
                 'funding_type' => $client->funding_type,
                 'funding_notes' => $client->funding_notes,
                 'site' => $client->site ? ['id' => $client->site->id, 'name' => $client->site->name] : null,
+                'room' => $this->roomPayload($client->room),
                 'service_context' => $client->serviceContext ? [
                     'id' => $client->serviceContext->id,
                     'type' => $client->serviceContext->type?->value,
@@ -545,6 +566,7 @@ class ClientController extends Controller
                 'cognitive_needs' => $client->cognitive_needs,
                 'dietary_requirements' => $client->dietary_requirements,
                 'sleep_preferences' => $client->sleep_preferences,
+                'sleep_target_hours' => $client->sleep_target_hours ? (float) $client->sleep_target_hours : null,
                 'fluid_intake_min_ml' => $client->fluid_intake_min_ml,
                 'fluid_intake_max_ml' => $client->fluid_intake_max_ml,
                 'seizure_duration_escalation_seconds' => $client->seizure_duration_escalation_seconds,
@@ -563,7 +585,7 @@ class ClientController extends Controller
             ],
             'medical' => [
                 'profile' => $client->medicalProfile,
-                'medications' => $client->medications,
+                'medications' => $client->medications->map(fn (ClientMedication $medication) => $this->medicationPayload($medication))->values(),
                 'conditions' => $client->conditions,
                 'emergency_contacts' => $client->emergencyContacts,
             ],
@@ -940,7 +962,15 @@ class ClientController extends Controller
                     ->orderByDesc('occurred_at')
                     ->limit(60)
                     ->get(),
+                'sleep' => ClientSleepEntry::query()
+                    ->where('client_id', $client->id)
+                    ->with('recorder:id,name')
+                    ->orderByDesc('slept_at')
+                    ->limit(60)
+                    ->get(),
+                'sleep_summary' => $this->buildSleepSummary($client),
             ],
+            'meal_logs' => $this->buildMealLogData($client),
             'client_routines' => ClientRoutine::query()
                 ->where('client_id', $client->id)
                 ->with('updater:id,name')
@@ -1017,6 +1047,7 @@ class ClientController extends Controller
                         'requested_end' => optional($r->requested_end)->toISOString(),
                         'status' => $r->status,
                     ])->values(),
+                'allocation' => app(ClientRespiteAllocationSummary::class)->forClient($client),
             ],
             'consents' => ClientConsent::where('client_id', $client->id)
                 ->with('consentType:id,name,category')
@@ -1081,6 +1112,7 @@ class ClientController extends Controller
                 'update_risks' => $request->user()?->canDo('risks.update') ?? false,
                 'delete_risks' => $request->user()?->canDo('risks.delete') ?? false,
             ],
+            'assignable_workers' => $this->buildAssignableWorkers($client, $request->user()),
             'pending_visit_count' => FamilyVisitRequest::where('client_id', $client->id)->where('status', 'pending')->count(),
             'pending_consent_requests_count' => $this->buildPendingConsentRequestCount($client),
             'family_notes_open_count' => FamilyNote::where('client_id', $client->id)->whereIn('status', ['open', 'in_progress'])->count(),
@@ -1237,6 +1269,162 @@ class ClientController extends Controller
             'hs_summary' => Inertia::optional(fn () => app(HsModuleSummaryService::class)->forClient($client->id)),
             'safety' => ClientSafetyPayload::forClient($client),
         ]);
+    }
+
+    private function roomPayload(?SiteHouseRoom $room): ?array
+    {
+        if (! $room) {
+            return null;
+        }
+
+        return [
+            'id' => $room->id,
+            'site_id' => $room->site_id,
+            'name' => $room->name,
+            'notes' => $room->notes,
+        ];
+    }
+
+    private function medicationPayload(ClientMedication $medication): array
+    {
+        $payload = $medication->toArray();
+        $stock = $medication->stock;
+
+        $payload['stock'] = $stock ? [
+            'on_hand' => $stock->on_hand,
+            'unit' => $stock->unit,
+            'reorder_threshold' => $stock->reorder_level,
+            'is_low' => $stock->isLowStock(),
+            'last_counted_at' => $stock->last_counted_at?->toISOString(),
+            'expiry_date' => $stock->expiry_date?->toDateString(),
+        ] : null;
+
+        return $payload;
+    }
+
+    private function buildMealLogData(Client $client): array
+    {
+        $timezone = config('app.worker_timezone', 'Pacific/Auckland');
+        $todayStart = now($timezone)->startOfDay()->utc();
+        $todayEnd = now($timezone)->endOfDay()->utc();
+        $weekStart = now($timezone)->subDays(6)->startOfDay()->utc();
+
+        $today = ClientMealLog::query()
+            ->where('client_id', $client->id)
+            ->whereBetween('occurred_at', [$todayStart, $todayEnd])
+            ->with('recorder:id,name')
+            ->orderByDesc('occurred_at')
+            ->get();
+
+        $history = ClientMealLog::query()
+            ->where('client_id', $client->id)
+            ->where('occurred_at', '>=', $weekStart)
+            ->with('recorder:id,name')
+            ->orderByDesc('occurred_at')
+            ->limit(50)
+            ->get();
+
+        return [
+            'today' => $today,
+            'last_7_days' => $history,
+            'summary' => [
+                'eaten_today' => $today->where('status', 'eaten')->count(),
+                'expected_today' => 3,
+                'partial_today' => $today->where('status', 'partial')->count(),
+                'refused_today' => $today->whereIn('status', ['refused', 'declined'])->count(),
+            ],
+        ];
+    }
+
+    private function buildSleepSummary(Client $client): array
+    {
+        $entries = ClientSleepEntry::query()
+            ->where('client_id', $client->id)
+            ->orderByDesc('slept_at')
+            ->limit(7)
+            ->get(['hours_slept']);
+
+        $target = $client->sleep_target_hours ? (float) $client->sleep_target_hours : 7.0;
+        $average = $entries->count() > 0
+            ? round((float) $entries->avg(fn (ClientSleepEntry $entry) => (float) $entry->hours_slept), 1)
+            : null;
+
+        return [
+            'average_7_nights' => $average,
+            'target_hours' => $target,
+            'below_target' => $average !== null ? $average < $target : null,
+        ];
+    }
+
+    private function buildAssignableWorkers(Client $client, ?User $user): array
+    {
+        if (! ($user?->canDo('clients.assignments.update') ?? false)) {
+            return [];
+        }
+
+        $assignedIds = $client->supportWorkers->pluck('id')->map(fn ($id) => (int) $id)->all();
+
+        return User::staff()
+            ->when($user->organization_id, fn ($q) => $q->where('organization_id', $user->organization_id))
+            ->orderByRaw(
+                count($assignedIds) > 0
+                    ? 'CASE WHEN id IN ('.implode(',', array_map('intval', $assignedIds)).') THEN 0 ELSE 1 END'
+                    : '1'
+            )
+            ->orderBy('name')
+            ->get(['id', 'name', 'email'])
+            ->map(fn (User $worker) => [
+                'id' => $worker->id,
+                'name' => $worker->name,
+                'email' => $worker->email,
+                'assigned' => in_array((int) $worker->id, $assignedIds, true),
+                'key_worker' => (int) $client->key_worker_id === (int) $worker->id,
+            ])
+            ->values()
+            ->all();
+    }
+
+    private function syncClientRoomAssignment(Client $client, ?int $previousRoomId = null): void
+    {
+        if ($previousRoomId && (int) $previousRoomId !== (int) $client->room_id) {
+            SiteHouseRoom::query()
+                ->whereKey($previousRoomId)
+                ->where('assigned_client_id', $client->id)
+                ->update([
+                    'assigned_client_id' => null,
+                    'assigned_from' => null,
+                    'assigned_until' => null,
+                ]);
+        }
+
+        if (! $client->room_id) {
+            SiteHouseRoom::query()
+                ->where('assigned_client_id', $client->id)
+                ->update([
+                    'assigned_client_id' => null,
+                    'assigned_from' => null,
+                    'assigned_until' => null,
+                ]);
+
+            return;
+        }
+
+        SiteHouseRoom::query()
+            ->where('assigned_client_id', $client->id)
+            ->whereKeyNot($client->room_id)
+            ->update([
+                'assigned_client_id' => null,
+                'assigned_from' => null,
+                'assigned_until' => null,
+            ]);
+
+        SiteHouseRoom::query()
+            ->whereKey($client->room_id)
+            ->update([
+                'assigned_client_id' => $client->id,
+                'assigned_from' => now()->toDateString(),
+                'assigned_until' => null,
+            ]);
     }
 
     private function serializeShiftSummary(?Shift $shift): ?array
@@ -1649,6 +1837,7 @@ class ClientController extends Controller
 
             $client = DB::transaction(function () use ($clientFields, $medical, $conditions, $emergencyContacts, $createPortalUser, $data, $auth) {
                 $client = Client::create($clientFields);
+                $this->syncClientRoomAssignment($client);
 
                 ClientOnboardingWorkflow::createForClient($client, $auth->id);
 
@@ -1803,7 +1992,23 @@ class ClientController extends Controller
             $sitesQuery->orWhere('id', $client->site_id);
         }
 
-        $sites = $sitesQuery->get(['id', 'name', 'is_active']);
+        $sites = $sitesQuery
+            ->with(['houseRooms' => fn ($query) => $query
+                ->where('is_active', true)
+                ->where('is_assignable', true)
+                ->orderBy('sort_order')
+                ->orderBy('name')])
+            ->get(['id', 'name', 'is_active'])
+            ->map(fn (Site $site) => [
+                'id' => $site->id,
+                'name' => $site->name,
+                'is_active' => (bool) $site->is_active,
+                'rooms' => $site->houseRooms->map(fn (SiteHouseRoom $room) => [
+                    'id' => $room->id,
+                    'name' => $room->name,
+                    'notes' => $room->notes,
+                ])->values(),
+            ]);
 
         $serviceContextsQuery = ServiceContext::query()->orderBy('name');
         $serviceContextsQuery->where('is_active', true);
@@ -1814,7 +2019,7 @@ class ClientController extends Controller
 
         $payload = [
             'client' => $client->only([
-                'id', 'site_id', 'service_context_id', 'nhi_number', 'first_name', 'last_name', 'preferred_name', 'date_of_birth', 'gender', 'status',
+                'id', 'site_id', 'room_id', 'service_context_id', 'nhi_number', 'first_name', 'last_name', 'preferred_name', 'date_of_birth', 'gender', 'status',
                 'phone', 'email', 'address_line_1', 'address_line_2', 'suburb', 'city', 'postcode',
                 'profile_photo_path', 'funding_type', 'funding_notes',
             ]),
@@ -1839,6 +2044,7 @@ class ClientController extends Controller
 
         try {
             $data = $request->validated();
+            $previousRoomId = $client->room_id ? (int) $client->room_id : null;
             $syncMedical = array_key_exists('medical', $data);
             $syncConditions = array_key_exists('conditions', $data);
             $syncEmergencyContacts = array_key_exists('emergency_contacts', $data);
@@ -1874,9 +2080,11 @@ class ClientController extends Controller
                 $emergencyContacts,
                 $syncMedical,
                 $syncConditions,
-                $syncEmergencyContacts
+                $syncEmergencyContacts,
+                $previousRoomId
             ) {
                 $client->update($clientFields);
+                $this->syncClientRoomAssignment($client->refresh(), $previousRoomId);
 
                 if ($syncMedical) {
                     $this->syncClientMedicalProfile($client, $medical);
@@ -2008,7 +2216,9 @@ class ClientController extends Controller
             'key_worker_id' => ['nullable', 'integer', 'exists:users,id'],
         ]);
 
-        $client->update(array_filter($data, fn ($v) => $v !== null));
+        $client->update(collect($data)
+            ->filter(fn ($_value, string $key) => $request->has($key))
+            ->all());
 
         return redirect()->back()->with('success', 'Updated.');
     }

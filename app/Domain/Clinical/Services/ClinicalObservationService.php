@@ -10,6 +10,7 @@ use App\Models\Client;
 use App\Models\Shift;
 use App\Models\TimelineEvent;
 use App\Models\User;
+use App\Support\WorkerClock;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\Log;
 use Illuminate\Validation\ValidationException;
@@ -47,7 +48,7 @@ class ClinicalObservationService
             'site_id' => $shift?->site_id ?? $client->site_id,
             'recorded_by' => $recorder->id,
             'observation_type' => $type,
-            'recorded_at' => $input['recorded_at'] ?? now(),
+            'recorded_at' => WorkerClock::toUtc($input['recorded_at'] ?? null) ?? now(),
             'data' => $input['data'],
             'notes' => $input['notes'] ?? null,
             'protocol_schedule_id' => $input['protocol_schedule_id'] ?? null,

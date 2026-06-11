@@ -6,8 +6,8 @@ use App\Http\Controllers\Controller;
 use App\Http\Resources\ClientDailyNoteResource;
 use App\Models\Client;
 use App\Models\ClientNote;
+use App\Support\WorkerClock;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 
 class ClientDailyNoteController extends Controller
@@ -45,7 +45,8 @@ class ClientDailyNoteController extends Controller
             'user_id' => $request->user()->id,
             'type' => $data['type'] ?? 'daily_note',
             'category' => $data['category'] ?? 'other',
-            'occurred_at' => isset($data['occurred_at']) ? Carbon::parse($data['occurred_at']) : now(),
+            'occurred_at' => WorkerClock::toUtc($data['occurred_at'] ?? null) ?? now(),
+            'follow_up_due_at' => WorkerClock::toUtc($data['follow_up_due_at'] ?? null),
             'visibility' => $isDraft ? 'internal' : ($data['visibility'] ?? 'internal'),
             'appears_on_timeline' => (bool) ($data['appears_on_timeline'] ?? true),
             'is_draft' => $isDraft,
@@ -63,6 +64,11 @@ class ClientDailyNoteController extends Controller
         $data = $this->validatedPayload($request, creating: false);
         if (($data['is_draft'] ?? $note->is_draft) === true) {
             $data['visibility'] = 'internal';
+        }
+        foreach (['occurred_at', 'follow_up_due_at'] as $field) {
+            if (array_key_exists($field, $data)) {
+                $data[$field] = WorkerClock::toUtc($data[$field]);
+            }
         }
 
         $note->update($data);

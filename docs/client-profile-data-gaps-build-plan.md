@@ -319,6 +319,62 @@ Safe to do any time; the pattern components exist:
 6. **§6 care-plan domains** — biggest UI lift, do last
 7. **§9 cosmetic sweep** — fold into whichever PR touches each tab
 
-Each item is independently shippable; none requires new permissions except where noted
-(none currently). After each ships, bind the waiting profile surface and delete the
-corresponding fallback copy ("No target set", "Nothing rostered"-style empties).
+Each item is independently shippable. After each ships, bind the waiting profile
+surface and delete the corresponding fallback copy ("No target set", "Nothing
+rostered"-style empties). Permission seeding details for the implemented care-plan
+route gates are captured in the closeout below.
+
+---
+
+## Implementation closeout — Codex 2026-06-11
+
+**Status:** implemented end to end on branch `codex/client-profile-data-gaps`.
+
+**Implemented scope**
+- §1 Room and site placement: `clients.room_id`, room/site validation, room occupancy
+  sync, add/edit client room selection, profile hero/details room display.
+- §2 Food & Meal: meal-log table/model/controller, profile Food & Meal tab log form,
+  today strip, 7-day history/summary, and My Day meal logging.
+- §3 Sleep: sleep-entry table/model/controller, sleep target field, profile health
+  sleep chart/metrics/history, and My Day sleep observation routing.
+- §4 Respite allocation: allocation table/model/controller/service, respite workspace
+  CRUD, and client profile allocation stats/progress.
+- §5 eMAR stock: existing medication stock is exposed in the profile medication payload
+  and rendered on the MAR tab with low-stock/reorder context.
+- §6 Care plan domains: validated `content.domains` schema, create/edit builder,
+  version/review copy through existing content flow, and profile/show domain cards.
+- §7 Workforce editor: assignable worker payload, in-tab assign/remove editor, and
+  key-worker quick update.
+- §8 Worker-time parsing: shared `App\Support\WorkerClock` helper and sweep over
+  incidents, calendar appointments, daily notes, legacy/current clinical events and
+  observations, bowel/fluid/seizure charts, meal logs, and sleep entries.
+- §9 Cosmetic/data fidelity: legacy assessment create buttons suppressed, profile show
+  split into smaller tab modules, food/respite/workers/care-plan surfaces bound to real
+  data, and MAR/personal-details polish completed for the specified gaps.
+
+**Verification run**
+- `php artisan migrate --force` — passed, no pending migrations.
+- `php artisan test tests/Feature/ClientProfileDataGapsBuildTest.php` — passed
+  (`8 passed`, `130 assertions`).
+- `php -l` over all modified and new PHP files — passed.
+- `npm run types` — passed.
+- `npx eslint` over touched profile/My Day/care-plan UI files — passed.
+- `npx vitest run resources/js/test/client-profile-source-size.test.ts resources/js/test/client-profile-phase-one-ui.test.tsx`
+  — passed (`2` files, `3` tests).
+- `npm run build` — passed.
+
+**Deploy/runbook note**
+- `php artisan migrate --force` is required for the new client room, meal log, sleep,
+  and respite allocation schema.
+- Deploys skip seeders in this project. This build adds the missing seeded
+  `care_plans.viewAny`, `care_plans.create`, `care_plans.update`, and
+  `care_plans.delete` permissions to `RbacSeeder` because the existing care-plan
+  routes already gate on `care_plans.*`. Production needs the RBAC seeder run, or
+  equivalent permission rows inserted, before auditing care-plan create/edit routes.
+
+**Claude audit boundaries**
+- Audit the real profile, My Day, care-plan, respite, and MAR surfaces rather than the
+  older static design snippets.
+- Treat `.design-drops/` as pre-existing untracked workspace material; it was not part
+  of this implementation.
+- Family portal domain summaries remain intentionally out of scope, as stated in §6.

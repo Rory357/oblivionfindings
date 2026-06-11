@@ -17,10 +17,7 @@ import {
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
-import {
-    StatusBadge,
-    type StatusVariant,
-} from '@/components/ui/status-badge';
+import { StatusBadge, type StatusVariant } from '@/components/ui/status-badge';
 import { Switch } from '@/components/ui/switch';
 import { Textarea } from '@/components/ui/textarea';
 import {
@@ -50,8 +47,6 @@ import {
     ChevronLeft,
     ChevronRight,
     ClipboardCheck,
-    Clock,
-    Droplet,
     FileText,
     Footprints,
     Globe,
@@ -64,10 +59,10 @@ import {
     Loader2,
     Mail,
     MapPin,
+    PartyPopper,
     Pencil,
     Phone,
     Plus,
-    PartyPopper,
     Shield,
     ShieldAlert,
     Stethoscope,
@@ -78,18 +73,17 @@ import {
     Wallet,
     X,
 } from 'lucide-react';
-import {
-    useMemo,
-    useRef,
-    useState,
-    type ReactNode,
-} from 'react';
+import { useMemo, useRef, useState, type ReactNode } from 'react';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
 /* ------------------------------------------------------------------ */
 
-type Option = { id: number; name: string };
+type Option = {
+    id: number;
+    name: string;
+    rooms?: Array<{ id: number; name: string; notes?: string | null }>;
+};
 type ServiceContextOption = { id: number; type?: string | null; name: string };
 
 type ConditionRow = {
@@ -134,6 +128,7 @@ export type ClientWizardForm = {
     _modal: boolean;
     // basics
     site_id: string;
+    room_id: string;
     service_context_id: string;
     status: string;
     first_name: string;
@@ -290,7 +285,17 @@ const DISABILITIES = [
     'Epilepsy',
     'Mental health condition',
 ];
-const BLOOD_TYPES = ['A+', 'A−', 'B+', 'B−', 'AB+', 'AB−', 'O+', 'O−', 'Unknown'];
+const BLOOD_TYPES = [
+    'A+',
+    'A−',
+    'B+',
+    'B−',
+    'AB+',
+    'AB−',
+    'O+',
+    'O−',
+    'Unknown',
+];
 const TRANSPORT_OPTIONS = [
     'Wheelchair-accessible vehicle',
     'Mobility seat / harness',
@@ -311,30 +316,103 @@ const FUNDING_OPTIONS = [
     'Other',
 ];
 
-const STEPS: { key: StepKey; label: string; icon: IconType; blurb: string }[] = [
-    { key: 'basics', label: 'Basics', icon: IdCard, blurb: 'Identity, placement & contact' },
-    { key: 'cultural', label: 'Cultural identity', icon: Globe, blurb: 'Whakapapa, language & beliefs' },
-    { key: 'support', label: 'Support needs', icon: Accessibility, blurb: 'How we keep them safe & well' },
-    { key: 'health', label: 'Health & medical', icon: Stethoscope, blurb: 'GP, allergies & conditions' },
-    { key: 'about', label: 'About me', icon: Heart, blurb: 'The person, not the file' },
-    { key: 'care', label: 'Care setup', icon: ClipboardCheck, blurb: 'Risk, key worker & funding' },
-    { key: 'contacts', label: 'Contacts & consent', icon: Phone, blurb: 'Who to call, and what they see' },
-    { key: 'review', label: 'Review & create', icon: CheckCircle2, blurb: 'Confirm and save' },
-];
+const STEPS: { key: StepKey; label: string; icon: IconType; blurb: string }[] =
+    [
+        {
+            key: 'basics',
+            label: 'Basics',
+            icon: IdCard,
+            blurb: 'Identity, placement & contact',
+        },
+        {
+            key: 'cultural',
+            label: 'Cultural identity',
+            icon: Globe,
+            blurb: 'Whakapapa, language & beliefs',
+        },
+        {
+            key: 'support',
+            label: 'Support needs',
+            icon: Accessibility,
+            blurb: 'How we keep them safe & well',
+        },
+        {
+            key: 'health',
+            label: 'Health & medical',
+            icon: Stethoscope,
+            blurb: 'GP, allergies & conditions',
+        },
+        {
+            key: 'about',
+            label: 'About me',
+            icon: Heart,
+            blurb: 'The person, not the file',
+        },
+        {
+            key: 'care',
+            label: 'Care setup',
+            icon: ClipboardCheck,
+            blurb: 'Risk, key worker & funding',
+        },
+        {
+            key: 'contacts',
+            label: 'Contacts & consent',
+            icon: Phone,
+            blurb: 'Who to call, and what they see',
+        },
+        {
+            key: 'review',
+            label: 'Review & create',
+            icon: CheckCircle2,
+            blurb: 'Confirm and save',
+        },
+    ];
 
 // Fields that count toward the "profile completeness" meter.
 const COMPLETION_FIELDS: (keyof ClientWizardForm)[] = [
-    'site_id', 'service_context_id', 'first_name', 'last_name', 'preferred_name',
-    'date_of_birth', 'gender', 'preferred_pronouns', 'nhi_number', 'phone', 'email',
-    'address_line_1', 'suburb', 'city', 'postcode', 'ethnicity', 'languages', 'religion',
-    'mobility_needs', 'sensory_needs', 'cognitive_needs', 'dietary_requirements',
-    'sleep_preferences', 'transport_needs', 'interests_hobbies', 'strengths_abilities',
-    'life_story', 'education_level', 'employment_status', 'service_start_date',
-    'key_worker_id', 'house_geofence_id', 'funding_type',
+    'site_id',
+    'room_id',
+    'service_context_id',
+    'first_name',
+    'last_name',
+    'preferred_name',
+    'date_of_birth',
+    'gender',
+    'preferred_pronouns',
+    'nhi_number',
+    'phone',
+    'email',
+    'address_line_1',
+    'suburb',
+    'city',
+    'postcode',
+    'ethnicity',
+    'languages',
+    'religion',
+    'mobility_needs',
+    'sensory_needs',
+    'cognitive_needs',
+    'dietary_requirements',
+    'sleep_preferences',
+    'transport_needs',
+    'interests_hobbies',
+    'strengths_abilities',
+    'life_story',
+    'education_level',
+    'employment_status',
+    'service_start_date',
+    'key_worker_id',
+    'house_geofence_id',
+    'funding_type',
 ];
 const COMPLETION_MEDICAL: (keyof MedicalShape)[] = [
-    'gp_name', 'gp_phone', 'blood_type', 'allergies', 'disabilities',
-    'medical_history', 'mental_health_history',
+    'gp_name',
+    'gp_phone',
+    'blood_type',
+    'allergies',
+    'disabilities',
+    'medical_history',
+    'mental_health_history',
 ];
 
 function isFilled(v: unknown): boolean {
@@ -344,7 +422,9 @@ function isFilled(v: unknown): boolean {
 
 function completionPct(data: ClientWizardForm): number {
     const flat = COMPLETION_FIELDS.filter((k) => isFilled(data[k])).length;
-    const med = COMPLETION_MEDICAL.filter((k) => isFilled(data.medical[k])).length;
+    const med = COMPLETION_MEDICAL.filter((k) =>
+        isFilled(data.medical[k]),
+    ).length;
     const hasContact = data.emergency_contacts.some((c) => c.name && c.phone);
     const total = COMPLETION_FIELDS.length + COMPLETION_MEDICAL.length + 1;
     return Math.round(((flat + med + (hasContact ? 1 : 0)) / total) * 100);
@@ -368,41 +448,94 @@ function nhiState(v: string): 'ok' | 'bad' | null {
 
 function emptyContact(): ContactRow {
     return {
-        name: '', relationship: '', phone: '', alternate_phone: '', email: '',
-        address: '', preferred_method: 'phone', availability: '', notes: '',
-        can_view_medical: false, can_view_medications: false,
-        can_view_incidents: false, can_receive_updates: true,
+        name: '',
+        relationship: '',
+        phone: '',
+        alternate_phone: '',
+        email: '',
+        address: '',
+        preferred_method: 'phone',
+        availability: '',
+        notes: '',
+        can_view_medical: false,
+        can_view_medications: false,
+        can_view_incidents: false,
+        can_receive_updates: true,
     };
 }
 
 function emptyMedical(): MedicalShape {
     return {
-        gp_name: '', gp_practice: '', gp_phone: '', hospital_preference: '',
-        blood_type: '', organ_donor: false, allergies: [], disabilities: [],
-        medical_history: '', mental_health_history: '', surgical_history: '',
-        immunisation_notes: '', notes: '',
+        gp_name: '',
+        gp_practice: '',
+        gp_phone: '',
+        hospital_preference: '',
+        blood_type: '',
+        organ_donor: false,
+        allergies: [],
+        disabilities: [],
+        medical_history: '',
+        mental_health_history: '',
+        surgical_history: '',
+        immunisation_notes: '',
+        notes: '',
     };
 }
 
-function initialForm(defaultServiceContextId?: number | null): ClientWizardForm {
+function initialForm(
+    defaultServiceContextId?: number | null,
+): ClientWizardForm {
     return {
         _modal: true,
-        site_id: '', service_context_id: defaultServiceContextId ? String(defaultServiceContextId) : '',
-        status: 'onboarding', first_name: '', last_name: '', preferred_name: '',
-        date_of_birth: '', gender: '', preferred_pronouns: '', nhi_number: '',
-        phone: '', email: '', profile_photo: null,
-        address_line_1: '', address_line_2: '', suburb: '', city: '', postcode: '',
+        site_id: '',
+        room_id: '',
+        service_context_id: defaultServiceContextId
+            ? String(defaultServiceContextId)
+            : '',
+        status: 'onboarding',
+        first_name: '',
+        last_name: '',
+        preferred_name: '',
+        date_of_birth: '',
+        gender: '',
+        preferred_pronouns: '',
+        nhi_number: '',
+        phone: '',
+        email: '',
+        profile_photo: null,
+        address_line_1: '',
+        address_line_2: '',
+        suburb: '',
+        city: '',
+        postcode: '',
         create_client_portal_user: false,
-        ethnicity: '', languages: [], religion: '',
-        mobility_needs: '', sensory_needs: '', cognitive_needs: '',
-        dietary_requirements: '', sleep_preferences: '',
-        transport_needs: [], transport_notes: '',
-        fluid_intake_min_ml: '', fluid_intake_max_ml: '', seizure_duration_escalation_seconds: '',
-        interests_hobbies: '', strengths_abilities: '', life_story: '',
-        education_level: '', employment_status: '',
-        medical: emptyMedical(), conditions: [],
-        service_start_date: '', key_worker_id: '', risk_level: 'low',
-        safeguarding_flag: false, house_geofence_id: '', funding_type: '', funding_notes: '',
+        ethnicity: '',
+        languages: [],
+        religion: '',
+        mobility_needs: '',
+        sensory_needs: '',
+        cognitive_needs: '',
+        dietary_requirements: '',
+        sleep_preferences: '',
+        transport_needs: [],
+        transport_notes: '',
+        fluid_intake_min_ml: '',
+        fluid_intake_max_ml: '',
+        seizure_duration_escalation_seconds: '',
+        interests_hobbies: '',
+        strengths_abilities: '',
+        life_story: '',
+        education_level: '',
+        employment_status: '',
+        medical: emptyMedical(),
+        conditions: [],
+        service_start_date: '',
+        key_worker_id: '',
+        risk_level: 'low',
+        safeguarding_flag: false,
+        house_geofence_id: '',
+        funding_type: '',
+        funding_notes: '',
         emergency_contacts: [emptyContact()],
     };
 }
@@ -521,9 +654,15 @@ function PhotoField({ ctx }: { ctx: StepCtx }) {
         <div className="flex items-center gap-3.5">
             <div className="relative grid h-16 w-16 shrink-0 place-items-center overflow-hidden rounded-2xl border border-border bg-primary/10">
                 {preview ? (
-                    <img src={preview} alt="" className="h-full w-full object-cover" />
+                    <img
+                        src={preview}
+                        alt=""
+                        className="h-full w-full object-cover"
+                    />
                 ) : initials ? (
-                    <span className="text-lg font-bold text-primary">{initials}</span>
+                    <span className="text-lg font-bold text-primary">
+                        {initials}
+                    </span>
                 ) : (
                     <Camera className="h-5 w-5 text-primary" />
                 )}
@@ -568,14 +707,18 @@ function PhotoField({ ctx }: { ctx: StepCtx }) {
 /*  Client-side validation (mirrors StoreClientRequest)                */
 /* ------------------------------------------------------------------ */
 
-function validateStep(key: StepKey, d: ClientWizardForm): Record<string, string> {
+function validateStep(
+    key: StepKey,
+    d: ClientWizardForm,
+): Record<string, string> {
     const e: Record<string, string> = {};
     if (key === 'basics') {
         if (!d.first_name.trim()) e.first_name = 'First name is required';
         if (!d.last_name.trim()) e.last_name = 'Last name is required';
         if (!d.date_of_birth) e.date_of_birth = 'Date of birth is required';
         if (!d.site_id) e.site_id = 'Choose a site';
-        if (!d.service_context_id) e.service_context_id = 'Choose a service context';
+        if (!d.service_context_id)
+            e.service_context_id = 'Choose a service context';
         if (d.email && !/^[^@\s]+@[^@\s]+\.[^@\s]+$/.test(d.email))
             e.email = 'Enter a valid email';
         if (d.nhi_number && nhiState(d.nhi_number) === 'bad')
@@ -594,8 +737,12 @@ function validateStep(key: StepKey, d: ClientWizardForm): Record<string, string>
             ),
         );
         if (anyData && c) {
-            if (!c.name.trim()) e['emergency_contacts.0.name'] = 'Primary contact name is required';
-            if (!c.phone.trim()) e['emergency_contacts.0.phone'] = 'Primary contact phone is required';
+            if (!c.name.trim())
+                e['emergency_contacts.0.name'] =
+                    'Primary contact name is required';
+            if (!c.phone.trim())
+                e['emergency_contacts.0.phone'] =
+                    'Primary contact phone is required';
         }
     }
     return e;
@@ -626,7 +773,10 @@ export function AddClientDialog(props: AddClientDialogProps) {
         <Dialog open={isOpen} onOpenChange={(open) => !open && onClose()}>
             <DialogContent
                 className="overflow-hidden p-0 [&>button]:hidden"
-                style={{ maxWidth: 'min(94vw, 1080px)', width: 'min(94vw, 1080px)' }}
+                style={{
+                    maxWidth: 'min(94vw, 1080px)',
+                    width: 'min(94vw, 1080px)',
+                }}
             >
                 <DialogTitle className="sr-only">{title}</DialogTitle>
                 <DialogDescription className="sr-only">
@@ -656,7 +806,9 @@ function AddClientBody({
 }: AddClientDialogProps) {
     const page = usePage<{ flash?: { created_client_id?: number | null } }>();
     const isEditMode = clientId != null;
-    const form = useForm<ClientWizardForm>(formWithInitialValues(defaultServiceContextId, initialValues));
+    const form = useForm<ClientWizardForm>(
+        formWithInitialValues(defaultServiceContextId, initialValues),
+    );
     const { data, setData, processing } = form;
 
     const [stepIndex, setStepIndex] = useState(0);
@@ -666,13 +818,18 @@ function AddClientBody({
     const cur = STEPS[stepIndex];
     const pct = useMemo(() => completionPct(data), [data]);
 
-    const set = <K extends keyof ClientWizardForm>(k: K, v: ClientWizardForm[K]) =>
+    const set = <K extends keyof ClientWizardForm>(
+        k: K,
+        v: ClientWizardForm[K],
+    ) =>
         // Inertia's setData value type (FormDataValues) doesn't simplify for a
         // generic key; the call site is type-safe via the K constraint above.
         // eslint-disable-next-line @typescript-eslint/no-explicit-any
         setData(k, v as any);
-    const setMedical = <K extends keyof MedicalShape>(k: K, v: MedicalShape[K]) =>
-        setData('medical', { ...data.medical, [k]: v });
+    const setMedical = <K extends keyof MedicalShape>(
+        k: K,
+        v: MedicalShape[K],
+    ) => setData('medical', { ...data.medical, [k]: v });
     const setMany = (partial: Partial<ClientWizardForm>) =>
         setData((prev) => ({ ...prev, ...partial }));
 
@@ -762,7 +919,11 @@ function AddClientBody({
                 data={data}
                 pct={pct}
                 clientSingular={clientSingular}
-                clientId={isEditMode ? clientId ?? null : page.props.flash?.created_client_id ?? null}
+                clientId={
+                    isEditMode
+                        ? (clientId ?? null)
+                        : (page.props.flash?.created_client_id ?? null)
+                }
                 isEditMode={isEditMode}
                 onClose={onClose}
                 onAddAnother={resetAll}
@@ -777,12 +938,18 @@ function AddClientBody({
             {/* ── Stepper rail ── */}
             <aside className="hidden w-[248px] shrink-0 flex-col gap-1 overflow-y-auto border-r border-sidebar-border bg-sidebar p-4 sm:flex">
                 <div className="mb-3 flex items-center gap-2.5">
-                        <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground">
-                        {isEditMode ? <ClipboardCheck className="h-5 w-5" /> : <UserPlus className="h-5 w-5" />}
+                    <span className="grid h-9 w-9 place-items-center rounded-lg bg-primary text-primary-foreground">
+                        {isEditMode ? (
+                            <ClipboardCheck className="h-5 w-5" />
+                        ) : (
+                            <UserPlus className="h-5 w-5" />
+                        )}
                     </span>
                     <div>
-                        <div className="text-sm font-bold leading-tight">
-                            {isEditMode ? 'Complete profile' : `Add ${clientSingular.toLowerCase()}`}
+                        <div className="text-sm leading-tight font-bold">
+                            {isEditMode
+                                ? 'Complete profile'
+                                : `Add ${clientSingular.toLowerCase()}`}
                         </div>
                         <div className="text-[11px] text-muted-foreground">
                             {isEditMode ? 'Full intake details' : 'New intake'}
@@ -876,11 +1043,13 @@ function AddClientBody({
                 <div className="h-[3px] shrink-0 bg-muted">
                     <div
                         className="h-full bg-primary transition-[width] duration-300"
-                        style={{ width: `${((stepIndex + 1) / STEPS.length) * 100}%` }}
+                        style={{
+                            width: `${((stepIndex + 1) / STEPS.length) * 100}%`,
+                        }}
                     />
                 </div>
 
-                <div className="min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-6 py-6">
+                <div className="min-h-0 flex-1 overflow-x-hidden overflow-y-auto px-6 py-6">
                     {isReview ? (
                         <ReviewStep ctx={ctx} pct={pct} goToStep={goToStep} />
                     ) : (
@@ -891,13 +1060,21 @@ function AddClientBody({
                 <footer className="flex shrink-0 items-center justify-between gap-3 border-t border-border bg-muted/30 px-5 py-3.5">
                     <div>
                         {stepIndex > 0 ? (
-                            <Button type="button" variant="ghost" onClick={back}>
+                            <Button
+                                type="button"
+                                variant="ghost"
+                                onClick={back}
+                            >
                                 <ChevronLeft className="h-4 w-4" /> Back
                             </Button>
                         ) : null}
                     </div>
                     <div className="flex items-center gap-2.5">
-                        <Button type="button" variant="outline" onClick={onClose}>
+                        <Button
+                            type="button"
+                            variant="outline"
+                            onClick={onClose}
+                        >
                             Cancel
                         </Button>
                         {isReview ? (
@@ -925,7 +1102,9 @@ function AddClientBody({
                                     {processing ? (
                                         <>
                                             <Loader2 className="h-4 w-4 animate-spin" />
-                                            {isEditMode ? 'Saving…' : 'Creating…'}
+                                            {isEditMode
+                                                ? 'Saving…'
+                                                : 'Creating…'}
                                         </>
                                     ) : (
                                         <>
@@ -955,8 +1134,14 @@ function AddClientBody({
 
 type StepCtx = {
     data: ClientWizardForm;
-    set: <K extends keyof ClientWizardForm>(k: K, v: ClientWizardForm[K]) => void;
-    setMedical: <K extends keyof MedicalShape>(k: K, v: MedicalShape[K]) => void;
+    set: <K extends keyof ClientWizardForm>(
+        k: K,
+        v: ClientWizardForm[K],
+    ) => void;
+    setMedical: <K extends keyof MedicalShape>(
+        k: K,
+        v: MedicalShape[K],
+    ) => void;
     setMany: (partial: Partial<ClientWizardForm>) => void;
     err: (name: string) => string | undefined;
     sites: Option[];
@@ -990,10 +1175,12 @@ function StepBasics({ ctx }: { ctx: StepCtx }) {
     const { data, set, setMany, err, sites, serviceContexts } = ctx;
     const age = ageFromDob(data.date_of_birth);
     const nhi = nhiState(data.nhi_number);
+    const selectedSite = sites.find((s) => String(s.id) === data.site_id);
+    const roomOptions = selectedSite?.rooms ?? [];
     const contextIcon = (i: number) =>
         i === 0 ? Home : i === 1 ? Heart : i === 2 ? Calendar : KeyRound;
     return (
-        <div className="animate-in fade-in slide-in-from-right-2 duration-300">
+        <div className="animate-in duration-300 fade-in slide-in-from-right-2">
             <StepHead
                 icon={IdCard}
                 title="Who are we adding?"
@@ -1006,7 +1193,11 @@ function StepBasics({ ctx }: { ctx: StepCtx }) {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                     <SubHead icon={User}>Identity</SubHead>
-                    <Field label="First name" required error={err('first_name')}>
+                    <Field
+                        label="First name"
+                        required
+                        error={err('first_name')}
+                    >
                         <Input
                             value={data.first_name}
                             onChange={(e) => set('first_name', e.target.value)}
@@ -1022,23 +1213,37 @@ function StepBasics({ ctx }: { ctx: StepCtx }) {
                             aria-invalid={!!err('last_name')}
                         />
                     </Field>
-                    <Field label="Preferred name" hint="what they like to be called">
+                    <Field
+                        label="Preferred name"
+                        hint="what they like to be called"
+                    >
                         <Input
                             value={data.preferred_name}
-                            onChange={(e) => set('preferred_name', e.target.value)}
+                            onChange={(e) =>
+                                set('preferred_name', e.target.value)
+                            }
                             placeholder="e.g. Hemi"
                         />
                     </Field>
-                    <Field label="Date of birth" required error={err('date_of_birth')}>
+                    <Field
+                        label="Date of birth"
+                        required
+                        error={err('date_of_birth')}
+                    >
                         <div className="flex items-center gap-2.5">
                             <Input
                                 type="date"
                                 value={data.date_of_birth}
-                                onChange={(e) => set('date_of_birth', e.target.value)}
+                                onChange={(e) =>
+                                    set('date_of_birth', e.target.value)
+                                }
                                 aria-invalid={!!err('date_of_birth')}
                             />
                             {age != null ? (
-                                <Badge variant="outline" className="shrink-0 gap-1 text-primary">
+                                <Badge
+                                    variant="outline"
+                                    className="shrink-0 gap-1 text-primary"
+                                >
                                     <Cake className="h-3 w-3" /> {age} yrs
                                 </Badge>
                             ) : null}
@@ -1056,7 +1261,10 @@ function StepBasics({ ctx }: { ctx: StepCtx }) {
                             value={data.preferred_pronouns}
                             onChange={(v) => set('preferred_pronouns', v)}
                             placeholder="Select pronouns"
-                            options={PRONOUNS.map((p) => ({ value: p, label: p }))}
+                            options={PRONOUNS.map((p) => ({
+                                value: p,
+                                label: p,
+                            }))}
                         />
                     </Field>
                     <Field
@@ -1068,19 +1276,32 @@ function StepBasics({ ctx }: { ctx: StepCtx }) {
                             <Input
                                 value={data.nhi_number}
                                 onChange={(e) =>
-                                    set('nhi_number', e.target.value.toUpperCase().slice(0, 7))
+                                    set(
+                                        'nhi_number',
+                                        e.target.value
+                                            .toUpperCase()
+                                            .slice(0, 7),
+                                    )
                                 }
                                 placeholder="e.g. ZAC5961"
                                 maxLength={7}
-                                aria-invalid={!!err('nhi_number') || nhi === 'bad'}
+                                aria-invalid={
+                                    !!err('nhi_number') || nhi === 'bad'
+                                }
                             />
                             {nhi === 'ok' ? (
-                                <Badge variant="outline" className="shrink-0 gap-1 text-status-success">
+                                <Badge
+                                    variant="outline"
+                                    className="shrink-0 gap-1 text-status-success"
+                                >
                                     <Check className="h-3 w-3" /> Valid
                                 </Badge>
                             ) : null}
                             {nhi === 'bad' ? (
-                                <Badge variant="outline" className="shrink-0 gap-1 text-status-critical">
+                                <Badge
+                                    variant="outline"
+                                    className="shrink-0 gap-1 text-status-critical"
+                                >
                                     <AlertTriangle className="h-3 w-3" /> Check
                                 </Badge>
                             ) : null}
@@ -1089,8 +1310,8 @@ function StepBasics({ ctx }: { ctx: StepCtx }) {
                     <div className="flex items-center gap-2.5 self-end rounded-md border border-primary/25 bg-primary/5 px-3 py-2.5">
                         <Info className="h-4 w-4 shrink-0 text-primary" />
                         <span className="text-xs leading-snug text-muted-foreground">
-                            Matches the national health record and prevents duplicate
-                            profiles. Format: 3 letters + 4 digits.
+                            Matches the national health record and prevents
+                            duplicate profiles. Format: 3 letters + 4 digits.
                         </span>
                     </div>
                 </div>
@@ -1100,9 +1321,39 @@ function StepBasics({ ctx }: { ctx: StepCtx }) {
                     <Field label="Site / home" required error={err('site_id')}>
                         <SelectInput
                             value={data.site_id}
-                            onChange={(v) => set('site_id', v)}
+                            onChange={(v) =>
+                                setMany({ site_id: v, room_id: '' })
+                            }
                             placeholder="Choose a site"
-                            options={sites.map((s) => ({ value: String(s.id), label: s.name }))}
+                            options={sites.map((s) => ({
+                                value: String(s.id),
+                                label: s.name,
+                            }))}
+                        />
+                    </Field>
+                    <Field
+                        label="Room"
+                        hint={
+                            roomOptions.length
+                                ? 'optional resident room'
+                                : 'rooms appear after choosing a site'
+                        }
+                        error={err('room_id')}
+                    >
+                        <SelectInput
+                            value={data.room_id}
+                            onChange={(v) => set('room_id', v)}
+                            placeholder={
+                                roomOptions.length
+                                    ? 'Choose a room'
+                                    : 'No rooms'
+                            }
+                            options={roomOptions.map((room) => ({
+                                value: String(room.id),
+                                label: room.notes
+                                    ? `${room.name} · ${room.notes}`
+                                    : room.name,
+                            }))}
                         />
                     </Field>
                     <Field label="Status">
@@ -1179,7 +1430,9 @@ function StepBasics({ ctx }: { ctx: StepCtx }) {
                     <Field label="Address line 2" span>
                         <Input
                             value={data.address_line_2}
-                            onChange={(e) => set('address_line_2', e.target.value)}
+                            onChange={(e) =>
+                                set('address_line_2', e.target.value)
+                            }
                             placeholder="Apartment, unit (optional)"
                         />
                     </Field>
@@ -1201,7 +1454,12 @@ function StepBasics({ ctx }: { ctx: StepCtx }) {
                         <Input
                             value={data.postcode}
                             onChange={(e) =>
-                                set('postcode', e.target.value.replace(/\D/g, '').slice(0, 4))
+                                set(
+                                    'postcode',
+                                    e.target.value
+                                        .replace(/\D/g, '')
+                                        .slice(0, 4),
+                                )
                             }
                             placeholder="3216"
                         />
@@ -1211,19 +1469,22 @@ function StepBasics({ ctx }: { ctx: StepCtx }) {
                 <div className="flex items-start gap-3 rounded-lg border border-border bg-muted/40 p-3">
                     <Switch
                         checked={data.create_client_portal_user}
-                        onCheckedChange={(v) => set('create_client_portal_user', v)}
+                        onCheckedChange={(v) =>
+                            set('create_client_portal_user', v)
+                        }
                     />
                     <div>
                         <div className="text-sm font-semibold">
                             Create a client portal login
                         </div>
                         <div className="mt-0.5 text-[13px] text-muted-foreground">
-                            Uses the email above. An invite is sent on save — email
-                            becomes required.
+                            Uses the email above. An invite is sent on save —
+                            email becomes required.
                         </div>
                         {data.create_client_portal_user && !data.email ? (
                             <FieldErr>
-                                Add a contact email above to enable portal access.
+                                Add a contact email above to enable portal
+                                access.
                             </FieldErr>
                         ) : null}
                     </div>
@@ -1236,7 +1497,7 @@ function StepBasics({ ctx }: { ctx: StepCtx }) {
 function StepCultural({ ctx }: { ctx: StepCtx }) {
     const { data, set } = ctx;
     return (
-        <div className="animate-in fade-in slide-in-from-right-2 duration-300">
+        <div className="animate-in duration-300 fade-in slide-in-from-right-2">
             <StepHead
                 icon={Globe}
                 title="Cultural identity"
@@ -1248,7 +1509,10 @@ function StepCultural({ ctx }: { ctx: StepCtx }) {
                         value={data.ethnicity}
                         onChange={(v) => set('ethnicity', v)}
                         placeholder="Select ethnicity"
-                        options={ETHNICITIES.map((e) => ({ value: e, label: e }))}
+                        options={ETHNICITIES.map((e) => ({
+                            value: e,
+                            label: e,
+                        }))}
                     />
                 </Field>
                 <Field label="Languages spoken" hint="select all that apply">
@@ -1268,9 +1532,9 @@ function StepCultural({ ctx }: { ctx: StepCtx }) {
                 </Field>
                 <div className="grid">
                     <InfoCard icon={Info}>
-                        Cultural needs flow through to the support plan, meal planning
-                        and rostering — e.g. matching a Te&nbsp;Reo–speaking key worker
-                        where possible.
+                        Cultural needs flow through to the support plan, meal
+                        planning and rostering — e.g. matching a
+                        Te&nbsp;Reo–speaking key worker where possible.
                     </InfoCard>
                 </div>
             </div>
@@ -1281,7 +1545,7 @@ function StepCultural({ ctx }: { ctx: StepCtx }) {
 function StepSupport({ ctx }: { ctx: StepCtx }) {
     const { data, set } = ctx;
     return (
-        <div className="animate-in fade-in slide-in-from-right-2 duration-300">
+        <div className="animate-in duration-300 fade-in slide-in-from-right-2">
             <StepHead
                 icon={Accessibility}
                 title="Support needs"
@@ -1294,7 +1558,9 @@ function StepSupport({ ctx }: { ctx: StepCtx }) {
                         <Textarea
                             rows={2}
                             value={data.mobility_needs}
-                            onChange={(e) => set('mobility_needs', e.target.value)}
+                            onChange={(e) =>
+                                set('mobility_needs', e.target.value)
+                            }
                             placeholder="e.g. Uses a walking frame indoors, wheelchair for longer distances. Needs assistance on stairs."
                         />
                     </Field>
@@ -1302,7 +1568,9 @@ function StepSupport({ ctx }: { ctx: StepCtx }) {
                         <Textarea
                             rows={2}
                             value={data.sensory_needs}
-                            onChange={(e) => set('sensory_needs', e.target.value)}
+                            onChange={(e) =>
+                                set('sensory_needs', e.target.value)
+                            }
                             placeholder="e.g. Hard of hearing — face them when speaking. Sensitive to bright light."
                         />
                     </Field>
@@ -1310,7 +1578,9 @@ function StepSupport({ ctx }: { ctx: StepCtx }) {
                         <Textarea
                             rows={2}
                             value={data.cognitive_needs}
-                            onChange={(e) => set('cognitive_needs', e.target.value)}
+                            onChange={(e) =>
+                                set('cognitive_needs', e.target.value)
+                            }
                             placeholder="e.g. Uses picture cards and short sentences. Allow extra processing time."
                         />
                     </Field>
@@ -1318,7 +1588,9 @@ function StepSupport({ ctx }: { ctx: StepCtx }) {
                         <Textarea
                             rows={2}
                             value={data.dietary_requirements}
-                            onChange={(e) => set('dietary_requirements', e.target.value)}
+                            onChange={(e) =>
+                                set('dietary_requirements', e.target.value)
+                            }
                             placeholder="e.g. Gluten-free, soft/minced texture. Nut allergy — EpiPen on file."
                         />
                     </Field>
@@ -1326,7 +1598,9 @@ function StepSupport({ ctx }: { ctx: StepCtx }) {
                         <Textarea
                             rows={2}
                             value={data.sleep_preferences}
-                            onChange={(e) => set('sleep_preferences', e.target.value)}
+                            onChange={(e) =>
+                                set('sleep_preferences', e.target.value)
+                            }
                             placeholder="e.g. Settles by 9pm with a nightlight. Wakes once for the bathroom."
                         />
                     </Field>
@@ -1334,7 +1608,11 @@ function StepSupport({ ctx }: { ctx: StepCtx }) {
 
                 <div className="grid gap-4 sm:grid-cols-2">
                     <SubHead icon={Truck}>Transport</SubHead>
-                    <Field label="Transport needs" span hint="select all that apply">
+                    <Field
+                        label="Transport needs"
+                        span
+                        hint="select all that apply"
+                    >
                         <ChipMulti
                             values={data.transport_needs}
                             onChange={(v) => set('transport_needs', v)}
@@ -1345,7 +1623,9 @@ function StepSupport({ ctx }: { ctx: StepCtx }) {
                         <Textarea
                             rows={2}
                             value={data.transport_notes}
-                            onChange={(e) => set('transport_notes', e.target.value)}
+                            onChange={(e) =>
+                                set('transport_notes', e.target.value)
+                            }
                             placeholder="e.g. Anxious in traffic — prefers front seat and calm music."
                         />
                     </Field>
@@ -1353,7 +1633,7 @@ function StepSupport({ ctx }: { ctx: StepCtx }) {
 
                 <SubHead icon={HeartPulse}>
                     Clinical thresholds{' '}
-                    <span className="font-normal normal-case tracking-normal">
+                    <span className="font-normal tracking-normal normal-case">
                         — optional, feed alerts &amp; charts
                     </span>
                 </SubHead>
@@ -1362,7 +1642,9 @@ function StepSupport({ ctx }: { ctx: StepCtx }) {
                         <Input
                             type="number"
                             value={data.fluid_intake_min_ml}
-                            onChange={(e) => set('fluid_intake_min_ml', e.target.value)}
+                            onChange={(e) =>
+                                set('fluid_intake_min_ml', e.target.value)
+                            }
                             placeholder="1500"
                         />
                     </Field>
@@ -1370,7 +1652,9 @@ function StepSupport({ ctx }: { ctx: StepCtx }) {
                         <Input
                             type="number"
                             value={data.fluid_intake_max_ml}
-                            onChange={(e) => set('fluid_intake_max_ml', e.target.value)}
+                            onChange={(e) =>
+                                set('fluid_intake_max_ml', e.target.value)
+                            }
                             placeholder="2500"
                         />
                     </Field>
@@ -1379,7 +1663,10 @@ function StepSupport({ ctx }: { ctx: StepCtx }) {
                             type="number"
                             value={data.seizure_duration_escalation_seconds}
                             onChange={(e) =>
-                                set('seizure_duration_escalation_seconds', e.target.value)
+                                set(
+                                    'seizure_duration_escalation_seconds',
+                                    e.target.value,
+                                )
                             }
                             placeholder="300"
                         />
@@ -1387,9 +1674,10 @@ function StepSupport({ ctx }: { ctx: StepCtx }) {
                 </div>
                 <div className="grid">
                     <InfoCard icon={Stethoscope}>
-                        Full medical profile, conditions and medications are set up on
-                        the client's <strong>Medical</strong> tab after creation. These
-                        thresholds give the care team early-warning alerts from day one.
+                        Full medical profile, conditions and medications are set
+                        up on the client's <strong>Medical</strong> tab after
+                        creation. These thresholds give the care team
+                        early-warning alerts from day one.
                     </InfoCard>
                 </div>
             </div>
@@ -1402,15 +1690,24 @@ function StepHealth({ ctx }: { ctx: StepCtx }) {
     const m = data.medical;
     const conditions = data.conditions;
     const updC = (i: number, k: keyof ConditionRow, v: string) =>
-        set('conditions', conditions.map((c, idx) => (idx === i ? { ...c, [k]: v } : c)));
+        set(
+            'conditions',
+            conditions.map((c, idx) => (idx === i ? { ...c, [k]: v } : c)),
+        );
     const addC = () =>
-        set('conditions', [...conditions, { label: '', severity: 'Mild', notes: '' }]);
+        set('conditions', [
+            ...conditions,
+            { label: '', severity: 'Mild', notes: '' },
+        ]);
     const rmC = (i: number) =>
-        set('conditions', conditions.filter((_, idx) => idx !== i));
+        set(
+            'conditions',
+            conditions.filter((_, idx) => idx !== i),
+        );
     const sevVariant = (s: string): StatusVariant =>
         s === 'Severe' ? 'critical' : s === 'Moderate' ? 'warning' : 'success';
     return (
-        <div className="animate-in fade-in slide-in-from-right-2 duration-300">
+        <div className="animate-in duration-300 fade-in slide-in-from-right-2">
             <StepHead
                 icon={Stethoscope}
                 title="Health & medical"
@@ -1422,28 +1719,39 @@ function StepHealth({ ctx }: { ctx: StepCtx }) {
                     <Field label="GP name">
                         <Input
                             value={m.gp_name}
-                            onChange={(e) => setMedical('gp_name', e.target.value)}
+                            onChange={(e) =>
+                                setMedical('gp_name', e.target.value)
+                            }
                             placeholder="Dr …"
                         />
                     </Field>
                     <Field label="GP practice">
                         <Input
                             value={m.gp_practice}
-                            onChange={(e) => setMedical('gp_practice', e.target.value)}
+                            onChange={(e) =>
+                                setMedical('gp_practice', e.target.value)
+                            }
                             placeholder="e.g. Hamilton East Medical"
                         />
                     </Field>
                     <Field label="GP phone">
                         <Input
                             value={m.gp_phone}
-                            onChange={(e) => setMedical('gp_phone', e.target.value)}
+                            onChange={(e) =>
+                                setMedical('gp_phone', e.target.value)
+                            }
                             placeholder="+64 7 …"
                         />
                     </Field>
                     <Field label="Preferred hospital">
                         <Input
                             value={m.hospital_preference}
-                            onChange={(e) => setMedical('hospital_preference', e.target.value)}
+                            onChange={(e) =>
+                                setMedical(
+                                    'hospital_preference',
+                                    e.target.value,
+                                )
+                            }
                             placeholder="e.g. Waikato Hospital"
                         />
                     </Field>
@@ -1456,17 +1764,24 @@ function StepHealth({ ctx }: { ctx: StepCtx }) {
                             value={m.blood_type}
                             onChange={(v) => setMedical('blood_type', v)}
                             placeholder="Select"
-                            options={BLOOD_TYPES.map((b) => ({ value: b, label: b }))}
+                            options={BLOOD_TYPES.map((b) => ({
+                                value: b,
+                                label: b,
+                            }))}
                         />
                     </Field>
                     <Field label="Organ donor">
                         <div className="flex h-10 items-center gap-2.5">
                             <Switch
                                 checked={m.organ_donor}
-                                onCheckedChange={(v) => setMedical('organ_donor', v)}
+                                onCheckedChange={(v) =>
+                                    setMedical('organ_donor', v)
+                                }
                             />
                             <span className="text-[13px] text-muted-foreground">
-                                {m.organ_donor ? 'Registered donor' : 'Not registered'}
+                                {m.organ_donor
+                                    ? 'Registered donor'
+                                    : 'Not registered'}
                             </span>
                         </div>
                     </Field>
@@ -1477,7 +1792,11 @@ function StepHealth({ ctx }: { ctx: StepCtx }) {
                             options={ALLERGIES}
                         />
                     </Field>
-                    <Field label="Disabilities" span hint="select all that apply">
+                    <Field
+                        label="Disabilities"
+                        span
+                        hint="select all that apply"
+                    >
                         <ChipMulti
                             values={m.disabilities}
                             onChange={(v) => setMedical('disabilities', v)}
@@ -1490,8 +1809,8 @@ function StepHealth({ ctx }: { ctx: StepCtx }) {
                 <div className="grid gap-2.5">
                     {conditions.length === 0 ? (
                         <div className="rounded-lg border border-dashed border-border p-3.5 text-center text-[13px] text-muted-foreground">
-                            No conditions added yet. Add any diagnoses the care team
-                            should be aware of.
+                            No conditions added yet. Add any diagnoses the care
+                            team should be aware of.
                         </div>
                     ) : null}
                     {conditions.map((c, i) => (
@@ -1502,12 +1821,16 @@ function StepHealth({ ctx }: { ctx: StepCtx }) {
                             <div className="space-y-2">
                                 <Input
                                     value={c.label}
-                                    onChange={(e) => updC(i, 'label', e.target.value)}
+                                    onChange={(e) =>
+                                        updC(i, 'label', e.target.value)
+                                    }
                                     placeholder="e.g. Type 2 diabetes"
                                 />
                                 <Input
                                     value={c.notes}
-                                    onChange={(e) => updC(i, 'notes', e.target.value)}
+                                    onChange={(e) =>
+                                        updC(i, 'notes', e.target.value)
+                                    }
                                     placeholder="Notes (optional)"
                                 />
                             </div>
@@ -1517,7 +1840,10 @@ function StepHealth({ ctx }: { ctx: StepCtx }) {
                                     onChange={(v) => updC(i, 'severity', v)}
                                     options={[
                                         { value: 'Mild', label: 'Mild' },
-                                        { value: 'Moderate', label: 'Moderate' },
+                                        {
+                                            value: 'Moderate',
+                                            label: 'Moderate',
+                                        },
                                         { value: 'Severe', label: 'Severe' },
                                     ]}
                                 />
@@ -1549,7 +1875,9 @@ function StepHealth({ ctx }: { ctx: StepCtx }) {
                         <Textarea
                             rows={2}
                             value={m.medical_history}
-                            onChange={(e) => setMedical('medical_history', e.target.value)}
+                            onChange={(e) =>
+                                setMedical('medical_history', e.target.value)
+                            }
                             placeholder="Significant past medical history, ongoing concerns…"
                         />
                     </Field>
@@ -1558,7 +1886,10 @@ function StepHealth({ ctx }: { ctx: StepCtx }) {
                             rows={2}
                             value={m.mental_health_history}
                             onChange={(e) =>
-                                setMedical('mental_health_history', e.target.value)
+                                setMedical(
+                                    'mental_health_history',
+                                    e.target.value,
+                                )
                             }
                             placeholder="Relevant mental-health background and supports."
                         />
@@ -1567,7 +1898,9 @@ function StepHealth({ ctx }: { ctx: StepCtx }) {
                         <Textarea
                             rows={2}
                             value={m.surgical_history}
-                            onChange={(e) => setMedical('surgical_history', e.target.value)}
+                            onChange={(e) =>
+                                setMedical('surgical_history', e.target.value)
+                            }
                             placeholder="Past operations and dates."
                         />
                     </Field>
@@ -1575,7 +1908,9 @@ function StepHealth({ ctx }: { ctx: StepCtx }) {
                         <Textarea
                             rows={2}
                             value={m.immunisation_notes}
-                            onChange={(e) => setMedical('immunisation_notes', e.target.value)}
+                            onChange={(e) =>
+                                setMedical('immunisation_notes', e.target.value)
+                            }
                             placeholder="Vaccination status, due dates…"
                         />
                     </Field>
@@ -1583,16 +1918,18 @@ function StepHealth({ ctx }: { ctx: StepCtx }) {
                         <Textarea
                             rows={2}
                             value={m.notes}
-                            onChange={(e) => setMedical('notes', e.target.value)}
+                            onChange={(e) =>
+                                setMedical('notes', e.target.value)
+                            }
                             placeholder="Anything else clinically relevant."
                         />
                     </Field>
                 </div>
                 <div className="grid">
                     <InfoCard icon={Shield} tone="warn">
-                        Medical information is sensitive. It's encrypted at rest and only
-                        visible to staff with clinical permissions — and to contacts you
-                        authorise on the next step.
+                        Medical information is sensitive. It's encrypted at rest
+                        and only visible to staff with clinical permissions —
+                        and to contacts you authorise on the next step.
                     </InfoCard>
                 </div>
             </div>
@@ -1603,7 +1940,7 @@ function StepHealth({ ctx }: { ctx: StepCtx }) {
 function StepAbout({ ctx }: { ctx: StepCtx }) {
     const { data, set } = ctx;
     return (
-        <div className="animate-in fade-in slide-in-from-right-2 duration-300">
+        <div className="animate-in duration-300 fade-in slide-in-from-right-2">
             <StepHead
                 icon={Heart}
                 title="About me"
@@ -1614,7 +1951,9 @@ function StepAbout({ ctx }: { ctx: StepCtx }) {
                     <Textarea
                         rows={2}
                         value={data.interests_hobbies}
-                        onChange={(e) => set('interests_hobbies', e.target.value)}
+                        onChange={(e) =>
+                            set('interests_hobbies', e.target.value)
+                        }
                         placeholder="e.g. Loves rugby (Chiefs fan), gardening, and Friday fish & chips."
                     />
                 </Field>
@@ -1622,7 +1961,9 @@ function StepAbout({ ctx }: { ctx: StepCtx }) {
                     <Textarea
                         rows={2}
                         value={data.strengths_abilities}
-                        onChange={(e) => set('strengths_abilities', e.target.value)}
+                        onChange={(e) =>
+                            set('strengths_abilities', e.target.value)
+                        }
                         placeholder="e.g. Independent with personal care, great memory for names, makes everyone laugh."
                     />
                 </Field>
@@ -1640,7 +1981,10 @@ function StepAbout({ ctx }: { ctx: StepCtx }) {
                             value={data.education_level}
                             onChange={(v) => set('education_level', v)}
                             placeholder="Select"
-                            options={EDUCATION.map((e) => ({ value: e, label: e }))}
+                            options={EDUCATION.map((e) => ({
+                                value: e,
+                                label: e,
+                            }))}
                         />
                     </Field>
                     <Field label="Employment status">
@@ -1648,7 +1992,10 @@ function StepAbout({ ctx }: { ctx: StepCtx }) {
                             value={data.employment_status}
                             onChange={(v) => set('employment_status', v)}
                             placeholder="Select"
-                            options={EMPLOYMENT.map((e) => ({ value: e, label: e }))}
+                            options={EMPLOYMENT.map((e) => ({
+                                value: e,
+                                label: e,
+                            }))}
                         />
                     </Field>
                 </div>
@@ -1660,7 +2007,7 @@ function StepAbout({ ctx }: { ctx: StepCtx }) {
 function StepCare({ ctx }: { ctx: StepCtx }) {
     const { data, set, keyWorkers, geofences } = ctx;
     return (
-        <div className="animate-in fade-in slide-in-from-right-2 duration-300">
+        <div className="animate-in duration-300 fade-in slide-in-from-right-2">
             <StepHead
                 icon={ClipboardCheck}
                 title="Care setup"
@@ -1672,7 +2019,9 @@ function StepCare({ ctx }: { ctx: StepCtx }) {
                         <Input
                             type="date"
                             value={data.service_start_date}
-                            onChange={(e) => set('service_start_date', e.target.value)}
+                            onChange={(e) =>
+                                set('service_start_date', e.target.value)
+                            }
                         />
                     </Field>
                     <Field label="Key worker">
@@ -1694,9 +2043,24 @@ function StepCare({ ctx }: { ctx: StepCtx }) {
                         onChange={(v) => set('risk_level', v)}
                         cols={3}
                         options={[
-                            { key: 'low', label: 'Low', icon: Shield, accent: 'text-status-success' },
-                            { key: 'medium', label: 'Medium', icon: ShieldAlert, accent: 'text-status-warning' },
-                            { key: 'high', label: 'High', icon: AlertTriangle, accent: 'text-status-critical' },
+                            {
+                                key: 'low',
+                                label: 'Low',
+                                icon: Shield,
+                                accent: 'text-status-success',
+                            },
+                            {
+                                key: 'medium',
+                                label: 'Medium',
+                                icon: ShieldAlert,
+                                accent: 'text-status-warning',
+                            },
+                            {
+                                key: 'high',
+                                label: 'High',
+                                icon: AlertTriangle,
+                                accent: 'text-status-critical',
+                            },
                         ]}
                     />
                 </Field>
@@ -1726,8 +2090,8 @@ function StepCare({ ctx }: { ctx: StepCtx }) {
                             Active safeguarding concern
                         </div>
                         <div className="mt-0.5 text-[13px] text-muted-foreground">
-                            Adds a safeguarding ribbon to the profile and restricts
-                            visibility to authorised staff.
+                            Adds a safeguarding ribbon to the profile and
+                            restricts visibility to authorised staff.
                         </div>
                     </div>
                 </div>
@@ -1753,14 +2117,19 @@ function StepCare({ ctx }: { ctx: StepCtx }) {
                         <Segmented
                             value={data.funding_type}
                             onChange={(v) => set('funding_type', v)}
-                            options={FUNDING_OPTIONS.map((f) => ({ value: f, label: f }))}
+                            options={FUNDING_OPTIONS.map((f) => ({
+                                value: f,
+                                label: f,
+                            }))}
                         />
                     </Field>
                     <Field label="Funding notes" span>
                         <Textarea
                             rows={3}
                             value={data.funding_notes}
-                            onChange={(e) => set('funding_notes', e.target.value)}
+                            onChange={(e) =>
+                                set('funding_notes', e.target.value)
+                            }
                             placeholder="Plan number, review dates, allocated hours, contact at funder…"
                         />
                     </Field>
@@ -1773,7 +2142,11 @@ function StepCare({ ctx }: { ctx: StepCtx }) {
 function StepContacts({ ctx }: { ctx: StepCtx }) {
     const { data, set, err } = ctx;
     const contacts = data.emergency_contacts;
-    const update = (i: number, k: keyof ContactRow, v: ContactRow[keyof ContactRow]) =>
+    const update = (
+        i: number,
+        k: keyof ContactRow,
+        v: ContactRow[keyof ContactRow],
+    ) =>
         set(
             'emergency_contacts',
             contacts.map((c, idx) => (idx === i ? { ...c, [k]: v } : c)),
@@ -1782,10 +2155,12 @@ function StepContacts({ ctx }: { ctx: StepCtx }) {
     const remove = (i: number) =>
         set(
             'emergency_contacts',
-            contacts.length > 1 ? contacts.filter((_, idx) => idx !== i) : contacts,
+            contacts.length > 1
+                ? contacts.filter((_, idx) => idx !== i)
+                : contacts,
         );
     return (
-        <div className="animate-in fade-in slide-in-from-right-2 duration-300">
+        <div className="animate-in duration-300 fade-in slide-in-from-right-2">
             <StepHead
                 icon={Phone}
                 title="Contacts & consent"
@@ -1803,10 +2178,14 @@ function StepContacts({ ctx }: { ctx: StepCtx }) {
                                     {i + 1}
                                 </span>
                                 <span className="text-sm font-semibold">
-                                    {i === 0 ? 'Primary contact' : `Contact ${i + 1}`}
+                                    {i === 0
+                                        ? 'Primary contact'
+                                        : `Contact ${i + 1}`}
                                 </span>
                                 {c.relationship ? (
-                                    <Badge variant="outline">{c.relationship}</Badge>
+                                    <Badge variant="outline">
+                                        {c.relationship}
+                                    </Badge>
                                 ) : null}
                             </div>
                             {contacts.length > 1 ? (
@@ -1825,14 +2204,21 @@ function StepContacts({ ctx }: { ctx: StepCtx }) {
                             <Field
                                 label="Full name"
                                 required={i === 0}
-                                error={i === 0 ? err('emergency_contacts.0.name') : undefined}
+                                error={
+                                    i === 0
+                                        ? err('emergency_contacts.0.name')
+                                        : undefined
+                                }
                             >
                                 <Input
                                     value={c.name}
-                                    onChange={(e) => update(i, 'name', e.target.value)}
+                                    onChange={(e) =>
+                                        update(i, 'name', e.target.value)
+                                    }
                                     placeholder="e.g. Sarah Walker"
                                     aria-invalid={
-                                        i === 0 && !!err('emergency_contacts.0.name')
+                                        i === 0 &&
+                                        !!err('emergency_contacts.0.name')
                                     }
                                 />
                             </Field>
@@ -1840,7 +2226,11 @@ function StepContacts({ ctx }: { ctx: StepCtx }) {
                                 <Input
                                     value={c.relationship}
                                     onChange={(e) =>
-                                        update(i, 'relationship', e.target.value)
+                                        update(
+                                            i,
+                                            'relationship',
+                                            e.target.value,
+                                        )
                                     }
                                     placeholder="e.g. Mother, EPOA, sibling"
                                 />
@@ -1848,14 +2238,21 @@ function StepContacts({ ctx }: { ctx: StepCtx }) {
                             <Field
                                 label="Phone"
                                 required={i === 0}
-                                error={i === 0 ? err('emergency_contacts.0.phone') : undefined}
+                                error={
+                                    i === 0
+                                        ? err('emergency_contacts.0.phone')
+                                        : undefined
+                                }
                             >
                                 <Input
                                     value={c.phone}
-                                    onChange={(e) => update(i, 'phone', e.target.value)}
+                                    onChange={(e) =>
+                                        update(i, 'phone', e.target.value)
+                                    }
                                     placeholder="+64 21 …"
                                     aria-invalid={
-                                        i === 0 && !!err('emergency_contacts.0.phone')
+                                        i === 0 &&
+                                        !!err('emergency_contacts.0.phone')
                                     }
                                 />
                             </Field>
@@ -1863,7 +2260,11 @@ function StepContacts({ ctx }: { ctx: StepCtx }) {
                                 <Input
                                     value={c.alternate_phone}
                                     onChange={(e) =>
-                                        update(i, 'alternate_phone', e.target.value)
+                                        update(
+                                            i,
+                                            'alternate_phone',
+                                            e.target.value,
+                                        )
                                     }
                                     placeholder="Landline / work"
                                 />
@@ -1872,7 +2273,9 @@ function StepContacts({ ctx }: { ctx: StepCtx }) {
                                 <Input
                                     type="email"
                                     value={c.email}
-                                    onChange={(e) => update(i, 'email', e.target.value)}
+                                    onChange={(e) =>
+                                        update(i, 'email', e.target.value)
+                                    }
                                     placeholder="name@example.co.nz"
                                 />
                             </Field>
@@ -1880,7 +2283,11 @@ function StepContacts({ ctx }: { ctx: StepCtx }) {
                                 <Input
                                     value={c.availability}
                                     onChange={(e) =>
-                                        update(i, 'availability', e.target.value)
+                                        update(
+                                            i,
+                                            'availability',
+                                            e.target.value,
+                                        )
                                     }
                                     placeholder="e.g. Weekdays after 5pm"
                                 />
@@ -1888,25 +2295,39 @@ function StepContacts({ ctx }: { ctx: StepCtx }) {
                             <Field label="Address" span>
                                 <Input
                                     value={c.address}
-                                    onChange={(e) => update(i, 'address', e.target.value)}
+                                    onChange={(e) =>
+                                        update(i, 'address', e.target.value)
+                                    }
                                     placeholder="Postal address (optional)"
                                 />
                             </Field>
                             <Field label="Preferred method">
                                 <Segmented
                                     value={c.preferred_method}
-                                    onChange={(v) => update(i, 'preferred_method', v)}
+                                    onChange={(v) =>
+                                        update(i, 'preferred_method', v)
+                                    }
                                     options={[
-                                        { value: 'phone', label: 'Call', icon: Phone },
+                                        {
+                                            value: 'phone',
+                                            label: 'Call',
+                                            icon: Phone,
+                                        },
                                         { value: 'text', label: 'Text' },
-                                        { value: 'email', label: 'Email', icon: Mail },
+                                        {
+                                            value: 'email',
+                                            label: 'Email',
+                                            icon: Mail,
+                                        },
                                     ]}
                                 />
                             </Field>
                             <Field label="Notes">
                                 <Input
                                     value={c.notes}
-                                    onChange={(e) => update(i, 'notes', e.target.value)}
+                                    onChange={(e) =>
+                                        update(i, 'notes', e.target.value)
+                                    }
                                     placeholder="Anything the on-call team should know"
                                 />
                             </Field>
@@ -1921,7 +2342,11 @@ function StepContacts({ ctx }: { ctx: StepCtx }) {
                                     <ConsentChip
                                         on={c.can_view_medical}
                                         onToggle={() =>
-                                            update(i, 'can_view_medical', !c.can_view_medical)
+                                            update(
+                                                i,
+                                                'can_view_medical',
+                                                !c.can_view_medical,
+                                            )
                                         }
                                         icon={Stethoscope}
                                         label="Medical info"
@@ -1985,9 +2410,15 @@ function ReviewRow({ label, value }: { label: string; value: ReactNode }) {
     const empty = value == null || value === '';
     return (
         <div className="flex justify-between gap-4 border-b border-border py-1.5 last:border-0">
-            <span className="shrink-0 text-[13px] text-muted-foreground">{label}</span>
+            <span className="shrink-0 text-[13px] text-muted-foreground">
+                {label}
+            </span>
             <span className="min-w-0 text-right text-[13px] font-medium">
-                {empty ? <span className="font-normal text-muted-foreground">—</span> : value}
+                {empty ? (
+                    <span className="font-normal text-muted-foreground">—</span>
+                ) : (
+                    value
+                )}
             </span>
         </div>
     );
@@ -2041,13 +2472,22 @@ function ReviewStep({
 }) {
     const { data, sites, serviceContexts, keyWorkers } = ctx;
     const siteName = sites.find((s) => String(s.id) === data.site_id)?.name;
-    const sc = serviceContexts.find((s) => String(s.id) === data.service_context_id)?.name;
-    const kw = keyWorkers.find((k) => String(k.id) === data.key_worker_id)?.name;
+    const roomName = sites
+        .find((s) => String(s.id) === data.site_id)
+        ?.rooms?.find((r) => String(r.id) === data.room_id)?.name;
+    const sc = serviceContexts.find(
+        (s) => String(s.id) === data.service_context_id,
+    )?.name;
+    const kw = keyWorkers.find(
+        (k) => String(k.id) === data.key_worker_id,
+    )?.name;
     const age = ageFromDob(data.date_of_birth);
-    const namedContacts = data.emergency_contacts.filter((c) => c.name || c.phone);
+    const namedContacts = data.emergency_contacts.filter(
+        (c) => c.name || c.phone,
+    );
     const conds = data.conditions.filter((c) => c.label);
     return (
-        <div className="animate-in fade-in slide-in-from-right-2 duration-300">
+        <div className="animate-in duration-300 fade-in slide-in-from-right-2">
             <StepHead
                 icon={CheckCircle2}
                 title="Review & create"
@@ -2057,7 +2497,9 @@ function ReviewStep({
             <div className="mb-4 flex items-center gap-4 rounded-xl border border-primary/30 bg-primary/10 p-4">
                 <Ring pct={pct} />
                 <div className="flex-1">
-                    <div className="text-[15px] font-bold">Profile {pct}% complete</div>
+                    <div className="text-[15px] font-bold">
+                        Profile {pct}% complete
+                    </div>
                     <div className="mt-0.5 text-[13px] text-muted-foreground">
                         {pct >= 80
                             ? 'Great — a rich, person-centred record from day one.'
@@ -2069,8 +2511,15 @@ function ReviewStep({
             </div>
 
             <div className="grid gap-3.5 sm:grid-cols-2">
-                <ReviewCard icon={IdCard} title="Basics" onEdit={() => goToStep('basics')}>
-                    <ReviewRow label="Name" value={`${data.first_name} ${data.last_name}`.trim()} />
+                <ReviewCard
+                    icon={IdCard}
+                    title="Basics"
+                    onEdit={() => goToStep('basics')}
+                >
+                    <ReviewRow
+                        label="Name"
+                        value={`${data.first_name} ${data.last_name}`.trim()}
+                    />
                     <ReviewRow label="Preferred" value={data.preferred_name} />
                     <ReviewRow
                         label="Age / DOB"
@@ -2082,6 +2531,7 @@ function ReviewStep({
                     />
                     <ReviewRow label="NHI" value={data.nhi_number} />
                     <ReviewRow label="Site" value={siteName} />
+                    <ReviewRow label="Room" value={roomName} />
                     <ReviewRow label="Service" value={sc} />
                     <ReviewRow
                         label="Status"
@@ -2099,9 +2549,15 @@ function ReviewStep({
                     onEdit={() => goToStep('cultural')}
                 >
                     <ReviewRow label="Ethnicity" value={data.ethnicity} />
-                    <ReviewRow label="Languages" value={data.languages.join(', ')} />
+                    <ReviewRow
+                        label="Languages"
+                        value={data.languages.join(', ')}
+                    />
                     <ReviewRow label="Religion" value={data.religion} />
-                    <ReviewRow label="Pronouns" value={data.preferred_pronouns} />
+                    <ReviewRow
+                        label="Pronouns"
+                        value={data.preferred_pronouns}
+                    />
                 </ReviewCard>
 
                 <ReviewCard
@@ -2110,8 +2566,14 @@ function ReviewStep({
                     onEdit={() => goToStep('support')}
                 >
                     <ReviewRow label="Mobility" value={data.mobility_needs} />
-                    <ReviewRow label="Dietary" value={data.dietary_requirements} />
-                    <ReviewRow label="Transport" value={data.transport_needs.join(', ')} />
+                    <ReviewRow
+                        label="Dietary"
+                        value={data.dietary_requirements}
+                    />
+                    <ReviewRow
+                        label="Transport"
+                        value={data.transport_needs.join(', ')}
+                    />
                     <ReviewRow
                         label="Fluid target"
                         value={
@@ -2135,15 +2597,23 @@ function ReviewStep({
                                 : ''
                         }
                     />
-                    <ReviewRow label="Blood type" value={data.medical.blood_type} />
-                    <ReviewRow label="Allergies" value={data.medical.allergies.join(', ')} />
+                    <ReviewRow
+                        label="Blood type"
+                        value={data.medical.blood_type}
+                    />
+                    <ReviewRow
+                        label="Allergies"
+                        value={data.medical.allergies.join(', ')}
+                    />
                     <ReviewRow
                         label="Disabilities"
                         value={data.medical.disabilities.join(', ')}
                     />
                     <ReviewRow
                         label="Conditions"
-                        value={conds.map((c) => `${c.label} (${c.severity})`).join(', ')}
+                        value={conds
+                            .map((c) => `${c.label} (${c.severity})`)
+                            .join(', ')}
                     />
                 </ReviewCard>
 
@@ -2152,7 +2622,10 @@ function ReviewStep({
                     title="Care setup"
                     onEdit={() => goToStep('care')}
                 >
-                    <ReviewRow label="Start date" value={data.service_start_date} />
+                    <ReviewRow
+                        label="Start date"
+                        value={data.service_start_date}
+                    />
                     <ReviewRow label="Key worker" value={kw} />
                     <ReviewRow
                         label="Risk"
@@ -2175,7 +2648,9 @@ function ReviewStep({
                         label="Safeguarding"
                         value={
                             data.safeguarding_flag ? (
-                                <StatusBadge variant="critical">Flagged</StatusBadge>
+                                <StatusBadge variant="critical">
+                                    Flagged
+                                </StatusBadge>
                             ) : (
                                 'No'
                             )
@@ -2248,14 +2723,15 @@ function SuccessPane({
     onAddAnother: () => void;
 }) {
     return (
-        <div className="flex min-h-0 w-full flex-col items-center justify-center px-10 py-12 text-center"
+        <div
+            className="flex min-h-0 w-full flex-col items-center justify-center px-10 py-12 text-center"
             style={{ minHeight: 'min(70vh, 560px)' }}
         >
             <div className="relative mb-5">
                 <span className="grid h-[76px] w-[76px] place-items-center rounded-full bg-status-success-bg text-status-success">
                     <Check className="h-10 w-10" strokeWidth={2.5} />
                 </span>
-                <PartyPopper className="absolute -right-3.5 -top-1.5 h-5 w-5 text-primary" />
+                <PartyPopper className="absolute -top-1.5 -right-3.5 h-5 w-5 text-primary" />
             </div>
             <h2 className="text-2xl font-bold">
                 {data.first_name} {data.last_name}{' '}
@@ -2263,7 +2739,8 @@ function SuccessPane({
             </h2>
             <p className="mt-2 max-w-md text-sm leading-relaxed text-muted-foreground">
                 The profile now has a {pct}% complete record. You can finish
-                onboarding, set up documents, and review details from their profile.
+                onboarding, set up documents, and review details from their
+                profile.
             </p>
             <div className="mt-6 flex gap-3">
                 {!isEditMode ? (

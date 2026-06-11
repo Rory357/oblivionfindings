@@ -4,6 +4,7 @@ namespace App\Services\HealthClinical;
 
 use App\Models\ClinicalEvent;
 use App\Models\User;
+use App\Support\WorkerClock;
 use Carbon\Carbon;
 use Illuminate\Contracts\Pagination\LengthAwarePaginator;
 use Illuminate\Support\Facades\DB;
@@ -20,7 +21,7 @@ class ClinicalEventService
             'shift_id' => $attributes['shift_id'] ?? null,
             'event_type' => $attributes['event_type'],
             'severity' => $attributes['severity'] ?? 'low',
-            'occurred_at' => $attributes['occurred_at'],
+            'occurred_at' => WorkerClock::toUtc($attributes['occurred_at'] ?? null) ?? now(),
             'description' => $attributes['description'],
             'metadata' => $attributes['metadata'] ?? null,
             'follow_up_required' => $attributes['follow_up_required'] ?? false,

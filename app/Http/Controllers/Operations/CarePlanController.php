@@ -7,6 +7,8 @@ use App\Models\CarePlan;
 use App\Models\Client;
 use App\Models\TimelineEvent;
 use Illuminate\Http\Request;
+use Illuminate\Validation\Rule;
+use Illuminate\Validation\ValidationException;
 
 class CarePlanController extends Controller
 {
@@ -107,15 +109,24 @@ class CarePlanController extends Controller
         $auth = $request->user();
         abort_unless($auth && $auth->canDo('care_plans.create'), 403);
 
+        $this->validateStructuredDomains($request->input('content'));
+
         $data = $request->validate([
             'client_id' => ['required', 'integer', 'exists:clients,id'],
             'title' => ['required', 'string', 'max:255'],
             'plan_type' => ['required', 'string', 'max:100'],
             'content' => ['nullable', 'array'],
+            'content.domains' => ['nullable', 'array'],
+            'content.domains.*.key' => ['nullable', 'string', 'max:80'],
+            'content.domains.*.label' => ['required_with:content.domains', 'filled', 'string', 'max:120'],
+            'content.domains.*.status' => ['nullable', Rule::in(['on_track', 'active', 'review'])],
+            'content.domains.*.strategies' => ['nullable', 'array'],
+            'content.domains.*.strategies.*.text' => ['required_with:content.domains.*.strategies', 'string', 'max:500'],
+            'content.domains.*.strategies.*.owner' => ['nullable', 'string', 'max:120'],
             'starts_at' => ['nullable', 'date'],
             'ends_at' => ['nullable', 'date', 'after_or_equal:starts_at'],
             'next_review_at' => ['nullable', 'date'],
-            'status' => ['nullable', 'string', 'in:draft,review,archived'],
+            'status' => ['nullable', 'string', 'in:draft,active,review,archived'],
         ]);
 
         $carePlan = CarePlan::create([
@@ -276,11 +287,20 @@ class CarePlanController extends Controller
             ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->findOrFail($carePlan);
 
+        $this->validateStructuredDomains($request->input('content'));
+
         $data = $request->validate([
             'client_id' => ['sometimes', 'required', 'integer', 'exists:clients,id'],
             'title' => ['sometimes', 'required', 'string', 'max:255'],
             'plan_type' => ['sometimes', 'required', 'string', 'max:100'],
             'content' => ['nullable', 'array'],
+            'content.domains' => ['nullable', 'array'],
+            'content.domains.*.key' => ['nullable', 'string', 'max:80'],
+            'content.domains.*.label' => ['required_with:content.domains', 'filled', 'string', 'max:120'],
+            'content.domains.*.status' => ['nullable', Rule::in(['on_track', 'active', 'review'])],
+            'content.domains.*.strategies' => ['nullable', 'array'],
+            'content.domains.*.strategies.*.text' => ['required_with:content.domains.*.strategies', 'string', 'max:500'],
+            'content.domains.*.strategies.*.owner' => ['nullable', 'string', 'max:120'],
             'starts_at' => ['nullable', 'date'],
             'ends_at' => ['nullable', 'date', 'after_or_equal:starts_at'],
             'next_review_at' => ['nullable', 'date'],
@@ -289,8 +309,9 @@ class CarePlanController extends Controller
 
         // Prevent activating a plan with no goals
         $becomingActive = ($data['status'] ?? null) === 'active' && $carePlan->status !== 'active';
-        if ($becomingActive && $carePlan->goals()->count() === 0) {
-            return back()->withErrors(['goals' => 'Cannot activate a care plan without at least one goal.']);
+        $content = $data['content'] ?? $carePlan->content ?? [];
+        if ($becomingActive && $carePlan->goals()->count() === 0 && ! $this->hasStructuredDomains($content)) {
+            return back()->withErrors(['goals' => 'Cannot activate a care plan without at least one goal or support domain.']);
         }
 
         $carePlan->update($data);
@@ -334,8 +355,8 @@ class CarePlanController extends Controller
         ]);
 
         // A care plan must have at least one goal before it can be activated
-        if ($carePlan->goals()->count() === 0) {
-            return back()->withErrors(['goals' => 'Cannot activate a care plan without at least one goal. Please add goals before completing the review.']);
+        if ($carePlan->goals()->count() === 0 && ! $this->hasStructuredDomains($carePlan->content ?? [])) {
+            return back()->withErrors(['goals' => 'Cannot activate a care plan without at least one goal or support domain. Please add goals or domains before completing the review.']);
         }
 
         // Archive the parent version
@@ -368,5 +389,46 @@ class CarePlanController extends Controller
 
         return redirect()->route('operations.care_plans.index')
             ->with('success', 'Care plan deleted.');
+    }
+
+    /**
+     * @param array<string, mixed>|null $content
+     */
+    private function hasStructuredDomains(?array $content): bool
+    {
+        return collect($content['domains'] ?? [])
+            ->contains(fn ($domain) => is_array($domain) && filled($domain['label'] ?? null));
+    }
+
+    /**
+     * @param array<string, mixed>|null $content
+     */
+    private function validateStructuredDomains(?array $content): void
+    {
+        $errors = [];
+
+        foreach (($content['domains'] ?? []) as $domainIndex => $domain) {
+            if (! is_array($domain)) {
+                continue;
+            }
+
+            if (blank($domain['label'] ?? null)) {
+                $errors["content.domains.{$domainIndex}.label"] = 'The domain label field is required.';
+            }
+
+            foreach (($domain['strategies'] ?? []) as $strategyIndex => $strategy) {
+                if (! is_array($strategy)) {
+                    continue;
+                }
+
+                if (blank($strategy['text'] ?? null)) {
+                    $errors["content.domains.{$domainIndex}.strategies.{$strategyIndex}.text"] = 'The strategy text field is required.';
+                }
+            }
+        }
+
+        if ($errors !== []) {
+            throw ValidationException::withMessages($errors);
+        }
     }
 }

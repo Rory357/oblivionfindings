@@ -4,12 +4,7 @@
  * into the eMAR module, and the scheduled / PRN / ceased medication lists. */
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
-import {
-    Card,
-    CardContent,
-    CardHeader,
-    CardTitle,
-} from '@/components/ui/card';
+import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Link } from '@inertiajs/react';
 import {
     AlertTriangle,
@@ -50,6 +45,7 @@ export function MarTab({
     const prnMeds = activeMeds.filter((m: any) => m.is_prn);
     const scheduledMeds = activeMeds.filter((m: any) => !m.is_prn);
     const controlledMeds = activeMeds.filter((m: any) => m.controlled_drug);
+    const stockedMeds = activeMeds.filter((m: any) => m.stock);
     const hasAllergies = allergies.length > 0;
 
     return (
@@ -228,6 +224,71 @@ export function MarTab({
                     </Link>
                 </Button>
             </div>
+
+            {stockedMeds.length > 0 && (
+                <Card>
+                    <CardHeader className="pb-2">
+                        <CardTitle className="flex items-center gap-2 text-base">
+                            <ClipboardList className="h-4 w-4 text-primary" />
+                            Stock
+                        </CardTitle>
+                    </CardHeader>
+                    <CardContent className="space-y-2">
+                        {stockedMeds.map((m: any) => {
+                            const stock = m.stock ?? {};
+                            return (
+                                <div
+                                    key={m.id}
+                                    className="flex flex-wrap items-center justify-between gap-3 rounded-lg border p-3"
+                                >
+                                    <div>
+                                        <p className="text-sm font-semibold">
+                                            {m.name}
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                            {stock.on_hand ?? '-'}{' '}
+                                            {stock.unit ?? 'doses'} on hand
+                                            {stock.reorder_threshold != null
+                                                ? ` · reorder at ${stock.reorder_threshold}`
+                                                : ''}
+                                        </p>
+                                        {stock.last_counted_at ? (
+                                            <p className="mt-0.5 text-xs text-muted-foreground">
+                                                Last counted{' '}
+                                                {new Date(
+                                                    stock.last_counted_at,
+                                                ).toLocaleDateString('en-NZ', {
+                                                    day: 'numeric',
+                                                    month: 'short',
+                                                })}
+                                            </p>
+                                        ) : null}
+                                    </div>
+                                    <div className="flex items-center gap-2">
+                                        {m.controlled_drug ? (
+                                            <Badge className="border-0 bg-status-critical-bg text-status-critical">
+                                                Controlled
+                                            </Badge>
+                                        ) : null}
+                                        {stock.is_low ? (
+                                            <Badge className="border-0 bg-status-warning-bg text-status-warning">
+                                                Reorder
+                                            </Badge>
+                                        ) : (
+                                            <Badge
+                                                variant="outline"
+                                                className="text-status-success"
+                                            >
+                                                In stock
+                                            </Badge>
+                                        )}
+                                    </div>
+                                </div>
+                            );
+                        })}
+                    </CardContent>
+                </Card>
+            )}
 
             {/* Scheduled Medications */}
             {scheduledMeds.length > 0 && (
@@ -434,7 +495,9 @@ export function MarTab({
                             medications through the medical tab or eMAR system.
                         </p>
                         <Button size="sm" className="mt-4" asChild>
-                            <Link href={`/emar/medications?client_id=${clientId}`}>
+                            <Link
+                                href={`/emar/medications?client_id=${clientId}`}
+                            >
                                 Add Medication
                             </Link>
                         </Button>

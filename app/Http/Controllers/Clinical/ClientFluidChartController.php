@@ -5,8 +5,8 @@ namespace App\Http\Controllers\Clinical;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientFluidEntry;
+use App\Support\WorkerClock;
 use Illuminate\Http\Request;
-use Illuminate\Support\Carbon;
 use Illuminate\Validation\Rule;
 
 class ClientFluidChartController extends Controller
@@ -35,7 +35,7 @@ class ClientFluidChartController extends Controller
             ...$data,
             'client_id' => $client->id,
             'organization_id' => $request->user()?->organization_id ?? $client->organization_id,
-            'occurred_at' => isset($data['occurred_at']) ? Carbon::parse($data['occurred_at']) : now(),
+            'occurred_at' => WorkerClock::toUtc($data['occurred_at'] ?? null) ?? now(),
             'recorded_by' => $request->user()?->id,
         ]);
 
@@ -50,7 +50,7 @@ class ClientFluidChartController extends Controller
 
         $data = $this->validatedPayload($request, false);
         if (array_key_exists('occurred_at', $data) && $data['occurred_at'] !== null) {
-            $data['occurred_at'] = Carbon::parse($data['occurred_at']);
+            $data['occurred_at'] = WorkerClock::toUtc($data['occurred_at']);
         }
 
         $entry->update($data);

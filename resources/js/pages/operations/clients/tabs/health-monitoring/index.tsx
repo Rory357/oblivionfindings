@@ -23,6 +23,7 @@ import {
     Droplets,
     FileText,
     HeartPulse,
+    Moon,
     Plus,
     Stethoscope,
 } from 'lucide-react';
@@ -74,10 +75,28 @@ type SeizureEntry = {
     recorder?: Recorder;
 };
 
+type SleepEntry = {
+    id: number;
+    slept_at?: string | null;
+    hours_slept?: number | null;
+    quality?: 'good' | 'fair' | 'poor' | string | null;
+    interruptions?: number | null;
+    settled_by?: string | null;
+    woke_at?: string | null;
+    notes?: string | null;
+    recorder?: Recorder;
+};
+
 export type HealthMonitoringData = {
     bowel?: BowelEntry[];
     fluid?: FluidEntry[];
     seizure?: SeizureEntry[];
+    sleep?: SleepEntry[];
+    sleep_summary?: {
+        target_hours?: number | null;
+        average_hours?: number | null;
+        entries_count?: number;
+    };
 };
 
 type HealthMonitoringTabProps = {
@@ -86,7 +105,13 @@ type HealthMonitoringTabProps = {
     isLoading?: boolean;
 };
 
-type SectionKey = 'fluid' | 'bowel' | 'seizure' | 'appointments' | 'docs';
+type SectionKey =
+    | 'fluid'
+    | 'bowel'
+    | 'seizure'
+    | 'sleep'
+    | 'appointments'
+    | 'docs';
 
 function dateLabel(value?: string | null) {
     if (!value) return 'No date';
@@ -114,6 +139,7 @@ const sections: Array<{
     { key: 'fluid', label: 'Fluid', icon: Droplets },
     { key: 'bowel', label: 'Bowel', icon: Stethoscope },
     { key: 'seizure', label: 'Seizure', icon: HeartPulse },
+    { key: 'sleep', label: 'Sleep', icon: Moon },
     { key: 'appointments', label: 'Appointments', icon: Calendar },
     { key: 'docs', label: 'Docs', icon: FileText },
 ];
@@ -144,10 +170,21 @@ export function HealthMonitoringTab({
         escalated: false,
         follow_up_action: '',
     });
+    const [sleep, setSleep] = useState({
+        slept_at: new Date().toISOString().slice(0, 10),
+        hours_slept: '',
+        quality: 'good',
+        interruptions: '',
+        settled_by: '',
+        woke_at: '',
+        notes: '',
+    });
 
-    const bowelEntries = data.bowel ?? [];
-    const fluidEntries = data.fluid ?? [];
-    const seizureEntries = data.seizure ?? [];
+    const bowelEntries = useMemo(() => data.bowel ?? [], [data.bowel]);
+    const fluidEntries = useMemo(() => data.fluid ?? [], [data.fluid]);
+    const seizureEntries = useMemo(() => data.seizure ?? [], [data.seizure]);
+    const sleepEntries = useMemo(() => data.sleep ?? [], [data.sleep]);
+    const sleepSummary = data.sleep_summary ?? {};
 
     const fluidChart = useMemo(() => {
         const buckets = new Map<
@@ -192,6 +229,16 @@ export function HealthMonitoringTab({
         .map((entry) => ({
             day: dateKey(entry.occurred_at),
             minutes: Math.round(((entry.duration_seconds ?? 0) / 60) * 10) / 10,
+        }));
+
+    const sleepChart = sleepEntries
+        .slice()
+        .reverse()
+        .slice(-14)
+        .map((entry) => ({
+            day: dateKey(entry.slept_at),
+            hours: Number(entry.hours_slept ?? 0),
+            target: Number(sleepSummary.target_hours ?? 7),
         }));
 
     const submitBowel = () => {
@@ -269,6 +316,38 @@ export function HealthMonitoringTab({
         );
     };
 
+    const submitSleep = () => {
+        if (!sleep.slept_at || !sleep.hours_slept) return;
+        router.post(
+            `/operations/clients/${clientId}/health/sleep`,
+            {
+                slept_at: sleep.slept_at,
+                hours_slept: Number(sleep.hours_slept),
+                quality: sleep.quality || null,
+                interruptions: sleep.interruptions
+                    ? Number(sleep.interruptions)
+                    : null,
+                settled_by: sleep.settled_by || null,
+                woke_at: sleep.woke_at || null,
+                notes: sleep.notes || null,
+            },
+            {
+                preserveScroll: true,
+                preserveState: false,
+                onSuccess: () =>
+                    setSleep({
+                        slept_at: new Date().toISOString().slice(0, 10),
+                        hours_slept: '',
+                        quality: 'good',
+                        interruptions: '',
+                        settled_by: '',
+                        woke_at: '',
+                        notes: '',
+                    }),
+            },
+        );
+    };
+
     if (isLoading) {
         return (
             <div className="space-y-6" aria-busy="true">
@@ -287,7 +366,7 @@ export function HealthMonitoringTab({
 
     return (
         <div className="space-y-6">
-            <div className="grid gap-3 md:grid-cols-3">
+            <div className="grid gap-3 md:grid-cols-4">
                 <MetricCard
                     label="Fluid entries"
                     value={fluidEntries.length}
@@ -308,6 +387,21 @@ export function HealthMonitoringTab({
                         seizureEntries.some((entry) => entry.escalated)
                             ? 'bg-status-critical-bg text-status-critical'
                             : 'bg-status-success-bg text-status-success'
+                    }
+                />
+                <MetricCard
+                    label="Sleep avg"
+                    value={
+                        Math.round(
+                            Number(sleepSummary.average_hours ?? 0) * 10,
+                        ) / 10
+                    }
+                    icon={Moon}
+                    tone={
+                        Number(sleepSummary.average_hours ?? 0) >=
+                        Number(sleepSummary.target_hours ?? 7)
+                            ? 'bg-status-success-bg text-status-success'
+                            : 'bg-status-warning-bg text-status-warning'
                     }
                 />
             </div>
@@ -670,6 +764,176 @@ export function HealthMonitoringTab({
                 </div>
             ) : null}
 
+            {section === 'sleep' ? (
+                <div className="grid gap-4 xl:grid-cols-[minmax(0,1fr)_22rem]">
+                    <ChartCard title="Sleep Hours">
+                        {sleepChart.length > 0 ? (
+                            <ResponsiveContainer width="100%" height={260}>
+                                <LineChart data={sleepChart}>
+                                    <CartesianGrid strokeDasharray="3 3" />
+                                    <XAxis dataKey="day" fontSize={12} />
+                                    <YAxis fontSize={12} />
+                                    <Tooltip />
+                                    <Line
+                                        dataKey="hours"
+                                        stroke="#2563eb"
+                                        strokeWidth={2}
+                                        name="Hours slept"
+                                    />
+                                    <Line
+                                        dataKey="target"
+                                        stroke="#f59e0b"
+                                        strokeDasharray="4 4"
+                                        strokeWidth={1.5}
+                                        name="Target"
+                                        dot={false}
+                                    />
+                                </LineChart>
+                            </ResponsiveContainer>
+                        ) : (
+                            <EmptyState
+                                icon={Moon}
+                                title="No sleep chart entries"
+                                variant="compact"
+                            />
+                        )}
+                    </ChartCard>
+                    <Card>
+                        <CardHeader>
+                            <CardTitle className="flex items-center gap-2 text-base">
+                                <Plus className="h-4 w-4 text-primary" />
+                                Add Sleep Entry
+                            </CardTitle>
+                        </CardHeader>
+                        <CardContent className="space-y-3">
+                            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                                <div className="space-y-2">
+                                    <Label>Night</Label>
+                                    <Input
+                                        type="date"
+                                        value={sleep.slept_at}
+                                        onChange={(event) =>
+                                            setSleep((current) => ({
+                                                ...current,
+                                                slept_at: event.target.value,
+                                            }))
+                                        }
+                                        className="min-h-11"
+                                    />
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Hours slept</Label>
+                                    <Input
+                                        type="number"
+                                        min="0"
+                                        max="24"
+                                        step="0.1"
+                                        value={sleep.hours_slept}
+                                        onChange={(event) =>
+                                            setSleep((current) => ({
+                                                ...current,
+                                                hours_slept: event.target.value,
+                                            }))
+                                        }
+                                        className="min-h-11"
+                                    />
+                                </div>
+                            </div>
+                            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                                <div className="space-y-2">
+                                    <Label>Quality</Label>
+                                    <Select
+                                        value={sleep.quality}
+                                        onValueChange={(value) =>
+                                            setSleep((current) => ({
+                                                ...current,
+                                                quality: value,
+                                            }))
+                                        }
+                                    >
+                                        <SelectTrigger className="min-h-11">
+                                            <SelectValue />
+                                        </SelectTrigger>
+                                        <SelectContent>
+                                            <SelectItem value="good">
+                                                Good
+                                            </SelectItem>
+                                            <SelectItem value="fair">
+                                                Fair
+                                            </SelectItem>
+                                            <SelectItem value="poor">
+                                                Poor
+                                            </SelectItem>
+                                        </SelectContent>
+                                    </Select>
+                                </div>
+                                <div className="space-y-2">
+                                    <Label>Interruptions</Label>
+                                    <Input
+                                        type="number"
+                                        min="0"
+                                        value={sleep.interruptions}
+                                        onChange={(event) =>
+                                            setSleep((current) => ({
+                                                ...current,
+                                                interruptions:
+                                                    event.target.value,
+                                            }))
+                                        }
+                                        className="min-h-11"
+                                    />
+                                </div>
+                            </div>
+                            <div className="grid gap-3 sm:grid-cols-2 xl:grid-cols-1">
+                                <Input
+                                    type="time"
+                                    value={sleep.settled_by}
+                                    onChange={(event) =>
+                                        setSleep((current) => ({
+                                            ...current,
+                                            settled_by: event.target.value,
+                                        }))
+                                    }
+                                    aria-label="Settled by"
+                                    className="min-h-11"
+                                />
+                                <Input
+                                    type="time"
+                                    value={sleep.woke_at}
+                                    onChange={(event) =>
+                                        setSleep((current) => ({
+                                            ...current,
+                                            woke_at: event.target.value,
+                                        }))
+                                    }
+                                    aria-label="Woke at"
+                                    className="min-h-11"
+                                />
+                            </div>
+                            <Textarea
+                                value={sleep.notes}
+                                onChange={(event) =>
+                                    setSleep((current) => ({
+                                        ...current,
+                                        notes: event.target.value,
+                                    }))
+                                }
+                                placeholder="Notes"
+                                className="min-h-24"
+                            />
+                            <Button
+                                type="button"
+                                onClick={submitSleep}
+                                disabled={!sleep.slept_at || !sleep.hours_slept}
+                                className="min-h-11 w-full"
+                            >
+                                Save Sleep Entry
+                            </Button>
+                        </CardContent>
+                    </Card>
+                </div>
+            ) : null}
+
             {section === 'appointments' ? (
                 <Card>
                     <CardHeader>
@@ -778,6 +1042,24 @@ export function HealthMonitoringTab({
                         </>
                     )}
                 />
+                <RecentEntries
+                    title="Recent sleep"
+                    entries={sleepEntries}
+                    render={(entry: SleepEntry) => (
+                        <>
+                            <p className="font-medium">
+                                {entry.hours_slept ?? '-'}h
+                                {entry.quality ? ` · ${entry.quality}` : ''}
+                            </p>
+                            <p className="text-muted-foreground">
+                                {dateLabel(entry.slept_at)}
+                                {entry.interruptions != null
+                                    ? ` · ${entry.interruptions} interruption${entry.interruptions === 1 ? '' : 's'}`
+                                    : ''}
+                            </p>
+                        </>
+                    )}
+                />
             </div>
         </div>
     );
@@ -795,6 +1077,7 @@ function MetricCard({
     tone: string;
 }) {
     return (
+        // eslint-disable-next-line no-restricted-syntax -- MetricCard is a compact stat tile reused inside this chart tab.
         <div className="rounded-lg border bg-card p-4">
             <div className="flex items-center justify-between gap-3">
                 <div>
@@ -836,11 +1119,13 @@ function RecentEntries<T extends { id: number }>({
     render: (entry: T) => ReactNode;
 }) {
     return (
+        // eslint-disable-next-line no-restricted-syntax -- RecentEntries is a compact chart-tab list panel.
         <div className="rounded-lg border bg-card p-4">
             <h3 className="text-sm font-semibold">{title}</h3>
             <div className="mt-3 space-y-2">
                 {entries.length > 0 ? (
                     entries.slice(0, 5).map((entry) => (
+                        // eslint-disable-next-line no-restricted-syntax -- Entry rows are compact repeated list items inside the chart panel.
                         <div
                             key={entry.id}
                             className="rounded-md border bg-background p-3 text-sm"

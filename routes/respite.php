@@ -1,5 +1,6 @@
 <?php
 
+use App\Http\Controllers\Respite\ClientRespiteAllocationController;
 use App\Http\Controllers\Respite\RespiteBookingController;
 use App\Http\Controllers\Respite\RespiteBookingRequestController;
 use App\Http\Controllers\Respite\RespiteCommunicationLogController;
@@ -93,6 +94,10 @@ Route::middleware(['auth'])->group(function () {
 
     // Resources
     Route::middleware('permission:respite.resources.manage')->group(function () {
+        Route::post('/respite/allocations', [ClientRespiteAllocationController::class, 'store'])->name('respite.allocations.store');
+        Route::put('/respite/allocations/{allocation}', [ClientRespiteAllocationController::class, 'update'])->name('respite.allocations.update');
+        Route::delete('/respite/allocations/{allocation}', [ClientRespiteAllocationController::class, 'destroy'])->name('respite.allocations.destroy');
+
         Route::get('/respite/resources', [RespiteResourceAllocationController::class, 'index'])->name('respite.resources.index');
         Route::post('/respite/resources', [RespiteResourceAllocationController::class, 'store'])->name('respite.resources.store');
         Route::delete('/respite/resources/{allocation}', [RespiteResourceAllocationController::class, 'destroy'])->name('respite.resources.destroy');

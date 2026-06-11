@@ -20,11 +20,17 @@ import { router } from '@inertiajs/react';
 import { Loader2 } from 'lucide-react';
 import { useEffect, useState } from 'react';
 
-type Option = { id: number; name: string; is_active?: boolean };
+type Option = {
+    id: number;
+    name: string;
+    is_active?: boolean;
+    rooms?: Array<{ id: number; name: string; notes?: string | null }>;
+};
 
 type FormState = {
     id: number;
     site_id: number | null;
+    room_id: number | null;
     service_context_id: number | null;
     first_name: string;
     last_name: string;
@@ -88,6 +94,7 @@ export function ClientEditDialog({
                 setData({
                     id: c.id,
                     site_id: c.site_id ?? null,
+                    room_id: c.room_id ?? null,
                     service_context_id: c.service_context_id ?? null,
                     first_name: c.first_name ?? '',
                     last_name: c.last_name ?? '',
@@ -120,6 +127,9 @@ export function ClientEditDialog({
     function update<K extends keyof FormState>(key: K, value: FormState[K]) {
         setData((prev) => (prev ? { ...prev, [key]: value } : prev));
     }
+
+    const selectedSiteRooms =
+        sites.find((site) => site.id === data?.site_id)?.rooms ?? [];
 
     function submit(e: React.FormEvent) {
         e.preventDefault();
@@ -193,10 +203,7 @@ export function ClientEditDialog({
                                     type="date"
                                     value={data.date_of_birth}
                                     onChange={(e) =>
-                                        update(
-                                            'date_of_birth',
-                                            e.target.value,
-                                        )
+                                        update('date_of_birth', e.target.value)
                                     }
                                 />
                             </Field>
@@ -229,10 +236,7 @@ export function ClientEditDialog({
                                     </SelectContent>
                                 </Select>
                             </Field>
-                            <Field
-                                label={siteSingular}
-                                error={errors.site_id}
-                            >
+                            <Field label={siteSingular} error={errors.site_id}>
                                 <Select
                                     value={
                                         data.site_id
@@ -240,9 +244,17 @@ export function ClientEditDialog({
                                             : NONE
                                     }
                                     onValueChange={(v) =>
-                                        update(
-                                            'site_id',
-                                            v === NONE ? null : Number(v),
+                                        setData((prev) =>
+                                            prev
+                                                ? {
+                                                      ...prev,
+                                                      site_id:
+                                                          v === NONE
+                                                              ? null
+                                                              : Number(v),
+                                                      room_id: null,
+                                                  }
+                                                : prev,
                                         )
                                     }
                                 >
@@ -259,6 +271,46 @@ export function ClientEditDialog({
                                                 {s.name}
                                                 {s.is_active === false
                                                     ? ' (inactive)'
+                                                    : ''}
+                                            </SelectItem>
+                                        ))}
+                                    </SelectContent>
+                                </Select>
+                            </Field>
+                            <Field label="Room" error={errors.room_id}>
+                                <Select
+                                    value={
+                                        data.room_id
+                                            ? String(data.room_id)
+                                            : NONE
+                                    }
+                                    onValueChange={(v) =>
+                                        update(
+                                            'room_id',
+                                            v === NONE ? null : Number(v),
+                                        )
+                                    }
+                                    disabled={selectedSiteRooms.length === 0}
+                                >
+                                    <SelectTrigger>
+                                        <SelectValue
+                                            placeholder={
+                                                selectedSiteRooms.length
+                                                    ? 'Select room'
+                                                    : 'No rooms'
+                                            }
+                                        />
+                                    </SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value={NONE}>—</SelectItem>
+                                        {selectedSiteRooms.map((room) => (
+                                            <SelectItem
+                                                key={room.id}
+                                                value={String(room.id)}
+                                            >
+                                                {room.name}
+                                                {room.notes
+                                                    ? ` · ${room.notes}`
                                                     : ''}
                                             </SelectItem>
                                         ))}
@@ -340,10 +392,7 @@ export function ClientEditDialog({
                                 <Input
                                     value={data.address_line_1}
                                     onChange={(e) =>
-                                        update(
-                                            'address_line_1',
-                                            e.target.value,
-                                        )
+                                        update('address_line_1', e.target.value)
                                     }
                                 />
                             </Field>
@@ -354,10 +403,7 @@ export function ClientEditDialog({
                                 <Input
                                     value={data.address_line_2}
                                     onChange={(e) =>
-                                        update(
-                                            'address_line_2',
-                                            e.target.value,
-                                        )
+                                        update('address_line_2', e.target.value)
                                     }
                                 />
                             </Field>
@@ -378,10 +424,7 @@ export function ClientEditDialog({
                                         }
                                     />
                                 </Field>
-                                <Field
-                                    label="Postcode"
-                                    error={errors.postcode}
-                                >
+                                <Field label="Postcode" error={errors.postcode}>
                                     <Input
                                         value={data.postcode}
                                         onChange={(e) =>
@@ -415,10 +458,7 @@ export function ClientEditDialog({
                                     rows={4}
                                     value={data.funding_notes}
                                     onChange={(e) =>
-                                        update(
-                                            'funding_notes',
-                                            e.target.value,
-                                        )
+                                        update('funding_notes', e.target.value)
                                     }
                                 />
                             </Field>
