@@ -258,7 +258,7 @@ const Home: React.FC = () => {
                                     </div>
 
                                     {/* Alert Panel */}
-                                    <div className="rounded-lg border border-status-warning/30 bg-status-warning p-3">
+                                    <div className="rounded-lg border border-status-warning/30 bg-status-warning-bg p-3">
                                         <div className="flex items-start gap-3">
                                             <div className="mt-0.5 flex h-2 w-2 shrink-0 rounded-full bg-status-warning" />
                                             <div className="flex-1">

@@ -352,7 +352,7 @@ const Features: React.FC = () => {
                                     </div>
 
                                     {/* Alert Panel */}
-                                    <div className="mb-3 rounded-lg border border-status-warning/20 bg-status-warning p-3">
+                                    <div className="mb-3 rounded-lg border border-status-warning/20 bg-status-warning-bg p-3">
                                         <div className="flex items-start gap-3">
                                             <AlertTriangle
                                                 size={16}
