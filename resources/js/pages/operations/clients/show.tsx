@@ -12,6 +12,7 @@ import {
     OverviewDesignGrid,
     buildAboutTiles,
 } from '@/components/clients/profile/overview-grid';
+import { Ring } from '@/components/wizard/primitives';
 import {
     AlertRibbon,
     ClientProfileHero,
@@ -3538,22 +3539,38 @@ export default function ClientShow({
                                                           100,
                                                   )
                                                 : 0;
+                                        const remaining =
+                                            steps.length - done;
                                         return (
-                                            <div className="mt-3">
-                                                <div className="flex justify-between text-xs text-muted-foreground">
-                                                    <span>
+                                            <div className="mt-3 flex flex-wrap items-center gap-5">
+                                                {/* Completeness ring (design tabs-daily OnboardingTab) */}
+                                                <Ring
+                                                    pct={pct}
+                                                    size={96}
+                                                />
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="text-sm font-semibold">
+                                                        {pct === 100
+                                                            ? 'Onboarding complete'
+                                                            : remaining <= 2
+                                                              ? 'Almost there'
+                                                              : 'In progress'}
+                                                    </div>
+                                                    <p className="mt-0.5 text-xs text-muted-foreground">
                                                         {done}/{steps.length}{' '}
                                                         steps complete
-                                                    </span>
-                                                    <span>{pct}%</span>
-                                                </div>
-                                                <div className="mt-1 h-2 rounded-full bg-muted">
-                                                    <div
-                                                        className="h-2 rounded-full bg-primary transition-all"
-                                                        style={{
-                                                            width: `${pct}%`,
-                                                        }}
-                                                    />
+                                                        {remaining > 0
+                                                            ? ` · ${remaining} remaining`
+                                                            : ''}
+                                                    </p>
+                                                    <div className="mt-2 h-2 rounded-full bg-muted">
+                                                        <div
+                                                            className="h-2 rounded-full bg-primary transition-all"
+                                                            style={{
+                                                                width: `${pct}%`,
+                                                            }}
+                                                        />
+                                                    </div>
                                                 </div>
                                             </div>
                                         );
@@ -4453,31 +4470,17 @@ export default function ClientShow({
                                     </p>
                                 </div>
                             </div>
-                            <div className="flex items-center gap-2">
-                                {can.record_observation ||
-                                can.record_clinical_observation ? (
-                                    <Button
-                                        variant="outline"
-                                        onClick={() =>
-                                            openProfileDialog('record_obs')
-                                        }
-                                    >
-                                        <Activity className="mr-1.5 h-4 w-4" />
-                                        Record observation
-                                    </Button>
-                                ) : null}
-                                {can.record_event ? (
-                                    <Button
-                                        onClick={() =>
-                                            openProfileDialog('abc_entry')
-                                        }
-                                        data-test="observations-abc-entry"
-                                    >
-                                        <Plus className="mr-1.5 h-4 w-4" />
-                                        New ABC entry
-                                    </Button>
-                                ) : null}
-                            </div>
+                            {can.record_event ? (
+                                <Button
+                                    onClick={() =>
+                                        openProfileDialog('abc_entry')
+                                    }
+                                    data-test="observations-abc-entry"
+                                >
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    New ABC entry
+                                </Button>
+                            ) : null}
                         </div>
                         <BehaviourInsightsCard
                             patterns={
@@ -7545,73 +7548,129 @@ export default function ClientShow({
                     })()}
 
                 {tab === 'assignments' && (
-                    <Card>
-                        <CardHeader>
-                            <CardTitle className="flex items-center justify-between text-base">
-                                <div className="flex items-center gap-2">
-                                    <span>Assigned Workers</span>
-                                    <span className="rounded-full bg-muted px-2 py-0.5 text-[10px] font-medium text-muted-foreground">
+                    <div className="space-y-4">
+                        {/* Design header (tab-workers.jsx WorkersTab) */}
+                        <div className="flex flex-wrap items-center justify-between gap-3">
+                            <div className="flex items-center gap-3">
+                                <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-accent text-primary">
+                                    <Users className="h-[19px] w-[19px]" />
+                                </span>
+                                <div>
+                                    <h2 className="text-lg leading-tight font-semibold">
+                                        Workers
+                                    </h2>
+                                    <p className="text-sm text-muted-foreground">
+                                        Support team assigned to{' '}
+                                        {preferredName}
+                                    </p>
+                                </div>
+                            </div>
+                            {can.assign_workers && (
+                                <Button asChild data-test="workers-assign">
+                                    <Link
+                                        href={`/operations/clients/${client.id}/assignments`}
+                                    >
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        Assign workers
+                                    </Link>
+                                </Button>
+                            )}
+                        </div>
+
+                        {/* Stat strip */}
+                        <div className="grid grid-cols-2 gap-3 sm:grid-cols-3">
+                            {/* eslint-disable-next-line no-restricted-syntax -- MiniStat tile per the profile pattern language */}
+                            <div className="rounded-xl border bg-card px-4 py-3">
+                                <div className="text-xl font-bold text-status-info">
+                                    {client.support_workers?.length ?? 0}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                    Assigned workers
+                                </div>
+                            </div>
+                            {/* eslint-disable-next-line no-restricted-syntax -- MiniStat tile per the profile pattern language */}
+                            <div className="rounded-xl border bg-card px-4 py-3">
+                                <div className="truncate text-xl font-bold text-primary">
+                                    {client.key_worker?.name ?? '—'}
+                                </div>
+                                <div className="text-xs text-muted-foreground">
+                                    Key worker
+                                </div>
+                            </div>
+                            {/* eslint-disable-next-line no-restricted-syntax -- MiniStat tile per the profile pattern language */}
+                            <div className="col-span-2 rounded-xl border bg-card px-4 py-3 sm:col-span-1">
+                                <div className="text-sm font-medium text-foreground/80">
+                                    Assigned workers see this profile, get
+                                    rostered, and receive handovers.
+                                </div>
+                            </div>
+                        </div>
+
+                        {/* Assigned workers — design AssignedRow styling */}
+                        <Card className="gap-0 py-0">
+                            <CardHeader className="px-5 pt-4 pb-0">
+                                <CardTitle className="flex items-center gap-2 text-[15px]">
+                                    <Users className="h-4 w-4 text-primary" />
+                                    Assigned workers
+                                    <span className="ml-auto rounded-full bg-muted px-2 py-0.5 text-[11px] font-semibold text-muted-foreground tabular-nums">
                                         {client.support_workers?.length ?? 0}
                                     </span>
-                                </div>
-                                {can.assign_workers && (
-                                    <Button size="sm" asChild>
-                                        <Link
-                                            href={`/operations/clients/${client.id}/assignments`}
-                                        >
-                                            Manage Assignments
-                                        </Link>
-                                    </Button>
-                                )}
-                            </CardTitle>
-                            <p className="text-xs text-muted-foreground">
-                                Controls which staff can see and work with this{' '}
-                                {(
-                                    labels?.['client.singular'] ?? 'Client'
-                                ).toLowerCase()}
-                                .
-                            </p>
-                        </CardHeader>
-                        <CardContent className="space-y-2">
-                            {(client.support_workers ?? []).length > 0 ? (
-                                <div className="space-y-2">
-                                    {client.support_workers.map((w) => (
-                                        <div
-                                            key={w.id}
-                                            className="flex items-center justify-between rounded-md border p-3"
-                                        >
-                                            <div className="flex items-center gap-3">
-                                                <Avatar className="h-8 w-8">
+                                </CardTitle>
+                            </CardHeader>
+                            <CardContent className="space-y-1.5 px-5 pt-3 pb-5">
+                                {(client.support_workers ?? []).length > 0 ? (
+                                    client.support_workers.map((w) => {
+                                        const isKey =
+                                            client.key_worker?.id === w.id;
+                                        return (
+                                            <div
+                                                key={w.id}
+                                                className={`flex items-center gap-2.5 rounded-lg border px-2.5 py-2 ${
+                                                    isKey
+                                                        ? 'border-primary/30 bg-accent'
+                                                        : 'border-border'
+                                                }`}
+                                            >
+                                                <Avatar className="h-[34px] w-[34px]">
                                                     <AvatarFallback className="text-xs">
                                                         {getInitials(w.name)}
                                                     </AvatarFallback>
                                                 </Avatar>
-                                                <div>
-                                                    <div className="text-sm font-medium">
-                                                        {w.name}
+                                                <div className="min-w-0 flex-1">
+                                                    <div className="flex flex-wrap items-center gap-1.5">
+                                                        <span className="truncate text-sm font-medium">
+                                                            {w.name}
+                                                        </span>
+                                                        {isKey && (
+                                                            <span className="inline-flex items-center gap-0.5 rounded-full bg-status-warning-bg px-1.5 py-0.5 text-[10px] font-medium text-status-warning">
+                                                                ★ Key worker
+                                                            </span>
+                                                        )}
                                                     </div>
                                                     {w.email && (
-                                                        <div className="text-xs text-muted-foreground">
+                                                        <p className="truncate text-xs text-muted-foreground">
                                                             {w.email}
-                                                        </div>
+                                                        </p>
                                                     )}
                                                 </div>
                                             </div>
-                                            {client.key_worker?.id === w.id && (
-                                                <span className="rounded-full bg-primary/10 px-2 py-0.5 text-[10px] font-medium text-primary">
-                                                    Key Worker
-                                                </span>
-                                            )}
-                                        </div>
-                                    ))}
-                                </div>
-                            ) : (
-                                <div className="py-8 text-center text-sm text-muted-foreground">
-                                    No workers assigned yet.
-                                </div>
-                            )}
-                        </CardContent>
-                    </Card>
+                                        );
+                                    })
+                                ) : (
+                                    <div className="flex flex-col items-center gap-2 rounded-xl border border-dashed py-10 text-center">
+                                        <Users className="h-6 w-6 text-muted-foreground" />
+                                        <p className="text-sm font-medium">
+                                            No workers assigned yet
+                                        </p>
+                                        <p className="text-xs text-muted-foreground">
+                                            Use Assign workers to build the
+                                            support team.
+                                        </p>
+                                    </div>
+                                )}
+                            </CardContent>
+                        </Card>
+                    </div>
                 )}
             </PageShell>
 

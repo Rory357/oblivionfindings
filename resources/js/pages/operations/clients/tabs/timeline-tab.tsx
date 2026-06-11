@@ -127,22 +127,29 @@ export function ClientTimelineTab({
                             className="h-8 pl-8 text-xs"
                         />
                     </div>
-                    <Select
-                        value={timelineTypeFilter}
-                        onValueChange={setTimelineTypeFilter}
-                    >
-                        <SelectTrigger className="h-8 w-[160px] text-xs">
-                            <SelectValue placeholder="All types" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="all">All types</SelectItem>
-                            {eventTypes.map((t) => (
-                                <SelectItem key={t} value={t}>
-                                    {typeLabel(t)}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
+                </div>
+                {/* Type filter chips (design tabs-daily TimelineTab) */}
+                <div className="scrollbar-none -mx-1 flex items-center gap-1.5 overflow-x-auto px-1 pt-2 pb-1">
+                    {['all', ...eventTypes].map((t) => {
+                        const active = timelineTypeFilter === t;
+                        return (
+                            // eslint-disable-next-line no-restricted-syntax -- filter chip pill per the profile pattern language
+                            <button
+                                key={t}
+                                type="button"
+                                aria-pressed={active}
+                                onClick={() => setTimelineTypeFilter(t)}
+                                data-test={`timeline-filter-${t}`}
+                                className={`inline-flex shrink-0 items-center gap-1.5 rounded-full border px-3 py-1.5 text-xs font-medium transition-colors ${
+                                    active
+                                        ? 'border-primary bg-accent text-primary'
+                                        : 'border-border bg-card text-muted-foreground hover:text-foreground'
+                                }`}
+                            >
+                                {t === 'all' ? 'All' : typeLabel(t)}
+                            </button>
+                        );
+                    })}
                 </div>
             </CardHeader>
             <CardContent className="space-y-2">
