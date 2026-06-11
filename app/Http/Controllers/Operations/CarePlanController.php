@@ -4,9 +4,12 @@ namespace App\Http\Controllers\Operations;
 
 use App\Http\Controllers\Controller;
 use App\Models\CarePlan;
+use App\Models\CarePlanSignOff;
 use App\Models\Client;
 use App\Models\TimelineEvent;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Http\Request;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 
@@ -111,7 +114,7 @@ class CarePlanController extends Controller
 
         $this->validateStructuredDomains($request->input('content'));
 
-        $data = $request->validate([
+        $data = $request->validate(array_merge([
             'client_id' => ['required', 'integer', 'exists:clients,id'],
             'title' => ['required', 'string', 'max:255'],
             'plan_type' => ['required', 'string', 'max:100'],
@@ -127,7 +130,7 @@ class CarePlanController extends Controller
             'ends_at' => ['nullable', 'date', 'after_or_equal:starts_at'],
             'next_review_at' => ['nullable', 'date'],
             'status' => ['nullable', 'string', 'in:draft,active,review,archived'],
-        ]);
+        ], $this->planContentRules()));
 
         $carePlan = CarePlan::create([
             'organization_id' => $auth->organization_id,
@@ -189,7 +192,7 @@ class CarePlanController extends Controller
                 ->with('success', 'Care plan created and onboarding step completed.');
         }
 
-        return redirect()->route('operations.care_plans.show', $carePlan)
+        return redirect("/operations/clients/{$data['client_id']}?tab=care_plans")
             ->with('success', 'Care plan created.');
     }
 
@@ -289,7 +292,7 @@ class CarePlanController extends Controller
 
         $this->validateStructuredDomains($request->input('content'));
 
-        $data = $request->validate([
+        $data = $request->validate(array_merge([
             'client_id' => ['sometimes', 'required', 'integer', 'exists:clients,id'],
             'title' => ['sometimes', 'required', 'string', 'max:255'],
             'plan_type' => ['sometimes', 'required', 'string', 'max:100'],
@@ -305,7 +308,7 @@ class CarePlanController extends Controller
             'ends_at' => ['nullable', 'date', 'after_or_equal:starts_at'],
             'next_review_at' => ['nullable', 'date'],
             'status' => ['nullable', 'string', 'in:draft,active,review,archived'],
-        ]);
+        ], $this->planContentRules()));
 
         // Prevent activating a plan with no goals
         $becomingActive = ($data['status'] ?? null) === 'active' && $carePlan->status !== 'active';
@@ -316,7 +319,7 @@ class CarePlanController extends Controller
 
         $carePlan->update($data);
 
-        return redirect()->route('operations.care_plans.show', $carePlan)
+        return redirect("/operations/clients/{$carePlan->client_id}?tab=care_plans")
             ->with('success', 'Care plan updated.');
     }
 
@@ -341,8 +344,10 @@ class CarePlanController extends Controller
             $newGoal->save();
         }
 
-        return redirect()->route('operations.care_plans.edit', $newVersion->id)
-            ->with('success', 'Review started. Edit the plan and complete the review when ready.');
+        // Stay inside the client profile — the Care & Support Plan tab surfaces the
+        // in-progress review version (care_plans_summary.review_plan) for editing.
+        return redirect("/operations/clients/{$carePlan->client_id}?tab=care_plans")
+            ->with('success', 'Review started. Update the plan and complete the review when ready.');
     }
 
     public function completeReview(Request $request, CarePlan $carePlan)
@@ -372,7 +377,7 @@ class CarePlanController extends Controller
             'next_review_at' => $carePlan->next_review_at ?? now()->addMonths(3),
         ]);
 
-        return redirect()->route('operations.care_plans.show', $carePlan->id)
+        return redirect("/operations/clients/{$carePlan->client_id}?tab=care_plans")
             ->with('success', 'Review completed. Plan is now active.');
     }
 
@@ -389,6 +394,149 @@ class CarePlanController extends Controller
 
         return redirect()->route('operations.care_plans.index')
             ->with('success', 'Care plan deleted.');
+    }
+
+    public function storeSignOff(Request $request, $carePlan)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('care_plans.update'), 403);
+
+        $carePlan = CarePlan::query()
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->findOrFail($carePlan);
+
+        $data = $request->validate([
+            'party_role' => ['required', Rule::in(CarePlanSignOff::PARTY_ROLES)],
+            'party_name' => ['required', 'string', 'max:160'],
+            'relationship' => ['nullable', 'string', 'max:120'],
+            'agreed_on' => ['required', 'date'],
+            'method' => ['nullable', Rule::in(CarePlanSignOff::METHODS)],
+            'acknowledgement' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        $signOff = $carePlan->signOffs()->create([
+            'organization_id' => $auth->organization_id,
+            'party_role' => $data['party_role'],
+            'party_name' => $data['party_name'],
+            'relationship' => $data['relationship'] ?? null,
+            'agreed_on' => $data['agreed_on'],
+            'method' => $data['method'] ?? null,
+            'acknowledgement' => $data['acknowledgement'] ?? null,
+            'recorded_by' => $auth->id,
+        ]);
+
+        app(\App\Services\Timeline\TimelineEmitter::class)->record([
+            'source_type' => CarePlan::class,
+            'source_id' => $carePlan->id,
+            'occurred_at' => now(),
+            'type' => 'care_plan_signed_off',
+            'actor_user_id' => $auth->id,
+            'client_id' => $carePlan->client_id,
+            'site_id' => $carePlan->client?->site_id,
+            'subject' => 'Care plan agreed by ' . $signOff->party_name,
+            'body' => null,
+            'meta' => array_filter([
+                'party_role' => $signOff->party_role,
+                'method' => $signOff->method,
+            ]),
+            'visibility' => 'internal',
+            'is_pinned' => false,
+            'created_by' => $auth->id,
+        ]);
+
+        return back()->with('success', 'Sign-off recorded.');
+    }
+
+    public function destroySignOff(Request $request, $carePlan, $signOff)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('care_plans.update'), 403);
+
+        $carePlan = CarePlan::query()
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->findOrFail($carePlan);
+
+        $carePlan->signOffs()->findOrFail($signOff)->delete();
+
+        return back()->with('success', 'Sign-off removed.');
+    }
+
+    public function exportPdf(Request $request, $carePlan)
+    {
+        $auth = $request->user();
+        abort_unless($auth && $auth->canDo('care_plans.viewAny'), 403);
+
+        $carePlan = CarePlan::query()
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+            ->with([
+                'client:id,first_name,last_name,date_of_birth',
+                'creator:id,name',
+                'reviewer:id,name',
+                'goals' => fn ($q) => $q->orderByDesc('progress_percentage'),
+                'signOffs' => fn ($q) => $q->orderBy('party_role'),
+                'signOffs.recorder:id,name',
+            ])
+            ->findOrFail($carePlan);
+
+        $content = is_array($carePlan->content) ? $carePlan->content : [];
+
+        $agreement = null;
+        $agreementId = data_get($content, 'funding.service_agreement_id');
+        if ($agreementId) {
+            $agreement = \App\Models\ServiceAgreement::query()
+                ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
+                ->find($agreementId);
+        }
+
+        $pdf = Pdf::loadView('pdf.care-plan', [
+            'plan' => $carePlan,
+            'content' => $content,
+            'agreement' => $agreement,
+            'generatedAt' => now(),
+        ])->setPaper('A4');
+
+        $clientName = trim(($carePlan->client?->first_name ?? '') . ' ' . ($carePlan->client?->last_name ?? ''));
+        $filename = 'care-plan-' . Str::slug($clientName !== '' ? $clientName : 'client') . '-v' . ($carePlan->version ?? 1) . '.pdf';
+
+        return $pdf->download($filename);
+    }
+
+    /**
+     * Validation rules for the structured `content` JSON beyond the domains
+     * (which are validated inline + by validateStructuredDomains). Shared by
+     * store() and update().
+     *
+     * @return array<string, array<int, mixed>>
+     */
+    private function planContentRules(): array
+    {
+        return [
+            'content.about_me' => ['nullable', 'array'],
+            'content.about_me.dreams' => ['nullable', 'string', 'max:2000'],
+            'content.about_me.important_to_me' => ['nullable', 'string', 'max:2000'],
+            'content.about_me.important_for_me' => ['nullable', 'string', 'max:2000'],
+            'content.about_me.ideal_day' => ['nullable', 'string', 'max:2000'],
+            'content.about_me.likes' => ['nullable', 'string', 'max:2000'],
+            'content.about_me.dislikes' => ['nullable', 'string', 'max:2000'],
+            'content.about_me.how_to_support' => ['nullable', 'string', 'max:2000'],
+            'content.support_needs' => ['nullable', 'array'],
+            'content.risk_factors' => ['nullable', 'string', 'max:5000'],
+            'content.support_strategies' => ['nullable', 'string', 'max:5000'],
+            'content.communication_preferences' => ['nullable', 'string', 'max:5000'],
+            'content.review_schedule' => ['nullable', 'array'],
+            'content.review_schedule.frequency_months' => ['nullable', 'integer', 'in:1,3,6,12'],
+            'content.egl' => ['nullable', 'array'],
+            'content.egl.vision' => ['nullable', 'string', 'max:2000'],
+            'content.egl.principles' => ['nullable', 'array'],
+            'content.egl.principles.*' => ['nullable', 'string', 'max:120'],
+            'content.funding' => ['nullable', 'array'],
+            'content.funding.nasc_organisation' => ['nullable', 'string', 'max:160'],
+            'content.funding.needs_assessment_ref' => ['nullable', 'string', 'max:160'],
+            'content.funding.needs_assessment_date' => ['nullable', 'date'],
+            'content.funding.service_agreement_id' => ['nullable', 'integer', 'exists:service_agreements,id'],
+            'content.funding.allocated_hours' => ['nullable', 'numeric', 'min:0', 'max:10000'],
+            'content.funding.funding_notes' => ['nullable', 'string', 'max:2000'],
+        ];
     }
 
     /**

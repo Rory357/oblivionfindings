@@ -596,6 +596,7 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
     Route::middleware('permission:care_plans.viewAny')->group(function () {
         Route::get('/care-plans', [CarePlanController::class, 'index'])->name('operations.care_plans.index');
         Route::get('/care-plans/{carePlan}', [CarePlanController::class, 'show'])->name('operations.care_plans.show');
+        Route::get('/care-plans/{carePlan}/pdf', [CarePlanController::class, 'exportPdf'])->name('operations.care_plans.pdf');
     });
 
     Route::middleware('permission:care_plans.update')->group(function () {
@@ -628,6 +629,12 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
 
         Route::post('/care-plans/{carePlan}/start-review', [CarePlanController::class, 'startReview'])->name('operations.care_plans.start_review');
         Route::post('/care-plans/{carePlan}/complete-review', [CarePlanController::class, 'completeReview'])->name('operations.care_plans.complete_review');
+
+        // Plan agreement / sign-off (who agreed: client, whānau, EOR/guardian, etc.)
+        Route::post('/care-plans/{carePlan}/sign-offs', [CarePlanController::class, 'storeSignOff'])
+            ->name('operations.care_plans.sign_offs.store');
+        Route::delete('/care-plans/{carePlan}/sign-offs/{signOff}', [CarePlanController::class, 'destroySignOff'])
+            ->name('operations.care_plans.sign_offs.destroy');
     });
 
     Route::delete('/care-plans/{carePlan}', [CarePlanController::class, 'destroy'])

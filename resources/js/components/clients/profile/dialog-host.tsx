@@ -4,11 +4,14 @@
  * their own components. Keys owned by show.tsx's pre-existing dialogs
  * (daily/quick/communication note, edit profile) are delegated before this
  * component is reached. */
+import { CarePlanWizardDialog, type CarePlanForEdit } from './care-plan-dialog';
 import { EmarRecordDialog, type EmarMedication } from './emar-dialog';
 import { FamilyChatPopup } from './family-chat';
 import { PROFILE_FLOWS, type ProfileFlowContext } from './flows';
 import { GoalWizardDialog, type GoalCard } from './goal-dialog';
 import { WorkflowWizardDialog } from './workflow-wizard';
+
+type SelectOption = { value: string; label: string };
 
 export type ProfileDialogState = {
     key: string;
@@ -49,6 +52,22 @@ export function ProfileDialogs({
                 carePlanId={flowContext.carePlanId}
                 clientLabel={flowContext.clientLabel}
                 goal={(dialog.ctx?.goal as GoalCard | undefined) ?? null}
+            />
+        );
+    }
+
+    if (dialog.key === 'care_plan') {
+        return (
+            <CarePlanWizardDialog
+                open
+                onClose={onClose}
+                clientId={flowContext.clientId}
+                clientLabel={flowContext.clientLabel}
+                preferredName={flowContext.preferredName}
+                plan={(dialog.ctx?.plan as CarePlanForEdit | undefined) ?? null}
+                staffOptions={flowContext.staffOptions}
+                serviceAgreementOptions={(dialog.ctx?.serviceAgreementOptions as SelectOption[] | undefined) ?? []}
+                fromOnboarding={Boolean(dialog.ctx?.fromOnboarding)}
             />
         );
     }

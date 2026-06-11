@@ -1004,10 +1004,17 @@ class ClientController extends Controller
                 ->get(),
 
             'care_plans_summary' => [
+                // The "current" plan: the active plan if one exists, otherwise the
+                // latest draft (so a freshly-created draft is visible + editable in-tab).
                 'active_plan' => CarePlan::where('client_id', $client->id)
-                    ->where('status', 'active')
+                    ->whereIn('status', ['active', 'draft'])
                     ->withCount(['goals', 'goals as goals_completed' => fn ($q) => $q->where('status', 'completed')])
-                    ->with(['goals' => function ($q) {
+                    ->with([
+                        'creator:id,name',
+                        'reviewer:id,name',
+                        'signOffs' => fn ($q) => $q->latest('agreed_on'),
+                        'signOffs.recorder:id,name',
+                        'goals' => function ($q) {
                         $q->select('id', 'care_plan_id', 'title', 'status', 'progress_percentage', 'priority', 'category', 'target_date', 'description')
                             ->withCount([
                                 'steps',
@@ -1016,6 +1023,8 @@ class ClientController extends Controller
                             ])
                             ->orderByDesc('progress_percentage');
                     }])
+                    ->orderByRaw("FIELD(status, 'active', 'draft')")
+                    ->orderByDesc('version')
                     ->first(),
                 'total_plans' => CarePlan::where('client_id', $client->id)->count(),
                 'review_due' => CarePlan::where('client_id', $client->id)
@@ -1028,6 +1037,22 @@ class ClientController extends Controller
                     ->orderByDesc('created_at')
                     ->limit(5)
                     ->get(),
+                // Full version history for the client (active + in-review + archived).
+                'versions' => CarePlan::where('client_id', $client->id)
+                    ->select('id', 'title', 'status', 'plan_type', 'version', 'parent_id', 'reviewed_at', 'reviewed_by', 'next_review_at', 'starts_at', 'created_at')
+                    ->with('reviewer:id,name')
+                    ->orderByDesc('version')
+                    ->orderByDesc('created_at')
+                    ->limit(30)
+                    ->get(),
+                // In-progress review version (status=review), surfaced so the tab can
+                // edit + complete it without leaving the profile.
+                'review_plan' => CarePlan::where('client_id', $client->id)
+                    ->where('status', 'review')
+                    ->with('creator:id,name')
+                    ->withCount(['goals'])
+                    ->orderByDesc('version')
+                    ->first(),
             ],
             'respite' => [
                 'bookings' => RespiteBooking::query()
@@ -1119,6 +1144,9 @@ class ClientController extends Controller
                 'create_risks' => $request->user()?->canDo('risks.create') ?? false,
                 'update_risks' => $request->user()?->canDo('risks.update') ?? false,
                 'delete_risks' => $request->user()?->canDo('risks.delete') ?? false,
+                'care_plans_view' => $request->user()?->canDo('care_plans.viewAny') ?? false,
+                'care_plans_create' => $request->user()?->canDo('care_plans.create') ?? false,
+                'care_plans_update' => $request->user()?->canDo('care_plans.update') ?? false,
             ],
             'assignable_workers' => $this->buildAssignableWorkers($client, $request->user()),
             'pending_visit_count' => FamilyVisitRequest::where('client_id', $client->id)->where('status', 'pending')->count(),

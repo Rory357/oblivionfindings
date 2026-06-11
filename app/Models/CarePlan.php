@@ -68,6 +68,16 @@ class CarePlan extends Model
         return $this->hasMany(CarePlan::class, 'parent_id');
     }
 
+    /**
+     * Recorded agreements to this plan version (client, whānau, EOR/guardian, etc.).
+     * Sign-offs are version-specific and are intentionally NOT copied when a review
+     * clones a new version — the reviewed plan must be agreed afresh.
+     */
+    public function signOffs()
+    {
+        return $this->hasMany(CarePlanSignOff::class);
+    }
+
     public function scopeActive($query)
     {
         return $query->where('status', 'active');
