@@ -5,6 +5,7 @@ namespace App\Http\Controllers\Operations;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientTransportBooking;
+use Carbon\CarbonImmutable;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
 
@@ -31,6 +32,8 @@ class ClientTransportBookingController extends Controller
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
 
+        $data['scheduled_at'] = $this->toUtc($data['scheduled_at']);
+
         ClientTransportBooking::create([
             ...$data,
             'organization_id' => $client->organization_id,
@@ -40,6 +43,20 @@ class ClientTransportBookingController extends Controller
         ]);
 
         return back()->with('success', 'Transport booked.');
+    }
+
+    /**
+     * The wizard sends a naive datetime-local string (worker wall-clock).
+     * Interpret it in the worker timezone and store UTC so it round-trips to
+     * the same wall-clock on display. See reference: store UTC, convert at the
+     * app.worker_timezone boundary.
+     */
+    private function toUtc(string $value): CarbonImmutable
+    {
+        return CarbonImmutable::parse(
+            $value,
+            config('app.worker_timezone', 'Pacific/Auckland'),
+        )->utc();
     }
 
     public function update(Request $request, Client $client, ClientTransportBooking $booking)
@@ -58,6 +75,10 @@ class ClientTransportBookingController extends Controller
             'status' => ['sometimes', 'string', Rule::in(ClientTransportBooking::STATUSES)],
             'notes' => ['nullable', 'string', 'max:2000'],
         ]);
+
+        if (array_key_exists('scheduled_at', $data)) {
+            $data['scheduled_at'] = $this->toUtc($data['scheduled_at']);
+        }
 
         $booking->update($data);
 

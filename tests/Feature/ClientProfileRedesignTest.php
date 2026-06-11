@@ -8,6 +8,8 @@ use App\Models\ClientTransportBooking;
 use App\Models\OpsConversation;
 use App\Models\Role;
 use App\Models\User;
+use Carbon\CarbonImmutable;
+use Database\Seeders\RbacSeeder;
 use Illuminate\Foundation\Testing\RefreshDatabase;
 use Tests\TestCase;
 
@@ -28,7 +30,7 @@ class ClientProfileRedesignTest extends TestCase
     {
         parent::setUp();
 
-        $this->seed(\Database\Seeders\RbacSeeder::class);
+        $this->seed(RbacSeeder::class);
 
         $this->admin = User::factory()->create(['role' => 'admin', 'approved_at' => now()]);
         $this->admin->roles()->attach(Role::where('name', 'admin')->first());
@@ -64,6 +66,36 @@ class ClientProfileRedesignTest extends TestCase
             ->assertRedirect();
 
         $this->assertDatabaseMissing('client_transport_bookings', ['id' => $booking->id]);
+    }
+
+    public function test_transport_booking_stores_scheduled_at_as_worker_timezone_utc(): void
+    {
+        // Worker enters 10:30am wall-clock; it must round-trip to 10:30am in the
+        // worker timezone, i.e. be stored as the correct UTC instant (not naive).
+        $this->actingAs($this->admin)->post(
+            "/operations/clients/{$this->client->id}/transport-bookings",
+            [
+                'purpose' => 'GP appointment',
+                'scheduled_at' => '2026-06-12T10:30',
+            ],
+        )->assertRedirect();
+
+        $booking = ClientTransportBooking::firstOrFail();
+        $expected = CarbonImmutable::parse(
+            '2026-06-12T10:30',
+            config('app.worker_timezone', 'Pacific/Auckland'),
+        )->utc();
+
+        $this->assertTrue(
+            $booking->scheduled_at->equalTo($expected),
+            "scheduled_at should be the UTC instant of 10:30 worker-time, got {$booking->scheduled_at->toIso8601String()}",
+        );
+        $this->assertSame(
+            '10:30',
+            $booking->scheduled_at
+                ->setTimezone(config('app.worker_timezone', 'Pacific/Auckland'))
+                ->format('H:i'),
+        );
     }
 
     public function test_transport_booking_rejects_other_clients_booking(): void
