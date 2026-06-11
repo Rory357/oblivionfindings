@@ -31,4 +31,5 @@ yarn-error.log
 /.vscode
 /.zed
 /.claude
+/.design-drops
 *.zip
