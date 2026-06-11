@@ -6,6 +6,13 @@ doesn't capture yet** — so each one gets built properly in its owning module i
 being faked on the profile. Once a module ships its part, the profile surface binds to it
 (the design components are already in place and waiting).
 
+> **Implementing agent — read this first.** This file is the complete spec; you don't need
+> the conversation that produced it. The redesign architecture and the workflow→endpoint
+> map are in `docs/client-profile-redesign-plan.md`. Repo gotchas you'll hit are in
+> **§0 below — read it before writing code or running tests.** This is a NZ supported-living
+> CRM: use NZ terminology/currency. Keep the existing real data + components; do not
+> replace working features to chase the mock (the prototype is hardcoded sample data).
+
 Conventions for every item below:
 
 - **Timezone:** datetime inputs are worker wall-clock. Parse in `app.worker_timezone`
@@ -20,6 +27,65 @@ Conventions for every item below:
   (hero vital / tab card), so "done" is visible on `/operations/clients/{id}`.
 - **Tests:** each item gets a feature test in the pattern of
   `tests/Feature/ClientProfileRedesignTest.php` (RbacSeeder + admin + Client factory).
+
+---
+
+## 0 · Repo gotchas (read before coding)
+
+These are project-specific landmines an implementing agent will not infer from the code.
+
+**PHP / artisan / tests**
+- Run PHP via the Herd binary directly: `C:\Users\steph\.config\herd\bin\php84\php.exe`
+  (`php84\php.exe artisan ...`). **Do not** use `php.bat` — Node-spawned it mangles args.
+  artisan errors print to **stdout**, not stderr.
+- **Never** run `php artisan test --parallel` here — per-worker test DBs aren't migrated,
+  so you get 3000+ false "table doesn't exist" failures. Run non-parallel and
+  change-scoped (`php84\php.exe artisan test tests/Feature/XxxTest.php`).
+- Run migrations after adding them: `php84\php.exe artisan migrate --force`.
+- Feature-test setup pattern (copy from `ClientProfileRedesignTest`): `RefreshDatabase`,
+  `$this->seed(RbacSeeder::class)`, admin = `User::factory()->create(['role'=>'admin',
+  'approved_at'=>now()])` then attach the `admin` Role, `Client::factory()`.
+
+**Frontend**
+- Verify every change: `npx tsc --noEmit`, `npx eslint <changed files>`, `npm run build`,
+  and `npx vitest run <relevant test>` (not the whole suite unless needed).
+- `resources/js/pages/operations/clients/show.tsx` must stay **< 500 KB** — there's a
+  vitest guard (`client-profile-source-size.test.ts`). It's near the cap; **extract new
+  tab bodies to `resources/js/pages/operations/clients/tabs/*.tsx`** rather than inlining
+  (see `tabs/mar.tsx`, `tabs/incidents-tab.tsx` for the pattern).
+- ESLint enforces design tokens + Card/Button usage. Bespoke styled-native surfaces
+  (filter chips, stat tiles) need an inline `// eslint-disable-next-line no-restricted-syntax`
+  with a reason — see existing tabs.
+
+**Timezone (this is §8's whole job — get the pattern right)**
+- `config('app.timezone') === 'UTC'`, `config('app.worker_timezone') === 'Pacific/Auckland'`.
+- A datetime-local input is worker wall-clock. **Store:**
+  `CarbonImmutable::parse($value, config('app.worker_timezone','Pacific/Auckland'))->utc()`.
+  Eloquent `'datetime'` cast + the frontend formatting in NZ then round-trips it.
+  Reference impl + test: `ClientTransportBookingController` and
+  `test_transport_booking_stores_scheduled_at_as_worker_timezone_utc`.
+
+**Inertia**
+- `back()->with('error', …)` fires Inertia's `onSuccess` with `flash.error` (NOT
+  `props.errors`) — gate success UI on `!flash.error`.
+- An endpoint hit by both Inertia and plain axios must content-negotiate
+  (`$request->header('X-Inertia') ? back() : response()->json(...)`) or axios
+  PUT/DELETE follows the 302 to a GET-only route → 405. See `ClientFamilyChatController`.
+
+**Deploy / permissions**
+- Deploys **skip seeders**, and permissions are seeded (not migrated). So a new
+  permission-gated feature 403s on the server until its `*PermissionsSeeder --force` is
+  run. **Reuse existing permissions** for everything in this plan; if any item genuinely
+  needs a new one, ship the seeder and add a one-line server-runbook note.
+
+**Profile binding**
+- The design surfaces already exist (`resources/js/components/clients/profile/` +
+  inline sections in `show.tsx`). When a module ships its data, bind the prop and delete
+  the fallback empty-state copy (e.g. "No target set", "Nothing rostered").
+
+**After implementation:** hand back for a design-fidelity + correctness audit (the
+established Claude-designs → Codex-implements → audit loop) — keep the real data/components,
+audit chrome vs. the design prototype in `.design-drops/client-profile-redesign/`.
 
 ---
 
