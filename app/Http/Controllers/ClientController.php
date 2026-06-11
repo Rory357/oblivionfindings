@@ -1007,7 +1007,15 @@ class ClientController extends Controller
                 'active_plan' => CarePlan::where('client_id', $client->id)
                     ->where('status', 'active')
                     ->withCount(['goals', 'goals as goals_completed' => fn ($q) => $q->where('status', 'completed')])
-                    ->with('goals:id,care_plan_id,title,status,progress_percentage,priority')
+                    ->with(['goals' => function ($q) {
+                        $q->select('id', 'care_plan_id', 'title', 'status', 'progress_percentage', 'priority', 'category', 'target_date', 'description')
+                            ->withCount([
+                                'steps',
+                                'steps as steps_done_count' => fn ($s) => $s->where('is_complete', true),
+                                'progressNotes as open_hurdles_count' => fn ($n) => $n->where('note_type', 'goal_hurdle')->where('is_flagged', true),
+                            ])
+                            ->orderByDesc('progress_percentage');
+                    }])
                     ->first(),
                 'total_plans' => CarePlan::where('client_id', $client->id)->count(),
                 'review_due' => CarePlan::where('client_id', $client->id)

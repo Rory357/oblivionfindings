@@ -611,6 +611,20 @@ Route::middleware(['auth'])->prefix('operations')->group(function () {
             ->name('operations.care_plans.goals.destroy');
         Route::patch('/care-plans/{carePlan}/goals/{goal}/progress', [CarePlanGoalController::class, 'updateProgress'])
             ->name('operations.care_plans.goals.progress');
+        Route::get('/care-plans/{carePlan}/goals/{goal}', [CarePlanGoalController::class, 'show'])
+            ->name('operations.care_plans.goals.show');
+        // Sub-goals (steps) — progress auto-recalculates from these
+        Route::post('/care-plans/{carePlan}/goals/{goal}/steps', [CarePlanGoalController::class, 'storeStep'])
+            ->name('operations.care_plans.goals.steps.store');
+        Route::put('/care-plans/{carePlan}/goals/{goal}/steps/{step}', [CarePlanGoalController::class, 'updateStep'])
+            ->name('operations.care_plans.goals.steps.update');
+        Route::delete('/care-plans/{carePlan}/goals/{goal}/steps/{step}', [CarePlanGoalController::class, 'destroyStep'])
+            ->name('operations.care_plans.goals.steps.destroy');
+        // Hurdles / issues (stored as goal-linked progress notes)
+        Route::post('/care-plans/{carePlan}/goals/{goal}/hurdles', [CarePlanGoalController::class, 'addHurdle'])
+            ->name('operations.care_plans.goals.hurdles.store');
+        Route::patch('/care-plans/{carePlan}/goals/{goal}/hurdles/{note}/resolve', [CarePlanGoalController::class, 'resolveHurdle'])
+            ->name('operations.care_plans.goals.hurdles.resolve');
 
         Route::post('/care-plans/{carePlan}/start-review', [CarePlanController::class, 'startReview'])->name('operations.care_plans.start_review');
         Route::post('/care-plans/{carePlan}/complete-review', [CarePlanController::class, 'completeReview'])->name('operations.care_plans.complete_review');

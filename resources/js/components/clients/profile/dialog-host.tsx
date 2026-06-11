@@ -7,6 +7,7 @@
 import { EmarRecordDialog, type EmarMedication } from './emar-dialog';
 import { FamilyChatPopup } from './family-chat';
 import { PROFILE_FLOWS, type ProfileFlowContext } from './flows';
+import { GoalWizardDialog, type GoalCard } from './goal-dialog';
 import { WorkflowWizardDialog } from './workflow-wizard';
 
 export type ProfileDialogState = {
@@ -36,6 +37,18 @@ export function ProfileDialogs({
                 open
                 onClose={onClose}
                 clientLabel={flowContext.clientLabel}
+            />
+        );
+    }
+
+    if (dialog.key === 'goal') {
+        return (
+            <GoalWizardDialog
+                open
+                onClose={onClose}
+                carePlanId={flowContext.carePlanId}
+                clientLabel={flowContext.clientLabel}
+                goal={(dialog.ctx?.goal as GoalCard | undefined) ?? null}
             />
         );
     }

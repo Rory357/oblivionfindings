@@ -1,42 +1,41 @@
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog';
 import { EmptyState } from '@/components/ui/empty-state';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
-import { Textarea } from '@/components/ui/textarea';
 import { cn } from '@/lib/utils';
-import { Link, router } from '@inertiajs/react';
+import { Link } from '@inertiajs/react';
 import {
+    CheckCircle2,
+    Circle,
     Compass,
+    Flag,
     HandHeart,
     Heart,
+    PauseCircle,
     Pencil,
+    Plus,
+    Route as RouteIcon,
+    ShieldAlert,
     Sparkles,
     Star,
     Target,
     Trophy,
     Waves,
 } from 'lucide-react';
-import { useState } from 'react';
 
 type Goal = {
     id?: number | string;
     title?: string | null;
     status?: string | null;
+    category?: string | null;
+    priority?: string | null;
     progress_percentage?: number | null;
     target_date?: string | null;
     description?: string | null;
+    steps_count?: number | null;
+    steps_done_count?: number | null;
+    open_hurdles_count?: number | null;
 };
 
 type GoalsPathTabProps = {
@@ -61,205 +60,72 @@ type GoalsPathTabProps = {
         next_review_at?: string | null;
     } | null;
     canEdit?: boolean;
+    onAddGoal?: () => void;
+    onManageGoal?: (goal: Goal) => void;
+    onEditPlan?: () => void;
 };
 
-function linesToArray(value: string): string[] {
-    return value
-        .split('\n')
-        .map((line) => line.trim())
-        .filter(Boolean);
+const STATUS_META: Record<
+    string,
+    { tone: string; label: string; icon: typeof Flag }
+> = {
+    completed: { tone: 'bg-status-success-bg text-status-success', label: 'Achieved', icon: CheckCircle2 },
+    in_progress: { tone: 'bg-status-info-bg text-status-info', label: 'In progress', icon: RouteIcon },
+    on_hold: { tone: 'bg-status-warning-bg text-status-warning', label: 'On hold', icon: PauseCircle },
+    cancelled: { tone: 'bg-muted text-muted-foreground', label: 'Cancelled', icon: Circle },
+    not_started: { tone: 'bg-muted text-muted-foreground', label: 'Not started', icon: Circle },
+};
+
+function metaFor(status?: string | null) {
+    return STATUS_META[status ?? 'not_started'] ?? STATUS_META.not_started;
 }
 
-function arrayToLines(value: string[] | null | undefined): string {
-    return (value ?? []).join('\n');
-}
-
-function PathPlanEditor({
-    clientId,
-    initial,
-}: {
-    clientId: number;
-    initial?: GoalsPathTabProps['pathPlan'];
-}) {
-    const [open, setOpen] = useState(false);
-    const [form, setForm] = useState({
-        dream: initial?.dream ?? '',
-        north_star: initial?.north_star ?? '',
-        strengths: arrayToLines(initial?.strengths),
-        action_steps: arrayToLines(initial?.action_steps),
-        trusted_people: arrayToLines(initial?.trusted_people),
-        independence_goals: arrayToLines(initial?.independence_goals),
-        community: initial?.community ?? '',
-        meaningful_outcomes: initial?.meaningful_outcomes ?? '',
-        plan_date: initial?.plan_date ?? '',
-        next_review_at: initial?.next_review_at ?? '',
-    });
-
-    const submit = () => {
-        router.post(
-            `/operations/clients/${clientId}/path-plan`,
-            {
-                ...form,
-                strengths: linesToArray(form.strengths),
-                action_steps: linesToArray(form.action_steps),
-                trusted_people: linesToArray(form.trusted_people),
-                independence_goals: linesToArray(form.independence_goals),
-            },
-            {
-                preserveScroll: true,
-                onSuccess: () => setOpen(false),
-            },
-        );
-    };
+function GoalCardTile({ goal, onClick }: { goal: Goal; onClick?: () => void }) {
+    const meta = metaFor(goal.status);
+    const Icon = meta.icon;
+    const pct = goal.progress_percentage ?? 0;
+    const stepsTotal = goal.steps_count ?? 0;
+    const hurdles = goal.open_hurdles_count ?? 0;
+    const subline = [
+        goal.category ?? 'Goal',
+        stepsTotal > 0 ? `${goal.steps_done_count ?? 0}/${stepsTotal} steps` : null,
+        hurdles > 0 ? `${hurdles} open hurdle${hurdles === 1 ? '' : 's'}` : null,
+    ]
+        .filter(Boolean)
+        .join(' · ');
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                <Button size="sm" variant="outline">
-                    <Pencil className="mr-1.5 h-3.5 w-3.5" />
-                    Edit PATH plan
-                </Button>
-            </DialogTrigger>
-            <DialogContent className="max-h-[85vh] max-w-2xl overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle>Edit PATH plan</DialogTitle>
-                    <DialogDescription>
-                        Capture the dream, strengths, trusted people, and next
-                        action steps from the PATH planning meeting. Bullet
-                        lists accept one item per line.
-                    </DialogDescription>
-                </DialogHeader>
-
-                <div className="space-y-3">
-                    <Label>The dream</Label>
-                    <Textarea
-                        rows={3}
-                        value={form.dream}
-                        onChange={(e) =>
-                            setForm({ ...form, dream: e.target.value })
-                        }
-                        placeholder="What is this client's biggest hope for their future?"
-                    />
-
-                    <Label className="mt-2">North star (short statement)</Label>
-                    <Input
-                        value={form.north_star}
-                        onChange={(e) =>
-                            setForm({ ...form, north_star: e.target.value })
-                        }
-                    />
-
-                    <Label className="mt-2">Strengths (one per line)</Label>
-                    <Textarea
-                        rows={3}
-                        value={form.strengths}
-                        onChange={(e) =>
-                            setForm({ ...form, strengths: e.target.value })
-                        }
-                    />
-
-                    <Label className="mt-2">Trusted people (one per line)</Label>
-                    <Textarea
-                        rows={3}
-                        value={form.trusted_people}
-                        onChange={(e) =>
-                            setForm({ ...form, trusted_people: e.target.value })
-                        }
-                    />
-
-                    <Label className="mt-2">
-                        Independence goals (one per line)
-                    </Label>
-                    <Textarea
-                        rows={3}
-                        value={form.independence_goals}
-                        onChange={(e) =>
-                            setForm({
-                                ...form,
-                                independence_goals: e.target.value,
-                            })
-                        }
-                    />
-
-                    <Label className="mt-2">Community & belonging</Label>
-                    <Textarea
-                        rows={2}
-                        value={form.community}
-                        onChange={(e) =>
-                            setForm({ ...form, community: e.target.value })
-                        }
-                    />
-
-                    <Label className="mt-2">Action steps (one per line)</Label>
-                    <Textarea
-                        rows={3}
-                        value={form.action_steps}
-                        onChange={(e) =>
-                            setForm({ ...form, action_steps: e.target.value })
-                        }
-                    />
-
-                    <Label className="mt-2">Meaningful outcomes</Label>
-                    <Textarea
-                        rows={2}
-                        value={form.meaningful_outcomes}
-                        onChange={(e) =>
-                            setForm({
-                                ...form,
-                                meaningful_outcomes: e.target.value,
-                            })
-                        }
-                    />
-
-                    <div className="grid gap-3 sm:grid-cols-2">
-                        <div>
-                            <Label>Plan date</Label>
-                            <Input
-                                type="date"
-                                value={form.plan_date}
-                                onChange={(e) =>
-                                    setForm({
-                                        ...form,
-                                        plan_date: e.target.value,
-                                    })
-                                }
-                            />
-                        </div>
-                        <div>
-                            <Label>Next review</Label>
-                            <Input
-                                type="date"
-                                value={form.next_review_at}
-                                onChange={(e) =>
-                                    setForm({
-                                        ...form,
-                                        next_review_at: e.target.value,
-                                    })
-                                }
-                            />
-                        </div>
+        /* eslint-disable-next-line no-restricted-syntax -- clickable goal card opens the manage wizard */
+        <button
+            type="button"
+            onClick={onClick}
+            disabled={!onClick}
+            data-test="goal-card"
+            className={cn(
+                'rounded-xl border bg-card p-4 text-left transition-colors',
+                onClick
+                    ? 'cursor-pointer hover:border-primary/50 hover:bg-accent/40'
+                    : 'cursor-default',
+            )}
+        >
+            <div className="flex items-start gap-3">
+                <span className={cn('mt-0.5 flex h-9 w-9 shrink-0 items-center justify-center rounded-lg', meta.tone)}>
+                    <Icon className="h-[18px] w-[18px]" />
+                </span>
+                <div className="min-w-0 flex-1">
+                    <div className="flex items-center justify-between gap-2">
+                        <span className="truncate text-sm font-semibold">{goal.title ?? 'Untitled goal'}</span>
+                        <Badge className={cn(meta.tone, 'shrink-0')}>{meta.label}</Badge>
+                    </div>
+                    <div className="mt-1 text-[11px] text-muted-foreground">{subline}</div>
+                    <div className="mt-2.5 flex items-center gap-2">
+                        <Progress value={pct} className="h-2" />
+                        <span className="w-9 shrink-0 text-right text-xs font-medium text-muted-foreground">{pct}%</span>
                     </div>
                 </div>
-
-                <DialogFooter>
-                    <Button variant="ghost" onClick={() => setOpen(false)}>
-                        Cancel
-                    </Button>
-                    <Button onClick={submit}>Save PATH plan</Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
+            </div>
+        </button>
     );
-}
-
-function statusTone(status?: string | null) {
-    const s = (status ?? '').toLowerCase();
-    if (s === 'completed') return 'bg-status-success-bg text-status-success';
-    if (s === 'in_progress') return 'bg-status-info-bg text-status-info';
-    if (s === 'blocked') return 'bg-status-critical-bg text-status-critical';
-    if (s === 'paused' || s === 'on_hold')
-        return 'bg-status-warning-bg text-status-warning';
-    return 'bg-muted text-muted-foreground';
 }
 
 function StorySection({
@@ -283,13 +149,9 @@ function StorySection({
                 <div className="min-w-0 flex-1">
                     <p className="font-medium">{label}</p>
                     {body?.trim() ? (
-                        <p className="mt-2 text-sm leading-6 whitespace-pre-wrap">
-                            {body}
-                        </p>
+                        <p className="mt-2 text-sm leading-6 whitespace-pre-wrap">{body}</p>
                     ) : (
-                        <p className="mt-2 text-sm italic text-muted-foreground">
-                            {placeholder}
-                        </p>
+                        <p className="mt-2 text-sm italic text-muted-foreground">{placeholder}</p>
                     )}
                 </div>
             </div>
@@ -338,9 +200,7 @@ function PathPillar({
                         ))}
                     </ul>
                 ) : (
-                    <p className="text-sm italic text-muted-foreground">
-                        {placeholder}
-                    </p>
+                    <p className="text-sm italic text-muted-foreground">{placeholder}</p>
                 )}
             </CardContent>
         </Card>
@@ -348,7 +208,6 @@ function PathPillar({
 }
 
 export function GoalsPathTab({
-    clientId,
     clientName,
     activePlanId,
     goals = [],
@@ -357,6 +216,9 @@ export function GoalsPathTab({
     interestsHobbies,
     pathPlan,
     canEdit = false,
+    onAddGoal,
+    onManageGoal,
+    onEditPlan,
 }: GoalsPathTabProps) {
     const sortedGoals = [...goals].sort((a, b) => {
         if ((a.status === 'completed') !== (b.status === 'completed')) {
@@ -364,38 +226,84 @@ export function GoalsPathTab({
         }
         return (b.progress_percentage ?? 0) - (a.progress_percentage ?? 0);
     });
-    const inProgress = goals.filter((g) =>
-        ['in_progress', 'open', null, undefined, ''].includes(g.status ?? null),
-    );
-    const completed = goals.filter((g) => g.status === 'completed');
+    const achieved = goals.filter((g) => g.status === 'completed').length;
+    const inProgress = goals.length - achieved;
 
     return (
         <div className="space-y-6" data-test="client-goals-path-tab">
-            <div className="rounded-lg border bg-card p-4">
-                <div className="flex items-center justify-between gap-3">
+            {/* ── Goals path (design card grid) ── */}
+            <div className="flex flex-wrap items-center justify-between gap-3">
+                <div className="flex items-center gap-3">
+                    <span className="flex h-10 w-10 items-center justify-center rounded-xl bg-primary/10 text-primary">
+                        <Flag className="h-[19px] w-[19px]" />
+                    </span>
                     <div>
-                        <h2 className="text-lg font-semibold">
-                            Goals, dreams & whole of life for {clientName}
-                        </h2>
+                        <h2 className="text-lg font-semibold leading-tight">Goals path</h2>
                         <p className="text-sm text-muted-foreground">
-                            Person-centred planning surfaces alongside concrete
-                            goal progress and the wider PATH framework.
+                            {achieved} achieved · {inProgress} in progress
+                        </p>
+                    </div>
+                </div>
+                {canEdit && onAddGoal ? (
+                    <Button onClick={onAddGoal} data-test="goals-add-goal">
+                        <Plus className="mr-1.5 h-4 w-4" />
+                        Add goal
+                    </Button>
+                ) : null}
+            </div>
+
+            {sortedGoals.length > 0 ? (
+                <div className="grid grid-cols-1 gap-3 md:grid-cols-2">
+                    {sortedGoals.map((goal, idx) => (
+                        <GoalCardTile
+                            key={goal.id ?? idx}
+                            goal={goal}
+                            onClick={
+                                canEdit && onManageGoal
+                                    ? () => onManageGoal(goal)
+                                    : undefined
+                            }
+                        />
+                    ))}
+                </div>
+            ) : (
+                <EmptyState
+                    icon={Target}
+                    title="No goals captured yet"
+                    description="Add goals to the active care plan to make day-to-day support intentional."
+                    action={
+                        canEdit && onAddGoal ? (
+                            <Button onClick={onAddGoal}>
+                                <Plus className="mr-1.5 h-4 w-4" />
+                                Add the first goal
+                            </Button>
+                        ) : undefined
+                    }
+                />
+            )}
+
+            {/* ── Person-centred planning (secondary) ── */}
+            {/* eslint-disable-next-line no-restricted-syntax -- section header band, not a content card */}
+            <div className="rounded-lg border bg-card p-4">
+                <div className="flex flex-wrap items-center justify-between gap-3">
+                    <div>
+                        <h3 className="text-base font-semibold">
+                            Person-centred planning for {clientName}
+                        </h3>
+                        <p className="text-sm text-muted-foreground">
+                            The whole-of-life story and PATH framework behind the goals above.
                         </p>
                     </div>
                     <div className="flex flex-wrap gap-2">
-                        {canEdit ? (
-                            <PathPlanEditor
-                                clientId={clientId}
-                                initial={pathPlan ?? undefined}
-                            />
+                        {canEdit && onEditPlan ? (
+                            <Button size="sm" variant="outline" onClick={onEditPlan} data-test="goals-edit-plan">
+                                <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                                Edit planning
+                            </Button>
                         ) : null}
                         {activePlanId ? (
                             <Button asChild size="sm" variant="outline">
-                                <Link
-                                    href={`/operations/care-plans/${activePlanId}`}
-                                >
-                                    Open care plan
-                                </Link>
+                                <Link href={`/operations/care-plans/${activePlanId}`}>Open care plan</Link>
                             </Button>
                         ) : null}
                     </div>
@@ -404,9 +312,7 @@ export function GoalsPathTab({
                     <p className="mt-3 text-xs text-muted-foreground">
                         Next PATH review:{' '}
                         <span className="font-medium">
-                            {new Date(
-                                pathPlan.next_review_at,
-                            ).toLocaleDateString('en-NZ', {
+                            {new Date(pathPlan.next_review_at).toLocaleDateString('en-NZ', {
                                 day: 'numeric',
                                 month: 'long',
                                 year: 'numeric',
@@ -415,77 +321,6 @@ export function GoalsPathTab({
                     </p>
                 ) : null}
             </div>
-
-            <Card>
-                <CardHeader>
-                    <CardTitle className="flex items-center gap-2 text-base">
-                        <Target className="h-4 w-4 text-primary" />
-                        Active goals
-                        <Badge variant="outline" className="ml-auto">
-                            {inProgress.length} in progress · {completed.length}{' '}
-                            done
-                        </Badge>
-                    </CardTitle>
-                </CardHeader>
-                <CardContent className="space-y-3">
-                    {sortedGoals.length > 0 ? (
-                        sortedGoals.map((goal, idx) => (
-                            <div
-                                key={goal.id ?? idx}
-                                className={cn(
-                                    'rounded-lg border p-4',
-                                    goal.status === 'completed' &&
-                                        'bg-status-success-bg/30',
-                                )}
-                            >
-                                <div className="flex items-start justify-between gap-2">
-                                    <div className="min-w-0">
-                                        <p className="font-medium">
-                                            {goal.title ?? 'Untitled goal'}
-                                        </p>
-                                        {goal.description ? (
-                                            <p className="mt-1 text-sm text-muted-foreground">
-                                                {goal.description}
-                                            </p>
-                                        ) : null}
-                                    </div>
-                                    <Badge
-                                        className={cn(
-                                            statusTone(goal.status),
-                                            'shrink-0 capitalize',
-                                        )}
-                                    >
-                                        {String(
-                                            goal.status ?? 'open',
-                                        ).replace(/_/g, ' ')}
-                                    </Badge>
-                                </div>
-                                {goal.progress_percentage != null ? (
-                                    <div className="mt-3">
-                                        <Progress
-                                            value={goal.progress_percentage}
-                                            className="h-2"
-                                        />
-                                        <p className="mt-1 text-xs text-muted-foreground">
-                                            {goal.progress_percentage}%
-                                            complete
-                                            {goal.target_date
-                                                ? ` · target ${goal.target_date}`
-                                                : ''}
-                                        </p>
-                                    </div>
-                                ) : null}
-                            </div>
-                        ))
-                    ) : (
-                        <EmptyState
-                            icon={Target}
-                            title="No goals captured yet"
-                            description="Add goals to the active care plan to make day-to-day support intentional."
-                        />
-                    )}
-                </CardContent>
-            </Card>
 
             <div className="grid gap-4 md:grid-cols-3">
                 <StorySection
@@ -511,9 +346,7 @@ export function GoalsPathTab({
             <div>
                 <div className="mb-3 flex items-center gap-2">
                     <Compass className="h-4 w-4 text-primary" />
-                    <h3 className="text-base font-semibold">
-                        PATH planning framework
-                    </h3>
+                    <h3 className="text-base font-semibold">PATH planning framework</h3>
                 </div>
                 <div className="grid gap-4 md:grid-cols-2">
                     <PathPillar
@@ -553,16 +386,12 @@ export function GoalsPathTab({
                     <PathPillar
                         icon={Waves}
                         title="Community & belonging"
-                        items={
-                            pathPlan?.community
-                                ? [pathPlan.community]
-                                : null
-                        }
+                        items={pathPlan?.community ? [pathPlan.community] : null}
                         placeholder="Activities, groups, or relationships that build belonging."
                         tone="info"
                     />
                     <PathPillar
-                        icon={Target}
+                        icon={ShieldAlert}
                         title="Next action steps"
                         items={pathPlan?.action_steps}
                         placeholder="Short concrete steps the team will work on next."

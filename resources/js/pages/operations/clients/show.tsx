@@ -3161,9 +3161,7 @@ export default function ClientShow({
                                             <Button
                                                 variant="outline"
                                                 onClick={() =>
-                                                    openProfileDialog(
-                                                        'add_goal',
-                                                    )
+                                                    openProfileDialog('goal')
                                                 }
                                                 data-test="careplan-add-goal"
                                             >
@@ -3860,6 +3858,45 @@ export default function ClientShow({
                         interestsHobbies={(client as any).interests_hobbies}
                         pathPlan={(pageProps as any).path_plan ?? null}
                         canEdit={can.edit}
+                        onAddGoal={() => openProfileDialog('goal')}
+                        onManageGoal={(goal) =>
+                            openProfileDialog('goal', { goal })
+                        }
+                        onEditPlan={() => {
+                            const pp =
+                                ((pageProps as any).path_plan ?? {}) as Record<
+                                    string,
+                                    unknown
+                                >;
+                            const toLines = (a: unknown) =>
+                                Array.isArray(a) ? a.join('\n') : '';
+                            const day = (v: unknown) =>
+                                typeof v === 'string' ? v.slice(0, 10) : '';
+                            openProfileDialog('edit_path_plan', {
+                                values: {
+                                    dream: pp.dream ?? '',
+                                    north_star: pp.north_star ?? '',
+                                    strengths: toLines(pp.strengths),
+                                    trusted_people: toLines(pp.trusted_people),
+                                    independence_goals: toLines(
+                                        pp.independence_goals,
+                                    ),
+                                    community: pp.community ?? '',
+                                    action_steps: toLines(pp.action_steps),
+                                    meaningful_outcomes:
+                                        pp.meaningful_outcomes ?? '',
+                                    life_story:
+                                        (client as any).life_story ?? '',
+                                    strengths_abilities:
+                                        (client as any).strengths_abilities ??
+                                        '',
+                                    interests_hobbies:
+                                        (client as any).interests_hobbies ?? '',
+                                    plan_date: day(pp.plan_date),
+                                    next_review_at: day(pp.next_review_at),
+                                },
+                            });
+                        }}
                     />
                 )}
 

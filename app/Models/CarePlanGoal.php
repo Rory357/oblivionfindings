@@ -51,4 +51,9 @@ class CarePlanGoal extends Model
     {
         return $this->hasMany(ProgressNote::class, 'care_plan_goal_id');
     }
+
+    public function steps()
+    {
+        return $this->hasMany(CarePlanGoalStep::class, 'care_plan_goal_id')->orderBy('sort_order');
+    }
 }

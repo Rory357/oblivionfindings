@@ -30,6 +30,17 @@ class ClientPathPlanController extends Controller
             'next_review_at' => ['nullable', 'date'],
         ]);
 
+        // Person-centred narrative lives on the client record itself, but is
+        // edited from the same Goals Path "Person-centred planning" wizard.
+        $narrative = $request->validate([
+            'life_story' => ['nullable', 'string'],
+            'strengths_abilities' => ['nullable', 'string'],
+            'interests_hobbies' => ['nullable', 'string'],
+        ]);
+        if ($request->hasAny(['life_story', 'strengths_abilities', 'interests_hobbies'])) {
+            $client->update($narrative);
+        }
+
         $plan = ClientPathPlan::updateOrCreate(
             ['client_id' => $client->id],
             array_merge($data, [

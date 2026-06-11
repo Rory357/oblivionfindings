@@ -793,46 +793,97 @@ const abcEntry: FlowFactory = (ctx) => ({
     },
 });
 
-const addGoal: FlowFactory = (ctx) => ({
-    key: 'add_goal',
-    icon: Flag,
-    title: 'Add goal',
-    sub: ctx.carePlanTitle ?? 'Goals path',
-    submitLabel: 'Create goal',
+/** Person-centred PATH + whole-of-life narrative editor (Goals Path secondary
+ * section). Replaces the inline PathPlanEditor dialog with the shared wizard UX.
+ * One-per-line list fields are split on submit; narrative fields persist onto
+ * the client. Submits to ClientPathPlanController@upsert. */
+const lines = (v: unknown): string[] =>
+    String(v ?? '')
+        .split('\n')
+        .map((l) => l.trim())
+        .filter(Boolean);
+
+const editPathPlan: FlowFactory = (ctx) => ({
+    key: 'edit_path_plan',
+    icon: Compass,
+    title: 'Person-centred planning',
+    sub: 'PATH & whole-of-life',
+    submitLabel: 'Save planning',
+    initialValues: ctx.dialog?.values as WizardValues | undefined,
     steps: [
         {
-            key: 'goal',
-            label: 'The goal',
-            icon: Flag,
-            blurb: 'What & why',
-            heading: 'What is the goal?',
-            desc: `Written with ${ctx.preferredName}, in their words where possible.`,
+            key: 'dream',
+            label: 'The dream',
+            icon: Compass,
+            blurb: 'Hopes & north star',
+            heading: 'The dream',
+            desc: `What is ${ctx.preferredName}'s biggest hope for the future? In their words.`,
             fields: [
                 {
-                    key: 'title',
-                    label: 'Goal',
-                    required: true,
+                    key: 'dream',
+                    label: 'The dream',
+                    type: 'textarea',
+                    rows: 3,
                     full: true,
-                    placeholder: 'e.g. Prepare a simple meal independently',
+                },
+                { key: 'north_star', label: 'North star (short statement)', full: true },
+            ],
+        },
+        {
+            key: 'strengths',
+            label: 'Strengths & people',
+            icon: Users,
+            blurb: 'What helps them thrive',
+            heading: 'Strengths & trusted people',
+            desc: 'One per line.',
+            fields: [
+                {
+                    key: 'strengths',
+                    label: 'Strengths (one per line)',
+                    type: 'textarea',
+                    rows: 3,
+                    full: true,
                 },
                 {
-                    key: 'category',
-                    label: 'Domain',
-                    type: 'select',
-                    required: true,
-                    options: [
-                        'Daily living',
-                        'Community',
-                        'Health',
-                        'Independence',
-                        'Finance',
-                        'Whānau',
-                        'Wellbeing',
-                    ],
+                    key: 'trusted_people',
+                    label: 'Trusted people (one per line)',
+                    type: 'textarea',
+                    rows: 3,
+                    full: true,
                 },
                 {
-                    key: 'why',
-                    label: `Why it matters to ${ctx.preferredName}`,
+                    key: 'independence_goals',
+                    label: 'Independence goals (one per line)',
+                    type: 'textarea',
+                    rows: 3,
+                    full: true,
+                },
+            ],
+        },
+        {
+            key: 'belonging',
+            label: 'Belonging & next steps',
+            icon: Leaf,
+            blurb: 'Community & actions',
+            heading: 'Belonging & next steps',
+            fields: [
+                {
+                    key: 'community',
+                    label: 'Community & belonging',
+                    type: 'textarea',
+                    rows: 2,
+                    full: true,
+                },
+                {
+                    key: 'action_steps',
+                    label: 'Action steps (one per line)',
+                    type: 'textarea',
+                    rows: 3,
+                    full: true,
+                },
+                {
+                    key: 'meaningful_outcomes',
+                    label: 'Meaningful outcomes',
                     type: 'textarea',
                     rows: 2,
                     full: true,
@@ -840,78 +891,71 @@ const addGoal: FlowFactory = (ctx) => ({
             ],
         },
         {
-            key: 'plan',
-            label: 'The plan',
-            icon: RouteIcon,
-            blurb: 'First step & support',
-            heading: 'How will we get there?',
-            picker: {
-                key: 'priority',
-                label: 'Priority',
-                options: [
-                    {
-                        key: 'low',
-                        label: 'Low',
-                        icon: Circle,
-                        desc: 'When capacity allows',
-                    },
-                    {
-                        key: 'medium',
-                        label: 'Medium',
-                        icon: Flag,
-                        desc: 'Active focus',
-                    },
-                    {
-                        key: 'high',
-                        label: 'High',
-                        icon: AlertTriangle,
-                        desc: 'Priority this quarter',
-                    },
-                ],
-            },
+            key: 'whole_life',
+            label: 'Whole of life',
+            icon: BookOpen,
+            blurb: 'Story, strengths, interests',
+            heading: 'Whole of life',
+            desc: 'Background the team should know — shown on the Goals Path tab.',
             fields: [
                 {
-                    key: 'first_step',
-                    label: 'First step',
+                    key: 'life_story',
+                    label: 'Life story',
                     type: 'textarea',
-                    required: true,
+                    rows: 3,
+                    full: true,
+                },
+                {
+                    key: 'strengths_abilities',
+                    label: 'Strengths & abilities',
+                    type: 'textarea',
                     rows: 2,
                     full: true,
                 },
-                { key: 'target_date', label: 'Target date', type: 'date' },
+                {
+                    key: 'interests_hobbies',
+                    label: 'Interests & hobbies',
+                    type: 'textarea',
+                    rows: 2,
+                    full: true,
+                },
             ],
-            info: 'Goals link to Care & Support Plan strategies and report progress on the Overview.',
-            infoIcon: Flag,
+        },
+        {
+            key: 'dates',
+            label: 'Dates',
+            icon: CalendarClock,
+            blurb: 'Plan & review',
+            heading: 'Dates',
+            fields: [
+                { key: 'plan_date', label: 'Plan date', type: 'date' },
+                { key: 'next_review_at', label: 'Next review', type: 'date' },
+            ],
+            info: 'The review date feeds the Actions & Reviews queue.',
+            infoIcon: CalendarClock,
         },
     ],
     submit: (values, helpers) => {
-        if (!ctx.carePlanId) {
-            toast.error(
-                'No active care plan — create one on the Care & Support Plan tab first.',
-            );
-            helpers.onError();
-            return;
-        }
-        const description = [
-            opt(values.why) ? `Why it matters: ${str(values.why)}` : null,
-            `First step: ${str(values.first_step)}`,
-        ]
-            .filter(Boolean)
-            .join('\n');
-
         submitInertia(
             'post',
-            `/care-plans/${ctx.carePlanId}/goals`,
+            `/operations/clients/${ctx.clientId}/path-plan`,
             {
-                title: str(values.title),
-                category: str(values.category),
-                priority: str(values.priority) || 'medium',
-                target_date: opt(values.target_date),
-                description,
-                status: 'not_started',
+                dream: opt(values.dream),
+                north_star: opt(values.north_star),
+                strengths: lines(values.strengths),
+                trusted_people: lines(values.trusted_people),
+                independence_goals: lines(values.independence_goals),
+                community: opt(values.community),
+                action_steps: lines(values.action_steps),
+                meaningful_outcomes: opt(values.meaningful_outcomes),
+                life_story: opt(values.life_story),
+                strengths_abilities: opt(values.strengths_abilities),
+                interests_hobbies: opt(values.interests_hobbies),
+                plan_date: opt(values.plan_date),
+                next_review_at: opt(values.next_review_at),
             },
             helpers,
-            'Goal added to path',
+            'Person-centred plan saved',
         );
     },
 });
@@ -2880,7 +2924,6 @@ export const PROFILE_FLOWS: Record<string, FlowFactory> = {
     edit_risk: addRisk,
     record_obs: recordObs,
     abc_entry: abcEntry,
-    add_goal: addGoal,
     plan_review: planReview,
     upload_doc: uploadDoc,
     transaction,
@@ -2899,4 +2942,5 @@ export const PROFILE_FLOWS: Record<string, FlowFactory> = {
     add_note: addTimelineNote,
     edit_rhythms: editRhythms,
     meal_pref: mealPref,
+    edit_path_plan: editPathPlan,
 };
