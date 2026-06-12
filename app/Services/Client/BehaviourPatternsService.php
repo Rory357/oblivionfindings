@@ -67,6 +67,7 @@ class BehaviourPatternsService
             'top_strategies' => $this->topValues($entries, fn ($e) => $e->strategies_used, 5),
             'top_behaviour_tags' => $this->topBehaviourTags($entries, $concernNotes),
             'daily_series' => $this->buildDailySeries($entries, $concernNotes, $days),
+            'summary' => $this->summaryFor($client),
         ];
     }
 
@@ -87,6 +88,95 @@ class BehaviourPatternsService
             'top_strategies' => [],
             'top_behaviour_tags' => [],
             'daily_series' => [],
+            'summary' => $this->emptySummary(),
+        ];
+    }
+
+    /**
+     * Headline stat-strip summary: 90-day entry count, average duration, the
+     * quarter-over-quarter trend, the most common antecedent, and a 6-month
+     * entries-by-month series. Computed over its own windows (independent of the
+     * 30-day pattern window above).
+     *
+     * @return array<string, mixed>
+     */
+    private function summaryFor(Client $client): array
+    {
+        $now = Carbon::now();
+        $start90 = $now->copy()->subDays(90);
+        $start180 = $now->copy()->subDays(180);
+
+        $recent = BehaviourAbcEntry::query()->forClient($client->id)->since($start90)->get();
+        $entries90 = $recent->count();
+
+        $prevQuarter = BehaviourAbcEntry::query()->forClient($client->id)
+            ->whereBetween('occurred_at', [$start180, $start90])
+            ->count();
+
+        $durations = $recent
+            ->pluck('duration_seconds')
+            ->filter(fn ($d) => is_numeric($d) && $d > 0);
+        $avgDuration = $durations->isNotEmpty() ? (int) round($durations->avg()) : null;
+
+        $trendPct = $prevQuarter > 0
+            ? (int) round((($entries90 - $prevQuarter) / $prevQuarter) * 100)
+            : null;
+
+        $topAntecedent = $recent
+            ->pluck('antecedent')
+            ->map(fn ($a) => is_string($a) && trim($a) !== '' ? trim($a) : null)
+            ->filter()
+            ->countBy()
+            ->sortDesc()
+            ->keys()
+            ->first();
+
+        return [
+            'entries_90d' => $entries90,
+            'avg_duration_seconds' => $avgDuration,
+            'trend_pct' => $trendPct,
+            'top_antecedent' => $topAntecedent ?: null,
+            'entries_by_month' => $this->entriesByMonth($client, $now),
+        ];
+    }
+
+    /**
+     * @return array<int, array{key: string, label: string, count: int}>
+     */
+    private function entriesByMonth(Client $client, Carbon $now): array
+    {
+        $start = $now->copy()->startOfMonth()->subMonths(5);
+
+        $months = [];
+        for ($i = 0; $i < 6; $i++) {
+            $m = $start->copy()->addMonths($i);
+            $months[$m->format('Y-m')] = ['key' => $m->format('Y-m'), 'label' => $m->format('M'), 'count' => 0];
+        }
+
+        BehaviourAbcEntry::query()->forClient($client->id)
+            ->where('occurred_at', '>=', $start)
+            ->get(['occurred_at'])
+            ->each(function ($row) use (&$months) {
+                $key = $row->occurred_at?->format('Y-m');
+                if ($key && isset($months[$key])) {
+                    $months[$key]['count']++;
+                }
+            });
+
+        return array_values($months);
+    }
+
+    /**
+     * @return array<string, mixed>
+     */
+    private function emptySummary(): array
+    {
+        return [
+            'entries_90d' => 0,
+            'avg_duration_seconds' => null,
+            'trend_pct' => null,
+            'top_antecedent' => null,
+            'entries_by_month' => [],
         ];
     }
 

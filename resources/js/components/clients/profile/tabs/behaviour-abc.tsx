@@ -7,6 +7,7 @@
  * changes (bumped when the dialog closes). */
 import {
     BehaviourInsightsCard,
+    BehaviourStatStrip,
     type BehaviourPattern,
 } from '@/components/behaviour-insights-card';
 import type { AbcEntryRow } from '@/components/clients/profile/abc-dialog';
@@ -124,7 +125,7 @@ export function BehaviourAbcTab({
                             Behaviour observations
                         </h2>
                         <p className="text-sm text-muted-foreground">
-                            ABC charting &amp; behaviour support
+                            ABC charting · used by the behaviour support plan
                         </p>
                     </div>
                 </div>
@@ -135,6 +136,8 @@ export function BehaviourAbcTab({
                     </Button>
                 ) : null}
             </div>
+
+            <BehaviourStatStrip patterns={patterns} />
 
             <BehaviourInsightsCard
                 patterns={patterns}

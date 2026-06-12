@@ -32,6 +32,17 @@ const patterns = {
     top_strategies: [{ label: 'Quiet space', count: 2 }],
     top_behaviour_tags: [{ label: 'Pacing', count: 2 }],
     daily_series: [{ date: '2026-06-10', entries: 2, concerns: 0 }],
+    summary: {
+        entries_90d: 3,
+        avg_duration_seconds: 240,
+        trend_pct: -40,
+        top_antecedent: 'Noise',
+        entries_by_month: [
+            { key: '2025-12', label: 'Dec', count: 2 },
+            { key: '2026-01', label: 'Jan', count: 1 },
+            { key: '2026-05', label: 'May', count: 0 },
+        ],
+    },
 };
 
 const entry = {
@@ -62,7 +73,7 @@ afterEach(() => {
 });
 
 describe('BehaviourAbcTab', () => {
-    it('renders the PBS analytics (function breakdown + entry count)', async () => {
+    it('renders the headline stat strip and the deeper PBS analytics', async () => {
         mockFetch([]);
         render(
             <BehaviourAbcTab
@@ -75,7 +86,14 @@ describe('BehaviourAbcTab', () => {
             />,
         );
 
-        expect(screen.getByText('ABC entries')).toBeTruthy();
+        // Design stat strip
+        expect(screen.getByText('Entries (90 days)')).toBeTruthy();
+        expect(screen.getByText('Avg duration')).toBeTruthy();
+        expect(screen.getByText('4m')).toBeTruthy();
+        expect(screen.getByText('-40%')).toBeTruthy();
+        expect(screen.getByText('Noise')).toBeTruthy();
+        expect(screen.getByText('Entries by month')).toBeTruthy();
+        // Deeper patterns card
         expect(screen.getByText('Function of behaviour')).toBeTruthy();
         expect(screen.getByText('Escape / avoidance')).toBeTruthy();
     });

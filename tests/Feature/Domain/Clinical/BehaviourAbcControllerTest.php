@@ -269,4 +269,27 @@ class BehaviourAbcControllerTest extends TestCase
         $this->assertSame(3, $functions['escape_avoidance']['count']);
         $this->assertSame(2, $functions['attention_social']['count']);
     }
+
+    public function test_pattern_service_builds_the_headline_summary(): void
+    {
+        // 3 entries this quarter, 2 in the prior quarter → trend should be negative.
+        BehaviourAbcEntry::factory()->count(3)->create([
+            'client_id' => $this->client->id,
+            'occurred_at' => now()->subDays(10),
+            'duration_seconds' => 240,
+            'antecedent' => 'Loud dining room',
+        ]);
+        BehaviourAbcEntry::factory()->count(5)->create([
+            'client_id' => $this->client->id,
+            'occurred_at' => now()->subDays(120),
+        ]);
+
+        $summary = app(BehaviourPatternsService::class)->forClient($this->client->fresh())['summary'];
+
+        $this->assertSame(3, $summary['entries_90d']);
+        $this->assertSame(240, $summary['avg_duration_seconds']);
+        $this->assertSame(-40, $summary['trend_pct']); // (3-5)/5 = -40%
+        $this->assertSame('Loud dining room', $summary['top_antecedent']);
+        $this->assertCount(6, $summary['entries_by_month']);
+    }
 }
