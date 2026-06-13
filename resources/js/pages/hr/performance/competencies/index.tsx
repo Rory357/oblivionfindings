@@ -87,7 +87,7 @@ export default function CompetencyIndex({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={Target}
                         title="Competency Framework"
                         description="Define and manage organisational competencies."

@@ -63,7 +63,7 @@ export default function RecruitmentKanban({ columns, stages, can }: Props) {
         >
             <Head title="Recruitment Kanban" />
             <PageShell>
-                <PageHero
+                <PageHero category="hr"
                     icon={LayoutGrid}
                     title="Recruitment Pipeline"
                     description={`Kanban view - ${totalCandidates} candidates across ${stages.length} stages`}

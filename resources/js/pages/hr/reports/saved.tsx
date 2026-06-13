@@ -131,7 +131,7 @@ export default function SavedReports({ reports, sources }: Props) {
             <Head title="Saved Reports" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={BarChart3}
                         title="Saved Reports"
                         description="Run, export, and manage saved HR reports."

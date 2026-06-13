@@ -219,7 +219,7 @@ export default function MyTime({
             <Head title="My Time" />
 
             <PageShell>
-                <PageHero
+                <PageHero category="hr"
                     icon={Clock}
                     title="My Time"
                     description="Track your shifts, hours, and upcoming roster."

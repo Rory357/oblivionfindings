@@ -143,7 +143,7 @@ export default function FeedbackRespond({ feedbackRequest, questions }: Props) {
                         });
 
                     return (
-                        <PageHero
+                        <PageHero category="hr"
                             icon={MessageSquare}
                             backHref="/hr/feedback"
                             backLabel="Back to Feedback"

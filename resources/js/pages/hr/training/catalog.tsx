@@ -197,7 +197,7 @@ export default function TrainingCatalog({
 
             <div className="space-y-6 p-4 lg:p-6">
                 {/* Hero Banner */}
-                <PageHero
+                <PageHero category="hr"
                     icon={BookOpen}
                     title="Course Catalog"
                     description="Browse and manage training courses for your organisation"

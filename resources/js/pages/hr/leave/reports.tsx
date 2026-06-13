@@ -124,7 +124,7 @@ export default function LeaveReports({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={BarChart3}
                         title="Leave Reports"
                         description="Absenteeism trends, Bradford Factor analysis, and leave utilisation."

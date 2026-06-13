@@ -222,7 +222,7 @@ export default function CreateOffer({ application, sites, roles }: Props) {
             <Head title={`Create Offer - ${candidateName}`} />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         avatar={{ fallback: initials }}
                         title="Prepare Offer"
                         description={`${candidateName} · ${application.position_title}`}

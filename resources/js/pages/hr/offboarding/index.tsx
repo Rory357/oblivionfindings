@@ -105,7 +105,7 @@ export default function OffboardingIndex({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={UserMinus}
                         title="Offboarding Checklists"
                         description="Manage employee exits with structured checklists and progress tracking."

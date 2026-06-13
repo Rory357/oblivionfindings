@@ -101,7 +101,7 @@ export default function EditTemplate({ template }: Props) {
             <Head title={`Edit ${template.name}`} />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref="/hr/documents/templates"
                         title="Edit Template"

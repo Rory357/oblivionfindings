@@ -67,7 +67,7 @@ export default function CandidateCreate({ sites, roles }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="New Candidate" />
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero category="hr" variant="compact"
                     title="New Candidate"
                     description="Add a new candidate to the recruitment pipeline."
                     actions={

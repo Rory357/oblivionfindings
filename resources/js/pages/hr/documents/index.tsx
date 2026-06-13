@@ -68,7 +68,7 @@ export default function DocumentsIndex({ documents, filters, can }: Props) {
             <Head title="HR Documents" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={Folder}
                         title="HR Documents"
                         description="Manage employee contracts, policies, certificates, and offer letters."

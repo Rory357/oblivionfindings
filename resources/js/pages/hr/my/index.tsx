@@ -194,7 +194,7 @@ export default function MyHrIndex({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         avatar={{
                             src: profile?.user?.profile_photo_path ?? undefined,
                             fallback: userInitials,

@@ -46,7 +46,7 @@ export default function CreateOnboarding({ employees }: Props) {
             <Head title="Create Onboarding Checklist" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref="/hr/onboarding"
                         title="Create Onboarding Checklist"

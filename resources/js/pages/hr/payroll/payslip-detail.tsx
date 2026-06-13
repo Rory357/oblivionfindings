@@ -120,7 +120,7 @@ export default function PayslipDetail({ payslip, ytd }: Props) {
             <Head title={`Payslip - ${payslip.user?.name ?? 'Employee'}`} />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref="/hr/payroll/payslips"
                         title={payslip.user?.name ?? 'Employee'}

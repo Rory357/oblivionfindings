@@ -165,7 +165,7 @@ export default function HrWebhookIndex({
             <Head title="HR Webhooks" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={Webhook}
                         title="HR Webhooks"
                         description="Manage webhook endpoints for HR event notifications."

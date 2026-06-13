@@ -60,7 +60,7 @@ export default function MyProfile({ profile }: Props) {
                 <Head title="My Profile" />
                 <PageLayout
                     hero={
-                        <PageHero
+                        <PageHero category="hr"
                             icon={User}
                             title="My Profile"
                             description="Your employment record and personal contact details."
@@ -95,7 +95,7 @@ export default function MyProfile({ profile }: Props) {
             <Head title="My Profile" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         avatar={{ src: profile.user.avatar ?? null, fallback: initials }}
                         title={profile.user.name}
                         description={profile.position_title}

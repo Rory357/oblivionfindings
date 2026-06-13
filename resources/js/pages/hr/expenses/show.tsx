@@ -110,7 +110,7 @@ export default function ExpenseShow({ claim, can }: Props) {
             <Head title={`Claim ${claim.claim_number}`} />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref="/hr/expenses"
                         title={claim.title}

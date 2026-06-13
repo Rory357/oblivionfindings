@@ -177,7 +177,7 @@ export default function ReportBuilder({ sources }: Props) {
             <Head title="Report Builder" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={BarChart3}
                         title="Report Builder"
                         description="Build and save custom HR reports with selected data sources and fields."

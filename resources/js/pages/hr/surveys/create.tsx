@@ -151,7 +151,7 @@ export default function CreateSurvey({ surveyTypes, questionTypes }: Props) {
             <Head title="Create Survey" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref="/hr/surveys"
                         title="Create Survey"

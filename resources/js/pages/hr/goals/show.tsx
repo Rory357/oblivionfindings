@@ -375,7 +375,7 @@ export default function GoalShow({ goal, users, can }: Props) {
                     }
 
                     return (
-                        <PageHero
+                        <PageHero category="hr"
                             icon={Target}
                             backHref="/hr/development/goals"
                             title={goal.title}

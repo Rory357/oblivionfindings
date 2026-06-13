@@ -379,7 +379,7 @@ export default function WellbeingIndex({
         >
             <Head title="HR Wellbeing" />
             <PageShell>
-                <PageHero
+                <PageHero category="hr"
                     icon={HeartPulse}
                     title="Wellbeing & Engagement"
                     description="Workload risk indicators, survey sentiment, and action plans."

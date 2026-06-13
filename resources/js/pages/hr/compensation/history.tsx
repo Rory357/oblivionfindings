@@ -94,7 +94,7 @@ export default function CompensationHistory({ profile, history, can }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref={`/hr/people/${profile.id}`}
                         title="Compensation History"

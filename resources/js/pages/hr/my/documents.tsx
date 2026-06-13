@@ -235,7 +235,7 @@ export default function MyDocuments({ documents, categories }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={FileText}
                         title="My Documents"
                         description="Your employment documents and records."

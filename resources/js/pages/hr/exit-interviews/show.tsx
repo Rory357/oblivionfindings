@@ -116,7 +116,7 @@ export default function ExitInterviewShow({ interview, can }: Props) {
             />
 
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero category="hr" variant="compact"
                     title={`Exit Interview: ${interview.employee_profile?.user?.name ?? 'Unknown'}`}
                     description={`Conducted on ${formatDate(interview.interview_date)}`}
                 />

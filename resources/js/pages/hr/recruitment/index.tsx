@@ -170,7 +170,7 @@ export default function RecruitmentIndex({
         >
             <Head title="Recruitment Pipeline" />
             <PageShell>
-                <PageHero
+                <PageHero category="hr"
                     icon={UserPlus}
                     title="Recruitment Pipeline"
                     description="Track candidates through the hiring process."

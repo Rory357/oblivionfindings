@@ -117,7 +117,7 @@ export default function Holidays({ holidays, year, can }: Props) {
             <Head title="Public Holidays" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={CalendarDays}
                         title="Public Holidays"
                         description="Manage public holidays used for NZ leave calculations."

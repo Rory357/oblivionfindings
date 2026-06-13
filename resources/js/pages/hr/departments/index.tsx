@@ -372,7 +372,7 @@ export default function DepartmentsIndex({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={Building}
                         title="Departments"
                         description={`Manage organisational departments — ${departments.total} total.`}

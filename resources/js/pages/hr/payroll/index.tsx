@@ -334,7 +334,7 @@ export default function PayrollIndex({
             <Head title="Payroll" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={Banknote}
                         title="Payroll Runs"
                         description="Manage payroll periods, lock runs, and export to your payroll provider."

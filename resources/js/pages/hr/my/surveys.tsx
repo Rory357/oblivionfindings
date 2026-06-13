@@ -333,7 +333,7 @@ export default function MySurveys({ surveys }: Props) {
             <Head title="My Surveys" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={MessageSquare}
                         title="My Surveys"
                         description="Take part in organisational pulse and feedback surveys."

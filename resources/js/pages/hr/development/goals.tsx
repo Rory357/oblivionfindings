@@ -145,7 +145,7 @@ export default function DevelopmentGoals({
         >
             <Head title="Development Goals" />
             <PageShell>
-                <PageHero
+                <PageHero category="hr"
                     icon={Target}
                     title="Development Goals"
                     description="Track growth plans, competency progression, and manager coaching outcomes."

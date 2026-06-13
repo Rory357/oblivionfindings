@@ -125,7 +125,7 @@ export default function AssetsIndex({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={Box}
                         title="Asset Management"
                         description="Track company assets and their assignments"

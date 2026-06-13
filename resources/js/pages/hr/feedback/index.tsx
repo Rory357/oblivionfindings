@@ -163,7 +163,7 @@ export default function FeedbackIndex({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={MessageCircle}
                         title="360-Degree Feedback"
                         description="Manage and respond to feedback requests across your team."

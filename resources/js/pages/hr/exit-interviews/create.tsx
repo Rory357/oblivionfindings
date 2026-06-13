@@ -86,7 +86,7 @@ export default function ExitInterviewCreate({
             <Head title="Record Exit Interview" />
 
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero category="hr" variant="compact"
                     title="Record Exit Interview"
                     description="Capture structured departure feedback."
                 />

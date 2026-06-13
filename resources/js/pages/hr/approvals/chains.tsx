@@ -141,7 +141,7 @@ export default function ApprovalChains({
             <Head title="Approval Chains" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={GitBranch}
                         title="Approval Chains"
                         description="Configure multi-level approval workflows for HR processes."

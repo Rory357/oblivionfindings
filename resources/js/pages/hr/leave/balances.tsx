@@ -95,7 +95,7 @@ export default function LeaveBalances({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={CalendarDays}
                         title="Leave Balances"
                         description={`Staff leave entitlements and usage for ${year}.`}

@@ -88,7 +88,7 @@ export default function DriversIndex({ records, summary, filters }: Props) {
             <Head title="Driver Eligibility" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={Car}
                         title="Driver Eligibility Register"
                         description="Staff driving licence status, eligibility, and expiry tracking."

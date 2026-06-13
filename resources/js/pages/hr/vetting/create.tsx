@@ -57,7 +57,7 @@ export default function CreateVetting({ staff, checkTypes }: Props) {
             <Head title="Add Background Check" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref="/hr/compliance/vetting"
                         title="Add Background Check"

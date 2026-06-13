@@ -177,7 +177,7 @@ export default function AuditLogIndex({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Audit Log - HR Settings" />
             <PageShell>
-                <PageHero
+                <PageHero category="hr"
                     icon={History}
                     title="Audit Log"
                     description="View all HR module activity and changes."

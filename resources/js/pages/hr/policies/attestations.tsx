@@ -72,7 +72,7 @@ export default function PolicyAttestations({ attestations, filters }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={ShieldCheck}
                         title="Policy Attestations"
                         description="Track staff acknowledgement and attestation of organisational policies."

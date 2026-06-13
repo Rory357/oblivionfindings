@@ -222,7 +222,7 @@ export default function FeedbackRequest({
             <Head title="Request 360 Feedback" />
             <div className="space-y-6 p-4 lg:p-6">
                 {/* Header */}
-                <PageHero
+                <PageHero category="hr"
                     icon={MessageCircle}
                     backHref="/hr/feedback"
                     backLabel="Back to Feedback"

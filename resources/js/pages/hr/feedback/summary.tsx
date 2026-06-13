@@ -127,7 +127,7 @@ export default function FeedbackSummary({
             <Head title={`Feedback Summary - ${subjectUser.name}`} />
             <div className="space-y-6 p-4 lg:p-6">
                 {/* Hero Banner */}
-                <PageHero
+                <PageHero category="hr"
                     icon={BarChart3}
                     backHref="/hr/feedback"
                     backLabel="Back to Feedback"

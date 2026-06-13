@@ -81,7 +81,7 @@ export default function EditPosition({
             <Head title={`Edit ${position.title}`} />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref="/hr/positions"
                         title="Edit Position"

@@ -139,7 +139,7 @@ export default function CreatePolicy({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref="/hr/policies"
                         title="Create New Policy"

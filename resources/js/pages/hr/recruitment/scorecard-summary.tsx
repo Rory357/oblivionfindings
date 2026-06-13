@@ -146,7 +146,7 @@ export default function ScorecardSummary({
         >
             <Head title={`Scorecards - ${fullName}`} />
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero category="hr" variant="compact"
                     title="Scorecard Summary"
                     description={`${fullName} - ${application.position_title} (${scorecards.length} scorecards)`}
                     actions={

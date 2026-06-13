@@ -107,7 +107,7 @@ export default function ExitInterviewTrends({ trends, filters }: Props) {
             <Head title="Exit Interview Trends" />
 
             <PageShell>
-                <PageHero
+                <PageHero category="hr"
                     icon={TrendingUp}
                     title="Exit Interview Trends"
                     description="Aggregate analysis of departure feedback."

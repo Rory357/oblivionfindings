@@ -108,7 +108,7 @@ export default function PoliciesIndex({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={BookOpen}
                         title="Policy Library"
                         description="Organisation policies, procedures, and staff attestations."

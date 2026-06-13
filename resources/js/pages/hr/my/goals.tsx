@@ -351,7 +351,7 @@ export default function MyGoals({ goals }: Props) {
             <Head title="My Goals" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={Target}
                         title="My Development Goals"
                         description="Track and update your development and performance goals."

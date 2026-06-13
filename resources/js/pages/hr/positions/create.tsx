@@ -59,7 +59,7 @@ export default function CreatePosition({
             <Head title="Create Position" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref="/hr/positions"
                         title="Create Position"

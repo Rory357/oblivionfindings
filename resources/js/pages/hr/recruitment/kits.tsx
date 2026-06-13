@@ -167,7 +167,7 @@ export default function InterviewKits({ kits, roles, can }: Props) {
         >
             <Head title="Interview Kits" />
             <PageShell>
-                <PageHero
+                <PageHero category="hr"
                     icon={Package}
                     title="Interview Kits"
                     description="Structured scorecards and interview criteria for consistent hiring decisions."

@@ -315,7 +315,7 @@ export default function DirectoryShow({
                         heroStats.push({ label: 'Compliant', value: `${complianceRate}%` });
 
                     return (
-                        <PageHero
+                        <PageHero category="hr"
                             backHref="/hr/directory"
                             backLabel="Back to Directory"
                             avatar={{

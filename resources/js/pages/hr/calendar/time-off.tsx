@@ -127,7 +127,7 @@ export default function TimeOffCalendar({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={CalendarOff}
                         title="Time Off Calendar"
                         description="See who is off each day, colour-coded by leave type."

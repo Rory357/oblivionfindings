@@ -69,7 +69,7 @@ export default function ShowPosition({ position, can }: Props) {
             <Head title={position.title} />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref="/hr/positions"
                         title={

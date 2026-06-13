@@ -65,7 +65,7 @@ export default function JobPostingShow({
             <Head title={posting.title} />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref="/hr/job-postings"
                         title={posting.title}

@@ -51,7 +51,7 @@ export default function AnnouncementCreate({ priorities, audiences }: Props) {
             <Head title="Create Announcement" />
 
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero category="hr" variant="compact"
                     title="Create Announcement"
                     description="Publish a new announcement to staff."
                 />

@@ -153,7 +153,7 @@ export default function CustomFieldsIndex({ definitions, fieldTypes }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Custom Fields - HR Settings" />
             <PageShell>
-                <PageHero
+                <PageHero category="hr"
                     icon={Settings}
                     title="Custom Fields"
                     description="Define custom fields for employee profiles."

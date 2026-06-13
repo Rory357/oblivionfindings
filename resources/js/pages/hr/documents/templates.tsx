@@ -85,7 +85,7 @@ export default function DocumentTemplates({
             <Head title="Document Templates" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={FileText}
                         title="Document Templates"
                         description="Manage templates for HR documents and letters."

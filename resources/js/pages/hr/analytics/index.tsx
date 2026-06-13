@@ -108,7 +108,7 @@ export default function AnalyticsDashboard({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={BarChart3}
                         title="Workforce Analytics"
                         description="Showing last 12 months of workforce trends and compliance metrics."

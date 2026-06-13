@@ -162,7 +162,7 @@ export default function MyExpenses({ claims, categories }: Props) {
             <Head title="My Expenses" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={FileText}
                         title="My Expenses"
                         description="Submit, track, and review your expense claims."

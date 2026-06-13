@@ -132,7 +132,7 @@ export default function WebhooksIndex({ webhooks, availableEvents }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Webhooks - HR Settings" />
             <PageShell>
-                <PageHero
+                <PageHero category="hr"
                     icon={Webhook}
                     title="Webhooks"
                     description="Manage webhook endpoints for HR event notifications."

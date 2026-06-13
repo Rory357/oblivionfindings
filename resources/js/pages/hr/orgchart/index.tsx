@@ -238,7 +238,7 @@ export default function OrgChartIndex({ hierarchy, can }: Props) {
             <Head title="Organisation Chart" />
             <PageShell>
                 <div className="px-6 pt-6">
-                    <PageHero
+                    <PageHero category="hr"
                         icon={Network}
                         title="Organisation Chart"
                         description={`Showing ${totalCount} active employee${totalCount !== 1 ? 's' : ''} across the organisation.`}

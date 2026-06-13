@@ -212,7 +212,7 @@ export default function PerformanceReviews({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={TrendingUp}
                         title="Performance Reviews"
                         description="Track and manage staff performance reviews."

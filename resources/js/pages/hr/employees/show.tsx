@@ -634,7 +634,7 @@ export default function EmployeeShow({
                         .toFixed(0);
 
                     return (
-                        <PageHero
+                        <PageHero category="hr"
                             avatar={{
                                 src: p.profile_photo_path ?? undefined,
                                 fallback: getInitials(p.user.name),

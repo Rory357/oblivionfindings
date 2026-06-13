@@ -84,7 +84,7 @@ export default function ComplianceCalendar({ events, filters }: Props) {
             <Head title="Compliance Calendar" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={Calendar}
                         title="Compliance Calendar"
                         description="Upcoming compliance events, vetting checks, and training expiry dates."

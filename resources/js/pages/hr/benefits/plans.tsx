@@ -114,7 +114,7 @@ export default function BenefitPlans({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={Gift}
                         title="Benefit Plans"
                         description="Manage available benefit plans for employees."

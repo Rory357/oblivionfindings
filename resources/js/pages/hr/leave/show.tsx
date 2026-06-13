@@ -80,7 +80,7 @@ export default function ShowLeave({ request, can }: Props) {
             <Head title={`Leave Request #${request.id}`} />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref="/hr/leave"
                         title={`Leave Request #${request.id}`}

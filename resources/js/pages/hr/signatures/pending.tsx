@@ -59,7 +59,7 @@ export default function PendingSignatures({ signatures }: Props) {
             <Head title="Pending Signatures" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={PenSquare}
                         title="Documents Awaiting Signature"
                         description="Review and sign documents that require your signature."

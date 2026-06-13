@@ -185,7 +185,7 @@ export default function CalendarIndex({
             <Head title="Company Calendar" />
 
             <PageShell>
-                <PageHero
+                <PageHero category="hr"
                     icon={Calendar}
                     title="Company Calendar"
                     description="View company events, training, and approved leave."

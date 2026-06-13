@@ -134,7 +134,7 @@ export default function TrainingIndex({
             <Head title="Training Dashboard" />
             <div className="space-y-6 p-4 lg:p-6">
                 {/* Hero Banner */}
-                <PageHero
+                <PageHero category="hr"
                     icon={GraduationCap}
                     title="Training Dashboard"
                     description="Monitor training renewals, compliance and overdue records"

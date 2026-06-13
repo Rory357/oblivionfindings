@@ -146,7 +146,7 @@ export default function DirectoryIndex({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={Users}
                         title="Employee Directory"
                         description={`${employees.total} team member${employees.total !== 1 ? 's' : ''} across the organisation.`}

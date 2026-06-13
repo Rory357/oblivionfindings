@@ -57,7 +57,7 @@ export default function CreateLeave({ staff, leaveTypes }: Props) {
             <Head title="Create Leave Request" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref="/hr/leave"
                         title="Create Leave Request"
