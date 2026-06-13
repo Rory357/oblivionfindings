@@ -59,7 +59,7 @@ export default function BonusIndex({ bonuses, can }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Bonus Payments" />
             <PageShell>
-                <PageHero
+                <PageHero category="hr"
                     icon={Banknote}
                     title="Bonus Payments"
                     description="Track and manage employee bonuses and incentives."

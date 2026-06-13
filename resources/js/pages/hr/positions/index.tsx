@@ -94,7 +94,7 @@ export default function PositionsIndex({
             <Head title="Positions" />
 
             <PageShell>
-                <PageHero
+                <PageHero category="hr"
                     icon={Briefcase}
                     title="Positions"
                     description="Manage job positions, headcount budgets and organisational structure."

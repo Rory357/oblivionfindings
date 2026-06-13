@@ -113,7 +113,7 @@ export default function CreateExpense({ categories }: Props) {
             <Head title="New Expense Claim" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref="/hr/expenses"
                         title="New Expense Claim"

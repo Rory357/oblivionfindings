@@ -240,7 +240,7 @@ export default function CompensationReviewDetail({
                 <Head title="New Compensation Review" />
                 <PageLayout
                     hero={
-                        <PageHero
+                        <PageHero category="hr"
                             variant="compact"
                             backHref="/hr/compensation/reviews"
                             title="New Compensation Review"
@@ -478,7 +478,7 @@ export default function CompensationReviewDetail({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref="/hr/compensation/reviews"
                         title={review.title}

@@ -181,7 +181,7 @@ export default function EditPolicy({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref="/hr/policies"
                         title="Edit Policy"

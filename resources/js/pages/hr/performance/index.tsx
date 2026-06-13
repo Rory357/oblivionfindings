@@ -284,7 +284,7 @@ export default function PerformanceIndex({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={Target}
                         title="Performance & Supervision"
                         description="Supervision notes, performance reviews, and staff development."

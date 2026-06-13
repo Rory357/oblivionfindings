@@ -128,7 +128,7 @@ export default function EditReview({ review, reviewTypes }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref={`/hr/performance/reviews/${review.id}`}
                         title="Edit Performance Review"

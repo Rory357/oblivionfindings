@@ -60,7 +60,7 @@ export default function SuccessionIndex({ plans, can }: Props) {
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Succession Planning" />
-            <PageHero
+            <PageHero category="hr"
                 icon={Users}
                 title="Succession Planning"
                 description="Identify and develop talent for key roles."

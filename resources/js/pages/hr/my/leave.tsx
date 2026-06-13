@@ -111,7 +111,7 @@ export default function MyLeave({ requests, balances, leaveTypes }: Props) {
             <Head title="My Leave" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={CalendarDays}
                         title="My Leave"
                         description="Submit and track your leave requests and balances."

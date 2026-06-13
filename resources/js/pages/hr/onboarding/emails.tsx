@@ -78,7 +78,7 @@ export default function OnboardingEmails({
             <Head title="Onboarding Email Templates" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref="/hr/onboarding"
                         title="Onboarding Email Templates"

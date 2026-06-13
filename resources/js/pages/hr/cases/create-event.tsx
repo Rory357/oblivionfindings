@@ -63,7 +63,7 @@ export default function CreateEvent({ hrCase, eventTypes }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref={`/hr/cases/${hrCase.id}`}
                         backLabel="Back to Case"

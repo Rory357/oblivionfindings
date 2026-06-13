@@ -387,7 +387,7 @@ export default function GoalsIndex({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={Target}
                         title="Goals & OKRs"
                         description="Track objectives, key results, and team alignment across the organisation."

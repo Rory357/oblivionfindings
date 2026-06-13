@@ -96,7 +96,7 @@ export default function JobPostingIndex({
             <Head title="Job Postings" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={Briefcase}
                         title="Job Postings"
                         description="Manage job listings for your career portal."

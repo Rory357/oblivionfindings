@@ -112,7 +112,7 @@ export default function EditSupervision({ note, staff, sessionTypes }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref={`/hr/performance/supervision/${note.id}`}
                         title="Edit Supervision Note"

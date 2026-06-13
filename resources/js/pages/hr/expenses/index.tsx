@@ -98,7 +98,7 @@ export default function ExpenseIndex({ claims, filters, can }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={Receipt}
                         title="Expense Claims"
                         description="Manage employee expense claims and reimbursements"

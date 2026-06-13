@@ -142,7 +142,7 @@ export default function RecruitmentAnalytics({
         >
             <Head title="Recruitment Analytics" />
             <PageShell>
-                <PageHero
+                <PageHero category="hr"
                     icon={BarChart3}
                     title="Recruitment Analytics"
                     description="Insights into your recruitment pipeline performance."

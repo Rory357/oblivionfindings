@@ -289,7 +289,7 @@ export default function HrAutomationsPage({
             <Head title="HR Automations" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={Settings}
                         title="HR Automations"
                         description="Configure rules that fire actions when HR events occur."

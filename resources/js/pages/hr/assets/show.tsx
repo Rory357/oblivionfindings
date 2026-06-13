@@ -179,7 +179,7 @@ export default function AssetShow({ asset, employees, can }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref="/hr/assets"
                         title={

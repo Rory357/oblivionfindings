@@ -132,7 +132,7 @@ export default function PolicyShow({ policy, attestationStats, can }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref="/hr/policies"
                         title={

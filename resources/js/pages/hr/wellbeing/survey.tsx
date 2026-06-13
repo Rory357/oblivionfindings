@@ -199,7 +199,7 @@ export default function WellbeingSurveyShow({
         >
             <Head title={`Survey · ${survey.title}`} />
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero category="hr" variant="compact"
                     title={survey.title}
                     description={survey.description ?? 'Engagement survey'}
                     actions={

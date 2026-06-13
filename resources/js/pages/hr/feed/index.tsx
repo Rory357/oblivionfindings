@@ -159,7 +159,7 @@ export default function FeedIndex({
             <Dialog open={kudosOpen} onOpenChange={setKudosOpen}>
                 <PageLayout
                     hero={
-                        <PageHero
+                        <PageHero category="hr"
                             icon={Rss}
                             title="Community Feed"
                             description="Stay connected with your team."

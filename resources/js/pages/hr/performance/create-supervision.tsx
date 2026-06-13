@@ -96,7 +96,7 @@ export default function CreateSupervision({ staff, sessionTypes }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref="/hr/performance"
                         title="Add Supervision Note"

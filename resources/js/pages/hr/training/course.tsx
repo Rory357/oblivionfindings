@@ -231,7 +231,7 @@ export default function CourseDetail({ course, users, can }: Props) {
                     if (course.cost) heroMeta.push({ label: formatCurrency(course.cost) });
 
                     return (
-                        <PageHero
+                        <PageHero category="hr"
                             icon={Book}
                             backHref="/hr/training/catalog"
                             backLabel="Back to Catalog"

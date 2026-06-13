@@ -239,7 +239,7 @@ export default function OnboardingIndex({
             <Head title="Onboarding" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={UserPlus}
                         title="Onboarding Checklists"
                         description="Track and manage onboarding checklists for new employees."

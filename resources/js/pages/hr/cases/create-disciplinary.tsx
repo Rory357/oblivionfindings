@@ -82,7 +82,7 @@ export default function CreateDisciplinary({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref={`/hr/cases/${hrCase.id}`}
                         backLabel="Back to Case"

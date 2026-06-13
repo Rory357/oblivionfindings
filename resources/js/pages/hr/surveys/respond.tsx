@@ -84,7 +84,7 @@ export default function RespondSurvey({ survey }: Props) {
             <PageLayout
                 width="narrow"
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref="/hr/surveys"
                         title={survey.title}

@@ -213,7 +213,7 @@ export default function MyPayslips({ payslips }: Props) {
             <Head title="My Payslips" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={Receipt}
                         title="My Payslips"
                         description="View your pay history and download payslips."

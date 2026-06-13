@@ -328,7 +328,7 @@ export default function StaffDocuments({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref={`/hr/people/${profile.id}`}
                         title="Documents"

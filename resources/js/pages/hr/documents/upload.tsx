@@ -51,7 +51,7 @@ export default function UploadDocument({ employees, categories }: Props) {
             <Head title="Upload HR Document" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref="/hr/documents"
                         title="Upload HR Document"

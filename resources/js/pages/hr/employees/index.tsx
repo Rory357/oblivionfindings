@@ -277,7 +277,7 @@ export default function EmployeesIndex({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={Users}
                         title="People"
                         description={`Manage your workforce — ${profiles.total} ${profiles.total === 1 ? 'person' : 'people'} total.`}

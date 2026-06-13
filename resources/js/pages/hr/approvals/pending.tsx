@@ -91,7 +91,7 @@ export default function PendingApprovals({ instances, can }: Props) {
             <Head title="Pending Approvals" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={CheckCircle2}
                         title="Pending Approvals"
                         description="Review and action pending approval requests."

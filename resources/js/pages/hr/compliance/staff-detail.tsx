@@ -119,7 +119,7 @@ export default function StaffComplianceDetail({
             <Head title={`Compliance - ${staff.name}`} />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref="/hr/compliance"
                         title={staff.name}

@@ -114,7 +114,7 @@ export default function PipIndex({ pips, stats, filters, can }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={ShieldAlert}
                         title="Performance Improvement Plans"
                         description="Manage and track employee improvement plans."

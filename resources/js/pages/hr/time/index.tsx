@@ -372,7 +372,7 @@ export default function TimeIndex({
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Timekeeping" />
-            <PageHero
+            <PageHero category="hr"
                 icon={Clock}
                 title="Timekeeping"
                 description="Clocking, time entries, period timesheets, and shift timesheets."

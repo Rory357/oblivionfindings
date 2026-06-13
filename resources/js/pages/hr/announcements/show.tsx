@@ -124,7 +124,7 @@ export default function AnnouncementShow({
             <Head title={announcement.title} />
 
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero category="hr" variant="compact"
                     title={announcement.title}
                     description={`Published ${formatDate(announcement.published_at)}`}
                 />

@@ -124,7 +124,7 @@ export default function AnnouncementsIndex({
             <Head title="Announcements" />
 
             <PageShell>
-                <PageHero
+                <PageHero category="hr"
                     icon={Megaphone}
                     title="Announcements"
                     description="Company-wide announcements and communications."

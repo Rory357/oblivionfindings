@@ -45,7 +45,7 @@ export default function SuccessionCreate({ positions, employees }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Create Succession Plan" />
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero category="hr" variant="compact"
                     title="Create Succession Plan"
                     description="Define a key role and identify potential successors."
                 />

@@ -168,7 +168,7 @@ export default function SignDocument({ signature, can }: Props) {
             <Head title={`Sign: ${signature.document_title}`} />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref="/hr/signatures/pending"
                         title="Sign Document"

@@ -144,7 +144,7 @@ export default function SalaryBands({ bands, filters, can }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={DollarSign}
                         title="Salary Bands"
                         description="Manage salary bands by position role."

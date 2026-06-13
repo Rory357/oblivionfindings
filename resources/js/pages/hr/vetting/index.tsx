@@ -135,7 +135,7 @@ export default function VettingIndex({ checks, summary, filters, can }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={ShieldCheck}
                         title="Vetting Register"
                         description="Staff background checks, DBS, and vetting records."

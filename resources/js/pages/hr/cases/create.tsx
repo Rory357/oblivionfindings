@@ -77,7 +77,7 @@ export default function CreateCase({ staff, caseTypes, severities }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref="/hr/cases"
                         title="New HR Case"

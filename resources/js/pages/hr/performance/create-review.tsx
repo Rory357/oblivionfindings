@@ -107,7 +107,7 @@ export default function CreateReview({ staff, reviewTypes }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref="/hr/performance/reviews"
                         title="Schedule Performance Review"

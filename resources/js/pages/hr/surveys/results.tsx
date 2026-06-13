@@ -95,7 +95,7 @@ export default function SurveyResults({ survey, results, enps, can }: Props) {
             <Head title={`Results: ${survey.title}`} />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref="/hr/surveys"
                         title={survey.title}

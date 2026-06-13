@@ -131,7 +131,7 @@ export default function SkillsMatrix({
             <Head title="Skills Matrix" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={Award}
                         title="Skills Matrix"
                         description={`Employee skills overview. ${can.assess ? 'Click a cell to assess.' : ''}`}

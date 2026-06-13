@@ -269,7 +269,7 @@ export default function HrCaseShow({ case: hrCase, timeline, can }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref="/hr/cases"
                         title={

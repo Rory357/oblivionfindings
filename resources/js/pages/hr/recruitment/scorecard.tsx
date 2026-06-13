@@ -154,7 +154,7 @@ export default function ScorecardForm({ interview, existing }: Props) {
         >
             <Head title={`Scorecard - ${fullName}`} />
             <PageShell>
-                <PageHero
+                <PageHero category="hr"
                     icon={ClipboardCheck}
                     title="Interview Scorecard"
                     description={`Evaluate ${fullName} for ${interview.application.position_title}`}

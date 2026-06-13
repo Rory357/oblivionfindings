@@ -107,7 +107,7 @@ export default function EditVetting({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref="/hr/compliance/vetting"
                         title="Edit Background Check"

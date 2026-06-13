@@ -1019,7 +1019,7 @@ export default function CandidateShow({
                         );
 
                     return (
-                        <PageHero
+                        <PageHero category="hr"
                             avatar={{ fallback: initials }}
                             title={fullName}
                             meta={heroMeta}

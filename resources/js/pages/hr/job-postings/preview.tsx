@@ -55,7 +55,7 @@ export default function PreviewJobPosting({ posting }: Props) {
             <PageLayout
                 width="narrow"
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref={`/hr/job-postings/${posting.id}`}
                         title={`Preview: ${posting.title}`}

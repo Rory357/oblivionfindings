@@ -79,7 +79,7 @@ export default function SurveyIndex({ surveys, filters, can }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={ClipboardList}
                         title="Employee Surveys"
                         description="Create and manage satisfaction surveys"

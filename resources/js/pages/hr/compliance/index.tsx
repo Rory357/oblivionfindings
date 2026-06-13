@@ -123,7 +123,7 @@ export default function ComplianceIndex({
             <Head title="Staff Compliance" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={ShieldCheck}
                         title="Staff Compliance"
                         description="Monitor staff compliance with training and certification requirements."

@@ -167,7 +167,7 @@ export default function BenefitsIndex({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={Heart}
                         title="Benefits Enrollments"
                         description="Overview of employee benefit plan enrollments"

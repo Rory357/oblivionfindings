@@ -104,7 +104,7 @@ export default function SkillsIndex({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={Star}
                         title="Skills"
                         description="Manage organisational skills and competencies"

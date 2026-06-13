@@ -62,7 +62,7 @@ export default function CreateAsset({ categories }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref="/hr/assets"
                         title="Create Asset"

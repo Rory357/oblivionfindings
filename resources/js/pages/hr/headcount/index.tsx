@@ -69,7 +69,7 @@ export default function HeadcountIndex({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Headcount Planning" />
             <PageShell>
-                <PageHero
+                <PageHero category="hr"
                     icon={Users}
                     title="Headcount Planning"
                     description="Workforce planning, forecasting, and attrition analysis."

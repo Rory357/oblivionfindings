@@ -153,7 +153,7 @@ export default function MyTraining({ complianceStatuses }: Props) {
             <Head title="My Training & Compliance" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={GraduationCap}
                         title="My Training & Compliance"
                         description="Track your compliance requirements and certifications."

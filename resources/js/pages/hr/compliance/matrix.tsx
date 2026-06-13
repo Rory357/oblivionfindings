@@ -178,7 +178,7 @@ export default function ComplianceMatrix({
             <Head title="Compliance Matrix" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={ShieldCheck}
                         title="Compliance Matrix"
                         description="Configure compliance requirements and role assignments."

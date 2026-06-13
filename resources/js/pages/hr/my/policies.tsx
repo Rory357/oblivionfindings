@@ -68,7 +68,7 @@ export default function MyPolicies({ policies }: Props) {
             <Head title="My Policies" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={BookOpen}
                         title="My Policies"
                         description="View and attest to required organisational policies."

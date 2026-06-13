@@ -107,7 +107,7 @@ export default function CompensationReviews({ reviews, filters, can }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={DollarSign}
                         title="Compensation Reviews"
                         description="Manage compensation review cycles and bulk salary adjustments."

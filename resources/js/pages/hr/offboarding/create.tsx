@@ -53,7 +53,7 @@ export default function CreateOffboarding({
             <Head title="Start Offboarding Checklist" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref="/hr/offboarding"
                         title="Start Offboarding Checklist"

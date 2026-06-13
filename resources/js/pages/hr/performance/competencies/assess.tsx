@@ -87,7 +87,7 @@ export default function CompetencyAssess({ competencies, staff }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref="/hr/performance/competencies"
                         title="Competency Assessment"

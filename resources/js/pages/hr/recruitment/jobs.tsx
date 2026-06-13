@@ -276,7 +276,7 @@ export default function RecruitmentJobs({
         >
             <Head title="Job Requisitions" />
             <PageShell>
-                <PageHero
+                <PageHero category="hr"
                     icon={Briefcase}
                     title="Job Requisitions"
                     description="Create and publish roles to the public careers page."

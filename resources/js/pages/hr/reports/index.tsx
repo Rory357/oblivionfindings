@@ -279,7 +279,7 @@ export default function ReportsIndex({
             <Head title="HR Reports" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={BarChart3}
                         title="HR Reports"
                         description="Export, schedule, and subscribe to HR analytics reports."

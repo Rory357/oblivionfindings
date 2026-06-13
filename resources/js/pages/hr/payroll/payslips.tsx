@@ -127,7 +127,7 @@ export default function PayslipsIndex({
             <Head title="Payslips" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={Receipt}
                         title="Payslips"
                         description="Generate, review, and distribute employee payslips."

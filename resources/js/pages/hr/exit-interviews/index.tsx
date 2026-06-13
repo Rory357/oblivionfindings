@@ -111,7 +111,7 @@ export default function ExitInterviewsIndex({
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title="Exit Interviews" />
 
-            <PageHero
+            <PageHero category="hr"
                 icon={LogOut}
                 title="Exit Interviews"
                 description="Track departure feedback and identify retention insights."

@@ -306,7 +306,7 @@ export default function MyReviews({ reviews }: Props) {
             <Head title="My Reviews" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={TrendingUp}
                         title="My Performance Reviews"
                         description="View and respond to your performance review cycles."

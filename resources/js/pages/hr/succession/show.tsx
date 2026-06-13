@@ -49,7 +49,7 @@ export default function SuccessionShow({ plan, can }: Props) {
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Succession: ${plan.role_title}`} />
             <PageShell>
-                <PageHero variant="compact"
+                <PageHero category="hr" variant="compact"
                     title={plan.role_title}
                     description={plan.department || 'Succession Plan'}
                 />

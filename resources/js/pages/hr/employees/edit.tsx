@@ -105,7 +105,7 @@ export default function EmployeeEdit({
             <Head title={`Edit ${profile.user.name}`} />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref="/hr/people"
                         title={`Edit ${profile.user.name}`}

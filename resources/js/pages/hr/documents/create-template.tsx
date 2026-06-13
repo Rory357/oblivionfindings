@@ -78,7 +78,7 @@ export default function CreateTemplate() {
             <Head title="Create Document Template" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref="/hr/documents/templates"
                         title="Create Document Template"

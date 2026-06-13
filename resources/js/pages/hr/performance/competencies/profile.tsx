@@ -97,7 +97,7 @@ export default function CompetencyProfile({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref="/hr/performance/competencies"
                         title={employee.name}

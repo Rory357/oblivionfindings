@@ -106,7 +106,7 @@ export default function ImportExportIndex() {
             ]}
         >
             <Head title="Employee Import / Export" />
-            <PageHero
+            <PageHero category="hr"
                 icon={UploadCloud}
                 title="Employee Import / Export"
                 description="Bulk import or export employee records via CSV."

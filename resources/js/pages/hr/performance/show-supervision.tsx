@@ -82,7 +82,7 @@ export default function ShowSupervision({ note, can }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         variant="compact"
                         backHref="/hr/performance"
                         title="Supervision Note"

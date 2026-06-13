@@ -179,7 +179,7 @@ export default function HrCasesIndex({ cases, summary, filters, can }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="hr"
                         icon={Folder}
                         title="HR Cases"
                         description="Manage disciplinary, grievance, and investigation workflows."
