@@ -95,7 +95,10 @@ Live-verify the HR gradient on oblivionfindings.com after deploy (next loop tick
   step machine. The first *real* HR wizard ships in M1 (`AddEmployeeDialog`) using this wrapper.
   *Acceptance:* shared wrapper + hook in place, tested; adoption begins M1.
 
-### M1 — People hub: directory + profile + org chart + positions/departments
+### M1 — People hub: directory + profile + org chart + positions/departments `[in progress — branch hr/m1-people]`
+
+Done so far (committed on branch, gates green): **M1-2 Add-Employee wizard** + **M1-4 org-chart permission fix & reassign**.
+Remaining before merge: M1-1 (hub tabs + directory merge), M1-3 (profile edit modal + custom fields), M1-5 (photo + true totals).
 
 - **M1-1 Merge the two employee lists.** *Problem:* `DirectoryController`/`directory/*` and
   `EmployeeProfileController`/`employees/*` are parallel people lists with duplicated avatar helpers.

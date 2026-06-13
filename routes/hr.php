@@ -206,6 +206,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::get('/people/{profile}/documents/{document}/download', [HrDocumentController::class, 'download'])->name('people.documents.download');
 
         Route::middleware('permission:hr.employees.manage')->group(function () {
+            Route::post('/people', [EmployeeProfileController::class, 'store'])->name('people.store');
             Route::get('/people/{profile}/edit', [EmployeeProfileController::class, 'edit'])->name('people.edit');
             Route::put('/people/{profile}', [EmployeeProfileController::class, 'update'])->name('people.update');
             Route::post('/people/{profile}/documents', [HrDocumentController::class, 'storeForProfile'])->name('people.documents.store');

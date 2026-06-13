@@ -1,3 +1,7 @@
+import {
+    AddEmployeeDialog,
+    type AddEmployeeFormData,
+} from '@/components/hr/add-employee-dialog';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -18,12 +22,14 @@ import {
     Briefcase,
     Clock,
     Download,
+    Plus,
     Search,
     ShieldAlert,
     UserPlus,
     Users,
     X,
 } from 'lucide-react';
+import { useState } from 'react';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -67,6 +73,7 @@ interface Props {
         compliance_alerts: number;
         type_counts: Record<string, number>;
     };
+    formData: AddEmployeeFormData | null;
     can: { manage: boolean };
 }
 
@@ -216,8 +223,11 @@ export default function EmployeesIndex({
     departments,
     filters,
     summary,
+    formData,
     can,
 }: Props) {
+    const [addOpen, setAddOpen] = useState(false);
+
     function applyFilter(key: string, value: string | null) {
         router.get(
             '/hr/people',
@@ -288,15 +298,27 @@ export default function EmployeesIndex({
                             { label: 'Compliance alerts', value: summary.compliance_alerts },
                         ]}
                         actions={can.manage ? (
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={submitExport}
-                                className="gap-1.5 border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                            >
-                                <Download className="h-4 w-4" />
-                                Export
-                            </Button>
+                            <div className="flex items-center gap-2">
+                                {formData ? (
+                                    <Button
+                                        size="sm"
+                                        onClick={() => setAddOpen(true)}
+                                        className="gap-1.5 bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                                    >
+                                        <Plus className="h-4 w-4" />
+                                        Add employee
+                                    </Button>
+                                ) : null}
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={submitExport}
+                                    className="gap-1.5 border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                >
+                                    <Download className="h-4 w-4" />
+                                    Export
+                                </Button>
+                            </div>
                         ) : null}
                     />
                 }
@@ -643,6 +665,16 @@ export default function EmployeesIndex({
                     <LaravelPagination links={profiles.links} />
                 )}
             </PageLayout>
+
+            {formData ? (
+                <AddEmployeeDialog
+                    open={addOpen}
+                    onClose={() => setAddOpen(false)}
+                    formData={formData}
+                    departments={departments}
+                    sites={sites}
+                />
+            ) : null}
         </AppLayout>
     );
 }

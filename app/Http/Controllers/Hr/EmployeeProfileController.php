@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Requests\Hr\StoreEmployeeRequest;
 use App\Http\Requests\Hr\UpdateEmployeeProfileRequest;
 use App\Domain\Hr\Models\HrAssetAssignment;
 use App\Domain\Hr\Models\HrCase;
@@ -13,6 +14,7 @@ use App\Domain\Hr\Models\HrDevelopmentGoal;
 use App\Domain\Hr\Models\HrDriverEligibility;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrEmployeeSkill;
+use App\Domain\Hr\Models\HrPosition;
 use App\Domain\Hr\Models\HrLeaveBalance;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrOnboardingChecklist;
@@ -22,10 +24,13 @@ use App\Domain\Hr\Models\HrPolicyAttestation;
 use App\Domain\Hr\Models\HrProbationReview;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Domain\Hr\Models\HrSupervisionNote;
+use App\Models\Role;
 use App\Models\Site;
 use App\Models\StaffBackgroundCheck;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 
 class EmployeeProfileController extends Controller
@@ -138,10 +143,31 @@ class EmployeeProfileController extends Controller
             ->orderBy('name')
             ->get(['id', 'name']);
 
+        // Option data for the Add-Employee wizard (manager-only surface).
+        $canManage = $user->canDo('hr.employees.manage');
+        $formData = $canManage ? [
+            'positions' => HrPosition::query()
+                ->where(fn ($q) => $q->where('tenant_id', $user->tenant_id)->orWhereNull('tenant_id'))
+                ->orderBy('title')
+                ->get(['id', 'title'])
+                ->map(fn ($p) => ['id' => $p->id, 'title' => $p->title])
+                ->values(),
+            'managers' => User::query()->staff()->orderBy('name')->get(['id', 'name'])
+                ->map(fn ($u) => ['value' => (string) $u->id, 'label' => $u->name])
+                ->values(),
+            'roles' => Role::query()->orderBy('name')->get(['name'])
+                ->map(fn ($r) => ['value' => $r->name, 'label' => ucwords(str_replace('_', ' ', $r->name))])
+                ->values(),
+            'employmentTypes' => collect(['full_time', 'part_time', 'casual', 'fixed_term', 'contractor'])
+                ->map(fn ($v) => ['value' => $v, 'label' => ucwords(str_replace('_', ' ', $v))])
+                ->values(),
+        ] : null;
+
         return Inertia::render('hr/employees/index', [
             'profiles' => $profiles,
             'sites' => $sites,
             'departments' => $departments,
+            'formData' => $formData,
             'filters' => [
                 'q' => $search,
                 'status' => $status,
@@ -161,6 +187,72 @@ class EmployeeProfileController extends Controller
                 'manage' => $user->canDo('hr.employees.manage'),
             ],
         ]);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Store — create a new employee (User + profile + role)               */
+    /* ------------------------------------------------------------------ */
+
+    public function store(StoreEmployeeRequest $request)
+    {
+        $actor = $request->user();
+        $data = $request->validated();
+        $roleName = $data['role'] ?? 'support_worker';
+
+        $positionTitle = $data['position_title'] ?? null;
+        if (empty($positionTitle) && ! empty($data['position_id'])) {
+            $positionTitle = HrPosition::find($data['position_id'])?->title;
+        }
+
+        $profile = DB::transaction(function () use ($data, $actor, $roleName, $positionTitle) {
+            $newUser = User::create([
+                'name' => $data['name'],
+                'email' => $data['email'],
+                'role' => $roleName,
+                'password' => bcrypt(Str::random(40)),
+                'approved_at' => now(),
+                'approved_by' => $actor->id,
+            ]);
+
+            $role = Role::where('name', $roleName)->first();
+            if ($role) {
+                $newUser->roles()->syncWithoutDetaching([$role->id]);
+            }
+
+            // hr_employee_profiles requires position_title / position_role /
+            // employment_type / start_date (NOT NULL). Quick-add fills sensible
+            // defaults the user can refine on the profile.
+            return HrEmployeeProfile::create([
+                'tenant_id' => $actor->tenant_id ?? 1,
+                'user_id' => $newUser->id,
+                'employee_number' => $this->generateEmployeeNumber(),
+                'preferred_name' => $data['preferred_name'] ?? null,
+                'position_id' => $data['position_id'] ?? null,
+                'position_title' => $positionTitle ?: 'New starter',
+                'position_role' => $roleName,
+                'employment_type' => $data['employment_type'] ?? 'full_time',
+                'department' => $data['department'] ?? null,
+                'primary_site_id' => $data['primary_site_id'] ?? null,
+                'manager_user_id' => $data['manager_user_id'] ?? null,
+                'start_date' => $data['start_date'] ?? now()->toDateString(),
+                'work_email' => $data['email'],
+                'work_phone' => $data['work_phone'] ?? null,
+                'is_active' => true,
+                'created_by' => $actor->id,
+                'updated_by' => $actor->id,
+            ]);
+        });
+
+        return redirect()
+            ->route('hr.people.show', $profile->id)
+            ->with('success', "{$data['name']} has been added to your team.");
+    }
+
+    private function generateEmployeeNumber(): string
+    {
+        $next = (int) (HrEmployeeProfile::withTrashed()->max('id') ?? 0) + 1;
+
+        return 'EMP-' . str_pad((string) $next, 5, '0', STR_PAD_LEFT);
     }
 
     /* ------------------------------------------------------------------ */
