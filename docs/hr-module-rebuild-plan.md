@@ -1,0 +1,345 @@
+# HR Module — Rebuild Plan (Design Parity + BambooHR Completeness + Payroll→Finance)
+
+**Created:** 2026-06-14 · **Author:** Claude (Opus 4.8, autonomous /loop)
+**Audit basis:** 9 parallel adversarial code sweeps over `resources/js/pages/hr/**` (156 pages),
+`app/Http/Controllers/Hr/**` (70 controllers), `app/Domain/Hr/Services/**` (46 services),
+`app/Domain/Hr/Models/**` (~116 models), `routes/hr.php` (1070 lines), `routes/api-hr.php`,
+`routes/training.php`, plus the Finance bridge surfaces.
+
+This plan is **distinct** from `docs/hr-module-audit-fix-plan.md` (a 2026-06-10/11 *functional/correctness*
+round — permissions, dead workflows, timezones, NZ statutory — mostly shipped). This round is about
+**Rostering-grade UX** (hero + standardised tabs + modal workflows everywhere), **finishing the
+half-built**, the **payroll→Finance bridge**, **peer recognition**, **onboarding modal**, and
+**de-duplication** — re-derived from code, prior claims treated as untrusted.
+
+Legend: each item is **Problem → Evidence → Fix → Acceptance**. `[ ]` open · `[x]` done.
+
+---
+
+## Design-spine reference (the bar — verified from code)
+
+- **Hero:** `resources/js/components/page/page-hero.tsx` — `PageHero` supports `category="hr"` (themed
+  gradient via `--category-hr`). Compact/inline variants ignore `category`. The Rostering hero
+  (`resources/js/pages/operations/rostering/index.tsx`) = `variant="hero"` + title + real-state
+  description + meta/badges + 3–4 KPI **stats from real data** + primary `actions`. No calendar/week nav.
+- **Tabs (DECISION):** standardise HR on **`TabStrip`** (`resources/js/components/rostering/tab-strip.tsx`)
+  — toned chips + count badges + active underline-bar + keyboard nav, matching Rostering exactly.
+  `PageTabs` (Radix underline) is NOT used for HR hubs. Today HR uses a chaotic mix: raw `ui/tabs`
+  (employees/show, candidates/show, recruitment/analytics, goals/*, hr/time, hr/leave, leave/reports),
+  bespoke button rows (feed, onboarding/emails), or no tabs. Neither `TabStrip` nor `PageTabs` is used
+  anywhere in HR today.
+- **Modals:** `resources/js/components/wizard/shell.tsx` (`WizardShell` + `WizardStepPane` +
+  `WizardSuccessPane` + `ReviewCard`/`ReviewRow`) + `primitives.tsx` (`Field`, `Segmented`,
+  `TilePicker`, `ChipMulti`, `SelectInput`, `StepHead`, `SubHead`, `InfoCard`, `Ring`). Reference UX:
+  `resources/js/components/clients/add-client-dialog.tsx`. HR create/edit are overwhelmingly
+  **standalone form pages**; **zero** HR pages use `WizardShell` today.
+- **Leave calendar parity target:** `resources/js/pages/my-calendar.tsx` + `resources/js/pages/calendar/global.tsx`
+  (FullCalendar, 4 views, async events, click→modal, drag-create/move, `--fc-*` token CSS). There is
+  **no shared FullCalendar wrapper** — each page re-instantiates FullCalendar.
+- **Shared HR components:** `resources/js/components/hr/` **does not exist** — no HR primitives today.
+
+---
+
+## Cross-cutting findings (apply across milestones)
+
+- **Hero gap is near-universal:** essentially no HR `PageHero` passes `category="hr"`; a handful of pages
+  have **no PageHero** at all (onboarding/show, offboarding/show, reports/show, cases/create-disciplinary).
+- **Tab chaos:** see above — one component (`TabStrip`) to rule them all.
+- **Standalone-page create/edit** instead of modals across People, Performance, Cases, Policies, Vetting,
+  Documents, Recruitment, Comp, Assets, Expenses, Leave.
+- **Misleading stats:** many index heroes compute counts from the current page (`data.length`) not true
+  totals — positions, audit-log, exit-interviews, onboarding, policies, assets, compensation/bands.
+- **Duplicated hero KPIs:** several pages render the same numbers in the hero AND a KpiCard strip
+  (hr/time, hr/leave, my/time, payroll).
+- **Swallowed fatals:** `HrNotificationService` (10 silent `catch`), `HrWebhookService:58`,
+  `HrAutomationService:68`, `WebhookDispatchService:92,139`, `EmployeeProfileController:357` (empty catch),
+  frontend `reports/builder.tsx:147`, `reports/saved.tsx:89`.
+- **Cross-tenant leaks:** `AnalyticsDashboardController:25` and `HeadcountController:24` pass `tenantId=null`;
+  `BonusController@store` hardcodes `tenant_id=null`; `/hr/feed` + `/hr/feed/kudos` are **ungated** (any tenant).
+- **Same-colour badge bug:** `text-status-success bg-status-success` (invisible text) in drivers, documents,
+  signatures — fix via a shared `StatusBadge`.
+
+---
+
+## Milestones
+
+### M0 — Foundations: the HR design spine `[in progress]`
+
+Create shared HR primitives and standardise hero + tabs + modal language so M1–M10 build on one spine.
+
+- **M0-1 Standardise on `TabStrip` for HR.** *Problem:* no canonical HR tab component; pages use raw
+  `ui/tabs`, button rows, or nothing. *Fix:* add `resources/js/components/hr/hr-tabs.tsx` re-exporting/
+  wrapping `TabStrip` with HR tab tones + a `useHrTabs(?tab= sync)` helper. *Acceptance:* one component
+  imported by every HR hub from M1 onward; visual match to Rostering tabs.
+- **M0-2 HR hero preset.** *Problem:* heroes omit `category="hr"`; structure varies. *Fix:* add
+  `resources/js/components/hr/hr-hero.tsx` — a thin `PageHero` preset that defaults `category="hr"`,
+  supports the "Kia ora {firstName}, …" personalisation + a live/status pill, and exposes typed
+  `stats`/`actions`/`quickActions`. *Acceptance:* used by every rebuilt hub; renders the HR-themed gradient.
+- **M0-3 Blanket `category="hr"` sweep.** *Problem:* ~140 existing HR `PageHero` call sites render the
+  default `--primary` gradient. *Evidence:* grep — `category="hr"` count ≈ 0 in `resources/js/pages/hr`.
+  *Fix:* codemod adding `category="hr"` to every `<PageHero` in `resources/js/pages/hr/**` lacking one
+  (no-op for compact/inline variants). *Acceptance:* every HR page hero shows the HR gradient; types+build green.
+- **M0-4 Shared `PeoplePicker`.** *Problem:* multiple flows take a raw "Employee Profile ID" number input
+  (benefits/index.tsx:409, bonuses, recognition). *Fix:* `resources/js/components/hr/people-picker.tsx`
+  (searchable user/employee combobox backed by an existing directory/API endpoint). *Acceptance:* reused
+  by benefits enrol, recognition modal, bonus create.
+- **M0-5 Shared `StatusBadge`.** *Problem:* same-colour text/bg badges (invisible text) in drivers/documents/
+  signatures; ad-hoc colour maps everywhere. *Fix:* `resources/js/components/hr/status-badge.tsx` mapping
+  status→token pair (`bg-status-*-bg text-status-*`). *Acceptance:* badges legible; reused across hubs.
+- **M0-6 HR wizard convention.** *Problem:* zero HR wizards; standalone pages instead. *Fix:* document the
+  `WizardShell` adoption pattern in this doc + ship one exemplar wizard (Positions create→`PositionDialog`)
+  to prove the kit in HR. *Acceptance:* exemplar modal works end-to-end; pattern documented.
+
+### M1 — People hub: directory + profile + org chart + positions/departments
+
+- **M1-1 Merge the two employee lists.** *Problem:* `DirectoryController`/`directory/*` and
+  `EmployeeProfileController`/`employees/*` are parallel people lists with duplicated avatar helpers.
+  *Evidence:* `directory/index.tsx:79-101` ≈ `employees/index.tsx:84-106`; two profile pages
+  (`directory/show.tsx` vs `employees/show.tsx`). *Fix:* one People hub at `/hr/people` with `TabStrip`
+  (Directory card-view · Table · Org chart · Positions · Departments); redirect `/hr/directory` →
+  `/hr/people`. One profile page with role-gated tabs (already 12 good tabs in `employees/show.tsx`),
+  absorbing the social/kudos view as a tab. *Acceptance:* one list, one profile; old routes redirect; no
+  duplicate avatar helpers.
+- **M1-2 Add-Employee wizard.** *Problem:* no create flow; employees only enter via onboarding/import
+  (`employees/index.tsx:290-300` has only Export). *Fix:* `AddEmployeeDialog` (WizardShell) creating
+  `User`+`HrEmployeeProfile` with role attach. *Acceptance:* new employee created from the hub; appears in pickers.
+- **M1-3 Profile edit → modal; surface custom fields.** *Problem:* `employees/edit.tsx`, positions
+  create/edit are standalone pages; custom fields defined but never shown on profile/edit. *Fix:* modal
+  edits per profile tab; render `HrCustomFieldDefinition` values in a profile tab + edit modal.
+  *Acceptance:* edits in modals; custom fields visible/editable.
+- **M1-4 Org chart actions + permission fix.** *Problem:* org chart read-only (`orgchart.update` unused;
+  `canManage` threaded but unused, `orgchart/index.tsx:299`); route gates `hr.employees.viewAny` but
+  controller requires `hr.orgchart.view` (`OrgChartController:20`) → 403 mismatch. *Fix:* drag-to-reassign
+  manager wired to `orgchart.update`; align route+controller permission; seed `hr.orgchart.*` in `RbacSeeder`.
+  *Acceptance:* reassign persists; permitted user loads org chart (no 403).
+- **M1-5 Directory photo upload + true totals.** *Problem:* `directory.uploadPhoto` route unused; positions/
+  audit-log stats are page-scoped. *Fix:* wire photo upload; compute stats from server totals.
+  *Acceptance:* photo upload works; hero stats show real totals.
+
+### M2 — Recruitment / ATS hub + Offer wizard
+
+- **M2-1 Collapse the two job systems.** *Problem:* `HrJobRequisition` (`/hr/recruitment/jobs`) and
+  `HrJobPosting` (`/hr/job-postings`) are parallel; applications link `jobPosting` but `createApplication`
+  writes `requisition_id`. *Evidence:* `CandidateController:195` vs `RecruitmentService:114`. *Fix:* make
+  `HrJobPosting` canonical (richer: approval/screening/analytics/preview); fold requisition channels in;
+  redirect `/hr/recruitment/jobs`. *Acceptance:* one job model end-to-end; applications consistent.
+- **M2-2 Recruitment hub tabs.** *Problem:* `recruitment/index`, `candidates.index` (same controller),
+  `kanban` are overlapping surfaces. *Fix:* one hub with `TabStrip` (Pipeline/Kanban · Candidates ·
+  Jobs · Interviews · Scorecards · Analytics); retire duplicate `candidates.index` route via redirect.
+  *Acceptance:* one recruitment hub; no duplicate candidate list route.
+- **M2-3 Real kanban board.** *Problem:* `recruitment/kanban.tsx` has no DnD/persistence; Kanban toggle
+  button disabled (`kanban.tsx:87-90`). *Fix:* drag-to-stage persisting via a new
+  `applications.move-stage` endpoint (or generalise `applications.advance`). *Acceptance:* dragging a card
+  changes its stage in the DB.
+- **M2-4 Offer wizard (explicit deliverable).** *Problem:* offer creation is a standalone page
+  (`candidates/create-offer.tsx`); decisions use `prompt()/confirm()` (`candidates/show.tsx:308,356`).
+  *Fix:* `OfferWizardDialog` (WizardShell): role/comp → terms → letter (template/merge → PDF) → review/send.
+  On accept → flows to Onboarding (M3). *Acceptance:* offer created/sent from a modal; templated letter
+  generated; accept triggers onboarding.
+- **M2-5 Interview scheduling captures interviewer; fix dead routes.** *Problem:* schedule form omits
+  interviewer; `onboarding/emails/{id}/edit` link is a 404; `jobs.unpublish-posting` &
+  `job-postings.reject-approval` have no UI. *Fix:* add interviewer field; wire or remove the dead
+  routes/links (house rule: hide if no backend). *Acceptance:* interviewer captured; no 404 links; no dead buttons.
+
+### M3 — Onboarding + Offboarding modal workflows (explicit deliverable)
+
+- **M3-1 Onboarding wizard.** *Problem:* onboarding "create" is a one-field employee picker
+  (`onboarding/create.tsx`); template editor is an always-open inline form on the index. *Fix:*
+  `OnboardingWizardDialog` (WizardShell): pick person/role/site/start-date → choose template → preview
+  tasks → assign compliance-matrix requirements for the role → docs-to-sign → welcome email → launch.
+  *Acceptance:* onboarding launched from a modal; provisions profile + compliance reqs + tasks + docs + email.
+- **M3-2 Onboarding email engine.** *Problem:* `HrOnboardingEmail`/`...Log` have **no sender** — no
+  Mailable/Job/scheduler anywhere. *Fix:* Mailable + queued send on checklist/stage, honouring
+  `send_days_before_start`; populate the Sent Log; create-template modal. *Acceptance:* welcome/sequence
+  emails send and log; template CRUD in modals.
+- **M3-3 Offer→Onboarding auto-flow.** *Problem:* accepting an offer only sets `offer_accepted`; onboarding
+  needs a separate manual convert. *Fix:* on accept, auto-`convertToEmployee` (idempotent) → generate
+  onboarding checklist. *Acceptance:* accepted offer auto-creates the hire + onboarding.
+- **M3-4 Offboarding wizard + exit-interview link.** *Problem:* offboarding create is a 2-field page; the
+  "Exit interview" task is a plain row not linked to an `HrExitInterview`. *Fix:* `OffboardingWizardDialog`
+  (checklist + asset return + access revoke); exit-interview task creates/links the record. *Acceptance:*
+  offboarding launched from a modal; exit-interview task opens a real exit interview.
+
+### M4 — Time & Leave hub + leave calendar = site calendar
+
+- **M4-1 Shared FullCalendar wrapper.** *Problem:* no shared wrapper; `my-calendar.tsx`, `calendar/global.tsx`,
+  `hr/calendar/index.tsx` each re-instantiate FullCalendar; `hr/calendar/time-off.tsx` is a hand-rolled
+  `grid grid-cols-7` (not FullCalendar). *Fix:* extract `resources/js/components/calendar/calendar-view.tsx`
+  (plugins, views, `--fc-*` tokens, eventClick→modal, drag) and adopt it in the site calendars + HR.
+  *Acceptance:* HR leave calendar visually/behaviourally matches the site calendar; one wrapper, reused.
+- **M4-2 Fix broken calendar create + wire edit/delete.** *Problem:* create dialog POSTs `/hr/calendar`
+  (only `/hr/calendar/events` exists) → 405 (`calendar/index.tsx:174`); `PUT/DELETE events/{event}` unused.
+  *Fix:* correct the endpoint; add event-click→detail/edit/delete modal. *Acceptance:* event create/edit/
+  delete works from the calendar.
+- **M4-3 Time & Leave hub tabs + leave-request modal.** *Problem:* `hr/time` & `hr/leave` use raw `ui/tabs`;
+  leave/index Balances & Reports tabs are empty stubs linking to standalone pages; new-request is a
+  standalone page/inline collapsible (3 duplicate request forms). *Fix:* `TabStrip` hub
+  (Timesheets · Requests · Balances · Calendar · Holidays · Reports); `LeaveRequestDialog` (WizardShell)
+  shared by admin + self-service; de-stub tabs to render real content. *Acceptance:* one request modal; no
+  empty tabs; tabs standardised.
+- **M4-4 Calendar housekeeping.** *Problem:* `DELETE /hr/my/leave/{leaveRequest}` (cancel) has no UI; iCal
+  feed not surfaced; native `confirm()/alert()` in leave/show. *Fix:* add cancel button; "Subscribe/.ics"
+  action; replace confirm() with dialogs. *Acceptance:* cancel works; .ics subscribe present; no native dialogs.
+
+### M5 — Payroll end-to-end → Finance bridge `[headline]`
+
+**Key finding:** the bridge is **~80% built and tested** (`lockRun` → `PostPayrollJournalJob` →
+`PayrollJournalService::postPayrollJournal` → balanced GL journal → `JournalPosted` →
+`PayrollCostAllocationService`). It is blocked by two gaps.
+
+- **M5-1 Generate payslips inside the lock flow (BLOCKER).** *Problem:* `postPayrollJournal` reads
+  `HrPayslip` rows (`PayrollJournalService:52`) but `lockRun` never generates them → job throws "no
+  payslips to post" and the journal silently never posts. The passing test manually calls
+  `generateBulkPayslips` before locking (`PayrollJournalPostingTest:44`). *Fix:* `lockRun` (or the job)
+  calls `PayslipService::generateBulkPayslips($run)` idempotently first. *Acceptance:* locking a run with
+  no pre-generated payslips posts a balanced journal + one payslip per employee.
+- **M5-2 Employee net-pay payment run (BLOCKER for "no re-keying").** *Problem:* `PaymentRunService` only
+  pays vendor `FinBill`s; net pay is computed but never disbursed. *Fix:* payroll-sourced payment run /
+  NZ direct-credit bank file from payslip `net_pay` + employee bank account (DR 2300 Accrued Wages / CR
+  Bank). *Acceptance:* an approved pay run produces a Finance payment run / bank file paying each employee's net.
+- **M5-3 Pay-run lifecycle UI + modal process.** *Problem:* `payroll/index.tsx` is a list with inline
+  buttons + a JSON-textarea mapping editor; no `category="hr"`, no tabs, no wizard; PAYE/net not shown on
+  the run. *Fix:* `TabStrip` (Runs · Payslips · Export profiles · GL mapping) + a pay-run process modal
+  (create→review (PAYE/KiwiSaver/net visible)→approve→post→export→pay); surface journal-post status +
+  failures on the run. *Acceptance:* full lifecycle visible; NZ deductions verifiable in UI; post failures surfaced.
+- **M5-4 Bridge hardening.** *Problem:* GL codes hardcoded (`PayrollJournalService:253`); requires open
+  fiscal period + seeded accounts or the queued job throws unseen; run gross (rate-rule) can diverge from
+  payslip gross (NZ calc) → reconciliation hole; payslip "PDF" is HTML (`PayslipService:147`);
+  `generateBulkPayslips` silently skips profile-less employees. *Fix:* per-org role→GL config (reuse/extend
+  the Integration mapping concept); preflight checks with surfaced errors; reconcile/align the two gross
+  engines (single source); real PDF; warn on skipped employees. *Acceptance:* non-seeded org gets a clear
+  error not a silent failure; run gross == journal gross == export gross; PDF is a real PDF.
+- **M5-5 IRD/PAYE filing surfacing.** *Problem:* `IrdFilingController` covers GST only; no PAYE/IR348
+  payday-filing feed from payroll. *Fix:* surface a payday-filing export/record from the posted run on the
+  IRD filings screen. *Acceptance:* a posted run yields a payday-filing artefact visible under IRD filings.
+
+### M6 — Performance hub
+
+- **M6-1 Performance hub tabs.** *Problem:* 9 sub-features across 24 pages, 3 tab primitives, 2 layout
+  wrappers. *Fix:* one hub (`TabStrip`): Overview · Reviews (incl. Probation) · Supervision/1:1 ·
+  Competencies · Skills · PIPs · Goals & OKRs · Succession · 360 Feedback. Standardise on `PageLayout`.
+  *Acceptance:* one hub; old sub-routes redirect to `hub#tab`.
+- **M6-2 Create/edit → modals.** *Problem:* create/edit are standalone pages, several ~95% duplicates
+  (create-review/edit-review; create-supervision/edit-supervision). *Fix:* `ReviewWizardDialog`,
+  `SupervisionDialog`, `CompetencyAssessDialog`, `PipWizardDialog`, `SuccessionPlanDialog` (+candidate
+  sub-modal), `GoalWizardDialog`. *Acceptance:* create/edit in modals; duplicate pages removed (routes redirect).
+- **M6-3 Wire dead write paths.** *Problem:* `probation.store/update`, `succession.update`/`candidates.*`,
+  `goals.update`, `competencies.update` have no UI; competencies profile link 404
+  (`competencies/index.tsx:280`); PIP outcome column bug (`PipController:36`); succession candidate mgmt
+  unreachable; no 9-box. *Fix:* wire each via modals; fix the 404 binding + outcome mapping; add a 9-box
+  grid to succession. *Acceptance:* every backend write path reachable; no 404; PIP outcome correct; 9-box renders.
+- **M6-4 Unify goal/competency models.** *Problem:* two goal systems (`HrGoal` vs `HrDevelopmentGoal`,
+  cross-linked by mistake `goals/show.tsx:380`); competencies vs skills vs development-goal "gaps" overlap.
+  *Fix:* fold Development Goals into the Goals tab (or a Development sub-tab) on one model; present
+  Competencies+Skills under one "Capabilities" tab; stop the cross-link. *Acceptance:* one goals surface;
+  capabilities consolidated; no mis-link.
+- **M6-5 Review cycles + self-assessment.** *Problem:* reviews are one-off; no cycle/campaign; no
+  self-assessment though `employee_comments` is validated. *Fix:* a review-cycle object + bulk launch +
+  employee self-assessment step. *Acceptance:* a cycle launches reviews in bulk; employee can self-assess.
+
+### M7 — Peer Recognition (explicit deliverable)
+
+**Key finding:** partially built — `HrKudos` model + `FeedService::sendKudos` + `FeedController::sendKudos`
++ 2 flat dialogs + profile stats + leaderboard. This is "finish/upgrade", not "build".
+
+- **M7-1 Give-recognition wizard.** *Problem:* both kudos flows are flat Radix dialogs; multi-recipient +
+  visibility not exposed (`is_public` hardcoded true, `FeedService:71`). *Fix:* `GiveRecognitionDialog`
+  (WizardShell): recipient(s) (PeoplePicker, multi) → value/badge (TilePicker) → message → visibility →
+  review. *Acceptance:* recognition sent from a stepper modal with multi-recipient + visibility.
+- **M7-2 Reactions.** *Problem:* none — no table/model/endpoint/UI. *Fix:* `hr_feed_reactions` table +
+  model + endpoint + UI on feed posts/kudos. *Acceptance:* users can react; counts persist.
+- **M7-3 Permissions + security (BLOCKER).** *Problem:* `/hr/feed`, `POST /hr/feed`, `POST /hr/feed/kudos`
+  are **ungated** (any user, any tenant); nav gated but route not. *Fix:* add `hr.feed.view`/`hr.recognition.*`
+  permissions + seeder + route gating; tenant-scope. *Acceptance:* unauthorised user 403s; tenant isolation enforced.
+- **M7-4 Hero stat + seeder + tests.** *Problem:* no "recognition this month" hero KPI; no
+  factory/seeder (leaderboard empty on fresh DB); zero tests. *Fix:* hero KPI; `HrKudos`/`HrFeedPost`
+  factories + demo seeder; feature tests. *Acceptance:* hero shows kudos KPI; demo populated; tests green.
+- **M7-5 Persist milestone posts (or remove the filter).** *Problem:* "milestone" post_type filter always
+  empty (never written). *Fix:* persist milestone posts or remove the dead filter. *Acceptance:* no dead filter.
+
+### M8 — Compliance & Training; Comp & Benefits; Engagement
+
+- **M8-1 Compliance/Training/Cases/Policies/Vetting/Docs hubs + modals.** *Problem:* compliance/matrix/
+  calendar/training/vetting/drivers are separate routes (no hub); create/edit standalone pages (cases ×4,
+  policies ×2, vetting ×2, documents ×3). *Fix:* hubs with `TabStrip`; convert create/edit to modals
+  (disciplinary as a multi-step wizard). *Acceptance:* hubs + modal CRUD; routes redirect.
+- **M8-2 Wire dead compliance backends.** *Problem:* driver register read-only
+  (`drivers.store/update/approve/suspend` dead); e-signature `signatures.request` dead (no UI); document
+  `documents.generate` dead (no UI); vetting `consent`/`captureConsent` dead. Signature page signs blind
+  (no doc preview, `ESignatureController:55`). *Fix:* add driver add/approve/suspend UI; "Send for
+  signature" + "Generate from template" modals; consent capture; document preview in `sign.tsx`.
+  *Acceptance:* each backend reachable; signer sees the document.
+- **M8-3 Policies fixes.** *Problem:* `policies/show.tsx` reads `content`/`change_summary` the controller
+  never persists (renders empty) + XSS via `dangerouslySetInnerHTML`; stats page-scoped. *Fix:* map real
+  fields; sanitise/remove raw HTML; server-side totals. *Acceptance:* content renders; no XSS; correct totals.
+- **M8-4 Compensation hub + finish flows.** *Problem:* 5 disconnected comp pages, 1 nav entry; bonus create
+  unreachable + `tenant_id=null`; `storeReview` redirects to a non-existent route name → exception; comp
+  review approval flow missing (applyReview no-op). *Fix:* Compensation hub (`TabStrip`: Bands · Reviews ·
+  Bonuses); bonus create modal + tenant scope; fix the route-name; add review-item approve + status
+  transition. *Acceptance:* bonus created from UI (tenant-scoped); review create works; review can be
+  approved + applied.
+- **M8-5 Benefits + Assets + Expenses.** *Problem:* benefits enrol uses raw profile-ID input; no plan
+  edit/lifecycle; assets create standalone + no retire/maintenance; expenses "Mark Paid" 404
+  (`markPaid` unrouted), no receipt upload, **expense→Finance bridge orphaned** (`PostExpenseJournalJob`
+  dispatched nowhere; `ExpenseService::approveClaim` never posts GL). *Fix:* Benefits hub + PeoplePicker
+  enrol + plan lifecycle; asset modals + retire/maintenance; route+wire `markPaid`; receipt upload;
+  dispatch `PostExpenseJournalJob` on approve. *Acceptance:* benefits enrol via picker; asset lifecycle;
+  expense paid + posts to Finance GL.
+- **M8-6 Engagement consolidation.** *Problem:* two survey systems (`HrSurvey` vs `HrEngagementSurvey`),
+  two announcement paths (`HrAnnouncement` vs feed post_type), `HrCheckIn` orphan model. *Fix:* consolidate
+  on the richer Engagement survey system (retire `/hr/surveys` via redirect); one announcement model;
+  announcements create → modal; wire or drop `HrCheckIn`. *Acceptance:* one survey system; one announcement
+  path; no orphan model.
+
+### M9 — Reports/Analytics; unified Approvals inbox; My-HR self-service
+
+- **M9-1 Fix the broken reports/analytics.** *Problem:* headcount page crashes (prop `currentHeadcount` vs
+  `current`, shape mismatch); saved-report Run/Export 404 (path mismatch); `exportToExcel` writes CSV bytes
+  to `.xlsx` (corrupt); analytics/headcount cross-tenant (`tenantId=null`). *Fix:* align props/shape; fix
+  the run/export routes; real XLSX (or honest CSV); tenant-scope. *Acceptance:* headcount loads; saved
+  reports run/export; XLSX opens; metrics tenant-scoped.
+- **M9-2 Reports hub + consolidate webhooks/scheduling.** *Problem:* 4 fragmented report pages; **three**
+  webhook systems (`HrWebhookController`/`reports/webhooks` vs `WebhookController`/`settings/webhooks` vs
+  automation actions); two scheduling systems (`HrReportSubscription` vs `HrSavedReport.is_scheduled`).
+  *Fix:* Reports hub (`TabStrip`: Reports · Builder · Saved · Scheduled · Automations · Webhooks); collapse
+  to one webhook model + one scheduling concept (redirect the loser). *Acceptance:* one reports hub; one
+  webhook system; one scheduling system.
+- **M9-3 Unified Approvals inbox.** *Problem:* `ApprovalWorkflowService` is a generic engine but
+  `initiateApproval()` is **never called** (approvals/pending always empty), `pending()` not scoped to the
+  approver, chains create-only, no offer/pay-run process types. *Fix:* wire `initiateApproval` into leave/
+  expense/timesheet/offer/pay-run submit; scope `pending()` to `getCurrentApprover()`; add process-type
+  tabs + chain edit/toggle; offers + pay-run sign-off as process types. *Acceptance:* one inbox shows the
+  user's real pending items across types; chains manageable.
+- **M9-4 My-HR self-service hub.** *Problem:* `/hr/my` is 11 separate full pages; my/training shows only
+  compliance (no LMS); my/policies un-attestable without a current version. *Fix:* one ESS hub (`TabStrip`:
+  Overview · Profile · Leave · Time · Pay · Expenses · Documents · Training · Policies · Reviews · Goals ·
+  Surveys); fix my/training to include enrolments; fix attest. *Acceptance:* one tabbed ESS hub; training
+  shows courses; policies attestable.
+
+### M10 — De-dup sweep, demo seeders, a11y + responsive, final parity
+
+- **M10-1 De-dup sweep close-out.** Verify every merge in M1–M9 kept old routes alive via redirect; extract
+  any remaining near-identical hero/table/card code into shared HR primitives. *Acceptance:* no duplicate
+  concept pages remain; all old routes 301/redirect; dup map in this doc updated.
+- **M10-2 Demo seeders for every hub.** *Problem:* many hubs empty in demo. *Fix:* extend `HrDemoSeeder`
+  so every hub renders populated (recognition, payroll run, performance, recruitment pipeline, etc.).
+  *Acceptance:* fresh `migrate:fresh --seed` → no empty hubs on the dev server.
+- **M10-3 Swallowed-fatal sweep.** Fix the silent catches listed in cross-cutting (notifications, webhooks,
+  automation, EmployeeProfileController, frontend). *Acceptance:* failures log/surface; no silent `return []`.
+- **M10-4 a11y + responsive + empty/loading/error states.** Axe pass (no criticals) + mobile pass on every
+  HR hub; consistent empty/loading/error states. *Acceptance:* axe clean; responsive; states present.
+- **M10-5 Final parity pass.** Side-by-side every HR hub vs Rostering on oblivionfindings.com. *Acceptance:*
+  hero/tabs/modals visually match; no dead buttons; DoD met.
+
+---
+
+## Verification gates (every milestone, before merge to main)
+
+`npm run types` (0 errors) · `npm run build` (clean) · `npm run lint` (clean on touched) ·
+`php artisan test tests/Feature/Hr` (non-parallel) + touched suites + new tests · playwright visual on
+touched HR pages · axe (no criticals) · browser smoke on oblivionfindings.com as demo admin (every modal,
+no console errors, real data, parity). Then update this doc + memory, merge `--no-ff`, push.
+
+## Deploy runbook deltas (per milestone introducing permissions/seeders)
+New permission keys → add to a seeder `DatabaseSeeder` calls + run `db:seed --class=… --force` on deploy.
+New demo data → `HrDemoSeeder`. Schema changes OK (dev only): `migrate:fresh --seed` then reseed demo.
