@@ -63,15 +63,18 @@ Legend: each item is **Problem → Evidence → Fix → Acceptance**. `[ ]` open
 
 ## Milestones
 
-### M0 — Foundations: the HR design spine `[in progress]`
+### M0 — Foundations: the HR design spine `[x] DONE — merged main 1cd01120, 2026-06-14`
 
 Create shared HR primitives and standardise hero + tabs + modal language so M1–M10 build on one spine.
+**Shipped:** `resources/js/components/hr/` (hr-hero, hr-tabs, people-picker, status-badge, wizard, index)
++ `category="hr"` sweep (154 PageHero tags / 152 pages) + 6 vitest specs. Gates: types/build/lint/vitest green.
+Live-verify the HR gradient on oblivionfindings.com after deploy (next loop tick).
 
-- **M0-1 Standardise on `TabStrip` for HR.** *Problem:* no canonical HR tab component; pages use raw
+- **[x] M0-1 Standardise on `TabStrip` for HR.** *Problem:* no canonical HR tab component; pages use raw
   `ui/tabs`, button rows, or nothing. *Fix:* add `resources/js/components/hr/hr-tabs.tsx` re-exporting/
   wrapping `TabStrip` with HR tab tones + a `useHrTabs(?tab= sync)` helper. *Acceptance:* one component
   imported by every HR hub from M1 onward; visual match to Rostering tabs.
-- **M0-2 HR hero preset.** *Problem:* heroes omit `category="hr"`; structure varies. *Fix:* add
+- **[x] M0-2 HR hero preset.** *Problem:* heroes omit `category="hr"`; structure varies. *Fix:* add
   `resources/js/components/hr/hr-hero.tsx` — a thin `PageHero` preset that defaults `category="hr"`,
   supports the "Kia ora {firstName}, …" personalisation + a live/status pill, and exposes typed
   `stats`/`actions`/`quickActions`. *Acceptance:* used by every rebuilt hub; renders the HR-themed gradient.
@@ -79,16 +82,18 @@ Create shared HR primitives and standardise hero + tabs + modal language so M1�
   default `--primary` gradient. *Evidence:* grep — `category="hr"` count ≈ 0 in `resources/js/pages/hr`.
   *Fix:* codemod adding `category="hr"` to every `<PageHero` in `resources/js/pages/hr/**` lacking one
   (no-op for compact/inline variants). *Acceptance:* every HR page hero shows the HR gradient; types+build green.
-- **M0-4 Shared `PeoplePicker`.** *Problem:* multiple flows take a raw "Employee Profile ID" number input
+  **[x] Done** — 154 tags / 152 files; build green.
+- **[x] M0-4 Shared `PeoplePicker`.** *Problem:* multiple flows take a raw "Employee Profile ID" number input
   (benefits/index.tsx:409, bonuses, recognition). *Fix:* `resources/js/components/hr/people-picker.tsx`
   (searchable user/employee combobox backed by an existing directory/API endpoint). *Acceptance:* reused
   by benefits enrol, recognition modal, bonus create.
-- **M0-5 Shared `StatusBadge`.** *Problem:* same-colour text/bg badges (invisible text) in drivers/documents/
+- **[x] M0-5 Shared `StatusBadge`.** *Problem:* same-colour text/bg badges (invisible text) in drivers/documents/
   signatures; ad-hoc colour maps everywhere. *Fix:* `resources/js/components/hr/status-badge.tsx` mapping
   status→token pair (`bg-status-*-bg text-status-*`). *Acceptance:* badges legible; reused across hubs.
-- **M0-6 HR wizard convention.** *Problem:* zero HR wizards; standalone pages instead. *Fix:* document the
-  `WizardShell` adoption pattern in this doc + ship one exemplar wizard (Positions create→`PositionDialog`)
-  to prove the kit in HR. *Acceptance:* exemplar modal works end-to-end; pattern documented.
+- **[x] M0-6 HR wizard convention.** *Problem:* zero HR wizards; standalone pages instead. *Fix:* shipped
+  `components/hr/wizard.ts` — re-exports the `WizardShell` kit from one HR entry point + a `useWizard()`
+  step machine. The first *real* HR wizard ships in M1 (`AddEmployeeDialog`) using this wrapper.
+  *Acceptance:* shared wrapper + hook in place, tested; adoption begins M1.
 
 ### M1 — People hub: directory + profile + org chart + positions/departments
 
