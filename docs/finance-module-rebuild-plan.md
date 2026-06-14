@@ -264,22 +264,29 @@ KiwiSaver + net-pay liability) via `PostPayrollJournalJob`; `AllocatePayrollCost
 - **[ ] M5-5 IRD/PAYE payday filing.** *Problem:* `buildPaydayFilingPayload` dead; IRD covers GST only. *Fix:*
   surface a payday-filing export/record from a posted run on the IRD filings screen. *Acceptance:* a posted run yields a payday-filing artefact under IRD filings.
 
-### M6 — Funding & Client Money hub + duplicate-backend reconciliation `[ ]` (contains P0)
-- **[ ] M6-1 Funding & Client Money hub + TabStrip.** Tabs: Funding streams · Funding claims · Client/resident
-  funds · Donor/trust funds · Service billing. Migrate `operations/funding/**` + `operations/client-funds/**`
-  UI into the hub; redirect old operations routes.
-- **[ ] M6-2 Reconcile client-money backend (P0).** *Problem:* legacy `ClientFund` (populated) vs empty
-  `ClientLedgerEntry` (richer) + `ClientLedgerService` netting flaw + two divergent profile tabs.
-  *Evidence:* gap-analysis §C. *Fix:* keep legacy `ClientFund` canonical; fix `ClientLedgerService` to
-  **segregate** personal vs operational running balances (`:163-225`); point both profile finance tabs +
-  family portal at the canonical backend; feature-flag/retire empty `ClientLedgerEntry`. *Acceptance:* one
-  client-money backend; resident personal balance never includes operational cost allocations; family portal matches.
+### M6 — Funding & Client Money hub + duplicate-backend reconciliation `[~]` (P0 balance-pollution fixed; backend-unification + hub remain)
+- **[ ] M6-1 Funding & Client Money hub + TabStrip.** *Cross-module* — funding-streams + donor-funds live in
+  finance (finance.admin / finance.reports.view) but funding/funding-claims + client-funds live in OPERATIONS
+  (routes/operations.php: FundingController/FundingClaimController/ClientFundController). A clean hub needs the
+  operations UI migrated into finance + old routes redirected — bigger + riskier than the prior same-module hubs;
+  deferred. Tabs: Funding streams · Funding claims · Client/resident funds · Donor/trust funds · Service billing.
+- **[~] M6-2 Reconcile client-money backend (P0).** *Balance-pollution slice DONE (commit f9d1fbf9):*
+  `ClientLedgerService` mixed operational `FinCostAllocation` outflows (org cost-of-support, thousands/week) into
+  the resident's PERSONAL running balance → families saw a hugely-negative balance. Now segregated — running
+  balance/opening/personal totals move only on `ClientLedgerEntry`; operational rows shown for transparency +
+  reported as `summary.operational_outflows`; each entry has `affects_personal_balance`. Consumed by client
+  financials tab + insights API + summary service. 1 test. *Remaining:* the BACKEND UNIFICATION — `ClientFund`
+  (legacy, populated, operations-written via ClientFundController) vs `ClientLedgerEntry` (the store
+  ClientLedgerService reads, written via observer→GL). Decide one canonical store, point both client profile
+  finance tabs + family portal at it, retire the other. (NOTE: `FundingService` is NOT dead — used by
+  CheckExpiringAgreementsJob — so plan M6-5 is moot.)
 - **[ ] M6-3 Client-Money Transaction modal.** Embed a permission-gated, audited "Record client transaction"
   modal (deposit/withdrawal/purchase/reimbursement) on the client finance tab → posts to the canonical
   trust-account path. *Acceptance:* transaction recorded from a modal; trust journal posts; audited.
 - **[ ] M6-4 Funder remittance reconciliation.** Add approved-vs-claimed-vs-received tracking + match a funder
   payment to claims. *Acceptance:* a funder remittance reconciles against claims.
-- **[ ] M6-5 Delete stale `FundingService`.** Verify dead (controller bypasses it; writes non-existent columns), then remove. *Acceptance:* no callers; build clean.
+- **[~] M6-5 Delete stale `FundingService`.** VERIFIED NOT DEAD — `App\Services\Operations\FundingService` is
+  used by `CheckExpiringAgreementsJob::handle`. Not removable; closing as not-applicable.
 
 ### M7 — Tax & Compliance hub `[ ]`
 - **[ ] M7-1 Tax hub + TabStrip + modals.** GST returns · IRD/payday filing · Audit exports · Consolidation ·
