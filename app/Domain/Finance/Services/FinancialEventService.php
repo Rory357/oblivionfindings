@@ -20,8 +20,8 @@ use RuntimeException;
  * journal, posts it via JournalPostingService, and creates cost allocation records for
  * cross-module reporting.
  *
- * Existing integrations (PayrollJournalService, BillingJournalService, FixedAssetService)
- * are NOT routed through here — they predate this service and remain independent.
+ * Existing integrations (PayrollJournalService, FixedAssetService) are NOT routed
+ * through here — they predate this service and remain independent.
  * New operational cost flows MUST use this service.
  */
 class FinancialEventService
