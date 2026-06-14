@@ -305,14 +305,20 @@ KiwiSaver + net-pay liability) via `PostPayrollJournalJob`; `AllocatePayrollCost
   REFUSES unless `services.ird.simulation_enabled` is set, and a simulation is clearly labelled (SIM- reference,
   status 'simulated', "NOT transmitted" message, warning flash). 2 tests + updated the status-flow test.
 
-### M8 — Reports & Planning hub + budget unification `[ ]`
-- **[ ] M8-1 Reports hub + TabStrip + period selector.** P&L · BS · TB · Cash flow · Aged AR · Aged AP ·
-  Funding summary · Budget vs actuals · Cash-flow forecast. (All read real GL already — just re-home + theme.)
-- **[ ] M8-2 Unify budgets to one engine.** *Problem:* three stores + double sync + orphaned interface.
-  *Evidence:* gap-analysis §E. *Fix:* Finance `SiteBudgetLine`+`FinCostAllocation` canonical; implement
-  `BudgetSyncInterface` (`FinanceBudgetSync`) + bind; Governance consumes via it; retire denormalised
-  `actual_amount` + manual `recordActuals`; collapse double hourly sync to one writer; unify category
-  vocabularies. *Acceptance:* one budget source of truth; Governance reads via interface; one scheduled writer.
+### M8 — Reports & Planning hub + budget unification `[~]` (hub done; budget-unification P0 remains)
+- **[x] M8-1 Reports hub + TabStrip.** *(commit e6f98de1)* `ReportsTabsFooter` (components/finance/reports-hub.tsx,
+  mirrors tax-hub) in all 9 report sub-page heros — P&L · balance sheet · trial balance · cash flow · aged AR ·
+  aged AP · funding summary · budget vs actuals · cash-flow forecast. All `finance.reports.view` (homogeneous), so
+  `ReportsController` redirects `/finance/reports` → P&L (mirrors PayablesController). Every page already used
+  PageHero + reads the real GL. Sidebar collapsed the 5-item Reports group to one "Reports" entry. 2 hub tests.
+  (Period selector deferred — each report already has its own period filter.)
+- **[ ] M8-2 Unify budgets to one engine (next dedicated tick — LARGE).** *Confirmed:* `BudgetActualsController`
+  reads the **Governance** `App\Domain\Governance\Models\Budget` (not Finance `SiteBudgetLine`); `BudgetActualsService::
+  getBudgetVsActualsReport` reads a denormalised `actual_amount` column off the budget line items (stale unless
+  synced) while a GL `SUM(debit/credit)` path also exists — the duplicate-backend + double-sync tangle. *Fix:*
+  Finance `SiteBudgetLine`+`FinCostAllocation` canonical; live-GL actuals (drop denormalised `actual_amount` +
+  manual `recordActuals`); implement+bind `BudgetSyncInterface`; one scheduled writer; unify category vocab.
+  Large cross-module (Governance+Finance) refactor — deserves its own careful tick, not a tail-of-tick change.
 - **[ ] M8-3 SpendApprovals → AP.** *Fix:* `SpendApproval::approve()` creates/links a `FinBill` (or gates the
   AP bill/payment-run via the `source` morph) so approved spend reaches Finance. *Acceptance:* approving a spend creates a financial record.
 - **[ ] M8-4 Cash-flow forecast payroll feed.** Add payroll-due dates as an outflow source. *Acceptance:* forecast includes upcoming pay runs.
