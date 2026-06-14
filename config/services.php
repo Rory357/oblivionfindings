@@ -81,6 +81,10 @@ return [
     'ird' => [
         'api_key' => env('IRD_API_KEY'),
         'api_secret' => env('IRD_API_SECRET'),
+        // Live IRD Gateway Services submission (SOAP + WS-Security X.509) is not
+        // wired yet. Set IRD_SIMULATION_ENABLED=true to allow an explicit,
+        // clearly-labelled SIMULATED submission for testing (never transmits).
+        'simulation_enabled' => env('IRD_SIMULATION_ENABLED', false),
     ],
 
     'sms' => [
