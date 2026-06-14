@@ -4,6 +4,7 @@ use App\Models\Client;
 use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientInrRecord;
 use App\Models\ClientMedication;
+use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationReview;
 use App\Models\Site;
 use App\Models\User;
@@ -167,4 +168,36 @@ it('computes admin rate from the day\'s administrations', function () {
 
     // No administrations seeded → rate is 0, not a divide-by-zero error.
     expect($payload['stats']['adminRate'])->toBe(0.0);
+});
+
+it('attaches a RecordDoseWizard context to overdue dose action items', function () {
+    $client = makeOverviewClient();
+    $med = ClientMedication::factory()->create([
+        'client_id' => $client->id,
+        'name' => 'Clozapine',
+        'dosage' => '200 mg',
+        'route' => 'Oral',
+        'controlled_drug' => false,
+        'is_prn' => false,
+    ]);
+
+    ClientMedicationAdministration::create([
+        'client_id' => $client->id,
+        'client_medication_id' => $med->id,
+        'status' => 'pending',
+        'scheduled_for' => today()->setTime(9, 0),
+        'administered_by' => User::factory()->create()->id,
+    ]);
+
+    $feed = app(MedicationOverviewService::class)->actionCentre(today());
+    $dose = collect($feed)->firstWhere('type', 'overdue_dose');
+
+    expect($dose)->not->toBeNull()
+        ->and($dose['action_type'])->toBe('record')
+        ->and($dose['record']['row']['medication_id'])->toBe($med->id)
+        ->and($dose['record']['row']['medication_name'])->toBe('Clozapine')
+        ->and($dose['record']['row']['client_name'])->toBe('Margaret Sole')
+        ->and($dose['record']['row']['status'])->toBe('overdue')
+        ->and($dose['record']['client']['name'])->toBe('Margaret Sole')
+        ->and($dose['record']['client']['allergies'])->toBe([]);
 });

@@ -62,6 +62,12 @@ import {
     DayPickerChip,
     parseYmd,
 } from '@/pages/meds/today/components/day-picker-chip';
+import { RecordDoseWizard } from '@/pages/meds/today/components/record-dose-wizard';
+import type {
+    ClientInfo,
+    NotGivenReasonOption,
+    ScheduleRow,
+} from '@/pages/meds/today/types';
 import { AddMedicationModal } from './components/add-medication-modal';
 import { AuditLogModal } from './components/audit-log-modal';
 import {
@@ -94,6 +100,7 @@ type ActionItem = {
     action: string;
     action_type: string;
     opened_at: string | null;
+    record?: { row: ScheduleRow; client: ClientInfo };
 };
 
 type Stats = {
@@ -204,6 +211,8 @@ type Props = {
     clientOptions: ClientOption[];
     medicationOptions: MedicationOption[];
     witnesses: WitnessOption[];
+    notGivenReasons: NotGivenReasonOption[];
+    signedAs: { name: string; role_label: string | null };
     canManageSettings?: boolean;
 };
 
@@ -298,6 +307,8 @@ export default function EmarHome(props: Props) {
         clientOptions,
         medicationOptions,
         witnesses,
+        notGivenReasons,
+        signedAs,
         canManageSettings,
     } = props;
 
@@ -321,11 +332,18 @@ export default function EmarHome(props: Props) {
         | 'audit-log'
     >(null);
     const [modalClientId, setModalClientId] = useState<number | null>(null);
+    const [recordWizard, setRecordWizard] = useState<{
+        row: ScheduleRow;
+        client: ClientInfo;
+    } | null>(null);
 
     const openModal = (key: typeof modal, clientId: number | null = null) => {
         setModalClientId(clientId);
         setModal(key);
     };
+
+    // Witnesses for the reused RecordDoseWizard, excluding the signer.
+    const recordWitnesses = witnesses.filter((w) => w.id !== currentUserId);
 
     const goDate = (ymd: string) =>
         router.get(
@@ -694,6 +712,14 @@ export default function EmarHome(props: Props) {
                                                 size="sm"
                                                 className={cn('shrink-0', SEVERITY_BTN[it.severity])}
                                                 onClick={() => openModal('cd-register', it.client_id)}
+                                            >
+                                                {it.action}
+                                            </Button>
+                                        ) : it.action_type === 'record' && it.record ? (
+                                            <Button
+                                                size="sm"
+                                                className={cn('shrink-0', SEVERITY_BTN[it.severity])}
+                                                onClick={() => setRecordWizard(it.record ?? null)}
                                             >
                                                 {it.action}
                                             </Button>
@@ -1207,6 +1233,17 @@ export default function EmarHome(props: Props) {
                 onClose={() => setModal(null)}
                 activity={recentActivity}
             />
+            {recordWizard ? (
+                <RecordDoseWizard
+                    row={recordWizard.row}
+                    client={recordWizard.client}
+                    date={date}
+                    witnesses={recordWitnesses}
+                    notGivenReasons={notGivenReasons}
+                    signedAs={signedAs}
+                    onClose={() => setRecordWizard(null)}
+                />
+            ) : null}
         </AppLayout>
     );
 }

@@ -69,6 +69,7 @@ class MedicationOverviewService
             'clientOptions' => $this->clientOptions(),
             'medicationOptions' => $this->medicationOptions(),
             'witnesses' => $this->witnesses(),
+            'notGivenReasons' => NotGivenReason::options(),
         ];
     }
 
@@ -337,6 +338,7 @@ class MedicationOverviewService
             'action' => 'Record',
             'action_type' => 'record',
             'opened_at' => optional($admin->scheduled_for)->toIso8601String(),
+            'record' => $this->buildRecordContext($admin, $date),
         ]);
     }
 
@@ -677,10 +679,67 @@ class MedicationOverviewService
         return ClientMedicationAdministration::where('status', 'pending')
             ->where('scheduled_for', '<', now()->subMinutes(60))
             ->whereDate('scheduled_for', $date)
-            ->with(['client:id,first_name,last_name', 'medication:id,client_id,name,dosage'])
+            ->with([
+                'client:id,first_name,last_name,preferred_name,nhi_number,date_of_birth,site_id',
+                'client.site:id,name',
+                'client.medicationAllergies' => fn ($q) => $q->whereNull('deleted_at'),
+                'medication:id,client_id,name,dosage,route,controlled_drug,witness_required',
+            ])
             ->orderBy('scheduled_for')
             ->limit(10)
             ->get();
+    }
+
+    /**
+     * Build the meds/today ScheduleRow + ClientInfo for an overdue dose so the
+     * shared RecordDoseWizard can open inline on /emar (same shape WorkerMeds
+     * builds — see clientsPayload()/scheduleForDate()). Writes still go through
+     * POST /meds/today/record → EnhancedMarService; no second pipeline.
+     */
+    private function buildRecordContext(ClientMedicationAdministration $admin, Carbon $date): array
+    {
+        $tz = config('app.worker_timezone', config('app.timezone'));
+        $client = $admin->client;
+        $med = $admin->medication;
+        $scheduled = $admin->scheduled_for;
+        $dob = $client?->date_of_birth;
+
+        return [
+            'row' => [
+                'key' => 'emar-'.$admin->id,
+                'client_id' => $admin->client_id,
+                'client_name' => $this->clientName($client),
+                'medication_id' => $admin->client_medication_id,
+                'medication_name' => $med?->name ?? 'Medication',
+                'dose' => $med?->dosage,
+                'route' => $med?->route,
+                'is_controlled' => (bool) ($med?->controlled_drug ?? false),
+                'requires_witness' => (bool) ($med?->witness_required ?? false) || (bool) ($med?->controlled_drug ?? false),
+                'scheduled_for' => optional($scheduled)->toIso8601String(),
+                'time' => $scheduled ? $scheduled->copy()->timezone($tz)->format('H:i') : '',
+                'round_label' => '',
+                'status' => 'overdue',
+                'recorded' => null,
+                'mar_url' => '/emar/mar?client_id='.$admin->client_id.'&date='.$date->toDateString(),
+            ],
+            'client' => [
+                'id' => $client?->id,
+                'name' => $this->clientName($client),
+                'preferred' => $client?->preferred_name ?: $client?->first_name,
+                'nhi' => $client?->nhi_number,
+                'dob' => $dob?->format('j M Y'),
+                'age' => $dob ? (int) $dob->copy()->timezone($tz)->diffInYears(now($tz)) : null,
+                'site_id' => $client?->site_id,
+                'site_name' => $client?->site?->name,
+                'allergies' => $client
+                    ? $client->medicationAllergies
+                        ->map(fn ($a) => trim((string) $a->allergen))
+                        ->filter()
+                        ->values()
+                        ->all()
+                    : [],
+            ],
+        ];
     }
 
     public function nextRound(Carbon $date)
