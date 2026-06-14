@@ -18,7 +18,9 @@ class FinBillFactory extends Factory
             'bill_number' => fake()->unique()->bothify('BILL-####'),
             'bill_date' => fake()->dateTimeBetween('-3 months', 'now'),
             'due_date' => fake()->dateTimeBetween('now', '+3 months'),
-            'status' => fake()->randomElement(['draft', 'awaiting_approval', 'approved', 'paid', 'void']),
+            // Must match the fin_bills.status enum — 'void' is not a member and
+            // randomly truncated on insert (flaky factory failures).
+            'status' => fake()->randomElement(['draft', 'awaiting_approval', 'approved', 'paid', 'cancelled']),
             'total_amount' => fake()->randomFloat(2, 50, 25000),
         ];
     }
