@@ -177,7 +177,7 @@ export default function FinanceDashboard({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={LayoutDashboard}
                         title="Finance Dashboard"
                         description="Revenue, expenses, cash flow, and outstanding balances at a glance."

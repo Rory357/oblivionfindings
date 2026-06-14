@@ -82,7 +82,7 @@ export default function CreditNoteShow({ auth, creditNote }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref="/finance/credit-notes"
                         title={

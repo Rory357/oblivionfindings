@@ -119,7 +119,7 @@ export default function AccountMapping({ integration, localAccounts }: PageProps
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref="/finance/integrations"
                         title={`${providerName} Account Mapping`}

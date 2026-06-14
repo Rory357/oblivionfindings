@@ -106,7 +106,7 @@ export default function QuoteCreate({ clients, price_book_items }: Props) {
     return (
         <AppLayout>
             <Head title="Create Quote" />
-            <PageHero variant="compact" title="Create Quote" description="Create a new quote for a client or prospect." backHref="/finance/quotes" />
+            <PageHero category="finance" variant="compact" title="Create Quote" description="Create a new quote for a client or prospect." backHref="/finance/quotes" />
             <PageShell>
                 <form onSubmit={handleSubmit}>
                     {/* Client Details */}

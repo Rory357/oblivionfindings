@@ -85,7 +85,7 @@ export default function DonorFundsIndex({ funds, summary }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={HandHeart}
                         title="Donor Funds"
                         description="Track donations, grants, and restricted funding"

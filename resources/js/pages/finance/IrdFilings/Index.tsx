@@ -128,7 +128,7 @@ export default function IrdFilingsIndex({ filings, availableGstReturns, filters 
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={Landmark}
                         title="IRD Filings"
                         description="Prepare and submit IRD e-filings directly to Inland Revenue"

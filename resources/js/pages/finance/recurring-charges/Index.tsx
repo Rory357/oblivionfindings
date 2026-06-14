@@ -70,7 +70,7 @@ export default function RecurringChargesIndex({ charges = { data: [], links: [],
     return (
         <AppLayout>
             <Head title="Recurring Charges" />
-            <PageHero
+            <PageHero category="finance"
                 icon={RefreshCw}
                 title="Recurring Charges"
                 description="Manage recurring billing charges for clients."

@@ -106,7 +106,7 @@ export default function PurchaseOrderCreate() {
             <Head title="Create Purchase Order" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref="/finance/purchase-orders"
                         title="New Purchase Order"

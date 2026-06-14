@@ -79,7 +79,7 @@ export default function BillingEntriesPage({
     return (
         <AppLayout>
             <Head title="Billing Entries" />
-            <PageHero variant="compact"
+            <PageHero category="finance" variant="compact"
                 title="Billing Entries"
                 description="Review generated billing rows by client, service date, and status."
                 backHref="/finance/billing"

@@ -85,7 +85,7 @@ export default function GstReturnPrepare({ filingDates, currentYear }: PageProps
             <PageLayout
                 width="narrow"
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref="/finance/gst-returns"
                         title="Prepare GST Return"

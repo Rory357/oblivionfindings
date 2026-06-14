@@ -107,7 +107,7 @@ export default function EftposBatches({ batches, terminals, unmatchedBankTransac
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={Layers}
                         title="EFTPOS Batches"
                         description="Reconcile EFTPOS settlements with bank transactions."

@@ -100,7 +100,7 @@ export default function InvoiceShow({ auth, invoice }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref="/finance/invoices"
                         title={

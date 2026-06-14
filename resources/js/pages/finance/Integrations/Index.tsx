@@ -395,7 +395,7 @@ export default function IntegrationsIndex({ integrations }: PageProps) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={Plug}
                         title="Accounting Integrations"
                         description="Connect to Xero or MYOB for two-way general ledger synchronisation"

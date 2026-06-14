@@ -160,7 +160,7 @@ export default function FixedAssetsIndex({ assets, summary, filters }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={Package}
                         title="Fixed Assets"
                         description="Manage your organisation's fixed asset register"

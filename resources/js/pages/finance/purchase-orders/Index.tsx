@@ -67,7 +67,7 @@ export default function PurchaseOrderIndex() {
             <Head title="Purchase Orders" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={ShoppingCart}
                         title="Purchase Orders"
                         description="Manage purchase orders and convert them to bills."

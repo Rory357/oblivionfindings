@@ -117,7 +117,7 @@ export default function JournalsIndex({ auth, journals, filters }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={BookOpen}
                         title="Journals"
                         description="General ledger journal entries"

@@ -47,7 +47,7 @@ export default function BankAccountCreate({ glAccounts }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref="/finance/bank-accounts"
                         title="Add Bank Account"

@@ -175,7 +175,7 @@ export default function FixedAssetShow({ asset, depreciationSchedule, linkedAsse
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref="/finance/fixed-assets"
                         title={

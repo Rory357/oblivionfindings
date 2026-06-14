@@ -98,7 +98,7 @@ export default function FixedAssetCreate({ assetAccounts, expenseAccounts }: Pro
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref="/finance/fixed-assets"
                         title="Add Fixed Asset"

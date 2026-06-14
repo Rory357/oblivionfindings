@@ -36,7 +36,7 @@ export default function PriceBookEdit({ price_book }: Props) {
     return (
         <AppLayout>
             <Head title={`Edit: ${price_book.name}`} />
-            <PageHero variant="compact" title={`Edit: ${price_book.name}`} backHref={`/finance/price-books/${price_book.id}`} />
+            <PageHero category="finance" variant="compact" title={`Edit: ${price_book.name}`} backHref={`/finance/price-books/${price_book.id}`} />
             <PageShell>
                 <form onSubmit={handleSubmit}>
                     <Card>

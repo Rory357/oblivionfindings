@@ -82,7 +82,7 @@ export default function AgingReport({ clients, totals }: PageProps) {
             <Head title="Aged Receivables" />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={Clock}
                         title="Aged Receivables"
                         description="Outstanding receivables grouped by client and aging bucket."

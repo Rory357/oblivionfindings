@@ -140,7 +140,7 @@ export default function PurchaseOrderEdit() {
             <Head title={`Edit ${po.po_number}`} />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref={`/finance/purchase-orders/${po.id}`}
                         title={`Edit ${po.po_number}`}

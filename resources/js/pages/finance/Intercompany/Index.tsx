@@ -225,7 +225,7 @@ export default function IntercompanyIndex({ group, transactions, entities }: Pag
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={ArrowLeftRight}
                         title="Intercompany Transactions"
                         description={`Manage transactions between entities in ${group.name}`}

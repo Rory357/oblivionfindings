@@ -147,7 +147,7 @@ export default function VendorsEdit({ vendor, expenseAccounts }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref={`/finance/vendors/${vendor.id}`}
                         title="Edit Vendor"

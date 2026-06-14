@@ -108,7 +108,7 @@ export default function InvoicesIndex({ auth, invoices, filters, summary }: Prop
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={Receipt}
                         title="Invoices"
                         description="Manage and send invoices to clients"

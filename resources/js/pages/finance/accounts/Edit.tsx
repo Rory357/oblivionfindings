@@ -147,7 +147,7 @@ export default function AccountEdit({ account, parentAccounts, taxRates, funding
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref="/finance/accounts"
                         title="Edit Account"

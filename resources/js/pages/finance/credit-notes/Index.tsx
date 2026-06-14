@@ -87,7 +87,7 @@ export default function CreditNotesIndex({ auth, creditNotes, filters }: Props) 
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={FileMinus}
                         title="Credit Notes"
                         description="Manage credit notes for accounts payable and receivable"

@@ -89,7 +89,7 @@ export default function TrialBalance({ report, filters }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={ListChecks}
                         title="Trial Balance"
                         description="Summary of all account balances verifying debits equal credits."

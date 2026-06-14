@@ -165,7 +165,7 @@ export default function BankTransactionsIndex({ transactions, bankAccounts, filt
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={Banknote}
                         title="Bank Transactions"
                         description="Review imported activity, filter reconciliation queues, and record manual transactions."

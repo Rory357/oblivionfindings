@@ -88,7 +88,7 @@ export default function PaymentRunShow({ paymentRun }: PageProps) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref="/finance/payment-runs"
                         title={paymentRun.run_number}

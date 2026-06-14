@@ -71,7 +71,7 @@ export default function BankFeedLogs({ feed, logs }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref="/finance/bank-feeds"
                         title="Sync Logs"

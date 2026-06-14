@@ -86,7 +86,7 @@ export default function PurchaseOrderShow() {
             <Head title={`PO ${po.po_number}`} />
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref="/finance/purchase-orders"
                         title={

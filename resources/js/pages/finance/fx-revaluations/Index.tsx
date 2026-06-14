@@ -66,7 +66,7 @@ export default function FxRevaluationsIndex({ revaluations }: PageProps) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={Globe}
                         title="FX Revaluations"
                         description="Calculate and post unrealised foreign exchange gain/loss adjustments"

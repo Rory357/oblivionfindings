@@ -77,7 +77,7 @@ export default function FundingStreamSummary({ startDate, endDate, data }: Props
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={Banknote}
                         title="Funding Stream Summary"
                         description="Revenue, expenses and margin by funding stream."

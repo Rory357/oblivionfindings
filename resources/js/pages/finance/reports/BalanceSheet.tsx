@@ -98,7 +98,7 @@ export default function BalanceSheet({ report, filters }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={Scale}
                         title="Balance Sheet"
                         description="Financial position showing assets, liabilities, and equity."

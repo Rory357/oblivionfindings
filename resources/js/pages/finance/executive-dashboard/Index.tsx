@@ -81,7 +81,7 @@ export default function ExecutiveFinancialDashboard({ kpis, insights, siteSummar
 
             <div className="flex flex-col gap-6 p-6">
                 {/* Hero */}
-                <PageHero
+                <PageHero category="finance"
                     title="Executive Financial Dashboard"
                     description="Organisation-wide financial overview and risk indicators"
                     icon={<BarChart3 className="h-7 w-7 text-white" />}

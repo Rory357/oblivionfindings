@@ -99,7 +99,7 @@ export default function EftposBatchDetail({ batch, transactions }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref="/finance/eftpos/batches"
                         title={`Batch ${batch.batch_number}`}
