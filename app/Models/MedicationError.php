@@ -19,6 +19,9 @@ class MedicationError extends Model
         'client_incident_id',
         'error_type',
         'severity',
+        'reached_client',
+        'harm_level',
+        'open_disclosure',
         'description',
         'immediate_action',
         'contributing_factors',
@@ -29,12 +32,16 @@ class MedicationError extends Model
         'review_notes',
         'outcome',
         'preventive_actions',
+        'close_note',
+        'closed_at',
+        'closed_by',
         'status',
     ];
 
     protected $casts = [
         'reported_at' => 'datetime',
         'reviewed_at' => 'datetime',
+        'closed_at' => 'datetime',
     ];
 
     // ─── Relationships ────────────────────────────────────
@@ -62,6 +69,11 @@ class MedicationError extends Model
     public function reviewedBy(): BelongsTo
     {
         return $this->belongsTo(User::class, 'reviewed_by');
+    }
+
+    public function closedBy(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'closed_by');
     }
 
     public function attachments(): MorphMany

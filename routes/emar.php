@@ -331,6 +331,9 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
     Route::post('/errors/{error}/resolve', [MedicationErrorController::class, 'resolve'])
         ->middleware('permission:medications.administer.correct|clients.update')
         ->name('emar.errors.resolve');
+    Route::post('/errors/{error}/close', [MedicationErrorController::class, 'close'])
+        ->middleware('permission:medications.administer.correct|clients.update')
+        ->name('emar.errors.close');
 
     // ─── PDF Exports ─────────────────────────────────────────
     Route::middleware('permission:medications.reports.export|reports.viewAny')->group(function () {

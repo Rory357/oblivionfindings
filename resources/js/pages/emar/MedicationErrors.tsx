@@ -1,942 +1,257 @@
-import SupportingEvidenceDialog, {
-    type SupportingEvidenceAttachment,
-} from '@/components/medications/SupportingEvidenceDialog';
-import PageShell from '@/components/page-shell';
-import { Badge } from '@/components/ui/badge';
+/* eslint-disable no-restricted-syntax -- error table, summary/analytics cards, filter toolbar and
+   hero month stepper are custom-layout bordered surfaces / chip buttons (not Card/Button); colours
+   are semantic tokens. */
+import { PageHero, type PageHeroStat } from '@/components/page';
+import { EntityFilter, TabStrip, type RosterTabItem } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import {
-    TabsRoot as Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger,
-} from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
-import { Head, router, useForm } from '@inertiajs/react';
 import {
-    AlertTriangle,
-    CheckCircle,
-    Clock,
-    Eye,
-    Paperclip,
-    Plus,
-    ShieldAlert,
-} from 'lucide-react';
-import { useState } from 'react';
+    CloseErrorDialog,
+    ERROR_TYPES,
+    ResolveErrorDialog,
+    ReviewErrorDialog,
+    SEVERITIES,
+    severityMeta,
+    statusMeta,
+    TriageDialog,
+    type ErrorRow,
+    type TriageAction,
+    typeLabel,
+} from '@/pages/emar/_error-dialogs';
+import { ReportErrorModal } from '@/pages/emar/components/report-error-modal';
+import { Head, router } from '@inertiajs/react';
+import { AlertTriangle, CheckCircle2, ChevronLeft, ChevronRight, Link2, ListChecks, Paperclip, Plus, Search } from 'lucide-react';
+import { useMemo, useState } from 'react';
+
+type Trend = { week: string; count: number; near_miss: number };
+type Stats = { total_open: number; critical: number; this_month: number; resolved_this_month: number; near_miss: number; trend: Trend[]; by_type: Record<string, number>; by_severity: Record<string, number> };
 
 type Props = {
-    errors: { data: any[]; links: any };
-    stats: {
-        total_open: number;
-        critical: number;
-        this_month: number;
-        resolved_this_month: number;
-    };
+    errors: ErrorRow[];
+    stats: Stats;
     clients: { id: number; first_name: string; last_name: string }[];
     staff: { id: number; name: string }[];
-    can: {
-        manage_evidence: boolean;
-    };
-    filters: {
-        client_id?: string;
-        severity?: string;
-        error_type?: string;
-        status?: string;
-        date_from?: string;
-        date_to?: string;
-        tab?: string;
-    };
+    sites: { id: number; name: string }[];
+    active_site: { id: number; name: string } | null;
+    site_brand_colour: string | null;
 };
 
-const errorTypeLabels: Record<string, string> = {
-    wrong_medication: 'Wrong Medication',
-    wrong_client: 'Wrong Client',
-    wrong_dose: 'Wrong Dose',
-    wrong_time: 'Wrong Time',
-    wrong_route: 'Wrong Route',
-    omission: 'Omission',
-    unauthorised: 'Unauthorised',
-    documentation: 'Documentation',
-    other: 'Other',
-};
+type Modal = { type: 'report' } | { type: 'triage' | 'review' | 'resolve' | 'close'; error: ErrorRow } | null;
 
-const severityColors: Record<string, string> = {
-    near_miss: 'bg-muted text-foreground',
-    minor: 'bg-status-info-bg text-status-info',
-    moderate: 'bg-status-warning-bg text-status-warning',
-    major: 'bg-status-warning-bg text-status-warning',
-    critical: 'bg-status-critical-bg text-status-critical',
-};
+const initials = (n: string) => n.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase() || '?';
+const fmtDate = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' }) : '—');
+const SEV_DOT: Record<string, string> = { near_miss: 'bg-muted-foreground', minor: 'bg-status-info', moderate: 'bg-status-warning', major: 'bg-status-warning', critical: 'bg-status-critical' };
 
-const statusColors: Record<string, string> = {
-    reported: 'bg-status-warning-bg text-status-warning',
-    investigating: 'bg-status-info-bg text-status-info',
-    resolved: 'bg-status-success-bg text-status-success',
-    closed: 'bg-muted text-muted-foreground',
-};
+export default function MedicationErrors({ errors, stats, clients, staff, sites, active_site: activeSite, site_brand_colour: brandColour }: Props) {
+    const [activeTab, setActiveTab] = useState('all');
+    const [search, setSearch] = useState('');
+    const [clientFilter, setClientFilter] = useState<number | null>(null);
+    const [severityFilter, setSeverityFilter] = useState<number | null>(null);
+    const [typeFilter, setTypeFilter] = useState<number | null>(null);
+    const [reporterFilter, setReporterFilter] = useState<number | null>(null);
+    const [month, setMonth] = useState<number | null>(null); // null = all time; else offset from current month
+    const [siteFilter, setSiteFilter] = useState<number | null>(activeSite?.id ?? null);
+    const [modal, setModal] = useState<Modal>(null);
 
-function ReportErrorDialog({ clients }: { clients: Props['clients'] }) {
-    const [open, setOpen] = useState(false);
+    const monthLabel = useMemo(() => { const d = new Date(); d.setMonth(d.getMonth() + (month ?? 0)); return d.toLocaleDateString('en-NZ', { month: 'long', year: 'numeric' }); }, [month]);
 
-    const form = useForm({
-        client_id: '',
-        client_medication_id: '',
-        error_type: '',
-        severity: '',
-        description: '',
-        immediate_action: '',
-        contributing_factors: '',
-        create_incident: false,
-    });
-
-    function handleSubmit(e: React.FormEvent) {
-        e.preventDefault();
-        form.post('/emar/errors', {
-            onSuccess: () => {
-                setOpen(false);
-                form.reset();
-            },
+    const filtered = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        const sev = severityFilter !== null ? SEVERITIES[severityFilter]?.value : null;
+        const typ = typeFilter !== null ? ERROR_TYPES[typeFilter]?.value : null;
+        return errors.filter((e) => {
+            if (clientFilter && e.client_id !== clientFilter) return false;
+            if (sev && e.severity !== sev) return false;
+            if (typ && e.error_type !== typ) return false;
+            if (reporterFilter && e.reported_by_user?.id !== reporterFilter) return false;
+            if (month !== null && e.reported_at) { const d = new Date(); d.setDate(1); d.setMonth(d.getMonth() + month); const ed = new Date(e.reported_at); if (ed.getMonth() !== d.getMonth() || ed.getFullYear() !== d.getFullYear()) return false; }
+            if (q) { const name = e.client ? `${e.client.first_name} ${e.client.last_name}` : ''; if (!`${name} ${e.medication?.name ?? ''} ${e.ref}`.toLowerCase().includes(q)) return false; }
+            return true;
         });
-    }
+    }, [errors, search, clientFilter, severityFilter, typeFilter, reporterFilter, month]);
+
+    const byTab = (tab: string) => filtered.filter((e) =>
+        tab === 'open' ? ['reported', 'investigating'].includes(e.status)
+            : tab === 'critical' ? e.severity === 'critical'
+                : tab === 'nearmiss' ? e.severity === 'near_miss'
+                    : tab === 'resolved' ? ['resolved', 'closed'].includes(e.status)
+                        : true);
+    const rows = byTab(activeTab);
+    const hasFilters = search || clientFilter || severityFilter !== null || typeFilter !== null || reporterFilter || month !== null;
+    const clearFilters = () => { setSearch(''); setClientFilter(null); setSeverityFilter(null); setTypeFilter(null); setReporterFilter(null); setMonth(null); };
+    const onSite = (id: number | null) => { setSiteFilter(id); router.get('/emar/errors', id ? { site_id: id } : {}, { preserveState: true, preserveScroll: true }); };
+
+    const TABS: RosterTabItem[] = [
+        { id: 'all', label: 'All errors', icon: ListChecks, tone: 'primary', badge: filtered.length || undefined },
+        { id: 'open', label: 'Open', icon: AlertTriangle, tone: 'warning', badge: byTab('open').length || undefined },
+        { id: 'critical', label: 'Critical', icon: AlertTriangle, tone: 'critical', badge: byTab('critical').length || undefined },
+        { id: 'nearmiss', label: 'Near misses', icon: CheckCircle2, tone: 'info', badge: byTab('nearmiss').length || undefined },
+        { id: 'resolved', label: 'Resolved', icon: CheckCircle2, tone: 'success', badge: byTab('resolved').length || undefined },
+    ];
+    const heroStats: PageHeroStat[] = [
+        { label: 'Open', value: stats.total_open, tone: stats.total_open > 0 ? 'warning' : 'neutral' },
+        { label: 'Critical', value: stats.critical, tone: stats.critical > 0 ? 'critical' : 'neutral' },
+        { label: 'Near miss · 30d', value: stats.near_miss },
+        { label: 'Resolved · 30d', value: stats.resolved_this_month },
+    ];
+
+    const trendMax = Math.max(1, ...stats.trend.map((t) => t.count));
+    const trendTotal = stats.trend.reduce((s, t) => s + t.count, 0);
+    const trendNearMiss = stats.trend.reduce((s, t) => s + t.near_miss, 0);
+    const topTypes = Object.entries(stats.by_type ?? {});
+    const typeMax = Math.max(1, ...topTypes.map(([, n]) => n));
+    const sevEntries = Object.entries(stats.by_severity ?? {});
+    const sevTotal = Math.max(1, sevEntries.reduce((s, [, n]) => s + n, 0));
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                <Button size="sm">
-                    <Plus className="mr-1 h-4 w-4" /> Report Error
-                </Button>
-            </DialogTrigger>
-            <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle>Report Medication Error</DialogTitle>
-                    <DialogDescription>
-                        Capture the medication error, severity, immediate
-                        response, and whether it should create an incident.
-                    </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                            <Label htmlFor="error_client_id">Client *</Label>
-                            <Select
-                                value={form.data.client_id}
-                                onValueChange={(v) =>
-                                    form.setData('client_id', v)
-                                }
-                            >
-                                <SelectTrigger id="error_client_id">
-                                    <SelectValue placeholder="Select client" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {clients.map((c) => (
-                                        <SelectItem
-                                            key={c.id}
-                                            value={c.id.toString()}
-                                        >
-                                            {c.last_name}, {c.first_name}
-                                        </SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            {form.errors.client_id && (
-                                <p className="text-xs text-status-critical">
-                                    {form.errors.client_id}
-                                </p>
-                            )}
-                        </div>
-
-                        <div className="space-y-1.5">
-                            <Label htmlFor="client_medication_id">
-                                Medication (optional)
-                            </Label>
-                            <Input
-                                id="client_medication_id"
-                                placeholder="Medication name or ID"
-                                value={form.data.client_medication_id}
-                                onChange={(e) =>
-                                    form.setData(
-                                        'client_medication_id',
-                                        e.target.value,
-                                    )
-                                }
-                            />
-                        </div>
-                    </div>
-
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                            <Label htmlFor="error_type">Error Type *</Label>
-                            <Select
-                                value={form.data.error_type}
-                                onValueChange={(v) =>
-                                    form.setData('error_type', v)
-                                }
-                            >
-                                <SelectTrigger id="error_type">
-                                    <SelectValue placeholder="Select type" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    {Object.entries(errorTypeLabels).map(
-                                        ([value, label]) => (
-                                            <SelectItem
-                                                key={value}
-                                                value={value}
-                                            >
-                                                {label}
-                                            </SelectItem>
-                                        ),
-                                    )}
-                                </SelectContent>
-                            </Select>
-                            {form.errors.error_type && (
-                                <p className="text-xs text-status-critical">
-                                    {form.errors.error_type}
-                                </p>
-                            )}
-                        </div>
-
-                        <div className="space-y-1.5">
-                            <Label htmlFor="severity">Severity *</Label>
-                            <Select
-                                value={form.data.severity}
-                                onValueChange={(v) =>
-                                    form.setData('severity', v)
-                                }
-                            >
-                                <SelectTrigger id="severity">
-                                    <SelectValue placeholder="Select severity" />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="near_miss">
-                                        Near Miss
-                                    </SelectItem>
-                                    <SelectItem value="minor">Minor</SelectItem>
-                                    <SelectItem value="moderate">
-                                        Moderate
-                                    </SelectItem>
-                                    <SelectItem value="major">Major</SelectItem>
-                                    <SelectItem value="critical">
-                                        Critical
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                            {form.errors.severity && (
-                                <p className="text-xs text-status-critical">
-                                    {form.errors.severity}
-                                </p>
-                            )}
-                        </div>
-                    </div>
-
-                    <div className="space-y-1.5">
-                        <Label htmlFor="description">Description *</Label>
-                        <Textarea
-                            id="description"
-                            rows={3}
-                            value={form.data.description}
-                            onChange={(e) =>
-                                form.setData('description', e.target.value)
-                            }
-                            placeholder="Describe the medication error in detail..."
-                        />
-                        {form.errors.description && (
-                            <p className="text-xs text-status-critical">
-                                {form.errors.description}
-                            </p>
-                        )}
-                    </div>
-
-                    <div className="space-y-1.5">
-                        <Label htmlFor="immediate_action">
-                            Immediate Action Taken
-                        </Label>
-                        <Textarea
-                            id="immediate_action"
-                            rows={2}
-                            value={form.data.immediate_action}
-                            onChange={(e) =>
-                                form.setData('immediate_action', e.target.value)
-                            }
-                            placeholder="What immediate action was taken?"
-                        />
-                    </div>
-
-                    <div className="space-y-1.5">
-                        <Label htmlFor="contributing_factors">
-                            Contributing Factors
-                        </Label>
-                        <Textarea
-                            id="contributing_factors"
-                            rows={2}
-                            value={form.data.contributing_factors}
-                            onChange={(e) =>
-                                form.setData(
-                                    'contributing_factors',
-                                    e.target.value,
-                                )
-                            }
-                            placeholder="What factors contributed to this error?"
-                        />
-                    </div>
-
-                    <div className="flex items-center gap-2">
-                        <input
-                            type="checkbox"
-                            id="create_incident"
-                            checked={form.data.create_incident}
-                            onChange={(e) =>
-                                form.setData(
-                                    'create_incident',
-                                    e.target.checked,
-                                )
-                            }
-                            className="h-4 w-4 rounded border-border"
-                        />
-                        <Label
-                            htmlFor="create_incident"
-                            className="text-sm font-normal"
-                        >
-                            Also create a linked incident report
-                        </Label>
-                    </div>
-
-                    <div className="flex justify-end gap-2 pt-2">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setOpen(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button type="submit" disabled={form.processing}>
-                            {form.processing ? 'Reporting...' : 'Report Error'}
-                        </Button>
-                    </div>
-                </form>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-function ReviewDialog({ error }: { error: any }) {
-    const [open, setOpen] = useState(false);
-
-    const form = useForm({
-        review_notes: '',
-        status: 'investigating',
-    });
-
-    function handleSubmit(e: React.FormEvent) {
-        e.preventDefault();
-        form.post(`/emar/errors/${error.id}/review`, {
-            onSuccess: () => {
-                setOpen(false);
-                form.reset();
-            },
-        });
-    }
-
-    return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                <Button size="sm" variant="outline" className="h-7 text-xs">
-                    <Eye className="mr-1 h-3 w-3" /> Review
-                </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-lg">
-                <DialogHeader>
-                    <DialogTitle>Review Medication Error</DialogTitle>
-                    <DialogDescription>
-                        Document the investigation notes and update the current
-                        review status.
-                    </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="space-y-1.5">
-                        <Label htmlFor="review_notes">Review Notes *</Label>
-                        <Textarea
-                            id="review_notes"
-                            rows={4}
-                            value={form.data.review_notes}
-                            onChange={(e) =>
-                                form.setData('review_notes', e.target.value)
-                            }
-                            placeholder="Enter your review notes..."
-                        />
-                        {form.errors.review_notes && (
-                            <p className="text-xs text-status-critical">
-                                {form.errors.review_notes}
-                            </p>
-                        )}
-                    </div>
-
-                    <div className="space-y-1.5">
-                        <Label htmlFor="review_status">Status</Label>
-                        <Select
-                            value={form.data.status}
-                            onValueChange={(v) => form.setData('status', v)}
-                        >
-                            <SelectTrigger id="review_status">
-                                <SelectValue />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="reported">
-                                    Reported
-                                </SelectItem>
-                                <SelectItem value="investigating">
-                                    Investigating
-                                </SelectItem>
-                                <SelectItem value="resolved">
-                                    Resolved
-                                </SelectItem>
-                                <SelectItem value="closed">Closed</SelectItem>
-                            </SelectContent>
-                        </Select>
-                    </div>
-
-                    <div className="flex justify-end gap-2 pt-2">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setOpen(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button type="submit" disabled={form.processing}>
-                            {form.processing ? 'Saving...' : 'Submit Review'}
-                        </Button>
-                    </div>
-                </form>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-function ResolveDialog({ error }: { error: any }) {
-    const [open, setOpen] = useState(false);
-
-    const form = useForm({
-        outcome: '',
-        preventive_actions: '',
-    });
-
-    function handleSubmit(e: React.FormEvent) {
-        e.preventDefault();
-        form.post(`/emar/errors/${error.id}/resolve`, {
-            onSuccess: () => {
-                setOpen(false);
-                form.reset();
-            },
-        });
-    }
-
-    return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                <Button size="sm" variant="outline" className="h-7 text-xs">
-                    <CheckCircle className="mr-1 h-3 w-3" /> Resolve
-                </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-lg">
-                <DialogHeader>
-                    <DialogTitle>Resolve Medication Error</DialogTitle>
-                    <DialogDescription>
-                        Record the outcome and preventive actions before
-                        closing this medication error.
-                    </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="space-y-1.5">
-                        <Label htmlFor="outcome">Outcome *</Label>
-                        <Textarea
-                            id="outcome"
-                            rows={3}
-                            value={form.data.outcome}
-                            onChange={(e) =>
-                                form.setData('outcome', e.target.value)
-                            }
-                            placeholder="Describe the outcome of this error..."
-                        />
-                        {form.errors.outcome && (
-                            <p className="text-xs text-status-critical">
-                                {form.errors.outcome}
-                            </p>
-                        )}
-                    </div>
-
-                    <div className="space-y-1.5">
-                        <Label htmlFor="preventive_actions">
-                            Preventive Actions *
-                        </Label>
-                        <Textarea
-                            id="preventive_actions"
-                            rows={3}
-                            value={form.data.preventive_actions}
-                            onChange={(e) =>
-                                form.setData(
-                                    'preventive_actions',
-                                    e.target.value,
-                                )
-                            }
-                            placeholder="What actions will be taken to prevent recurrence?"
-                        />
-                        {form.errors.preventive_actions && (
-                            <p className="text-xs text-status-critical">
-                                {form.errors.preventive_actions}
-                            </p>
-                        )}
-                    </div>
-
-                    <div className="flex justify-end gap-2 pt-2">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setOpen(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button type="submit" disabled={form.processing}>
-                            {form.processing ? 'Resolving...' : 'Mark Resolved'}
-                        </Button>
-                    </div>
-                </form>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-export default function MedicationErrors({
-    errors,
-    stats,
-    clients,
-    staff,
-    can,
-    filters,
-}: Props) {
-    const [evidenceTarget, setEvidenceTarget] = useState<any | null>(null);
-    const [attachmentOverrides, setAttachmentOverrides] = useState<
-        Record<number, SupportingEvidenceAttachment[]>
-    >({});
-
-    function getAttachments(error: any): SupportingEvidenceAttachment[] {
-        return attachmentOverrides[error.id] ?? error.attachments ?? [];
-    }
-
-    function updateAttachments(
-        errorId: number,
-        attachments: SupportingEvidenceAttachment[],
-    ) {
-        setAttachmentOverrides((current) => ({
-            ...current,
-            [errorId]: attachments,
-        }));
-    }
-
-    function updateFilter(key: string, value: string) {
-        router.get(
-            '/emar/errors',
-            { ...filters, [key]: value || undefined },
-            { preserveState: true },
-        );
-    }
-
-    function switchTab(tab: string) {
-        router.get(
-            '/emar/errors',
-            { ...filters, tab: tab === 'all' ? undefined : tab },
-            { preserveState: true },
-        );
-    }
-
-    return (
-        <AppLayout>
+        <AppLayout breadcrumbs={[{ title: 'eMAR', href: '/emar' }, { title: 'Medication Errors', href: '/emar/errors' }]}>
             <Head title="eMAR - Medication Errors" />
-            <PageHero
-                icon={AlertTriangle}
-                title="Medication Errors"
-                description="Record, review, and resolve medication errors. Track trends and implement preventive actions."
-                stats={[
-                    { label: 'Open', value: stats.total_open },
-                    { label: 'Critical', value: stats.critical },
-                    { label: 'This month', value: stats.this_month },
-                    { label: 'Resolved this month', value: stats.resolved_this_month },
-                ]}
-                actions={<ReportErrorDialog clients={clients} />}
-            />
-            <PageShell>
-                {/* Stats Cards */}
-                <div className="mb-6 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
-                    <Card>
-                        <CardContent className="flex items-center gap-3 p-4">
-                            <div className="rounded-lg bg-status-warning-bg p-2">
-                                <Clock className="h-5 w-5 text-status-warning" />
-                            </div>
-                            <div>
-                                <p className="text-2xl font-bold">
-                                    {stats.total_open}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                    Total Open
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-3 p-4">
-                            <div className="rounded-lg bg-status-critical-bg p-2">
-                                <ShieldAlert className="h-5 w-5 text-status-critical" />
-                            </div>
-                            <div>
-                                <p className="text-2xl font-bold">
-                                    {stats.critical}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                    Critical
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-3 p-4">
-                            <div className="rounded-lg bg-status-info-bg p-2">
-                                <AlertTriangle className="h-5 w-5 text-status-info" />
-                            </div>
-                            <div>
-                                <p className="text-2xl font-bold">
-                                    {stats.this_month}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                    This Month
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-3 p-4">
-                            <div className="rounded-lg bg-status-success-bg p-2">
-                                <CheckCircle className="h-5 w-5 text-status-success" />
-                            </div>
-                            <div>
-                                <p className="text-2xl font-bold">
-                                    {stats.resolved_this_month}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                    Resolved This Month
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-
-                {/* Filters */}
-                <div className="mb-6 flex flex-wrap gap-3">
-                    <Input
-                        type="date"
-                        className="w-40"
-                        placeholder="From date"
-                        value={filters.date_from ?? ''}
-                        onChange={(e) =>
-                            updateFilter('date_from', e.target.value)
-                        }
-                    />
-                    <Input
-                        type="date"
-                        className="w-40"
-                        placeholder="To date"
-                        value={filters.date_to ?? ''}
-                        onChange={(e) =>
-                            updateFilter('date_to', e.target.value)
-                        }
-                    />
-                    <Select
-                        value={filters.client_id ?? ''}
-                        onValueChange={(v) => updateFilter('client_id', v)}
-                    >
-                        <SelectTrigger className="w-56">
-                            <SelectValue placeholder="All clients" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {clients.map((c) => (
-                                <SelectItem key={c.id} value={c.id.toString()}>
-                                    {c.last_name}, {c.first_name}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <Select
-                        value={filters.severity ?? ''}
-                        onValueChange={(v) => updateFilter('severity', v)}
-                    >
-                        <SelectTrigger className="w-40">
-                            <SelectValue placeholder="All severities" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="near_miss">Near Miss</SelectItem>
-                            <SelectItem value="minor">Minor</SelectItem>
-                            <SelectItem value="moderate">Moderate</SelectItem>
-                            <SelectItem value="major">Major</SelectItem>
-                            <SelectItem value="critical">Critical</SelectItem>
-                        </SelectContent>
-                    </Select>
-                    <Select
-                        value={filters.error_type ?? ''}
-                        onValueChange={(v) => updateFilter('error_type', v)}
-                    >
-                        <SelectTrigger className="w-48">
-                            <SelectValue placeholder="All types" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {Object.entries(errorTypeLabels).map(
-                                ([value, label]) => (
-                                    <SelectItem key={value} value={value}>
-                                        {label}
-                                    </SelectItem>
-                                ),
-                            )}
-                        </SelectContent>
-                    </Select>
-                    <Select
-                        value={filters.status ?? ''}
-                        onValueChange={(v) => updateFilter('status', v)}
-                    >
-                        <SelectTrigger className="w-40">
-                            <SelectValue placeholder="All statuses" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="reported">Reported</SelectItem>
-                            <SelectItem value="investigating">
-                                Investigating
-                            </SelectItem>
-                            <SelectItem value="resolved">Resolved</SelectItem>
-                            <SelectItem value="closed">Closed</SelectItem>
-                        </SelectContent>
-                    </Select>
-                </div>
-
-                <Tabs
-                    defaultValue={filters.tab ?? 'all'}
-                    onValueChange={switchTab}
-                >
-                    <TabsList className="mb-4">
-                        <TabsTrigger value="all">All Errors</TabsTrigger>
-                        <TabsTrigger value="open">Open</TabsTrigger>
-                        <TabsTrigger value="critical">Critical</TabsTrigger>
-                        <TabsTrigger value="resolved">Resolved</TabsTrigger>
-                    </TabsList>
-
-                    {['all', 'open', 'critical', 'resolved'].map((tab) => (
-                        <TabsContent key={tab} value={tab}>
-                            <Card>
-                                <CardHeader className="flex flex-row items-center justify-between pb-3">
-                                    <CardTitle className="text-base">
-                                        Medication Errors
-                                    </CardTitle>
-                                    <ReportErrorDialog clients={clients} />
-                                </CardHeader>
-                                <CardContent className="p-0">
-                                    <table className="w-full text-sm">
-                                        <thead>
-                                            <tr className="border-b bg-muted/50">
-                                                <th className="p-3 text-left font-medium">
-                                                    Date
-                                                </th>
-                                                <th className="p-3 text-left font-medium">
-                                                    Client
-                                                </th>
-                                                <th className="p-3 text-left font-medium">
-                                                    Medication
-                                                </th>
-                                                <th className="p-3 text-left font-medium">
-                                                    Type
-                                                </th>
-                                                <th className="p-3 text-left font-medium">
-                                                    Severity
-                                                </th>
-                                                <th className="p-3 text-left font-medium">
-                                                    Description
-                                                </th>
-                                                <th className="p-3 text-left font-medium">
-                                                    Reported By
-                                                </th>
-                                                <th className="p-3 text-left font-medium">
-                                                    Status
-                                                </th>
-                                                <th className="p-3 text-right font-medium">
-                                                    Actions
-                                                </th>
-                                            </tr>
-                                        </thead>
-                                        <tbody>
-                                            {errors.data.map((err: any) => (
-                                                <tr
-                                                    key={err.id}
-                                                    className="border-b last:border-0"
-                                                >
-                                                    <td className="p-3 text-xs">
-                                                        {err.reported_at
-                                                            ? new Date(
-                                                                  err.reported_at,
-                                                              ).toLocaleDateString(
-                                                                  'en-NZ',
-                                                              )
-                                                            : '—'}
-                                                    </td>
-                                                    <td className="p-3">
-                                                        {err.client?.last_name},{' '}
-                                                        {err.client?.first_name}
-                                                    </td>
-                                                    <td className="p-3 text-xs">
-                                                        {err.medication?.name ??
-                                                            '—'}
-                                                    </td>
-                                                    <td className="p-3">
-                                                        <Badge
-                                                            variant="outline"
-                                                            className="text-xs"
-                                                        >
-                                                            {errorTypeLabels[
-                                                                err.error_type
-                                                            ] ?? err.error_type}
-                                                        </Badge>
-                                                    </td>
-                                                    <td className="p-3">
-                                                        <Badge
-                                                            className={`text-xs ${severityColors[err.severity] ?? ''}`}
-                                                        >
-                                                            {err.severity?.replace(
-                                                                '_',
-                                                                ' ',
-                                                            )}
-                                                        </Badge>
-                                                    </td>
-                                                    <td
-                                                        className="max-w-[200px] truncate p-3 text-xs"
-                                                        title={err.description}
-                                                    >
-                                                        {err.description}
-                                                    </td>
-                                                    <td className="p-3 text-xs">
-                                                        {err.reported_by_user
-                                                            ?.name ?? '—'}
-                                                    </td>
-                                                    <td className="p-3">
-                                                        <Badge
-                                                            className={`text-xs ${statusColors[err.status] ?? ''}`}
-                                                        >
-                                                            {err.status}
-                                                        </Badge>
-                                                        {getAttachments(err)
-                                                            .length > 0 && (
-                                                            <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                                                                <Paperclip className="h-3 w-3" />
-                                                                {
-                                                                    getAttachments(
-                                                                        err,
-                                                                    ).length
-                                                                }{' '}
-                                                                evidence file(s)
-                                                            </div>
-                                                        )}
-                                                    </td>
-                                                    <td className="p-3 text-right">
-                                                        <div className="flex justify-end gap-1">
-                                                            <Button
-                                                                size="sm"
-                                                                variant="outline"
-                                                                className="h-7 text-xs"
-                                                                onClick={() =>
-                                                                    setEvidenceTarget(
-                                                                        err,
-                                                                    )
-                                                                }
-                                                            >
-                                                                <Paperclip className="mr-1 h-3 w-3" />
-                                                                Evidence
-                                                            </Button>
-                                                            {(err.status ===
-                                                                'reported' ||
-                                                                err.status ===
-                                                                    'investigating') && (
-                                                                <>
-                                                                    <ReviewDialog
-                                                                        error={
-                                                                            err
-                                                                        }
-                                                                    />
-                                                                    <ResolveDialog
-                                                                        error={
-                                                                            err
-                                                                        }
-                                                                    />
-                                                                </>
-                                                            )}
-                                                        </div>
-                                                    </td>
-                                                </tr>
-                                            ))}
-                                            {errors.data.length === 0 && (
-                                                <tr>
-                                                    <td
-                                                        colSpan={9}
-                                                        className="p-6 text-center text-muted-foreground"
-                                                    >
-                                                        No medication errors
-                                                        found.
-                                                    </td>
-                                                </tr>
-                                            )}
-                                        </tbody>
-                                    </table>
-                                </CardContent>
-                            </Card>
-                        </TabsContent>
-                    ))}
-                </Tabs>
-
-                <SupportingEvidenceDialog
-                    isOpen={!!evidenceTarget}
-                    onClose={() => setEvidenceTarget(null)}
-                    clientId={evidenceTarget?.client?.id ?? null}
-                    targetType="error"
-                    targetId={evidenceTarget?.id ?? null}
-                    title="Medication Error Evidence"
-                    subject={
-                        evidenceTarget
-                            ? `${evidenceTarget.client?.last_name}, ${evidenceTarget.client?.first_name} - ${errorTypeLabels[evidenceTarget.error_type] ?? evidenceTarget.error_type}`
-                            : ''
+            <div className="flex flex-col gap-6 p-6">
+                <PageHero
+                    variant="hero"
+                    category="ops"
+                    brandColour={brandColour}
+                    icon={AlertTriangle}
+                    title={
+                        <span>
+                            <span className="flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-wide text-primary-foreground/80">
+                                <span aria-hidden className="relative inline-flex h-2 w-2">
+                                    <span className="absolute inset-0 animate-ping rounded-full bg-status-success/70" />
+                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success" />
+                                </span>
+                                Medication-safety register · live
+                            </span>
+                            <span className="mt-1 block text-[26px] font-bold leading-tight">
+                                Medication errors for{' '}
+                                <span className="border-b-2 border-primary-foreground/40">{activeSite?.name ?? 'your services'}</span>
+                            </span>
+                        </span>
                     }
-                    attachments={
-                        evidenceTarget ? getAttachments(evidenceTarget) : []
+                    description="Report, triage and resolve medication errors and near misses. A no-blame register — every report strengthens the system."
+                    stats={heroStats}
+                    actions={
+                        <Button className="bg-primary-foreground text-primary hover:bg-primary-foreground/90" onClick={() => setModal({ type: 'report' })}>
+                            <Plus className="h-4 w-4" />
+                            Report an error
+                        </Button>
                     }
-                    canManage={can.manage_evidence}
-                    onAttachmentsChange={(attachments) => {
-                        if (!evidenceTarget) {
-                            return;
-                        }
-
-                        updateAttachments(evidenceTarget.id, attachments);
-                    }}
+                    footer={
+                        <div className="flex flex-col gap-3 py-3 lg:flex-row lg:items-center lg:justify-between">
+                            <div className="flex items-center gap-2">
+                                <button onClick={() => setMonth((m) => (m ?? 0) - 1)} className="rounded-full border border-primary-foreground/20 bg-primary-foreground/10 p-1.5 text-primary-foreground hover:bg-primary-foreground/20"><ChevronLeft className="h-3.5 w-3.5" /></button>
+                                <span className="rounded-full border border-primary-foreground/30 bg-primary-foreground/15 px-3 py-1 text-xs font-medium text-primary-foreground">{month === null ? 'All time' : monthLabel}</span>
+                                <button onClick={() => setMonth((m) => (m ?? 0) + 1)} className="rounded-full border border-primary-foreground/20 bg-primary-foreground/10 p-1.5 text-primary-foreground hover:bg-primary-foreground/20"><ChevronRight className="h-3.5 w-3.5" /></button>
+                                {month !== null && <button onClick={() => setMonth(null)} className="rounded-full bg-primary-foreground px-3 py-1 text-xs font-medium text-primary">All time</button>}
+                            </div>
+                            {sites.length > 0 && <EntityFilter label="Site" allLabel="All sites" items={sites} value={siteFilter} onChange={onSite} onDark />}
+                        </div>
+                    }
                 />
-            </PageShell>
+
+                <div className="grid gap-4 lg:grid-cols-[1.5fr_1fr_1fr]">
+                    <Card title="Reports · last 8 weeks">
+                        <div className="flex h-20 items-end gap-1.5">
+                            {stats.trend.map((t, i) => (
+                                <div key={i} className="flex flex-1 flex-col items-center gap-1">
+                                    <div className={`w-full rounded-t ${i === stats.trend.length - 1 ? 'bg-primary' : 'bg-primary/30'}`} style={{ height: `${Math.max(4, (t.count / trendMax) * 64)}px` }} title={`${t.week}: ${t.count}`} />
+                                </div>
+                            ))}
+                        </div>
+                        <div className="mt-2 text-xs text-muted-foreground">{trendTotal} total · {trendNearMiss} near miss</div>
+                    </Card>
+                    <Card title="Top error types">
+                        {topTypes.length === 0 ? <div className="py-4 text-center text-xs text-muted-foreground">No data.</div> : (
+                            <div className="flex flex-col gap-2">
+                                {topTypes.map(([t, n]) => (
+                                    <div key={t} className="flex items-center gap-2 text-xs">
+                                        <span className="w-28 shrink-0 truncate">{typeLabel(t)}</span>
+                                        <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: `${(n / typeMax) * 100}%` }} /></div>
+                                        <span className="w-5 text-right tabular-nums text-muted-foreground">{n}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </Card>
+                    <Card title="By severity">
+                        <div className="flex h-2.5 overflow-hidden rounded-full">
+                            {sevEntries.map(([s, n]) => n > 0 && <div key={s} className={SEV_DOT[s]} style={{ width: `${(n / sevTotal) * 100}%` }} />)}
+                        </div>
+                        <div className="mt-2 flex flex-col gap-1">
+                            {sevEntries.map(([s, n]) => (
+                                <div key={s} className="flex items-center gap-2 text-xs"><span className={`h-2 w-2 rounded-full ${SEV_DOT[s]}`} /><span className="flex-1 capitalize text-muted-foreground">{s.replace('_', ' ')}</span><span className="tabular-nums">{n}</span></div>
+                            ))}
+                        </div>
+                    </Card>
+                </div>
+
+                <TabStrip value={activeTab} onChange={setActiveTab} items={TABS} ariaLabel="Error views" />
+
+                <div className="flex flex-wrap items-center gap-2">
+                    <div className="flex items-center gap-2 rounded-full border bg-card px-3 py-1.5">
+                        <Search className="h-3.5 w-3.5 text-muted-foreground" />
+                        <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search client, medication or ref…" className="w-48 bg-transparent text-sm outline-none placeholder:text-muted-foreground" />
+                    </div>
+                    <EntityFilter label="Client" allLabel="All clients" items={clients.map((c) => ({ id: c.id, name: `${c.first_name} ${c.last_name}` }))} value={clientFilter} onChange={setClientFilter} />
+                    <EntityFilter label="Severity" allLabel="All severities" items={SEVERITIES.map((s, i) => ({ id: i, name: s.label }))} value={severityFilter} onChange={setSeverityFilter} />
+                    <EntityFilter label="Type" allLabel="All types" items={ERROR_TYPES.map((t, i) => ({ id: i, name: t.label }))} value={typeFilter} onChange={setTypeFilter} />
+                    <EntityFilter label="Reporter" allLabel="Any reporter" items={staff} value={reporterFilter} onChange={setReporterFilter} />
+                    {hasFilters && <Button size="sm" variant="ghost" onClick={clearFilters}>Clear</Button>}
+                </div>
+
+                <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+                    {rows.length === 0 ? <div className="px-5 py-12 text-center text-sm text-muted-foreground">No errors match the current filters.</div> : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full min-w-[940px] text-sm">
+                                <thead>
+                                    <tr className="bg-muted/50 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                                        <th className="px-4 py-2.5">Date</th><th className="px-4 py-2.5">Client</th><th className="px-4 py-2.5">Medication</th><th className="px-4 py-2.5">Type</th><th className="px-4 py-2.5">Severity</th><th className="px-4 py-2.5">Reported by</th><th className="px-4 py-2.5">Status</th><th className="px-4 py-2.5 text-right">Actions</th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {rows.map((e) => {
+                                        const sev = severityMeta(e.severity); const st = statusMeta(e.status);
+                                        return (
+                                            <tr key={e.id} className="cursor-pointer border-b last:border-b-0 hover:bg-muted/30" onClick={() => setModal({ type: 'triage', error: e })}>
+                                                <td className="px-4 py-3"><div>{fmtDate(e.reported_at)}</div><div className="font-mono text-[10px] text-muted-foreground">{e.ref}</div></td>
+                                                <td className="px-4 py-3"><div className="flex items-center gap-2"><span className="flex h-7 w-7 items-center justify-center rounded-full bg-primary/10 text-[10px] font-bold text-primary">{initials(e.client ? `${e.client.first_name} ${e.client.last_name}` : '?')}</span><div><div className="font-medium">{e.client ? `${e.client.first_name} ${e.client.last_name}` : 'Unknown'}</div><div className="text-xs text-muted-foreground">{e.site_name ?? ''}</div></div></div></td>
+                                                <td className="px-4 py-3 text-muted-foreground">{e.medication?.name ?? '—'}</td>
+                                                <td className="px-4 py-3"><span className="rounded-full border px-2 py-0.5 text-xs text-muted-foreground">{typeLabel(e.error_type)}</span></td>
+                                                <td className="px-4 py-3"><span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${sev.cls}`}>{sev.label}</span></td>
+                                                <td className="px-4 py-3 text-muted-foreground">{e.reported_by_user?.name ?? '—'}</td>
+                                                <td className="px-4 py-3"><div className="flex items-center gap-1.5"><span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${st.cls}`}>{st.label}</span>{e.attachments.length > 0 && <span className="flex items-center gap-0.5 text-[10px] text-muted-foreground"><Paperclip className="h-3 w-3" />{e.attachments.length}</span>}{e.incident && <Link2 className="h-3 w-3 text-status-critical" />}</div></td>
+                                                <td className="px-4 py-3" onClick={(ev) => ev.stopPropagation()}>
+                                                    <div className="flex items-center justify-end gap-1">
+                                                        <Button size="sm" variant="ghost" onClick={() => setModal({ type: 'triage', error: e })}>View</Button>
+                                                        {e.status === 'reported' && <Button size="sm" variant="outline" onClick={() => setModal({ type: 'review', error: e })}>Review</Button>}
+                                                        {(e.status === 'reported' || e.status === 'investigating') && <Button size="sm" onClick={() => setModal({ type: 'resolve', error: e })}>Resolve</Button>}
+                                                        {e.status === 'resolved' && <Button size="sm" onClick={() => setModal({ type: 'close', error: e })}>Close out</Button>}
+                                                    </div>
+                                                </td>
+                                            </tr>
+                                        );
+                                    })}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
+            </div>
+
+            <ReportErrorModal open={modal?.type === 'report'} onClose={() => setModal(null)} clients={clients.map((c) => ({ id: c.id, name: `${c.first_name} ${c.last_name}`, site: null }))} />
+            {modal?.type === 'triage' && <TriageDialog error={modal.error} onDismiss={() => setModal(null)} onAction={(a: TriageAction) => setModal({ type: a, error: modal.error })} />}
+            {modal?.type === 'review' && <ReviewErrorDialog error={modal.error} onClose={() => setModal(null)} />}
+            {modal?.type === 'resolve' && <ResolveErrorDialog error={modal.error} onClose={() => setModal(null)} />}
+            {modal?.type === 'close' && <CloseErrorDialog error={modal.error} onClose={() => setModal(null)} />}
         </AppLayout>
+    );
+}
+
+function Card({ title, children }: { title: string; children: React.ReactNode }) {
+    return (
+        <div className="rounded-2xl border bg-card p-4 shadow-sm">
+            <div className="mb-3 text-sm font-semibold">{title}</div>
+            {children}
+        </div>
     );
 }

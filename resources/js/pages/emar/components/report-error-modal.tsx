@@ -66,6 +66,8 @@ export function ReportErrorModal({
     const [contributing, setContributing] = useState('');
     const [immediate, setImmediate] = useState('');
     const [createIncident, setCreateIncident] = useState('no');
+    const [reachedClient, setReachedClient] = useState('');
+    const [openDisclosure, setOpenDisclosure] = useState('na');
 
     const reset = () => {
         setStep(0);
@@ -76,6 +78,8 @@ export function ReportErrorModal({
         setContributing('');
         setImmediate('');
         setCreateIncident('no');
+        setReachedClient('');
+        setOpenDisclosure('na');
     };
 
     const close = () => {
@@ -94,6 +98,8 @@ export function ReportErrorModal({
                 client_id: Number(clientId),
                 error_type: errorType,
                 severity,
+                reached_client: reachedClient || null,
+                open_disclosure: openDisclosure || null,
                 description,
                 immediate_action: immediate || null,
                 contributing_factors: contributing || null,
@@ -206,6 +212,18 @@ export function ReportErrorModal({
                             options={SEVERITIES}
                         />
                     </Field>
+                    <Field label="Did the error reach the client?" span>
+                        <SelectInput
+                            value={reachedClient}
+                            onChange={setReachedClient}
+                            placeholder="Choose"
+                            options={[
+                                { value: 'no', label: 'No — intercepted (near miss territory)' },
+                                { value: 'yes', label: 'Yes — reached the client' },
+                                { value: 'unknown', label: 'Unknown' },
+                            ]}
+                        />
+                    </Field>
                     <Field label="Contributing factors" span>
                         <Textarea
                             value={contributing}
@@ -230,7 +248,7 @@ export function ReportErrorModal({
                             placeholder="Clinical response, who was notified, observations (optional)"
                         />
                     </Field>
-                    <Field label="Raise an incident?" span>
+                    <Field label="Raise an incident?">
                         <SelectInput
                             value={createIncident}
                             onChange={setCreateIncident}
@@ -238,6 +256,18 @@ export function ReportErrorModal({
                             options={[
                                 { value: 'no', label: 'No — error log only' },
                                 { value: 'yes', label: 'Yes — also create an incident' },
+                            ]}
+                        />
+                    </Field>
+                    <Field label="Family / open disclosure">
+                        <SelectInput
+                            value={openDisclosure}
+                            onChange={setOpenDisclosure}
+                            placeholder="Choose"
+                            options={[
+                                { value: 'na', label: 'Not required' },
+                                { value: 'pending', label: 'Pending' },
+                                { value: 'done', label: 'Completed' },
                             ]}
                         />
                     </Field>

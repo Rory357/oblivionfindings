@@ -7,9 +7,10 @@ use App\Models\Client;
 use App\Models\ClientIncident;
 use App\Models\MedicationError;
 use App\Models\MedicationMarAttachment;
+use App\Models\Site;
 use App\Models\User;
-use App\Services\MedicationIncidentIntegrationService;
 use App\Services\Medication\MedicationSignalService;
+use App\Services\MedicationIncidentIntegrationService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
@@ -40,25 +41,38 @@ class MedicationErrorController extends Controller
     {
         return [
             'id' => $error->id,
+            'ref' => 'ERR-'.str_pad((string) $error->id, 4, '0', STR_PAD_LEFT),
             'error_type' => $error->error_type,
             'severity' => $error->severity,
+            'reached_client' => $error->reached_client,
+            'harm_level' => $error->harm_level,
+            'open_disclosure' => $error->open_disclosure,
             'description' => $error->description,
             'immediate_action' => $error->immediate_action,
             'contributing_factors' => $error->contributing_factors,
             'review_notes' => $error->review_notes,
             'outcome' => $error->outcome,
             'preventive_actions' => $error->preventive_actions,
+            'close_note' => $error->close_note,
             'status' => $error->status,
             'reported_at' => $error->reported_at?->toIso8601String(),
             'reviewed_at' => $error->reviewed_at?->toIso8601String(),
+            'closed_at' => $error->closed_at?->toIso8601String(),
+            'client_id' => $error->client_id,
             'client' => $error->client ? [
                 'id' => $error->client->id,
                 'first_name' => $error->client->first_name,
                 'last_name' => $error->client->last_name,
             ] : null,
+            'site_id' => $error->client?->site_id,
+            'site_name' => $error->client?->site?->name,
             'medication' => $error->medication ? [
                 'id' => $error->medication->id,
                 'name' => $error->medication->name,
+            ] : null,
+            'incident' => $error->incident ? [
+                'id' => $error->incident->id,
+                'ref' => 'INC-'.str_pad((string) $error->incident->id, 4, '0', STR_PAD_LEFT),
             ] : null,
             'reported_by_user' => $error->reportedBy ? [
                 'id' => $error->reportedBy->id,
@@ -77,70 +91,59 @@ class MedicationErrorController extends Controller
 
     public function index(Request $request)
     {
-        $query = MedicationError::with([
-            'client',
-            'medication',
-            'reportedBy',
-            'reviewedBy',
-            'attachments.uploadedBy:id,name',
-        ]);
+        $siteFilter = $request->integer('site_id') ?: null;
+        $bySite = fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteFilter));
 
-        // Filters
-        if ($request->filled('client_id')) {
-            $query->where('client_id', $request->client_id);
-        }
-        if ($request->filled('severity')) {
-            $query->where('severity', $request->severity);
-        }
-        if ($request->filled('error_type')) {
-            $query->where('error_type', $request->error_type);
-        }
-        if ($request->filled('status')) {
-            $query->where('status', $request->status);
-        }
-        if ($request->filled('date_from')) {
-            $query->where('reported_at', '>=', $request->date_from);
-        }
-        if ($request->filled('date_to')) {
-            $query->where('reported_at', '<=', $request->date_to . ' 23:59:59');
-        }
+        // Flat, client-side-filterable register — the redesigned page facets by
+        // tab/search/severity/type/reporter with live counts (drops pagination).
+        $models = MedicationError::query()
+            ->with(['client:id,first_name,last_name,site_id', 'client.site:id,name', 'medication:id,name', 'incident:id', 'reportedBy:id,name', 'reviewedBy:id,name', 'attachments.uploadedBy:id,name'])
+            ->when($siteFilter, $bySite)
+            ->orderByDesc('reported_at')
+            ->limit(300)
+            ->get();
 
-        // Tab filtering
-        if ($request->tab === 'open') {
-            $query->open();
-        } elseif ($request->tab === 'critical') {
-            $query->critical();
-        } elseif ($request->tab === 'resolved') {
-            $query->whereIn('status', ['resolved', 'closed']);
-        }
+        $errors = $models->map(fn (MedicationError $error) => $this->serializeError($error, $request))->values();
 
-        $errors = $query->orderByDesc('reported_at')
-            ->paginate(20)
-            ->through(fn (MedicationError $error) => $this->serializeError($error, $request))
-            ->withQueryString();
+        // Aggregate stats over the whole (optionally site-scoped) register.
+        $statRows = MedicationError::query()
+            ->when($siteFilter, $bySite)
+            ->get(['id', 'severity', 'error_type', 'status', 'reported_at', 'updated_at']);
 
-        // Stats
         $now = now();
         $startOfMonth = $now->copy()->startOfMonth();
+        $last30 = $now->copy()->subDays(30);
+        $isOpen = fn ($r) => in_array($r->status, ['reported', 'investigating'], true);
 
-        $totalOpen = MedicationError::open()->count();
-        $totalCritical = MedicationError::critical()->open()->count();
-        $thisMonth = MedicationError::where('reported_at', '>=', $startOfMonth)->count();
-        $resolvedThisMonth = MedicationError::whereIn('status', ['resolved', 'closed'])
-            ->where('updated_at', '>=', $startOfMonth)
-            ->count();
+        $trend = collect(range(7, 0))->map(function ($w) use ($statRows, $now) {
+            $start = $now->copy()->startOfWeek()->subWeeks($w);
+            $end = $start->copy()->endOfWeek();
+            $inWeek = $statRows->filter(fn ($r) => $r->reported_at && $r->reported_at->betweenIncluded($start, $end));
+
+            return [
+                'week' => $start->format('d M'),
+                'count' => $inWeek->count(),
+                'near_miss' => $inWeek->where('severity', 'near_miss')->count(),
+            ];
+        })->values();
 
         return Inertia::render('emar/MedicationErrors', [
             'errors' => $errors,
             'stats' => [
-                'total_open' => $totalOpen,
-                'critical' => $totalCritical,
-                'this_month' => $thisMonth,
-                'resolved_this_month' => $resolvedThisMonth,
+                'total_open' => $statRows->filter($isOpen)->count(),
+                'critical' => $statRows->filter(fn ($r) => $r->severity === 'critical' && $isOpen($r))->count(),
+                'this_month' => $statRows->filter(fn ($r) => $r->reported_at && $r->reported_at->gte($startOfMonth))->count(),
+                'resolved_this_month' => $statRows->filter(fn ($r) => in_array($r->status, ['resolved', 'closed'], true) && $r->updated_at && $r->updated_at->gte($startOfMonth))->count(),
+                'near_miss' => $statRows->filter(fn ($r) => $r->severity === 'near_miss' && $r->reported_at && $r->reported_at->gte($last30))->count(),
+                'trend' => $trend,
+                'by_type' => $statRows->groupBy('error_type')->map->count()->sortDesc()->take(5),
+                'by_severity' => collect(['near_miss', 'minor', 'moderate', 'major', 'critical'])->mapWithKeys(fn ($s) => [$s => $statRows->where('severity', $s)->count()]),
             ],
             'clients' => Client::orderBy('last_name')->get(['id', 'first_name', 'last_name']),
             'staff' => User::orderBy('name')->get(['id', 'name']),
-            'filters' => $request->only(['client_id', 'severity', 'error_type', 'status', 'date_from', 'date_to', 'tab']),
+            'sites' => Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'active_site' => $siteFilter ? Site::query()->whereKey($siteFilter)->first(['id', 'name']) : null,
+            'site_brand_colour' => $siteFilter ? Site::query()->whereKey($siteFilter)->value('brand_colour') : null,
             'can' => [
                 'manage_evidence' => $request->user()->canDo('medications.administer.record')
                     || $request->user()->canDo('medications.administer.correct')
@@ -156,6 +159,8 @@ class MedicationErrorController extends Controller
             'client_medication_id' => 'nullable|exists:client_medications,id',
             'error_type' => 'required|in:wrong_medication,wrong_client,wrong_dose,wrong_time,wrong_route,omission,unauthorised,documentation,other',
             'severity' => 'required|in:near_miss,minor,moderate,major,critical',
+            'reached_client' => 'nullable|in:no,yes,unknown',
+            'open_disclosure' => 'nullable|in:na,pending,done',
             'description' => 'required|string|max:5000',
             'immediate_action' => 'nullable|string|max:5000',
             'contributing_factors' => 'nullable|string|max:5000',
@@ -171,7 +176,7 @@ class MedicationErrorController extends Controller
         if ($request->boolean('create_incident')) {
             $incident = ClientIncident::create([
                 'client_id' => $validated['client_id'],
-                'title' => 'Medication Error: ' . str_replace('_', ' ', $validated['error_type']),
+                'title' => 'Medication Error: '.str_replace('_', ' ', $validated['error_type']),
                 'description' => $validated['description'],
                 'occurred_at' => now(),
                 'reported_by' => $request->user()->id,
@@ -237,11 +242,13 @@ class MedicationErrorController extends Controller
         $validated = $request->validate([
             'outcome' => 'required|string|max:5000',
             'preventive_actions' => 'required|string|max:5000',
+            'harm_level' => 'nullable|in:a_c,d_e,f_g,h_i',
         ]);
 
         $error->update([
             'outcome' => $validated['outcome'],
             'preventive_actions' => $validated['preventive_actions'],
+            'harm_level' => $validated['harm_level'] ?? $error->harm_level,
             'status' => 'resolved',
             'reviewed_by' => $error->reviewed_by ?? $request->user()->id,
             'reviewed_at' => $error->reviewed_at ?? now(),
@@ -254,5 +261,30 @@ class MedicationErrorController extends Controller
         );
 
         return redirect()->back()->with('success', 'Error resolved successfully.');
+    }
+
+    /**
+     * Close out a resolved error — the final governance sign-off. Closing keeps
+     * the record (SoftDeletes is reserved for retraction); it just marks the
+     * lifecycle complete with an optional close-out note.
+     */
+    public function close(Request $request, MedicationError $error)
+    {
+        $validated = $request->validate([
+            'close_note' => 'nullable|string|max:5000',
+        ]);
+
+        if (! in_array($error->status, ['resolved', 'closed'], true)) {
+            return redirect()->back()->withErrors(['status' => 'Only a resolved error can be closed out.']);
+        }
+
+        $error->update([
+            'close_note' => $validated['close_note'] ?? $error->close_note,
+            'status' => 'closed',
+            'closed_at' => now(),
+            'closed_by' => $request->user()->id,
+        ]);
+
+        return redirect()->back()->with('success', 'Error closed out.');
     }
 }
