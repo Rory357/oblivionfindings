@@ -800,9 +800,14 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     |--------------------------------------------------------------------------
     */
     Route::prefix('feed')->name('feed.')->group(function () {
-        Route::get('/', [FeedController::class, 'index'])->name('index');
-        Route::post('/', [FeedController::class, 'store'])->name('store');
-        Route::post('/kudos', [FeedController::class, 'sendKudos'])->name('kudos');
+        Route::get('/', [FeedController::class, 'index'])
+            ->middleware('permission:hr.recognition.view')->name('index');
+
+        // Mutations require the give permission (was previously ungated).
+        Route::middleware('permission:hr.recognition.give')->group(function () {
+            Route::post('/', [FeedController::class, 'store'])->name('store');
+            Route::post('/kudos', [FeedController::class, 'sendKudos'])->name('kudos');
+        });
     });
 
     /*
