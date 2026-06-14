@@ -1,2736 +1,493 @@
-import ClientAllergyBanner from '@/components/emar/ClientAllergyBanner';
-import DrugInteractionAlert from '@/components/emar/DrugInteractionAlert';
-import { PageHero } from '@/components/page';
-import AdministrationEvidenceDialog from '@/components/medications/AdministrationEvidenceDialog';
-import ClientMedicationTools from '@/components/medications/ClientMedicationTools';
-import RecordAdministrationDialog from '@/components/medications/RecordAdministrationDialog';
-import RefusalFollowUpDialog from '@/components/medications/RefusalFollowUpDialog';
-import { type SafetyCheck } from '@/components/medications/SafetyCheckPanel';
-import { Alert, AlertDescription, AlertTitle } from '@/components/ui/alert';
-import { Badge } from '@/components/ui/badge';
+import AttentionBar from '@/components/emar/mar/attention-bar';
+import ClinicalRail from '@/components/emar/mar/clinical-rail';
+import MarGrid, { type MarGridMed } from '@/components/emar/mar/mar-grid';
+import PrnCard from '@/components/emar/mar/prn-card';
+import { PageHero, type PageHeroBadge, type PageHeroMetaItem, type PageHeroStat } from '@/components/page';
+import { EntityFilter, TabStrip, type RosterTabItem } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import {
-    Sheet,
-    SheetContent,
-    SheetHeader,
-    SheetTitle,
-} from '@/components/ui/sheet';
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipProvider,
-    TooltipTrigger,
-} from '@/components/ui/tooltip';
 import AppLayout from '@/layouts/app-layout';
-import { submitEmarMutation } from '@/lib/emar-offline';
-import { Head, router, usePage } from '@inertiajs/react';
-import axios from 'axios';
-import {
-    AlertTriangle,
-    ArrowUpDown,
-    Check,
-    ChevronLeft,
-    ChevronRight,
-    Clock,
-    Eye,
-    FileDown,
-    MinusCircle,
-    Paperclip,
-    Phone,
-    Pill,
-    Plus,
-    Shield,
-    Syringe,
-    XCircle,
-} from 'lucide-react';
-import type { KeyboardEvent } from 'react';
-import { useState } from 'react';
-import { toast } from 'sonner';
+import { addDays, DayPickerChip, toYmd } from '@/pages/meds/today/components/day-picker-chip';
+import { PrnWizard } from '@/pages/meds/today/components/prn-wizard';
+import { RecordDoseWizard } from '@/pages/meds/today/components/record-dose-wizard';
+import type { ClientInfo, NotGivenReasonOption, PrnMedication, ScheduleRow, WitnessOption } from '@/pages/meds/today/types';
+import MarGovernanceDialogs, { type MarModal } from '@/pages/emar/components/mar-governance-dialogs';
+import { Head, router } from '@inertiajs/react';
+import { CalendarDays, FileDown, HeartPulse, Home, Pill, Plus, Shield, User } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
-type AdministrationAttachment = {
-    id: number;
-    file_name: string;
-    mime_type?: string | null;
-    file_size?: number | null;
-    formatted_size?: string | null;
-    description?: string | null;
-    uploaded_at?: string | null;
-    uploaded_by?: string | null;
-    download_url: string;
-    can_delete: boolean;
-};
-
-type Administration = {
-    id: number | null;
-    scheduled_for: string | null;
-    administered_at: string | null;
-    status: string;
-    administered_by: string | null;
-    witnessed_by: string | null;
-    notes: string | null;
-    reason: string | null;
-    reason_code?: string | null;
-    dose_given?: string | null;
-    outcome?: string | null;
-    site?: string | null;
-    blood_glucose_level?: string | number | null;
-    pulse_bpm?: string | number | null;
-    blood_pressure_systolic?: string | number | null;
-    blood_pressure_diastolic?: string | number | null;
-    created_at?: string | null;
-    is_correction?: boolean;
-    correction_reason?: string | null;
-    correction_status?: string | null;
-    correction_rejection_reason?: string | null;
-    attachments?: AdministrationAttachment[];
-};
-
-type MedicationScanVerification = {
-    primary_code: string;
-    primary_label: string;
-    primary_source: string;
-    internal_code: string;
-    vendor_barcode?: string | null;
-    nzulm_code?: string | null;
-    requires_internal_code: boolean;
-    svg_url: string;
-    code_options: Array<{
-        source: string;
-        label: string;
-        value: string;
-    }>;
-};
-
-type MedicationStock = {
-    on_hand: number;
-    unit: string;
-};
-
-type MedicationAdminRules = {
-    requires_countersign: boolean;
-    required_observations: string[];
-    matched_rules?: Array<Record<string, unknown>>;
-};
-
-type ScheduledMed = {
-    id: number;
-    name: string;
-    dosage: string;
-    frequency: string;
-    route: string | null;
-    form: string | null;
-    instructions: string | null;
-    controlled_drug: boolean;
-    high_risk: boolean;
-    witness_required: boolean;
-    approval_status?: string;
-    is_administrable?: boolean;
-    admin_rules?: MedicationAdminRules;
-    pharmac_therapeutic_group?: string | null;
-    pharmac_subgroup?: string | null;
-    dose_times: string[];
-    administrations: Administration[];
-    scan_verification: MedicationScanVerification;
-    stock: MedicationStock | null;
-};
-
-type PrnMed = {
-    id: number;
-    name: string;
-    dosage: string;
-    indication: string | null;
-    max_per_day: string | null;
-    prn_count_24h: number;
-    prn_remaining: number | null;
-    controlled_drug: boolean;
-    high_risk: boolean;
-    witness_required: boolean;
-    approval_status?: string;
-    is_administrable?: boolean;
-    admin_rules?: MedicationAdminRules;
-    pharmac_therapeutic_group?: string | null;
-    pharmac_subgroup?: string | null;
-    administrations: Administration[];
-    scan_verification: MedicationScanVerification;
-    stock: MedicationStock | null;
-};
-
-type MarSortColumn = 'medication' | 'dose' | 'status';
-type MarSortDirection = 'asc' | 'desc';
+type Client = { id: number; first_name: string; last_name: string };
 
 type MarData = {
-    scheduled: ScheduledMed[];
-    prn: PrnMed[];
-    awaiting_verification?: Array<
-        Partial<ScheduledMed> & {
-            id: number;
-            name: string;
-            dosage: string;
-            approval_status?: string;
-            rejection_reason?: string | null;
-        }
-    >;
-    attention_alerts?: Array<{
+    scheduled: Array<{
         id: number;
-        type: string;
-        title: string;
-        detail?: string | null;
-        prompt_on_open: boolean;
-        created_at?: string | null;
+        name: string;
+        dosage: string;
+        frequency: string;
+        route: string | null;
+        instructions: string | null;
+        controlled_drug: boolean;
+        high_risk: boolean;
+        witness_required: boolean;
+        admin_rules?: { required_observations?: string[] | null } | null;
+        dose_times: string[];
     }>;
+    attention_alerts?: Array<{ id: number; type: string; title: string; detail?: string | null; prompt_on_open: boolean }>;
     inr_records?: Array<{
         id: number;
         medication_name?: string | null;
         inr_value: string | number;
         tested_on?: string | null;
         next_test_date?: string | null;
+        target_range_min?: string | number | null;
+        target_range_max?: string | number | null;
+        medication_dose?: string | null;
         disabled_at?: string | null;
     }>;
-    syringe_drivers?: Array<{
-        id: number;
-        status: string;
-        commenced_at?: string | null;
-        rate?: string | null;
-        rate_unit?: string | null;
-        contents?: Array<Record<string, unknown>>;
-        site_of_insertion?: string | null;
-    }>;
-    settings?: {
-        suppress_med_admin_alerts?: boolean;
-        med_alerts_suppressed_reason?: string | null;
-        next_chart_review_date?: string | null;
-        chart_review_interval_months?: number | null;
-        care_level?: string | null;
-    };
-    stats: {
-        total_scheduled: number;
-        total_prn: number;
-        given: number;
-        refused: number;
-        withheld: number;
-        missed: number;
-        pending: number;
-    };
-};
-
-type Client = {
-    id: number;
-    first_name: string;
-    last_name: string;
-    date_of_birth: string | null;
-    nhi_number: string | null;
-    active_medications_count: number;
-};
-
-type Allergy = {
-    id: number;
-    allergen: string;
-    reaction: string;
-    severity: string;
-    notes?: string | null;
-    identified_date?: string | null;
-};
-
-type Interaction = {
-    drug_a: string;
-    drug_b: string;
-    severity: string;
-    description: string;
+    syringe_drivers?: Array<{ id: number; status: string; rate?: string | null; rate_unit?: string | null; site_of_insertion?: string | null }>;
+    awaiting_verification?: Array<{ id: number; name: string; dosage: string }>;
+    settings?: { care_level?: string | null; next_chart_review_date?: string | null };
 };
 
 type Props = {
     clients: Client[];
-    selectedClient: Client | null;
+    selectedClient: { id: number; first_name: string; last_name: string } | null;
+    selected_client_info: ClientInfo | null;
     marData: MarData;
     date: string;
-    staff: { id: number; name: string }[];
-    allergies: Allergy[];
-    interactions: Interaction[];
+    schedule: ScheduleRow[];
+    prn_medications: PrnMedication[];
+    witnesses: WitnessOption[];
+    not_given_reasons: NotGivenReasonOption[];
+    board_user: { name: string; role_label: string | null; med_competent: boolean; cd_witness: boolean };
+    site_brand_colour: string | null;
+    allergies: Array<{ id: number; allergen: string; severity?: string | null }>;
     clientContext: {
-        profile: {
-            gp_name?: string | null;
-            gp_practice?: string | null;
-            gp_phone?: string | null;
-            hospital_preference?: string | null;
-            medical_history?: string | null;
-            notes?: string | null;
-        } | null;
-        conditions: Array<{
-            id: number;
-            label: string;
-            severity?: string | null;
-            notes?: string | null;
-        }>;
-        emergency_contacts: Array<{
-            id: number;
-            name: string;
-            relationship?: string | null;
-            phone?: string | null;
-            email?: string | null;
-            preferred_method?: string | null;
-            availability?: string | null;
-        }>;
-        medication_charts: Array<{
-            id: number;
-            title?: string | null;
-            original_name?: string | null;
-            version?: string | null;
-            effective_date?: string | null;
-            expiry_date?: string | null;
-            notes?: string | null;
-            uploaded_at?: string | null;
-            uploaded_by?: string | null;
-            download_url: string;
-        }>;
+        profile: { gp_name?: string | null } | null;
+        conditions: Array<{ id: number; label: string; severity?: string | null }>;
+        emergency_contacts: Array<{ id: number; name: string; relationship?: string | null; phone?: string | null }>;
     } | null;
-    breakGlassAccess: {
-        active: boolean;
-        accesses: Array<{
-            id: number;
-            user_id: number;
-            user_name?: string | null;
-            reason?: string | null;
-            expires_at?: string | null;
-            is_current_user: boolean;
-        }>;
-    };
-    pendingCorrections: Array<{
-        id: number;
-        original_administration_id?: number | null;
-        medication_name: string;
-        status: string;
-        dose_given?: string | null;
-        reason?: string | null;
-        notes?: string | null;
-        correction_reason?: string | null;
-        submitted_by?: string | null;
-        submitted_at?: string | null;
-        administered_at?: string | null;
-        attachments?: AdministrationAttachment[];
-    }>;
-    alerts: Array<{
-        id: number;
-        alert_type: string;
-        severity: string;
-        message: string;
-        created_at?: string | null;
-    }>;
-    controlledDiscrepancies: Array<{
-        id: number;
-        medication_name?: string | null;
-        difference?: number | null;
-        reason?: string | null;
-        notes?: string | null;
-        status: string;
-        reported_at?: string | null;
-    }>;
+    pendingCorrections: Array<{ id: number }>;
     can: {
         record: boolean;
-        correct: boolean;
         verify_orders?: boolean;
-        manage_settings?: boolean;
         manage_inr?: boolean;
         manage_syringe_drivers?: boolean;
-        revoke_break_glass: boolean;
-        view_controlled: boolean;
+        manage_settings?: boolean;
         export_reports: boolean;
     };
 };
 
-function statusIcon(status: string) {
-    switch (status) {
-        case 'given':
-            return <Check className="h-4 w-4 text-status-success" />;
-        case 'refused':
-            return <XCircle className="h-4 w-4 text-status-warning" />;
-        case 'withheld':
-            return <MinusCircle className="h-4 w-4 text-status-warning" />;
-        case 'missed':
-            return <AlertTriangle className="h-4 w-4 text-status-critical" />;
-        case 'pending':
-            return <Clock className="h-4 w-4 text-muted-foreground" />;
-        default:
-            return <Clock className="h-4 w-4 text-muted-foreground" />;
-    }
+const TABS: RosterTabItem[] = [
+    { id: 'schedule', label: 'Schedule', icon: Pill, tone: 'primary' },
+    { id: 'due', label: 'Due / overdue', icon: CalendarDays, tone: 'critical' },
+    { id: 'prn', label: 'PRN', icon: Plus, tone: 'warning' },
+    { id: 'history', label: 'History', icon: Shield, tone: 'info' },
+];
+
+function initials(name: string): string {
+    return name
+        .split(/\s+/)
+        .filter(Boolean)
+        .slice(0, 2)
+        .map((part) => part[0]!.toUpperCase())
+        .join('');
 }
 
-function statusBadge(status: string) {
-    const variant =
-        {
-            given: 'default' as const,
-            refused: 'destructive' as const,
-            withheld: 'secondary' as const,
-            missed: 'destructive' as const,
-            pending: 'outline' as const,
-        }[status] ?? ('outline' as const);
-    return (
-        <Badge variant={variant} className="text-xs">
-            {status}
-        </Badge>
+export default function MarCharts(props: Props) {
+    const {
+        clients,
+        selected_client_info: info,
+        marData,
+        date,
+        schedule,
+        prn_medications: prn,
+        witnesses,
+        not_given_reasons: notGivenReasons,
+        board_user: signer,
+        site_brand_colour: brandColour,
+        allergies,
+        clientContext,
+        pendingCorrections,
+        can,
+    } = props;
+
+    const [activeTab, setActiveTab] = useState('schedule');
+    const [search, setSearch] = useState('');
+    const [recordRow, setRecordRow] = useState<ScheduleRow | null>(null);
+    const [prnMedId, setPrnMedId] = useState<number | null>(null);
+    const [modal, setModal] = useState<MarModal>(null);
+
+    const isToday = date === toYmd(new Date());
+    const signedAs = { name: signer.name, role_label: signer.role_label };
+
+    const goDate = (next: string) => {
+        if (!info) return;
+        router.get('/emar/mar', { client_id: info.id, date: next }, { preserveState: true, preserveScroll: true });
+    };
+
+    const switchClient = (clientId: number | null) => {
+        if (!clientId) return;
+        router.get('/emar/mar', { client_id: clientId, date }, { preserveState: true });
+    };
+
+    // Build the grid medication rows (rich metadata) keyed to the flat schedule.
+    // `marData` is an empty array (not an object) when no resident is selected,
+    // so guard the access — these hooks run before the no-client early return.
+    const gridMeds: MarGridMed[] = useMemo(
+        () =>
+            (marData.scheduled ?? []).map((med) => ({
+                id: med.id,
+                name: med.name,
+                dosage: med.dosage,
+                route: med.route,
+                frequency: med.frequency,
+                instructions: med.instructions,
+                controlled_drug: med.controlled_drug,
+                high_risk: med.high_risk,
+                witness_required: med.witness_required,
+                is_inr: /warfarin/i.test(med.name),
+                requires_observation: (med.admin_rules?.required_observations?.length ?? 0) > 0,
+                dose_times: med.dose_times ?? [],
+            })),
+        [marData.scheduled],
     );
-}
 
-function medicationRowKey(med: ScheduledMed | PrnMed, isPrn: boolean) {
-    return `${isPrn ? 'prn' : 'scheduled'}-${med.id}`;
-}
-
-function formatMedicationTime(value?: string | null) {
-    if (!value) return '—';
-
-    return new Date(value).toLocaleTimeString('en-NZ', {
-        hour: '2-digit',
-        minute: '2-digit',
-    });
-}
-
-function medicationStatusSortValue(med: ScheduledMed | PrnMed) {
-    return (
-        med.administrations.find(
-            (administration) => administration.status !== 'pending',
-        )?.status ??
-        med.administrations[0]?.status ??
-        'pending'
+    const searched = useMemo(
+        () => (search ? gridMeds.filter((m) => m.name.toLowerCase().includes(search.toLowerCase())) : gridMeds),
+        [gridMeds, search],
     );
-}
 
-function medicationSortValue(
-    med: ScheduledMed | PrnMed,
-    column: MarSortColumn,
-) {
-    if (column === 'dose') return med.dosage ?? '';
-    if (column === 'status') return medicationStatusSortValue(med);
+    const dueMedIds = useMemo(() => {
+        const ids = new Set<number>();
+        for (const row of schedule) {
+            if (row.status === 'due' || row.status === 'overdue') ids.add(row.medication_id);
+        }
+        return ids;
+    }, [schedule]);
 
-    return med.name;
-}
+    const visibleMeds = activeTab === 'due' ? searched.filter((m) => dueMedIds.has(m.id)) : searched;
 
-function sortMedicationList<T extends ScheduledMed | PrnMed>(
-    medications: T[],
-    column: MarSortColumn,
-    direction: MarSortDirection,
-): T[] {
-    return [...medications].sort((a, b) => {
-        const result = medicationSortValue(a, column).localeCompare(
-            medicationSortValue(b, column),
-            undefined,
-            { numeric: true, sensitivity: 'base' },
-        );
+    // Live counts from the flat schedule.
+    const counts = useMemo(() => {
+        let recorded = 0;
+        let due = 0;
+        let overdue = 0;
+        let cdDue = 0;
+        for (const row of schedule) {
+            if (row.recorded) recorded += 1;
+            if (row.status === 'due') due += 1;
+            if (row.status === 'overdue') overdue += 1;
+            if ((row.status === 'due' || row.status === 'overdue') && row.is_controlled) cdDue += 1;
+        }
+        const total = schedule.length;
+        return {
+            recorded,
+            total,
+            due,
+            overdue,
+            cdDue,
+            pct: total ? Math.round((recorded / total) * 100) : 0,
+            prnGiven: prn.reduce((sum, p) => sum + p.given_last_24h, 0),
+        };
+    }, [schedule, prn]);
 
-        return direction === 'asc' ? result : -result;
-    });
-}
+    const latestInr = (marData.inr_records ?? []).find((r) => !r.disabled_at) ?? (marData.inr_records ?? [])[0] ?? null;
+    const awaitingCount = marData.awaiting_verification?.length ?? 0;
 
-export default function MarCharts({
-    clients,
-    selectedClient,
-    marData,
-    date,
-    staff,
-    allergies,
-    interactions,
-    clientContext,
-    breakGlassAccess,
-    pendingCorrections,
-    alerts,
-    controlledDiscrepancies,
-    can,
-}: Props) {
-    const { auth } = usePage<{ auth: { user: { id: number } } }>().props;
-    const [selectedClientId, setSelectedClientId] = useState<string>(
-        selectedClient?.id?.toString() ?? '',
-    );
-    const [selectedMed, setSelectedMed] = useState<
-        (ScheduledMed | PrnMed) | null
-    >(null);
-    const [dialogOpen, setDialogOpen] = useState(false);
-    const [safetyCheck, setSafetyCheck] = useState<SafetyCheck | null>(null);
-    const [prnHistoryData, setPrnHistoryData] = useState<{
-        history: Array<{
-            id: number;
-            administered_at: string;
-            dose_given?: string;
-            reason?: string;
-            administered_by?: string;
-        }>;
-        count: number;
-        max_per_day?: string;
-        remaining_today?: number;
-    } | null>(null);
-    const [loadingSafety, setLoadingSafety] = useState(false);
-    const [selectedIsPrn, setSelectedIsPrn] = useState(false);
-    const [selectedScheduledTime, setSelectedScheduledTime] = useState<
-        string | null
-    >(null);
-    const [detailSelection, setDetailSelection] = useState<{
-        id: number;
-        isPrn: boolean;
-    } | null>(null);
-    const [mobileDetailOpen, setMobileDetailOpen] = useState(false);
-    const [marSortColumn, setMarSortColumn] =
-        useState<MarSortColumn>('medication');
-    const [marSortDirection, setMarSortDirection] =
-        useState<MarSortDirection>('asc');
-    const [followUpTarget, setFollowUpTarget] = useState<{
-        administrationId: number;
-        medicationName: string;
-    } | null>(null);
-    const [evidenceTarget, setEvidenceTarget] = useState<{
-        administration: Administration;
-        medicationName: string;
-    } | null>(null);
-    const [attachmentOverrides, setAttachmentOverrides] = useState<
-        Record<number, AdministrationAttachment[]>
-    >({});
-    const [acknowledgedAttentionPromptIds, setAcknowledgedAttentionPromptIds] =
-        useState<number[]>([]);
+    const onRecord = (row: ScheduleRow) => setRecordRow(row);
+    const onGivePrn = (med: PrnMedication) => setPrnMedId(med.id);
 
-    function navigateDate(offset: number) {
-        const d = new Date(date);
-        d.setDate(d.getDate() + offset);
-        router.get(
-            '/emar/mar',
-            {
-                client_id: selectedClientId,
-                date: d.toISOString().split('T')[0],
-            },
-            { preserveState: true },
-        );
-    }
-
-    function selectClient(id: string) {
-        setSelectedClientId(id);
-        router.get(
-            '/emar/mar',
-            { client_id: id, date },
-            { preserveState: true },
-        );
-    }
-
-    function getNextRecordableAdministration(med: ScheduledMed) {
+    // ── No resident selected: prompt to pick one ───────────────────────────
+    if (!info) {
         return (
-            [...med.administrations]
-                .filter(
-                    (administration) =>
-                        ['pending', 'missed'].includes(administration.status) &&
-                        administration.scheduled_for,
-                )
-                .sort((left, right) =>
-                    (left.scheduled_for ?? '').localeCompare(
-                        right.scheduled_for ?? '',
-                    ),
-                )[0] ?? null
+            <AppLayout breadcrumbs={[{ title: 'eMAR', href: '/emar' }, { title: 'MAR Charts', href: '/emar/mar' }]}>
+                <Head title="MAR Charts" />
+                <div className="flex flex-col gap-6 p-6">
+                    <PageHero
+                        variant="hero"
+                        category="ops"
+                        icon={Pill}
+                        title="MAR Charts"
+                        description="Select a resident to open their medication administration record."
+                    />
+                    <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3">
+                        {clients.map((client) => (
+                            // eslint-disable-next-line no-restricted-syntax -- resident picker card (custom layout, not a <Button>)
+                            <button
+                                key={client.id}
+                                type="button"
+                                onClick={() => switchClient(client.id)}
+                                className="flex items-center gap-3 rounded-xl border bg-card p-4 text-left transition hover:border-primary/40 hover:shadow-sm"
+                            >
+                                <span className="flex h-10 w-10 items-center justify-center rounded-full bg-primary/10 text-sm font-bold text-primary">
+                                    {initials(`${client.first_name} ${client.last_name}`)}
+                                </span>
+                                <span className="font-medium">
+                                    {client.first_name} {client.last_name}
+                                </span>
+                            </button>
+                        ))}
+                    </div>
+                </div>
+            </AppLayout>
         );
     }
 
-    function getLatestRefusalFollowUpTarget(med: ScheduledMed | PrnMed) {
-        return (
-            [...med.administrations]
-                .filter(
-                    (administration) =>
-                        typeof administration.id === 'number' &&
-                        ['refused', 'withheld'].includes(administration.status),
-                )
-                .sort((left, right) =>
-                    (
-                        right.administered_at ??
-                        right.scheduled_for ??
-                        ''
-                    ).localeCompare(
-                        left.administered_at ?? left.scheduled_for ?? '',
-                    ),
-                )[0] ?? null
-        );
-    }
+    const heroMeta: PageHeroMetaItem[] = [
+        info.nhi ? { icon: User, label: `NHI ${info.nhi}` } : null,
+        info.dob ? { icon: CalendarDays, label: `${info.dob}${info.age != null ? ` (${info.age})` : ''}` } : null,
+        clientContext?.profile?.gp_name ? { icon: HeartPulse, label: clientContext.profile.gp_name } : null,
+        info.site_name ? { icon: Home, label: info.site_name } : null,
+        marData.settings?.care_level ? { icon: Shield, label: marData.settings.care_level } : null,
+    ].filter(Boolean) as PageHeroMetaItem[];
 
-    async function openRecordDialog(
-        med: ScheduledMed | PrnMed,
-        isPrn: boolean,
-    ) {
-        if (!selectedClient) return;
-        const shouldWaitForMobileSheet = mobileDetailOpen;
+    const heroBadges: PageHeroBadge[] = [
+        counts.overdue > 0 ? { tone: 'critical' as const, label: `${counts.overdue} overdue` } : null,
+        counts.cdDue > 0 ? { tone: 'warning' as const, label: `${counts.cdDue} controlled · witness` } : null,
+        latestInr ? { tone: 'info' as const, label: `Warfarin · INR ${latestInr.inr_value}` } : null,
+        (marData.attention_alerts ?? []).some((a) => a.type === 'paper_prescription')
+            ? { label: 'Paper prescription on file' }
+            : null,
+    ].filter(Boolean) as PageHeroBadge[];
 
-        setMobileDetailOpen(false);
-        setLoadingSafety(true);
-        setSelectedMed(med);
-        setSelectedIsPrn(isPrn);
-        setSelectedScheduledTime(
-            !isPrn && 'dose_times' in med
-                ? (getNextRecordableAdministration(med)?.scheduled_for ?? null)
-                : null,
-        );
-        setPrnHistoryData(null);
-        setSafetyCheck(null);
-
-        if (shouldWaitForMobileSheet) {
-            await new Promise((resolve) => window.setTimeout(resolve, 340));
-        }
-
-        setDialogOpen(true);
-
-        try {
-            const response = await axios.get(
-                `/api/medications/clients/${selectedClient.id}/medications/${med.id}/safety-check`,
-            );
-            setSafetyCheck(response.data.safety_check ?? response.data);
-            if (isPrn && response.data.prn_data) {
-                setPrnHistoryData(response.data.prn_data);
-            }
-        } catch (error: unknown) {
-            toast.error(
-                error instanceof Error
-                    ? error.message
-                    : 'Failed to load safety check data',
-            );
-        } finally {
-            setLoadingSafety(false);
-        }
-    }
-
-    async function handleSubmit(data: Record<string, unknown>) {
-        if (!selectedClient || !selectedMed) return;
-
-        try {
-            const result = await submitEmarMutation(
-                `/api/medications/clients/${selectedClient.id}/medications/${selectedMed.id}/administrations`,
-                data,
-                {
-                    successMessage: 'Medication administration recorded.',
-                    queuedMessage:
-                        'Medication administration saved offline and will sync automatically when the device reconnects.',
-                },
-            );
-
-            if (result.status === 'conflict') {
-                return;
-            }
-
-            setDialogOpen(false);
-            setSelectedMed(null);
-            setSelectedScheduledTime(null);
-
-            if (result.status !== 'queued') {
-                router.reload();
-            }
-        } catch (error: unknown) {
-            toast.error(
-                error instanceof Error
-                    ? error.message
-                    : 'Failed to record administration',
-            );
-        }
-    }
-
-    function getAdministrationAttachments(
-        administration: Administration,
-    ): AdministrationAttachment[] {
-        if (!administration.id) {
-            return [];
-        }
-
-        return (
-            attachmentOverrides[administration.id] ??
-            administration.attachments ??
-            []
-        );
-    }
-
-    function handleAttachmentsChange(
-        administrationId: number,
-        attachments: AdministrationAttachment[],
-    ) {
-        setAttachmentOverrides((current) => ({
-            ...current,
-            [administrationId]: attachments,
-        }));
-    }
-
-    function hasPendingDoses(med: ScheduledMed): boolean {
-        return med.administrations.some((administration) =>
-            ['pending', 'missed'].includes(administration.status),
-        );
-    }
-
-    function toggleMarSort(column: MarSortColumn) {
-        if (marSortColumn === column) {
-            setMarSortDirection((current) =>
-                current === 'asc' ? 'desc' : 'asc',
-            );
-            return;
-        }
-
-        setMarSortColumn(column);
-        setMarSortDirection('asc');
-    }
-
-    const scheduledRows = sortMedicationList(
-        marData?.scheduled ?? [],
-        marSortColumn,
-        marSortDirection,
-    );
-    const prnRows = sortMedicationList(
-        marData?.prn ?? [],
-        marSortColumn,
-        marSortDirection,
-    );
-
-    const medicationRows = [
-        ...scheduledRows.map((med) => ({
-            key: medicationRowKey(med, false),
-            med,
-            isPrn: false,
-        })),
-        ...prnRows.map((med) => ({
-            key: medicationRowKey(med, true),
-            med,
-            isPrn: true,
-        })),
+    const heroStats: PageHeroStat[] = [
+        { label: 'Recorded', value: `${counts.pct}%` },
+        { label: 'Due now', value: counts.due, tone: counts.due > 0 ? 'warning' : 'neutral' },
+        { label: 'Overdue', value: counts.overdue, tone: counts.overdue > 0 ? 'critical' : 'neutral' },
+        { label: 'PRN today', value: counts.prnGiven },
     ];
 
-    const detailEntry =
-        medicationRows.find(
-            (entry) =>
-                detailSelection &&
-                entry.med.id === detailSelection.id &&
-                entry.isPrn === detailSelection.isPrn,
-        ) ??
-        medicationRows[0] ??
-        null;
-
-    const selectedDetailKey = detailEntry?.key ?? null;
-    const attentionAlerts = marData?.attention_alerts ?? [];
-    const attentionPrompt = attentionAlerts.find(
-        (alert) =>
-            alert.prompt_on_open &&
-            !acknowledgedAttentionPromptIds.includes(alert.id),
-    );
-    const awaitingVerification = marData?.awaiting_verification ?? [];
-    const latestInr = (marData?.inr_records ?? []).find(
-        (record) => !record.disabled_at,
-    );
-    const runningSyringeDrivers = marData?.syringe_drivers ?? [];
-    const toolMedications = [
-        ...(marData?.scheduled ?? []),
-        ...(marData?.prn ?? []),
-    ].map((med) => ({ id: med.id, name: med.name }));
-
-    function handleRejectMedication(medicationId: number) {
-        const reason = window.prompt(
-            'Reason for rejecting this medication order:',
-        );
-        if (reason === null || !reason.trim()) {
-            return;
-        }
-        router.post(
-            `/emar/medications/${medicationId}/reject`,
-            { rejection_reason: reason },
-            { preserveScroll: true },
-        );
-    }
-
-    function acknowledgeAttentionPrompt() {
-        if (!attentionPrompt) return;
-
-        setAcknowledgedAttentionPromptIds((ids) =>
-            ids.includes(attentionPrompt.id)
-                ? ids
-                : [...ids, attentionPrompt.id],
-        );
-    }
-
-    function selectMedicationForDetail(
-        med: ScheduledMed | PrnMed,
-        isPrn: boolean,
-        openMobile = false,
-    ) {
-        setDetailSelection({ id: med.id, isPrn });
-
-        if (
-            openMobile &&
-            typeof window !== 'undefined' &&
-            window.matchMedia('(max-width: 1023px)').matches
-        ) {
-            setMobileDetailOpen(true);
-        }
-    }
-
-    function handleMedicationRowKeyDown(
-        event: KeyboardEvent<HTMLTableRowElement>,
-        key: string,
-    ) {
-        const index = medicationRows.findIndex((entry) => entry.key === key);
-        if (index < 0) return;
-
-        if (event.key === 'ArrowDown' || event.key === 'ArrowUp') {
-            event.preventDefault();
-            const offset = event.key === 'ArrowDown' ? 1 : -1;
-            const next =
-                medicationRows[
-                    Math.min(
-                        Math.max(index + offset, 0),
-                        medicationRows.length - 1,
-                    )
-                ];
-            if (!next) return;
-
-            selectMedicationForDetail(next.med, next.isPrn);
-            requestAnimationFrame(() => {
-                document
-                    .querySelector<HTMLTableRowElement>(
-                        `[data-mar-row-key="${next.key}"]`,
-                    )
-                    ?.focus();
-            });
-        }
-
-        if (event.key === 'Enter') {
-            event.preventDefault();
-            const entry = medicationRows[index];
-            if (entry) {
-                void openRecordDialog(entry.med, entry.isPrn);
-            }
-        }
-    }
-
-    function handleApproveCorrection(correctionId: number) {
-        router.post(
-            `/emar/corrections/${correctionId}/approve`,
-            {},
-            { preserveScroll: true },
-        );
-    }
-
-    function handleRejectCorrection(correctionId: number) {
-        const reason = window.prompt('Reason for rejecting this correction:');
-        if (reason === null || !reason.trim()) {
-            return;
-        }
-
-        router.post(
-            `/emar/corrections/${correctionId}/reject`,
-            { reason },
-            { preserveScroll: true },
-        );
-    }
-
-    function handleRevokeBreakGlass(accessId: number) {
-        if (!selectedClient) {
-            return;
-        }
-
-        router.delete(
-            `/emar/clients/${selectedClient.id}/break-glass/${accessId}`,
-            {
-                preserveScroll: true,
-            },
-        );
-    }
-
-    const mappedMedication = selectedMed
-        ? {
-              id: selectedMed.id,
-              name: selectedMed.name,
-              dosage: selectedMed.dosage,
-              route:
-                  'route' in selectedMed
-                      ? (selectedMed.route ?? undefined)
-                      : undefined,
-              form:
-                  'form' in selectedMed
-                      ? (selectedMed.form ?? undefined)
-                      : undefined,
-              is_prn: selectedIsPrn,
-              controlled_drug: selectedMed.controlled_drug,
-              high_risk:
-                  'high_risk' in selectedMed ? selectedMed.high_risk : false,
-              witness_required:
-                  'witness_required' in selectedMed
-                      ? selectedMed.witness_required
-                      : false,
-              admin_rules:
-                  'admin_rules' in selectedMed
-                      ? selectedMed.admin_rules
-                      : undefined,
-              instructions:
-                  'instructions' in selectedMed
-                      ? (selectedMed.instructions ?? undefined)
-                      : undefined,
-              scan_verification: selectedMed.scan_verification,
-              stock: 'stock' in selectedMed ? selectedMed.stock : null,
-          }
-        : null;
-
-    return (
-        <AppLayout>
-            <Head title="eMAR - MAR Charts" />
-            <div className="flex flex-col gap-6 p-6">
-                <PageHero
-                    title="MAR Charts"
-                    description="Medication Administration Record charts by client and date"
-                    icon={<Pill className="h-7 w-7 text-white" />}
-                    backHref="/emar"
-                    backLabel="Back"
-                />
-                {/* Filters */}
-                <div className="mb-6 flex flex-wrap items-center gap-4">
-                    <div className="w-72">
-                        <Select
-                            value={selectedClientId}
-                            onValueChange={selectClient}
-                        >
-                            <SelectTrigger>
-                                <SelectValue placeholder="Select client..." />
-                            </SelectTrigger>
-                            <SelectContent>
-                                {clients.map((c) => (
-                                    <SelectItem
-                                        key={c.id}
-                                        value={c.id.toString()}
-                                    >
-                                        {c.last_name}, {c.first_name} (
-                                        {c.active_medications_count} meds)
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div className="flex items-center gap-2">
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            data-test="mar-date-prev"
-                            aria-label="Previous day"
-                            onClick={() => navigateDate(-1)}
-                        >
-                            <ChevronLeft className="h-4 w-4" />
-                        </Button>
-                        <Input
-                            type="date"
-                            value={date}
-                            data-test="mar-date-input"
-                            aria-label="MAR date"
-                            onChange={(e) =>
-                                router.get(
-                                    '/emar/mar',
-                                    {
-                                        client_id: selectedClientId,
-                                        date: e.target.value,
-                                    },
-                                    { preserveState: true },
-                                )
-                            }
-                            className="w-40"
-                        />
-                        <Button
-                            variant="outline"
-                            size="icon"
-                            data-test="mar-date-next"
-                            aria-label="Next day"
-                            onClick={() => navigateDate(1)}
-                        >
-                            <ChevronRight className="h-4 w-4" />
-                        </Button>
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            onClick={() =>
-                                router.get(
-                                    '/emar/mar',
-                                    {
-                                        client_id: selectedClientId,
-                                        date: new Date()
-                                            .toISOString()
-                                            .split('T')[0],
-                                    },
-                                    { preserveState: true },
-                                )
-                            }
-                        >
-                            Today
-                        </Button>
-                    </div>
-                    {selectedClientId && (
-                        <Button
-                            variant="outline"
-                            size="sm"
-                            disabled={!can.export_reports}
-                            onClick={() =>
-                                window.open(
-                                    `/emar/pdf/mar-chart?client_id=${selectedClientId}&date_from=${date}&date_to=${date}`,
-                                    '_blank',
-                                )
-                            }
-                        >
-                            <FileDown className="mr-1 h-4 w-4" />
-                            Print PDF
-                        </Button>
-                    )}
-                </div>
-
-                {!selectedClient ? (
-                    <Card>
-                        <CardContent className="flex flex-col items-center py-16">
-                            <Pill className="mb-4 h-12 w-12 text-muted-foreground/30" />
-                            <p className="text-muted-foreground">
-                                Select a client to view their MAR chart.
-                            </p>
-                        </CardContent>
-                    </Card>
-                ) : (
-                    <>
-                        {/* Client Header & Stats */}
-                        <div className="mb-4 flex flex-wrap items-center justify-between gap-4">
-                            <div>
-                                <h2 className="text-lg font-semibold">
-                                    {selectedClient.last_name},{' '}
-                                    {selectedClient.first_name}
-                                </h2>
-                                {selectedClient.nhi_number && (
-                                    <p className="text-sm text-muted-foreground">
-                                        NHI: {selectedClient.nhi_number}
-                                    </p>
-                                )}
-                            </div>
-                            {marData?.stats && (
-                                <div className="flex gap-3">
-                                    <Badge variant="outline" className="gap-1">
-                                        <Check className="h-3 w-3 text-status-success" />{' '}
-                                        {marData.stats.given} Given
-                                    </Badge>
-                                    <Badge variant="outline" className="gap-1">
-                                        <XCircle className="h-3 w-3 text-status-warning" />{' '}
-                                        {marData.stats.refused} Refused
-                                    </Badge>
-                                    <Badge variant="outline" className="gap-1">
-                                        <MinusCircle className="h-3 w-3 text-status-warning" />{' '}
-                                        {marData.stats.withheld} Withheld
-                                    </Badge>
-                                    <Badge variant="outline" className="gap-1">
-                                        <AlertTriangle className="h-3 w-3 text-status-critical" />{' '}
-                                        {marData.stats.missed} Missed
-                                    </Badge>
-                                    <Badge variant="outline" className="gap-1">
-                                        <Clock className="h-3 w-3" />{' '}
-                                        {marData.stats.pending} Pending
-                                    </Badge>
-                                </div>
-                            )}
-                        </div>
-
-                        {/* Allergy & Interaction Warnings */}
-                        {allergies && allergies.length > 0 && (
-                            <div className="mb-4">
-                                <ClientAllergyBanner allergies={allergies} />
-                            </div>
-                        )}
-                        {interactions && interactions.length > 0 && (
-                            <div className="mb-4">
-                                <DrugInteractionAlert
-                                    interactions={interactions}
-                                />
-                            </div>
-                        )}
-
-                        <div className="mb-4">
-                            <ClientMedicationTools
-                                client={selectedClient}
-                                staff={staff}
-                                medications={toolMedications}
-                                attentionAlerts={attentionAlerts}
-                                inrRecords={marData?.inr_records ?? []}
-                                syringeDrivers={runningSyringeDrivers}
-                                settings={marData?.settings ?? {}}
-                                can={{
-                                    manage_settings: can.manage_settings,
-                                    manage_inr: can.manage_inr,
-                                    manage_syringe_drivers:
-                                        can.manage_syringe_drivers,
-                                }}
-                            />
-                        </div>
-
-                        {(attentionAlerts.length > 0 ||
-                            marData?.settings?.suppress_med_admin_alerts ||
-                            latestInr ||
-                            runningSyringeDrivers.length > 0) && (
-                            <div className="mb-4 grid gap-3 lg:grid-cols-2">
-                                {marData?.settings
-                                    ?.suppress_med_admin_alerts && (
-                                    <Alert>
-                                        <AlertTriangle className="h-4 w-4" />
-                                        <AlertTitle>
-                                            Medication administration alerts
-                                            suppressed
-                                        </AlertTitle>
-                                        <AlertDescription>
-                                            {marData.settings
-                                                .med_alerts_suppressed_reason ??
-                                                'Due and overdue medication alerts are currently suppressed for this client.'}
-                                        </AlertDescription>
-                                    </Alert>
-                                )}
-
-                                {attentionAlerts.map((alert) => (
-                                    <Alert
-                                        key={alert.id}
-                                        variant={
-                                            alert.prompt_on_open
-                                                ? 'destructive'
-                                                : 'default'
-                                        }
-                                    >
-                                        <AlertTriangle className="h-4 w-4" />
-                                        <AlertTitle>{alert.title}</AlertTitle>
-                                        {alert.detail && (
-                                            <AlertDescription>
-                                                {alert.detail}
-                                            </AlertDescription>
-                                        )}
-                                    </Alert>
-                                ))}
-
-                                {latestInr && (
-                                    <Alert>
-                                        <Shield className="h-4 w-4" />
-                                        <AlertTitle>
-                                            Latest INR {latestInr.inr_value}
-                                        </AlertTitle>
-                                        <AlertDescription>
-                                            {latestInr.medication_name ??
-                                                'Warfarin'}
-                                            {latestInr.tested_on
-                                                ? ` tested ${latestInr.tested_on}`
-                                                : ''}
-                                            {latestInr.next_test_date
-                                                ? `, next due ${latestInr.next_test_date}`
-                                                : ''}
-                                        </AlertDescription>
-                                    </Alert>
-                                )}
-
-                                {runningSyringeDrivers.map((driver) => (
-                                    <Alert key={driver.id}>
-                                        <Syringe className="h-4 w-4" />
-                                        <AlertTitle>
-                                            Syringe driver running
-                                        </AlertTitle>
-                                        <AlertDescription>
-                                            {driver.rate
-                                                ? `${driver.rate} ${driver.rate_unit ?? ''}`
-                                                : 'Rate not recorded'}
-                                            {driver.site_of_insertion
-                                                ? ` • ${driver.site_of_insertion}`
-                                                : ''}
-                                        </AlertDescription>
-                                    </Alert>
-                                ))}
-                            </div>
-                        )}
-
-                        {awaitingVerification.length > 0 && (
-                            <Card className="mb-4">
-                                <CardHeader className="pb-3">
-                                    <CardTitle className="text-base">
-                                        Medication orders awaiting verification
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-3">
-                                    {awaitingVerification.map((med) => (
-                                        <div
-                                            key={med.id}
-                                            className="flex flex-wrap items-center justify-between gap-3 rounded-md border p-3 text-sm"
-                                        >
-                                            <div>
-                                                <div className="font-medium">
-                                                    {med.name}
-                                                </div>
-                                                <div className="text-muted-foreground">
-                                                    {med.dosage}
-                                                    {med.route
-                                                        ? ` • ${med.route}`
-                                                        : ''}
-                                                    {med.approval_status
-                                                        ? ` • ${med.approval_status.replace('_', ' ')}`
-                                                        : ''}
-                                                </div>
-                                                {med.rejection_reason && (
-                                                    <div className="mt-1 text-xs text-status-critical">
-                                                        {med.rejection_reason}
-                                                    </div>
-                                                )}
-                                            </div>
-                                            {can.verify_orders && (
-                                                <div className="flex gap-2">
-                                                    <Button
-                                                        size="sm"
-                                                        onClick={() =>
-                                                            router.post(
-                                                                `/emar/medications/${med.id}/verify`,
-                                                                {},
-                                                                {
-                                                                    preserveScroll:
-                                                                        true,
-                                                                },
-                                                            )
-                                                        }
-                                                    >
-                                                        Verify
-                                                    </Button>
-                                                    {med.approval_status !==
-                                                        'rejected' && (
-                                                        <Button
-                                                            size="sm"
-                                                            variant="outline"
-                                                            onClick={() =>
-                                                                handleRejectMedication(
-                                                                    med.id,
-                                                                )
-                                                            }
-                                                        >
-                                                            Reject
-                                                        </Button>
-                                                    )}
-                                                </div>
-                                            )}
-                                        </div>
-                                    ))}
-                                </CardContent>
-                            </Card>
-                        )}
-
-                        <div className="mb-6 grid gap-4 xl:grid-cols-2">
-                            <Card>
-                                <CardHeader className="pb-3">
-                                    <CardTitle className="text-base">
-                                        Clinical Context
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-4 text-sm">
-                                    <div>
-                                        <div className="text-xs tracking-wide text-muted-foreground uppercase">
-                                            GP
-                                        </div>
-                                        <div>
-                                            {clientContext?.profile?.gp_name ??
-                                                'Not recorded'}
-                                        </div>
-                                        {clientContext?.profile
-                                            ?.gp_practice && (
-                                            <div className="text-muted-foreground">
-                                                {
-                                                    clientContext.profile
-                                                        .gp_practice
-                                                }
-                                            </div>
-                                        )}
-                                        {clientContext?.profile?.gp_phone && (
-                                            <div className="text-muted-foreground">
-                                                {clientContext.profile.gp_phone}
-                                            </div>
-                                        )}
-                                    </div>
-
-                                    <div>
-                                        <div className="text-xs tracking-wide text-muted-foreground uppercase">
-                                            Conditions
-                                        </div>
-                                        <div className="mt-2 flex flex-wrap gap-2">
-                                            {clientContext?.conditions
-                                                ?.length ? (
-                                                clientContext.conditions.map(
-                                                    (condition) => (
-                                                        <Badge
-                                                            key={condition.id}
-                                                            variant="outline"
-                                                        >
-                                                            {condition.label}
-                                                            {condition.severity
-                                                                ? ` • ${condition.severity}`
-                                                                : ''}
-                                                        </Badge>
-                                                    ),
-                                                )
-                                            ) : (
-                                                <span className="text-muted-foreground">
-                                                    No conditions recorded.
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <div className="text-xs tracking-wide text-muted-foreground uppercase">
-                                            Emergency Contacts
-                                        </div>
-                                        <div className="mt-2 space-y-2">
-                                            {clientContext?.emergency_contacts
-                                                ?.length ? (
-                                                clientContext.emergency_contacts.map(
-                                                    (contact) => (
-                                                        <div
-                                                            key={contact.id}
-                                                            className="rounded-md border p-2"
-                                                        >
-                                                            <div className="font-medium">
-                                                                {contact.name}
-                                                            </div>
-                                                            <div className="text-xs text-muted-foreground">
-                                                                {contact.relationship ??
-                                                                    'Relationship not recorded'}
-                                                                {contact.phone
-                                                                    ? ` • ${contact.phone}`
-                                                                    : ''}
-                                                            </div>
-                                                            {contact.preferred_method && (
-                                                                <div className="mt-1 text-xs text-muted-foreground">
-                                                                    Preferred
-                                                                    contact:{' '}
-                                                                    {
-                                                                        contact.preferred_method
-                                                                    }
-                                                                </div>
-                                                            )}
-                                                        </div>
-                                                    ),
-                                                )
-                                            ) : (
-                                                <span className="text-muted-foreground">
-                                                    No emergency contacts
-                                                    recorded.
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-
-                                    <div>
-                                        <div className="text-xs tracking-wide text-muted-foreground uppercase">
-                                            Medication Charts
-                                        </div>
-                                        <div className="mt-2 space-y-2">
-                                            {clientContext?.medication_charts
-                                                ?.length ? (
-                                                clientContext.medication_charts.map(
-                                                    (chart) => (
-                                                        <a
-                                                            key={chart.id}
-                                                            href={
-                                                                chart.download_url
-                                                            }
-                                                            className="block rounded-md border p-2 transition hover:border-primary/40 hover:bg-muted/40"
-                                                        >
-                                                            <div className="font-medium">
-                                                                {chart.title ||
-                                                                    chart.original_name ||
-                                                                    `Chart ${chart.id}`}
-                                                            </div>
-                                                            <div className="text-xs text-muted-foreground">
-                                                                {chart.version
-                                                                    ? `Version ${chart.version}`
-                                                                    : 'Medication chart'}
-                                                                {chart.effective_date
-                                                                    ? ` • Effective ${chart.effective_date}`
-                                                                    : ''}
-                                                            </div>
-                                                        </a>
-                                                    ),
-                                                )
-                                            ) : (
-                                                <span className="text-muted-foreground">
-                                                    No medication charts
-                                                    uploaded.
-                                                </span>
-                                            )}
-                                        </div>
-                                    </div>
-                                </CardContent>
-                            </Card>
-
-                            <Card>
-                                <CardHeader className="pb-3">
-                                    <CardTitle className="text-base">
-                                        Alerts & Workflow
-                                    </CardTitle>
-                                </CardHeader>
-                                <CardContent className="space-y-4 text-sm">
-                                    <div className="space-y-2">
-                                        <div className="text-xs tracking-wide text-muted-foreground uppercase">
-                                            Active Alerts
-                                        </div>
-                                        {alerts.length > 0 ? (
-                                            alerts.map((alert) => (
-                                                <Alert
-                                                    key={alert.id}
-                                                    variant={
-                                                        alert.severity ===
-                                                        'critical'
-                                                            ? 'destructive'
-                                                            : 'default'
-                                                    }
-                                                >
-                                                    <AlertTriangle className="h-4 w-4" />
-                                                    <AlertTitle>
-                                                        {alert.alert_type.replace(
-                                                            '_',
-                                                            ' ',
-                                                        )}
-                                                    </AlertTitle>
-                                                    <AlertDescription>
-                                                        <p>{alert.message}</p>
-                                                        {alert.created_at && (
-                                                            <p className="text-xs">
-                                                                Raised{' '}
-                                                                {new Date(
-                                                                    alert.created_at,
-                                                                ).toLocaleString(
-                                                                    'en-NZ',
-                                                                )}
-                                                            </p>
-                                                        )}
-                                                    </AlertDescription>
-                                                </Alert>
-                                            ))
-                                        ) : (
-                                            <span className="text-muted-foreground">
-                                                No active medication alerts.
-                                            </span>
-                                        )}
-                                    </div>
-
-                                    {can.view_controlled && (
-                                        <div className="space-y-2">
-                                            <div className="text-xs tracking-wide text-muted-foreground uppercase">
-                                                Controlled Discrepancies
-                                            </div>
-                                            {controlledDiscrepancies.length >
-                                            0 ? (
-                                                controlledDiscrepancies.map(
-                                                    (discrepancy) => (
-                                                        <div
-                                                            key={discrepancy.id}
-                                                            className="rounded-md border p-3"
-                                                        >
-                                                            <div className="flex items-center justify-between gap-2">
-                                                                <span className="font-medium">
-                                                                    {discrepancy.medication_name ??
-                                                                        'Controlled medication'}
-                                                                </span>
-                                                                <Badge variant="destructive">
-                                                                    {
-                                                                        discrepancy.status
-                                                                    }
-                                                                </Badge>
-                                                            </div>
-                                                            <div className="mt-1 text-xs text-muted-foreground">
-                                                                Difference:{' '}
-                                                                {discrepancy.difference ??
-                                                                    0}
-                                                                {discrepancy.reported_at
-                                                                    ? ` • Reported ${new Date(discrepancy.reported_at).toLocaleString('en-NZ')}`
-                                                                    : ''}
-                                                            </div>
-                                                            {(discrepancy.reason ||
-                                                                discrepancy.notes) && (
-                                                                <p className="mt-2 text-xs text-muted-foreground">
-                                                                    {discrepancy.reason ??
-                                                                        discrepancy.notes}
-                                                                </p>
-                                                            )}
-                                                        </div>
-                                                    ),
-                                                )
-                                            ) : (
-                                                <span className="text-muted-foreground">
-                                                    No open controlled
-                                                    discrepancies.
-                                                </span>
-                                            )}
-                                        </div>
-                                    )}
-
-                                    <div className="space-y-2">
-                                        <div className="text-xs tracking-wide text-muted-foreground uppercase">
-                                            Break-Glass Access
-                                        </div>
-                                        {breakGlassAccess.active ? (
-                                            breakGlassAccess.accesses.map(
-                                                (access) => (
-                                                    <div
-                                                        key={access.id}
-                                                        className="rounded-md border p-3"
-                                                    >
-                                                        <div className="flex items-center justify-between gap-2">
-                                                            <div>
-                                                                <div className="font-medium">
-                                                                    {access.user_name ??
-                                                                        'Unknown user'}
-                                                                </div>
-                                                                <div className="text-xs text-muted-foreground">
-                                                                    Expires{' '}
-                                                                    {access.expires_at
-                                                                        ? new Date(
-                                                                              access.expires_at,
-                                                                          ).toLocaleString(
-                                                                              'en-NZ',
-                                                                          )
-                                                                        : 'soon'}
-                                                                </div>
-                                                            </div>
-                                                            {can.revoke_break_glass && (
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="outline"
-                                                                    onClick={() =>
-                                                                        handleRevokeBreakGlass(
-                                                                            access.id,
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    Revoke
-                                                                </Button>
-                                                            )}
-                                                        </div>
-                                                        {access.reason && (
-                                                            <p className="mt-2 text-xs text-muted-foreground">
-                                                                {access.reason}
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                ),
-                                            )
-                                        ) : (
-                                            <span className="text-muted-foreground">
-                                                No active break-glass access
-                                                recorded.
-                                            </span>
-                                        )}
-                                    </div>
-
-                                    <div className="space-y-2">
-                                        <div className="text-xs tracking-wide text-muted-foreground uppercase">
-                                            Pending Corrections
-                                        </div>
-                                        {pendingCorrections.length > 0 ? (
-                                            pendingCorrections.map(
-                                                (correction) => (
-                                                    <div
-                                                        key={correction.id}
-                                                        className="rounded-md border p-3"
-                                                    >
-                                                        <div className="flex items-center justify-between gap-3">
-                                                            <div>
-                                                                <div className="font-medium">
-                                                                    {
-                                                                        correction.medication_name
-                                                                    }
-                                                                </div>
-                                                                <div className="text-xs text-muted-foreground">
-                                                                    {
-                                                                        correction.status
-                                                                    }
-                                                                    {correction.submitted_by
-                                                                        ? ` • ${correction.submitted_by}`
-                                                                        : ''}
-                                                                </div>
-                                                                {correction
-                                                                    .attachments
-                                                                    ?.length ? (
-                                                                    <div className="mt-1 flex items-center gap-1 text-xs text-muted-foreground">
-                                                                        <Paperclip className="h-3 w-3" />
-                                                                        {
-                                                                            correction
-                                                                                .attachments
-                                                                                .length
-                                                                        }{' '}
-                                                                        evidence
-                                                                        file(s)
-                                                                    </div>
-                                                                ) : null}
-                                                            </div>
-                                                            <div className="flex gap-2">
-                                                                {(correction
-                                                                    .attachments
-                                                                    ?.length ||
-                                                                    can.record ||
-                                                                    can.correct) && (
-                                                                    <Button
-                                                                        size="sm"
-                                                                        variant="outline"
-                                                                        onClick={() =>
-                                                                            setEvidenceTarget(
-                                                                                {
-                                                                                    administration:
-                                                                                        {
-                                                                                            id: correction.id,
-                                                                                            scheduled_for:
-                                                                                                null,
-                                                                                            administered_at:
-                                                                                                correction.administered_at ??
-                                                                                                null,
-                                                                                            status: correction.status,
-                                                                                            administered_by:
-                                                                                                correction.submitted_by ??
-                                                                                                null,
-                                                                                            witnessed_by:
-                                                                                                null,
-                                                                                            notes:
-                                                                                                correction.notes ??
-                                                                                                null,
-                                                                                            reason:
-                                                                                                correction.reason ??
-                                                                                                null,
-                                                                                            dose_given:
-                                                                                                correction.dose_given ??
-                                                                                                null,
-                                                                                            attachments:
-                                                                                                correction.attachments ??
-                                                                                                [],
-                                                                                        },
-                                                                                    medicationName:
-                                                                                        correction.medication_name,
-                                                                                },
-                                                                            )
-                                                                        }
-                                                                    >
-                                                                        <Paperclip className="mr-1 h-3.5 w-3.5" />
-                                                                        Evidence
-                                                                    </Button>
-                                                                )}
-                                                                {can.correct && (
-                                                                    <div className="flex gap-2">
-                                                                        <Button
-                                                                            size="sm"
-                                                                            onClick={() =>
-                                                                                handleApproveCorrection(
-                                                                                    correction.id,
-                                                                                )
-                                                                            }
-                                                                        >
-                                                                            Approve
-                                                                        </Button>
-                                                                        <Button
-                                                                            size="sm"
-                                                                            variant="outline"
-                                                                            onClick={() =>
-                                                                                handleRejectCorrection(
-                                                                                    correction.id,
-                                                                                )
-                                                                            }
-                                                                        >
-                                                                            Reject
-                                                                        </Button>
-                                                                    </div>
-                                                                )}
-                                                            </div>
-                                                        </div>
-                                                        {correction.correction_reason && (
-                                                            <p className="mt-2 text-xs text-muted-foreground">
-                                                                Correction
-                                                                reason:{' '}
-                                                                {
-                                                                    correction.correction_reason
-                                                                }
-                                                            </p>
-                                                        )}
-                                                    </div>
-                                                ),
-                                            )
-                                        ) : (
-                                            <span className="text-muted-foreground">
-                                                No pending corrections awaiting
-                                                review.
-                                            </span>
-                                        )}
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        </div>
-
-                        <div className="grid gap-4 lg:grid-cols-[minmax(0,1fr)_360px] xl:grid-cols-[minmax(0,1fr)_440px]">
-                            <div className="min-w-0">
-                                {/* Scheduled Medications */}
-                                <Card className="mb-6">
-                                    <CardHeader className="pb-3">
-                                        <CardTitle className="text-base">
-                                            Scheduled Medications (
-                                            {marData?.scheduled?.length ?? 0})
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="p-0">
-                                        <div className="overflow-x-auto">
-                                            <table className="w-full text-sm">
-                                                <thead className="sticky top-0 z-10 bg-background">
-                                                    <tr className="border-b bg-muted/50">
-                                                        <SortableHeader
-                                                            label="Medication"
-                                                            column="medication"
-                                                            activeColumn={
-                                                                marSortColumn
-                                                            }
-                                                            direction={
-                                                                marSortDirection
-                                                            }
-                                                            onSort={
-                                                                toggleMarSort
-                                                            }
-                                                        />
-                                                        <SortableHeader
-                                                            label="Dose"
-                                                            column="dose"
-                                                            activeColumn={
-                                                                marSortColumn
-                                                            }
-                                                            direction={
-                                                                marSortDirection
-                                                            }
-                                                            onSort={
-                                                                toggleMarSort
-                                                            }
-                                                        />
-                                                        <th className="p-3 text-left font-medium">
-                                                            Route
-                                                        </th>
-                                                        <th className="p-3 text-left font-medium">
-                                                            Frequency
-                                                        </th>
-                                                        <th className="p-3 text-left font-medium">
-                                                            Flags
-                                                        </th>
-                                                        <th className="p-3 text-left font-medium">
-                                                            Administrations
-                                                        </th>
-                                                        <th className="p-3 text-left font-medium">
-                                                            Actions
-                                                        </th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {scheduledRows.map(
-                                                        (med) => {
-                                                            const rowKey =
-                                                                medicationRowKey(
-                                                                    med,
-                                                                    false,
-                                                                );
-                                                            const selected =
-                                                                selectedDetailKey ===
-                                                                rowKey;
-
-                                                            return (
-                                                                <tr
-                                                                    key={med.id}
-                                                                    data-test="mar-row"
-                                                                    data-mar-row-key={
-                                                                        rowKey
-                                                                    }
-                                                                    tabIndex={0}
-                                                                    aria-selected={
-                                                                        selected
-                                                                    }
-                                                                    onClick={() =>
-                                                                        selectMedicationForDetail(
-                                                                            med,
-                                                                            false,
-                                                                            true,
-                                                                        )
-                                                                    }
-                                                                    onKeyDown={(
-                                                                        event,
-                                                                    ) =>
-                                                                        handleMedicationRowKeyDown(
-                                                                            event,
-                                                                            rowKey,
-                                                                        )
-                                                                    }
-                                                                    className={`border-b transition outline-none last:border-0 hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring ${selected ? 'bg-muted/60' : ''}`}
-                                                                >
-                                                                    <td className="p-3">
-                                                                        <span className="font-medium">
-                                                                            {
-                                                                                med.name
-                                                                            }
-                                                                        </span>
-                                                                        {med.instructions && (
-                                                                            <p className="mt-0.5 text-xs text-muted-foreground">
-                                                                                {
-                                                                                    med.instructions
-                                                                                }
-                                                                            </p>
-                                                                        )}
-                                                                        {med.stock && (
-                                                                            <p className="mt-1 text-xs text-muted-foreground">
-                                                                                Stock:{' '}
-                                                                                {
-                                                                                    med
-                                                                                        .stock
-                                                                                        .on_hand
-                                                                                }{' '}
-                                                                                {
-                                                                                    med
-                                                                                        .stock
-                                                                                        .unit
-                                                                                }
-                                                                            </p>
-                                                                        )}
-                                                                    </td>
-                                                                    <td className="p-3">
-                                                                        {
-                                                                            med.dosage
-                                                                        }
-                                                                    </td>
-                                                                    <td className="p-3">
-                                                                        {med.route ??
-                                                                            '—'}
-                                                                    </td>
-                                                                    <td className="p-3">
-                                                                        {
-                                                                            med.frequency
-                                                                        }
-                                                                    </td>
-                                                                    <td className="p-3">
-                                                                        <div className="flex gap-1">
-                                                                            {med.controlled_drug && (
-                                                                                <TooltipProvider>
-                                                                                    <Tooltip>
-                                                                                        <TooltipTrigger>
-                                                                                            <Shield className="h-4 w-4 text-status-critical" />
-                                                                                        </TooltipTrigger>
-                                                                                        <TooltipContent>
-                                                                                            Controlled
-                                                                                            Drug
-                                                                                        </TooltipContent>
-                                                                                    </Tooltip>
-                                                                                </TooltipProvider>
-                                                                            )}
-                                                                            {med.high_risk && (
-                                                                                <TooltipProvider>
-                                                                                    <Tooltip>
-                                                                                        <TooltipTrigger>
-                                                                                            <AlertTriangle className="h-4 w-4 text-status-warning" />
-                                                                                        </TooltipTrigger>
-                                                                                        <TooltipContent>
-                                                                                            High
-                                                                                            Risk
-                                                                                        </TooltipContent>
-                                                                                    </Tooltip>
-                                                                                </TooltipProvider>
-                                                                            )}
-                                                                            {med.witness_required && (
-                                                                                <TooltipProvider>
-                                                                                    <Tooltip>
-                                                                                        <TooltipTrigger>
-                                                                                            <Eye className="h-4 w-4 text-status-info" />
-                                                                                        </TooltipTrigger>
-                                                                                        <TooltipContent>
-                                                                                            Witness
-                                                                                            Required
-                                                                                        </TooltipContent>
-                                                                                    </Tooltip>
-                                                                                </TooltipProvider>
-                                                                            )}
-                                                                        </div>
-                                                                    </td>
-                                                                    <td className="p-3">
-                                                                        <div className="flex flex-wrap gap-1.5">
-                                                                            {med
-                                                                                .administrations
-                                                                                .length >
-                                                                            0 ? (
-                                                                                med.administrations.map(
-                                                                                    (
-                                                                                        a,
-                                                                                        idx,
-                                                                                    ) => (
-                                                                                        <div
-                                                                                            key={
-                                                                                                a.id ??
-                                                                                                `slot-${idx}`
-                                                                                            }
-                                                                                            className="flex items-center gap-1"
-                                                                                        >
-                                                                                            <TooltipProvider>
-                                                                                                <Tooltip>
-                                                                                                    <TooltipTrigger>
-                                                                                                        <div
-                                                                                                            className={`flex items-center gap-1 rounded-md border px-2 py-1 ${
-                                                                                                                a.status ===
-                                                                                                                'given'
-                                                                                                                    ? 'border-status-success/30 bg-status-success-bg dark:border-status-success/30'
-                                                                                                                    : a.status ===
-                                                                                                                        'missed'
-                                                                                                                      ? 'border-status-critical/30 bg-status-critical-bg dark:border-status-critical/30'
-                                                                                                                      : a.status ===
-                                                                                                                          'refused'
-                                                                                                                        ? 'border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30'
-                                                                                                                        : a.status ===
-                                                                                                                            'withheld'
-                                                                                                                          ? 'border-status-warning/30 bg-status-warning-bg dark:border-status-warning/30'
-                                                                                                                          : 'border-muted bg-muted/30'
-                                                                                                            }`}
-                                                                                                        >
-                                                                                                            {statusIcon(
-                                                                                                                a.status,
-                                                                                                            )}
-                                                                                                            <span className="font-mono text-xs">
-                                                                                                                {a.scheduled_for
-                                                                                                                    ? new Date(
-                                                                                                                          a.scheduled_for,
-                                                                                                                      ).toLocaleTimeString(
-                                                                                                                          'en-NZ',
-                                                                                                                          {
-                                                                                                                              hour: '2-digit',
-                                                                                                                              minute: '2-digit',
-                                                                                                                          },
-                                                                                                                      )
-                                                                                                                    : '—'}
-                                                                                                            </span>
-                                                                                                            {getAdministrationAttachments(
-                                                                                                                a,
-                                                                                                            )
-                                                                                                                .length >
-                                                                                                                0 && (
-                                                                                                                <Paperclip className="h-3 w-3 text-muted-foreground" />
-                                                                                                            )}
-                                                                                                        </div>
-                                                                                                    </TooltipTrigger>
-                                                                                                    <TooltipContent>
-                                                                                                        <p className="font-medium capitalize">
-                                                                                                            {
-                                                                                                                a.status
-                                                                                                            }
-                                                                                                        </p>
-                                                                                                        {a.administered_by && (
-                                                                                                            <p>
-                                                                                                                By:{' '}
-                                                                                                                {
-                                                                                                                    a.administered_by
-                                                                                                                }
-                                                                                                            </p>
-                                                                                                        )}
-                                                                                                        {a.witnessed_by && (
-                                                                                                            <p>
-                                                                                                                Witnessed:{' '}
-                                                                                                                {
-                                                                                                                    a.witnessed_by
-                                                                                                                }
-                                                                                                            </p>
-                                                                                                        )}
-                                                                                                        {(a.reason_code ||
-                                                                                                            a.reason) && (
-                                                                                                            <p>
-                                                                                                                Reason:{' '}
-                                                                                                                {
-                                                                                                                    a.reason_code ??
-                                                                                                                    a.reason
-                                                                                                                }
-                                                                                                            </p>
-                                                                                                        )}
-                                                                                                        {a.notes && (
-                                                                                                            <p>
-                                                                                                                Notes:{' '}
-                                                                                                                {
-                                                                                                                    a.notes
-                                                                                                                }
-                                                                                                            </p>
-                                                                                                        )}
-                                                                                                        {a.is_correction && (
-                                                                                                            <p>
-                                                                                                                Correction
-                                                                                                                pending{' '}
-                                                                                                                {a.correction_status ??
-                                                                                                                    'review'}
-                                                                                                            </p>
-                                                                                                        )}
-                                                                                                        {getAdministrationAttachments(
-                                                                                                            a,
-                                                                                                        )
-                                                                                                            .length >
-                                                                                                            0 && (
-                                                                                                            <p>
-                                                                                                                Evidence:{' '}
-                                                                                                                {
-                                                                                                                    getAdministrationAttachments(
-                                                                                                                        a,
-                                                                                                                    )
-                                                                                                                        .length
-                                                                                                                }{' '}
-                                                                                                                file(s)
-                                                                                                            </p>
-                                                                                                        )}
-                                                                                                    </TooltipContent>
-                                                                                                </Tooltip>
-                                                                                            </TooltipProvider>
-                                                                                            {a.id && (
-                                                                                                <Button
-                                                                                                    variant="ghost"
-                                                                                                    size="icon"
-                                                                                                    className="h-7 w-7"
-                                                                                                    onClick={() =>
-                                                                                                        setEvidenceTarget(
-                                                                                                            {
-                                                                                                                administration:
-                                                                                                                    a,
-                                                                                                                medicationName:
-                                                                                                                    med.name,
-                                                                                                            },
-                                                                                                        )
-                                                                                                    }
-                                                                                                >
-                                                                                                    <Paperclip className="h-3.5 w-3.5" />
-                                                                                                </Button>
-                                                                                            )}
-                                                                                        </div>
-                                                                                    ),
-                                                                                )
-                                                                            ) : med
-                                                                                  .dose_times
-                                                                                  .length >
-                                                                              0 ? (
-                                                                                med.dose_times.map(
-                                                                                    (
-                                                                                        t,
-                                                                                    ) => (
-                                                                                        <div
-                                                                                            key={
-                                                                                                t
-                                                                                            }
-                                                                                            className="flex items-center gap-1 rounded-md border border-muted bg-muted/30 px-2 py-1"
-                                                                                        >
-                                                                                            <Clock className="h-3.5 w-3.5 text-muted-foreground" />
-                                                                                            <span className="font-mono text-xs text-muted-foreground">
-                                                                                                {
-                                                                                                    t
-                                                                                                }
-                                                                                            </span>
-                                                                                        </div>
-                                                                                    ),
-                                                                                )
-                                                                            ) : (
-                                                                                <span className="text-xs text-muted-foreground">
-                                                                                    No
-                                                                                    schedule
-                                                                                </span>
-                                                                            )}
-                                                                        </div>
-                                                                    </td>
-                                                                    <td className="p-3">
-                                                                        <div className="flex flex-wrap gap-2">
-                                                                            <Button
-                                                                                variant="outline"
-                                                                                size="sm"
-                                                                                disabled={
-                                                                                    !can.record ||
-                                                                                    !hasPendingDoses(
-                                                                                        med,
-                                                                                    )
-                                                                                }
-                                                                                onClick={(
-                                                                                    event,
-                                                                                ) => {
-                                                                                    event.stopPropagation();
-                                                                                    void openRecordDialog(
-                                                                                        med,
-                                                                                        false,
-                                                                                    );
-                                                                                }}
-                                                                            >
-                                                                                <Syringe className="mr-1 h-3 w-3" />
-                                                                                Record
-                                                                            </Button>
-                                                                            {getLatestRefusalFollowUpTarget(
-                                                                                med,
-                                                                            ) && (
-                                                                                <Button
-                                                                                    variant="ghost"
-                                                                                    size="sm"
-                                                                                    disabled={
-                                                                                        !can.record
-                                                                                    }
-                                                                                    onClick={(
-                                                                                        event,
-                                                                                    ) => {
-                                                                                        event.stopPropagation();
-                                                                                        setFollowUpTarget(
-                                                                                            {
-                                                                                                administrationId:
-                                                                                                    getLatestRefusalFollowUpTarget(
-                                                                                                        med,
-                                                                                                    )
-                                                                                                        ?.id as number,
-                                                                                                medicationName:
-                                                                                                    med.name,
-                                                                                            },
-                                                                                        );
-                                                                                    }}
-                                                                                >
-                                                                                    <Phone className="mr-1 h-3 w-3" />
-                                                                                    Follow-Up
-                                                                                </Button>
-                                                                            )}
-                                                                        </div>
-                                                                    </td>
-                                                                </tr>
-                                                            );
-                                                        },
-                                                    )}
-                                                    {scheduledRows.length ===
-                                                        0 && (
-                                                        <tr>
-                                                            <td
-                                                                colSpan={7}
-                                                                className="p-6 text-center text-muted-foreground"
-                                                            >
-                                                                No scheduled
-                                                                medications.
-                                                            </td>
-                                                        </tr>
-                                                    )}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-
-                                {/* PRN Medications */}
-                                <Card>
-                                    <CardHeader className="pb-3">
-                                        <CardTitle className="text-base">
-                                            PRN / As-Needed Medications (
-                                            {marData?.prn?.length ?? 0})
-                                        </CardTitle>
-                                    </CardHeader>
-                                    <CardContent className="p-0">
-                                        <div className="overflow-x-auto">
-                                            <table className="w-full text-sm">
-                                                <thead className="sticky top-0 z-10 bg-background">
-                                                    <tr className="border-b bg-muted/50">
-                                                        <SortableHeader
-                                                            label="Medication"
-                                                            column="medication"
-                                                            activeColumn={
-                                                                marSortColumn
-                                                            }
-                                                            direction={
-                                                                marSortDirection
-                                                            }
-                                                            onSort={
-                                                                toggleMarSort
-                                                            }
-                                                        />
-                                                        <SortableHeader
-                                                            label="Dose"
-                                                            column="dose"
-                                                            activeColumn={
-                                                                marSortColumn
-                                                            }
-                                                            direction={
-                                                                marSortDirection
-                                                            }
-                                                            onSort={
-                                                                toggleMarSort
-                                                            }
-                                                        />
-                                                        <th className="p-3 text-left font-medium">
-                                                            Indication
-                                                        </th>
-                                                        <th className="p-3 text-left font-medium">
-                                                            24h Usage
-                                                        </th>
-                                                        <th className="p-3 text-left font-medium">
-                                                            Administrations
-                                                        </th>
-                                                        <th className="p-3 text-left font-medium">
-                                                            Actions
-                                                        </th>
-                                                    </tr>
-                                                </thead>
-                                                <tbody>
-                                                    {prnRows.map((med) => {
-                                                        const rowKey =
-                                                            medicationRowKey(
-                                                                med,
-                                                                true,
-                                                            );
-                                                        const selected =
-                                                            selectedDetailKey ===
-                                                            rowKey;
-
-                                                        return (
-                                                            <tr
-                                                                key={med.id}
-                                                                data-test="mar-row"
-                                                                data-mar-row-key={
-                                                                    rowKey
-                                                                }
-                                                                tabIndex={0}
-                                                                aria-selected={
-                                                                    selected
-                                                                }
-                                                                onClick={() =>
-                                                                    selectMedicationForDetail(
-                                                                        med,
-                                                                        true,
-                                                                        true,
-                                                                    )
-                                                                }
-                                                                onKeyDown={(
-                                                                    event,
-                                                                ) =>
-                                                                    handleMedicationRowKeyDown(
-                                                                        event,
-                                                                        rowKey,
-                                                                    )
-                                                                }
-                                                                className={`border-b transition outline-none last:border-0 hover:bg-muted/40 focus-visible:ring-2 focus-visible:ring-ring ${selected ? 'bg-muted/60' : ''}`}
-                                                            >
-                                                                <td className="p-3">
-                                                                    <span className="font-medium">
-                                                                        {
-                                                                            med.name
-                                                                        }
-                                                                    </span>
-                                                                    {med.controlled_drug && (
-                                                                        <Badge
-                                                                            variant="destructive"
-                                                                            className="ml-2 text-[10px]"
-                                                                        >
-                                                                            CD
-                                                                        </Badge>
-                                                                    )}
-                                                                    {med.stock && (
-                                                                        <p className="mt-1 text-xs text-muted-foreground">
-                                                                            Stock:{' '}
-                                                                            {
-                                                                                med
-                                                                                    .stock
-                                                                                    .on_hand
-                                                                            }{' '}
-                                                                            {
-                                                                                med
-                                                                                    .stock
-                                                                                    .unit
-                                                                            }
-                                                                        </p>
-                                                                    )}
-                                                                </td>
-                                                                <td className="p-3">
-                                                                    {med.dosage}
-                                                                </td>
-                                                                <td className="p-3 text-xs">
-                                                                    {med.indication ??
-                                                                        '—'}
-                                                                </td>
-                                                                <td className="p-3">
-                                                                    <div className="flex items-center gap-2">
-                                                                        <span
-                                                                            className={`text-sm font-medium ${med.prn_remaining === 0 ? 'text-status-critical' : med.prn_remaining !== null && med.prn_remaining <= 1 ? 'text-status-warning' : ''}`}
-                                                                        >
-                                                                            {
-                                                                                med.prn_count_24h
-                                                                            }{' '}
-                                                                            /{' '}
-                                                                            {med.max_per_day ??
-                                                                                '∞'}
-                                                                        </span>
-                                                                        {med.prn_remaining !==
-                                                                            null && (
-                                                                            <span className="text-xs text-muted-foreground">
-                                                                                (
-                                                                                {
-                                                                                    med.prn_remaining
-                                                                                }{' '}
-                                                                                remaining)
-                                                                            </span>
-                                                                        )}
-                                                                    </div>
-                                                                </td>
-                                                                <td className="p-3">
-                                                                    <div className="flex flex-wrap gap-2">
-                                                                        {med.administrations.map(
-                                                                            (
-                                                                                a,
-                                                                            ) => (
-                                                                                <div
-                                                                                    key={
-                                                                                        a.id
-                                                                                    }
-                                                                                    className="flex items-center gap-1"
-                                                                                >
-                                                                                    {statusIcon(
-                                                                                        a.status,
-                                                                                    )}
-                                                                                    <span className="text-xs">
-                                                                                        {a.administered_at
-                                                                                            ? new Date(
-                                                                                                  a.administered_at,
-                                                                                              ).toLocaleTimeString(
-                                                                                                  'en-NZ',
-                                                                                                  {
-                                                                                                      hour: '2-digit',
-                                                                                                      minute: '2-digit',
-                                                                                                  },
-                                                                                              )
-                                                                                            : '—'}
-                                                                                    </span>
-                                                                                    {getAdministrationAttachments(
-                                                                                        a,
-                                                                                    )
-                                                                                        .length >
-                                                                                        0 && (
-                                                                                        <Paperclip className="h-3 w-3 text-muted-foreground" />
-                                                                                    )}
-                                                                                    {a.id && (
-                                                                                        <Button
-                                                                                            variant="ghost"
-                                                                                            size="icon"
-                                                                                            className="h-6 w-6"
-                                                                                            onClick={() =>
-                                                                                                setEvidenceTarget(
-                                                                                                    {
-                                                                                                        administration:
-                                                                                                            a,
-                                                                                                        medicationName:
-                                                                                                            med.name,
-                                                                                                    },
-                                                                                                )
-                                                                                            }
-                                                                                        >
-                                                                                            <Paperclip className="h-3.5 w-3.5" />
-                                                                                        </Button>
-                                                                                    )}
-                                                                                </div>
-                                                                            ),
-                                                                        )}
-                                                                        {med
-                                                                            .administrations
-                                                                            .length ===
-                                                                            0 && (
-                                                                            <span className="text-xs text-muted-foreground">
-                                                                                None
-                                                                                today
-                                                                            </span>
-                                                                        )}
-                                                                    </div>
-                                                                </td>
-                                                                <td className="p-3">
-                                                                    <div className="flex flex-wrap gap-2">
-                                                                        <Button
-                                                                            variant="outline"
-                                                                            size="sm"
-                                                                            disabled={
-                                                                                !can.record ||
-                                                                                med.prn_remaining ===
-                                                                                    0
-                                                                            }
-                                                                            onClick={(
-                                                                                event,
-                                                                            ) => {
-                                                                                event.stopPropagation();
-                                                                                void openRecordDialog(
-                                                                                    med,
-                                                                                    true,
-                                                                                );
-                                                                            }}
-                                                                        >
-                                                                            <Plus className="mr-1 h-3 w-3" />
-                                                                            Give
-                                                                        </Button>
-                                                                        {getLatestRefusalFollowUpTarget(
-                                                                            med,
-                                                                        ) && (
-                                                                            <Button
-                                                                                variant="ghost"
-                                                                                size="sm"
-                                                                                disabled={
-                                                                                    !can.record
-                                                                                }
-                                                                                onClick={(
-                                                                                    event,
-                                                                                ) => {
-                                                                                    event.stopPropagation();
-                                                                                    setFollowUpTarget(
-                                                                                        {
-                                                                                            administrationId:
-                                                                                                getLatestRefusalFollowUpTarget(
-                                                                                                    med,
-                                                                                                )
-                                                                                                    ?.id as number,
-                                                                                            medicationName:
-                                                                                                med.name,
-                                                                                        },
-                                                                                    );
-                                                                                }}
-                                                                            >
-                                                                                <Phone className="mr-1 h-3 w-3" />
-                                                                                Follow-Up
-                                                                            </Button>
-                                                                        )}
-                                                                    </div>
-                                                                </td>
-                                                            </tr>
-                                                        );
-                                                    })}
-                                                    {prnRows.length === 0 && (
-                                                        <tr>
-                                                            <td
-                                                                colSpan={6}
-                                                                className="p-6 text-center text-muted-foreground"
-                                                            >
-                                                                No PRN
-                                                                medications.
-                                                            </td>
-                                                        </tr>
-                                                    )}
-                                                </tbody>
-                                            </table>
-                                        </div>
-                                    </CardContent>
-                                </Card>
-                            </div>
-
-                            <MedicationDetailPanel
-                                entry={detailEntry}
-                                canRecord={can.record}
-                                onRecord={(med, isPrn) =>
-                                    void openRecordDialog(med, isPrn)
-                                }
-                            />
-                        </div>
-
-                        <Sheet
-                            open={mobileDetailOpen}
-                            onOpenChange={setMobileDetailOpen}
-                        >
-                            <SheetContent
-                                side="bottom"
-                                className="max-h-[88dvh] overflow-y-auto rounded-t-xl p-0 lg:hidden"
-                            >
-                                <SheetHeader className="border-b px-4 py-3 text-left">
-                                    <SheetTitle>Medication details</SheetTitle>
-                                </SheetHeader>
-                                <MedicationDetailPanel
-                                    entry={detailEntry}
-                                    canRecord={can.record}
-                                    onRecord={(med, isPrn) =>
-                                        void openRecordDialog(med, isPrn)
-                                    }
-                                    className="border-0 shadow-none"
-                                />
-                            </SheetContent>
-                        </Sheet>
-
-                        <RecordAdministrationDialog
-                            isOpen={dialogOpen}
-                            onClose={() => {
-                                setDialogOpen(false);
-                                setSelectedMed(null);
-                                setSelectedScheduledTime(null);
-                            }}
-                            onSubmit={handleSubmit}
-                            medication={mappedMedication}
-                            clientId={selectedClient?.id ?? null}
-                            scheduledTime={selectedScheduledTime}
-                            witnesses={staff.filter(
-                                (s) => s.id !== auth.user.id,
-                            )}
-                            currentUserId={auth.user.id}
-                            safetyCheck={safetyCheck}
-                            prnData={prnHistoryData}
-                            isLoading={loadingSafety}
-                        />
-
-                        <Dialog
-                            open={!!attentionPrompt}
-                            onOpenChange={(open) => {
-                                if (!open) acknowledgeAttentionPrompt();
-                            }}
-                        >
-                            <DialogContent className="sm:max-w-lg">
-                                <DialogHeader>
-                                    <DialogTitle>
-                                        Medication chart warning
-                                    </DialogTitle>
-                                    <DialogDescription>
-                                        Review this warning before recording or
-                                        checking medication for this client.
-                                    </DialogDescription>
-                                </DialogHeader>
-                                {attentionPrompt && (
-                                    <div className="rounded-md border border-status-warning/40 bg-status-warning/10 p-3 text-sm">
-                                        <div className="font-medium">
-                                            {attentionPrompt.title}
-                                        </div>
-                                        {attentionPrompt.detail && (
-                                            <p className="mt-1 text-muted-foreground">
-                                                {attentionPrompt.detail}
-                                            </p>
-                                        )}
-                                    </div>
-                                )}
-                                <DialogFooter>
-                                    <Button onClick={acknowledgeAttentionPrompt}>
-                                        OK to proceed
-                                    </Button>
-                                </DialogFooter>
-                            </DialogContent>
-                        </Dialog>
-
-                        <AdministrationEvidenceDialog
-                            isOpen={!!evidenceTarget}
-                            onClose={() => setEvidenceTarget(null)}
-                            clientId={selectedClient?.id ?? null}
-                            medicationName={
-                                evidenceTarget?.medicationName ?? ''
-                            }
-                            administration={
-                                evidenceTarget?.administration ?? null
-                            }
-                            canManage={can.record || can.correct}
-                            onAttachmentsChange={handleAttachmentsChange}
-                        />
-
-                        {followUpTarget && selectedClient && (
-                            <RefusalFollowUpDialog
-                                isOpen={!!followUpTarget}
-                                onClose={() => setFollowUpTarget(null)}
-                                administrationId={
-                                    followUpTarget.administrationId
-                                }
-                                clientId={selectedClient.id}
-                                medicationName={followUpTarget.medicationName}
-                            />
-                        )}
-                    </>
+    const heroFooter = (
+        <div className="flex flex-col items-stretch gap-2 py-3 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-wrap items-center gap-1.5">
+                <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+                    onClick={() => goDate(addDays(date, -1))}
+                >
+                    Prev
+                </Button>
+                <DayPickerChip date={date} isToday={isToday} onPick={goDate} />
+                <Button
+                    variant="outline"
+                    size="sm"
+                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+                    onClick={() => goDate(addDays(date, 1))}
+                >
+                    Next
+                </Button>
+                {!isToday && (
+                    <Button
+                        variant="ghost"
+                        size="sm"
+                        className="text-primary-foreground hover:bg-primary-foreground/10"
+                        onClick={() => goDate(toYmd(new Date()))}
+                    >
+                        Back to today
+                    </Button>
                 )}
             </div>
+            <div className="flex flex-wrap items-center gap-2 md:ml-auto">
+                <input
+                    type="text"
+                    value={search}
+                    onChange={(e) => setSearch(e.target.value)}
+                    placeholder="Search medication…"
+                    className="h-9 w-44 rounded-full border border-primary-foreground/30 bg-primary-foreground/10 px-3 text-sm text-primary-foreground placeholder:text-primary-foreground/60 focus:outline-none focus:ring-2 focus:ring-primary-foreground/40"
+                />
+                <EntityFilter
+                    label="Resident"
+                    allLabel="All residents"
+                    items={clients.map((c) => ({ id: c.id, name: `${c.first_name} ${c.last_name}` }))}
+                    value={info.id}
+                    onChange={switchClient}
+                    onDark
+                />
+            </div>
+        </div>
+    );
+
+    return (
+        <AppLayout breadcrumbs={[{ title: 'eMAR', href: '/emar' }, { title: 'MAR Charts', href: '/emar/mar' }]}>
+            <Head title={`MAR · ${info.name}`} />
+            <div className="flex flex-col gap-6 p-6">
+                <PageHero
+                    variant="hero"
+                    category="ops"
+                    brandColour={brandColour}
+                    avatar={{ fallback: initials(info.name) }}
+                    title={
+                        <span>
+                            <span className="flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-wide text-primary-foreground/80">
+                                {isToday ? (
+                                    <span aria-hidden className="relative inline-flex h-2 w-2">
+                                        <span className="absolute inset-0 animate-ping rounded-full bg-status-success/70" />
+                                        <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success" />
+                                    </span>
+                                ) : (
+                                    <CalendarDays className="h-3 w-3" />
+                                )}
+                                {isToday ? 'Live medication chart' : 'Medication chart'}
+                            </span>
+                            <span className="mt-1 block text-[28px] font-bold leading-tight">{info.name}</span>
+                        </span>
+                    }
+                    description={
+                        <span>
+                            Medication administration record for{' '}
+                            <span className="border-b-2 border-primary-foreground/40 font-medium">{date}</span>
+                        </span>
+                    }
+                    meta={heroMeta}
+                    badges={heroBadges}
+                    stats={heroStats}
+                    actions={
+                        <>
+                            <Button asChild className="bg-primary-foreground text-primary hover:bg-primary-foreground/90">
+                                <a href="/emar/rounds">Start medication round</a>
+                            </Button>
+                            {can.record && (
+                                <Button
+                                    variant="outline"
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+                                    onClick={() => setModal('addMed')}
+                                >
+                                    <Plus className="h-4 w-4" />
+                                    Add medication
+                                </Button>
+                            )}
+                            {can.export_reports && (
+                                <Button
+                                    asChild
+                                    variant="outline"
+                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20"
+                                >
+                                    <a href={`/emar/pdf/mar-chart?client_id=${info.id}&date_from=${date}&date_to=${date}`} target="_blank" rel="noreferrer">
+                                        <FileDown className="h-4 w-4" />
+                                        PDF
+                                    </a>
+                                </Button>
+                            )}
+                        </>
+                    }
+                    footer={heroFooter}
+                />
+
+                <AttentionBar
+                    alerts={marData.attention_alerts ?? []}
+                    onReview={() => setModal('warnings')}
+                    onManage={() => setModal('alerts')}
+                    canManage={!!can.manage_settings}
+                />
+
+                <TabStrip value={activeTab} onChange={setActiveTab} items={TABS} ariaLabel="MAR chart views" />
+
+                <div className="grid grid-cols-1 gap-6 xl:grid-cols-[minmax(0,1fr)_372px]">
+                    <div className="flex min-w-0 flex-col gap-6">
+                        {activeTab === 'history' ? (
+                            <HistoryList schedule={schedule} />
+                        ) : activeTab === 'prn' ? (
+                            <PrnCard prn={prn} canRecord={can.record} onGive={onGivePrn} />
+                        ) : (
+                            <>
+                                <MarGrid
+                                    meds={visibleMeds}
+                                    schedule={schedule}
+                                    onRecord={onRecord}
+                                    onContext={(e, row) => {
+                                        // Right-click opens the full record wizard (safe default —
+                                        // CD witness is never skipped). One-click quick-actions are
+                                        // a documented follow-up enhancement.
+                                        e.preventDefault();
+                                        onRecord(row);
+                                    }}
+                                />
+                                <PrnCard prn={prn} canRecord={can.record} onGive={onGivePrn} />
+                            </>
+                        )}
+                    </div>
+
+                    <ClinicalRail
+                        inrRecords={marData.inr_records ?? []}
+                        syringeDrivers={marData.syringe_drivers ?? []}
+                        awaitingVerification={awaitingCount}
+                        pendingCorrections={pendingCorrections.length}
+                        chartReviewDate={marData.settings?.next_chart_review_date ?? null}
+                        allergies={allergies}
+                        conditions={clientContext?.conditions ?? []}
+                        emergencyContacts={clientContext?.emergency_contacts ?? []}
+                        can={{
+                            manageInr: !!can.manage_inr,
+                            manageSyringeDrivers: !!can.manage_syringe_drivers,
+                            verifyOrders: !!can.verify_orders,
+                        }}
+                        onRecordInr={() => setModal('inr')}
+                        onStartDriver={() => setModal('syringe')}
+                        onVerifyOrders={() => setModal('verify')}
+                    />
+                </div>
+            </div>
+
+            {recordRow && (
+                <RecordDoseWizard
+                    row={recordRow}
+                    client={info}
+                    date={date}
+                    witnesses={witnesses}
+                    notGivenReasons={notGivenReasons}
+                    signedAs={signedAs}
+                    onClose={() => setRecordRow(null)}
+                />
+            )}
+
+            {prnMedId !== null && (
+                <PrnWizard
+                    medications={prn}
+                    clients={new Map([[info.id, info]])}
+                    date={date}
+                    witnesses={witnesses}
+                    signedAs={signedAs}
+                    initialMedId={prnMedId}
+                    onClose={() => setPrnMedId(null)}
+                />
+            )}
+
+            <MarGovernanceDialogs
+                modal={modal}
+                onClose={() => setModal(null)}
+                clientId={info.id}
+                attentionAlerts={marData.attention_alerts ?? []}
+                awaitingVerification={marData.awaiting_verification ?? []}
+                witnesses={witnesses}
+            />
         </AppLayout>
     );
 }
 
-function SortableHeader({
-    label,
-    column,
-    activeColumn,
-    direction,
-    onSort,
-}: {
-    label: string;
-    column: MarSortColumn;
-    activeColumn: MarSortColumn;
-    direction: MarSortDirection;
-    onSort: (column: MarSortColumn) => void;
-}) {
-    const active = column === activeColumn;
-
+function HistoryList({ schedule }: { schedule: ScheduleRow[] }) {
+    const recorded = schedule.filter((r) => r.recorded);
     return (
-        <th className="p-3 text-left font-medium">
-            <Button
-                type="button"
-                variant="ghost"
-                size="sm"
-                className="-ml-2 h-8 gap-1 px-2"
-                aria-sort={
-                    active
-                        ? direction === 'asc'
-                            ? 'ascending'
-                            : 'descending'
-                        : 'none'
-                }
-                onClick={() => onSort(column)}
-            >
-                {label}
-                <ArrowUpDown className="h-3.5 w-3.5" />
-            </Button>
-        </th>
-    );
-}
-
-function MedicationDetailPanel({
-    entry,
-    canRecord,
-    onRecord,
-    className = 'hidden h-fit lg:sticky lg:top-4 lg:block',
-}: {
-    entry: { med: ScheduledMed | PrnMed; isPrn: boolean } | null;
-    canRecord: boolean;
-    onRecord: (med: ScheduledMed | PrnMed, isPrn: boolean) => void;
-    className?: string;
-}) {
-    if (!entry) {
-        return (
-            <Card className={className} data-test="mar-detail-pane">
-                <CardContent className="py-8 text-sm text-muted-foreground">
-                    Select a medication row to see details.
-                </CardContent>
-            </Card>
-        );
-    }
-
-    const { med, isPrn } = entry;
-    const administrations = med.administrations ?? [];
-    const selectedDose = administrations.find((administration) =>
-        ['pending', 'missed'].includes(administration.status),
-    );
-    const recent = administrations
-        .filter((administration) => administration.status !== 'pending')
-        .slice(0, 5);
-    const canRecordSelected =
-        canRecord &&
-        (isPrn ||
-            administrations.some((administration) =>
-                ['pending', 'missed'].includes(administration.status),
-            ));
-
-    return (
-        <Card className={className} data-test="mar-detail-pane">
-            <CardHeader className="pb-3">
-                <div className="flex items-start justify-between gap-3">
-                    <div className="min-w-0">
-                        <CardTitle className="truncate text-base">
-                            {med.name}
-                        </CardTitle>
-                        <p className="mt-1 text-sm text-muted-foreground">
-                            {med.dosage || 'Dose not recorded'}
-                            {'route' in med && med.route
-                                ? ` · ${med.route}`
-                                : ''}
-                        </p>
-                    </div>
-                    <Badge variant="outline">
-                        {isPrn ? 'PRN' : 'Scheduled'}
-                    </Badge>
-                </div>
-            </CardHeader>
-            <CardContent className="space-y-4 text-sm">
-                <section className="space-y-2">
-                    <div className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                        Selected dose
-                    </div>
-                    <div className="rounded-md border p-3">
-                        <div className="flex items-center justify-between gap-3">
+        <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+            <div className="border-b px-5 py-4 text-[15px] font-bold">Today&apos;s recorded administrations</div>
+            {recorded.length === 0 ? (
+                <div className="px-5 py-10 text-center text-sm text-muted-foreground">Nothing recorded yet.</div>
+            ) : (
+                <ul className="divide-y">
+                    {recorded.map((row) => (
+                        <li key={row.key} className="flex items-center justify-between px-5 py-3 text-sm">
                             <div>
-                                <div className="font-medium">
-                                    {isPrn
-                                        ? 'As-needed dose'
-                                        : formatMedicationTime(
-                                              selectedDose?.scheduled_for,
-                                          )}
-                                </div>
-                                <div className="mt-1 text-xs text-muted-foreground">
-                                    {selectedDose
-                                        ? statusBadge(selectedDose.status)
-                                        : isPrn
-                                          ? 'Record when clinically needed.'
-                                          : 'No open dose selected.'}
-                                </div>
+                                <span className="font-medium">{row.medication_name}</span>
+                                <span className="ml-2 text-xs text-muted-foreground">{row.time}</span>
                             </div>
-                            <Button
-                                size="sm"
-                                disabled={!canRecordSelected}
-                                onClick={() => onRecord(med, isPrn)}
-                            >
-                                {isPrn ? 'Give' : 'Record'}
-                            </Button>
-                        </div>
-                    </div>
-                </section>
-
-                <section className="space-y-2">
-                    <div className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                        Recent administrations
-                    </div>
-                    {recent.length > 0 ? (
-                        <div className="divide-y rounded-md border">
-                            {recent.map((administration, index) => (
-                                <div
-                                    key={administration.id ?? index}
-                                    className="flex items-start justify-between gap-3 p-3"
-                                >
-                                    <div className="min-w-0">
-                                        <div className="font-medium capitalize">
-                                            {administration.status}
-                                        </div>
-                                        <div className="text-xs text-muted-foreground">
-                                            {formatMedicationTime(
-                                                administration.administered_at ??
-                                                    administration.scheduled_for,
-                                            )}
-                                            {administration.administered_by
-                                                ? ` · ${administration.administered_by}`
-                                                : ''}
-                                        </div>
-                                        {(administration.reason_code ||
-                                            administration.reason) && (
-                                            <div className="mt-1 line-clamp-2 text-xs text-muted-foreground">
-                                                {administration.reason_code ??
-                                                    administration.reason}
-                                            </div>
-                                        )}
-                                    </div>
-                                    {statusIcon(administration.status)}
-                                </div>
-                            ))}
-                        </div>
-                    ) : (
-                        <p className="rounded-md border p-3 text-xs text-muted-foreground">
-                            No administrations recorded yet today.
-                        </p>
-                    )}
-                </section>
-
-                <section className="space-y-2">
-                    <div className="text-xs font-medium tracking-wide text-muted-foreground uppercase">
-                        Order details
-                    </div>
-                    <dl className="grid grid-cols-2 gap-x-3 gap-y-2 rounded-md border p-3 text-xs">
-                        <dt className="text-muted-foreground">Frequency</dt>
-                        <dd className="text-right">
-                            {'frequency' in med ? med.frequency : 'As needed'}
-                        </dd>
-                        <dt className="text-muted-foreground">Form</dt>
-                        <dd className="text-right">
-                            {'form' in med ? (med.form ?? '—') : '—'}
-                        </dd>
-                        <dt className="text-muted-foreground">Stock</dt>
-                        <dd className="text-right">
-                            {med.stock
-                                ? `${med.stock.on_hand} ${med.stock.unit}`
-                                : '—'}
-                        </dd>
-                        <dt className="text-muted-foreground">Flags</dt>
-                        <dd className="text-right">
-                            {[
-                                med.controlled_drug ? 'CD' : null,
-                                'high_risk' in med && med.high_risk
-                                    ? 'High risk'
-                                    : null,
-                                med.witness_required ? 'Witness' : null,
-                            ]
-                                .filter(Boolean)
-                                .join(', ') || 'None'}
-                        </dd>
-                    </dl>
-                    {'instructions' in med && med.instructions && (
-                        <p className="rounded-md border p-3 text-xs text-muted-foreground">
-                            {med.instructions}
-                        </p>
-                    )}
-                </section>
-            </CardContent>
-        </Card>
+                            <div className="flex items-center gap-3 text-xs">
+                                <span className="font-medium capitalize">{row.recorded?.status}</span>
+                                {row.recorded?.by && <span className="text-muted-foreground">{row.recorded.by}</span>}
+                            </div>
+                        </li>
+                    ))}
+                </ul>
+            )}
+        </div>
     );
 }

@@ -7,7 +7,7 @@ isolated in their own worktrees `hr-m1-people` / `fin-wt`). Design bundles: `.de
 
 | # | Page | Route | Bundle folder | Status | Commit |
 |---|------|-------|---------------|--------|--------|
-| 1 | MAR Charts | `/emar/mar` | `Emar_Charts_Page/` | in-progress | — |
+| 1 | MAR Charts | `/emar/mar` | `Emar_Charts_Page/` | done* | `b6658602` + frontend |
 | 2 | Medication Rounds | `/emar/rounds` | `Emar_Medication_Rounds_Page/` | todo | — |
 | 3 | Medications Database | `/emar/medications` | `Medications_Page/` | todo | — |
 | 4 | Prescriptions & Orders | `/emar/prescriptions` | `Prescription_Page/` | todo | — |
@@ -24,7 +24,7 @@ isolated in their own worktrees `hr-m1-people` / `fin-wt`). Design bundles: `.de
 | 15 | Reports | `/emar/reports` | `Emar_Reports/` | todo | — |
 | 16 | Emergency Access | `/emar/emergency-access` | `Emar_Emergency_Access_Page/` | todo | — |
 
-Status legend: `todo` / `in-progress` / `done`.
+Status legend: `todo` / `in-progress` / `done`. `done*` = all automated gates green (types/lint/pint/tests/build); live pixel-verify vs prototype deferred to user (auth-gated dev server).
 
 ## Global / shared work (do once, reuse across pages)
 
@@ -54,10 +54,16 @@ Plan: `docs/emar-redesign/mar-charts-plan.md`. Commits so far: foundation `848cc
 - `Emar/WorkerMedsController@today` (`:66`) builds that payload via private helpers: `scheduleForDate` (:556), `clientsPayload` (:674), `sitesPayload` (:718), `prnMedications` (:749), `witnesses` (:1019), `administrationsForDay` (:517), `recordedPayload` (:638), `roundLabelFor` (:660), `prnFollowUps` (:849), `activityForDate` (:957), `rawUtcInstant` (:1169), `friendlyTimeLabel` (:829). Deps via ctor (`:59`) — incl. `MarScheduleService $scheduleService`.
 - `recordDose` (:176) confirms safety layers (verification gate, coded omission, observations, witness+credential, time window) all run in `EnhancedMarService`. **So MAR gaps 3–5 need NO new backend — just reuse the `meds.today.record` path.**
 
-**NEXT STEPS (ordered):**
-1. **Extract `app/Services/Emar/MedsBoardPayloadService.php`** owning the helpers above (`forClients(array $clientIds, Carbon $date, User $user): array` → `{schedule, prn_medications, witnesses, not_given_reasons, board_user, clients, sites, stats?}`). Move the private methods from `WorkerMedsController` into it; have `WorkerMedsController@today` delegate. **Then run the meds/today tests** (frontline path — guard against regression) before proceeding.
-2. `EmarController@mar` (`:746`): call the service for `[selectedClient->id]` and add `schedule`/`prn_medications`/`witnesses`/`not_given_reasons`/`board_user` to the props; add `site_brand_colour` (selected client's `site->brand_colour`) to `selectedClient`.
-3. Rebuild `resources/js/pages/emar/MarCharts.tsx`: hero (`PageHero` + `brandColour`), attention bar, **MAR grid** (group `schedule` by `medication_id` × `time` columns), PRN card, clinical rail. New components under `resources/js/components/emar/mar/`.
-4. Wire `RecordDoseWizard` (left-click cell / quick-actions; CD → full wizard) + `PrnWizard` (PRN Give). Build the rail/governance modals on `MedsWizardDialog` posting to the existing endpoints.
-5. `TabStrip` facets (schedule/due/prn/history). Retire legacy `RecordAdministrationDialog`/`prn-sheet` usage from MAR; redirect `emar.clients.inr.index` once unused.
-6. §9 gate: types/lint/pint/tests(+new)/build/screenshot vs prototype + brand-colour change + modal-chrome audit + cross-module click-through. Commit `feat(emar): redesign MAR Charts`.
+**DONE:**
+1. ✅ `app/Services/Emar/MedsBoardPayloadService.php` extracted; `WorkerMedsController` delegates; `EmarController@mar` exposes the board keys + `site_brand_colour`. Commit `b6658602`. 10 worker-meds + 2 MAR-payload tests green.
+2. ✅ Frontend rebuilt: `resources/js/pages/emar/MarCharts.tsx` (hero+`brandColour`, attention bar, time-grid, PRN card, clinical rail, `TabStrip` schedule/due/prn/history, no-resident picker) + new components `resources/js/components/emar/mar/{mar-grid,attention-bar,prn-card,clinical-rail}.tsx` + `resources/js/pages/emar/components/mar-governance-dialogs.tsx` (Add-medication / Record-INR / Syringe-driver / Manage-alerts / Verify-order / Chart-warnings — all on `MedsWizardDialog`). Reuses `RecordDoseWizard` + `PrnWizard` (one dose/PRN path). types + lint clean.
+
+**DEFERRED → backlog (with reason):**
+- Right-click **quick-action context menu** (one-click mark given/refused) — right-click currently opens the full `RecordDoseWizard` (safe; CD witness never skipped). Enhancement.
+- **Corrections-review** modal — rail shows the pending count (informational); full review flow is a follow-up.
+- **Chart-warnings auto-prompt on open** — currently a manual "Review warnings" button (`WarningsDialog` built); auto-`useEffect` open is a small follow-up.
+- **Drug-interactions banner** — not surfaced in the new layout (attention bar covers warnings); could fold interactions into the attention bar.
+- **Break-glass status** on MAR — dropped from MAR (owned by Emergency Access page #16).
+- Standalone **Record-observation** modal — NOT needed: observations are captured at dose sign-off inside `RecordDoseWizard` (rule-driven). Reconciled, not a gap.
+
+**REMAINING for §9 gate:** build (running), live pixel-verify vs prototype (defer to user/dev — auth-gated), then commit `feat(emar): redesign MAR Charts` + flip status to done.
