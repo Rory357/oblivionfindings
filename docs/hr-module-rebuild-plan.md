@@ -395,8 +395,12 @@ flat Send-Kudos dialog. M7-R3 (e08c55c5) — HrDemoSeeder feed/kudos demo data (
     index/plans/summary used `forTenant(null)`→`whereNull` so real enrollments NEVER showed (list always empty);
     `storePlan` wrote `tenant_id=null` into a NOT-NULL col (plan create dead on MySQL); added cross-tenant guard
     on update. Routed via `ResolvesHrTenant` + ships `employees` prop. 4 tests (BenefitsEnrollmentTest).
-    REMAINING: benefits plan edit/lifecycle; asset modals/retire; `markPaid` route+UI; receipt upload; expenses
-    create page→modal + "Posted to GL" badge.
+  - ✅ **DONE (aff27454):** Expenses finishing — wired `markPaid` (was unrouted; show.tsx Mark-Paid button POSTed
+    to a nonexistent `/mark-paid` = dead button) → new route `hr.expenses.pay` + `ExpenseController::pay` (guards
+    `gl_posted_at` set, mirrors payroll pay-net gate) + server `can.pay` flag. Added "Posted to GL" badge (show
+    payload now ships `journal_id`/`gl_posted_at`). Fixed the always-empty index (`forTenant(null)`→`whereNull`)
+    via `ResolvesHrTenant`. Fixed invisible status badges. 5 tests (ExpensePaymentTest). REMAINING: expenses
+    create page→modal + receipt upload; benefits plan edit/lifecycle; asset modals/retire.
 - **M8-6 Engagement consolidation.** *Problem:* two survey systems (`HrSurvey` vs `HrEngagementSurvey`),
   two announcement paths (`HrAnnouncement` vs feed post_type), `HrCheckIn` orphan model. *Fix:* consolidate
   on the richer Engagement survey system (retire `/hr/surveys` via redirect); one announcement model;
