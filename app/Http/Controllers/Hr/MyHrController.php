@@ -330,6 +330,11 @@ class MyHrController extends Controller
 
         return Inertia::render('hr/my/training', [
             'complianceStatuses' => $complianceStatuses,
+            'can' => [
+                // Only surface the LMS catalog link to users who can open it
+                // (the catalog route is gated hr.training.view|training.viewAny).
+                'viewCatalog' => $user->canDo('hr.training.view') || $user->canDo('training.viewAny'),
+            ],
         ]);
     }
 
