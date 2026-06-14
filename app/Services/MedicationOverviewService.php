@@ -16,6 +16,7 @@ use App\Models\MedicationError;
 use App\Models\MedicationReview;
 use App\Models\MedicationRound;
 use App\Models\MedicationSyringeDriver;
+use App\Models\User;
 use Carbon\Carbon;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Str;
@@ -66,7 +67,43 @@ class MedicationOverviewService
             'activeAlertsList' => $this->activeAlertsList(),
             'compliance' => $this->complianceSnapshot(),
             'clientOptions' => $this->clientOptions(),
+            'medicationOptions' => $this->medicationOptions(),
+            'witnesses' => $this->witnesses(),
         ];
+    }
+
+    /**
+     * Active medications across the clients with a chart, for the CD/stock modal
+     * pickers. Flat list the frontend filters by selected client.
+     */
+    public function medicationOptions(): array
+    {
+        return ClientMedication::active()
+            ->orderBy('name')
+            ->get(['id', 'client_id', 'name', 'dose_unit', 'controlled_drug'])
+            ->map(fn ($med) => [
+                'id' => $med->id,
+                'client_id' => $med->client_id,
+                'name' => $med->name,
+                'unit' => $med->dose_unit,
+                'controlled' => (bool) $med->controlled_drug,
+            ])
+            ->all();
+    }
+
+    /**
+     * Staff eligible to witness a controlled-drug entry (mirrors the meds/today
+     * + EmarController witness list: staff with medications.controlled.witness).
+     */
+    public function witnesses(): array
+    {
+        return User::staff()
+            ->orderBy('name')
+            ->get(['id', 'name'])
+            ->filter(fn (User $user) => $user->canDo('medications.controlled.witness'))
+            ->map(fn (User $user) => ['id' => $user->id, 'name' => $user->name])
+            ->values()
+            ->all();
     }
 
     /**

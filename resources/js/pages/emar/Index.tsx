@@ -63,9 +63,15 @@ import {
     parseYmd,
 } from '@/pages/meds/today/components/day-picker-chip';
 import { AddMedicationModal } from './components/add-medication-modal';
+import {
+    CdRegisterModal,
+    type MedicationOption,
+    type WitnessOption,
+} from './components/cd-register-modal';
 import { GenerateRoundsModal } from './components/generate-rounds-modal';
 import { MedicationReviewModal } from './components/medication-review-modal';
 import { ReportErrorModal, type ClientOption } from './components/report-error-modal';
+import { StockMovementModal } from './components/stock-movement-modal';
 
 /* ── Types (mirror MedicationOverviewService::payload) ───────────────── */
 
@@ -194,6 +200,8 @@ type Props = {
     medicationErrors: MedicationErrors;
     recentActivity: ActivityItem[];
     clientOptions: ClientOption[];
+    medicationOptions: MedicationOption[];
+    witnesses: WitnessOption[];
     canManageSettings?: boolean;
 };
 
@@ -286,19 +294,34 @@ export default function EmarHome(props: Props) {
         medicationErrors,
         recentActivity,
         clientOptions,
+        medicationOptions,
+        witnesses,
         canManageSettings,
     } = props;
 
     const page = usePage<SharedData>();
     const firstName = (page.props.auth?.user?.name ?? '').split(' ')[0] || 'there';
+    const currentUserId = page.props.auth?.user?.id ?? 0;
 
     const [acFilter, setAcFilter] = useState<'all' | AcCategory>('all');
     const [search, setSearch] = useState('');
     const [siteFilter, setSiteFilter] = useState<number | null>(null);
     const [dismissed, setDismissed] = useState<Set<string>>(new Set());
     const [modal, setModal] = useState<
-        null | 'generate-rounds' | 'report-error' | 'add-medication' | 'medication-review'
+        | null
+        | 'generate-rounds'
+        | 'report-error'
+        | 'add-medication'
+        | 'medication-review'
+        | 'cd-register'
+        | 'stock-movement'
     >(null);
+    const [modalClientId, setModalClientId] = useState<number | null>(null);
+
+    const openModal = (key: typeof modal, clientId: number | null = null) => {
+        setModalClientId(clientId);
+        setModal(key);
+    };
 
     const goDate = (ymd: string) =>
         router.get(
@@ -664,9 +687,19 @@ export default function EmarHome(props: Props) {
                                             </div>
                                             <p className="truncate text-xs text-muted-foreground">{it.summary}</p>
                                         </div>
-                                        <Button asChild size="sm" className={cn('shrink-0', SEVERITY_BTN[it.severity])}>
-                                            <Link href={actionHref(it)}>{it.action}</Link>
-                                        </Button>
+                                        {it.action_type === 'cd_balance' ? (
+                                            <Button
+                                                size="sm"
+                                                className={cn('shrink-0', SEVERITY_BTN[it.severity])}
+                                                onClick={() => openModal('cd-register', it.client_id)}
+                                            >
+                                                {it.action}
+                                            </Button>
+                                        ) : (
+                                            <Button asChild size="sm" className={cn('shrink-0', SEVERITY_BTN[it.severity])}>
+                                                <Link href={actionHref(it)}>{it.action}</Link>
+                                            </Button>
+                                        )}
                                         <Button
                                             variant="ghost"
                                             size="icon"
@@ -981,11 +1014,21 @@ export default function EmarHome(props: Props) {
                 <div className="grid gap-3.5 lg:grid-cols-3">
                     {/* Stock & pharmacy */}
                     <Card className="rounded-[18px]">
-                        <CardHeader className="flex-row items-center gap-2 pb-2">
-                            <span className="grid h-8 w-8 place-items-center rounded-lg bg-status-warning-bg text-status-warning">
-                                <Package className="h-4 w-4" />
-                            </span>
-                            <CardTitle className="text-sm">Stock &amp; pharmacy</CardTitle>
+                        <CardHeader className="flex-row items-center justify-between gap-2 pb-2">
+                            <div className="flex items-center gap-2">
+                                <span className="grid h-8 w-8 place-items-center rounded-lg bg-status-warning-bg text-status-warning">
+                                    <Package className="h-4 w-4" />
+                                </span>
+                                <CardTitle className="text-sm">Stock &amp; pharmacy</CardTitle>
+                            </div>
+                            <Button
+                                variant="outline"
+                                size="sm"
+                                className="h-7 px-2.5 text-xs"
+                                onClick={() => openModal('stock-movement')}
+                            >
+                                Record stock
+                            </Button>
                         </CardHeader>
                         <CardContent className="space-y-1.5 text-xs">
                             <div className="flex items-center justify-between">
@@ -1132,6 +1175,22 @@ export default function EmarHome(props: Props) {
                 open={modal === 'medication-review'}
                 onClose={() => setModal(null)}
                 clients={clientOptions}
+            />
+            <CdRegisterModal
+                open={modal === 'cd-register'}
+                onClose={() => setModal(null)}
+                clients={clientOptions}
+                medications={medicationOptions}
+                witnesses={witnesses}
+                currentUserId={currentUserId}
+                initialClientId={modalClientId}
+            />
+            <StockMovementModal
+                open={modal === 'stock-movement'}
+                onClose={() => setModal(null)}
+                clients={clientOptions}
+                medications={medicationOptions}
+                initialClientId={modalClientId}
             />
         </AppLayout>
     );

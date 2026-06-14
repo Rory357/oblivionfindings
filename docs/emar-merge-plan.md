@@ -147,9 +147,12 @@ InfoCard, SelectInput, SummaryRow`), matching `add-client-dialog.tsx`.
        pages (functional, not stubs). FOLLOW-UP: enrich payload + lift record-dose-wizard onto rows.
 7. [~] Build BUILD-NEW modals on the shared shell. DONE: Generate rounds (hero), Report med error
        (AC header → emar.errors.store), Add medication (client-board button → emar.medications.store,
-       4 steps), Schedule medication review (Clinical-watch reviews card → emar.reviews.store, 2 steps).
-       TODO: CD register entry (needs witnesses/users list), Stock movement (needs per-client meds list),
-       Reports & exports (export route links), Audit log (single-pane viewer).
+       4 steps), Schedule medication review (Clinical-watch card → emar.reviews.store, 2 steps),
+       CD register entry (AC "Start count" rows → emar.controlled.entries.store, 3 steps, witness ≠ self,
+       client_request_uuid idempotency), Stock movement (Ops Stock card → emar.stock.receive/adjust, 3 steps).
+       Payload gained `witnesses` (staff with medications.controlled.witness) + `medicationOptions`
+       (active meds {id,client_id,name,unit,controlled}). TODO: Reports & exports (export route links),
+       Audit log (single-pane viewer).
 8. [ ] Migrate raw `Dialog`/`Sheet` modals reachable from `/emar` (prn-effect; refusal follow-up). NOTE:
        none are currently reachable from the merged `/emar` (page deep-links to pages); migrations land
        when those modals are surfaced in-page.
