@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrCompensationHistory;
 use App\Domain\Hr\Models\HrCompensationReview;
 use App\Domain\Hr\Models\HrEmployeeProfile;
@@ -14,6 +15,8 @@ use Inertia\Inertia;
 
 class CompensationController extends Controller
 {
+    use ResolvesHrTenant;
+
     public function __construct(
         protected CompensationService $compensationService,
     ) {}
@@ -68,7 +71,7 @@ class CompensationController extends Controller
         ]);
 
         HrSalaryBand::create([
-            'tenant_id' => $user->tenant_id,
+            'tenant_id' => $this->resolveHrTenantIdForUser($user),
             'created_by' => $user->id,
             ...$data,
         ]);
@@ -203,12 +206,12 @@ class CompensationController extends Controller
         ]);
 
         $this->compensationService->createCompensationReview([
-            'tenant_id' => $user->tenant_id,
+            'tenant_id' => $this->resolveHrTenantIdForUser($user),
             'created_by' => $user->id,
             ...$data,
         ]);
 
-        return redirect()->route('hr.compensation.reviews.index')->with('success', 'Compensation review created.');
+        return redirect()->route('hr.compensation.reviews')->with('success', 'Compensation review created.');
     }
 
     /**
