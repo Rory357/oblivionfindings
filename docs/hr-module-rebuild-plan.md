@@ -481,6 +481,14 @@ flat Send-Kudos dialog. M7-R3 (e08c55c5) — HrDemoSeeder feed/kudos demo data (
   expense/timesheet/offer/pay-run submit; scope `pending()` to `getCurrentApprover()`; add process-type
   tabs + chain edit/toggle; offers + pay-run sign-off as process types. *Acceptance:* one inbox shows the
   user's real pending items across types; chains manageable.
+  - ✅ **PARTIAL — tenant-correctness (fc64fa59):** ApprovalController chains/storeChain/pending used $user->tenant_id
+    (null) → ResolvesHrTenant + a cross-tenant guard on action(); 3 tests (ApprovalChainTenantTest). The inbox now
+    loads honestly (empty) + chains are tenant-scoped/usable.
+  - ⚠️ **DEFERRED to M10 (design decision, NOT a safe loop wire):** initiateApproval has ZERO callers; the generic
+    approval-chain engine is a PARALLEL system to each feature's own approve flow (leave/expense/etc. approve
+    directly). Wiring initiateApproval into those flows would create a duplicate, competing approval state — a product
+    call on which mechanism is authoritative (adopt the generic engine everywhere vs remove it as speculative). Not
+    done here to avoid dual-approval bugs. pending()-scope-to-approver + process-type tabs also depend on that call.
 - **M9-4 My-HR self-service hub.** *Problem:* `/hr/my` is 11 separate full pages; my/training shows only
   compliance (no LMS); my/policies un-attestable without a current version. *Fix:* one ESS hub (`TabStrip`:
   Overview · Profile · Leave · Time · Pay · Expenses · Documents · Training · Policies · Reviews · Goals ·
