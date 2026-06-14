@@ -1,3 +1,8 @@
+import {
+    GoalDialog,
+    type GoalOption,
+    type ParentGoalOption,
+} from '@/components/hr/performance/goal-dialog';
 import { PageHero, type PageHeroBadge, type PageHeroMetaItem } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -105,6 +110,7 @@ interface Goal {
     completed_at: string | null;
     user: { id: number; name: string } | null;
     creator: string | null;
+    parent_goal_id: number | null;
     parent_goal: { id: number; title: string; goal_type: string } | null;
     child_goals: ChildGoal[];
     key_results: KeyResult[];
@@ -119,6 +125,9 @@ interface UserItem {
 interface Props {
     goal: Goal;
     users: UserItem[];
+    goalTypes: GoalOption[];
+    priorities: GoalOption[];
+    parentGoals: ParentGoalOption[];
     can: { manage: boolean; updateProgress: boolean };
 }
 
@@ -222,7 +231,15 @@ function capitalize(str: string): string {
 /*  Component                                                          */
 /* ------------------------------------------------------------------ */
 
-export default function GoalShow({ goal, users, can }: Props) {
+export default function GoalShow({
+    goal,
+    users,
+    goalTypes,
+    priorities,
+    parentGoals,
+    can,
+}: Props) {
+    const [editOpen, setEditOpen] = useState(false);
     const [showKrForm, setShowKrForm] = useState(false);
     const [editingKrId, setEditingKrId] = useState<number | null>(null);
     const [krUpdateValue, setKrUpdateValue] = useState('');
@@ -383,6 +400,17 @@ export default function GoalShow({ goal, users, can }: Props) {
                             meta={heroMeta}
                             badges={heroBadges}
                             stats={heroStats}
+                            actions={
+                                can.manage ? (
+                                    <Button
+                                        size="sm"
+                                        onClick={() => setEditOpen(true)}
+                                    >
+                                        <Pencil className="mr-1.5 h-4 w-4" />
+                                        Edit goal
+                                    </Button>
+                                ) : undefined
+                            }
                         />
                     );
                 })()}
@@ -1209,6 +1237,30 @@ export default function GoalShow({ goal, users, can }: Props) {
                     </form>
                 </DialogContent>
             </Dialog>
+
+            {can.manage && (
+                <GoalDialog
+                    open={editOpen}
+                    onClose={() => setEditOpen(false)}
+                    owners={users}
+                    goalTypes={goalTypes}
+                    priorities={priorities}
+                    parentGoals={parentGoals}
+                    goal={{
+                        id: goal.id,
+                        user: goal.user,
+                        title: goal.title,
+                        description: goal.description,
+                        goal_type: goal.goal_type,
+                        priority: goal.priority,
+                        parent_goal_id: goal.parent_goal_id,
+                        target_value: goal.target_value,
+                        unit: goal.unit,
+                        start_date: goal.start_date,
+                        due_date: goal.due_date,
+                    }}
+                />
+            )}
         </AppLayout>
     );
 }

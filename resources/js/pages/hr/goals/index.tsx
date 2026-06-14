@@ -1,3 +1,8 @@
+import {
+    GoalDialog,
+    type GoalOption,
+    type ParentGoalOption,
+} from '@/components/hr/performance/goal-dialog';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -103,6 +108,9 @@ interface Props {
         links: Array<{ url: string | null; label: string; active: boolean }>;
     };
     users: Array<{ id: number; name: string }>;
+    goalTypes: GoalOption[];
+    priorities: GoalOption[];
+    parentGoals: ParentGoalOption[];
     analytics: Analytics;
     cascadeTree: CascadeGoal[];
     filters: {
@@ -340,11 +348,15 @@ function CascadeItem({
 export default function GoalsIndex({
     goals,
     users,
+    goalTypes,
+    priorities,
+    parentGoals,
     analytics,
     cascadeTree,
     filters,
     can,
 }: Props) {
+    const [goalDialogOpen, setGoalDialogOpen] = useState(false);
     const [selectedCompanyId, setSelectedCompanyId] = useState<number | null>(
         cascadeTree[0]?.id ?? null,
     );
@@ -399,11 +411,9 @@ export default function GoalsIndex({
                         ]}
                         actions={
                             can.manage && (
-                                <Button asChild>
-                                    <Link href="/hr/goals/create">
-                                        <Plus className="mr-1.5 h-4 w-4" /> New
-                                        Objective
-                                    </Link>
+                                <Button onClick={() => setGoalDialogOpen(true)}>
+                                    <Plus className="mr-1.5 h-4 w-4" /> New
+                                    Objective
                                 </Button>
                             )
                         }
@@ -849,6 +859,17 @@ export default function GoalsIndex({
                         </div>
                     </TabsContent>
                 </Tabs>
+
+                {can.manage && (
+                    <GoalDialog
+                        open={goalDialogOpen}
+                        onClose={() => setGoalDialogOpen(false)}
+                        owners={users}
+                        goalTypes={goalTypes}
+                        priorities={priorities}
+                        parentGoals={parentGoals}
+                    />
+                )}
             </PageLayout>
         </AppLayout>
     );

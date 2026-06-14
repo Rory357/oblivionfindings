@@ -42,6 +42,7 @@ class GoalController extends Controller
         $goals->through(fn (HrGoal $g) => [
             'id' => $g->id,
             'title' => $g->title,
+            'description' => $g->description,
             'goal_type' => $g->goal_type,
             'status' => $g->status,
             'priority' => $g->priority,
@@ -52,6 +53,7 @@ class GoalController extends Controller
             'start_date' => $g->start_date?->toDateString(),
             'due_date' => $g->due_date?->toDateString(),
             'user' => $g->user ? ['id' => $g->user->id, 'name' => $g->user->name] : null,
+            'parent_goal_id' => $g->parent_goal_id,
             'parent_goal' => $g->parentGoal ? ['id' => $g->parentGoal->id, 'title' => $g->parentGoal->title] : null,
             'key_results_count' => $g->keyResults->count(),
         ]);
@@ -63,6 +65,9 @@ class GoalController extends Controller
         return Inertia::render('hr/goals/index', [
             'goals' => $goals,
             'users' => $users,
+            'goalTypes' => $this->goalTypeOptions(),
+            'priorities' => $this->priorityOptions(),
+            'parentGoals' => $this->parentGoalOptions($tenantId),
             'analytics' => $analytics,
             'cascadeTree' => $cascadeTree,
             'filters' => [
@@ -81,52 +86,47 @@ class GoalController extends Controller
     /*  Create                                                             */
     /* ------------------------------------------------------------------ */
 
+    /**
+     * The page-based create form was replaced by the GoalDialog on the goals hub.
+     * Preserve the route with a redirect.
+     */
     public function create(Request $request)
     {
         $user = $request->user();
         abort_unless($this->canManage($user), 403);
 
-        $tenantId = $user->tenant_id ?? 1;
+        return redirect()->route('hr.goals.index');
+    }
 
-        $users = User::orderBy('name')->get(['id', 'name']);
+    /** Goal-type options for the dialog. */
+    private function goalTypeOptions(): array
+    {
+        return [
+            ['value' => 'company', 'label' => 'Company'],
+            ['value' => 'team', 'label' => 'Team'],
+            ['value' => 'individual', 'label' => 'Individual'],
+        ];
+    }
 
-        $parentGoals = HrGoal::forTenant($tenantId)
+    /** Priority options for the dialog. */
+    private function priorityOptions(): array
+    {
+        return [
+            ['value' => 'low', 'label' => 'Low'],
+            ['value' => 'medium', 'label' => 'Medium'],
+            ['value' => 'high', 'label' => 'High'],
+        ];
+    }
+
+    /** Active/draft goals selectable as a parent in the dialog. */
+    private function parentGoalOptions(int $tenantId)
+    {
+        return HrGoal::forTenant($tenantId)
             ->where(fn ($q) => $q->where('status', 'active')->orWhere('status', 'draft'))
-            ->get(['id', 'title', 'goal_type'])
-            ->map(fn ($g) => ['id' => $g->id, 'title' => $g->title, 'goal_type' => $g->goal_type]);
-
-        // If creating under a parent, load parent context
-        $parentContext = null;
-        if ($request->query('parent_id')) {
-            $parent = HrGoal::with('user:id,name', 'keyResults')->find($request->query('parent_id'));
-            if ($parent) {
-                $parentContext = [
-                    'id' => $parent->id,
-                    'title' => $parent->title,
-                    'goal_type' => $parent->goal_type,
-                    'progress_percentage' => $parent->progress_percentage,
-                    'status' => $parent->status,
-                    'user' => $parent->user ? ['name' => $parent->user->name] : null,
-                    'key_results_count' => $parent->keyResults->count(),
-                ];
-            }
-        }
-
-        return Inertia::render('hr/goals/create', [
-            'users' => $users,
-            'parentGoals' => $parentGoals,
-            'parentContext' => $parentContext,
-            'goalTypes' => [
-                ['value' => 'company', 'label' => 'Company'],
-                ['value' => 'team', 'label' => 'Team'],
-                ['value' => 'individual', 'label' => 'Individual'],
-            ],
-            'priorities' => [
-                ['value' => 'low', 'label' => 'Low'],
-                ['value' => 'medium', 'label' => 'Medium'],
-                ['value' => 'high', 'label' => 'High'],
-            ],
-        ]);
+            ->orderBy('title')
+            ->get(['id', 'title'])
+            ->map(fn ($g) => ['id' => $g->id, 'title' => $g->title])
+            ->values();
     }
 
     /* ------------------------------------------------------------------ */
@@ -200,6 +200,7 @@ class GoalController extends Controller
                 'completed_at' => $goal->completed_at?->toDateString(),
                 'user' => $goal->user ? ['id' => $goal->user->id, 'name' => $goal->user->name] : null,
                 'creator' => $goal->creator?->name,
+                'parent_goal_id' => $goal->parent_goal_id,
                 'parent_goal' => $goal->parentGoal ? ['id' => $goal->parentGoal->id, 'title' => $goal->parentGoal->title, 'goal_type' => $goal->parentGoal->goal_type] : null,
                 'child_goals' => $goal->childGoals->map(fn ($c) => [
                     'id' => $c->id,
@@ -233,6 +234,9 @@ class GoalController extends Controller
                 ])->values(),
             ],
             'users' => $users,
+            'goalTypes' => $this->goalTypeOptions(),
+            'priorities' => $this->priorityOptions(),
+            'parentGoals' => $this->parentGoalOptions($user->tenant_id ?? 1),
             'can' => [
                 'manage' => $this->canManage($user),
                 'updateProgress' => $this->canManage($user) || $goal->user_id === $user->id,
