@@ -687,6 +687,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::middleware('permission:hr.expenses.approve')->group(function () {
             Route::post('/{expenseClaim}/approve', [ExpenseController::class, 'approve'])->name('approve');
             Route::post('/{expenseClaim}/reject', [ExpenseController::class, 'reject'])->name('reject');
+            Route::post('/{expenseClaim}/pay', [ExpenseController::class, 'pay'])->name('pay');
         });
 
         Route::get('/{expenseClaim}', [ExpenseController::class, 'show'])->name('show');

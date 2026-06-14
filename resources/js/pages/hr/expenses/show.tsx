@@ -43,12 +43,14 @@ type ClaimData = {
     approved_by: string | null;
     approved_at: string | null;
     paid_at: string | null;
+    journal_id: number | null;
+    gl_posted_at: string | null;
     items: ExpenseItem[];
 };
 
 type Props = {
     claim: ClaimData;
-    can: { approve: boolean; manage: boolean };
+    can: { approve: boolean; manage: boolean; pay: boolean };
 };
 
 const breadcrumbs: BreadcrumbItem[] = [
@@ -59,27 +61,26 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const statusConfig: Record<string, { className: string; label: string }> = {
     draft: {
-        className:
-            'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
+        className: 'border-border/30 bg-muted text-muted-foreground',
         label: 'Draft',
     },
     submitted: {
         className:
-            'border-status-warning/30 text-status-warning bg-status-warning',
+            'border-status-warning/30 bg-status-warning-bg text-status-warning',
         label: 'Submitted',
     },
     approved: {
         className:
-            'border-status-success/30 text-status-success bg-status-success',
+            'border-status-success/30 bg-status-success-bg text-status-success',
         label: 'Approved',
     },
     rejected: {
         className:
-            'border-status-critical/30 text-status-critical bg-status-critical',
+            'border-status-critical/30 bg-status-critical-bg text-status-critical',
         label: 'Rejected',
     },
     paid: {
-        className: 'border-status-info/30 text-status-info bg-status-info',
+        className: 'border-status-info/30 bg-status-info-bg text-status-info',
         label: 'Paid',
     },
 };
@@ -125,6 +126,14 @@ export default function ExpenseShow({ claim, can }: Props) {
                                 >
                                     {config.label}
                                 </Badge>
+                                {claim.gl_posted_at && (
+                                    <Badge
+                                        variant="outline"
+                                        className="border-status-success/30 bg-status-success-bg text-status-success"
+                                    >
+                                        Posted to GL
+                                    </Badge>
+                                )}
                             </span>
                         }
                         actions={
@@ -167,12 +176,12 @@ export default function ExpenseShow({ claim, can }: Props) {
                                         </Button>
                                     </>
                                 )}
-                                {can.manage && claim.status === 'approved' && (
+                                {can.pay && (
                                     <Button
                                         size="sm"
                                         onClick={() =>
                                             router.post(
-                                                `/hr/expenses/${claim.id}/mark-paid`,
+                                                `/hr/expenses/${claim.id}/pay`,
                                             )
                                         }
                                     >
