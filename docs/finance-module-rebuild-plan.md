@@ -149,10 +149,14 @@ Land the spine M1–M10 build on. **No behaviour change**, design only.
   permission-filtered (no 403 dead tabs); each sub-route keeps its own controller/data and stays live (no
   hard redirect needed — the URLs now render the hub). Sidebar collapsed the scattered ledger items into one
   "General Ledger" entry. 3 LedgerHubRedirect tests; full Finance suite 53 green; types/build/lint/route:list green.
-- **[ ] M1-2 New Account / New Journal / FX-reval / Period-close as wizard modals.** Replace the standalone
-  Create pages + dialogs with `WizardShell` (New Journal = the multi-line DR/CR wizard with live balance check +
-  `PostingPreview`). *Acceptance:* create/post in modals; journal won't submit unbalanced. *(Part C — old
-  Create pages still work today, so no dead buttons in the interim.)*
+- **[~] M1-2 New Account / New Journal / FX-reval / Period-close as wizard modals.** *(Part C — old Create
+  pages still work in the interim, so no dead buttons.)*
+  - **[x] New Journal modal** — `components/finance/new-journal-dialog.tsx`: 3-step WizardShell (Details →
+    Lines → Review) using the shared `PostingPreview` + `journalBalance` for a live debits==credits check;
+    "Save & post" disabled until balanced. Wired into the journals Index (controller now passes `canManage` +
+    accounts/cost-centres/funding-streams reference data, gated by the create permission). 2 index tests; full
+    Finance suite 55 green; types/build/lint green.
+  - **[ ] New Account modal**, **[ ] FX-revaluation modal**, **[ ] Period-close modal** — next.
 - **[x] M1-3 Fix `5020` leave-expense collision.** Added dedicated `5050 Leave Expense` (FinanceSeeder,
   idempotent) and repointed `config/finance.php` `event_accounts.leave_provision.debit` 5020→5050; `5020`
   stays ACC Employer Levy only. Test asserts a leave_provision event debits 5050/Leave Expense, balanced +
