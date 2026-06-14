@@ -41,9 +41,11 @@ class ClientLedgerService
 
         $totalInflows = '0';
         $totalOutflows = '0';
+        $operationalOutflows = '0';
         $runningBalance = '0';
 
-        // If running balance is enabled, we need the opening balance (all prior inflows - outflows)
+        // The running balance is the PERSONAL trust balance — opening personal
+        // balance, then only personal entries move it.
         if ($withRunningBalance) {
             $runningBalance = $this->getOpeningBalance($clientId, $from);
         }
@@ -51,17 +53,29 @@ class ClientLedgerService
         $result = [];
         foreach ($entries as $entry) {
             $signed = $entry['signed_amount'];
+            $isPersonal = ($entry['source'] ?? null) === 'client_ledger';
 
-            if (bccomp($signed, '0', 2) >= 0) {
-                $totalInflows = bcadd($totalInflows, $signed, 2);
+            if ($isPersonal) {
+                if (bccomp($signed, '0', 2) >= 0) {
+                    $totalInflows = bcadd($totalInflows, $signed, 2);
+                } else {
+                    $totalOutflows = bcadd($totalOutflows, $signed, 2); // Already negative
+                }
+
+                if ($withRunningBalance) {
+                    $runningBalance = bcadd($runningBalance, $signed, 2);
+                }
             } else {
-                $totalOutflows = bcadd($totalOutflows, $signed, 2); // Already negative
+                // Operational cost allocation — informational only; the org's cost of
+                // support is never deducted from the resident's personal balance.
+                $operationalOutflows = bcadd($operationalOutflows, $signed, 2);
             }
 
             if ($withRunningBalance) {
-                $runningBalance = bcadd($runningBalance, $signed, 2);
+                // Personal balance, unchanged by operational rows.
                 $entry['running_balance'] = $runningBalance;
             }
+            $entry['affects_personal_balance'] = $isPersonal;
 
             $result[] = $entry;
         }
@@ -75,6 +89,9 @@ class ClientLedgerService
                 'total_inflows' => $totalInflows,
                 'total_outflows' => $totalOutflows,
                 'net' => bcadd($totalInflows, $totalOutflows, 2),
+                // Org cost-of-support attributed to the client; segregated from the
+                // personal balance for transparency.
+                'operational_outflows' => $operationalOutflows,
             ],
             'running_balance_enabled' => $withRunningBalance,
         ];
@@ -125,7 +142,7 @@ class ClientLedgerService
     }
 
     /* ------------------------------------------------------------------ */
-    /*  Private                                                            */
+    /*  Private */
     /* ------------------------------------------------------------------ */
 
     /**
@@ -181,7 +198,7 @@ class ClientLedgerService
                 'category' => null,
                 'direction' => 'outflow',
                 'amount' => (string) $alloc->amount,
-                'signed_amount' => '-' . (string) $alloc->amount,
+                'signed_amount' => '-'.(string) $alloc->amount,
                 'description' => $alloc->journal?->description ?? $alloc->event_type,
                 'reference' => $alloc->journal?->journal_number ?? null,
                 'journal_id' => $alloc->journal_id,
@@ -193,14 +210,15 @@ class ClientLedgerService
     }
 
     /**
-     * Calculate opening balance as of a given date.
+     * Calculate the PERSONAL opening balance as of a given date.
      *
-     * Sum of all inflows minus outflows from ClientLedgerEntry before the date,
-     * minus all cost allocations before the date.
+     * Personal inflows minus outflows from ClientLedgerEntry only. Operational cost
+     * allocations (the org's cost of supporting the client) are deliberately NOT
+     * subtracted — they are not deductions from the resident's personal trust money,
+     * so they must never reduce the personal balance.
      */
     private function getOpeningBalance(int $clientId, Carbon $asOf): string
     {
-        // Personal transactions before period
         $ledgerInflows = ClientLedgerEntry::forClient($clientId)
             ->where('entry_date', '<', $asOf)
             ->inflows()
@@ -211,17 +229,6 @@ class ClientLedgerService
             ->outflows()
             ->sum('amount');
 
-        // Operational cost allocations before period (these are always "outflows" from client perspective)
-        $allocOutflows = FinCostAllocation::forClient($clientId)
-            ->where('event_date', '<', $asOf)
-            ->whereHas('financialEvent', function ($q) {
-                $q->where('source_type', '!=', ClientLedgerEntry::class);
-            })
-            ->sum('amount');
-
-        $balance = bcsub((string) $ledgerInflows, (string) $ledgerOutflows, 2);
-        $balance = bcsub($balance, (string) $allocOutflows, 2);
-
-        return $balance;
+        return bcsub((string) $ledgerInflows, (string) $ledgerOutflows, 2);
     }
 }
