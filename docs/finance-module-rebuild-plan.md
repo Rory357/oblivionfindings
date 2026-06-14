@@ -387,9 +387,18 @@ KiwiSaver + net-pay liability) via `PostPayrollJournalJob`; `AllocatePayrollCost
   builders; GL journal untouched (export-only, money-safe + idempotent). MyobSyncProvider already throws an explicit
   "not supported yet" (no dead controls — left as-is). New test asserts mapped→AccountID + unmapped→AccountCode;
   existing no-mapping test still green. Finance suite 119 green. *Acceptance met:* a non-code mapping is honoured in sync.
-- **[ ] M10-3 Final de-dup sweep (all three classes).** Verify every collapsed route redirects; extract any
-  remaining near-identical finance hero/table/card code into `components/finance/`; confirm no cross-loop fork
-  with HR (payroll bridge, expenses, approvals, calendar, primitives). *Acceptance:* no duplicate concept pages; dup map updated.
+- **[x] M10-3 De-dup sweep — DONE (main 83fcbb99).** Route-redirect coverage already complete (Ledger/Banking/
+  Payables/Reports/Tax/Settings hub redirect tests; Receivables is a landing page by design). Component sweep:
+  the only GENUINE byte-identical duplication was the hub KPI/summary card — copy-pasted 7× across invoices (4) +
+  bills (3) index heroes. Extracted `components/finance/summary-card.tsx` (`FinanceSummaryCard`, tone-keyed to the
+  status palette) and replaced all 7 inline blocks with one-line calls; output byte-identical (the redundant
+  `dark:` variants dropped — status tokens already adapt). gst-returns/site-dashboard are deliberate variants
+  (solid badge, mono values) — left untouched (folding them in would change their look). Other candidates checked
+  + rejected as NOT genuine duplication: KPI cards already use 3 different shared components (FleetStatCard /
+  OpsStatCard / inline KpiCard); status-config maps are domain-specific per entity (bespoke, not duplicated);
+  empty-states are contextual. (Known but out-of-scope: ~70 finance pages re-implement `Intl.NumberFormat` NZD
+  inline instead of `money.tsx`'s `formatMoney` — a large mechanical migration, not a copy-paste block; deferred.)
+  No cross-loop fork with HR. types/eslint/build green; suite unchanged at 126.
 - **[x] M10-4 Demo seeders — SHIPPED (main 8519cce0).** Root cause: `DatabaseSeeder` called only
   `FinancePermissionsSeeder` (permissions, no data) so every finance hub + the new Calendar rendered EMPTY on a
   fresh seed. Added `FinanceDemoSeeder` (wired into `DatabaseSeeder` after the other `*DemoSeeder`s), modelled on
