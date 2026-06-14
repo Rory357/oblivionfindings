@@ -647,6 +647,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::get('/reviews/create', [CompensationController::class, 'createReview'])->name('reviews.create');
             Route::post('/reviews', [CompensationController::class, 'storeReview'])->name('reviews.store');
             Route::get('/reviews/{review}', [CompensationController::class, 'showReview'])->name('reviews.show');
+            Route::post('/reviews/{review}/approve', [CompensationController::class, 'approveReview'])->name('reviews.approve');
             Route::post('/reviews/{review}/apply', [CompensationController::class, 'applyReview'])->name('reviews.apply');
             Route::post('/bonuses', [BonusController::class, 'store'])->name('bonuses.store');
             Route::post('/bonuses/{bonus}/approve', [BonusController::class, 'approve'])->name('bonuses.approve');

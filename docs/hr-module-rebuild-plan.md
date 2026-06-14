@@ -567,6 +567,42 @@ flat Send-Kudos dialog. M7-R3 (e08c55c5) — HrDemoSeeder feed/kudos demo data (
     visible proficiency-code text. Gates: types + eslint(touched) + build green. NOTE: live axe/mobile pass is
     browser-blocked → deferred to USER. Remaining a11y static candidates: skills/matrix cell label, fill-amber-400
     raw-palette star fills (non-token, cosmetic).
+- **M10-7 Finish-half-built: compensation review APPROVE (no dead button).** *Problem (verified by a parallel
+  audit + adversarial check, S27):* a comp review is created `planning` with items `pending`, but `applyReview`/
+  `applyCompensationReview` require status `approved` (items `approved`) and the review-detail "Apply Review"
+  button only shows when `status==='approved'` — yet NO route/method/UI ever transitioned planning→approved. So
+  the Apply button was permanently unreachable and the whole apply pipeline was dead code (mirror that DID exist:
+  `BonusController::approve`).
+  - ✅ **DONE — wire approve end-to-end (S27):** `CompensationService::approveCompensationReview($review,$approverId)`
+    (guards status ∈ planning/in_progress; marks each pending item `approved` + `approved_by` via the model so it's
+    audited; flips review→`approved`). `CompensationController@approveReview` (perm `hr.compensation.manage`,
+    LogicException→flash error) + POST `reviews.approve`. review-detail.tsx: "Approve Review" button when
+    planning/in_progress, then the existing "Apply Review" appears. Also hardened `applyReview` to catch the
+    LogicException (was an uncaught 500). ⚠️ `hr_compensation_reviews` has NO approved_by column (only the ITEMS +
+    history tables do) — approver attribution lives on the items; the review tracks status only. 4 tests
+    (CompensationReviewApprovalTest: approve flips review+items, approve→apply updates salary + writes history,
+    apply-without-approve flashes error not 500, perm gate). Gates: types + eslint + build + sibling comp suite green.
+- **M10 REMAINING-WORK MAP (from the S27 parallel audit + adversarial verify — ranked, all safeHeadless unless noted):**
+  - *Standardised-tabs shells (the big DoD item; structure is headless-verifiable via route-redirect tests + types +
+    build, only visual parity is browser-blocked):* only People + Recruitment have the canonical TabStrip; Leave uses
+    in-page Radix tabs (OK). LACKING tabs, ranked by cluster size: **Performance** (~8 surfaces/20+ pages — largest),
+    **My-HR/ESS** (12 pages), **Compliance** (~7 surfaces), **Reports** (5), **Compensation** (3, no index),
+    **Documents** (3), **Settings** (3, low). One hub/tick.
+  - *Half-built backends (finish or hide):* **Asset retire/maintenance** — index filter + status colours offer
+    maintenance/retired but AssetService only assign/return + no route/UI can set them (medium; either wire or hide
+    the filter options). **Expense receipt upload** — receipt_path column + service param + show-page "Attached" badge
+    exist, but create form has no file input, request has no rule, no upload route (medium). **Benefit plan
+    deactivate** — storePlan hardcodes is_active:true, no updatePlan route (low; missing transition, no dead button).
+  - *Orphan models/tables to drop (reversible migration, like HrCheckIn):* **HrSurvey\*** (4 tables — NOT a clean
+    self-contained drop: adversarial check found it's wired into HrDemoSeeder + DuskDatabaseSeeder + HrSurveyFactory +
+    HrDemoSeederTest + SurveySystemRetiredTest, so dropping requires editing all of those too). **HrDashboardConfig**
+    (fully standalone leaf — cleanest drop, zero test fallout). HrEmployeeProfileVersion/HrEmployeeStatusChange +
+    HrCompensationReviewItem are dead *relationships on LIVE parents* (lower priority / future scope — leave).
+  - *Static a11y/token (build+eslint-verifiable):* **same-token contrast killers** — ~15 page files pair `bg-status-X`
+    with `text-status-X` (NO `-bg` suffix) → invisible text (the exact bug status-badge.tsx guards; S26 grep MISSED
+    these because the order is `text-…` before `bg-…`). Fix = swap `bg-status-X`→`bg-status-X-bg`. Plus raw-palette
+    `fill-amber-400/fill-yellow-400` star fills (token `amberx` exists) and 3 residual unlabelled controls
+    (leave select checkboxes ×2, goals chevron toggle).
 - **M10-5 Final parity pass.** Side-by-side every HR hub vs Rostering on oblivionfindings.com. *Acceptance:*
   hero/tabs/modals visually match; no dead buttons; DoD met.
 

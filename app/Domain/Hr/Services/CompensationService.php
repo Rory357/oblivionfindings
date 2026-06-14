@@ -86,6 +86,34 @@ class CompensationService
     }
 
     /**
+     * Approve a compensation review: mark its pending line-items approved and flip
+     * the review to 'approved' so it becomes eligible for applyCompensationReview().
+     */
+    public function approveCompensationReview(HrCompensationReview $review, int $approverId): void
+    {
+        if (! in_array($review->status, ['planning', 'in_progress'], true)) {
+            throw new \LogicException("Cannot approve a '{$review->status}' compensation review. Only planning or in-progress reviews can be approved.");
+        }
+
+        DB::transaction(function () use ($review, $approverId) {
+            // Update each pending item through the model so the change is audited.
+            $review->items()
+                ->where('status', 'pending')
+                ->get()
+                ->each(function ($item) use ($approverId) {
+                    $item->update([
+                        'status' => 'approved',
+                        'approved_by' => $approverId,
+                    ]);
+                });
+
+            // The reviews table has no approved_by column — approver attribution
+            // lives on each line-item; the review only tracks its status.
+            $review->update(['status' => 'approved']);
+        });
+    }
+
+    /**
      * Apply an approved compensation review: bulk-update profiles and create history entries.
      */
     public function applyCompensationReview(HrCompensationReview $review): void
