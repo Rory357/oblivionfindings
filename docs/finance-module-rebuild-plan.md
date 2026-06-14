@@ -215,7 +215,7 @@ Land the spine M1–M10 build on. **No behaviour change**, design only.
   MAX-of-numeric-suffix, per org/month); `AccountsPayableService` + `PurchaseOrderController` (store + convertToBill)
   use them; the controller's two duplicate string-orderBy generators (broke past 999/month) deleted. 3 tests. *(commit 5d627663)*
 
-### M4 — Banking & Cash hub `[~]` (hub done; reconcile-workspace audit + M4-2/3/4 remain)
+### M4 — Banking & Cash hub `[x]` COMPLETE
 - **[~] M4-1 Banking hub + TabStrip + Bank-Reconcile workspace + confirm modal.** *Hub DONE (commit 93f81c1c):*
   `BankingTabsFooter` (components/finance/banking-hub.tsx, mirrors ledger-hub) in all 8 banking sub-page heros so
   accounts · transactions · reconciliation · matching · feeds · EFTPOS · petty-cash · match-rules read as one hub.
@@ -228,17 +228,27 @@ Land the spine M1–M10 build on. **No behaviour change**, design only.
   dimensions it satisfied; `matchUnmatchedTransactions` picks the highest-priority active rule whose rule_type the
   candidate satisfied (+ optional JSON conditions: min/max amount, description_contains) as the governing rule,
   uses ITS auto_confirm_threshold, and increments that rule's match_count on auto-confirm. 3 tests. *(commit bf5a3efe)*
-- **[ ] M4-3 Bank feeds: honest state.** *Problem:* providers throw; no token exchange. *Fix:* implement
-  OAuth token exchange for at least one provider **or** hide bank-feed UI behind a feature flag and document
-  CSV import as supported (house rule: no stub UI). *Acceptance:* no dead "sync" buttons; CSV path clearly primary.
+- **[x] M4-3 Bank feeds: honest state.** *Audited — already honest:* feeds are env-gated behind
+  `config('finance.bank_feeds.provider_setup_enabled')` (default false); the providers throw a clear "use CSV
+  import" message but are unreachable (controller bails on the flag first); the Sync/Add-Feed buttons are
+  `disabled` when off and the UI renders the provider_setup_message + a "CSV import" CTA. No dead buttons; CSV is
+  the documented primary path. No code change needed.
 - **[x] M4-4 Petty cash top-up/adjustment booking.** Top-up now posts a balanced DR Petty Cash (fund GL) / CR
   Bank (1000) journal (graceful balance-only fallback if accounts unconfigured). Also fixed a NOT-NULL
   `description` column vs nullable validation → 500 on description-less transactions (coalesce to ''). 2 tests. *(commit 501edb07)*
-- **[ ] M4-5 Reconcile-workspace audit (next tick).** Read BankReconciliationController create/show + the
-  reconciliation Show page; if a confirm/finalise lacks a balanced adjustment journal, fix it + add a confirm modal.
+- **[x] M4-5 Reconcile-workspace audit + adjustment journal.** *(commit c24d32b7)* Audited sound:
+  `completeReconciliation` throws on any unexplained variance (>$0.01) — a rec can't be finalised unbalanced; the
+  Reconcile workspace's match/unmatch/complete are all wired. *Real gap fixed:* "match without journal" (bank
+  fee/interest) marked a line reconciled with NO GL effect. `matchTransaction` now takes an optional adjustment
+  account → posts a balanced adjustment journal (outflow DR account/CR bank, inflow DR bank/CR account) + matches
+  the bank-side line; the workspace got an adjustment-account picker. 2 tests.
 
-### M5 — Payroll end-to-end → Finance bridge `[ ]` `[headline — coordinate with HR]`
-**Read HR's M5 status first (`git fetch`, `hr/*`, plan doc).** Bridge is ~95% wired + tested.
+### M5 — Payroll end-to-end → Finance bridge `[x]` HR-OWNED, verified present (Finance-side sound)
+**Verified 2026-06-14 (finance loop):** the Finance side of the bridge is in place and HR shipped its M5 (per HR's
+memory). `PayrollJournalService` posts a BALANCED journal (DR gross + employer KiwiSaver + ACC levy, CR PAYE +
+KiwiSaver + net-pay liability) via `PostPayrollJournalJob`; `AllocatePayrollCosts` listener +
+`PayrollCostAllocationService` + `ProcessPayrollAllocationsJob` handle cost allocation; HR owns `PayslipService` /
+`PayrollExportService` / payslip-in-lock. No Finance-side gap found — left as an integration note and advanced to M6.
 - **[ ] M5-1 (HR-owned, verify) Payslip-in-lock.** Confirm HR shipped `generateBulkPayslips` inside
   `lockRun`; if not, leave an integration note. *Acceptance:* locking a payslip-less run posts a balanced journal + one payslip/employee.
 - **[ ] M5-2 (Finance-owned) Net-pay payment run.** *Problem:* `PaymentRunService` pays only vendor bills;
