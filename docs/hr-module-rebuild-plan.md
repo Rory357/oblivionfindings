@@ -227,18 +227,21 @@ native confirm()/alert()).
   feed not surfaced; native `confirm()/alert()` in leave/show. *Fix:* add cancel button; "Subscribe/.ics"
   action; replace confirm() with dialogs. *Acceptance:* cancel works; .ics subscribe present; no native dialogs.
 
-### M5 — Payroll end-to-end → Finance bridge `[headline]`
+### M5 — Payroll end-to-end → Finance bridge `[headline]` — 🟡 HEADLINE DONE (main 76bb724e, 2026-06-14); net-pay run remaining
 
-**Key finding:** the bridge is **~80% built and tested** (`lockRun` → `PostPayrollJournalJob` →
-`PayrollJournalService::postPayrollJournal` → balanced GL journal → `JournalPosted` →
-`PayrollCostAllocationService`). It is blocked by two gaps.
+**Re-derived (audit CORRECTS the "~80%"):** the bridge was ~90% built AND already had a passing balanced-journal
+test. The ONLY production gap was M5-1 (payslips never generated on lock). `PostPayrollJournalJob` *was* already
+dispatched on lock (the stale FINANCE_READINESS_AUDIT "zero callers" claim is wrong). **M5-1 SHIPPED** (76bb724e):
+`PayrollExportService::lockRun` now generates payslips idempotently → balanced journal posts → cost allocation
+fires, all via the existing route. Also fixed a gross-parity hole (payslip recomputed gross from hours×rate,
+ignoring the run item's rule-loaded `gross_pay`): added `grossOverride` to `NzPayrollCalculatorService` +
+`PayslipService`; `generateBulkPayslips` passes each item's authoritative gross so Σpayslip gross == run
+total_gross == GL wage expense. **M5-2 (net-pay payment run) is the remaining piece** before M5 closes.
 
-- **M5-1 Generate payslips inside the lock flow (BLOCKER).** *Problem:* `postPayrollJournal` reads
-  `HrPayslip` rows (`PayrollJournalService:52`) but `lockRun` never generates them → job throws "no
-  payslips to post" and the journal silently never posts. The passing test manually calls
-  `generateBulkPayslips` before locking (`PayrollJournalPostingTest:44`). *Fix:* `lockRun` (or the job)
-  calls `PayslipService::generateBulkPayslips($run)` idempotently first. *Acceptance:* locking a run with
-  no pre-generated payslips posts a balanced journal + one payslip per employee.
+- **M5-1 Generate payslips inside the lock flow (BLOCKER).** ✅ DONE (76bb724e). *Was:* `postPayrollJournal` reads
+  `HrPayslip` rows but `lockRun` never generated them → "no payslips to post". *Fixed:* lockRun generates them
+  idempotently; updated `PayrollJournalPostingTest` to drop the manual pre-generation (proving lock does it) +
+  assert payslip count, net = gross+holiday−deductions, and gross parity. 10 payroll regression tests still green.
 - **M5-2 Employee net-pay payment run (BLOCKER for "no re-keying").** *Problem:* `PaymentRunService` only
   pays vendor `FinBill`s; net pay is computed but never disbursed. *Fix:* payroll-sourced payment run /
   NZ direct-credit bank file from payslip `net_pay` + employee bank account (DR 2300 Accrued Wages / CR
