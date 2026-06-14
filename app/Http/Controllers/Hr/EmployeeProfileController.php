@@ -25,6 +25,7 @@ use App\Domain\Hr\Models\HrPolicyAttestation;
 use App\Domain\Hr\Models\HrProbationReview;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Domain\Hr\Models\HrSupervisionNote;
+use App\Domain\Hr\Services\OrgChartService;
 use App\Models\Role;
 use App\Models\Site;
 use App\Models\StaffBackgroundCheck;
@@ -216,6 +217,47 @@ class EmployeeProfileController extends Controller
             ->orderBy('title')
             ->get(['id', 'title', 'code']);
 
+        // --- Departments tab (folds /hr/departments; own filters + paginator) ---
+        $deptSearch = trim((string) $request->query('dept_q', ''));
+        $deptStatus = $request->query('dept_status');
+
+        $departmentsPane = HrDepartment::query()
+            ->where(fn ($q) => $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id'))
+            ->with(['manager:id,name', 'parent:id,name'])
+            ->withCount(['employees' => fn ($q) => $q->where('is_active', true)])
+            ->when($deptSearch !== '', fn ($q) => $q->where(fn ($i) => $i
+                ->where('name', 'like', "%{$deptSearch}%")
+                ->orWhere('code', 'like', "%{$deptSearch}%")))
+            ->when($deptStatus === 'active', fn ($q) => $q->where('is_active', true))
+            ->when($deptStatus === 'inactive', fn ($q) => $q->where('is_active', false))
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->paginate(25, ['*'], 'dept_page')
+            ->withQueryString();
+
+        $departmentManagers = User::query()->staff()->orderBy('name')->get(['id', 'name']);
+        $departmentParents = HrDepartment::query()
+            ->where(fn ($q) => $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id'))
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+        $canDept = $user->canDo('hr.settings.manage') || $user->canDo('hr.employees.manage');
+
+        // --- Org chart tab (folds /hr/orgchart) ---
+        $orgHierarchy = app(OrgChartService::class)->getHierarchy($tenantId);
+        $orgPeople = HrEmployeeProfile::forTenant($tenantId)
+            ->active()
+            ->with('user:id,name')
+            ->orderBy('position_title')
+            ->get()
+            ->map(fn ($p) => [
+                'user_id' => $p->user_id,
+                'name' => $p->user?->name ?? 'Unknown',
+                'position_title' => $p->position_title,
+            ])
+            ->values();
+        $canOrgManage = $user->canDo('hr.orgchart.manage') || $user->canDo('hr.employees.manage');
+
         return Inertia::render('hr/employees/index', [
             'profiles' => $profiles,
             'sites' => $sites,
@@ -228,6 +270,17 @@ class EmployeeProfileController extends Controller
                 'department' => $posDepartment,
                 'status' => $posStatus,
             ],
+            'departmentsPane' => $departmentsPane,
+            'departmentManagers' => $departmentManagers,
+            'departmentParents' => $departmentParents,
+            'departmentFilters' => [
+                'q' => $deptSearch,
+                'status' => $deptStatus,
+            ],
+            'canDept' => $canDept,
+            'orgHierarchy' => $orgHierarchy,
+            'orgPeople' => $orgPeople,
+            'canOrgManage' => $canOrgManage,
             'filters' => [
                 'q' => $search,
                 'status' => $status,

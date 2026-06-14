@@ -1,5 +1,14 @@
+import { router } from '@inertiajs/react';
+import {
+    ChevronDown,
+    ChevronRight,
+    Search,
+    UserCog,
+    Users,
+} from 'lucide-react';
+import { useMemo, useState } from 'react';
+
 import { PeoplePicker, type PersonOption } from '@/components/hr/people-picker';
-import PageShell from '@/components/page-shell';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent } from '@/components/ui/card';
 import {
@@ -11,21 +20,8 @@ import {
     DialogTitle,
 } from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { PageHero } from '@/components/page';
-import AppLayout from '@/layouts/app-layout';
-import { type BreadcrumbItem } from '@/types';
-import { Head, router } from '@inertiajs/react';
-import {
-    ChevronDown,
-    ChevronRight,
-    Network,
-    Search,
-    Users,
-    UserCog,
-} from 'lucide-react';
-import { useMemo, useState } from 'react';
 
-interface OrgNode {
+export interface OrgNode {
     id: number;
     user_id: number;
     name: string;
@@ -36,22 +32,11 @@ interface OrgNode {
     children: OrgNode[];
 }
 
-interface OrgPerson {
+export interface OrgPerson {
     user_id: number;
     name: string;
     position_title: string | null;
 }
-
-interface Props {
-    hierarchy: OrgNode[];
-    people: OrgPerson[];
-    can: { manage: boolean };
-}
-
-const breadcrumbs: BreadcrumbItem[] = [
-    { title: 'HR', href: '/hr/people' },
-    { title: 'Organisation Chart', href: '/hr/orgchart' },
-];
 
 function getInitials(name: string): string {
     return name
@@ -62,7 +47,7 @@ function getInitials(name: string): string {
         .slice(0, 2);
 }
 
-function flattenNodes(nodes: OrgNode[]): OrgNode[] {
+export function flattenNodes(nodes: OrgNode[]): OrgNode[] {
     const result: OrgNode[] = [];
     for (const node of nodes) {
         result.push(node);
@@ -147,8 +132,9 @@ function ReassignManagerDialog({
                 <DialogHeader>
                     <DialogTitle>Change reporting line</DialogTitle>
                     <DialogDescription>
-                        Choose who <span className="font-medium">{node.name}</span>{' '}
-                        reports to. Leave empty to make them top-level.
+                        Choose who{' '}
+                        <span className="font-medium">{node.name}</span> reports
+                        to. Leave empty to make them top-level.
                     </DialogDescription>
                 </DialogHeader>
                 <div className="py-2">
@@ -195,7 +181,6 @@ function OrgNodeCard({
 
     const [collapsed, setCollapsed] = useState(false);
 
-    // When searching, always show matched branches
     const isExpanded = isFilterActive ? isMatch : !collapsed;
 
     if (isFilterActive && !isMatch) {
@@ -204,13 +189,11 @@ function OrgNodeCard({
 
     return (
         <div className="flex flex-col items-center">
-            {/* Card */}
             <div
                 className={`relative flex w-56 items-center gap-3 rounded-lg border bg-card p-3 shadow-sm transition-shadow hover:shadow-md ${
                     isSelfMatch ? 'ring-2 ring-primary/50' : ''
                 }`}
             >
-                {/* Avatar */}
                 <div className="flex h-10 w-10 shrink-0 items-center justify-center rounded-full bg-primary/10 text-sm font-semibold text-primary">
                     {node.profile_photo_path ? (
                         <img
@@ -223,7 +206,6 @@ function OrgNodeCard({
                     )}
                 </div>
 
-                {/* Info */}
                 <div className="min-w-0 flex-1">
                     <p className="truncate text-sm leading-tight font-medium">
                         {node.name}
@@ -238,7 +220,6 @@ function OrgNodeCard({
                     )}
                 </div>
 
-                {/* Change-manager (reassign) */}
                 {canManage && (
                     <Button
                         type="button"
@@ -253,7 +234,6 @@ function OrgNodeCard({
                     </Button>
                 )}
 
-                {/* Expand/collapse toggle */}
                 {hasChildren && !isFilterActive && (
                     <Button
                         type="button"
@@ -280,15 +260,11 @@ function OrgNodeCard({
                 />
             )}
 
-            {/* Children */}
             {hasChildren && isExpanded && (
                 <div className="flex flex-col items-center">
-                    {/* Vertical connector from parent to children row */}
                     <div className="h-6 w-px bg-border" />
 
-                    {/* Horizontal connector + children */}
                     <div className="relative flex gap-8">
-                        {/* Horizontal line spanning children */}
                         {node.children.filter(
                             (c) => !isFilterActive || matchingIds.has(c.id),
                         ).length > 1 && (
@@ -319,7 +295,6 @@ function OrgNodeCard({
                                     key={child.id}
                                     className="flex flex-col items-center"
                                 >
-                                    {/* Vertical connector to child */}
                                     <div className="h-6 w-px bg-border" />
                                     <OrgNodeCard
                                         node={child}
@@ -339,11 +314,20 @@ function OrgNodeCard({
     );
 }
 
-export default function OrgChartIndex({ hierarchy, people, can }: Props) {
+/**
+ * Org-chart tree pane — shared by the standalone page and the People-hub tab.
+ * Owns its own search box, tree render and empty states (no PageHero/layout).
+ */
+export function OrgChartPane({
+    hierarchy,
+    people,
+    canManage,
+}: {
+    hierarchy: OrgNode[];
+    people: OrgPerson[];
+    canManage: boolean;
+}) {
     const [searchQuery, setSearchQuery] = useState('');
-
-    const allNodes = useMemo(() => flattenNodes(hierarchy), [hierarchy]);
-    const totalCount = allNodes.length;
 
     const matchingIds = useMemo(
         () => findMatchingIds(hierarchy, searchQuery),
@@ -351,79 +335,64 @@ export default function OrgChartIndex({ hierarchy, people, can }: Props) {
     );
 
     return (
-        <AppLayout breadcrumbs={breadcrumbs}>
-            <Head title="Organisation Chart" />
-            <PageShell>
-                <div className="px-6 pt-6">
-                    <PageHero category="hr"
-                        icon={Network}
-                        title="Organisation Chart"
-                        description={`Showing ${totalCount} active employee${totalCount !== 1 ? 's' : ''} across the organisation.`}
-                        stats={[
-                            { label: 'Employees', value: totalCount },
-                            { label: 'Top-level', value: hierarchy.length },
-                        ]}
-                    />
-                </div>
+        <div className="space-y-4">
+            <div className="relative w-full max-w-sm">
+                <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                <Input
+                    placeholder="Search by name, position, department…"
+                    value={searchQuery}
+                    onChange={(e) => setSearchQuery(e.target.value)}
+                    className="pl-9"
+                />
+            </div>
 
-                <div className="px-6">
-                    <div className="relative w-full max-w-sm">
-                        <Search className="absolute top-1/2 left-3 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
-                        <Input
-                            placeholder="Search by name, position, department..."
-                            value={searchQuery}
-                            onChange={(e) => setSearchQuery(e.target.value)}
-                            className="pl-9"
-                        />
+            <div className="overflow-x-auto pb-4">
+                {hierarchy.length === 0 ? (
+                    <Card>
+                        <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+                            <Users className="mb-4 h-12 w-12 text-muted-foreground/40" />
+                            <p className="text-lg font-medium text-muted-foreground">
+                                No organisation structure found
+                            </p>
+                            <p className="mt-1 text-sm text-muted-foreground/70">
+                                Assign managers to employees to build the org
+                                chart.
+                            </p>
+                        </CardContent>
+                    </Card>
+                ) : searchQuery && matchingIds.size === 0 ? (
+                    <Card>
+                        <CardContent className="flex flex-col items-center justify-center py-16 text-center">
+                            <Search className="mb-4 h-12 w-12 text-muted-foreground/40" />
+                            <p className="text-lg font-medium text-muted-foreground">
+                                No results found
+                            </p>
+                            <p className="mt-1 text-sm text-muted-foreground/70">
+                                Try a different search term.
+                            </p>
+                        </CardContent>
+                    </Card>
+                ) : (
+                    <div className="flex min-w-max justify-center gap-12 pt-4">
+                        {hierarchy.map((root) => {
+                            if (searchQuery && !matchingIds.has(root.id))
+                                return null;
+                            return (
+                                <OrgNodeCard
+                                    key={root.id}
+                                    node={root}
+                                    canManage={canManage}
+                                    people={people}
+                                    searchQuery={searchQuery}
+                                    matchingIds={matchingIds}
+                                />
+                            );
+                        })}
                     </div>
-                </div>
-
-                <div className="overflow-x-auto px-6 pb-8">
-                    {hierarchy.length === 0 ? (
-                        <Card>
-                            <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-                                <Users className="mb-4 h-12 w-12 text-muted-foreground/40" />
-                                <p className="text-lg font-medium text-muted-foreground">
-                                    No organisation structure found
-                                </p>
-                                <p className="mt-1 text-sm text-muted-foreground/70">
-                                    Assign managers to employees to build the
-                                    org chart.
-                                </p>
-                            </CardContent>
-                        </Card>
-                    ) : searchQuery && matchingIds.size === 0 ? (
-                        <Card>
-                            <CardContent className="flex flex-col items-center justify-center py-16 text-center">
-                                <Search className="mb-4 h-12 w-12 text-muted-foreground/40" />
-                                <p className="text-lg font-medium text-muted-foreground">
-                                    No results found
-                                </p>
-                                <p className="mt-1 text-sm text-muted-foreground/70">
-                                    Try a different search term.
-                                </p>
-                            </CardContent>
-                        </Card>
-                    ) : (
-                        <div className="flex min-w-max justify-center gap-12 pt-4">
-                            {hierarchy.map((root) => {
-                                if (searchQuery && !matchingIds.has(root.id))
-                                    return null;
-                                return (
-                                    <OrgNodeCard
-                                        key={root.id}
-                                        node={root}
-                                        canManage={can.manage}
-                                        people={people}
-                                        searchQuery={searchQuery}
-                                        matchingIds={matchingIds}
-                                    />
-                                );
-                            })}
-                        </div>
-                    )}
-                </div>
-            </PageShell>
-        </AppLayout>
+                )}
+            </div>
+        </div>
     );
 }
+
+export default OrgChartPane;

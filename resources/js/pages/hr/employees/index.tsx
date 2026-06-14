@@ -1,9 +1,17 @@
 import {
     AddEmployeeDialog,
     type AddEmployeeFormData,
+    type Department,
+    DepartmentDialog,
+    type DepartmentFilters,
+    DepartmentsPane,
     DirectoryPane,
     HrTabs,
     type HrTabItem,
+    type OrgNode,
+    type OrgPerson,
+    OrgChartPane,
+    type PaginatedDepartments,
     type PaginatedPositions,
     type PositionFilters,
     type PositionParent,
@@ -30,9 +38,11 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     Briefcase,
+    Building2,
     Clock,
     Contact,
     Download,
+    Network,
     Plus,
     Search,
     ShieldAlert,
@@ -88,6 +98,14 @@ interface Props {
     positions: PaginatedPositions;
     parentPositions: PositionParent[];
     positionFilters: PositionFilters;
+    departmentsPane: PaginatedDepartments;
+    departmentManagers: Array<{ id: number; name: string }>;
+    departmentParents: Array<{ id: number; name: string }>;
+    departmentFilters: DepartmentFilters;
+    canDept: boolean;
+    orgHierarchy: OrgNode[];
+    orgPeople: OrgPerson[];
+    canOrgManage: boolean;
     can: { manage: boolean };
 }
 
@@ -241,6 +259,14 @@ export default function EmployeesIndex({
     positions,
     parentPositions,
     positionFilters,
+    departmentsPane,
+    departmentManagers,
+    departmentParents,
+    departmentFilters,
+    canDept,
+    orgHierarchy,
+    orgPeople,
+    canOrgManage,
     can,
 }: Props) {
     const [addOpen, setAddOpen] = useState(false);
@@ -249,6 +275,8 @@ export default function EmployeesIndex({
     const [editingPosition, setEditingPosition] = useState<PositionRow | null>(
         null,
     );
+    const [deptDialogOpen, setDeptDialogOpen] = useState(false);
+    const [editingDept, setEditingDept] = useState<Department | null>(null);
 
     const tabItems: HrTabItem[] = [
         {
@@ -271,6 +299,19 @@ export default function EmployeesIndex({
             icon: Briefcase,
             tone: 'violet',
             badge: positions.total,
+        },
+        {
+            id: 'departments',
+            label: 'Departments',
+            icon: Building2,
+            tone: 'success',
+            badge: departmentsPane.total,
+        },
+        {
+            id: 'orgchart',
+            label: 'Org chart',
+            icon: Network,
+            tone: 'warning',
         },
     ];
 
@@ -742,6 +783,30 @@ export default function EmployeesIndex({
                         }}
                     />
                 )}
+
+                {tab === 'departments' && (
+                    <DepartmentsPane
+                        departments={departmentsPane}
+                        filters={departmentFilters}
+                        canManage={canDept}
+                        onCreate={() => {
+                            setEditingDept(null);
+                            setDeptDialogOpen(true);
+                        }}
+                        onEdit={(d) => {
+                            setEditingDept(d);
+                            setDeptDialogOpen(true);
+                        }}
+                    />
+                )}
+
+                {tab === 'orgchart' && (
+                    <OrgChartPane
+                        hierarchy={orgHierarchy}
+                        people={orgPeople}
+                        canManage={canOrgManage}
+                    />
+                )}
             </PageLayout>
 
             {formData ? (
@@ -761,6 +826,16 @@ export default function EmployeesIndex({
                     position={editingPosition}
                     parentPositions={parentPositions}
                     departments={departments}
+                />
+            ) : null}
+
+            {canDept ? (
+                <DepartmentDialog
+                    open={deptDialogOpen}
+                    onClose={() => setDeptDialogOpen(false)}
+                    department={editingDept}
+                    managers={departmentManagers}
+                    parentOptions={departmentParents}
                 />
             ) : null}
         </AppLayout>

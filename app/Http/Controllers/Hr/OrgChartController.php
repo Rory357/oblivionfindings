@@ -6,7 +6,6 @@ use App\Http\Controllers\Controller;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Services\OrgChartService;
 use Illuminate\Http\Request;
-use Inertia\Inertia;
 
 class OrgChartController extends Controller
 {
@@ -14,6 +13,10 @@ class OrgChartController extends Controller
         private readonly OrgChartService $orgChartService,
     ) {}
 
+    /**
+     * The org chart is folded into the People hub "Org chart" tab. Preserve the
+     * route by redirecting; the hub controller builds the hierarchy + people.
+     */
     public function index(Request $request)
     {
         $user = $request->user();
@@ -21,31 +24,7 @@ class OrgChartController extends Controller
         // too so neither key alone 403s a legitimately-permitted user.
         abort_unless($user && ($user->canDo('hr.orgchart.view') || $user->canDo('hr.employees.viewAny')), 403);
 
-        $hierarchy = $this->orgChartService->getHierarchy($user->tenant_id);
-        $canManage = $user->canDo('hr.orgchart.manage') || $user->canDo('hr.employees.manage');
-
-        // Flat people list powers the "Change manager" picker (manager-only).
-        $people = $canManage
-            ? HrEmployeeProfile::forTenant($user->tenant_id)
-                ->active()
-                ->with('user:id,name')
-                ->orderBy('position_title')
-                ->get()
-                ->map(fn ($p) => [
-                    'user_id' => $p->user_id,
-                    'name' => $p->user?->name ?? 'Unknown',
-                    'position_title' => $p->position_title,
-                ])
-                ->values()
-            : collect();
-
-        return Inertia::render('hr/orgchart/index', [
-            'hierarchy' => $hierarchy,
-            'people' => $people,
-            'can' => [
-                'manage' => $canManage,
-            ],
-        ]);
+        return redirect()->route('hr.people.index', ['tab' => 'orgchart']);
     }
 
     public function update(Request $request, HrEmployeeProfile $profile)
@@ -58,8 +37,8 @@ class OrgChartController extends Controller
         ]);
 
         $managerUserId = $validated['manager_user_id'] ?? null;
-        if ($managerUserId !== null && (int) $managerUserId === (int) $profile->user_id) {
-            return redirect()->back()->with('error', 'An employee cannot report to themselves.');
+        if ($managerUserId !== null && $this->orgChartService->wouldCreateCycle($profile, (int) $managerUserId)) {
+            return redirect()->back()->with('error', 'That change would create a reporting loop.');
         }
 
         $this->orgChartService->updateManager($profile, $managerUserId);

@@ -31,13 +31,25 @@ function orgChartProfile(User $user, array $overrides = []): HrEmployeeProfile
     ], $overrides));
 }
 
-test('org chart loads for a viewAny user without the finer hr.orgchart.view key', function () {
+test('org chart route admits a viewAny user (no 403) and redirects into the hub', function () {
     // The hr role holds hr.employees.viewAny but NOT hr.orgchart.view — the
-    // OR-permission fix must let the page load instead of 403ing.
+    // OR-permission fix must admit the user (302 to the hub), not 403.
     expect($this->hr->canDo('hr.orgchart.view'))->toBeFalse();
     expect($this->hr->canDo('hr.employees.viewAny'))->toBeTrue();
 
-    $this->actingAs($this->hr)->get('/hr/orgchart')->assertOk();
+    $this->actingAs($this->hr)
+        ->get('/hr/orgchart')
+        ->assertRedirect(route('hr.people.index', ['tab' => 'orgchart']));
+});
+
+test('the people hub exposes the org chart hierarchy', function () {
+    $u = User::factory()->create(['role' => 'support_worker', 'approved_at' => now()]);
+    orgChartProfile($u);
+
+    $response = $this->actingAs($this->hr)->get('/hr/people?tab=orgchart');
+    $response->assertOk();
+
+    expect($response->inertiaProps('orgHierarchy'))->toBeArray();
 });
 
 test('a manager can reassign an employee reporting line', function () {
