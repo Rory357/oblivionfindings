@@ -317,11 +317,16 @@ class AccountsPayableService
 
             $journalLines = [];
 
+            // line_total is GST-inclusive; reverse the net (ex-GST) against the
+            // expense/revenue accounts and the GST portion against the GST control
+            // account, so the reversal mirrors the original invoice/bill journal
+            // (which split net vs GST) instead of lumping GST into revenue/expense.
+            $gstAmount = (string) ($cn->gst_amount ?? 0);
+
             if ($cn->type === 'payable') {
-                // For AP credit notes: DR Accounts Payable, CR expense accounts
+                // AP credit note: DR Accounts Payable / CR expense (net) + CR GST Paid (2210)
                 $apAccount = $this->findApAccount($cn->organization_id);
 
-                // DR Accounts Payable
                 $journalLines[] = [
                     'account_id' => $apAccount->id,
                     'description' => "Credit Note {$cn->credit_note_number}",
@@ -329,32 +334,45 @@ class AccountsPayableService
                     'credit' => 0,
                 ];
 
-                // CR expense accounts for each line
                 foreach ($cn->lines as $line) {
                     $journalLines[] = [
                         'account_id' => $line->account_id,
                         'description' => $line->description,
                         'debit' => 0,
-                        'credit' => $line->line_total,
+                        'credit' => bcsub((string) $line->line_total, (string) ($line->gst_amount ?? 0), 2),
+                    ];
+                }
+
+                if (bccomp($gstAmount, '0', 2) > 0) {
+                    $journalLines[] = [
+                        'account_id' => $this->findAccountByCode($cn->organization_id, '2210')->id,
+                        'description' => "GST on Credit Note {$cn->credit_note_number}",
+                        'debit' => 0,
+                        'credit' => $gstAmount,
                     ];
                 }
             } else {
-                // For AR credit notes: DR revenue accounts, CR Accounts Receivable
-                $arAccount = FinAccount::forOrganization($cn->organization_id)
-                    ->where('code', '1100')
-                    ->firstOrFail();
+                // AR credit note: DR revenue (net) + DR GST Collected (2200) / CR Accounts Receivable
+                $arAccount = $this->findAccountByCode($cn->organization_id, '1100');
 
-                // DR revenue accounts for each line
                 foreach ($cn->lines as $line) {
                     $journalLines[] = [
                         'account_id' => $line->account_id,
                         'description' => $line->description,
-                        'debit' => $line->line_total,
+                        'debit' => bcsub((string) $line->line_total, (string) ($line->gst_amount ?? 0), 2),
                         'credit' => 0,
                     ];
                 }
 
-                // CR Accounts Receivable
+                if (bccomp($gstAmount, '0', 2) > 0) {
+                    $journalLines[] = [
+                        'account_id' => $this->findAccountByCode($cn->organization_id, '2200')->id,
+                        'description' => "GST on Credit Note {$cn->credit_note_number}",
+                        'debit' => $gstAmount,
+                        'credit' => 0,
+                    ];
+                }
+
                 $journalLines[] = [
                     'account_id' => $arAccount->id,
                     'description' => "Credit Note {$cn->credit_note_number}",
@@ -460,6 +478,13 @@ class AccountsPayableService
     {
         return FinAccount::forOrganization($orgId)
             ->where('code', '2000')
+            ->firstOrFail();
+    }
+
+    private function findAccountByCode(?int $orgId, string $code): FinAccount
+    {
+        return FinAccount::forOrganization($orgId)
+            ->where('code', $code)
             ->firstOrFail();
     }
 
