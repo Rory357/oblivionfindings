@@ -63,6 +63,7 @@ import {
     parseYmd,
 } from '@/pages/meds/today/components/day-picker-chip';
 import { AddMedicationModal } from './components/add-medication-modal';
+import { AuditLogModal } from './components/audit-log-modal';
 import {
     CdRegisterModal,
     type MedicationOption,
@@ -71,6 +72,7 @@ import {
 import { GenerateRoundsModal } from './components/generate-rounds-modal';
 import { MedicationReviewModal } from './components/medication-review-modal';
 import { ReportErrorModal, type ClientOption } from './components/report-error-modal';
+import { ReportsModal } from './components/reports-modal';
 import { StockMovementModal } from './components/stock-movement-modal';
 
 /* ── Types (mirror MedicationOverviewService::payload) ───────────────── */
@@ -315,6 +317,8 @@ export default function EmarHome(props: Props) {
         | 'medication-review'
         | 'cd-register'
         | 'stock-movement'
+        | 'reports'
+        | 'audit-log'
     >(null);
     const [modalClientId, setModalClientId] = useState<number | null>(null);
 
@@ -542,12 +546,10 @@ export default function EmarHome(props: Props) {
                                 size="sm"
                                 variant="outline"
                                 className="border-primary-foreground/30 bg-transparent text-primary-foreground hover:bg-primary-foreground/10"
-                                asChild
+                                onClick={() => setModal('reports')}
                             >
-                                <Link href="/emar/reports">
-                                    <Printer className="h-4 w-4" />
-                                    Export MAR &amp; CD register
-                                </Link>
+                                <Printer className="h-4 w-4" />
+                                Export MAR &amp; CD register
                             </Button>
                         </>
                     }
@@ -714,13 +716,15 @@ export default function EmarHome(props: Props) {
                                     </div>
                                 ))
                             )}
-                            <Link
-                                href="/emar/audit"
+                            {/* eslint-disable-next-line no-restricted-syntax -- inline text trigger; a shadcn Button would change the link styling. */}
+                            <button
+                                type="button"
+                                onClick={() => setModal('audit-log')}
                                 className="mt-2 inline-flex items-center gap-1.5 text-xs font-medium text-muted-foreground hover:text-foreground"
                             >
                                 <FileText className="h-3.5 w-3.5" />
                                 View audit log &amp; resolved history
-                            </Link>
+                            </button>
                         </CardContent>
                     </Card>
 
@@ -1191,6 +1195,17 @@ export default function EmarHome(props: Props) {
                 clients={clientOptions}
                 medications={medicationOptions}
                 initialClientId={modalClientId}
+            />
+            <ReportsModal
+                open={modal === 'reports'}
+                onClose={() => setModal(null)}
+                clients={clientOptions}
+                defaultDate={date}
+            />
+            <AuditLogModal
+                open={modal === 'audit-log'}
+                onClose={() => setModal(null)}
+                activity={recentActivity}
             />
         </AppLayout>
     );
