@@ -20,6 +20,10 @@ import {
     TableRow,
 } from '@/components/ui/table';
 import {
+    ProbationDialog,
+    type ExistingProbationReview,
+} from '@/components/hr/performance/probation-dialog';
+import {
     ReviewWizardDialog,
     type ExistingReview,
     type ReviewStaff,
@@ -82,6 +86,10 @@ type ProbationReview = {
     review_date: string;
     status: string;
     recommendation: string | null;
+    extension_weeks: number | null;
+    concerns: string | null;
+    areas_assessed: string[] | null;
+    notes: string | null;
 };
 
 type Props = {
@@ -206,6 +214,9 @@ export default function PerformanceReviews({
     const NONE = '__none__';
     const [createOpen, setCreateOpen] = useState(false);
     const [editing, setEditing] = useState<ExistingReview | null>(null);
+    const [probationOpen, setProbationOpen] = useState(false);
+    const [editingProbation, setEditingProbation] =
+        useState<ExistingProbationReview | null>(null);
 
     const onFilter = (next: Partial<typeof filters>) => {
         router.get(
@@ -680,72 +691,130 @@ export default function PerformanceReviews({
                     <LaravelPagination links={reviews.links} />
                 ) : null}
 
-                {probationReviews.length > 0 && (
+                {(probationReviews.length > 0 || can.manage) && (
                     <Card>
                         <CardHeader>
-                            <CardTitle className="flex items-center gap-2 text-sm font-medium">
-                                <ShieldCheck className="h-4 w-4 text-status-info" />{' '}
-                                Probation Reviews
-                            </CardTitle>
+                            <div className="flex items-center justify-between">
+                                <CardTitle className="flex items-center gap-2 text-sm font-medium">
+                                    <ShieldCheck className="h-4 w-4 text-status-info" />{' '}
+                                    Probation Reviews
+                                </CardTitle>
+                                {can.manage && (
+                                    <Button
+                                        size="sm"
+                                        variant="outline"
+                                        onClick={() => {
+                                            setEditingProbation(null);
+                                            setProbationOpen(true);
+                                        }}
+                                    >
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        Record probation review
+                                    </Button>
+                                )}
+                            </div>
                         </CardHeader>
                         <CardContent className="p-0">
-                            <Table>
-                                <TableHeader>
-                                    <TableRow>
-                                        <TableHead>Staff Member</TableHead>
-                                        <TableHead>Reviewer</TableHead>
-                                        <TableHead>Review #</TableHead>
-                                        <TableHead>Date</TableHead>
-                                        <TableHead>Status</TableHead>
-                                        <TableHead>Recommendation</TableHead>
-                                    </TableRow>
-                                </TableHeader>
-                                <TableBody>
-                                    {probationReviews.map((pr) => (
-                                        <TableRow key={pr.id}>
-                                            <TableCell className="font-medium">
-                                                {pr.employee?.name ?? 'Unknown'}
-                                            </TableCell>
-                                            <TableCell>
-                                                {pr.reviewer?.name ?? 'Unknown'}
-                                            </TableCell>
-                                            <TableCell>
-                                                #{pr.review_number}
-                                            </TableCell>
-                                            <TableCell>
-                                                {formatDate(pr.review_date)}
-                                            </TableCell>
-                                            <TableCell>
-                                                <Badge
-                                                    className={getStatusColor(
-                                                        pr.status,
-                                                    )}
-                                                >
-                                                    {pr.status.replace(
-                                                        /_/g,
-                                                        ' ',
-                                                    )}
-                                                </Badge>
-                                            </TableCell>
-                                            <TableCell>
-                                                {pr.recommendation ? (
+                            {probationReviews.length === 0 ? (
+                                <p className="px-4 py-8 text-center text-sm text-muted-foreground">
+                                    No probation reviews recorded yet.
+                                </p>
+                            ) : (
+                                <Table>
+                                    <TableHeader>
+                                        <TableRow>
+                                            <TableHead>Staff Member</TableHead>
+                                            <TableHead>Reviewer</TableHead>
+                                            <TableHead>Review #</TableHead>
+                                            <TableHead>Date</TableHead>
+                                            <TableHead>Status</TableHead>
+                                            <TableHead>Recommendation</TableHead>
+                                            <TableHead className="w-16"></TableHead>
+                                        </TableRow>
+                                    </TableHeader>
+                                    <TableBody>
+                                        {probationReviews.map((pr) => (
+                                            <TableRow key={pr.id}>
+                                                <TableCell className="font-medium">
+                                                    {pr.employee?.name ?? 'Unknown'}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {pr.reviewer?.name ?? 'Unknown'}
+                                                </TableCell>
+                                                <TableCell>
+                                                    #{pr.review_number}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {formatDate(pr.review_date)}
+                                                </TableCell>
+                                                <TableCell>
                                                     <Badge
-                                                        className={getRecommendationColor(
-                                                            pr.recommendation,
+                                                        className={getStatusColor(
+                                                            pr.status,
                                                         )}
                                                     >
-                                                        {pr.recommendation}
+                                                        {pr.status.replace(
+                                                            /_/g,
+                                                            ' ',
+                                                        )}
                                                     </Badge>
-                                                ) : (
-                                                    <span className="text-muted-foreground">
-                                                        Pending
-                                                    </span>
-                                                )}
-                                            </TableCell>
-                                        </TableRow>
-                                    ))}
-                                </TableBody>
-                            </Table>
+                                                </TableCell>
+                                                <TableCell>
+                                                    {pr.recommendation ? (
+                                                        <Badge
+                                                            className={getRecommendationColor(
+                                                                pr.recommendation,
+                                                            )}
+                                                        >
+                                                            {pr.recommendation}
+                                                        </Badge>
+                                                    ) : (
+                                                        <span className="text-muted-foreground">
+                                                            Pending
+                                                        </span>
+                                                    )}
+                                                </TableCell>
+                                                <TableCell>
+                                                    {can.manage && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            onClick={() => {
+                                                                setEditingProbation(
+                                                                    {
+                                                                        id: pr.id,
+                                                                        employee:
+                                                                            pr.employee,
+                                                                        review_number:
+                                                                            pr.review_number,
+                                                                        review_date:
+                                                                            pr.review_date,
+                                                                        status: pr.status,
+                                                                        recommendation:
+                                                                            pr.recommendation,
+                                                                        extension_weeks:
+                                                                            pr.extension_weeks,
+                                                                        concerns:
+                                                                            pr.concerns,
+                                                                        areas_assessed:
+                                                                            pr.areas_assessed,
+                                                                        notes: pr.notes,
+                                                                    },
+                                                                );
+                                                                setProbationOpen(
+                                                                    true,
+                                                                );
+                                                            }}
+                                                        >
+                                                            Edit
+                                                        </Button>
+                                                    )}
+                                                </TableCell>
+                                            </TableRow>
+                                        ))}
+                                    </TableBody>
+                                </Table>
+                            )}
                         </CardContent>
                     </Card>
                 )}
@@ -761,6 +830,19 @@ export default function PerformanceReviews({
                         staff={staff}
                         reviewTypes={reviewTypes}
                         review={editing}
+                    />
+                )}
+
+                {can.manage && (
+                    <ProbationDialog
+                        key={`prob-${editingProbation?.id ?? 'new'}`}
+                        open={probationOpen}
+                        onClose={() => {
+                            setProbationOpen(false);
+                            setEditingProbation(null);
+                        }}
+                        staff={staff}
+                        review={editingProbation}
                     />
                 )}
             </PageLayout>
