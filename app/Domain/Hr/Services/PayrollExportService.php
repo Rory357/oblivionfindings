@@ -18,6 +18,10 @@ use Illuminate\Support\Str;
 
 class PayrollExportService
 {
+    public function __construct(
+        private readonly PayslipService $payslipService,
+    ) {}
+
     /**
      * @return array<string, string>
      */
@@ -159,6 +163,14 @@ class PayrollExportService
                 'locked_by' => $lockedBy,
                 'validation_errors' => [],
             ]);
+
+            // Generate payslips on lock so the GL journal (posted right after by
+            // the controller via PostPayrollJournalJob) has payslips to read.
+            // Idempotent: a re-run or the standalone Generate endpoint may have
+            // already created them.
+            if ($run->payslips()->count() === 0) {
+                $this->payslipService->generateBulkPayslips($run->fresh('items'));
+            }
 
             $this->markRunTimesheetsPaid($run);
 

@@ -2,14 +2,14 @@ import { Head, Link, router } from '@inertiajs/react';
 import { type BreadcrumbItem, PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
-import { ReceivablesTabsFooter } from '@/components/finance';
+import { NewInvoiceDialog, ReceivablesTabsFooter, RecordReceiptDialog, type ClientOption, type TaxRateOption } from '@/components/finance';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Card, CardContent } from '@/components/ui/card';
-import { Plus, Search, AlertTriangle, Send, DollarSign, Clock, FileText, CheckCircle, Receipt } from 'lucide-react';
+import { Plus, Search, AlertTriangle, Send, DollarSign, Clock, FileText, CheckCircle, Receipt, Wallet } from 'lucide-react';
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 
@@ -25,6 +25,8 @@ interface Invoice {
     status: string;
     sent_at: string | null;
     paid_at: string | null;
+    amount_due?: number;
+    amount_paid?: number;
 }
 
 interface PaginatedInvoices {
@@ -52,6 +54,9 @@ interface Props extends PageProps {
     invoices: PaginatedInvoices;
     filters: Filters;
     summary: Summary;
+    canManage: boolean;
+    clients: ClientOption[];
+    taxRates: TaxRateOption[];
 }
 
 const formatCurrency = (amount: string | number, currency = 'NZD') =>
@@ -74,11 +79,18 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Invoices', href: '/finance/invoices' },
 ];
 
-export default function InvoicesIndex({ auth, invoices, filters, summary }: Props) {
+export default function InvoicesIndex({ auth, invoices, filters, summary, canManage, clients, taxRates }: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
     const [status, setStatus] = useState(filters.status ?? '');
     const [dateFrom, setDateFrom] = useState(filters.date_from ?? '');
     const [dateTo, setDateTo] = useState(filters.date_to ?? '');
+    const [receiptInvoice, setReceiptInvoice] = useState<Invoice | null>(null);
+    const [newInvoiceOpen, setNewInvoiceOpen] = useState(false);
+
+    const canReceipt = (invoice: Invoice) =>
+        canManage &&
+        Number(invoice.amount_due ?? 0) > 0 &&
+        !['draft', 'cancelled', 'paid'].includes(invoice.status);
 
     const applyFilters = () => {
         const params: Record<string, string> = {};
@@ -120,12 +132,12 @@ export default function InvoicesIndex({ auth, invoices, filters, summary }: Prop
                             { label: 'Paid this month', value: formatCurrency(summary.paid_this_month) },
                         ]}
                         actions={
-                            <Button asChild size="sm">
-                                <Link href="/finance/invoices/create">
+                            canManage && (
+                                <Button size="sm" onClick={() => setNewInvoiceOpen(true)}>
                                     <Plus className="w-4 h-4 mr-1.5" />
                                     New Invoice
-                                </Link>
-                            </Button>
+                                </Button>
+                            )
                         }
                         footer={<ReceivablesTabsFooter active="invoices" />}
                     />
@@ -251,12 +263,13 @@ export default function InvoicesIndex({ auth, invoices, filters, summary }: Prop
                                 <TableHead className="text-right">Total</TableHead>
                                 <TableHead>Status</TableHead>
                                 <TableHead>Sent</TableHead>
+                                <TableHead className="text-right">Actions</TableHead>
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {invoices.data.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={7} className="text-center text-muted-foreground py-8">
+                                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
                                         No invoices found.
                                     </TableCell>
                                 </TableRow>
@@ -305,6 +318,21 @@ export default function InvoicesIndex({ auth, invoices, filters, summary }: Prop
                                                 <span className="text-muted-foreground">-</span>
                                             )}
                                         </TableCell>
+                                        <TableCell className="text-right">
+                                            {canReceipt(invoice) && (
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setReceiptInvoice(invoice);
+                                                    }}
+                                                >
+                                                    <Wallet className="mr-1.5 h-3.5 w-3.5" />
+                                                    Record receipt
+                                                </Button>
+                                            )}
+                                        </TableCell>
                                     </TableRow>
                                 ))
                             )}
@@ -328,6 +356,31 @@ export default function InvoicesIndex({ auth, invoices, filters, summary }: Prop
                     )}
                 </Card>
             </PageLayout>
+
+            {receiptInvoice && (
+                <RecordReceiptDialog
+                    key={receiptInvoice.id}
+                    open
+                    onClose={() => setReceiptInvoice(null)}
+                    invoice={{
+                        id: receiptInvoice.id,
+                        invoice_number: receiptInvoice.invoice_number,
+                        client_name: receiptInvoice.client_name,
+                        currency_code: receiptInvoice.currency_code,
+                        total_amount: receiptInvoice.total_amount,
+                        amount_due: Number(receiptInvoice.amount_due ?? 0),
+                    }}
+                />
+            )}
+
+            {canManage && (
+                <NewInvoiceDialog
+                    open={newInvoiceOpen}
+                    onClose={() => setNewInvoiceOpen(false)}
+                    clients={clients}
+                    taxRates={taxRates}
+                />
+            )}
         </AppLayout>
     );
 }

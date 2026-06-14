@@ -2,13 +2,14 @@
 
 use App\Domain\Finance\Jobs\PostPayrollJournalJob;
 use App\Domain\Finance\Models\FinAccount;
+use App\Domain\Finance\Models\FinBankAccount;
 use App\Domain\Finance\Models\FinCostAllocation;
 use App\Domain\Finance\Models\FinFiscalPeriod;
 use App\Domain\Finance\Models\FinJournal;
 use App\Domain\Finance\Services\PayrollJournalService;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrPayslip;
 use App\Domain\Hr\Services\PayrollExportService;
-use App\Domain\Hr\Services\PayslipService;
 use App\Models\Client;
 use App\Models\Role;
 use App\Models\ServiceContext;
@@ -41,10 +42,21 @@ it('posts one balanced payroll journal with allocations when a payroll run is lo
     expect($run->items)->toHaveCount(2);
 
     $this->actingAs($hr);
-    app(PayslipService::class)->generateBulkPayslips($run->fresh('items'));
 
+    // Locking now generates the payslips itself (no manual pre-generation).
     $this->post(route('hr.payroll.runs.lock', $run))
         ->assertRedirect();
+
+    $payslips = HrPayslip::where('payroll_run_id', $run->id)->get();
+    expect($payslips)->toHaveCount(2);
+    foreach ($payslips as $payslip) {
+        expect(round((float) $payslip->net_pay, 2))
+            ->toBe(round((float) $payslip->gross_pay + (float) $payslip->holiday_pay - (float) $payslip->total_deductions, 2));
+    }
+    // Payslip gross ties to the run total (gross-parity override).
+    $run->refresh();
+    expect(round((float) $payslips->sum('gross_pay'), 2))
+        ->toBe(round((float) $run->total_gross, 2));
 
     $run->refresh();
     $journal = FinJournal::query()
@@ -90,6 +102,73 @@ it('posts one balanced payroll journal with allocations when a payroll run is lo
 
     expect(FinJournal::where('type', 'payroll')->where('source_id', $run->id)->count())->toBe(1)
         ->and(FinCostAllocation::where('journal_id', $journal->id)->count())->toBe($allocations->count());
+});
+
+it('pays employee net pay, clearing accrued wages against the bank (idempotently)', function () {
+    createPayrollJournalPostingAccounts();
+    createPayrollJournalPostingOpenPeriod();
+
+    $bankGl = FinAccount::factory()->create([
+        'organization_id' => 1,
+        'code' => '1000',
+        'name' => 'Bank',
+        'type' => 'asset',
+        'opening_balance' => 0,
+        'is_active' => true,
+    ]);
+    FinBankAccount::factory()->create([
+        'organization_id' => 1,
+        'gl_account_id' => $bankGl->id,
+        'is_primary' => true,
+        'is_active' => true,
+    ]);
+
+    $hr = createPayrollJournalPostingUser('hr');
+    createPayrollJournalPostingTimesheet($hr, 'EMP-NP-001', '2026-04-03 06:00:00');
+    createPayrollJournalPostingTimesheet($hr, 'EMP-NP-002', '2026-04-04 06:00:00');
+
+    $run = app(PayrollExportService::class)->createRun(
+        tenantId: 1,
+        periodStart: Carbon::parse('2026-04-01')->startOfDay(),
+        periodEnd: Carbon::parse('2026-04-15')->endOfDay(),
+        createdBy: $hr->id,
+    );
+
+    $this->actingAs($hr);
+    $this->post(route('hr.payroll.runs.lock', $run))->assertRedirect();
+    $run->refresh();
+    expect($run->journal_id)->not->toBeNull(); // accrual journal posted on lock
+
+    $totalNet = (float) HrPayslip::where('payroll_run_id', $run->id)->sum('net_pay');
+
+    $this->post(route('hr.payroll.runs.pay', $run))->assertRedirect();
+    $run->refresh();
+
+    expect($run->net_paid_at)->not->toBeNull()
+        ->and($run->payment_journal_id)->not->toBeNull();
+
+    $payJournal = FinJournal::findOrFail($run->payment_journal_id)->load('lines.account');
+    $debits = $payJournal->lines->reduce(fn (string $t, $l) => bcadd($t, (string) $l->debit, 2), '0');
+    $credits = $payJournal->lines->reduce(fn (string $t, $l) => bcadd($t, (string) $l->credit, 2), '0');
+
+    expect(bccomp($debits, $credits, 2))->toBe(0)
+        ->and(bccomp($debits, (string) round($totalNet, 2), 2))->toBe(0);
+
+    // DR 2300 Accrued Wages, CR 1000 Bank
+    expect((float) $payJournal->lines->firstWhere('account.code', '2300')->debit)->toBeGreaterThan(0)
+        ->and((float) $payJournal->lines->firstWhere('account.code', '1000')->credit)->toBeGreaterThan(0);
+
+    // Every payslip flipped to paid.
+    expect(HrPayslip::where('payroll_run_id', $run->id)->where('status', 'paid')->count())->toBe(2);
+
+    // Idempotent: a second pay is blocked and posts no second journal.
+    $this->post(route('hr.payroll.runs.pay', $run))->assertRedirect();
+    expect(
+        FinJournal::where('type', 'payroll')
+            ->where('source_type', 'payroll_net_pay')
+            ->where('source_id', $run->id)
+            ->count()
+    )->toBe(1);
 });
 
 function createPayrollJournalPostingAccounts(): void

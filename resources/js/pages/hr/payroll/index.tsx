@@ -39,6 +39,8 @@ interface PayrollRun {
     created_at: string;
     locked_at: string | null;
     exported_at: string | null;
+    gl_posted_at: string | null;
+    net_paid_at: string | null;
     export_profile: {
         id: number;
         name: string;
@@ -877,6 +879,30 @@ export default function PayrollIndex({
                                                                 Lock
                                                             </Button>
                                                         )}
+                                                    {can.manage &&
+                                                        run.gl_posted_at &&
+                                                        !run.net_paid_at && (
+                                                            <Button
+                                                                variant="outline"
+                                                                size="sm"
+                                                                onClick={() =>
+                                                                    router.post(
+                                                                        `/hr/payroll/runs/${run.id}/pay`,
+                                                                        {},
+                                                                        {
+                                                                            preserveScroll: true,
+                                                                        },
+                                                                    )
+                                                                }
+                                                            >
+                                                                Pay net
+                                                            </Button>
+                                                        )}
+                                                    {run.net_paid_at && (
+                                                        <span className="inline-flex items-center rounded-md bg-status-success-bg px-2 py-1 text-xs font-semibold text-status-success">
+                                                            Paid
+                                                        </span>
+                                                    )}
                                                     {can.export_data &&
                                                         run.status ===
                                                             'locked' && (
