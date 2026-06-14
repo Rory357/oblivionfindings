@@ -1,14 +1,21 @@
+import {
+    SuccessionCandidateDialog,
+    type ExistingSuccessionCandidate,
+    type SuccessionEmployeeOption,
+} from '@/components/hr/performance/succession-candidate-dialog';
 import PageShell from '@/components/page-shell';
 import { Badge } from '@/components/ui/badge';
+import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head } from '@inertiajs/react';
-import { Star, Users } from 'lucide-react';
+import { Pencil, Plus, Star, Users } from 'lucide-react';
+import { useState } from 'react';
 
 type Candidate = {
     id: number;
-    name: string;
+    employee: { id: number; name: string } | null;
     readiness: string;
     strengths: string | null;
     development_needs: string | null;
@@ -23,7 +30,11 @@ type Plan = {
     notes: string | null;
     candidates: Candidate[];
 };
-type Props = { plan: Plan; can: { manage?: boolean } };
+type Props = {
+    plan: Plan;
+    employees: SuccessionEmployeeOption[];
+    can: { manage?: boolean };
+};
 
 const breadcrumbs = [
     { title: 'HR', href: '/hr' },
@@ -44,7 +55,28 @@ const readinessColors: Record<string, string> = {
     developing: 'border-border/30 text-muted-foreground',
 };
 
-export default function SuccessionShow({ plan, can }: Props) {
+export default function SuccessionShow({ plan, employees, can }: Props) {
+    const [dialogOpen, setDialogOpen] = useState(false);
+    const [editing, setEditing] = useState<ExistingSuccessionCandidate | null>(
+        null,
+    );
+
+    const openAdd = () => {
+        setEditing(null);
+        setDialogOpen(true);
+    };
+    const openEdit = (c: Candidate) => {
+        setEditing({
+            id: c.id,
+            employee: c.employee,
+            readiness: c.readiness,
+            strengths: c.strengths,
+            development_needs: c.development_needs,
+            overall_rating: c.overall_rating,
+        });
+        setDialogOpen(true);
+    };
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`Succession: ${plan.role_title}`} />
@@ -101,7 +133,15 @@ export default function SuccessionShow({ plan, can }: Props) {
                 )}
                 <Card>
                     <CardHeader>
-                        <CardTitle>Succession Candidates</CardTitle>
+                        <div className="flex items-center justify-between">
+                            <CardTitle>Succession Candidates</CardTitle>
+                            {can.manage && (
+                                <Button size="sm" variant="outline" onClick={openAdd}>
+                                    <Plus className="mr-1.5 h-4 w-4" />
+                                    Add candidate
+                                </Button>
+                            )}
+                        </div>
                     </CardHeader>
                     <CardContent>
                         {plan.candidates.length === 0 ? (
@@ -113,22 +153,38 @@ export default function SuccessionShow({ plan, can }: Props) {
                                 {plan.candidates.map((c) => (
                                     <Card key={c.id}>
                                         <CardContent className="space-y-2 pt-4">
-                                            <div className="flex items-center justify-between">
+                                            <div className="flex items-center justify-between gap-2">
                                                 <p className="font-medium">
-                                                    {c.name}
+                                                    {c.employee?.name ??
+                                                        'Unknown'}
                                                 </p>
-                                                <Badge
-                                                    variant="outline"
-                                                    className={
-                                                        readinessColors[
+                                                <div className="flex items-center gap-2">
+                                                    <Badge
+                                                        variant="outline"
+                                                        className={
+                                                            readinessColors[
+                                                                c.readiness
+                                                            ]
+                                                        }
+                                                    >
+                                                        {readinessLabels[
                                                             c.readiness
-                                                        ]
-                                                    }
-                                                >
-                                                    {readinessLabels[
-                                                        c.readiness
-                                                    ] || c.readiness}
-                                                </Badge>
+                                                        ] || c.readiness}
+                                                    </Badge>
+                                                    {can.manage && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="icon"
+                                                            className="h-7 w-7"
+                                                            onClick={() =>
+                                                                openEdit(c)
+                                                            }
+                                                            aria-label="Edit candidate"
+                                                        >
+                                                            <Pencil className="h-3.5 w-3.5" />
+                                                        </Button>
+                                                    )}
+                                                </div>
                                             </div>
                                             {c.overall_rating && (
                                                 <div className="flex gap-0.5">
@@ -169,6 +225,20 @@ export default function SuccessionShow({ plan, can }: Props) {
                         )}
                     </CardContent>
                 </Card>
+
+                {can.manage && (
+                    <SuccessionCandidateDialog
+                        key={editing?.id ?? 'new'}
+                        open={dialogOpen}
+                        onClose={() => {
+                            setDialogOpen(false);
+                            setEditing(null);
+                        }}
+                        planId={plan.id}
+                        employees={employees}
+                        candidate={editing}
+                    />
+                )}
             </PageShell>
         </AppLayout>
     );
