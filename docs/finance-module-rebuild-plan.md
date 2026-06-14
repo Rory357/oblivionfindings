@@ -312,13 +312,14 @@ KiwiSaver + net-pay liability) via `PostPayrollJournalJob`; `AllocatePayrollCost
   `ReportsController` redirects `/finance/reports` → P&L (mirrors PayablesController). Every page already used
   PageHero + reads the real GL. Sidebar collapsed the 5-item Reports group to one "Reports" entry. 2 hub tests.
   (Period selector deferred — each report already has its own period filter.)
-- **[ ] M8-2 Unify budgets to one engine (next dedicated tick — LARGE).** *Confirmed:* `BudgetActualsController`
-  reads the **Governance** `App\Domain\Governance\Models\Budget` (not Finance `SiteBudgetLine`); `BudgetActualsService::
-  getBudgetVsActualsReport` reads a denormalised `actual_amount` column off the budget line items (stale unless
-  synced) while a GL `SUM(debit/credit)` path also exists — the duplicate-backend + double-sync tangle. *Fix:*
-  Finance `SiteBudgetLine`+`FinCostAllocation` canonical; live-GL actuals (drop denormalised `actual_amount` +
-  manual `recordActuals`); implement+bind `BudgetSyncInterface`; one scheduled writer; unify category vocab.
-  Large cross-module (Governance+Finance) refactor — deserves its own careful tick, not a tail-of-tick change.
+- **[~] M8-2 Unify budgets to one engine.** *Live-GL-actuals slice DONE (commit 069a36fc):* the most-visible bug —
+  `getBudgetVsActualsReport` read each line item's denormalised `actual_amount` (only fresh after a manual
+  `syncActuals()`), so the report was stale. Now computes actuals LIVE from posted journal lines (reuses
+  `mapAccountToLineItem` + `sumPostedJournalLines` over the budget's fiscal-year range); per-line + category + grand
+  variance derive from the live figure. Always accurate without a sync. 1 test. *Remaining (own tick — LARGE):* the
+  STORE unification — `BudgetActualsController` reads the Governance `Budget` model, not Finance `SiteBudgetLine`;
+  retire the denormalised `actual_amount` write path (`syncActuals` is now optional for the report); implement+bind
+  `BudgetSyncInterface`; collapse any double scheduled writer; unify category vocab. Cross-module Governance+Finance.
 - **[ ] M8-3 SpendApprovals → AP.** *Fix:* `SpendApproval::approve()` creates/links a `FinBill` (or gates the
   AP bill/payment-run via the `source` morph) so approved spend reaches Finance. *Acceptance:* approving a spend creates a financial record.
 - **[ ] M8-4 Cash-flow forecast payroll feed.** Add payroll-due dates as an outflow source. *Acceptance:* forecast includes upcoming pay runs.
