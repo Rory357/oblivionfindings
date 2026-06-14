@@ -230,6 +230,13 @@ app(Schedule::class)
     ->timezone('Pacific/Auckland')
     ->dailyAt('08:00');
 
+// Onboarding email automation: dispatch templates due today (start_date − offset): daily 08:00
+app(Schedule::class)
+    ->command('hr:onboarding-emails')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('08:00')
+    ->withoutOverlapping();
+
 // Engagement action plan reminders and overdue escalations: daily at 07:15
 app(Schedule::class)
     ->job(new SendEngagementActionPlanRemindersJob)

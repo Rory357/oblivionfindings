@@ -3,14 +3,21 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrOnboardingEmail;
 use App\Domain\Hr\Models\HrOnboardingEmailLog;
-use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Services\OnboardingEmailService;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
 
 class OnboardingEmailController extends Controller
 {
+    use ResolvesHrTenant;
+
+    public function __construct(
+        private readonly OnboardingEmailService $emailService,
+    ) {}
+
     /**
      * List email templates.
      */
@@ -28,7 +35,7 @@ class OnboardingEmailController extends Controller
         return Inertia::render('hr/onboarding/emails', [
             'templates' => $templates,
             'can' => [
-                'manage' => true,
+                'manage' => $user->canDo('hr.onboarding.manage'),
             ],
         ]);
     }
@@ -50,7 +57,7 @@ class OnboardingEmailController extends Controller
         ]);
 
         HrOnboardingEmail::create([
-            'tenant_id' => $user->tenant_id ?? null,
+            'tenant_id' => $this->resolveHrTenantIdForUser($user),
             'template_name' => $data['template_name'],
             'subject' => $data['subject'],
             'body' => $data['body'],
@@ -104,17 +111,7 @@ class OnboardingEmailController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.onboarding.manage'), 403);
 
-        // Render with sample data
-        $sampleData = [
-            'employee_name' => 'Jane Smith',
-            'position_title' => 'Support Worker',
-            'start_date' => now()->addDays(7)->format('d/m/Y'),
-            'manager_name' => 'John Manager',
-            'company_name' => config('app.name', 'Company'),
-        ];
-
-        $renderedSubject = $this->renderTemplate($email->subject, $sampleData);
-        $renderedBody = $this->renderTemplate($email->body, $sampleData);
+        $sampleData = $this->emailService->sampleData();
 
         return Inertia::render('hr/onboarding/emails', [
             'templates' => HrOnboardingEmail::query()
@@ -124,11 +121,11 @@ class OnboardingEmailController extends Controller
             'preview' => [
                 'id' => $email->id,
                 'template_name' => $email->template_name,
-                'subject' => $renderedSubject,
-                'body' => $renderedBody,
+                'subject' => $this->emailService->render($email->subject, $sampleData),
+                'body' => $this->emailService->render($email->body, $sampleData),
             ],
             'can' => [
-                'manage' => true,
+                'manage' => $user->canDo('hr.onboarding.manage'),
             ],
         ]);
     }
@@ -159,20 +156,8 @@ class OnboardingEmailController extends Controller
             'emailLog' => $logs,
             'showLog' => true,
             'can' => [
-                'manage' => true,
+                'manage' => $user->canDo('hr.onboarding.manage'),
             ],
         ]);
-    }
-
-    /**
-     * Simple mail-merge style template rendering.
-     */
-    private function renderTemplate(string $template, array $data): string
-    {
-        foreach ($data as $key => $value) {
-            $template = str_replace('{{' . $key . '}}', (string) $value, $template);
-        }
-
-        return $template;
     }
 }
