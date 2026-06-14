@@ -1397,29 +1397,92 @@ class EmarController extends Controller
     // ─── Prescriptions / Prescriber Orders ─────────────────
     public function prescriptions(Request $request)
     {
+        $siteFilter = $request->integer('site_id') ?: null;
+
+        // Flat order list — the redesigned page filters by tab/search/status
+        // client-side with live facet counts.
         $orders = MedicationPrescriberOrder::query()
-            ->with(['client:id,first_name,last_name', 'medication:id,name', 'receivedByUser:id,name'])
-            ->when($request->status, fn ($q, $s) => $q->where('status', $s))
-            ->when($request->client_id, fn ($q, $id) => $q->where('client_id', $id))
+            ->with(['client:id,first_name,last_name', 'medication:id,name', 'receivedByUser:id,name', 'countersignedByUser:id,name', 'dispensedByUser:id,name'])
+            ->when($siteFilter, fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteFilter)))
             ->latest('order_date')
-            ->paginate(50);
+            ->get()
+            ->map(function (MedicationPrescriberOrder $o) {
+                $orderDate = $o->order_date instanceof \DateTimeInterface ? $o->order_date : null;
 
-        $pendingCountersigns = MedicationPrescriberOrder::awaitingCountersign()->count();
+                return [
+                    'id' => $o->id,
+                    'client_id' => $o->client_id,
+                    'client_name' => $o->client ? trim($o->client->first_name.' '.$o->client->last_name) : 'Unknown',
+                    'client_medication_id' => $o->client_medication_id,
+                    'order_type' => $o->order_type,
+                    'status' => $o->status,
+                    'prescriber_name' => $o->prescriber_name,
+                    'prescriber_registration' => $o->prescriber_registration,
+                    'prescriber_type' => $o->prescriber_type,
+                    'medication_name' => $o->medication_name,
+                    'dose' => $o->dose,
+                    'route' => $o->route,
+                    'frequency' => $o->frequency,
+                    'indication' => $o->indication,
+                    'instructions' => $o->instructions,
+                    'order_date' => $orderDate?->toDateString(),
+                    'effective_date' => $o->effective_date instanceof \DateTimeInterface ? $o->effective_date->toDateString() : null,
+                    'expiry_date' => $o->expiry_date instanceof \DateTimeInterface ? $o->expiry_date->toDateString() : null,
+                    'requires_countersign' => (bool) $o->requires_countersign,
+                    'countersigned_at' => $o->countersigned_at?->toIso8601String(),
+                    'countersigned_by_name' => $o->countersignedByUser?->name,
+                    'countersign_method' => $o->countersign_method,
+                    'countersign_due_at' => ($o->requires_countersign && ! $o->countersigned_at && $orderDate)
+                        ? $orderDate->copy()->addDay()->toIso8601String()
+                        : null,
+                    'read_back_confirmed' => (bool) $o->read_back_confirmed,
+                    'received_by_name' => $o->receivedByUser?->name,
+                    'dispensed_at' => $o->dispensed_at?->toIso8601String(),
+                    'dispensed_by_name' => $o->dispensedByUser?->name,
+                    'pharmacy_name' => $o->pharmacy_name,
+                    'batch_number' => $o->batch_number,
+                    'batch_expiry' => $o->batch_expiry instanceof \DateTimeInterface ? $o->batch_expiry->toDateString() : null,
+                ];
+            })->all();
 
-        $covertAuthorisations = MedicationCovertAuthorisation::query()
+        $covert = MedicationCovertAuthorisation::query()
             ->active()
-            ->with(['client:id,first_name,last_name', 'medication:id,name'])
-            ->get();
+            ->with(['client:id,first_name,last_name', 'medication:id,name', 'recordedByUser:id,name'])
+            ->when($siteFilter, fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteFilter)))
+            ->get()
+            ->map(function (MedicationCovertAuthorisation $c) {
+                $review = $c->review_date instanceof \DateTimeInterface ? $c->review_date : null;
 
-        $clients = Client::orderBy('last_name')->get(['id', 'first_name', 'last_name']);
+                return [
+                    'id' => $c->id,
+                    'client_id' => $c->client_id,
+                    'client_name' => $c->client ? trim($c->client->first_name.' '.$c->client->last_name) : 'Unknown',
+                    'medication_name' => $c->medication?->name,
+                    'authorised_by_name' => $c->authorised_by_name,
+                    'authorised_by_registration' => $c->authorised_by_registration,
+                    'clinical_justification' => $c->clinical_justification,
+                    'legal_basis' => $c->legal_basis,
+                    'administration_method' => $c->administration_method,
+                    'pharmacist_advice' => $c->pharmacist_advice,
+                    'authorised_date' => $c->authorised_date instanceof \DateTimeInterface ? $c->authorised_date->toDateString() : null,
+                    'review_date' => $review?->toDateString(),
+                    'recorded_by_name' => $c->recordedByUser?->name,
+                    'review_overdue' => $review ? $review->isPast() : false,
+                ];
+            })->all();
+
+        $activeSite = $siteFilter ? Site::find($siteFilter) : null;
 
         return Inertia::render('emar/Prescriptions', [
             'orders' => $orders,
-            'pendingCountersigns' => $pendingCountersigns,
-            'covertAuthorisations' => $covertAuthorisations,
-            'clients' => $clients,
+            'covert' => $covert,
+            'clients' => Client::orderBy('last_name')->get(['id', 'first_name', 'last_name']),
             'staff' => $this->getStaffList(),
-            'filters' => $request->only(['status', 'client_id']),
+            'medications' => ClientMedication::current()->orderBy('name')->get(['id', 'name', 'client_id'])
+                ->map(fn (ClientMedication $m) => ['id' => $m->id, 'name' => $m->name, 'client_id' => $m->client_id])->all(),
+            'sites' => Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'active_site' => $activeSite ? ['id' => $activeSite->id, 'name' => $activeSite->name] : null,
+            'site_brand_colour' => $activeSite?->brand_colour,
         ]);
     }
 
@@ -1778,6 +1841,8 @@ class EmarController extends Controller
             'order_date' => 'required|date',
             'effective_date' => 'nullable|date',
             'expiry_date' => 'nullable|date',
+            'read_back_confirmed' => 'nullable|boolean',
+            'read_back_witnessed_by' => 'nullable|exists:users,id',
         ]);
 
         $validated['received_by'] = auth()->id();
@@ -1793,6 +1858,7 @@ class EmarController extends Controller
     {
         $validated = $request->validate([
             'status' => 'nullable|string|max:255',
+            'client_medication_id' => 'nullable|exists:client_medications,id',
             'pharmacy_notes' => 'nullable|string',
             'pharmacy_name' => 'nullable|string|max:255',
             'batch_number' => 'nullable|string|max:255',
@@ -1808,11 +1874,17 @@ class EmarController extends Controller
         return redirect()->back();
     }
 
-    public function countersignPrescription(MedicationPrescriberOrder $order)
+    public function countersignPrescription(Request $request, MedicationPrescriberOrder $order)
     {
+        $validated = $request->validate([
+            'countersign_method' => 'nullable|string|max:255',
+        ]);
+
         $order->update([
             'countersigned_at' => now(),
             'countersigned_by' => auth()->id(),
+            'countersign_method' => $validated['countersign_method'] ?? null,
+            'status' => $order->status === 'pending' ? 'confirmed' : $order->status,
         ]);
 
         return redirect()->back();

@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class MedicationPrescriberOrder extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory;
 
     protected $fillable = [
         'client_id',
@@ -29,8 +29,11 @@ class MedicationPrescriberOrder extends Model
         'effective_date',
         'expiry_date',
         'requires_countersign',
+        'read_back_confirmed',
+        'read_back_witnessed_by',
         'countersigned_at',
         'countersigned_by',
+        'countersign_method',
         'received_by',
         'dispensed_by',
         'dispensed_at',
@@ -48,6 +51,7 @@ class MedicationPrescriberOrder extends Model
         'countersigned_at' => 'datetime',
         'dispensed_at' => 'datetime',
         'requires_countersign' => 'boolean',
+        'read_back_confirmed' => 'boolean',
     ];
 
     public function client()
@@ -92,6 +96,6 @@ class MedicationPrescriberOrder extends Model
 
     public function needsCountersign(): bool
     {
-        return $this->requires_countersign && !$this->countersigned_at;
+        return $this->requires_countersign && ! $this->countersigned_at;
     }
 }
