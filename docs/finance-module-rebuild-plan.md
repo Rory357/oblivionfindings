@@ -140,18 +140,20 @@ Land the spine M1–M10 build on. **No behaviour change**, design only.
 - **[x] M0-4 `category="finance"` sweep.** Idempotent quote/brace-aware codemod added `category="finance"`
   to all **104** finance `<PageHero>` tags. Gates: types ✓, vitest 10/10 ✓, eslint (components + 104 pages) ✓, build ✓.
 
-### M1 — Ledger hub + GL hardening `[ ]`
+### M1 — Ledger hub + GL hardening `[in progress — branch finance/m1-ledger]`
+**Part A (GL hardening) DONE — gates green, merging as a verified increment.** Part B (hub UI) next.
 - **[ ] M1-1 Ledger hub + TabStrip.** Fold accounts/journals/cost-centres/fiscal-periods/currencies/
   fx-revaluations/fixed-assets into `/finance/ledger` with TabStrip; old routes redirect. *Acceptance:* one hub; redirects resolve.
 - **[ ] M1-2 New Account / New Journal / FX-reval / Period-close as wizard modals.** Replace standalone
   pages + dialogs with `WizardShell` (New Journal = the multi-line DR/CR wizard with live balance check +
-  posting-preview). *Acceptance:* create/post in modals; journal won't submit unbalanced.
-- **[ ] M1-3 Fix `5020` leave-expense collision.** *Problem:* `leave_provision` debit maps to `5020`
-  ("ACC Employer Levy") → silent mis-post. *Evidence:* `config/finance.php:55` vs `FinanceSeeder.php:157`.
-  *Fix:* add a dedicated Leave Expense account (e.g. `5050`), point `event_accounts.leave_provision.debit`
-  at it, leave `5020` as ACC only; backfill seeder. *Acceptance:* leave-provision event debits Leave Expense; `finance:verify-chart` green.
-- **[ ] M1-4 `finance:verify-chart` name parity.** Extend the command to assert config-implied name vs seeded
-  name (would have caught `5020`). *Acceptance:* command fails on a name collision; test added.
+  `PostingPreview`). *Acceptance:* create/post in modals; journal won't submit unbalanced.
+- **[x] M1-3 Fix `5020` leave-expense collision.** Added dedicated `5050 Leave Expense` (FinanceSeeder,
+  idempotent) and repointed `config/finance.php` `event_accounts.leave_provision.debit` 5020→5050; `5020`
+  stays ACC Employer Levy only. Test asserts a leave_provision event debits 5050/Leave Expense, balanced +
+  idempotent. *(commit db73bcdd)*
+- **[x] M1-4 `finance:verify-chart` name parity.** Added config-driven `config('finance.account_names')`
+  (code→intended-name keyword, single source of truth) + a name-parity gate in `VerifyFinanceChart`; fails
+  when a code is seeded under a contradictory name (would have caught 5020). Test covers the failure case. *(commit db73bcdd)*
 
 ### M2 — Sales & Receivables hub + AR data + recurring billing `[ ]` (contains P0s)
 - **[ ] M2-1 Receivables hub + TabStrip + wizard modals.** Fold invoices/quotes/credit-notes(AR)/recurring/
