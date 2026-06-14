@@ -30,10 +30,12 @@ use App\Models\MedicationSelfAdminAssessment;
 use App\Models\MedicationSyringeDriver;
 use App\Models\Shift;
 use App\Models\ShiftHandover;
+use App\Models\Site;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\DoseSchedulingService;
 use App\Services\Emar\MedsBoardPayloadService;
+use App\Services\GuidedRoundService;
 use App\Services\MarScheduleService;
 use App\Services\MedicationAlertService;
 use App\Services\MedicationIncidentIntegrationService;
@@ -1452,23 +1454,105 @@ class EmarController extends Controller
     // ─── Medication Rounds ─────────────────────────────────
     public function rounds(Request $request)
     {
+        $user = $request->user();
         $date = $request->input('date', today()->toDateString());
+        $siteFilter = $request->integer('site_id') ?: null;
 
         $rounds = MedicationRound::query()
             ->forDate($date)
+            ->when($siteFilter, fn ($q) => $q->where('site_id', $siteFilter))
             ->with(['assignedTo:id,name', 'startedBy:id,name', 'completedBy:id,name'])
             ->orderBy('scheduled_time')
-            ->get();
+            ->get()
+            ->map(fn (MedicationRound $r) => [
+                'id' => $r->id,
+                'name' => $r->name,
+                'scheduled_time' => substr((string) $r->scheduled_time, 0, 5),
+                'window_minutes' => (int) ($r->window_minutes ?? 60),
+                'status' => $r->status,
+                'round_date' => $r->round_date?->toDateString(),
+                'total_medications' => (int) $r->total_medications,
+                'given' => (int) $r->administered_count,
+                'refused' => (int) $r->refused_count,
+                'withheld' => (int) $r->withheld_count,
+                'missed' => (int) $r->missed_count,
+                'assignee' => $r->assignedTo?->name,
+                'assigned_to' => $r->assigned_to,
+                'started_at' => $r->started_at?->toIso8601String(),
+                'completed_at' => $r->completed_at?->toIso8601String(),
+            ])
+            ->all();
 
         $templates = MedicationRoundTemplate::query()
             ->with('defaultAssignedTo:id,name')
             ->orderBy('scheduled_time')
-            ->get();
+            ->get()
+            ->map(fn (MedicationRoundTemplate $t) => [
+                'id' => $t->id,
+                'name' => $t->name,
+                'scheduled_time' => substr((string) $t->scheduled_time, 0, 5),
+                'window_minutes' => (int) ($t->window_minutes ?? 60),
+                'days_of_week' => $t->days_of_week ?? [],
+                'active' => (bool) $t->active,
+                'site_id' => $t->site_id,
+                'service_context_id' => $t->service_context_id,
+                'default_assigned_to' => $t->default_assigned_to,
+                'default_staff' => $t->defaultAssignedTo?->name,
+            ])
+            ->all();
 
-        // Last auto-generated round timestamp
         $lastGenerated = MedicationRound::whereNotNull('round_template_id')
             ->latest('created_at')
             ->value('created_at');
+
+        // Guided-round modal payload (round + ordered doses + progress) when the
+        // page is opened with ?guided={id}. Auto-starts a pending round for a
+        // competent viewer (mirrors the retired guided page).
+        $guidedRound = null;
+        if ($request->filled('guided')) {
+            $round = MedicationRound::find($request->integer('guided'));
+            if ($round) {
+                $svc = app(GuidedRoundService::class);
+                if ($round->status === 'pending' && $user?->canDo('medications.administer.record')) {
+                    $round->forceFill([
+                        'status' => 'in_progress',
+                        'started_by' => $user->id,
+                        'started_at' => now(),
+                    ])->save();
+                    $round->refresh();
+                }
+                $items = $svc->items($round);
+                $guidedRound = [
+                    'round' => [
+                        'id' => $round->id,
+                        'name' => $round->name,
+                        'status' => $round->status,
+                        'scheduled_time' => substr((string) $round->scheduled_time, 0, 5),
+                        'window_minutes' => (int) ($round->window_minutes ?? 60),
+                        'round_date' => $round->round_date?->toDateString(),
+                    ],
+                    'items' => $items,
+                    'progress' => $svc->summarise($items),
+                ];
+            }
+        }
+
+        // Activity feed — administrations recorded against this day's rounds.
+        $roundIds = array_column($rounds, 'id');
+        $activity = empty($roundIds) ? [] : ClientMedicationAdministration::query()
+            ->whereIn('medication_round_id', $roundIds)
+            ->with(['medication:id,name', 'administeredBy:id,name'])
+            ->latest('administered_at')
+            ->limit(40)
+            ->get()
+            ->map(fn (ClientMedicationAdministration $a) => [
+                'id' => $a->id,
+                'status' => $a->status,
+                'medication_name' => $a->medication?->name,
+                'staff' => $a->administeredBy?->name,
+                'time' => $a->administered_at?->format('H:i'),
+            ])
+            ->all();
 
         return Inertia::render('emar/Rounds', [
             'rounds' => $rounds,
@@ -1476,6 +1560,13 @@ class EmarController extends Controller
             'staff' => $this->getStaffList(),
             'date' => $date,
             'lastGenerated' => $lastGenerated?->toIso8601String(),
+            'guidedRound' => $guidedRound,
+            'activity' => $activity,
+            'sites' => Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'site_brand_colour' => $siteFilter ? Site::whereKey($siteFilter)->value('brand_colour') : null,
+            'witnesses' => $this->boardPayload->witnesses($user),
+            'not_given_reasons' => $this->boardPayload->notGivenReasons(),
+            'board_user' => $this->boardPayload->boardUser($user),
         ]);
     }
 
@@ -2147,8 +2238,9 @@ class EmarController extends Controller
             'scheduled_time' => 'required|date_format:H:i',
             'window_minutes' => 'required|integer|min:5|max:120',
             'days_of_week' => 'nullable|array',
-            'days_of_week.*' => 'integer|min:0|max:6',
+            'days_of_week.*' => 'integer|min:1|max:7',
             'site_id' => 'nullable|exists:sites,id',
+            'service_context_id' => 'nullable|exists:service_contexts,id',
             'default_assigned_to' => 'nullable|exists:users,id',
         ]);
 
@@ -2166,7 +2258,9 @@ class EmarController extends Controller
             'scheduled_time' => 'nullable|date_format:H:i',
             'window_minutes' => 'nullable|integer|min:5|max:120',
             'days_of_week' => 'nullable|array',
-            'days_of_week.*' => 'integer|min:0|max:6',
+            'days_of_week.*' => 'integer|min:1|max:7',
+            'site_id' => 'nullable|exists:sites,id',
+            'service_context_id' => 'nullable|exists:service_contexts,id',
             'active' => 'nullable|boolean',
             'default_assigned_to' => 'nullable|exists:users,id',
         ]);

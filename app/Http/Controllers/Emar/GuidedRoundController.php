@@ -7,13 +7,12 @@ use App\Http\Controllers\Controller;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationRound;
-use App\Models\TimelineEvent;
 use App\Services\EnhancedMarService;
 use App\Services\GuidedRoundService;
 use App\Services\MarScheduleService;
+use App\Services\Timeline\TimelineEmitter;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
-use Inertia\Inertia;
 
 /**
  * Frontline guided medication round flow.
@@ -31,8 +30,7 @@ class GuidedRoundController extends Controller
         protected GuidedRoundService $guidedRoundService,
         protected EnhancedMarService $marService,
         protected MarScheduleService $scheduleService,
-    ) {
-    }
+    ) {}
 
     /**
      * Render the guided round page.
@@ -42,34 +40,15 @@ class GuidedRoundController extends Controller
         $user = $request->user();
         abort_unless($this->canWork($user), 403);
 
-        $items = $this->guidedRoundService->items($round);
-        $progress = $this->guidedRoundService->summarise($items);
+        // The guided walk-through is now a modal on /emar/rounds (and surfaced
+        // on /meds/today). Redirect deep links there with the round pre-opened
+        // — the rounds() controller builds the items/progress payload and
+        // auto-starts a pending round for a competent viewer.
+        $dateStr = $round->round_date instanceof \DateTimeInterface
+            ? $round->round_date->format('Y-m-d')
+            : (string) $round->round_date;
 
-        // Auto-start on first entry when the round is still pending and the
-        // worker is cleared to administer. Completing is left explicit.
-        if ($round->status === 'pending') {
-            $round->forceFill([
-                'status' => 'in_progress',
-                'started_by' => $user->id,
-                'started_at' => now(),
-            ])->save();
-            $round->refresh();
-        }
-
-        return Inertia::render('meds/round/guided', [
-            'round' => [
-                'id' => $round->id,
-                'name' => $round->name,
-                'status' => $round->status,
-                'scheduled_time' => $round->scheduled_time,
-                'window_minutes' => $round->window_minutes,
-                'round_date' => $round->round_date?->toDateString(),
-                'started_at' => $round->started_at?->toIso8601String(),
-                'completed_at' => $round->completed_at?->toIso8601String(),
-            ],
-            'items' => $items,
-            'progress' => $progress,
-        ]);
+        return redirect()->route('emar.rounds', ['date' => $dateStr, 'guided' => $round->id]);
     }
 
     /**
@@ -231,7 +210,7 @@ class GuidedRoundController extends Controller
             $admin->save();
 
             $statusLabel = ucfirst(str_replace('_', ' ', $backendStatus));
-            app(\App\Services\Timeline\TimelineEmitter::class)->record([
+            app(TimelineEmitter::class)->record([
                 'source_type' => ClientMedicationAdministration::class,
                 'source_id' => $admin->id,
                 'occurred_at' => $admin->administered_at ?? now(),
