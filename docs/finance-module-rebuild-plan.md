@@ -400,9 +400,17 @@ KiwiSaver + net-pay liability) via `PostPayrollJournalJob`; `AllocatePayrollCost
   (Receivables), a recent GST return (Tax + Calendar), plus a fixed asset + donor fund. 3 tests (every hub
   populates · calendar returns live events incl. overdue · idempotent). Finance suite 122 green. *Acceptance met.*
   (Not seeded — no factory: FinFundingStream / FinAccountingIntegration; Settings is a config hub, empty-OK.)
-- **[ ] M10-5 a11y + responsive + end-to-end pipeline tests + final parity.** Axe (no criticals) + mobile on
-  every hub; consistent empty/loading/error states; end-to-end finance pipeline tests; side-by-side every hub
-  vs Rostering on oblivionfindings.com. *Acceptance:* axe clean; responsive; DoD met.
+- **[~] M10-5 end-to-end pipeline tests DONE (main ab8e726e); a11y/responsive live-verify deferred.** Audited GL
+  journal-posting coverage across every money pipeline. Balance + open-fiscal-period are architecturally enforced
+  by `JournalPostingService::post()` (throws on imbalance / non-open period). Idempotency is by state-machine —
+  each poster guards on status (`approveBill` requires draft/awaiting_approval; `processPaymentRun` requires
+  approved; `approveCreditNote` requires draft; invoice/expense/leave guard on journal_id/event-key) so replay
+  can't double-post (the coverage audit's "no guard → double-post" suspicion was disproved by reading the code —
+  **no bug**). The only GAP was *tests*: bill-approval and payment-run had zero journal-posting coverage. Added
+  `BillAndPaymentRunJournalPostingTest` (4 tests): each posts a single BALANCED journal to the right accounts
+  (DR Expense/CR AP; DR AP/CR Bank) and replaying throws + posts no second journal. Finance suite 126 green.
+  *Remaining (deferred — needs the live dev server / browser, out of scope for the headless loop):* axe a11y +
+  responsive sweep on every hub, side-by-side-vs-Rostering parity on oblivionfindings.com.
 
 ---
 
