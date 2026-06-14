@@ -95,6 +95,14 @@ export default function BenefitPlans({
         );
     };
 
+    const togglePlanActive = (plan: BenefitPlan) => {
+        router.put(
+            `/hr/benefits/plans/${plan.id}`,
+            { is_active: !plan.is_active },
+            { preserveScroll: true },
+        );
+    };
+
     const submit = (e: FormEvent) => {
         e.preventDefault();
         router.post('/hr/benefits/plans', form, {
@@ -214,17 +222,36 @@ export default function BenefitPlans({
                                             {plan.enrollments_count}
                                         </TableCell>
                                         <TableCell>
-                                            <Badge
-                                                variant={
-                                                    plan.is_active
-                                                        ? 'default'
-                                                        : 'secondary'
-                                                }
-                                            >
-                                                {plan.is_active
-                                                    ? 'Active'
-                                                    : 'Inactive'}
-                                            </Badge>
+                                            <div className="flex items-center gap-2">
+                                                <Badge
+                                                    variant={
+                                                        plan.is_active
+                                                            ? 'default'
+                                                            : 'secondary'
+                                                    }
+                                                >
+                                                    {plan.is_active
+                                                        ? 'Active'
+                                                        : 'Inactive'}
+                                                </Badge>
+                                                {can.manage && (
+                                                    <Button
+                                                        type="button"
+                                                        variant="ghost"
+                                                        size="sm"
+                                                        className="h-7"
+                                                        onClick={() =>
+                                                            togglePlanActive(
+                                                                plan,
+                                                            )
+                                                        }
+                                                    >
+                                                        {plan.is_active
+                                                            ? 'Deactivate'
+                                                            : 'Activate'}
+                                                    </Button>
+                                                )}
+                                            </div>
                                         </TableCell>
                                     </TableRow>
                                 ))}

@@ -169,4 +169,28 @@ class BenefitsController extends Controller
 
         return redirect()->back()->with('success', 'Enrollment updated.');
     }
+
+    /**
+     * Activate or deactivate a benefit plan. Deactivating closes the plan to NEW
+     * enrollments (it drops out of the enroll dropdown); existing enrollments
+     * reference the plan by id and are unaffected.
+     */
+    public function updatePlan(Request $request, HrBenefitPlan $plan)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.benefits.manage'), 403);
+
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $plan->tenant_id);
+
+        $data = $request->validate([
+            'is_active' => ['required', 'boolean'],
+        ]);
+
+        $plan->update($data);
+
+        return redirect()->back()->with(
+            'success',
+            $data['is_active'] ? 'Benefit plan activated.' : 'Benefit plan deactivated.',
+        );
+    }
 }
