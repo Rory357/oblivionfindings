@@ -17,6 +17,20 @@ class AnnouncementController extends Controller
 {
     use ResolvesHrTenant;
 
+    private const PRIORITIES = [
+        ['value' => 'low', 'label' => 'Low'],
+        ['value' => 'normal', 'label' => 'Normal'],
+        ['value' => 'high', 'label' => 'High'],
+        ['value' => 'urgent', 'label' => 'Urgent'],
+    ];
+
+    private const AUDIENCES = [
+        ['value' => 'all', 'label' => 'All Staff'],
+        ['value' => 'department', 'label' => 'Department'],
+        ['value' => 'site', 'label' => 'Site'],
+        ['value' => 'role', 'label' => 'Role'],
+    ];
+
     /**
      * List announcements (feed view).
      */
@@ -47,6 +61,8 @@ class AnnouncementController extends Controller
         return Inertia::render('hr/announcements/index', [
             'announcements' => $announcements,
             'acknowledgedIds' => $acknowledgedIds,
+            'priorities' => self::PRIORITIES,
+            'audiences' => self::AUDIENCES,
             'filters' => [
                 'priority' => $request->query('priority'),
             ],
@@ -57,27 +73,12 @@ class AnnouncementController extends Controller
     }
 
     /**
-     * Show form to create an announcement.
+     * The create page is retired — announcements are created from the index
+     * modal. Route preserved as a redirect for any bookmarks.
      */
     public function create(Request $request)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.announcements.manage'), 403);
-
-        return Inertia::render('hr/announcements/create', [
-            'priorities' => [
-                ['value' => 'low', 'label' => 'Low'],
-                ['value' => 'normal', 'label' => 'Normal'],
-                ['value' => 'high', 'label' => 'High'],
-                ['value' => 'urgent', 'label' => 'Urgent'],
-            ],
-            'audiences' => [
-                ['value' => 'all', 'label' => 'All Staff'],
-                ['value' => 'department', 'label' => 'Department'],
-                ['value' => 'site', 'label' => 'Site'],
-                ['value' => 'role', 'label' => 'Role'],
-            ],
-        ]);
+        return redirect()->route('hr.announcements.index');
     }
 
     /**
