@@ -6,12 +6,16 @@ use App\Domain\Hr\Models\HrAnnouncement;
 use App\Domain\Hr\Models\HrApplication;
 use App\Domain\Hr\Models\HrAsset;
 use App\Domain\Hr\Models\HrAssetAssignment;
+use App\Domain\Hr\Models\HrApprovalChain;
 use App\Domain\Hr\Models\HrBenefitEnrollment;
 use App\Domain\Hr\Models\HrBenefitPlan;
 use App\Domain\Hr\Models\HrBonusPayment;
 use App\Domain\Hr\Models\HrCandidate;
 use App\Domain\Hr\Models\HrCompensationReview;
+use App\Domain\Hr\Models\HrDriverEligibility;
 use App\Domain\Hr\Models\HrSalaryBand;
+use App\Domain\Hr\Models\HrSavedReport;
+use App\Models\StaffBackgroundCheck;
 use App\Domain\Hr\Models\HrCase;
 use App\Domain\Hr\Models\HrCourse;
 use App\Domain\Hr\Models\HrCourseEnrollment;
@@ -59,6 +63,114 @@ class HrDemoSeeder extends Seeder
         $this->seedAnnouncementsAndSurveys($tenantId, $admin);
         $this->seedRecognitionFeed($tenantId, $admin, $manager, $profiles);
         $this->seedCompensationAndBenefits($tenantId, $admin, $manager, $profiles);
+        $this->seedComplianceExtras($tenantId, $admin, $manager, $profiles);
+    }
+
+    /**
+     * Seed the remaining hubs that were empty in demo: driver eligibility,
+     * vetting/background checks, approval chains, and saved reports.
+     * Idempotent via updateOrCreate on natural keys.
+     *
+     * @param  Collection<int, HrEmployeeProfile>  $profiles
+     */
+    private function seedComplianceExtras(int $tenantId, User $admin, User $manager, Collection $profiles): void
+    {
+        if ($profiles->isEmpty()) {
+            return;
+        }
+
+        // Driver eligibility register (user_id is unique per row).
+        $drivers = [
+            ['profile' => 0, 'number' => 'DL-DEMO-001', 'class' => 'Class 1', 'status' => 'eligible', 'canDrive' => true],
+            ['profile' => 1, 'number' => 'DL-DEMO-002', 'class' => 'Class 1', 'status' => 'pending_review', 'canDrive' => false],
+        ];
+
+        foreach ($drivers as $driver) {
+            HrDriverEligibility::updateOrCreate(
+                ['user_id' => $profiles[$driver['profile']]->user_id],
+                [
+                    'tenant_id' => $tenantId,
+                    'licence_number' => $driver['number'],
+                    'licence_class' => $driver['class'],
+                    'licence_endorsements' => ['P'],
+                    'licence_expires_at' => '2028-03-31',
+                    'incident_free_since' => '2024-01-01',
+                    'status' => $driver['status'],
+                    'can_drive_clients' => $driver['canDrive'],
+                    'can_drive_clients_approved_by' => $driver['canDrive'] ? $manager->id : null,
+                    'can_drive_clients_approved_at' => $driver['canDrive'] ? Carbon::parse('2026-04-02 09:00:00') : null,
+                    'next_review_at' => '2027-04-02',
+                    'created_by' => $admin->id,
+                ],
+            );
+        }
+
+        // Vetting / background checks (keyed by user + check type).
+        $checks = [
+            ['profile' => 0, 'type' => 'police_check', 'ref' => 'PV-DEMO-001'],
+            ['profile' => 1, 'type' => 'right_to_work', 'ref' => 'RTW-DEMO-002'],
+        ];
+
+        foreach ($checks as $check) {
+            StaffBackgroundCheck::updateOrCreate(
+                ['user_id' => $profiles[$check['profile']]->user_id, 'check_type' => $check['type']],
+                [
+                    'status' => 'clear',
+                    'reference_number' => $check['ref'],
+                    'provider' => 'Demo Vetting Service',
+                    'check_date' => '2026-01-20',
+                    'issue_date' => '2026-02-01',
+                    'expires_at' => '2029-02-01',
+                    'disclosures_present' => false,
+                    'updated_by' => $admin->id,
+                ],
+            );
+        }
+
+        // Approval chains (configuration only; instances are created by business
+        // flows, which is a separate design decision).
+        $chains = [
+            ['name' => 'Leave Approval', 'process_type' => 'leave'],
+            ['name' => 'Expense Approval', 'process_type' => 'expense'],
+        ];
+
+        foreach ($chains as $chainData) {
+            $chain = HrApprovalChain::updateOrCreate(
+                ['tenant_id' => $tenantId, 'name' => $chainData['name']],
+                [
+                    'process_type' => $chainData['process_type'],
+                    'is_active' => true,
+                    'created_by' => $admin->id,
+                ],
+            );
+
+            $chain->steps()->updateOrCreate(
+                ['step_order' => 1],
+                [
+                    'approver_type' => 'manager',
+                    'auto_approve_after_days' => 7,
+                    'created_at' => now(),
+                ],
+            );
+        }
+
+        // Saved reports (tenant_id null to match the controller's current scope).
+        $reports = [
+            ['name' => 'Active Staff', 'type' => 'employee', 'fields' => ['employee_number', 'name', 'position_title', 'department']],
+            ['name' => 'Leave Register', 'type' => 'leave', 'fields' => ['employee_name', 'leave_type', 'start_date', 'end_date', 'status']],
+        ];
+
+        foreach ($reports as $report) {
+            HrSavedReport::updateOrCreate(
+                ['tenant_id' => null, 'name' => $report['name']],
+                [
+                    'report_type' => $report['type'],
+                    'fields' => $report['fields'],
+                    'sort_direction' => 'asc',
+                    'created_by' => $admin->id,
+                ],
+            );
+        }
     }
 
     /**
