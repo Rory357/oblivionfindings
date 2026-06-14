@@ -1,1617 +1,400 @@
-import MedicationScanVerificationPanel from '@/components/medications/MedicationScanVerificationPanel';
-import ScheduledStockCounts from '@/components/medications/ScheduledStockCounts';
-import { PageHero } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
+/* eslint-disable no-restricted-syntax -- stock list/order/reconciliation surfaces are custom-layout
+   bordered tables and chip buttons (not Card/Button); all colours are semantic tokens. */
+import { PageHero, type PageHeroStat } from '@/components/page';
+import { EntityFilter, TabStrip, type RosterTabItem } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import {
-    TabsRoot as Tabs,
-    TabsContent,
-    TabsList,
-    TabsTrigger,
-} from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
-import {
-    emptyMedicationScanCapture,
-    hasVerifiedMedicationScan,
-    toMedicationScanPayload,
-    type MedicationScanCapture,
-    type MedicationScanVerification,
-} from '@/lib/medication-scan';
-import { submitEmarMutation } from '@/lib/emar-offline';
-import { applyFormRequestErrors } from '@/lib/form-request-errors';
 import AppLayout from '@/layouts/app-layout';
-import { Head, router, useForm } from '@inertiajs/react';
 import {
-    AlertTriangle,
-    ArrowRightLeft,
-    Calendar,
-    Clock,
-    Package,
-    Pencil,
-    Plus,
-    ShoppingCart,
-    Truck,
-} from 'lucide-react';
-import { useState } from 'react';
+    AdjustStockDialog,
+    NewPharmacyOrderDialog,
+    ReceiveStockDialog,
+    StockCountDialog,
+    type ClientOpt,
+    type StaffOpt,
+    type StockMed,
+    type StockRow,
+} from '@/pages/emar/_stock-dialogs';
+import { Head, router } from '@inertiajs/react';
+import { AlertTriangle, Barcode, CalendarX2, Check, ClipboardCheck, Clock, Package, Pencil, Plus, Search, ShieldCheck, ShoppingCart, Snowflake, Truck } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
-type StockItem = {
+type ControlledRegisterRow = {
     id: number;
     medication_id: number;
-    medication_name: string;
+    medication_name: string | null;
     client_name: string;
-    client_id: number;
+    cd_class: string | null;
+    register_balance: number;
     on_hand: number;
     unit: string;
-    reorder_level: number | null;
-    reorder_quantity: number | null;
-    last_counted_at: string | null;
-    is_low: boolean;
-    controlled: boolean;
-    expiry_date: string | null;
-    batch_number: string | null;
-    supplier_name: string | null;
-    is_expired: boolean;
-    is_expiring_soon: boolean;
-    is_expiring_90: boolean;
-    scan_verification?: MedicationScanVerification | null;
+    last_check_at: string | null;
+    last_check_witness: string | null;
+    discrepancy: number | null;
+};
+type OrderRow = {
+    id: number;
+    client_name: string;
+    medication_name: string | null;
+    pharmacy_name: string | null;
+    order_type: string | null;
+    status: string;
+    quantity_ordered: number | null;
+    quantity_received: number | null;
+    ordered_at: string | null;
+    submitted_at: string | null;
+    confirmed_at: string | null;
+    dispensed_at: string | null;
+    delivered_at: string | null;
 };
 
 type Props = {
-    stockItems: StockItem[];
+    stockItems: StockRow[];
     lowStockCount: number;
     expiringCount: number;
     expiredCount: number;
-    pharmacyOrders: any[];
-    clients: { id: number; first_name: string; last_name: string }[];
-    activeMedications: {
-        id: number;
-        name: string;
-        client_id: number;
-        client?: { first_name: string; last_name: string };
-        scan_verification?: MedicationScanVerification | null;
-    }[];
-    witnesses: Array<{ id: number; name: string }>;
+    controlledRegister: ControlledRegisterRow[];
+    pharmacyOrders: OrderRow[];
+    clients: ClientOpt[];
+    activeMedications: StockMed[];
+    witnesses: StaffOpt[];
+    sites: { id: number; name: string }[];
+    active_site: { id: number; name: string } | null;
+    site_brand_colour: string | null;
 };
 
-function ExpiryBadge({ item }: { item: StockItem }) {
-    if (!item.expiry_date) return null;
-    if (item.is_expired) {
-        return (
-            <Badge variant="destructive" className="text-[10px]">
-                Expired
-            </Badge>
-        );
-    }
-    if (item.is_expiring_soon) {
-        return (
-            <Badge className="bg-status-warning text-[10px] text-white">
-                Expires &lt;30d
-            </Badge>
-        );
-    }
-    if (item.is_expiring_90) {
-        return (
-            <Badge className="bg-status-warning-bg text-[10px] text-status-warning">
-                Expires &lt;90d
-            </Badge>
-        );
-    }
-    return null;
-}
+type Modal =
+    | { type: 'order'; clientId?: number; medId?: number }
+    | { type: 'receive'; medId?: number }
+    | { type: 'count'; medId?: number; controlledOnly?: boolean }
+    | { type: 'adjust'; item: StockRow }
+    | null;
 
-function formatDate(dateStr: string | null) {
-    if (!dateStr) return '—';
-    return new Date(dateStr).toLocaleDateString('en-NZ');
-}
+const STAGES = ['draft', 'submitted', 'confirmed', 'dispensed', 'delivered'];
+const STAGE_LABELS = ['Ordered', 'Submitted', 'Confirmed', 'Dispensed', 'Delivered'];
+const NEXT_LABEL: Record<string, string> = { draft: 'Submit to pharmacy', submitted: 'Mark confirmed', confirmed: 'Mark dispensed', dispensed: 'Receive stock' };
+const fmtDate = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' }) : '—');
+const initials = (name: string) => name.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase() || '?';
 
-export default function StockManagement({
-    stockItems,
-    lowStockCount,
-    expiringCount,
-    expiredCount,
-    pharmacyOrders,
-    clients,
-    activeMedications,
-    witnesses,
-}: Props) {
-    const [activeTab, setActiveTab] = useState<string>('all');
-    const lowStock = stockItems.filter((s) => s.is_low);
-    const expiringSoon = stockItems.filter((s) => s.is_expiring_soon);
-    const expiredItems = stockItems.filter((s) => s.is_expired);
+export default function StockManagement({ stockItems, lowStockCount, expiringCount, expiredCount, controlledRegister, pharmacyOrders, clients, activeMedications, witnesses, sites, active_site: activeSite, site_brand_colour: brandColour }: Props) {
+    const [activeTab, setActiveTab] = useState('all');
+    const [search, setSearch] = useState('');
+    const [siteFilter, setSiteFilter] = useState<number | null>(activeSite?.id ?? null);
+    const [chip, setChip] = useState<'all' | 'controlled' | 'cold_chain'>('all');
+    const [modal, setModal] = useState<Modal>(null);
 
-    // New Pharmacy Order dialog
-    const [orderOpen, setOrderOpen] = useState(false);
-    const orderForm = useForm({
-        client_id: '',
-        client_medication_id: '',
-        pharmacy_name: '',
-        pharmacy_phone: '',
-        order_type: '',
-        quantity_ordered: '',
-        order_notes: '',
-        batch_number: '',
-        batch_expiry: '',
-    });
+    const openOrders = pharmacyOrders.filter((o) => o.status !== 'delivered');
+    const cdDiscrepancies = controlledRegister.filter((r) => r.discrepancy !== null && r.discrepancy !== 0).length;
 
-    const filteredMedications = activeMedications.filter(
-        (m) =>
-            !orderForm.data.client_id ||
-            m.client_id === Number(orderForm.data.client_id),
-    );
-
-    function submitOrder(e: React.FormEvent) {
-        e.preventDefault();
-        orderForm.post('/emar/stock/pharmacy-orders', {
-            onSuccess: () => {
-                setOrderOpen(false);
-                orderForm.reset();
-            },
+    const filtered = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        return stockItems.filter((s) => {
+            if (activeTab === 'low' && !s.is_low) return false;
+            if (activeTab === 'expiring' && !s.is_expiring_soon) return false;
+            if (activeTab === 'expired' && !s.is_expired) return false;
+            if (chip === 'controlled' && !s.controlled) return false;
+            if (chip === 'cold_chain' && !s.requires_cold_chain) return false;
+            if (q && !`${s.medication_name ?? ''} ${s.client_name} ${s.batch_number ?? ''}`.toLowerCase().includes(q)) return false;
+            return true;
         });
-    }
+    }, [stockItems, activeTab, chip, search]);
 
-    // Advance Order dialog
-    const [advanceOpen, setAdvanceOpen] = useState(false);
-    const [advanceOrderId, setAdvanceOrderId] = useState<number | null>(null);
-    const advanceForm = useForm({
-        quantity_received: '',
-        batch_number: '',
-        batch_expiry: '',
-    });
-
-    function openAdvance(orderId: number) {
-        setAdvanceOrderId(orderId);
-        advanceForm.reset();
-        setAdvanceOpen(true);
-    }
-
-    function submitAdvance(e: React.FormEvent) {
-        e.preventDefault();
-        if (advanceOrderId === null) return;
-        advanceForm.post(
-            `/emar/stock/pharmacy-orders/${advanceOrderId}/advance`,
-            {
-                onSuccess: () => {
-                    setAdvanceOpen(false);
-                    advanceForm.reset();
-                    setAdvanceOrderId(null);
-                },
-            },
-        );
-    }
-
-    // Receive Stock dialog
-    const [receiveOpen, setReceiveOpen] = useState(false);
-    const receiveForm = useForm({
-        client_medication_id: '',
-        quantity: '',
-        notes: '',
-        batch_number: '',
-        expiry_date: '',
-        scan_code: '',
-        scan_source: 'manual' as 'manual' | 'scanner',
-        scan_verified: false,
-        scan_match_source: '',
-    });
-    const [receiveScanCapture, setReceiveScanCapture] =
-        useState<MedicationScanCapture>(emptyMedicationScanCapture());
-    const [receivingStock, setReceivingStock] = useState(false);
-    const selectedReceiveMedication =
-        activeMedications.find(
-            (medication) =>
-                String(medication.id) === receiveForm.data.client_medication_id,
-        ) ?? null;
-
-    async function submitReceive(e: React.FormEvent) {
-        e.preventDefault();
-        receiveForm.clearErrors();
-
-        if (
-            selectedReceiveMedication?.scan_verification &&
-            !hasVerifiedMedicationScan(receiveScanCapture)
-        ) {
-            receiveForm.setError(
-                'scan_code',
-                'Verify the medication code before receiving stock.',
-            );
-            return;
-        }
-
-        setReceivingStock(true);
-
-        try {
-            const result = await submitEmarMutation(
-                '/emar/stock/receive',
-                {
-                    ...receiveForm.data,
-                    quantity: Number(receiveForm.data.quantity),
-                    expiry_date: receiveForm.data.expiry_date || null,
-                    notes: receiveForm.data.notes || null,
-                    batch_number: receiveForm.data.batch_number || null,
-                    ...toMedicationScanPayload(receiveScanCapture),
-                },
-                {
-                    successMessage: 'Stock receipt recorded.',
-                    queuedMessage:
-                        'Stock receipt saved offline and will sync automatically when the device reconnects.',
-                },
-            );
-
-            if (result.status === 'conflict') {
-                return;
-            }
-
-            setReceiveOpen(false);
-            receiveForm.reset();
-            setReceiveScanCapture(emptyMedicationScanCapture());
-
-            if (result.status !== 'queued') {
-                router.reload({
-                    only: [
-                        'stockItems',
-                        'lowStockCount',
-                        'expiringCount',
-                        'expiredCount',
-                        'pharmacyOrders',
-                    ],
-                });
-            }
-        } catch (error: unknown) {
-            applyFormRequestErrors(
-                error,
-                (field, value) =>
-                    (
-                        receiveForm.setError as (
-                            field: string,
-                            value: string,
-                        ) => void
-                    )(field, value),
-                'Failed to record stock receipt.',
-            );
-        } finally {
-            setReceivingStock(false);
-        }
-    }
-
-    // Stock Adjustment dialog
-    const [adjustOpen, setAdjustOpen] = useState(false);
-    const adjustForm = useForm({
-        client_medication_id: '',
-        new_quantity: '',
-        reason: '',
-    });
-
-    function submitAdjust(e: React.FormEvent) {
-        e.preventDefault();
-        adjustForm.post('/emar/stock/adjust', {
-            onSuccess: () => {
-                setAdjustOpen(false);
-                adjustForm.reset();
-            },
+    const byClient = useMemo(() => {
+        const groups = new Map<number, { client_id: number; client_name: string; site_name: string | null; rows: StockRow[] }>();
+        filtered.forEach((s) => {
+            const key = s.client_id ?? 0;
+            if (!groups.has(key)) groups.set(key, { client_id: key, client_name: s.client_name || 'Unknown', site_name: s.site_name, rows: [] });
+            groups.get(key)!.rows.push(s);
         });
-    }
+        return [...groups.values()].sort((a, b) => a.client_name.localeCompare(b.client_name));
+    }, [filtered]);
 
-    // Edit Stock dialog
-    const [editOpen, setEditOpen] = useState(false);
-    const [editingItem, setEditingItem] = useState<StockItem | null>(null);
-    const editForm = useForm({
-        reorder_level: '',
-        reorder_quantity: '',
-        expiry_date: '',
-        batch_number: '',
-        supplier_name: '',
-    });
+    const advance = (id: number) => router.post(`/emar/stock/pharmacy-orders/${id}/advance`, {}, { preserveScroll: true, only: ['pharmacyOrders', 'stockItems', 'lowStockCount', 'expiringCount', 'expiredCount'] });
+    const onSite = (id: number | null) => { setSiteFilter(id); router.get('/emar/stock', id ? { site_id: id } : {}, { preserveState: true, preserveScroll: true }); };
 
-    function openEdit(item: StockItem) {
-        setEditingItem(item);
-        editForm.setData({
-            reorder_level:
-                item.reorder_level !== null ? String(item.reorder_level) : '',
-            reorder_quantity:
-                item.reorder_quantity !== null
-                    ? String(item.reorder_quantity)
-                    : '',
-            expiry_date: item.expiry_date ?? '',
-            batch_number: item.batch_number ?? '',
-            supplier_name: item.supplier_name ?? '',
-        });
-        setEditOpen(true);
-    }
+    const TABS: RosterTabItem[] = [
+        { id: 'all', label: 'All stock', icon: Package, tone: 'primary', badge: stockItems.length || undefined },
+        { id: 'low', label: 'Low stock', icon: AlertTriangle, tone: 'warning', badge: lowStockCount || undefined },
+        { id: 'expiring', label: 'Expiring', icon: Clock, tone: 'warning', badge: expiringCount || undefined },
+        { id: 'expired', label: 'Expired', icon: CalendarX2, tone: 'critical', badge: expiredCount || undefined },
+        { id: 'controlled', label: 'Controlled drugs', icon: ShieldCheck, tone: 'primary', badge: controlledRegister.length || undefined },
+        { id: 'orders', label: 'Pharmacy orders', icon: ShoppingCart, tone: 'info', badge: openOrders.length || undefined },
+    ];
 
-    function submitEdit(e: React.FormEvent) {
-        e.preventDefault();
-        if (!editingItem) return;
-        editForm.patch(`/emar/stock/${editingItem.id}`, {
-            onSuccess: () => {
-                setEditOpen(false);
-                setEditingItem(null);
-                editForm.reset();
-            },
-        });
-    }
+    const heroStats: PageHeroStat[] = [
+        { label: 'Tracked', value: stockItems.length },
+        { label: 'Low', value: lowStockCount, tone: lowStockCount > 0 ? 'warning' : 'neutral' },
+        { label: 'Expiring', value: expiringCount, tone: expiringCount > 0 ? 'warning' : 'neutral' },
+        { label: 'Orders', value: openOrders.length },
+    ];
 
-    // Filtered items for tabs
-    function getFilteredItems() {
-        switch (activeTab) {
-            case 'low':
-                return lowStock;
-            case 'expiring':
-                return expiringSoon;
-            case 'expired':
-                return expiredItems;
-            default:
-                return stockItems;
-        }
-    }
-
-    const displayItems = getFilteredItems();
-    const refreshStockPanels = () =>
-        router.reload({
-            only: [
-                'stockItems',
-                'lowStockCount',
-                'expiringCount',
-                'expiredCount',
-                'pharmacyOrders',
-            ],
-        });
+    const description = `${stockItems.length} item${stockItems.length === 1 ? '' : 's'} tracked${activeSite ? ` at ${activeSite.name}` : ' across your services'}. ${lowStockCount} below reorder level, ${expiringCount} expiring within 30 days${cdDiscrepancies > 0 ? `, and ${cdDiscrepancies} controlled-drug count${cdDiscrepancies === 1 ? '' : 's'} needs investigation` : ''}.`;
 
     return (
-        <AppLayout>
+        <AppLayout breadcrumbs={[{ title: 'eMAR', href: '/emar' }, { title: 'Stock Management', href: '/emar/stock' }]}>
             <Head title="eMAR - Stock Management" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero
-                    title="Stock Management"
-                    description="Medication stock levels, reorder alerts, and pharmacy orders"
-                    icon={<Package className="h-7 w-7 text-white" />}
-                    backHref="/emar"
-                    backLabel="Back"
+                    variant="hero"
+                    category="ops"
+                    brandColour={brandColour}
+                    icon={Package}
+                    title={
+                        <span>
+                            <span className="flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-wide text-primary-foreground/80">
+                                <span aria-hidden className="relative inline-flex h-2 w-2">
+                                    <span className="absolute inset-0 animate-ping rounded-full bg-status-success/70" />
+                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success" />
+                                </span>
+                                Live stock board · live
+                            </span>
+                            <span className="mt-1 block text-[26px] font-bold leading-tight">
+                                Medication stock for{' '}
+                                <span className="border-b-2 border-primary-foreground/40">{activeSite?.name ?? 'your services'}</span>
+                            </span>
+                        </span>
+                    }
+                    description={description}
+                    stats={heroStats}
+                    actions={
+                        <>
+                            <Button className="bg-primary-foreground text-primary hover:bg-primary-foreground/90" onClick={() => setModal({ type: 'order' })}>
+                                <Plus className="h-4 w-4" />
+                                New pharmacy order
+                            </Button>
+                            <Button variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20" onClick={() => setModal({ type: 'receive' })}>
+                                <Truck className="h-4 w-4" />
+                                Receive stock
+                            </Button>
+                        </>
+                    }
+                    footer={
+                        <div className="flex flex-col gap-3 py-3 lg:flex-row lg:items-center lg:justify-between">
+                            <div className="flex flex-wrap items-center gap-2">
+                                {([['all', 'All items'], ['controlled', 'Controlled only'], ['cold_chain', 'Cold chain']] as const).map(([id, label]) => (
+                                    <button key={id} onClick={() => setChip(id)} className={`rounded-full px-3 py-1 text-xs font-medium transition ${chip === id ? 'bg-primary-foreground text-primary' : 'border border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20'}`}>
+                                        {label}
+                                    </button>
+                                ))}
+                                <Button size="sm" variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20" onClick={() => setModal({ type: 'count' })}>
+                                    <Barcode className="h-3.5 w-3.5" />
+                                    Run stock count
+                                </Button>
+                            </div>
+                            <div className="flex flex-wrap items-center gap-2">
+                                <div className="flex items-center gap-2 rounded-full bg-primary-foreground px-3 py-1.5">
+                                    <Search className="h-3.5 w-3.5 text-muted-foreground" />
+                                    <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search medication, client or batch…" className="w-56 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground" />
+                                </div>
+                                {sites.length > 0 && <EntityFilter label="Site" allLabel="All sites" items={sites} value={siteFilter} onChange={onSite} onDark />}
+                            </div>
+                        </div>
+                    }
                 />
-                {/* Alert Summary Cards */}
-                <div className="mb-6 grid gap-4 sm:grid-cols-4">
-                    <Card>
-                        <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-status-info-bg text-status-info">
-                                <Package className="h-5 w-5" />
-                            </div>
-                            <div>
-                                <p className="text-2xl font-bold">
-                                    {stockItems.length}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                    Total Items Tracked
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-status-warning-bg text-status-warning">
-                                <AlertTriangle className="h-5 w-5" />
-                            </div>
-                            <div>
-                                <p className="text-2xl font-bold">
-                                    {lowStockCount}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                    Low Stock Items
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-status-warning-bg text-status-warning">
-                                <Clock className="h-5 w-5" />
-                            </div>
-                            <div>
-                                <p className="text-2xl font-bold">
-                                    {expiringCount}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                    Expiring in 30 Days
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-status-critical-bg text-status-critical">
-                                <Calendar className="h-5 w-5" />
-                            </div>
-                            <div>
-                                <p className="text-2xl font-bold">
-                                    {expiredCount}
-                                </p>
-                                <p className="text-xs text-muted-foreground">
-                                    Expired Items
-                                </p>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
 
-                {/* Action Buttons */}
-                <div className="mb-4 flex flex-wrap justify-end gap-2">
-                    {/* New Pharmacy Order */}
-                    <Dialog open={orderOpen} onOpenChange={setOrderOpen}>
-                        <DialogTrigger asChild>
-                            <Button>
-                                <Plus className="mr-2 h-4 w-4" /> New Pharmacy
-                                Order
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent className="max-w-lg">
-                            <form onSubmit={submitOrder}>
-                                <DialogHeader>
-                                    <DialogTitle>
-                                        New Pharmacy Order
-                                    </DialogTitle>
-                                    <DialogDescription>
-                                        Place a medication order with a
-                                        pharmacy.
-                                    </DialogDescription>
-                                </DialogHeader>
-                                <div className="space-y-4 py-4">
-                                    <div className="space-y-2">
-                                        <Label>Client</Label>
-                                        <Select
-                                            value={orderForm.data.client_id}
-                                            onValueChange={(v) => {
-                                                orderForm.setData(
-                                                    'client_id',
-                                                    v,
-                                                );
-                                                orderForm.setData(
-                                                    'client_medication_id',
-                                                    '',
-                                                );
-                                            }}
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select client..." />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {clients.map((c) => (
-                                                    <SelectItem
-                                                        key={c.id}
-                                                        value={String(c.id)}
-                                                    >
-                                                        {c.last_name},{' '}
-                                                        {c.first_name}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        {orderForm.errors.client_id && (
-                                            <p className="text-sm text-status-critical">
-                                                {orderForm.errors.client_id}
-                                            </p>
-                                        )}
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>Medication</Label>
-                                        <Select
-                                            value={
-                                                orderForm.data
-                                                    .client_medication_id
-                                            }
-                                            onValueChange={(v) =>
-                                                orderForm.setData(
-                                                    'client_medication_id',
-                                                    v,
-                                                )
-                                            }
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select medication..." />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {filteredMedications.map(
-                                                    (m) => (
-                                                        <SelectItem
-                                                            key={m.id}
-                                                            value={String(m.id)}
-                                                        >
-                                                            {m.name}
-                                                            {m.client
-                                                                ? ` (${m.client.first_name} ${m.client.last_name})`
-                                                                : ''}
-                                                        </SelectItem>
-                                                    ),
-                                                )}
-                                            </SelectContent>
-                                        </Select>
-                                        {orderForm.errors
-                                            .client_medication_id && (
-                                            <p className="text-sm text-status-critical">
-                                                {
-                                                    orderForm.errors
-                                                        .client_medication_id
-                                                }
-                                            </p>
-                                        )}
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label>Pharmacy Name</Label>
-                                            <Input
-                                                value={
-                                                    orderForm.data.pharmacy_name
-                                                }
-                                                onChange={(e) =>
-                                                    orderForm.setData(
-                                                        'pharmacy_name',
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                placeholder="Pharmacy name"
-                                            />
-                                            {orderForm.errors.pharmacy_name && (
-                                                <p className="text-sm text-status-critical">
-                                                    {
-                                                        orderForm.errors
-                                                            .pharmacy_name
-                                                    }
-                                                </p>
-                                            )}
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Pharmacy Phone</Label>
-                                            <Input
-                                                value={
-                                                    orderForm.data
-                                                        .pharmacy_phone
-                                                }
-                                                onChange={(e) =>
-                                                    orderForm.setData(
-                                                        'pharmacy_phone',
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                placeholder="Phone number"
-                                            />
-                                            {orderForm.errors
-                                                .pharmacy_phone && (
-                                                <p className="text-sm text-status-critical">
-                                                    {
-                                                        orderForm.errors
-                                                            .pharmacy_phone
-                                                    }
-                                                </p>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label>Order Type</Label>
-                                            <Select
-                                                value={
-                                                    orderForm.data.order_type
-                                                }
-                                                onValueChange={(v) =>
-                                                    orderForm.setData(
-                                                        'order_type',
-                                                        v,
-                                                    )
-                                                }
-                                            >
-                                                <SelectTrigger>
-                                                    <SelectValue placeholder="Select type..." />
-                                                </SelectTrigger>
-                                                <SelectContent>
-                                                    <SelectItem value="routine">
-                                                        Routine
-                                                    </SelectItem>
-                                                    <SelectItem value="urgent">
-                                                        Urgent
-                                                    </SelectItem>
-                                                    <SelectItem value="initial">
-                                                        Initial
-                                                    </SelectItem>
-                                                    <SelectItem value="repeat">
-                                                        Repeat
-                                                    </SelectItem>
-                                                </SelectContent>
-                                            </Select>
-                                            {orderForm.errors.order_type && (
-                                                <p className="text-sm text-status-critical">
-                                                    {
-                                                        orderForm.errors
-                                                            .order_type
-                                                    }
-                                                </p>
-                                            )}
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Quantity Ordered</Label>
-                                            <Input
-                                                type="number"
-                                                min={1}
-                                                value={
-                                                    orderForm.data
-                                                        .quantity_ordered
-                                                }
-                                                onChange={(e) =>
-                                                    orderForm.setData(
-                                                        'quantity_ordered',
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                placeholder="Qty"
-                                            />
-                                            {orderForm.errors
-                                                .quantity_ordered && (
-                                                <p className="text-sm text-status-critical">
-                                                    {
-                                                        orderForm.errors
-                                                            .quantity_ordered
-                                                    }
-                                                </p>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label>Batch Number</Label>
-                                            <Input
-                                                value={
-                                                    orderForm.data.batch_number
-                                                }
-                                                onChange={(e) =>
-                                                    orderForm.setData(
-                                                        'batch_number',
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                placeholder="Batch number"
-                                            />
-                                            {orderForm.errors.batch_number && (
-                                                <p className="text-sm text-status-critical">
-                                                    {
-                                                        orderForm.errors
-                                                            .batch_number
-                                                    }
-                                                </p>
-                                            )}
-                                        </div>
-                                        <div className="space-y-2">
-                                            <Label>Expiry Date</Label>
-                                            <Input
-                                                type="date"
-                                                value={
-                                                    orderForm.data.batch_expiry
-                                                }
-                                                onChange={(e) =>
-                                                    orderForm.setData(
-                                                        'batch_expiry',
-                                                        e.target.value,
-                                                    )
-                                                }
-                                            />
-                                            {orderForm.errors.batch_expiry && (
-                                                <p className="text-sm text-status-critical">
-                                                    {
-                                                        orderForm.errors
-                                                            .batch_expiry
-                                                    }
-                                                </p>
-                                            )}
-                                        </div>
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>Order Notes</Label>
-                                        <Textarea
-                                            value={orderForm.data.order_notes}
-                                            onChange={(e) =>
-                                                orderForm.setData(
-                                                    'order_notes',
-                                                    e.target.value,
-                                                )
-                                            }
-                                            rows={3}
-                                            placeholder="Any special instructions..."
-                                        />
-                                        {orderForm.errors.order_notes && (
-                                            <p className="text-sm text-status-critical">
-                                                {orderForm.errors.order_notes}
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-                                <DialogFooter>
-                                    <Button
-                                        type="submit"
-                                        disabled={orderForm.processing}
-                                    >
-                                        {orderForm.processing
-                                            ? 'Placing Order...'
-                                            : 'Place Order'}
-                                    </Button>
-                                </DialogFooter>
-                            </form>
-                        </DialogContent>
-                    </Dialog>
+                {cdDiscrepancies > 0 && (
+                    <div className="flex items-center justify-between gap-3 rounded-xl border border-status-critical/30 bg-status-critical-bg/60 px-4 py-3">
+                        <span className="flex items-center gap-2 text-sm font-medium text-status-critical">
+                            <AlertTriangle className="h-4 w-4" />
+                            {cdDiscrepancies} controlled-drug count{cdDiscrepancies === 1 ? '' : 's'} with an unreconciled balance — investigate before close of shift.
+                        </span>
+                        <Button size="sm" variant="outline" onClick={() => setActiveTab('controlled')}>Review</Button>
+                    </div>
+                )}
 
-                    {/* Receive Stock */}
-                    <Dialog
-                        open={receiveOpen}
-                        onOpenChange={(open) => {
-                            setReceiveOpen(open);
-                            if (!open) {
-                                receiveForm.reset();
-                                receiveForm.clearErrors();
-                                setReceiveScanCapture(
-                                    emptyMedicationScanCapture(),
-                                );
-                            }
-                        }}
-                    >
-                        <DialogTrigger asChild>
-                            <Button variant="outline">
-                                <Truck className="mr-2 h-4 w-4" /> Receive Stock
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                            <form onSubmit={submitReceive}>
-                                <DialogHeader>
-                                    <DialogTitle>Receive Stock</DialogTitle>
-                                    <DialogDescription>
-                                        Record incoming medication stock.
-                                    </DialogDescription>
-                                </DialogHeader>
-                                <div className="space-y-4 py-4">
-                                    <div className="space-y-2">
-                                        <Label>Medication</Label>
-                                        <Select
-                                            value={
-                                                receiveForm.data
-                                                    .client_medication_id
-                                            }
-                                            onValueChange={(v) => {
-                                                receiveForm.setData(
-                                                    'client_medication_id',
-                                                    v,
-                                                );
-                                                receiveForm.clearErrors(
-                                                    'client_medication_id',
-                                                    'scan_code',
-                                                );
-                                            }}
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select medication..." />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {activeMedications.map((m) => (
-                                                    <SelectItem
-                                                        key={m.id}
-                                                        value={String(m.id)}
-                                                    >
-                                                        {m.name}
-                                                        {m.client
-                                                            ? ` (${m.client.first_name} ${m.client.last_name})`
-                                                            : ''}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        {receiveForm.errors
-                                            .client_medication_id && (
-                                            <p className="text-sm text-status-critical">
-                                                {
-                                                    receiveForm.errors
-                                                        .client_medication_id
-                                                }
-                                            </p>
-                                        )}
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>Quantity</Label>
-                                        <Input
-                                            type="number"
-                                            min={1}
-                                            value={receiveForm.data.quantity}
-                                            onChange={(e) =>
-                                                receiveForm.setData(
-                                                    'quantity',
-                                                    e.target.value,
-                                                )
-                                            }
-                                            placeholder="Quantity received"
-                                        />
-                                        {receiveForm.errors.quantity && (
-                                            <p className="text-sm text-status-critical">
-                                                {receiveForm.errors.quantity}
-                                            </p>
-                                        )}
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-4">
-                                        <div className="space-y-2">
-                                            <Label>Batch Number</Label>
-                                            <Input
-                                                value={
-                                                    receiveForm.data
-                                                        .batch_number
-                                                }
-                                                onChange={(e) =>
-                                                    receiveForm.setData(
-                                                        'batch_number',
-                                                        e.target.value,
-                                                    )
-                                                }
-                                                placeholder="Batch number"
-                                            />
-                                            {receiveForm.errors
-                                                .batch_number && (
-                                                <p className="text-sm text-status-critical">
-                                                    {
-                                                        receiveForm.errors
-                                                            .batch_number
-                                                    }
-                                                </p>
-                                            )}
+                <TabStrip value={activeTab} onChange={setActiveTab} items={TABS} ariaLabel="Stock views" />
+
+                {['all', 'low', 'expiring', 'expired'].includes(activeTab) && (
+                    byClient.length === 0 ? (
+                        <div className="rounded-2xl border border-dashed bg-card px-5 py-12 text-center text-sm text-muted-foreground">No stock matches the current filters.</div>
+                    ) : (
+                        <div className="flex flex-col gap-4">
+                            {byClient.map((g) => (
+                                <div key={g.client_id} className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+                                    <div className="flex items-center justify-between gap-3 border-b bg-muted/40 px-4 py-3">
+                                        <div className="flex items-center gap-3">
+                                            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">{initials(g.client_name)}</span>
+                                            <div>
+                                                <div className="text-sm font-semibold">{g.client_name}</div>
+                                                <div className="text-xs text-muted-foreground">{[g.site_name, `${g.rows.length} item${g.rows.length === 1 ? '' : 's'}`].filter(Boolean).join(' · ')}</div>
+                                            </div>
                                         </div>
-                                        <div className="space-y-2">
-                                            <Label>Expiry Date</Label>
-                                            <Input
-                                                type="date"
-                                                value={
-                                                    receiveForm.data.expiry_date
-                                                }
-                                                onChange={(e) =>
-                                                    receiveForm.setData(
-                                                        'expiry_date',
-                                                        e.target.value,
-                                                    )
-                                                }
-                                            />
-                                            {receiveForm.errors.expiry_date && (
-                                                <p className="text-sm text-status-critical">
-                                                    {
-                                                        receiveForm.errors
-                                                            .expiry_date
-                                                    }
-                                                </p>
-                                            )}
-                                        </div>
+                                        <Button size="sm" variant="outline" onClick={() => setModal({ type: 'order', clientId: g.client_id })}><ShoppingCart className="h-3.5 w-3.5" />Order</Button>
                                     </div>
-                                    <div className="space-y-2">
-                                        <Label>Notes</Label>
-                                        <Input
-                                            value={receiveForm.data.notes}
-                                            onChange={(e) =>
-                                                receiveForm.setData(
-                                                    'notes',
-                                                    e.target.value,
-                                                )
-                                            }
-                                            placeholder="Optional notes"
-                                        />
-                                        {receiveForm.errors.notes && (
-                                            <p className="text-sm text-status-critical">
-                                                {receiveForm.errors.notes}
-                                            </p>
-                                        )}
-                                    </div>
-                                    <MedicationScanVerificationPanel
-                                        clientId={
-                                            selectedReceiveMedication
-                                                ? selectedReceiveMedication.client_id
-                                                : null
-                                        }
-                                        medicationId={
-                                            selectedReceiveMedication?.id ??
-                                            null
-                                        }
-                                        scanVerification={
-                                            selectedReceiveMedication?.scan_verification
-                                        }
-                                        resetKey={`${receiveOpen}-${receiveForm.data.client_medication_id}`}
-                                        requirementText="Verification is required before receiving stock."
-                                        onChange={(capture) => {
-                                            receiveForm.clearErrors(
-                                                'scan_code',
-                                            );
-                                            setReceiveScanCapture(capture);
-                                        }}
-                                    />
-                                    {receiveForm.errors.scan_code && (
-                                        <p className="text-sm text-status-critical">
-                                            {receiveForm.errors.scan_code}
-                                        </p>
-                                    )}
-                                </div>
-                                <DialogFooter>
-                                    <Button
-                                        type="submit"
-                                        disabled={
-                                            receivingStock ||
-                                            (!!selectedReceiveMedication?.scan_verification &&
-                                                !hasVerifiedMedicationScan(
-                                                    receiveScanCapture,
-                                                ))
-                                        }
-                                    >
-                                        {receivingStock
-                                            ? 'Recording...'
-                                            : 'Receive Stock'}
-                                    </Button>
-                                </DialogFooter>
-                            </form>
-                        </DialogContent>
-                    </Dialog>
-
-                    {/* Stock Adjustment */}
-                    <Dialog open={adjustOpen} onOpenChange={setAdjustOpen}>
-                        <DialogTrigger asChild>
-                            <Button variant="outline">
-                                <ArrowRightLeft className="mr-2 h-4 w-4" />{' '}
-                                Stock Adjustment
-                            </Button>
-                        </DialogTrigger>
-                        <DialogContent>
-                            <form onSubmit={submitAdjust}>
-                                <DialogHeader>
-                                    <DialogTitle>Stock Adjustment</DialogTitle>
-                                    <DialogDescription>
-                                        Manually adjust stock levels with a
-                                        required reason.
-                                    </DialogDescription>
-                                </DialogHeader>
-                                <div className="space-y-4 py-4">
-                                    <div className="space-y-2">
-                                        <Label>Medication</Label>
-                                        <Select
-                                            value={
-                                                adjustForm.data
-                                                    .client_medication_id
-                                            }
-                                            onValueChange={(v) =>
-                                                adjustForm.setData(
-                                                    'client_medication_id',
-                                                    v,
-                                                )
-                                            }
-                                        >
-                                            <SelectTrigger>
-                                                <SelectValue placeholder="Select medication..." />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {activeMedications.map((m) => (
-                                                    <SelectItem
-                                                        key={m.id}
-                                                        value={String(m.id)}
-                                                    >
-                                                        {m.name}
-                                                        {m.client
-                                                            ? ` (${m.client.first_name} ${m.client.last_name})`
-                                                            : ''}
-                                                    </SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        {adjustForm.errors
-                                            .client_medication_id && (
-                                            <p className="text-sm text-status-critical">
-                                                {
-                                                    adjustForm.errors
-                                                        .client_medication_id
-                                                }
-                                            </p>
-                                        )}
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>New Quantity</Label>
-                                        <Input
-                                            type="number"
-                                            min={0}
-                                            value={adjustForm.data.new_quantity}
-                                            onChange={(e) =>
-                                                adjustForm.setData(
-                                                    'new_quantity',
-                                                    e.target.value,
-                                                )
-                                            }
-                                            placeholder="Corrected stock count"
-                                        />
-                                        {adjustForm.errors.new_quantity && (
-                                            <p className="text-sm text-status-critical">
-                                                {adjustForm.errors.new_quantity}
-                                            </p>
-                                        )}
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>
-                                            Reason{' '}
-                                            <span className="text-status-critical">
-                                                *
-                                            </span>
-                                        </Label>
-                                        <Textarea
-                                            value={adjustForm.data.reason}
-                                            onChange={(e) =>
-                                                adjustForm.setData(
-                                                    'reason',
-                                                    e.target.value,
-                                                )
-                                            }
-                                            rows={3}
-                                            placeholder="Explain why the stock count is being adjusted..."
-                                            required
-                                        />
-                                        {adjustForm.errors.reason && (
-                                            <p className="text-sm text-status-critical">
-                                                {adjustForm.errors.reason}
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-                                <DialogFooter>
-                                    <Button
-                                        type="submit"
-                                        disabled={adjustForm.processing}
-                                    >
-                                        {adjustForm.processing
-                                            ? 'Adjusting...'
-                                            : 'Adjust Stock'}
-                                    </Button>
-                                </DialogFooter>
-                            </form>
-                        </DialogContent>
-                    </Dialog>
-                </div>
-
-                {/* Advance Order Dialog (not trigger-based, opened programmatically) */}
-                <Dialog open={advanceOpen} onOpenChange={setAdvanceOpen}>
-                    <DialogContent>
-                        <form onSubmit={submitAdvance}>
-                            <DialogHeader>
-                                <DialogTitle>
-                                    Advance Pharmacy Order
-                                </DialogTitle>
-                                <DialogDescription>
-                                    Record delivery details for this pharmacy
-                                    order.
-                                </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4 py-4">
-                                <div className="space-y-2">
-                                    <Label>Quantity Received</Label>
-                                    <Input
-                                        type="number"
-                                        min={1}
-                                        value={
-                                            advanceForm.data.quantity_received
-                                        }
-                                        onChange={(e) =>
-                                            advanceForm.setData(
-                                                'quantity_received',
-                                                e.target.value,
-                                            )
-                                        }
-                                        placeholder="Qty received"
-                                    />
-                                    {advanceForm.errors.quantity_received && (
-                                        <p className="text-sm text-status-critical">
-                                            {
-                                                advanceForm.errors
-                                                    .quantity_received
-                                            }
-                                        </p>
-                                    )}
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Batch Number</Label>
-                                    <Input
-                                        value={advanceForm.data.batch_number}
-                                        onChange={(e) =>
-                                            advanceForm.setData(
-                                                'batch_number',
-                                                e.target.value,
-                                            )
-                                        }
-                                        placeholder="Batch number"
-                                    />
-                                    {advanceForm.errors.batch_number && (
-                                        <p className="text-sm text-status-critical">
-                                            {advanceForm.errors.batch_number}
-                                        </p>
-                                    )}
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Batch Expiry</Label>
-                                    <Input
-                                        type="date"
-                                        value={advanceForm.data.batch_expiry}
-                                        onChange={(e) =>
-                                            advanceForm.setData(
-                                                'batch_expiry',
-                                                e.target.value,
-                                            )
-                                        }
-                                    />
-                                    {advanceForm.errors.batch_expiry && (
-                                        <p className="text-sm text-status-critical">
-                                            {advanceForm.errors.batch_expiry}
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                            <DialogFooter>
-                                <Button
-                                    type="submit"
-                                    disabled={advanceForm.processing}
-                                >
-                                    {advanceForm.processing
-                                        ? 'Advancing...'
-                                        : 'Advance Order'}
-                                </Button>
-                            </DialogFooter>
-                        </form>
-                    </DialogContent>
-                </Dialog>
-
-                {/* Edit Stock Dialog */}
-                <Dialog open={editOpen} onOpenChange={setEditOpen}>
-                    <DialogContent>
-                        <form onSubmit={submitEdit}>
-                            <DialogHeader>
-                                <DialogTitle>Edit Stock Details</DialogTitle>
-                                <DialogDescription>
-                                    Update reorder level, expiry date, batch
-                                    number, and supplier for{' '}
-                                    {editingItem?.medication_name}.
-                                </DialogDescription>
-                            </DialogHeader>
-                            <div className="space-y-4 py-4">
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label>Reorder Level</Label>
-                                        <Input
-                                            type="number"
-                                            min={0}
-                                            value={editForm.data.reorder_level}
-                                            onChange={(e) =>
-                                                editForm.setData(
-                                                    'reorder_level',
-                                                    e.target.value,
-                                                )
-                                            }
-                                            placeholder="Reorder when at or below"
-                                        />
-                                        {editForm.errors.reorder_level && (
-                                            <p className="text-sm text-status-critical">
-                                                {editForm.errors.reorder_level}
-                                            </p>
-                                        )}
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>Reorder Quantity</Label>
-                                        <Input
-                                            type="number"
-                                            min={1}
-                                            value={
-                                                editForm.data.reorder_quantity
-                                            }
-                                            onChange={(e) =>
-                                                editForm.setData(
-                                                    'reorder_quantity',
-                                                    e.target.value,
-                                                )
-                                            }
-                                            placeholder="Suggested qty to order"
-                                        />
-                                        {editForm.errors.reorder_quantity && (
-                                            <p className="text-sm text-status-critical">
-                                                {
-                                                    editForm.errors
-                                                        .reorder_quantity
-                                                }
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="grid grid-cols-2 gap-4">
-                                    <div className="space-y-2">
-                                        <Label>Expiry Date</Label>
-                                        <Input
-                                            type="date"
-                                            value={editForm.data.expiry_date}
-                                            onChange={(e) =>
-                                                editForm.setData(
-                                                    'expiry_date',
-                                                    e.target.value,
-                                                )
-                                            }
-                                        />
-                                        {editForm.errors.expiry_date && (
-                                            <p className="text-sm text-status-critical">
-                                                {editForm.errors.expiry_date}
-                                            </p>
-                                        )}
-                                    </div>
-                                    <div className="space-y-2">
-                                        <Label>Batch Number</Label>
-                                        <Input
-                                            value={editForm.data.batch_number}
-                                            onChange={(e) =>
-                                                editForm.setData(
-                                                    'batch_number',
-                                                    e.target.value,
-                                                )
-                                            }
-                                            placeholder="Batch number"
-                                        />
-                                        {editForm.errors.batch_number && (
-                                            <p className="text-sm text-status-critical">
-                                                {editForm.errors.batch_number}
-                                            </p>
-                                        )}
-                                    </div>
-                                </div>
-                                <div className="space-y-2">
-                                    <Label>Supplier Name</Label>
-                                    <Input
-                                        value={editForm.data.supplier_name}
-                                        onChange={(e) =>
-                                            editForm.setData(
-                                                'supplier_name',
-                                                e.target.value,
-                                            )
-                                        }
-                                        placeholder="Supplier / pharmacy name"
-                                    />
-                                    {editForm.errors.supplier_name && (
-                                        <p className="text-sm text-status-critical">
-                                            {editForm.errors.supplier_name}
-                                        </p>
-                                    )}
-                                </div>
-                            </div>
-                            <DialogFooter>
-                                <Button
-                                    type="submit"
-                                    disabled={editForm.processing}
-                                >
-                                    {editForm.processing
-                                        ? 'Saving...'
-                                        : 'Save Changes'}
-                                </Button>
-                            </DialogFooter>
-                        </form>
-                    </DialogContent>
-                </Dialog>
-
-                <Tabs value={activeTab} onValueChange={setActiveTab}>
-                    <TabsList className="mb-4">
-                        <TabsTrigger value="all">
-                            <Package className="mr-1 h-3.5 w-3.5" /> All Stock
-                        </TabsTrigger>
-                        {lowStock.length > 0 && (
-                            <TabsTrigger value="low">
-                                <AlertTriangle className="mr-1 h-3.5 w-3.5" />{' '}
-                                Low Stock ({lowStock.length})
-                            </TabsTrigger>
-                        )}
-                        {expiringSoon.length > 0 && (
-                            <TabsTrigger value="expiring">
-                                <Clock className="mr-1 h-3.5 w-3.5" /> Expiring
-                                Soon ({expiringSoon.length})
-                            </TabsTrigger>
-                        )}
-                        {expiredItems.length > 0 && (
-                            <TabsTrigger value="expired">
-                                <Calendar className="mr-1 h-3.5 w-3.5" />{' '}
-                                Expired ({expiredItems.length})
-                            </TabsTrigger>
-                        )}
-                        <TabsTrigger value="orders">
-                            <ShoppingCart className="mr-1 h-3.5 w-3.5" />{' '}
-                            Pharmacy Orders
-                        </TabsTrigger>
-                    </TabsList>
-
-                    {/* Stock Table (shared by all/low/expiring/expired tabs) */}
-                    {['all', 'low', 'expiring', 'expired'].map((tab) => (
-                        <TabsContent key={tab} value={tab}>
-                            <Card
-                                className={
-                                    tab === 'low'
-                                        ? 'border-status-warning/30 dark:border-status-warning/30'
-                                        : tab === 'expired'
-                                          ? 'border-status-critical/30 dark:border-status-critical/30'
-                                          : ''
-                                }
-                            >
-                                <CardContent className="p-0">
                                     <div className="overflow-x-auto">
-                                        <table className="w-full text-sm">
+                                        <table className="w-full min-w-[760px] text-sm">
                                             <thead>
-                                                <tr
-                                                    className={`border-b ${tab === 'low' ? 'bg-status-warning-bg' : tab === 'expired' ? 'bg-status-critical-bg' : 'bg-muted/50'}`}
-                                                >
-                                                    <th className="p-3 text-left font-medium">
-                                                        Medication
-                                                    </th>
-                                                    <th className="p-3 text-left font-medium">
-                                                        Client
-                                                    </th>
-                                                    <th className="p-3 text-left font-medium">
-                                                        Batch #
-                                                    </th>
-                                                    <th className="p-3 text-left font-medium">
-                                                        Expiry Date
-                                                    </th>
-                                                    <th className="p-3 text-left font-medium">
-                                                        On Hand
-                                                    </th>
-                                                    <th className="p-3 text-left font-medium">
-                                                        Reorder Level
-                                                    </th>
-                                                    <th className="p-3 text-left font-medium">
-                                                        Status
-                                                    </th>
-                                                    <th className="p-3 text-left font-medium">
-                                                        Last Counted
-                                                    </th>
-                                                    <th className="p-3 text-left font-medium">
-                                                        Actions
-                                                    </th>
+                                                <tr className="bg-muted/50 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                                                    <th className="px-4 py-2.5">Medication</th>
+                                                    <th className="px-4 py-2.5">Batch · expiry</th>
+                                                    <th className="px-4 py-2.5">On hand</th>
+                                                    <th className="px-4 py-2.5">Reorder at</th>
+                                                    <th className="px-4 py-2.5">Status</th>
+                                                    <th className="px-4 py-2.5 text-right">Actions</th>
                                                 </tr>
                                             </thead>
                                             <tbody>
-                                                {displayItems.map((s) => (
-                                                    <tr
-                                                        key={s.id}
-                                                        className="border-b last:border-0"
-                                                    >
-                                                        <td className="p-3 font-medium">
-                                                            {s.medication_name}
-                                                            {s.controlled && (
-                                                                <Badge
-                                                                    variant="destructive"
-                                                                    className="ml-1 text-[10px]"
-                                                                >
-                                                                    CD
-                                                                </Badge>
-                                                            )}
-                                                        </td>
-                                                        <td className="p-3">
-                                                            {s.client_name}
-                                                        </td>
-                                                        <td className="p-3 font-mono text-xs">
-                                                            {s.batch_number ??
-                                                                '—'}
-                                                        </td>
-                                                        <td className="p-3">
-                                                            <span className="text-xs">
-                                                                {formatDate(
-                                                                    s.expiry_date,
-                                                                )}
-                                                            </span>
-                                                            {s.expiry_date && (
-                                                                <span className="ml-1">
-                                                                    <ExpiryBadge
-                                                                        item={s}
-                                                                    />
-                                                                </span>
-                                                            )}
-                                                        </td>
-                                                        <td
-                                                            className={`p-3 font-mono ${s.is_low ? 'font-semibold text-status-critical' : ''}`}
-                                                        >
-                                                            {s.on_hand} {s.unit}
-                                                        </td>
-                                                        <td className="p-3 font-mono">
-                                                            {s.reorder_level ??
-                                                                '—'}
-                                                        </td>
-                                                        <td className="space-x-1 p-3">
-                                                            {s.is_low && (
-                                                                <Badge className="bg-status-warning text-[10px] text-white">
-                                                                    Low Stock
-                                                                </Badge>
-                                                            )}
-                                                            {s.is_expired && (
-                                                                <Badge
-                                                                    variant="destructive"
-                                                                    className="text-[10px]"
-                                                                >
-                                                                    Expired
-                                                                </Badge>
-                                                            )}
-                                                            {!s.is_low &&
-                                                                !s.is_expired &&
-                                                                !s.is_expiring_soon && (
-                                                                    <Badge
-                                                                        variant="outline"
-                                                                        className="text-[10px]"
-                                                                    >
-                                                                        OK
-                                                                    </Badge>
-                                                                )}
-                                                        </td>
-                                                        <td className="p-3 text-xs">
-                                                            {s.last_counted_at
-                                                                ? new Date(
-                                                                      s.last_counted_at,
-                                                                  ).toLocaleDateString(
-                                                                      'en-NZ',
-                                                                  )
-                                                                : 'Never'}
-                                                        </td>
-                                                        <td className="p-3">
-                                                            <div className="flex items-center gap-1">
-                                                                <ScheduledStockCounts
-                                                                    clientId={
-                                                                        s.client_id
-                                                                    }
-                                                                    medicationId={
-                                                                        s.medication_id
-                                                                    }
-                                                                    medicationName={
-                                                                        s.medication_name
-                                                                    }
-                                                                    controlledDrug={
-                                                                        s.controlled
-                                                                    }
-                                                                    scanVerification={
-                                                                        s.scan_verification
-                                                                    }
-                                                                    witnesses={
-                                                                        witnesses
-                                                                    }
-                                                                    onUpdate={
-                                                                        refreshStockPanels
-                                                                    }
-                                                                />
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="ghost"
-                                                                    onClick={() =>
-                                                                        openEdit(
-                                                                            s,
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    <Pencil className="h-3.5 w-3.5" />
-                                                                </Button>
-                                                            </div>
-                                                        </td>
-                                                    </tr>
-                                                ))}
-                                                {displayItems.length === 0 && (
-                                                    <tr>
-                                                        <td
-                                                            colSpan={9}
-                                                            className="p-6 text-center text-muted-foreground"
-                                                        >
-                                                            No stock records
-                                                            found.
-                                                        </td>
-                                                    </tr>
-                                                )}
+                                                {g.rows.map((s) => <StockRowView key={s.id} s={s} onCount={() => setModal(s.controlled ? { type: 'count', medId: s.medication_id } : { type: 'adjust', item: s })} onAdjust={() => setModal({ type: 'adjust', item: s })} />)}
                                             </tbody>
                                         </table>
                                     </div>
-                                </CardContent>
-                            </Card>
-                        </TabsContent>
-                    ))}
+                                </div>
+                            ))}
+                        </div>
+                    )
+                )}
 
-                    <TabsContent value="orders">
-                        <Card>
-                            <CardContent className="p-0">
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="border-b bg-muted/50">
-                                            <th className="p-3 text-left font-medium">
-                                                Client
-                                            </th>
-                                            <th className="p-3 text-left font-medium">
-                                                Medication
-                                            </th>
-                                            <th className="p-3 text-left font-medium">
-                                                Pharmacy
-                                            </th>
-                                            <th className="p-3 text-left font-medium">
-                                                Type
-                                            </th>
-                                            <th className="p-3 text-left font-medium">
-                                                Status
-                                            </th>
-                                            <th className="p-3 text-left font-medium">
-                                                Qty
-                                            </th>
-                                            <th className="p-3 text-left font-medium">
-                                                Actions
-                                            </th>
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {pharmacyOrders.map((o: any) => (
-                                            <tr
-                                                key={o.id}
-                                                className="border-b last:border-0"
-                                            >
-                                                <td className="p-3">
-                                                    {o.client?.last_name},{' '}
-                                                    {o.client?.first_name}
-                                                </td>
-                                                <td className="p-3 font-medium">
-                                                    {o.medication?.name ?? '—'}
-                                                </td>
-                                                <td className="p-3 text-xs">
-                                                    {o.pharmacy_name}
-                                                </td>
-                                                <td className="p-3">
-                                                    <Badge
-                                                        variant="outline"
-                                                        className="text-xs"
-                                                    >
-                                                        {o.order_type}
-                                                    </Badge>
-                                                </td>
-                                                <td className="p-3">
-                                                    <Badge
-                                                        variant="secondary"
-                                                        className="text-xs"
-                                                    >
-                                                        {o.status}
-                                                    </Badge>
-                                                </td>
-                                                <td className="p-3 font-mono">
-                                                    {o.quantity_ordered ?? '—'}
-                                                </td>
-                                                <td className="p-3">
-                                                    <Button
-                                                        size="sm"
-                                                        variant="outline"
-                                                        onClick={() =>
-                                                            openAdvance(o.id)
-                                                        }
-                                                    >
-                                                        Advance
-                                                    </Button>
-                                                </td>
+                {activeTab === 'controlled' && (
+                    <div className="flex flex-col gap-4">
+                        <div className="flex flex-wrap items-center justify-between gap-3 rounded-xl border border-status-critical/30 bg-status-critical-bg/50 px-4 py-3">
+                            <span className="text-sm text-status-critical">Controlled-drug register — running-balance reconciliation. Any non-zero discrepancy must be investigated and witnessed before close of shift.</span>
+                            <Button size="sm" onClick={() => setModal({ type: 'count', controlledOnly: true })}><ShieldCheck className="h-3.5 w-3.5" />Record CD balance check</Button>
+                        </div>
+                        <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+                            {controlledRegister.length === 0 ? (
+                                <div className="px-5 py-12 text-center text-sm text-muted-foreground">No controlled drugs in stock.</div>
+                            ) : (
+                                <div className="overflow-x-auto">
+                                    <table className="w-full min-w-[760px] text-sm">
+                                        <thead>
+                                            <tr className="bg-muted text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                                                <th className="px-4 py-2.5">Medication</th>
+                                                <th className="px-4 py-2.5">Client</th>
+                                                <th className="px-4 py-2.5">Register balance</th>
+                                                <th className="px-4 py-2.5">Last witnessed check</th>
+                                                <th className="px-4 py-2.5">Reconciliation</th>
+                                                <th className="px-4 py-2.5 text-right">Actions</th>
                                             </tr>
-                                        ))}
-                                        {pharmacyOrders.length === 0 && (
-                                            <tr>
-                                                <td
-                                                    colSpan={7}
-                                                    className="p-6 text-center text-muted-foreground"
-                                                >
-                                                    No pending pharmacy orders.
-                                                </td>
-                                            </tr>
-                                        )}
-                                    </tbody>
-                                </table>
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-                </Tabs>
+                                        </thead>
+                                        <tbody>
+                                            {controlledRegister.map((r) => {
+                                                const reconciled = r.discrepancy === null || r.discrepancy === 0;
+                                                return (
+                                                    <tr key={r.id} className="border-b last:border-b-0">
+                                                        <td className="px-4 py-3 font-medium">{r.medication_name}{r.cd_class && <span className="ml-2 rounded-full bg-status-critical-bg px-2 py-0.5 text-[10px] font-semibold text-status-critical">Class {r.cd_class}</span>}</td>
+                                                        <td className="px-4 py-3 text-muted-foreground">{r.client_name}</td>
+                                                        <td className="px-4 py-3 font-mono font-semibold tabular-nums">{r.register_balance} {r.unit}</td>
+                                                        <td className="px-4 py-3 text-muted-foreground">{r.last_check_at ? `${fmtDate(r.last_check_at)}${r.last_check_witness ? ` · ${r.last_check_witness}` : ''}` : 'Never'}</td>
+                                                        <td className="px-4 py-3">{reconciled ? <span className="rounded-full bg-status-success-bg px-2 py-0.5 text-[11px] font-semibold text-status-success">Reconciled</span> : <span className="rounded-full bg-status-critical-bg px-2 py-0.5 text-[11px] font-semibold text-status-critical">Discrepancy {r.discrepancy! > 0 ? '+' : ''}{r.discrepancy}</span>}</td>
+                                                        <td className="px-4 py-3 text-right">
+                                                            <div className="flex items-center justify-end gap-2">
+                                                                <Button size="sm" variant="outline" onClick={() => setModal({ type: 'count', medId: r.medication_id, controlledOnly: true })}>Count</Button>
+                                                                {!reconciled && <a href="/emar/controlled" className="text-xs font-medium text-status-critical underline">Investigate</a>}
+                                                            </div>
+                                                        </td>
+                                                    </tr>
+                                                );
+                                            })}
+                                        </tbody>
+                                    </table>
+                                </div>
+                            )}
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'orders' && (
+                    <div className="flex flex-col gap-4">
+                        <div className="flex items-center justify-between">
+                            <span className="text-sm text-muted-foreground">Tracking {openOrders.length} open order{openOrders.length === 1 ? '' : 's'}.</span>
+                            <Button size="sm" onClick={() => setModal({ type: 'order' })}><Plus className="h-3.5 w-3.5" />New pharmacy order</Button>
+                        </div>
+                        {pharmacyOrders.length === 0 ? (
+                            <div className="rounded-2xl border border-dashed bg-card px-5 py-12 text-center text-sm text-muted-foreground">No pharmacy orders.</div>
+                        ) : (
+                            pharmacyOrders.map((o) => <OrderCard key={o.id} o={o} onAdvance={() => advance(o.id)} />)
+                        )}
+                    </div>
+                )}
             </div>
+
+            {modal?.type === 'order' && <NewPharmacyOrderDialog clients={clients} medications={activeMedications} stockItems={stockItems} defaultClientId={modal.clientId} defaultMedId={modal.medId} onClose={() => setModal(null)} />}
+            {modal?.type === 'receive' && <ReceiveStockDialog medications={activeMedications} defaultMedId={modal.medId} onClose={() => setModal(null)} />}
+            {modal?.type === 'count' && <StockCountDialog medications={activeMedications} stockItems={stockItems} witnesses={witnesses} defaultMedId={modal.medId} controlledOnly={modal.controlledOnly} onClose={() => setModal(null)} />}
+            {modal?.type === 'adjust' && <AdjustStockDialog item={modal.item} onClose={() => setModal(null)} />}
         </AppLayout>
+    );
+}
+
+function StockRowView({ s, onCount, onAdjust }: { s: StockRow; onCount: () => void; onAdjust: () => void }) {
+    const reorder = s.reorder_level ?? 0;
+    const ratio = reorder > 0 ? Math.min(100, (s.on_hand / (reorder * 2)) * 100) : 100;
+    const barTone = s.is_low ? 'bg-status-critical' : s.on_hand <= reorder * 1.4 ? 'bg-status-warning' : 'bg-status-success';
+    const statusPill = s.is_expired
+        ? { label: 'Expired', cls: 'bg-status-critical-bg text-status-critical' }
+        : s.is_low
+          ? { label: 'Reorder now', cls: 'bg-status-warning-bg text-status-warning' }
+          : s.is_expiring_soon
+            ? { label: 'Expiring', cls: 'bg-status-warning-bg text-status-warning' }
+            : { label: 'In stock', cls: 'bg-status-success-bg text-status-success' };
+    const expiryTone = s.is_expired ? 'text-status-critical' : s.is_expiring_soon ? 'text-status-warning' : 'text-muted-foreground';
+    return (
+        <tr className="border-b last:border-b-0">
+            <td className="px-4 py-3">
+                <div className="flex items-center gap-1.5 font-medium">
+                    {s.medication_name}
+                    {s.controlled && <span className="rounded-full bg-status-critical-bg px-1.5 py-0.5 text-[10px] font-semibold text-status-critical">CD</span>}
+                    {s.requires_cold_chain && <Snowflake className="h-3.5 w-3.5 text-status-info" aria-label="Cold chain" />}
+                </div>
+                {s.medication_dose && <div className="text-xs text-muted-foreground">{s.medication_dose}</div>}
+            </td>
+            <td className="px-4 py-3">
+                <div className="font-mono text-xs">{s.batch_number ?? '—'}</div>
+                {s.expiry_date && <div className={`text-xs ${expiryTone}`}>{new Date(s.expiry_date).toLocaleDateString('en-NZ')}{s.is_expiring_soon && !s.is_expired ? ' · FEFO' : ''}</div>}
+            </td>
+            <td className="px-4 py-3">
+                <div className={`font-mono tabular-nums ${s.is_low ? 'font-semibold text-status-critical' : ''}`}>{s.on_hand} {s.unit}</div>
+                <div className="mt-1 h-1.5 w-24 overflow-hidden rounded-full bg-muted"><div className={`h-full rounded-full ${barTone}`} style={{ width: `${ratio}%` }} /></div>
+            </td>
+            <td className="px-4 py-3 font-mono tabular-nums text-muted-foreground">{s.reorder_level ?? '—'}</td>
+            <td className="px-4 py-3"><span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${statusPill.cls}`}>{statusPill.label}</span></td>
+            <td className="px-4 py-3">
+                <div className="flex items-center justify-end gap-1">
+                    <Button size="sm" variant="ghost" onClick={onCount} title="Record count"><ClipboardCheck className="h-3.5 w-3.5" /></Button>
+                    <Button size="sm" variant="ghost" onClick={onAdjust} title="Adjust / edit"><Pencil className="h-3.5 w-3.5" /></Button>
+                </div>
+            </td>
+        </tr>
+    );
+}
+
+function OrderCard({ o, onAdvance }: { o: OrderRow; onAdvance: () => void }) {
+    const stageIndex = Math.max(0, STAGES.indexOf(o.status));
+    const typeTone = o.order_type === 'urgent' ? 'bg-status-critical-bg text-status-critical' : o.order_type === 'repeat' ? 'bg-primary/10 text-primary' : 'bg-muted text-muted-foreground';
+    const nextLabel = NEXT_LABEL[o.status];
+    const stageTimes = [o.ordered_at, o.submitted_at, o.confirmed_at, o.dispensed_at, o.delivered_at];
+    return (
+        <div className="rounded-2xl border bg-card p-4 shadow-sm">
+            <div className="flex flex-wrap items-start justify-between gap-3">
+                <div>
+                    <div className="flex items-center gap-2 font-semibold">{o.medication_name ?? '—'}{o.order_type && <span className={`rounded-full px-2 py-0.5 text-[10px] font-semibold capitalize ${typeTone}`}>{o.order_type}</span>}</div>
+                    <div className="text-xs text-muted-foreground">{o.client_name} · {o.pharmacy_name ?? 'pharmacy'} · ordered {fmtDate(o.ordered_at)}</div>
+                </div>
+                <div className="text-right text-sm">
+                    <div className="font-mono font-semibold tabular-nums">{o.quantity_ordered ?? '—'} units</div>
+                    {o.status === 'delivered' && o.quantity_received != null && <div className="text-xs text-status-success">{o.quantity_received} received</div>}
+                </div>
+            </div>
+            <div className="mt-4 flex items-center">
+                {STAGE_LABELS.map((label, i) => {
+                    const done = i < stageIndex;
+                    const current = i === stageIndex;
+                    return (
+                        <div key={label} className="flex flex-1 items-center last:flex-none">
+                            <div className="flex flex-col items-center gap-1">
+                                <span className={`flex h-6 w-6 items-center justify-center rounded-full text-[11px] font-semibold ${done ? 'bg-primary text-primary-foreground' : current ? 'border-2 border-primary bg-card text-primary' : 'border border-border bg-card text-muted-foreground'}`}>{done ? <Check className="h-3.5 w-3.5" /> : i + 1}</span>
+                                <span className={`text-[10px] ${current ? 'font-semibold text-foreground' : 'text-muted-foreground'}`}>{label}</span>
+                                <span className="text-[9px] text-muted-foreground">{fmtDate(stageTimes[i])}</span>
+                            </div>
+                            {i < STAGE_LABELS.length - 1 && <div className={`mx-1 h-0.5 flex-1 ${i < stageIndex ? 'bg-primary' : 'bg-border'}`} />}
+                        </div>
+                    );
+                })}
+            </div>
+            {nextLabel && (
+                <div className="mt-4 flex justify-end">
+                    <Button size="sm" onClick={onAdvance}>{o.status === 'dispensed' ? <Truck className="h-3.5 w-3.5" /> : <Check className="h-3.5 w-3.5" />}{nextLabel}</Button>
+                </div>
+            )}
+        </div>
     );
 }

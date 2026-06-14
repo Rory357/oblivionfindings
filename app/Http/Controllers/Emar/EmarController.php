@@ -1422,58 +1422,128 @@ class EmarController extends Controller
     // ─── Stock Management ──────────────────────────────────
     public function stock(Request $request)
     {
-        $stockItems = ClientMedicationStock::query()
-            ->with(['medication' => fn ($q) => $q->with('client:id,first_name,last_name')])
-            ->whereHas('medication', fn ($q) => $q->active())
-            ->get()
-            ->map(fn ($s) => [
-                'id' => $s->id,
-                'medication_id' => $s->client_medication_id,
-                'medication_name' => $s->medication?->name,
-                'client_name' => $s->medication?->client?->first_name.' '.$s->medication?->client?->last_name,
-                'client_id' => $s->medication?->client_id,
-                'on_hand' => $s->on_hand,
-                'unit' => $s->unit,
-                'reorder_level' => $s->reorder_level,
-                'last_counted_at' => $s->last_counted_at,
-                'is_low' => $s->isLowStock(),
-                'controlled' => $s->medication?->controlled_drug,
-                'expiry_date' => $s->expiry_date?->toDateString(),
-                'batch_number' => $s->batch_number,
-                'supplier_name' => $s->supplier_name,
-                'reorder_quantity' => $s->reorder_quantity,
-                'is_expired' => $s->isExpired(),
-                'is_expiring_soon' => $s->isExpiringSoon(30),
-                'is_expiring_90' => $s->isExpiringSoon(90),
-                'scan_verification' => $s->medication?->client
-                    ? $this->buildMedicationScanPayload($s->medication->client, $s->medication)
-                    : null,
-            ]);
+        $siteFilter = $request->integer('site_id') ?: null;
+        $bySite = fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteFilter));
+
+        $stockModels = ClientMedicationStock::query()
+            ->with(['medication' => fn ($q) => $q->with(['client:id,first_name,last_name,site_id', 'client.site:id,name'])])
+            ->whereHas('medication', fn ($q) => $q->active()->when($siteFilter, $bySite))
+            ->get();
+
+        $stockItems = $stockModels->map(fn ($s) => [
+            'id' => $s->id,
+            'medication_id' => $s->client_medication_id,
+            'medication_name' => $s->medication?->name,
+            'medication_dose' => $s->medication?->dosage,
+            'client_name' => trim(($s->medication?->client?->first_name ?? '').' '.($s->medication?->client?->last_name ?? '')),
+            'client_id' => $s->medication?->client_id,
+            'site_id' => $s->medication?->client?->site_id,
+            'site_name' => $s->medication?->client?->site?->name,
+            'on_hand' => $s->on_hand,
+            'unit' => $s->unit,
+            'reorder_level' => $s->reorder_level,
+            'last_counted_at' => $s->last_counted_at,
+            'is_low' => $s->isLowStock(),
+            'controlled' => (bool) $s->medication?->controlled_drug,
+            'storage_condition' => $s->storage_condition ?? 'ambient',
+            'requires_cold_chain' => $s->requiresColdChain(),
+            'expiry_date' => $s->expiry_date?->toDateString(),
+            'batch_number' => $s->batch_number,
+            'supplier_name' => $s->supplier_name,
+            'reorder_quantity' => $s->reorder_quantity,
+            'is_expired' => $s->isExpired(),
+            'is_expiring_soon' => $s->isExpiringSoon(30),
+            'is_expiring_90' => $s->isExpiringSoon(90),
+            'scan_verification' => $s->medication?->client
+                ? $this->buildMedicationScanPayload($s->medication->client, $s->medication)
+                : null,
+        ])->values();
 
         $lowStockCount = $stockItems->where('is_low', true)->count();
 
+        // Controlled-drug reconciliation: register balance (last witnessed
+        // balance check) vs physical on-hand, plus any open discrepancy.
+        $controlledMedIds = $stockModels->filter(fn ($s) => $s->medication?->controlled_drug)->pluck('client_medication_id')->filter()->values();
+        $lastChecks = ClientControlledDrugEntry::query()
+            ->whereIn('client_medication_id', $controlledMedIds)
+            ->where('entry_type', 'balance_check')
+            ->with('witnessedBy:id,name')
+            ->latest('recorded_at')
+            ->get()
+            ->groupBy('client_medication_id');
+        $openDiscrepancies = ClientControlledDrugDiscrepancy::query()
+            ->whereIn('client_medication_id', $controlledMedIds)
+            ->whereIn('status', ['open', 'under_review'])
+            ->get()
+            ->groupBy('client_medication_id');
+
+        $controlledRegister = $stockModels
+            ->filter(fn ($s) => $s->medication?->controlled_drug)
+            ->map(function ($s) use ($lastChecks, $openDiscrepancies) {
+                $check = $lastChecks->get($s->client_medication_id)?->first();
+                $discrepancy = $openDiscrepancies->get($s->client_medication_id)?->first();
+
+                return [
+                    'id' => $s->id,
+                    'medication_id' => $s->client_medication_id,
+                    'medication_name' => $s->medication?->name,
+                    'client_id' => $s->medication?->client_id,
+                    'client_name' => trim(($s->medication?->client?->first_name ?? '').' '.($s->medication?->client?->last_name ?? '')),
+                    'cd_class' => $s->medication?->controlled_drug_class,
+                    'register_balance' => $check?->on_hand_after ?? $s->on_hand,
+                    'on_hand' => $s->on_hand,
+                    'unit' => $s->unit,
+                    'last_check_at' => $check?->recorded_at instanceof \DateTimeInterface ? $check->recorded_at->toIso8601String() : null,
+                    'last_check_witness' => $check?->witnessedBy?->name,
+                    'discrepancy' => $discrepancy ? (float) $discrepancy->difference : null,
+                ];
+            })->values();
+
+        // Flat pharmacy-order lifecycle — the page renders the 5-stage tracker.
         $pharmacyOrders = MedicationPharmacyOrder::query()
-            ->pending()
             ->with(['client:id,first_name,last_name', 'medication:id,name'])
+            ->when($siteFilter, $bySite)
             ->latest()
-            ->limit(20)
-            ->get();
+            ->limit(40)
+            ->get()
+            ->map(fn (MedicationPharmacyOrder $o) => [
+                'id' => $o->id,
+                'client_name' => $o->client ? trim($o->client->first_name.' '.$o->client->last_name) : 'Unknown',
+                'medication_name' => $o->medication?->name,
+                'pharmacy_name' => $o->pharmacy_name,
+                'order_type' => $o->order_type,
+                'status' => $o->status,
+                'quantity_ordered' => $o->quantity_ordered,
+                'quantity_received' => $o->quantity_received,
+                'ordered_at' => $o->created_at?->toIso8601String(),
+                'submitted_at' => $o->submitted_at?->toIso8601String(),
+                'confirmed_at' => $o->confirmed_at?->toIso8601String(),
+                'dispensed_at' => $o->dispensed_at?->toIso8601String(),
+                'delivered_at' => $o->delivered_at?->toIso8601String(),
+                'batch_number' => $o->batch_number,
+                'batch_expiry' => $o->batch_expiry instanceof \DateTimeInterface ? $o->batch_expiry->toDateString() : null,
+            ])->values();
+
+        $activeSite = $siteFilter ? Site::find($siteFilter) : null;
 
         return Inertia::render('emar/StockManagement', [
             'stockItems' => $stockItems,
             'lowStockCount' => $lowStockCount,
-            'expiringCount' => ClientMedicationStock::expiringSoon()->count(),
-            'expiredCount' => ClientMedicationStock::expired()->count(),
+            'expiringCount' => $stockItems->where('is_expiring_soon', true)->count(),
+            'expiredCount' => $stockItems->where('is_expired', true)->count(),
+            'controlledRegister' => $controlledRegister,
             'pharmacyOrders' => $pharmacyOrders,
             'clients' => $this->getClientsList(),
             'activeMedications' => ClientMedication::active()
                 ->with('client:id,first_name,last_name')
+                ->when($siteFilter, $bySite)
                 ->orderBy('name')
-                ->get(['id', 'name', 'client_id', 'dosage', 'barcode', 'nzulm_code'])
+                ->get(['id', 'name', 'client_id', 'dosage', 'barcode', 'nzulm_code', 'controlled_drug'])
                 ->map(fn (ClientMedication $medication) => [
                     'id' => $medication->id,
                     'name' => $medication->name,
                     'client_id' => $medication->client_id,
+                    'controlled' => (bool) $medication->controlled_drug,
                     'client' => $medication->client ? [
                         'first_name' => $medication->client->first_name,
                         'last_name' => $medication->client->last_name,
@@ -1484,6 +1554,9 @@ class EmarController extends Controller
                 ])
                 ->values(),
             'witnesses' => $this->getStaffList(),
+            'sites' => Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'active_site' => $activeSite ? ['id' => $activeSite->id, 'name' => $activeSite->name] : null,
+            'site_brand_colour' => $activeSite?->brand_colour,
         ]);
     }
 
@@ -3085,6 +3158,7 @@ class EmarController extends Controller
             'expiry_date' => 'nullable|date',
             'batch_number' => 'nullable|string|max:100',
             'supplier_name' => 'nullable|string|max:255',
+            'storage_condition' => 'nullable|string|in:ambient,fridge,controlled_room',
         ]);
 
         $stock->update($validated);

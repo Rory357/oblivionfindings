@@ -10,8 +10,8 @@ use Illuminate\Database\Eloquent\Model;
 
 class ClientMedicationStock extends Model
 {
-    use HasFactory;
     use AuditableChanges;
+    use HasFactory;
 
     protected $fillable = [
         'client_medication_id',
@@ -25,6 +25,7 @@ class ClientMedicationStock extends Model
         'batch_number',
         'last_reorder_alert_at',
         'supplier_name',
+        'storage_condition',
     ];
 
     protected $casts = [
@@ -96,6 +97,15 @@ class ClientMedicationStock extends Model
     public function isLowStock(): bool
     {
         return $this->reorder_level !== null && $this->on_hand <= $this->reorder_level;
+    }
+
+    /**
+     * Whether this medication must be kept in the cold chain (fridge) or a
+     * controlled room temperature — anything other than ambient storage.
+     */
+    public function requiresColdChain(): bool
+    {
+        return in_array($this->storage_condition, ['fridge', 'controlled_room'], true);
     }
 
     /**
