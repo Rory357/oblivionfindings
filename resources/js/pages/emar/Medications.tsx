@@ -1,1715 +1,346 @@
-import { PageHero } from '@/components/page';
-import DrugInteractionManager from '@/components/medications/DrugInteractionManager';
-import MedicationVersionHistory from '@/components/medications/MedicationVersionHistory';
-import { Badge } from '@/components/ui/badge';
+/* eslint-disable no-restricted-syntax -- the directory card/table + clickable rows are
+   custom-layout surfaces (not Card/Button); all colours are semantic tokens. */
+import { MED_TABS, matchesTab, type ClientOption, type MedCan, type MedRow } from '@/components/emar/medications/types';
+import { PageHero, type PageHeroBadge, type PageHeroMetaItem, type PageHeroStat } from '@/components/page';
+import { EntityFilter, TabStrip, type RosterTabItem } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogHeader,
-    DialogTitle,
-    DialogTrigger,
-} from '@/components/ui/dialog';
 import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import {
-    Tooltip,
-    TooltipContent,
-    TooltipProvider,
-    TooltipTrigger,
-} from '@/components/ui/tooltip';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
-import { Head, router, useForm } from '@inertiajs/react';
-import axios from 'axios';
 import {
-    AlertTriangle,
-    Ban,
-    Clock,
-    FileUp,
-    Pencil,
-    Pill,
-    Plus,
-} from 'lucide-react';
-import { useEffect, useMemo, useRef, useState } from 'react';
-import { toast } from 'sonner';
+    AddMedicationDialog,
+    DiscontinueDialog,
+    EditMedicationDialog,
+    ImportCsvDialog,
+    InteractionsDialog,
+    MedicationDetailDialog,
+    RejectOrderDialog,
+} from '@/pages/emar/_dialogs';
+import { Head, router } from '@inertiajs/react';
+import { Activity, AlertTriangle, BadgeCheck, Ban, Clock, FileUp, Flame, Layers, Package, Pencil, Pill, Plus, Search, Shield, Users } from 'lucide-react';
+import { useMemo, useState } from 'react';
+
+type Modal =
+    | { type: 'add' }
+    | { type: 'import' }
+    | { type: 'interactions' }
+    | { type: 'detail' | 'edit' | 'discontinue' | 'reject'; med: MedRow }
+    | null;
 
 type Props = {
-    medications: { data: any[]; links: any };
-    clients: { id: number; first_name: string; last_name: string }[];
+    medications: MedRow[];
+    clients: ClientOption[];
     staff: { id: number; name: string }[];
-    filters: {
-        search?: string;
-        status?: string;
-        type?: string;
-        client_id?: string;
-    };
-    interactionMap: Record<number, string>;
-    selectedClient: {
-        id: number;
-        first_name: string;
-        last_name: string;
-    } | null;
-    clientContext: {
-        profile: {
-            medical_history?: string | null;
-            mental_health_history?: string | null;
-            surgical_history?: string | null;
-            gp_name?: string | null;
-            gp_practice?: string | null;
-            gp_phone?: string | null;
-            hospital_preference?: string | null;
-            blood_type?: string | null;
-            organ_donor?: boolean;
-            immunisation_notes?: string | null;
-            disabilities?: string[];
-            allergies?: string[];
-            notes?: string | null;
-        } | null;
-        conditions: Array<{
-            id: number;
-            label: string;
-            severity?: string | null;
-            notes?: string | null;
-        }>;
-        emergency_contacts: Array<{
-            id: number;
-            name: string;
-            relationship?: string | null;
-            phone?: string | null;
-            email?: string | null;
-            notes?: string | null;
-            preferred_method?: string | null;
-            availability?: string | null;
-            authorised_health_info?: boolean;
-        }>;
-        medication_charts: Array<{
-            id: number;
-            title?: string | null;
-            original_name?: string | null;
-            version?: string | null;
-            effective_date?: string | null;
-            expiry_date?: string | null;
-            notes?: string | null;
-            mime_type?: string | null;
-            uploaded_at?: string | null;
-            uploaded_by?: string | null;
-            download_url: string;
-        }>;
-    } | null;
-    can: {
-        manage_allergies: boolean;
-        manage_interactions: boolean;
-        verify_orders?: boolean;
-    };
+    sites: { id: number; name: string }[];
+    active_site: { id: number; name: string } | null;
+    site_brand_colour: string | null;
+    witnesses: { id: number; name: string }[];
+    can: MedCan;
 };
 
-type MedicationAllergy = {
-    id: number;
-    allergen: string;
-    reaction?: string | null;
-    severity?: string | null;
-    is_severe?: boolean;
-    notes?: string | null;
-    identified_date?: string | null;
-    recorded_by?: string | null;
+const TAB_ICONS: Record<string, typeof Layers> = {
+    all: Layers,
+    active: Activity,
+    prn: Clock,
+    controlled: Shield,
+    high_risk: Flame,
+    awaiting: BadgeCheck,
 };
 
-const doseUnits = [
-    'mg',
-    'mcg',
-    'g',
-    'ml',
-    'units',
-    'tablets',
-    'capsules',
-    'drops',
-    'puffs',
-];
-const frequencies = [
-    'Once daily',
-    'Twice daily',
-    'Three times daily',
-    'Four times daily',
-    'Every 4 hours',
-    'Every 6 hours',
-    'Every 8 hours',
-    'Every 12 hours',
-    'Weekly',
-    'Fortnightly',
-    'Monthly',
-    'PRN',
-    'Stat',
-];
-const routes = [
-    'oral',
-    'sublingual',
-    'topical',
-    'transdermal',
-    'inhaled',
-    'nebulised',
-    'subcutaneous',
-    'intramuscular',
-    'intravenous',
-    'rectal',
-    'vaginal',
-    'optic',
-    'otic',
-    'nasal',
-];
-const forms = [
-    'tablet',
-    'capsule',
-    'liquid',
-    'cream',
-    'ointment',
-    'gel',
-    'patch',
-    'inhaler',
-    'injection',
-    'suppository',
-    'drops',
-    'spray',
-    'powder',
-];
-
-/** Maps frequency values to their calculated dose times (mirrors PHP DoseSchedulingService). */
-function calculateDoseTimes(frequency: string): string[] {
-    const normalised = frequency.toLowerCase().replace(/[\s\-_]/g, '');
-    const map: Record<string, string[]> = {
-        oncedaily: ['08:00'],
-        daily: ['08:00'],
-        od: ['08:00'],
-        twicedaily: ['08:00', '20:00'],
-        bd: ['08:00', '20:00'],
-        bid: ['08:00', '20:00'],
-        threetimesdaily: ['08:00', '14:00', '20:00'],
-        tds: ['08:00', '14:00', '20:00'],
-        tid: ['08:00', '14:00', '20:00'],
-        fourtimesdaily: ['08:00', '12:00', '18:00', '22:00'],
-        qds: ['08:00', '12:00', '18:00', '22:00'],
-        qid: ['08:00', '12:00', '18:00', '22:00'],
-        every4hours: ['06:00', '10:00', '14:00', '18:00', '22:00'],
-        q4h: ['06:00', '10:00', '14:00', '18:00', '22:00'],
-        every6hours: ['06:00', '12:00', '18:00', '00:00'],
-        q6h: ['06:00', '12:00', '18:00', '00:00'],
-        every8hours: ['06:00', '14:00', '22:00'],
-        q8h: ['06:00', '14:00', '22:00'],
-        every12hours: ['08:00', '20:00'],
-        q12h: ['08:00', '20:00'],
-        everymorning: ['08:00'],
-        mane: ['08:00'],
-        everynight: ['22:00'],
-        nocte: ['22:00'],
-        weekly: ['08:00'],
-        fortnightly: ['08:00'],
-        monthly: ['08:00'],
-        prn: [],
-        asneeded: [],
-        whenrequired: [],
-        stat: [],
-    };
-    return map[normalised] ?? ['08:00'];
+function hue(id: number): number {
+    return Math.round((id * 137.508) % 360);
+}
+function initials(name: string): string {
+    return name.split(/[\s,]+/).filter(Boolean).slice(0, 2).map((p) => p[0]!.toUpperCase()).join('');
 }
 
-function DoseTimesPreview({ frequency }: { frequency: string }) {
-    const times = useMemo(
-        () => (frequency ? calculateDoseTimes(frequency) : []),
-        [frequency],
-    );
-
-    if (!frequency) return null;
-
+function StateBadge({ med }: { med: MedRow }) {
+    const tone = med.state === 'active' ? 'bg-status-success-bg text-status-success' : med.state === 'paused' ? 'bg-status-warning-bg text-status-warning' : 'bg-muted text-muted-foreground';
     return (
-        <div className="rounded-md border border-status-success/30 bg-status-success-bg p-3 dark:border-status-success/30">
-            <div className="flex items-center gap-2 text-sm font-medium text-status-success dark:text-status-success">
-                <Clock className="h-4 w-4" />
-                Scheduled Dose Times
-            </div>
-            {times.length > 0 ? (
-                <div className="mt-2 flex flex-wrap gap-2">
-                    {times.map((t) => (
-                        <span
-                            key={t}
-                            className="inline-flex items-center rounded-full bg-status-success-bg px-2.5 py-0.5 text-xs font-medium text-status-success dark:bg-status-success-bg dark:text-status-success"
-                        >
-                            {t}
-                        </span>
-                    ))}
-                </div>
-            ) : (
-                <p className="mt-1 text-xs text-status-success dark:text-status-success">
-                    No fixed schedule — administered as needed or one-off.
-                </p>
+        <div className="flex flex-col items-start gap-0.5">
+            <span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold capitalize ${tone}`}>{med.state}</span>
+            {med.approval_status === 'pending_verification' && (
+                <span className="rounded border border-status-warning/40 px-1.5 py-0.5 text-[10px] font-medium text-status-warning">Awaiting verification</span>
+            )}
+            {med.approval_status === 'rejected' && (
+                <span className="rounded border border-status-critical/40 px-1.5 py-0.5 text-[10px] font-medium text-status-critical">Rejected</span>
             )}
         </div>
     );
 }
 
-function defaultFormData() {
-    return {
-        client_id: '',
-        medication_name: '',
-        brand_name: '',
-        dose: '',
-        dose_unit: '',
-        frequency: '',
-        route: '',
-        form: '',
-        instructions: '',
-        indication: '',
-        is_prn: false as boolean,
-        prn_reason: '',
-        max_per_day: '',
-        min_hours_between_doses: '',
-        controlled_drug: false as boolean,
-        high_risk: false as boolean,
-        witness_required: false as boolean,
-        start_date: '',
-        prescriber: '',
-        pharmac_therapeutic_group: '',
-        pharmac_subgroup: '',
+function Flag({ label, tone }: { label: string; tone: string }) {
+    return <span className={`rounded px-1.5 py-0.5 text-[9.5px] font-bold uppercase tracking-wide ${tone}`}>{label}</span>;
+}
+
+export default function Medications(props: Props) {
+    const { medications, clients, sites, active_site: activeSite, site_brand_colour: brandColour, can } = props;
+
+    const [activeTab, setActiveTab] = useState('all');
+    const [search, setSearch] = useState('');
+    const [clientFilter, setClientFilter] = useState<string>('all');
+    const [siteFilter, setSiteFilter] = useState<number | null>(activeSite?.id ?? null);
+    const [sort, setSort] = useState<'medication' | 'client' | 'stock'>('medication');
+    const [modal, setModal] = useState<Modal>(null);
+
+    const counts = useMemo(
+        () => ({
+            active: medications.filter((m) => m.state === 'active').length,
+            prn: medications.filter((m) => m.is_prn).length,
+            controlled: medications.filter((m) => m.controlled_drug).length,
+            awaiting: medications.filter((m) => m.approval_status === 'pending_verification').length,
+            lowStock: medications.filter((m) => m.stock?.low).length,
+            clients: new Set(medications.map((m) => m.client_id)).size,
+        }),
+        [medications],
+    );
+
+    const visible = useMemo(() => {
+        const q = search.toLowerCase();
+        const list = medications.filter((m) => {
+            if (!matchesTab(m, activeTab)) return false;
+            if (clientFilter !== 'all' && String(m.client_id) !== clientFilter) return false;
+            if (q && !`${m.name} ${m.brand_name ?? ''} ${m.client_name}`.toLowerCase().includes(q)) return false;
+            return true;
+        });
+        list.sort((a, b) => {
+            if (sort === 'client') return a.client_name.localeCompare(b.client_name);
+            if (sort === 'stock') return Number(a.stock?.on_hand ?? Infinity) - Number(b.stock?.on_hand ?? Infinity);
+            return a.name.localeCompare(b.name);
+        });
+        return list;
+    }, [medications, activeTab, clientFilter, search, sort]);
+
+    const TABS: RosterTabItem[] = MED_TABS.map((t) => ({
+        id: t.id,
+        label: t.label,
+        icon: TAB_ICONS[t.id] ?? Layers,
+        tone: t.tone,
+        badge: medications.filter((m) => matchesTab(m, t.id)).length || undefined,
+    }));
+
+    const heroMeta: PageHeroMetaItem[] = [{ icon: Users, label: `${counts.clients} client${counts.clients === 1 ? '' : 's'}` }, { icon: Package, label: `${medications.length} orders` }];
+
+    const heroBadges: PageHeroBadge[] = [
+        counts.awaiting > 0 ? { tone: 'warning' as const, label: `${counts.awaiting} to verify` } : null,
+        counts.lowStock > 0 ? { tone: 'critical' as const, label: `${counts.lowStock} low on stock` } : null,
+    ].filter(Boolean) as PageHeroBadge[];
+
+    const heroStats: PageHeroStat[] = [
+        { label: 'Active', value: counts.active },
+        { label: 'PRN', value: counts.prn },
+        { label: 'Controlled', value: counts.controlled },
+        { label: 'To verify', value: counts.awaiting, tone: counts.awaiting > 0 ? 'warning' : 'neutral' },
+    ];
+
+    const verify = (med: MedRow) => {
+        router.post(`/emar/medications/${med.id}/verify`, {}, { preserveScroll: true });
+        setModal(null);
     };
-}
-
-function getEditableDose(med: any) {
-    if (med.dose_amount !== null && med.dose_amount !== undefined) {
-        return med.dose_amount.toString();
-    }
-
-    const dosage = med.dosage ?? '';
-    const doseUnit = med.dose_unit ?? '';
-
-    if (dosage && doseUnit) {
-        const suffix = ` ${doseUnit}`;
-        if (dosage.endsWith(suffix)) {
-            return dosage.slice(0, -suffix.length);
-        }
-    }
-
-    return dosage;
-}
-
-function MedicationFormFields({
-    form,
-    clients,
-    idPrefix,
-}: {
-    form: ReturnType<typeof useForm<ReturnType<typeof defaultFormData>>>;
-    clients: Props['clients'];
-    idPrefix: string;
-}) {
-    return (
-        <>
-            <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                    <Label htmlFor={`${idPrefix}_client_id`}>Client *</Label>
-                    <Select
-                        value={form.data.client_id}
-                        onValueChange={(v) => form.setData('client_id', v)}
-                    >
-                        <SelectTrigger id={`${idPrefix}_client_id`}>
-                            <SelectValue placeholder="Select client" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {clients.map((c) => (
-                                <SelectItem key={c.id} value={c.id.toString()}>
-                                    {c.last_name}, {c.first_name}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    {form.errors.client_id && (
-                        <p className="text-xs text-status-critical">
-                            {form.errors.client_id}
-                        </p>
-                    )}
-                </div>
-                <div className="space-y-1.5">
-                    <Label htmlFor={`${idPrefix}_medication_name`}>
-                        Medication Name *
-                    </Label>
-                    <Input
-                        id={`${idPrefix}_medication_name`}
-                        value={form.data.medication_name}
-                        onChange={(e) =>
-                            form.setData('medication_name', e.target.value)
-                        }
-                    />
-                    {form.errors.medication_name && (
-                        <p className="text-xs text-status-critical">
-                            {form.errors.medication_name}
-                        </p>
-                    )}
-                </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                    <Label htmlFor={`${idPrefix}_brand_name`}>Brand Name</Label>
-                    <Input
-                        id={`${idPrefix}_brand_name`}
-                        value={form.data.brand_name}
-                        onChange={(e) =>
-                            form.setData('brand_name', e.target.value)
-                        }
-                    />
-                </div>
-                <div className="space-y-1.5">
-                    <Label htmlFor={`${idPrefix}_dose`}>Dose *</Label>
-                    <Input
-                        id={`${idPrefix}_dose`}
-                        value={form.data.dose}
-                        onChange={(e) => form.setData('dose', e.target.value)}
-                    />
-                    {form.errors.dose && (
-                        <p className="text-xs text-status-critical">
-                            {form.errors.dose}
-                        </p>
-                    )}
-                </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                    <Label htmlFor={`${idPrefix}_dose_unit`}>Dose Unit *</Label>
-                    <Select
-                        value={form.data.dose_unit}
-                        onValueChange={(v) => form.setData('dose_unit', v)}
-                    >
-                        <SelectTrigger id={`${idPrefix}_dose_unit`}>
-                            <SelectValue placeholder="Select unit" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {doseUnits.map((u) => (
-                                <SelectItem key={u} value={u}>
-                                    {u}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    {form.errors.dose_unit && (
-                        <p className="text-xs text-status-critical">
-                            {form.errors.dose_unit}
-                        </p>
-                    )}
-                </div>
-                <div className="space-y-1.5">
-                    <Label htmlFor={`${idPrefix}_frequency`}>Frequency *</Label>
-                    <Select
-                        value={form.data.frequency}
-                        onValueChange={(v) => form.setData('frequency', v)}
-                    >
-                        <SelectTrigger id={`${idPrefix}_frequency`}>
-                            <SelectValue placeholder="Select frequency" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {frequencies.map((f) => (
-                                <SelectItem key={f} value={f}>
-                                    {f}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    {form.errors.frequency && (
-                        <p className="text-xs text-status-critical">
-                            {form.errors.frequency}
-                        </p>
-                    )}
-                </div>
-            </div>
-
-            <DoseTimesPreview frequency={form.data.frequency} />
-
-            <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                    <Label htmlFor={`${idPrefix}_route`}>Route *</Label>
-                    <Select
-                        value={form.data.route}
-                        onValueChange={(v) => form.setData('route', v)}
-                    >
-                        <SelectTrigger id={`${idPrefix}_route`}>
-                            <SelectValue placeholder="Select route" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {routes.map((r) => (
-                                <SelectItem key={r} value={r}>
-                                    {r}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    {form.errors.route && (
-                        <p className="text-xs text-status-critical">
-                            {form.errors.route}
-                        </p>
-                    )}
-                </div>
-                <div className="space-y-1.5">
-                    <Label htmlFor={`${idPrefix}_form`}>Form *</Label>
-                    <Select
-                        value={form.data.form}
-                        onValueChange={(v) => form.setData('form', v)}
-                    >
-                        <SelectTrigger id={`${idPrefix}_form`}>
-                            <SelectValue placeholder="Select form" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {forms.map((f) => (
-                                <SelectItem key={f} value={f}>
-                                    {f}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    {form.errors.form && (
-                        <p className="text-xs text-status-critical">
-                            {form.errors.form}
-                        </p>
-                    )}
-                </div>
-            </div>
-
-            <div className="space-y-1.5">
-                <Label htmlFor={`${idPrefix}_instructions`}>Instructions</Label>
-                <Textarea
-                    id={`${idPrefix}_instructions`}
-                    rows={3}
-                    value={form.data.instructions}
-                    onChange={(e) =>
-                        form.setData('instructions', e.target.value)
-                    }
-                />
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                    <Label htmlFor={`${idPrefix}_indication`}>Indication</Label>
-                    <Input
-                        id={`${idPrefix}_indication`}
-                        value={form.data.indication}
-                        onChange={(e) =>
-                            form.setData('indication', e.target.value)
-                        }
-                    />
-                </div>
-                <div className="space-y-1.5">
-                    <Label htmlFor={`${idPrefix}_prescriber`}>Prescriber</Label>
-                    <Input
-                        id={`${idPrefix}_prescriber`}
-                        value={form.data.prescriber}
-                        onChange={(e) =>
-                            form.setData('prescriber', e.target.value)
-                        }
-                    />
-                </div>
-            </div>
-
-            <div className="grid grid-cols-2 gap-4">
-                <div className="space-y-1.5">
-                    <Label htmlFor={`${idPrefix}_start_date`}>Start Date</Label>
-                    <Input
-                        id={`${idPrefix}_start_date`}
-                        type="date"
-                        value={form.data.start_date}
-                        onChange={(e) =>
-                            form.setData('start_date', e.target.value)
-                        }
-                    />
-                    {form.errors.start_date && (
-                        <p className="text-xs text-status-critical">
-                            {form.errors.start_date}
-                        </p>
-                    )}
-                </div>
-            </div>
-
-            {/* Checkbox flags */}
-            <div className="grid grid-cols-2 gap-4">
-                <div className="flex items-center space-x-2">
-                    <Checkbox
-                        id={`${idPrefix}_is_prn`}
-                        checked={form.data.is_prn}
-                        onCheckedChange={(v) =>
-                            form.setData('is_prn', v === true)
-                        }
-                    />
-                    <Label htmlFor={`${idPrefix}_is_prn`}>
-                        PRN (as needed)
-                    </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                    <Checkbox
-                        id={`${idPrefix}_controlled_drug`}
-                        checked={form.data.controlled_drug}
-                        onCheckedChange={(v) =>
-                            form.setData('controlled_drug', v === true)
-                        }
-                    />
-                    <Label htmlFor={`${idPrefix}_controlled_drug`}>
-                        Controlled Drug
-                    </Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                    <Checkbox
-                        id={`${idPrefix}_high_risk`}
-                        checked={form.data.high_risk}
-                        onCheckedChange={(v) =>
-                            form.setData('high_risk', v === true)
-                        }
-                    />
-                    <Label htmlFor={`${idPrefix}_high_risk`}>High Risk</Label>
-                </div>
-                <div className="flex items-center space-x-2">
-                    <Checkbox
-                        id={`${idPrefix}_witness_required`}
-                        checked={form.data.witness_required}
-                        onCheckedChange={(v) =>
-                            form.setData('witness_required', v === true)
-                        }
-                    />
-                    <Label htmlFor={`${idPrefix}_witness_required`}>
-                        Witness Required
-                    </Label>
-                </div>
-            </div>
-
-            <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
-                <div className="space-y-1.5">
-                    <Label htmlFor={`${idPrefix}_therapeutic_group`}>
-                        Pharmac Therapeutic Group
-                    </Label>
-                    <Input
-                        id={`${idPrefix}_therapeutic_group`}
-                        value={form.data.pharmac_therapeutic_group}
-                        onChange={(e) =>
-                            form.setData(
-                                'pharmac_therapeutic_group',
-                                e.target.value,
-                            )
-                        }
-                        placeholder="e.g. Anticoagulants"
-                    />
-                </div>
-                <div className="space-y-1.5">
-                    <Label htmlFor={`${idPrefix}_subgroup`}>
-                        Therapeutic Subgroup
-                    </Label>
-                    <Input
-                        id={`${idPrefix}_subgroup`}
-                        value={form.data.pharmac_subgroup}
-                        onChange={(e) =>
-                            form.setData('pharmac_subgroup', e.target.value)
-                        }
-                        placeholder="e.g. Vitamin K antagonists"
-                    />
-                </div>
-            </div>
-
-            {/* PRN fields - shown when is_prn is checked */}
-            {form.data.is_prn && (
-                <div className="rounded-md border border-status-info/30 bg-status-info-bg p-4 dark:border-status-info/30">
-                    <p className="mb-3 text-sm font-medium text-status-info dark:text-status-info">
-                        PRN Details
-                    </p>
-                    <div className="grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                        <div className="space-y-1.5">
-                            <Label htmlFor={`${idPrefix}_prn_reason`}>
-                                PRN Reason
-                            </Label>
-                            <Input
-                                id={`${idPrefix}_prn_reason`}
-                                value={form.data.prn_reason}
-                                onChange={(e) =>
-                                    form.setData('prn_reason', e.target.value)
-                                }
-                            />
-                        </div>
-                        <div className="space-y-1.5">
-                            <Label htmlFor={`${idPrefix}_max_doses`}>
-                                Max Doses / Day
-                            </Label>
-                            <Input
-                                id={`${idPrefix}_max_doses`}
-                                type="number"
-                                value={form.data.max_per_day}
-                                onChange={(e) =>
-                                    form.setData('max_per_day', e.target.value)
-                                }
-                            />
-                            {form.errors.max_per_day && (
-                                <p className="text-xs text-status-critical">
-                                    {form.errors.max_per_day}
-                                </p>
-                            )}
-                        </div>
-                        <div className="space-y-1.5">
-                            <Label htmlFor={`${idPrefix}_min_hours`}>
-                                Min Hours Between
-                            </Label>
-                            <Input
-                                id={`${idPrefix}_min_hours`}
-                                type="number"
-                                value={form.data.min_hours_between_doses}
-                                onChange={(e) =>
-                                    form.setData(
-                                        'min_hours_between_doses',
-                                        e.target.value,
-                                    )
-                                }
-                            />
-                            {form.errors.min_hours_between_doses && (
-                                <p className="text-xs text-status-critical">
-                                    {form.errors.min_hours_between_doses}
-                                </p>
-                            )}
-                        </div>
-                    </div>
-                </div>
-            )}
-        </>
-    );
-}
-
-function AddMedicationDialog({ clients }: { clients: Props['clients'] }) {
-    const [open, setOpen] = useState(false);
-    const form = useForm(defaultFormData());
-
-    function handleSubmit(e: React.FormEvent) {
-        e.preventDefault();
-        form.post('/emar/medications', {
-            onSuccess: () => {
-                setOpen(false);
-                form.reset();
-            },
-        });
-    }
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                <Button size="sm">
-                    <Plus className="mr-1 h-4 w-4" /> Add Medication
-                </Button>
-            </DialogTrigger>
-            <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle>Add Medication</DialogTitle>
-                    <DialogDescription>
-                        Create a medication profile with scheduling, safety
-                        flags, and administration details.
-                    </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <MedicationFormFields
-                        form={form}
-                        clients={clients}
-                        idPrefix="add"
-                    />
-                    <div className="flex justify-end gap-2 pt-2">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setOpen(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button type="submit" disabled={form.processing}>
-                            {form.processing ? 'Saving...' : 'Add Medication'}
-                        </Button>
-                    </div>
-                </form>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-function EditMedicationDialog({
-    med,
-    clients,
-}: {
-    med: any;
-    clients: Props['clients'];
-}) {
-    const [open, setOpen] = useState(false);
-    const form = useForm({
-        client_id: med.client_id?.toString() ?? '',
-        medication_name: med.name ?? '',
-        brand_name: med.brand_name ?? '',
-        dose: getEditableDose(med),
-        dose_unit: med.dose_unit ?? '',
-        frequency: med.frequency ?? '',
-        route: med.route ?? '',
-        form: med.form ?? '',
-        instructions: med.instructions ?? '',
-        indication: med.indication ?? '',
-        is_prn: !!med.is_prn,
-        prn_reason: med.prn_reason ?? '',
-        max_per_day: med.max_per_day?.toString() ?? '',
-        min_hours_between_doses: med.min_hours_between_doses?.toString() ?? '',
-        controlled_drug: !!med.controlled_drug,
-        high_risk: !!med.high_risk,
-        witness_required: !!med.witness_required,
-        start_date: med.start_date ?? '',
-        prescriber: med.prescriber ?? '',
-        pharmac_therapeutic_group: med.pharmac_therapeutic_group ?? '',
-        pharmac_subgroup: med.pharmac_subgroup ?? '',
-    });
-
-    function handleSubmit(e: React.FormEvent) {
-        e.preventDefault();
-        form.put(`/emar/medications/${med.id}`, {
-            onSuccess: () => {
-                setOpen(false);
-                form.reset();
-            },
-        });
-    }
-
-    return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                <Button size="sm" variant="ghost" className="h-7 w-7 p-0">
-                    <Pencil className="h-3.5 w-3.5" />
-                </Button>
-            </DialogTrigger>
-            <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle>Edit Medication</DialogTitle>
-                    <DialogDescription>
-                        Update the medication schedule, dosage, or safety
-                        requirements for this client.
-                    </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <MedicationFormFields
-                        form={form}
-                        clients={clients}
-                        idPrefix={`edit_${med.id}`}
-                    />
-                    <div className="flex justify-end gap-2 pt-2">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setOpen(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button type="submit" disabled={form.processing}>
-                            {form.processing
-                                ? 'Saving...'
-                                : 'Update Medication'}
-                        </Button>
-                    </div>
-                </form>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-function ImportCsvDialog() {
-    const [open, setOpen] = useState(false);
-    const [uploading, setUploading] = useState(false);
-    const fileRef = useRef<HTMLInputElement>(null);
-
-    function handleSubmit(e: React.FormEvent) {
-        e.preventDefault();
-        const file = fileRef.current?.files?.[0];
-        if (!file) return;
-
-        setUploading(true);
-        const formData = new FormData();
-        formData.append('csv_file', file);
-
-        router.post('/emar/medications/import', formData, {
-            forceFormData: true,
-            onFinish: () => {
-                setUploading(false);
-                setOpen(false);
-                if (fileRef.current) fileRef.current.value = '';
-            },
-        });
-    }
-
-    return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                <Button size="sm" variant="outline">
-                    <FileUp className="mr-1 h-4 w-4" /> Import CSV
-                </Button>
-            </DialogTrigger>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Import Medications from CSV</DialogTitle>
-                    <DialogDescription>
-                        Upload a CSV of medication rows using the documented
-                        client and dose format.
-                    </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="rounded-md border border-status-info/30 bg-status-info-bg p-3 text-sm dark:border-status-info/30">
-                        <p className="font-medium text-status-info dark:text-status-info">
-                            CSV Format
-                        </p>
-                        <p className="mt-1 text-xs text-status-info dark:text-status-info">
-                            client_name, medication_name, dose, frequency, route
-                        </p>
-                        <p className="mt-1 text-xs text-muted-foreground">
-                            Client name should match &quot;Last, First&quot; or
-                            &quot;First Last&quot; format. First row can be a
-                            header (it will be skipped if it contains
-                            &quot;client_name&quot;).
-                        </p>
-                    </div>
-                    <div className="space-y-1.5">
-                        <Label htmlFor="csv_file">CSV File</Label>
-                        <Input
-                            id="csv_file"
-                            ref={fileRef}
-                            type="file"
-                            accept=".csv"
-                        />
-                    </div>
-                    <div className="flex justify-end gap-2 pt-2">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setOpen(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button type="submit" disabled={uploading}>
-                            {uploading ? 'Importing...' : 'Import'}
-                        </Button>
-                    </div>
-                </form>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-function AddAllergyDialog({
-    clientId,
-    onCreated,
-}: {
-    clientId: number;
-    onCreated: (allergy: MedicationAllergy) => void;
-}) {
-    const [open, setOpen] = useState(false);
-    const [saving, setSaving] = useState(false);
-    const [form, setForm] = useState({
-        allergen: '',
-        reaction: '',
-        severity: 'moderate',
-        notes: '',
-        identified_date: '',
-    });
-
-    async function handleSubmit(e: React.FormEvent) {
-        e.preventDefault();
-        setSaving(true);
-
-        try {
-            const response = await axios.post(
-                `/api/medications/clients/${clientId}/allergies`,
-                {
-                    allergen: form.allergen,
-                    reaction: form.reaction || null,
-                    severity: form.severity || null,
-                    notes: form.notes || null,
-                    identified_date: form.identified_date || null,
-                },
-            );
-
-            onCreated({
-                id: response.data.allergy.id,
-                allergen: response.data.allergy.allergen,
-                severity: response.data.allergy.severity,
-            });
-            toast.success('Medication allergy recorded.');
-            setOpen(false);
-            setForm({
-                allergen: '',
-                reaction: '',
-                severity: 'moderate',
-                notes: '',
-                identified_date: '',
-            });
-        } catch (error: unknown) {
-            toast.error(
-                error instanceof Error
-                    ? error.message
-                    : 'Failed to save allergy.',
-            );
-        } finally {
-            setSaving(false);
-        }
-    }
-
-    return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                <Button size="sm" variant="outline">
-                    <Plus className="mr-1 h-4 w-4" /> Add Allergy
-                </Button>
-            </DialogTrigger>
-            <DialogContent className="max-w-lg">
-                <DialogHeader>
-                    <DialogTitle>Add Medication Allergy</DialogTitle>
-                    <DialogDescription>
-                        Record a medication allergy for the selected client so
-                        it is visible on medication workflows.
-                    </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={handleSubmit} className="space-y-4">
-                    <div className="space-y-1.5">
-                        <Label htmlFor="allergen">Allergen *</Label>
-                        <Input
-                            id="allergen"
-                            value={form.allergen}
-                            onChange={(e) =>
-                                setForm((current) => ({
-                                    ...current,
-                                    allergen: e.target.value,
-                                }))
-                            }
-                            required
-                        />
-                    </div>
-                    <div className="space-y-1.5">
-                        <Label htmlFor="reaction">Reaction</Label>
-                        <Input
-                            id="reaction"
-                            value={form.reaction}
-                            onChange={(e) =>
-                                setForm((current) => ({
-                                    ...current,
-                                    reaction: e.target.value,
-                                }))
-                            }
-                        />
-                    </div>
-                    <div className="grid grid-cols-2 gap-4">
-                        <div className="space-y-1.5">
-                            <Label htmlFor="severity">Severity</Label>
-                            <Select
-                                value={form.severity}
-                                onValueChange={(value) =>
-                                    setForm((current) => ({
-                                        ...current,
-                                        severity: value,
-                                    }))
-                                }
-                            >
-                                <SelectTrigger id="severity">
-                                    <SelectValue />
-                                </SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="mild">Mild</SelectItem>
-                                    <SelectItem value="moderate">
-                                        Moderate
-                                    </SelectItem>
-                                    <SelectItem value="severe">
-                                        Severe
-                                    </SelectItem>
-                                    <SelectItem value="life_threatening">
-                                        Life Threatening
-                                    </SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <div className="space-y-1.5">
-                            <Label htmlFor="identified_date">
-                                Identified Date
-                            </Label>
-                            <Input
-                                id="identified_date"
-                                type="date"
-                                value={form.identified_date}
-                                onChange={(e) =>
-                                    setForm((current) => ({
-                                        ...current,
-                                        identified_date: e.target.value,
-                                    }))
-                                }
-                            />
-                        </div>
-                    </div>
-                    <div className="space-y-1.5">
-                        <Label htmlFor="allergy_notes">Notes</Label>
-                        <Textarea
-                            id="allergy_notes"
-                            rows={3}
-                            value={form.notes}
-                            onChange={(e) =>
-                                setForm((current) => ({
-                                    ...current,
-                                    notes: e.target.value,
-                                }))
-                            }
-                        />
-                    </div>
-                    <div className="flex justify-end gap-2">
-                        <Button
-                            type="button"
-                            variant="outline"
-                            onClick={() => setOpen(false)}
-                        >
-                            Cancel
-                        </Button>
-                        <Button
-                            type="submit"
-                            disabled={saving || !form.allergen.trim()}
-                        >
-                            {saving ? 'Saving...' : 'Save Allergy'}
-                        </Button>
-                    </div>
-                </form>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-export default function Medications({
-    medications,
-    clients,
-    staff,
-    filters,
-    interactionMap = {},
-    selectedClient,
-    clientContext,
-    can,
-}: Props) {
-    const [allergies, setAllergies] = useState<MedicationAllergy[]>([]);
-    const [loadingAllergies, setLoadingAllergies] = useState(false);
-
-    useEffect(() => {
-        if (!selectedClient) {
-            setAllergies([]);
-            return;
-        }
-
-        setLoadingAllergies(true);
-
-        axios
-            .get(`/api/medications/clients/${selectedClient.id}/allergies`)
-            .then((response) => {
-                setAllergies(response.data.allergies ?? []);
-            })
-            .catch(() => {
-                toast.error(
-                    'Failed to load medication allergies for this client.',
-                );
-            })
-            .finally(() => {
-                setLoadingAllergies(false);
-            });
-    }, [selectedClient]);
-
-    function updateFilter(key: string, value: string) {
-        router.get(
-            '/emar/medications',
-            { ...filters, [key]: value || undefined },
-            { preserveState: true },
-        );
-    }
-
-    function handleDiscontinue(med: any) {
-        const reason = prompt('Reason for discontinuation:');
-        if (reason !== null) {
-            router.post(`/emar/medications/${med.id}/discontinue`, { reason });
-        }
-    }
-
-    function handleVerifyMedication(med: any) {
-        router.post(
-            `/emar/medications/${med.id}/verify`,
-            {},
-            { preserveScroll: true },
-        );
-    }
-
-    function handleRejectMedication(med: any) {
-        const reason = prompt('Reason for rejecting this medication order:');
-        if (reason === null || !reason.trim()) {
-            return;
-        }
-        router.post(
-            `/emar/medications/${med.id}/reject`,
-            { rejection_reason: reason },
-            { preserveScroll: true },
-        );
-    }
-
-    return (
-        <AppLayout>
-            <Head title="eMAR - Medications" />
+        <AppLayout breadcrumbs={[{ title: 'eMAR', href: '/emar' }, { title: 'Medications', href: '/emar/medications' }]}>
+            <Head title="Medications Database" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero
-                    title="Medications Database"
-                    description="Central medication directory with search, filtering, and status tracking"
-                    icon={<Pill className="h-7 w-7 text-white" />}
-                    backHref="/emar"
-                    backLabel="Back"
+                    variant="hero"
+                    category="ops"
+                    brandColour={brandColour}
+                    icon={Pill}
+                    title={
+                        <span>
+                            <span className="flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-wide text-primary-foreground/80">
+                                <span aria-hidden className="relative inline-flex h-2 w-2">
+                                    <span className="absolute inset-0 animate-ping rounded-full bg-status-success/70" />
+                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success" />
+                                </span>
+                                Medication register
+                            </span>
+                            <span className="mt-1 block text-[26px] font-bold leading-tight">
+                                The medication register for{' '}
+                                <span className="border-b-2 border-primary-foreground/40">{activeSite?.name ?? 'your services'}</span>
+                            </span>
+                        </span>
+                    }
+                    description={`${medications.length} medications across ${counts.clients} clients. ${counts.awaiting} awaiting prescriber verification and ${counts.lowStock} low on stock.`}
+                    meta={heroMeta}
+                    badges={heroBadges}
+                    stats={heroStats}
+                    actions={
+                        <>
+                            <Button className="bg-primary-foreground text-primary hover:bg-primary-foreground/90" onClick={() => setModal({ type: 'add' })}>
+                                <Plus className="h-4 w-4" />
+                                Add medication
+                            </Button>
+                            <Button variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20" onClick={() => setModal({ type: 'import' })}>
+                                <FileUp className="h-4 w-4" />
+                                Import
+                            </Button>
+                        </>
+                    }
+                    footer={
+                        sites.length > 0 ? (
+                            <div className="flex items-center justify-end py-3">
+                                <EntityFilter
+                                    label="Site"
+                                    allLabel="All sites"
+                                    items={sites}
+                                    value={siteFilter}
+                                    onChange={(id) => {
+                                        setSiteFilter(id);
+                                        router.get('/emar/medications', id ? { site_id: id } : {}, { preserveState: true, preserveScroll: true });
+                                    }}
+                                    onDark
+                                />
+                            </div>
+                        ) : undefined
+                    }
                 />
-                {/* Filters */}
-                <div className="mb-6 flex flex-wrap items-center gap-3">
-                    <Input
-                        placeholder="Search medications..."
-                        value={filters.search ?? ''}
-                        onChange={(e) => updateFilter('search', e.target.value)}
-                        className="w-64"
-                    />
-                    <Select
-                        value={filters.status ?? ''}
-                        onValueChange={(v) => updateFilter('status', v)}
-                    >
-                        <SelectTrigger className="w-40">
-                            <SelectValue placeholder="All statuses" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="active">Active</SelectItem>
-                            <SelectItem value="ceased">Ceased</SelectItem>
-                            <SelectItem value="paused">Paused</SelectItem>
-                        </SelectContent>
-                    </Select>
-                    <Select
-                        value={filters.type ?? ''}
-                        onValueChange={(v) => updateFilter('type', v)}
-                    >
-                        <SelectTrigger className="w-40">
-                            <SelectValue placeholder="All types" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            <SelectItem value="prn">PRN Only</SelectItem>
-                            <SelectItem value="controlled">
-                                Controlled
-                            </SelectItem>
-                            <SelectItem value="high_risk">High Risk</SelectItem>
-                        </SelectContent>
-                    </Select>
-                    <Select
-                        value={filters.client_id ?? ''}
-                        onValueChange={(v) => updateFilter('client_id', v)}
-                    >
-                        <SelectTrigger className="w-56">
-                            <SelectValue placeholder="All clients" />
-                        </SelectTrigger>
-                        <SelectContent>
-                            {clients.map((c) => (
-                                <SelectItem key={c.id} value={c.id.toString()}>
-                                    {c.last_name}, {c.first_name}
-                                </SelectItem>
-                            ))}
-                        </SelectContent>
-                    </Select>
-                    <div className="ml-auto flex gap-2">
-                        <DrugInteractionManager
-                            canManage={can.manage_interactions}
-                        />
-                        <ImportCsvDialog />
-                        <AddMedicationDialog clients={clients} />
+
+                <TabStrip value={activeTab} onChange={setActiveTab} items={TABS} ariaLabel="Medication register views" />
+
+                <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+                    <div className="flex flex-wrap items-center gap-2.5 border-b p-3.5">
+                        <div className="relative">
+                            <Search className="pointer-events-none absolute left-2.5 top-1/2 h-4 w-4 -translate-y-1/2 text-muted-foreground" />
+                            <Input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search medication, brand or client…" className="w-72 pl-8" />
+                        </div>
+                        <Select value={clientFilter} onValueChange={setClientFilter}>
+                            <SelectTrigger className="h-9 w-44">
+                                <SelectValue placeholder="All clients" />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="all">All clients</SelectItem>
+                                {clients.map((c) => (
+                                    <SelectItem key={c.id} value={String(c.id)}>
+                                        {c.last_name}, {c.first_name}
+                                    </SelectItem>
+                                ))}
+                            </SelectContent>
+                        </Select>
+                        <Select value={sort} onValueChange={(v) => setSort(v as typeof sort)}>
+                            <SelectTrigger className="h-9 w-40">
+                                <SelectValue />
+                            </SelectTrigger>
+                            <SelectContent>
+                                <SelectItem value="medication">Sort: Medication</SelectItem>
+                                <SelectItem value="client">Sort: Client</SelectItem>
+                                <SelectItem value="stock">Sort: Stock (low first)</SelectItem>
+                            </SelectContent>
+                        </Select>
+                        <div className="ml-auto flex items-center gap-2">
+                            <span className="text-xs text-muted-foreground">
+                                {visible.length} of {medications.length}
+                            </span>
+                            <Button variant="outline" size="sm" onClick={() => setModal({ type: 'interactions' })}>
+                                <AlertTriangle className="h-4 w-4" />
+                                Interactions
+                            </Button>
+                        </div>
                     </div>
-                </div>
 
-                {selectedClient && clientContext && (
-                    <div className="mb-6 grid gap-4 xl:grid-cols-3">
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-base">
-                                    {selectedClient.last_name},{' '}
-                                    {selectedClient.first_name}
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-3 text-sm">
-                                <div>
-                                    <div className="text-xs tracking-wide text-muted-foreground uppercase">
-                                        GP
-                                    </div>
-                                    <div>
-                                        {clientContext.profile?.gp_name ??
-                                            'Not recorded'}
-                                    </div>
-                                    {clientContext.profile?.gp_practice && (
-                                        <div className="text-muted-foreground">
-                                            {clientContext.profile.gp_practice}
-                                        </div>
-                                    )}
-                                    {clientContext.profile?.gp_phone && (
-                                        <div className="text-muted-foreground">
-                                            {clientContext.profile.gp_phone}
-                                        </div>
-                                    )}
-                                </div>
-                                <div>
-                                    <div className="text-xs tracking-wide text-muted-foreground uppercase">
-                                        Hospital Preference
-                                    </div>
-                                    <div>
-                                        {clientContext.profile
-                                            ?.hospital_preference ??
-                                            'Not recorded'}
-                                    </div>
-                                </div>
-                                <div>
-                                    <div className="text-xs tracking-wide text-muted-foreground uppercase">
-                                        Medical Notes
-                                    </div>
-                                    <p className="line-clamp-4 whitespace-pre-wrap text-muted-foreground">
-                                        {clientContext.profile
-                                            ?.medical_history ||
-                                            clientContext.profile?.notes ||
-                                            'No medical notes recorded.'}
-                                    </p>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <CardTitle className="text-base">
-                                    Conditions & Contacts
-                                </CardTitle>
-                            </CardHeader>
-                            <CardContent className="space-y-4 text-sm">
-                                <div>
-                                    <div className="mb-2 text-xs tracking-wide text-muted-foreground uppercase">
-                                        Conditions
-                                    </div>
-                                    <div className="flex flex-wrap gap-2">
-                                        {clientContext.conditions.length > 0 ? (
-                                            clientContext.conditions.map(
-                                                (condition) => (
-                                                    <Badge
-                                                        key={condition.id}
-                                                        variant="outline"
-                                                    >
-                                                        {condition.label}
-                                                        {condition.severity
-                                                            ? ` • ${condition.severity}`
-                                                            : ''}
-                                                    </Badge>
-                                                ),
-                                            )
-                                        ) : (
-                                            <span className="text-muted-foreground">
-                                                No conditions recorded.
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-                                <div>
-                                    <div className="mb-2 text-xs tracking-wide text-muted-foreground uppercase">
-                                        Emergency Contacts
-                                    </div>
-                                    <div className="space-y-2">
-                                        {clientContext.emergency_contacts
-                                            .length > 0 ? (
-                                            clientContext.emergency_contacts.map(
-                                                (contact) => (
-                                                    <div
-                                                        key={contact.id}
-                                                        className="rounded-md border p-2"
-                                                    >
-                                                        <div className="font-medium">
-                                                            {contact.name}
-                                                        </div>
-                                                        <div className="text-xs text-muted-foreground">
-                                                            {contact.relationship ??
-                                                                'Relationship not recorded'}
-                                                            {contact.phone
-                                                                ? ` • ${contact.phone}`
-                                                                : ''}
-                                                        </div>
-                                                    </div>
-                                                ),
-                                            )
-                                        ) : (
-                                            <span className="text-muted-foreground">
-                                                No emergency contacts recorded.
-                                            </span>
-                                        )}
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-
-                        <Card>
-                            <CardHeader className="pb-3">
-                                <div className="flex items-center justify-between gap-2">
-                                    <CardTitle className="text-base">
-                                        Allergies & Charts
-                                    </CardTitle>
-                                    {can.manage_allergies && (
-                                        <AddAllergyDialog
-                                            clientId={selectedClient.id}
-                                            onCreated={(allergy) =>
-                                                setAllergies((current) => [
-                                                    allergy,
-                                                    ...current,
-                                                ])
-                                            }
-                                        />
-                                    )}
-                                </div>
-                            </CardHeader>
-                            <CardContent className="space-y-4 text-sm">
-                                <div>
-                                    <div className="mb-2 text-xs tracking-wide text-muted-foreground uppercase">
-                                        Medication Allergies
-                                    </div>
-                                    <div className="space-y-2">
-                                        {loadingAllergies ? (
-                                            <div className="text-muted-foreground">
-                                                Loading allergies…
-                                            </div>
-                                        ) : allergies.length > 0 ? (
-                                            allergies.map((allergy) => (
-                                                <div
-                                                    key={allergy.id}
-                                                    className="rounded-md border p-2"
-                                                >
-                                                    <div className="flex items-center gap-2">
-                                                        <span className="font-medium">
-                                                            {allergy.allergen}
+                    {visible.length === 0 ? (
+                        <div className="flex flex-col items-center gap-2 px-5 py-14 text-center text-sm text-muted-foreground">
+                            <Pill className="h-6 w-6" />
+                            No medications match these filters.
+                        </div>
+                    ) : (
+                        <div className="overflow-x-auto">
+                            <table className="w-full min-w-[980px] text-sm">
+                                <thead>
+                                    <tr className="bg-muted text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                                        <th className="px-4 py-2.5">Medication</th>
+                                        <th className="px-4 py-2.5">Client</th>
+                                        <th className="px-4 py-2.5">Dose</th>
+                                        <th className="px-4 py-2.5">Frequency</th>
+                                        <th className="px-4 py-2.5">Flags</th>
+                                        <th className="px-4 py-2.5">State</th>
+                                        <th className="px-4 py-2.5">Stock</th>
+                                        <th className="px-4 py-2.5"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {visible.map((m) => (
+                                        <tr key={m.id} className="cursor-pointer border-b last:border-b-0 hover:bg-muted/60" onClick={() => setModal({ type: 'detail', med: m })}>
+                                            <td className="px-4 py-3">
+                                                <div className="font-medium">{m.name}</div>
+                                                <div className="truncate text-xs text-muted-foreground">{[m.brand_name, m.instructions].filter(Boolean).join(' · ')}</div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <span className="flex items-center gap-2">
+                                                    <span className="flex h-6 w-6 items-center justify-center rounded-full text-[10px] font-bold text-primary-foreground" style={{ backgroundColor: `oklch(0.62 0.16 ${hue(m.client_id)})` }}>
+                                                        {initials(m.client_name)}
+                                                    </span>
+                                                    {m.client_name}
+                                                </span>
+                                            </td>
+                                            <td className="px-4 py-3 tabular-nums">{[m.dosage, m.dose_unit].filter(Boolean).join(' ') || '—'}</td>
+                                            <td className="px-4 py-3 text-muted-foreground">{m.is_prn ? 'PRN' : m.frequency ?? '—'}</td>
+                                            <td className="px-4 py-3">
+                                                <div className="flex flex-wrap items-center gap-1">
+                                                    {m.is_prn && <Flag label="PRN" tone="bg-muted text-muted-foreground" />}
+                                                    {m.controlled_drug && <Flag label="CD" tone="bg-status-critical-bg text-status-critical" />}
+                                                    {m.high_risk && <Flag label="High-risk" tone="bg-status-warning-bg text-status-warning" />}
+                                                    {m.witness_required && <Flag label="Witness" tone="bg-status-info-bg text-status-info" />}
+                                                    {m.interaction_severity && <AlertTriangle className="h-3.5 w-3.5 text-status-warning" />}
+                                                </div>
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                <StateBadge med={m} />
+                                            </td>
+                                            <td className="px-4 py-3">
+                                                {m.stock ? (
+                                                    Number(m.stock.on_hand) === 0 ? (
+                                                        <span className="rounded-full bg-status-critical-bg px-2 py-0.5 text-[11px] font-semibold text-status-critical">Out of stock</span>
+                                                    ) : (
+                                                        <span className={m.stock.low ? 'text-status-warning' : 'text-muted-foreground'}>
+                                                            {m.stock.on_hand} {m.stock.unit}
+                                                            {m.stock.low ? ' · low' : ''}
                                                         </span>
-                                                        {allergy.severity && (
-                                                            <Badge
-                                                                variant={
-                                                                    allergy.is_severe
-                                                                        ? 'destructive'
-                                                                        : 'outline'
-                                                                }
-                                                            >
-                                                                {allergy.severity.replace(
-                                                                    '_',
-                                                                    ' ',
-                                                                )}
-                                                            </Badge>
-                                                        )}
-                                                    </div>
-                                                    {(allergy.reaction ||
-                                                        allergy.notes) && (
-                                                        <p className="mt-1 text-xs text-muted-foreground">
-                                                            {allergy.reaction ??
-                                                                allergy.notes}
-                                                        </p>
+                                                    )
+                                                ) : (
+                                                    <span className="text-muted-foreground">—</span>
+                                                )}
+                                            </td>
+                                            <td className="px-4 py-3 text-right" onClick={(e) => e.stopPropagation()}>
+                                                <div className="flex items-center justify-end gap-1">
+                                                    <Button size="icon" variant="ghost" aria-label="Edit" onClick={() => setModal({ type: 'edit', med: m })}>
+                                                        <Pencil className="h-4 w-4" />
+                                                    </Button>
+                                                    {m.state === 'active' && (
+                                                        <Button size="icon" variant="ghost" aria-label="Discontinue" onClick={() => setModal({ type: 'discontinue', med: m })}>
+                                                            <Ban className="h-4 w-4 text-status-critical" />
+                                                        </Button>
                                                     )}
                                                 </div>
-                                            ))
-                                        ) : (
-                                            <div className="text-muted-foreground">
-                                                No medication allergies
-                                                recorded.
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                                <div>
-                                    <div className="mb-2 text-xs tracking-wide text-muted-foreground uppercase">
-                                        Medication Charts
-                                    </div>
-                                    <div className="space-y-2">
-                                        {clientContext.medication_charts
-                                            .length > 0 ? (
-                                            clientContext.medication_charts.map(
-                                                (chart) => (
-                                                    <a
-                                                        key={chart.id}
-                                                        href={
-                                                            chart.download_url
-                                                        }
-                                                        className="block rounded-md border p-2 transition hover:border-primary/40 hover:bg-muted/40"
-                                                    >
-                                                        <div className="font-medium">
-                                                            {chart.title ||
-                                                                chart.original_name ||
-                                                                `Chart ${chart.id}`}
-                                                        </div>
-                                                        <div className="text-xs text-muted-foreground">
-                                                            {chart.version
-                                                                ? `Version ${chart.version}`
-                                                                : 'Current chart'}
-                                                            {chart.effective_date
-                                                                ? ` • Effective ${chart.effective_date}`
-                                                                : ''}
-                                                        </div>
-                                                    </a>
-                                                ),
-                                            )
-                                        ) : (
-                                            <div className="text-muted-foreground">
-                                                No medication charts uploaded.
-                                            </div>
-                                        )}
-                                    </div>
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </div>
-                )}
-
-                <Card>
-                    <CardContent className="p-0">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b bg-muted/50">
-                                    <th className="p-3 text-left font-medium">
-                                        Medication
-                                    </th>
-                                    <th className="p-3 text-left font-medium">
-                                        Client
-                                    </th>
-                                    <th className="p-3 text-left font-medium">
-                                        Dose
-                                    </th>
-                                    <th className="p-3 text-left font-medium">
-                                        Frequency
-                                    </th>
-                                    <th className="p-3 text-left font-medium">
-                                        Route
-                                    </th>
-                                    <th className="p-3 text-left font-medium">
-                                        Flags
-                                    </th>
-                                    <th className="p-3 text-left font-medium">
-                                        State
-                                    </th>
-                                    <th className="p-3 text-left font-medium">
-                                        Stock
-                                    </th>
-                                    <th className="p-3 text-right font-medium">
-                                        Actions
-                                    </th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {medications.data.map((m: any) => (
-                                    <tr
-                                        key={m.id}
-                                        className="border-b last:border-0"
-                                    >
-                                        <td className="p-3">
-                                            <span className="font-medium">
-                                                {m.name}
-                                            </span>
-                                            {m.instructions && (
-                                                <p className="mt-0.5 line-clamp-1 text-xs text-muted-foreground">
-                                                    {m.instructions}
-                                                </p>
-                                            )}
-                                        </td>
-                                        <td className="p-3">
-                                            {m.client?.last_name},{' '}
-                                            {m.client?.first_name}
-                                        </td>
-                                        <td className="p-3 text-xs">
-                                            {m.dose_amount !== null &&
-                                            m.dose_amount !== undefined &&
-                                            m.dose_unit
-                                                ? `${m.dose_amount} ${m.dose_unit}`
-                                                : (m.dosage ?? '—')}
-                                        </td>
-                                        <td className="p-3 text-xs">
-                                            {m.frequency}
-                                        </td>
-                                        <td className="p-3 text-xs">
-                                            {m.route ?? '—'}
-                                        </td>
-                                        <td className="p-3">
-                                            <div className="flex gap-1">
-                                                {m.is_prn && (
-                                                    <Badge
-                                                        variant="outline"
-                                                        className="text-[10px]"
-                                                    >
-                                                        PRN
-                                                    </Badge>
-                                                )}
-                                                {m.controlled_drug && (
-                                                    <Badge
-                                                        variant="destructive"
-                                                        className="text-[10px]"
-                                                    >
-                                                        CD
-                                                    </Badge>
-                                                )}
-                                                {m.high_risk && (
-                                                    <Badge className="bg-status-warning-bg text-[10px] text-status-warning">
-                                                        HR
-                                                    </Badge>
-                                                )}
-                                                {m.witness_required && (
-                                                    <Badge
-                                                        variant="secondary"
-                                                        className="text-[10px]"
-                                                    >
-                                                        W
-                                                    </Badge>
-                                                )}
-                                                {interactionMap[m.id] && (
-                                                    <TooltipProvider>
-                                                        <Tooltip>
-                                                            <TooltipTrigger>
-                                                                <AlertTriangle
-                                                                    className={`h-4 w-4 ${
-                                                                        interactionMap[
-                                                                            m.id
-                                                                        ] ===
-                                                                        'contraindicated'
-                                                                            ? 'text-status-critical'
-                                                                            : interactionMap[
-                                                                                    m
-                                                                                        .id
-                                                                                ] ===
-                                                                                'major'
-                                                                              ? 'text-status-warning'
-                                                                              : 'text-status-warning'
-                                                                    }`}
-                                                                />
-                                                            </TooltipTrigger>
-                                                            <TooltipContent>
-                                                                Drug interaction
-                                                                (
-                                                                {
-                                                                    interactionMap[
-                                                                        m.id
-                                                                    ]
-                                                                }
-                                                                )
-                                                            </TooltipContent>
-                                                        </Tooltip>
-                                                    </TooltipProvider>
-                                                )}
-                                            </div>
-                                        </td>
-                                        <td className="p-3">
-                                            <div className="flex flex-col items-start gap-1">
-                                                <Badge
-                                                    variant={
-                                                        m.state === 'active'
-                                                            ? 'default'
-                                                            : m.state ===
-                                                                'paused'
-                                                              ? 'secondary'
-                                                              : 'outline'
-                                                    }
-                                                    className="text-xs"
-                                                >
-                                                    {m.state}
-                                                </Badge>
-                                                {m.approval_status &&
-                                                    m.approval_status !==
-                                                        'verified' && (
-                                                        <Badge
-                                                            variant={
-                                                                m.approval_status ===
-                                                                'rejected'
-                                                                    ? 'destructive'
-                                                                    : 'outline'
-                                                            }
-                                                            className="border-status-warning/40 text-[10px] text-status-warning"
-                                                        >
-                                                            {m.approval_status ===
-                                                            'rejected'
-                                                                ? 'Rejected'
-                                                                : 'Awaiting verification'}
-                                                        </Badge>
-                                                    )}
-                                            </div>
-                                        </td>
-                                        <td className="p-3 font-mono text-xs">
-                                            {m.stock?.on_hand ?? '—'}
-                                        </td>
-                                        <td className="p-3 text-right">
-                                            <div className="flex items-center justify-end gap-1">
-                                                {m.client_id && (
-                                                    <MedicationVersionHistory
-                                                        clientId={m.client_id}
-                                                        medicationId={m.id}
-                                                        medicationName={m.name}
-                                                    />
-                                                )}
-                                                <EditMedicationDialog
-                                                    med={m}
-                                                    clients={clients}
-                                                />
-                                                {can.verify_orders &&
-                                                    m.approval_status &&
-                                                    m.approval_status !==
-                                                        'verified' && (
-                                                        <>
-                                                            <Button
-                                                                size="sm"
-                                                                variant="ghost"
-                                                                className="h-7 px-2 text-xs text-status-success hover:text-status-success"
-                                                                onClick={() =>
-                                                                    handleVerifyMedication(
-                                                                        m,
-                                                                    )
-                                                                }
-                                                            >
-                                                                Verify
-                                                            </Button>
-                                                            {m.approval_status !==
-                                                                'rejected' && (
-                                                                <Button
-                                                                    size="sm"
-                                                                    variant="ghost"
-                                                                    className="h-7 px-2 text-xs"
-                                                                    onClick={() =>
-                                                                        handleRejectMedication(
-                                                                            m,
-                                                                        )
-                                                                    }
-                                                                >
-                                                                    Reject
-                                                                </Button>
-                                                            )}
-                                                        </>
-                                                    )}
-                                                {m.state === 'active' && (
-                                                    <Button
-                                                        size="sm"
-                                                        variant="ghost"
-                                                        className="h-7 px-2 text-xs text-status-critical hover:text-status-critical"
-                                                        onClick={() =>
-                                                            handleDiscontinue(m)
-                                                        }
-                                                    >
-                                                        <Ban className="mr-1 h-3 w-3" />{' '}
-                                                        Discontinue
-                                                    </Button>
-                                                )}
-                                            </div>
-                                        </td>
-                                    </tr>
-                                ))}
-                                {medications.data.length === 0 && (
-                                    <tr>
-                                        <td
-                                            colSpan={9}
-                                            className="p-6 text-center text-muted-foreground"
-                                        >
-                                            No medications found.
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </CardContent>
-                </Card>
+                                            </td>
+                                        </tr>
+                                    ))}
+                                </tbody>
+                            </table>
+                        </div>
+                    )}
+                </div>
             </div>
+
+            {/* Modals */}
+            {modal?.type === 'add' && <AddMedicationDialog clients={clients} onClose={() => setModal(null)} />}
+            {modal?.type === 'import' && <ImportCsvDialog onClose={() => setModal(null)} />}
+            {modal?.type === 'interactions' && <InteractionsDialog medications={medications} onClose={() => setModal(null)} />}
+            {modal?.type === 'edit' && <EditMedicationDialog medication={modal.med} onClose={() => setModal(null)} />}
+            {modal?.type === 'discontinue' && <DiscontinueDialog medication={modal.med} onClose={() => setModal(null)} />}
+            {modal?.type === 'reject' && <RejectOrderDialog medication={modal.med} onClose={() => setModal(null)} />}
+            {modal?.type === 'detail' && (
+                <MedicationDetailDialog
+                    medication={modal.med}
+                    canVerify={!!can.verify_orders}
+                    onClose={() => setModal(null)}
+                    onEdit={() => setModal({ type: 'edit', med: modal.med })}
+                    onDiscontinue={() => setModal({ type: 'discontinue', med: modal.med })}
+                    onReject={() => setModal({ type: 'reject', med: modal.med })}
+                    onVerify={() => verify(modal.med)}
+                />
+            )}
         </AppLayout>
     );
 }

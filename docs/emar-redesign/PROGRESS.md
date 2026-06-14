@@ -9,7 +9,7 @@ isolated in their own worktrees `hr-m1-people` / `fin-wt`). Design bundles: `.de
 |---|------|-------|---------------|--------|--------|
 | 1 | MAR Charts | `/emar/mar` | `Emar_Charts_Page/` | done* | `b6658602` + frontend |
 | 2 | Medication Rounds | `/emar/rounds` | `Emar_Medication_Rounds_Page/` | done* | `628a1783` + frontend |
-| 3 | Medications Database | `/emar/medications` | `Medications_Page/` | todo | — |
+| 3 | Medications Database | `/emar/medications` | `Medications_Page/` | done* | `e85d3a13` + frontend |
 | 4 | Prescriptions & Orders | `/emar/prescriptions` | `Prescription_Page/` | todo | — |
 | 5 | PRN Records | `/emar/prn` | `PRN_Redesign/` | todo | — |
 | 6 | Controlled Drugs | `/emar/controlled` | `Controlled_Drugs_Page/` | todo | — |
@@ -38,6 +38,8 @@ Status legend: `todo` / `in-progress` / `done`. `done*` = all automated gates gr
 - **`resources/js/components/page/page-hero.tsx`** (brand-colour foundation): added optional `brandColour?: string | null` prop + resolved `heroBase` (brandColour → category → primary) driving `--hero-base`. Purely additive — existing `category`-only callers unchanged. ⚠️ Finance loop also edits this file.
 
 ## Backlog / deferred
+
+**Page 3 (Medications Database):** import **row-preview/validation** step (kept fire-and-forget CSV import w/ toast), full **live drug-interaction engine** in the Add-wizard Safety step (allergy cross-check IS live via `/api/medications/clients/{id}/allergies`; interaction shown as a note + the **Interactions** reference modal lists `interaction_severity`), **client-context cards** (folded into the detail modal + hero), and **version-history** modal (old `MedicationVersionHistory` — not in the new design's modal set). The shared 4-step `AddMedicationDialog` (in `pages/emar/_dialogs.tsx`) now also powers MAR's "Add medication" (mar-governance-dialogs reuses it — one create path). §7 retire is moot (orphaned medications pages already removed). Reasons: secondary; core shipped = register hero + TabStrip facets + filterable directory + all-modal CRUD (Add/Edit/Detail/Discontinue[req. reason]/Import/Verify/Reject/Interactions).
 
 **Page 2 (Rounds):** round **timeline** donut axis (most complex visual lens), **Chart** resident×round matrix tab (needs per-round items load — secondary lens), **audit-&-timeline** dialog, **right-click context menu** (board cards open via button), template-wizard **service-context** selector (site + default staff cover coverage), **Re-record** on already-recorded doses (backend dedup blocks it → shown read-only), and backend **G2/G3** (complete-with-pending guard + auto-miss scheduled job) + G5–G8/G10. Reasons: secondary lenses / separable miss-tracking infra; core shipped = hero + board (cards/list) + guided modal + templates wizard + generate + activity. Cross-module: `meds.round.show` deep links keep working via the redirect (repointing `RoundInfo.url` to skip the hop is a minor optimisation, deferred).
 
