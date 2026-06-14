@@ -62,7 +62,9 @@ import {
     DayPickerChip,
     parseYmd,
 } from '@/pages/meds/today/components/day-picker-chip';
+import { AddMedicationModal } from './components/add-medication-modal';
 import { GenerateRoundsModal } from './components/generate-rounds-modal';
+import { MedicationReviewModal } from './components/medication-review-modal';
 import { ReportErrorModal, type ClientOption } from './components/report-error-modal';
 
 /* ── Types (mirror MedicationOverviewService::payload) ───────────────── */
@@ -294,7 +296,9 @@ export default function EmarHome(props: Props) {
     const [search, setSearch] = useState('');
     const [siteFilter, setSiteFilter] = useState<number | null>(null);
     const [dismissed, setDismissed] = useState<Set<string>>(new Set());
-    const [modal, setModal] = useState<null | 'generate-rounds' | 'report-error'>(null);
+    const [modal, setModal] = useState<
+        null | 'generate-rounds' | 'report-error' | 'add-medication' | 'medication-review'
+    >(null);
 
     const goDate = (ymd: string) =>
         router.get(
@@ -795,9 +799,15 @@ export default function EmarHome(props: Props) {
                                 <p className="text-xs text-muted-foreground">Med-pass progress per client.</p>
                             </div>
                         </div>
-                        <Link href="/emar/mar" className="text-xs font-medium text-primary hover:underline">
-                            All clients →
-                        </Link>
+                        <div className="flex items-center gap-3">
+                            <Button size="sm" onClick={() => setModal('add-medication')}>
+                                <Pill className="h-4 w-4" />
+                                Add medication
+                            </Button>
+                            <Link href="/emar/mar" className="text-xs font-medium text-primary hover:underline">
+                                All clients →
+                            </Link>
+                        </div>
                     </CardHeader>
                     <CardContent>
                         {filteredBoard.length === 0 ? (
@@ -922,11 +932,21 @@ export default function EmarHome(props: Props) {
 
                         {/* Reviews due */}
                         <Card className="rounded-[18px]">
-                            <CardHeader className="flex-row items-center gap-2 pb-2">
-                                <span className="grid h-8 w-8 place-items-center rounded-lg bg-status-warning-bg text-status-warning">
-                                    <CalendarCheck className="h-4 w-4" />
-                                </span>
-                                <CardTitle className="text-sm">Chart reviews due</CardTitle>
+                            <CardHeader className="flex-row items-center justify-between gap-2 pb-2">
+                                <div className="flex items-center gap-2">
+                                    <span className="grid h-8 w-8 place-items-center rounded-lg bg-status-warning-bg text-status-warning">
+                                        <CalendarCheck className="h-4 w-4" />
+                                    </span>
+                                    <CardTitle className="text-sm">Chart reviews due</CardTitle>
+                                </div>
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    className="h-7 px-2.5 text-xs"
+                                    onClick={() => setModal('medication-review')}
+                                >
+                                    Schedule
+                                </Button>
                             </CardHeader>
                             <CardContent className="space-y-2">
                                 {reviewsDue.length === 0 ? (
@@ -1100,6 +1120,16 @@ export default function EmarHome(props: Props) {
             />
             <ReportErrorModal
                 open={modal === 'report-error'}
+                onClose={() => setModal(null)}
+                clients={clientOptions}
+            />
+            <AddMedicationModal
+                open={modal === 'add-medication'}
+                onClose={() => setModal(null)}
+                clients={clientOptions}
+            />
+            <MedicationReviewModal
+                open={modal === 'medication-review'}
                 onClose={() => setModal(null)}
                 clients={clientOptions}
             />
