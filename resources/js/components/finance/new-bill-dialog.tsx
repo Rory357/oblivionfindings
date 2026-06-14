@@ -21,6 +21,24 @@ import {
 export type VendorOption = { id: number; name: string };
 export type AccountOption = { id: number; code: string; name: string };
 
+/** An existing draft bill to prefill the wizard with (edit mode). */
+export type EditableBillLine = {
+    description: string;
+    quantity: string | number;
+    unit_price: string | number;
+    account_id: number | string | null;
+    gst_rate: string | number; // backend stores a FRACTION (0.15); prefilled back to a percentage
+};
+export type EditableBill = {
+    id: number;
+    vendor_id: number | string;
+    vendor_reference: string | null;
+    bill_date: string;
+    due_date: string;
+    notes: string | null;
+    lines: EditableBillLine[];
+};
+
 type LineForm = {
     description: string;
     quantity: string;
@@ -28,6 +46,15 @@ type LineForm = {
     account_id: string;
     gst_rate: string; // percentage: '15' standard, '0' zero-rated
 };
+
+/** Map a stored line (gst_rate as a fraction) back into the form's percentage shape. */
+const lineFromBill = (l: EditableBillLine): LineForm => ({
+    description: l.description ?? '',
+    quantity: String(l.quantity ?? '1'),
+    unit_price: String(l.unit_price ?? ''),
+    account_id: l.account_id != null ? String(l.account_id) : '',
+    gst_rate: String(Math.round(Number(l.gst_rate ?? 0.15) * 100)),
+});
 
 const emptyLine = (): LineForm => ({
     description: '',
@@ -65,12 +92,16 @@ export function NewBillDialog({
     onClose,
     vendors,
     accounts,
+    bill,
 }: {
     open: boolean;
     onClose: () => void;
     vendors: VendorOption[];
     accounts: AccountOption[];
+    /** When provided, the wizard opens in EDIT mode (prefilled, PUTs the update). */
+    bill?: EditableBill | null;
 }) {
+    const isEdit = !!bill;
     const wizard = useWizard(STEPS.length);
     const { index, goTo, next, back, isFirst, isLast, reset } = wizard;
 
@@ -81,7 +112,14 @@ export function NewBillDialog({
         due_date: string;
         notes: string;
         lines: LineForm[];
-    }>({
+    }>(bill ? {
+        vendor_id: String(bill.vendor_id ?? ''),
+        vendor_reference: bill.vendor_reference ?? '',
+        bill_date: String(bill.bill_date).slice(0, 10),
+        due_date: String(bill.due_date).slice(0, 10),
+        notes: bill.notes ?? '',
+        lines: bill.lines.length ? bill.lines.map(lineFromBill) : [emptyLine()],
+    } : {
         vendor_id: '',
         vendor_reference: '',
         bill_date: today(),
@@ -134,21 +172,26 @@ export function NewBillDialog({
     };
 
     const submit = () => {
-        form.post('/finance/bills', {
+        const opts = {
             preserveScroll: true,
             onSuccess: () => close(),
             onError: () => goTo(0),
-        });
+        };
+        if (isEdit && bill) {
+            form.put(`/finance/bills/${bill.id}`, opts);
+        } else {
+            form.post('/finance/bills', opts);
+        }
     };
 
     return (
         <WizardShell
             open={open}
             onClose={close}
-            title="New bill"
-            description="Record a draft accounts-payable bill"
+            title={isEdit ? 'Edit bill' : 'New bill'}
+            description={isEdit ? 'Update this draft accounts-payable bill' : 'Record a draft accounts-payable bill'}
             railIcon={ReceiptText}
-            railTitle="New Bill"
+            railTitle={isEdit ? 'Edit Bill' : 'New Bill'}
             railSub="Accounts payable"
             steps={STEPS}
             stepIndex={index}
@@ -179,7 +222,7 @@ export function NewBillDialog({
                     )}
                     {isLast && (
                         <Button type="button" onClick={submit} disabled={processing || !detailsValid || !linesValid}>
-                            Create bill
+                            {isEdit ? 'Save changes' : 'Create bill'}
                         </Button>
                     )}
                 </>
@@ -301,7 +344,7 @@ export function NewBillDialog({
 
             {index === 2 && (
                 <div>
-                    <StepHead icon={ListChecks} title="Review & create" blurb="Creates a draft bill you can then approve." />
+                    <StepHead icon={ListChecks} title={isEdit ? 'Review & save' : 'Review & create'} blurb={isEdit ? 'Updates this draft bill.' : 'Creates a draft bill you can then approve.'} />
                     <ReviewCard icon={FileText} title="Bill">
                         <ReviewRow label="Vendor" value={vendorName} />
                         {data.vendor_reference && <ReviewRow label="Vendor reference" value={data.vendor_reference} />}
@@ -312,7 +355,7 @@ export function NewBillDialog({
                         <ReviewRow label="GST" value={money(totals.gst)} />
                         <ReviewRow label="Total (NZD)" value={money(totals.total)} />
                     </ReviewCard>
-                    {processing && <p className="mt-3 text-[13px] text-muted-foreground">Creating…</p>}
+                    {processing && <p className="mt-3 text-[13px] text-muted-foreground">{isEdit ? 'Saving…' : 'Creating…'}</p>}
                 </div>
             )}
         </WizardShell>

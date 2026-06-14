@@ -29,7 +29,11 @@ class BillController extends Controller
         $orgId = $request->user()->organization_id;
 
         $query = FinBill::forOrganization($orgId)
-            ->with('vendor:id,name')
+            ->with([
+                'vendor:id,name',
+                // Lines power the in-place Edit modal's prefill for draft bills.
+                'lines:id,bill_id,description,quantity,unit_price,gst_rate,account_id',
+            ])
             ->orderBy('bill_date', 'desc');
 
         if ($request->filled('status')) {

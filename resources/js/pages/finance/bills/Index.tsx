@@ -19,9 +19,19 @@ interface Vendor {
     name: string;
 }
 
+interface BillLine {
+    id: number;
+    description: string;
+    quantity: string;
+    unit_price: string;
+    gst_rate: string;
+    account_id: number | null;
+}
+
 interface Bill {
     id: number;
     bill_number: string;
+    vendor_id: number;
     vendor_reference: string | null;
     vendor: Vendor | null;
     bill_date: string;
@@ -29,6 +39,8 @@ interface Bill {
     total_amount: string;
     amount_paid: string;
     status: string;
+    notes: string | null;
+    lines: BillLine[];
 }
 
 interface PaginatedBills {
@@ -88,6 +100,7 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary, can
     const [dateFrom, setDateFrom] = useState(filters.date_from ?? '');
     const [dateTo, setDateTo] = useState(filters.date_to ?? '');
     const [newBillOpen, setNewBillOpen] = useState(false);
+    const [editBill, setEditBill] = useState<Bill | null>(null);
 
     const applyFilters = () => {
         const params: Record<string, string> = {};
@@ -224,12 +237,13 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary, can
                                 <TableHead className="text-right">Total</TableHead>
                                 <TableHead className="text-right">Paid</TableHead>
                                 <TableHead>Status</TableHead>
+                                {canManage && <TableHead className="text-right">Actions</TableHead>}
                             </TableRow>
                         </TableHeader>
                         <TableBody>
                             {bills.data.length === 0 ? (
                                 <TableRow>
-                                    <TableCell colSpan={8} className="text-center text-muted-foreground py-8">
+                                    <TableCell colSpan={canManage ? 9 : 8} className="text-center text-muted-foreground py-8">
                                         No bills found.
                                     </TableCell>
                                 </TableRow>
@@ -266,6 +280,22 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary, can
                                                 {statusConfig[bill.status]?.label ?? bill.status}
                                             </Badge>
                                         </TableCell>
+                                        {canManage && (
+                                            <TableCell className="text-right">
+                                                {bill.status === 'draft' && (
+                                                    <Button
+                                                        size="sm"
+                                                        variant="ghost"
+                                                        onClick={(e) => {
+                                                            e.stopPropagation();
+                                                            setEditBill(bill);
+                                                        }}
+                                                    >
+                                                        Edit
+                                                    </Button>
+                                                )}
+                                            </TableCell>
+                                        )}
                                     </TableRow>
                                 ))
                             )}
@@ -294,6 +324,17 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary, can
                 <NewBillDialog
                     open={newBillOpen}
                     onClose={() => setNewBillOpen(false)}
+                    vendors={vendors}
+                    accounts={accounts}
+                />
+            )}
+
+            {canManage && editBill && (
+                <NewBillDialog
+                    key={editBill.id}
+                    open
+                    bill={editBill}
+                    onClose={() => setEditBill(null)}
                     vendors={vendors}
                     accounts={accounts}
                 />
