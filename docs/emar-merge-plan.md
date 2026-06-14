@@ -141,10 +141,10 @@ InfoCard, SelectInput, SummaryRow`), matching `add-client-dialog.tsx`.
 3. [x] Build `MedicationOverviewService` + action-centre feed (+ feature tests). ✅ 6 tests / 46 assertions green.
 4. [~] Extend `dashboard()` payload (DONE — service-backed). TS Inertia prop types pending in page rebuild.
 5. [x] Rebuild `emar/Index.tsx` to the merged composition (hero → quick access). ✅ committed 0eefdadd.
-6. [ ] Wire reused modals into the Action centre + board. record-dose-wizard reuse needs the meds/today
-       `ScheduleRow` + witnesses + not-given-reasons + client allergy payload (significant coupling) —
-       interim: Record/Investigate/Review action buttons + client tiles deep-link to the kept /emar/*
-       pages (functional, not stubs). FOLLOW-UP: enrich payload + lift record-dose-wizard onto rows.
+6. [x] Wire reused modals into the Action centre + board. ✅ record-dose-wizard now opens inline from the
+       AC "Record" button (commit 8d69fa9a) — payload enriched with `record` {ScheduleRow, ClientInfo},
+       `notGivenReasons`, `signedAs`; posts /meds/today/record (no second pipeline). Client tiles + ribbon
+       keep deep-links (map to a client/MAR, not one dose). recorded-detail-dialog not surfaced (deferred).
 7. [~] Build BUILD-NEW modals on the shared shell. DONE: Generate rounds (hero), Report med error
        (AC header → emar.errors.store), Add medication (client-board button → emar.medications.store,
        4 steps), Schedule medication review (Clinical-watch card → emar.reviews.store, 2 steps),
@@ -153,14 +153,44 @@ InfoCard, SelectInput, SummaryRow`), matching `add-client-dialog.tsx`.
        Reports & exports (hero Export button → builds GET download URLs for emar.pdf.* + emar.reports.export*,
        2 steps), Audit log (AC "View audit log" link → single-pane viewer over recentActivity + CSV export).
        Payload gained `witnesses` + `medicationOptions`. **ALL 8 BUILD-NEW modals complete.**
-8. [ ] Migrate raw `Dialog`/`Sheet` modals reachable from `/emar` (prn-effect; refusal follow-up). NOTE:
-       none are currently reachable from the merged `/emar` (page deep-links to pages); migrations land
-       when those modals are surfaced in-page.
-9. [~] Redirect `/emar/daily` ✅ (MedicationsController@index → 301 emar.index). Nav removal + delete
-       `medications/index.tsx` pending.
-10. [ ] Verification (§9): `npm run types`, `npm run lint`, `vendor/bin/pint`, `php artisan test`,
-        `npm run build`, visual parity vs both `.dc.html`, redirect check.
-11. [ ] Final summary incl. shared-file edits + deferred backlog.
+8. [x] Migrate raw `Dialog`/`Sheet` modals reachable from `/emar`. ✅ VERIFIED: zero raw-Dialog/Sheet
+       workflow modals are reachable from `/emar` — grep of emar/Index.tsx imports shows only
+       MedsWizardDialog-based modals + RecordDoseWizard (also MedsWizardDialog). prn-effect/refusal/evidence
+       live on the deep pages only → deferred (deep-page convergence).
+9. [x] Redirect `/emar/daily` ✅ (→ 301 emar.index, route name kept resolvable). "Daily Overview" removed
+       from app-sidebar.tsx ✅. `medications/index.tsx` deleted ✅ (commit 0eefdadd).
+10. [x] Verification (§9): `npm run types` ✅, `npm run lint` ✅ (raw-colour guardrail), `vendor/bin/pint` ✅,
+        `php artisan test` (MedicationOverviewServiceTest — 7 passed / 54 assertions) ✅, `npm run build` ✅.
+        Visual parity: STRUCTURAL audit passed (all 9 §3 sections in order, 6 KPI cards, minmax(0,1fr)_360px
+        grid, category="ops" hero, 2 TabStrips, 9 modals). Pixel-level screenshot vs the .dc.html prototypes
+        requires a logged-in browser (auth-gated page) — NOT achievable in this headless loop; hand to the
+        user's standard "verify on dev" step (Chrome MCP as demo admin on .com after merge). Redirect ✅.
+11. [x] Final summary — see below + the loop's closing message.
+
+## 10. Final summary (implementation complete)
+
+**New backend:** `app/Services/MedicationOverviewService.php` (dashboard maths + clinical-watch/ops
+derivations + unified severity-sorted action-centre feed incl. INR-out-of-range, CD discrepancy, overdue
+review, CD balance-due, stock, med errors; + clientOptions/medicationOptions/witnesses/notGivenReasons +
+the RecordDoseWizard `record` context). `EmarController::dashboard()` consumes it (+ `?date=`, signedAs).
+`MedicationsController@index` → 301 redirect. Tests: `tests/Feature/Emar/MedicationOverviewServiceTest.php`.
+
+**New frontend:** `resources/js/pages/emar/Index.tsx` (full merged design) + 8 modals in
+`resources/js/pages/emar/components/` (generate-rounds, report-error, add-medication, medication-review,
+cd-register, stock-movement, reports, audit-log) — all on MedsWizardDialog — plus the reused RecordDoseWizard.
+
+**Shared-file edits (flag for integration):** `resources/js/components/app-sidebar.tsx` — removed the
+"Daily Overview" nav item (minimal/additive). `page-hero.tsx` and `app.css` were **NOT** touched (no missing
+prop/token). Deleted `resources/js/pages/medications/index.tsx`.
+
+**Deferred backlog** (out-of-scope per both READMEs): witness e-signature at administration; configurable
+countersigning + observation-on-signoff prompts; medication-order verification gate; client attention-bar /
+paper-script flag; Pharmac therapeutic-group reporting + care-level filter; inter-site chart transfer +
+nightly encrypted PDF backup. Plus: converging the deep-page raw dialogs (RecordAdministrationDialog,
+prn-effect, prn-sheet, refusal-followup, evidence, profile emar-dialog) onto MedsWizardDialog — none are
+reachable from `/emar`, so out of this task's scope.
+
+**Commits (on `main`):** b0c8b81c, 0eefdadd, d38b42a5, 942ce8b5, 6fc0ca96, 0eae35dc, 8d69fa9a.
 
 ## 8. Risks / shared-file overlap
 
