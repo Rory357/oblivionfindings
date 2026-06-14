@@ -1,516 +1,301 @@
-import { PageHero } from '@/components/page';
-import { Badge } from '@/components/ui/badge';
+/* eslint-disable no-restricted-syntax -- the board/templates/activity surfaces are
+   custom-layout bordered panels (not Card components); all colours are semantic tokens. */
+import RoundBoard from '@/components/emar/rounds/round-board';
+import type { ActivityItem, GuidedRound, RoundSummary, RoundTemplate, StaffOption } from '@/components/emar/rounds/types';
+import { PageHero, type PageHeroBadge, type PageHeroStat } from '@/components/page';
+import { EntityFilter, TabStrip, type RosterTabItem } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Progress } from '@/components/ui/progress';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
 import { Switch } from '@/components/ui/switch';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router, useForm } from '@inertiajs/react';
-import { AlertTriangle, CheckCircle, ChevronLeft, ChevronRight, Clock, ListChecks, Pencil, Play, Plus, Trash2, Users, Zap } from 'lucide-react';
-import { useState } from 'react';
-
-type MedRound = {
-    id: number;
-    name: string;
-    round_type: string;
-    scheduled_time: string;
-    window_minutes: number;
-    status: string;
-    total_medications: number;
-    administered_count: number;
-    refused_count: number;
-    withheld_count: number;
-    missed_count: number;
-    started_at: string | null;
-    completed_at: string | null;
-    assigned_to: { id: number; name: string } | null;
-    started_by: { id: number; name: string } | null;
-    completed_by: { id: number; name: string } | null;
-    notes: string | null;
-};
-
-type Template = {
-    id: number;
-    name: string;
-    scheduled_time: string;
-    window_minutes: number;
-    days_of_week: number[] | null;
-    active: boolean;
-    default_assigned_to: { id: number; name: string } | null;
-};
+import GuidedRoundDialog from '@/pages/emar/components/guided-round-dialog';
+import GenerateRoundsModal from '@/pages/emar/components/generate-rounds-modal';
+import RoundTemplateDialog from '@/pages/emar/components/round-template-dialog';
+import { addDays, DayPickerChip, toYmd } from '@/pages/meds/today/components/day-picker-chip';
+import type { NotGivenReasonOption, WitnessOption } from '@/pages/meds/today/types';
+import { Head, router } from '@inertiajs/react';
+import { Activity, CalendarCheck, CalendarDays, LayoutList, Pencil, Pill, Plus, RefreshCw, Trash2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
 type Props = {
-    rounds: MedRound[];
-    templates: Template[];
+    rounds: RoundSummary[];
+    templates: RoundTemplate[];
+    staff: StaffOption[];
     date: string;
-    staff: { id: number; name: string }[];
     lastGenerated: string | null;
+    guidedRound: GuidedRound | null;
+    activity: ActivityItem[];
+    sites: { id: number; name: string }[];
+    site_brand_colour: string | null;
+    witnesses: WitnessOption[];
+    not_given_reasons: NotGivenReasonOption[];
+    board_user: { first_name: string; name: string; role_label: string | null; med_competent: boolean; cd_witness: boolean };
 };
 
-const statusConfig: Record<string, { color: string; icon: any }> = {
-    pending: { color: 'bg-muted text-foreground', icon: Clock },
-    in_progress: { color: 'bg-status-info-bg text-status-info', icon: Play },
-    completed: { color: 'bg-status-success-bg text-status-success', icon: CheckCircle },
-    partial: { color: 'bg-status-warning-bg text-status-warning', icon: AlertTriangle },
-};
+export default function Rounds(props: Props) {
+    const {
+        rounds,
+        templates,
+        staff,
+        date,
+        guidedRound,
+        activity,
+        sites,
+        site_brand_colour: brandColour,
+        witnesses,
+        not_given_reasons: notGivenReasons,
+        board_user: signer,
+    } = props;
 
-const DAY_NAMES = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-const UNASSIGNED_STAFF_VALUE = '__unassigned__';
+    const [activeTab, setActiveTab] = useState('board');
+    const [boardView, setBoardView] = useState<'cards' | 'list'>('cards');
+    const [siteFilter, setSiteFilter] = useState<number | null>(null);
+    const [generateOpen, setGenerateOpen] = useState(false);
+    const [templateEditing, setTemplateEditing] = useState<RoundTemplate | 'new' | null>(null);
 
-function EditTemplateDialog({ template, staff, open, onOpenChange }: { template: Template; staff: { id: number; name: string }[]; open: boolean; onOpenChange: (open: boolean) => void }) {
-    const form = useForm({
-        name: template.name ?? '',
-        scheduled_time: template.scheduled_time ?? '',
-        window_minutes: template.window_minutes ?? 60,
-        days_of_week: template.days_of_week ?? ([] as number[]),
-        default_assigned_to: template.default_assigned_to?.id?.toString() ?? '',
-    });
+    const isToday = date === toYmd(new Date());
 
-    function toggleDay(day: number) {
-        const current = form.data.days_of_week;
-        if (current.includes(day)) {
-            form.setData('days_of_week', current.filter((d) => d !== day));
-        } else {
-            form.setData('days_of_week', [...current, day].sort());
-        }
-    }
+    const navigate = (params: Record<string, string | number | undefined>) => {
+        router.get('/emar/rounds', { date, ...(siteFilter ? { site_id: siteFilter } : {}), ...params }, { preserveState: true, preserveScroll: true });
+    };
+    const goDate = (next: string) => navigate({ date: next, guided: undefined });
+    const openGuided = (roundId: number) => navigate({ guided: roundId });
+    const closeGuided = () => navigate({ guided: undefined });
+    const changeSite = (id: number | null) => {
+        setSiteFilter(id);
+        router.get('/emar/rounds', { date, ...(id ? { site_id: id } : {}) }, { preserveState: true });
+    };
+    const assign = (roundId: number, userId: number | null) => {
+        router.put(`/emar/rounds/${roundId}/assign`, { assigned_to: userId }, { preserveScroll: true });
+    };
+    const deleteTemplate = (id: number) => router.delete(`/emar/rounds/templates/${id}`, { preserveScroll: true });
+    const toggleTemplateActive = (t: RoundTemplate) =>
+        router.put(`/emar/rounds/templates/${t.id}`, { active: !t.active }, { preserveScroll: true });
 
-    function submit(e: React.FormEvent) {
-        e.preventDefault();
-        form.put(`/emar/rounds/templates/${template.id}`, {
-            onSuccess: () => { onOpenChange(false); form.reset(); },
-        });
-    }
+    // Hero counts
+    const counts = useMemo(() => {
+        const totalRounds = rounds.length;
+        const doneRounds = rounds.filter((r) => r.status === 'completed').length;
+        const totalDoses = rounds.reduce((s, r) => s + r.total_medications, 0);
+        const given = rounds.reduce((s, r) => s + r.given, 0);
+        const recorded = rounds.reduce((s, r) => s + r.given + r.refused + r.withheld + r.missed, 0);
+        const due = Math.max(0, totalDoses - recorded);
+        const flags = rounds.reduce((s, r) => s + r.refused + r.withheld + r.missed, 0);
+        return { totalRounds, doneRounds, totalDoses, given, due, flags };
+    }, [rounds]);
 
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent>
-                <DialogHeader>
-                    <DialogTitle>Edit Round Template</DialogTitle>
-                    <DialogDescription>
-                        Update the timing, staff assignment, and generation days
-                        for this medication round template.
-                    </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={submit} className="space-y-4">
-                    <div>
-                        <Label htmlFor="edit-tpl-name">Name</Label>
-                        <Input id="edit-tpl-name" value={form.data.name} onChange={(e) => form.setData('name', e.target.value)} placeholder="e.g. Morning Round" />
-                        {form.errors.name && <p className="mt-1 text-xs text-status-critical">{form.errors.name}</p>}
-                    </div>
-                    <div>
-                        <Label htmlFor="edit-tpl-time">Scheduled Time</Label>
-                        <Input id="edit-tpl-time" type="time" value={form.data.scheduled_time} onChange={(e) => form.setData('scheduled_time', e.target.value)} />
-                        {form.errors.scheduled_time && <p className="mt-1 text-xs text-status-critical">{form.errors.scheduled_time}</p>}
-                    </div>
-                    <div>
-                        <Label htmlFor="edit-tpl-window">Window (minutes)</Label>
-                        <Input id="edit-tpl-window" type="number" min={0} value={form.data.window_minutes} onChange={(e) => form.setData('window_minutes', parseInt(e.target.value) || 0)} />
-                        {form.errors.window_minutes && <p className="mt-1 text-xs text-status-critical">{form.errors.window_minutes}</p>}
-                    </div>
-                    <div>
-                        <Label>Default Assigned Staff</Label>
-                        <Select
-                            value={
-                                form.data.default_assigned_to ||
-                                UNASSIGNED_STAFF_VALUE
-                            }
-                            onValueChange={(v) =>
-                                form.setData(
-                                    'default_assigned_to',
-                                    v === UNASSIGNED_STAFF_VALUE ? '' : v,
-                                )
-                            }
-                        >
-                            <SelectTrigger className="mt-1">
-                                <SelectValue placeholder="Unassigned" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value={UNASSIGNED_STAFF_VALUE}>
-                                    Unassigned
-                                </SelectItem>
-                                {staff.map((s) => (
-                                    <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                    </div>
-                    <div>
-                        <Label>Days of Week</Label>
-                        <div className="mt-2 flex flex-wrap gap-3">
-                            {DAY_NAMES.map((name, idx) => {
-                                const day = idx + 1;
-                                return (
-                                    <label key={day} className="flex items-center gap-1.5 text-sm">
-                                        <Checkbox checked={form.data.days_of_week.includes(day)} onCheckedChange={() => toggleDay(day)} />
-                                        {name}
-                                    </label>
-                                );
-                            })}
-                        </div>
-                        <p className="mt-1 text-xs text-muted-foreground">Leave unchecked for every day.</p>
-                    </div>
-                    <div className="flex justify-end gap-2">
-                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-                        <Button type="submit" disabled={form.processing}>Save Changes</Button>
-                    </div>
-                </form>
-            </DialogContent>
-        </Dialog>
+    const TABS: RosterTabItem[] = [
+        { id: 'board', label: 'Board', icon: CalendarCheck, tone: 'primary', badge: rounds.length || undefined },
+        { id: 'templates', label: 'Templates', icon: LayoutList, tone: 'violet', badge: templates.length || undefined },
+        { id: 'activity', label: 'Activity', icon: Activity, tone: 'success', badge: activity.length || undefined },
+    ];
+
+    const heroBadges: PageHeroBadge[] = [
+        { label: `${sites.length} site${sites.length === 1 ? '' : 's'}` },
+        signer.med_competent ? { tone: 'success' as const, label: signer.cd_witness ? 'Med-competent · CD witness' : 'Med-competent' } : null,
+        counts.flags > 0 ? { tone: 'warning' as const, label: `${counts.flags} flag${counts.flags === 1 ? '' : 's'}` } : null,
+    ].filter(Boolean) as PageHeroBadge[];
+
+    const heroStats: PageHeroStat[] = [
+        { label: 'Rounds', value: `${counts.doneRounds}/${counts.totalRounds}` },
+        { label: 'Given', value: `${counts.given}/${counts.totalDoses}` },
+        { label: 'Due', value: counts.due, tone: counts.due > 0 ? 'warning' : 'neutral' },
+        { label: 'Flags', value: counts.flags, tone: counts.flags > 0 ? 'critical' : 'neutral' },
+    ];
+
+    const heroFooter = (
+        <div className="flex flex-col items-stretch gap-2 py-3 md:flex-row md:items-center md:justify-between">
+            <div className="flex flex-wrap items-center gap-1.5">
+                <Button variant="outline" size="sm" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20" onClick={() => goDate(addDays(date, -1))}>
+                    Prev
+                </Button>
+                <DayPickerChip date={date} isToday={isToday} onPick={goDate} />
+                <Button variant="outline" size="sm" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20" onClick={() => goDate(addDays(date, 1))}>
+                    Next
+                </Button>
+                {!isToday && (
+                    <Button variant="ghost" size="sm" className="text-primary-foreground hover:bg-primary-foreground/10" onClick={() => goDate(toYmd(new Date()))}>
+                        Back to today
+                    </Button>
+                )}
+            </div>
+            <div className="flex flex-wrap items-center gap-2 md:ml-auto">
+                <EntityFilter label="Site" allLabel="All sites" items={sites} value={siteFilter} onChange={changeSite} onDark />
+            </div>
+        </div>
     );
-}
-
-export default function Rounds({ rounds, templates, date, staff, lastGenerated }: Props) {
-    const [templateOpen, setTemplateOpen] = useState(false);
-    const [editTemplateOpen, setEditTemplateOpen] = useState(false);
-    const [editingTemplate, setEditingTemplate] = useState<Template | null>(null);
-
-    function openEditTemplate(template: Template) {
-        setEditingTemplate(template);
-        setEditTemplateOpen(true);
-    }
-
-    function deleteTemplate(id: number) {
-        if (!confirm('Are you sure you want to delete this template?')) return;
-        router.delete(`/emar/rounds/templates/${id}`);
-    }
-
-    function toggleTemplateActive(template: Template) {
-        router.put(`/emar/rounds/templates/${template.id}`, { active: !template.active }, { preserveState: true });
-    }
-
-    const templateForm = useForm({
-        name: '',
-        scheduled_time: '',
-        window_minutes: 60,
-        days_of_week: [] as number[],
-        default_assigned_to: '' as string,
-    });
-
-    function navigateDate(offset: number) {
-        const d = new Date(date);
-        d.setDate(d.getDate() + offset);
-        router.get('/emar/rounds', { date: d.toISOString().split('T')[0] }, { preserveState: true });
-    }
-
-    function submitTemplate(e: React.FormEvent) {
-        e.preventDefault();
-        templateForm.post('/emar/rounds/templates', {
-            onSuccess: () => {
-                setTemplateOpen(false);
-                templateForm.reset();
-            },
-        });
-    }
-
-    function generateRounds() {
-        router.post('/emar/rounds/generate', { date });
-    }
-
-    function generateAllToday() {
-        router.post('/emar/rounds/generate', { date: new Date().toISOString().split('T')[0], generate_all: true });
-    }
-
-    function toggleDay(day: number) {
-        const current = templateForm.data.days_of_week;
-        if (current.includes(day)) {
-            templateForm.setData('days_of_week', current.filter((d) => d !== day));
-        } else {
-            templateForm.setData('days_of_week', [...current, day].sort());
-        }
-    }
 
     return (
-        <AppLayout>
-            <Head title="eMAR - Medication Rounds" />
+        <AppLayout breadcrumbs={[{ title: 'eMAR', href: '/emar' }, { title: 'Medication Rounds', href: '/emar/rounds' }]}>
+            <Head title="Medication Rounds" />
             <div className="flex flex-col gap-6 p-6">
                 <PageHero
-                    title="Medication Rounds"
-                    description="Manage daily medication administration rounds, assignments, and completion tracking"
-                    icon={<Clock className="h-7 w-7 text-white" />}
-                    backHref="/emar"
-                    backLabel="Back"
-                />
-                {/* Date Navigation & Actions */}
-                <div className="mb-6 flex flex-wrap items-center gap-3">
-                    <Button variant="outline" size="icon" onClick={() => navigateDate(-1)}><ChevronLeft className="h-4 w-4" /></Button>
-                    <Input type="date" value={date} onChange={(e) => router.get('/emar/rounds', { date: e.target.value }, { preserveState: true })} className="w-40" />
-                    <Button variant="outline" size="icon" onClick={() => navigateDate(1)}><ChevronRight className="h-4 w-4" /></Button>
-                    <Button variant="outline" size="sm" onClick={() => router.get('/emar/rounds', { date: new Date().toISOString().split('T')[0] })}>Today</Button>
-                    <div className="ml-auto flex items-center gap-3">
-                        {lastGenerated && (
-                            <span className="text-xs text-muted-foreground">
-                                Last generated: {new Date(lastGenerated).toLocaleString('en-NZ', { day: 'numeric', month: 'short', hour: '2-digit', minute: '2-digit' })}
+                    variant="hero"
+                    category="ops"
+                    brandColour={brandColour}
+                    icon={Pill}
+                    title={
+                        <span>
+                            <span className="flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-wide text-primary-foreground/80">
+                                {isToday ? (
+                                    <span aria-hidden className="relative inline-flex h-2 w-2">
+                                        <span className="absolute inset-0 animate-ping rounded-full bg-status-success/70" />
+                                        <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success" />
+                                    </span>
+                                ) : (
+                                    <CalendarDays className="h-3 w-3" />
+                                )}
+                                {isToday ? 'Live medication board' : 'Medication board · day view'}
                             </span>
-                        )}
-                        <Button variant="outline" size="sm" onClick={generateAllToday}>
-                            <Zap className="mr-1 h-4 w-4" /> Generate All Today
-                        </Button>
-                        <Button variant="outline" size="sm" onClick={generateRounds}>
-                            <Zap className="mr-1 h-4 w-4" /> Generate Rounds
-                        </Button>
-                        <Dialog open={templateOpen} onOpenChange={setTemplateOpen}>
-                            <DialogTrigger asChild>
-                                <Button size="sm"><Plus className="mr-1 h-4 w-4" /> New Template</Button>
-                            </DialogTrigger>
-                            <DialogContent>
-                                <DialogHeader>
-                                    <DialogTitle>New Round Template</DialogTitle>
-                                    <DialogDescription>
-                                        Create a reusable medication round
-                                        schedule and optionally assign a default
-                                        staff member.
-                                    </DialogDescription>
-                                </DialogHeader>
-                                <form onSubmit={submitTemplate} className="space-y-4">
-                                    <div>
-                                        <Label htmlFor="tpl-name">Name</Label>
-                                        <Input id="tpl-name" value={templateForm.data.name} onChange={(e) => templateForm.setData('name', e.target.value)} placeholder="e.g. Morning Round" />
-                                        {templateForm.errors.name && <p className="mt-1 text-xs text-status-critical">{templateForm.errors.name}</p>}
-                                    </div>
-                                    <div>
-                                        <Label htmlFor="tpl-time">Scheduled Time</Label>
-                                        <Input id="tpl-time" type="time" value={templateForm.data.scheduled_time} onChange={(e) => templateForm.setData('scheduled_time', e.target.value)} />
-                                        {templateForm.errors.scheduled_time && <p className="mt-1 text-xs text-status-critical">{templateForm.errors.scheduled_time}</p>}
-                                    </div>
-                                    <div>
-                                        <Label htmlFor="tpl-window">Window (minutes)</Label>
-                                        <Input id="tpl-window" type="number" min={0} value={templateForm.data.window_minutes} onChange={(e) => templateForm.setData('window_minutes', parseInt(e.target.value) || 0)} />
-                                        {templateForm.errors.window_minutes && <p className="mt-1 text-xs text-status-critical">{templateForm.errors.window_minutes}</p>}
-                                    </div>
-                                    <div>
-                                        <Label>Default Assigned Staff</Label>
-                                        <Select
-                                            value={
-                                                templateForm.data
-                                                    .default_assigned_to ||
-                                                UNASSIGNED_STAFF_VALUE
-                                            }
-                                            onValueChange={(v) =>
-                                                templateForm.setData(
-                                                    'default_assigned_to',
-                                                    v ===
-                                                        UNASSIGNED_STAFF_VALUE
-                                                        ? ''
-                                                        : v,
-                                                )
-                                            }
-                                        >
-                                            <SelectTrigger className="mt-1">
-                                                <SelectValue placeholder="Unassigned" />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                <SelectItem
-                                                    value={
-                                                        UNASSIGNED_STAFF_VALUE
-                                                    }
-                                                >
-                                                    Unassigned
-                                                </SelectItem>
-                                                {staff.map((s) => (
-                                                    <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                    <div>
-                                        <Label>Days of Week</Label>
-                                        <div className="mt-2 flex flex-wrap gap-3">
-                                            {DAY_NAMES.map((name, idx) => {
-                                                const day = idx + 1;
-                                                return (
-                                                    <label key={day} className="flex items-center gap-1.5 text-sm">
-                                                        <Checkbox checked={templateForm.data.days_of_week.includes(day)} onCheckedChange={() => toggleDay(day)} />
-                                                        {name}
-                                                    </label>
-                                                );
-                                            })}
-                                        </div>
-                                        <p className="mt-1 text-xs text-muted-foreground">Leave unchecked for every day.</p>
-                                    </div>
-                                    <div className="flex justify-end gap-2">
-                                        <Button type="button" variant="outline" onClick={() => setTemplateOpen(false)}>Cancel</Button>
-                                        <Button type="submit" disabled={templateForm.processing}>Create Template</Button>
-                                    </div>
-                                </form>
-                            </DialogContent>
-                        </Dialog>
-                    </div>
-                </div>
+                            <span className="mt-1 block text-[26px] font-bold leading-tight">
+                                Kia ora {signer.first_name}, today&apos;s rounds —{' '}
+                                <span className="border-b-2 border-primary-foreground/40">{date}</span>
+                            </span>
+                        </span>
+                    }
+                    description={`${counts.totalDoses} scheduled doses across ${sites.length} site${sites.length === 1 ? '' : 's'}. ${counts.given} given, ${counts.due} still to give.`}
+                    badges={heroBadges}
+                    stats={heroStats}
+                    actions={
+                        <>
+                            <Button className="bg-primary-foreground text-primary hover:bg-primary-foreground/90" onClick={() => setGenerateOpen(true)}>
+                                <RefreshCw className="h-4 w-4" />
+                                Generate rounds
+                            </Button>
+                            <Button variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20" onClick={() => setTemplateEditing('new')}>
+                                <Plus className="h-4 w-4" />
+                                New template
+                            </Button>
+                        </>
+                    }
+                    footer={heroFooter}
+                />
 
-                {/* Rounds Grid */}
-                <div className="mb-8 grid gap-4 sm:grid-cols-2 lg:grid-cols-3">
-                    {rounds.map((round) => {
-                        const cfg = statusConfig[round.status] ?? statusConfig.pending;
-                        const Icon = cfg.icon;
-                        const completionPct = round.total_medications > 0 ? Math.round((round.administered_count / round.total_medications) * 100) : 0;
-                        return (
-                            <Card key={round.id}>
-                                <CardHeader className="pb-2">
-                                    <div className="flex items-center justify-between">
-                                        <CardTitle className="text-base">{round.name}</CardTitle>
-                                        <Badge className={`text-xs ${cfg.color}`}>
-                                            <Icon className="mr-1 h-3 w-3" /> {round.status}
-                                        </Badge>
-                                    </div>
-                                    <p className="text-xs text-muted-foreground">{round.scheduled_time} ({round.round_type})</p>
-                                </CardHeader>
-                                <CardContent>
-                                    <div className="mb-3">
-                                        <div className="mb-1 flex justify-between text-xs text-muted-foreground">
-                                            <span>Progress</span>
-                                            <span>{round.administered_count} / {round.total_medications}</span>
-                                        </div>
-                                        <Progress value={completionPct} className="h-2" />
-                                    </div>
-                                    <div className="grid grid-cols-2 sm:grid-cols-4 gap-2 text-center text-xs">
-                                        <div>
-                                            <p className="font-bold text-status-success">{round.administered_count}</p>
-                                            <p className="text-muted-foreground">Given</p>
-                                        </div>
-                                        <div>
-                                            <p className="font-bold text-status-warning">{round.refused_count}</p>
-                                            <p className="text-muted-foreground">Refused</p>
-                                        </div>
-                                        <div>
-                                            <p className="font-bold text-status-warning">{round.withheld_count}</p>
-                                            <p className="text-muted-foreground">Withheld</p>
-                                        </div>
-                                        <div>
-                                            <p className="font-bold text-status-critical">{round.missed_count}</p>
-                                            <p className="text-muted-foreground">Missed</p>
-                                        </div>
-                                    </div>
-                                    {round.assigned_to && (
-                                        <div className="mt-3 flex items-center gap-1 text-xs text-muted-foreground">
-                                            <Users className="h-3 w-3" /> {round.assigned_to.name}
-                                        </div>
-                                    )}
-                                    {round.started_at && (
-                                        <p className="mt-1 text-xs text-muted-foreground">
-                                            Started: {new Date(round.started_at).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' })}
-                                            {round.completed_at && ` — Completed: ${new Date(round.completed_at).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' })}`}
-                                        </p>
-                                    )}
-                                    {/* Round Actions */}
-                                    <div className="mt-3 flex flex-wrap items-center gap-2 border-t pt-3">
-                                        {round.status !== 'completed' && (
-                                            <Button size="sm" asChild>
-                                                <Link href={`/emar/rounds/${round.id}/guided`}>
-                                                    <ListChecks className="mr-1 h-3 w-3" />
-                                                    {round.status === 'in_progress' ? 'Resume round' : 'Start guided round'}
-                                                </Link>
-                                            </Button>
-                                        )}
-                                        {round.status === 'pending' && (
-                                            <Button size="sm" variant="outline" onClick={() => router.post(`/emar/rounds/${round.id}/start`)}>
-                                                <Play className="mr-1 h-3 w-3" /> Mark started
-                                            </Button>
-                                        )}
-                                        {round.status === 'in_progress' && (
-                                            <Button size="sm" variant="outline" onClick={() => router.post(`/emar/rounds/${round.id}/complete`)}>
-                                                <CheckCircle className="mr-1 h-3 w-3" /> Complete
-                                            </Button>
-                                        )}
-                                        <Select
-                                            value={round.assigned_to?.id?.toString() ?? ''}
-                                            onValueChange={(v) => router.put(`/emar/rounds/${round.id}/assign`, { assigned_to: parseInt(v) })}
-                                        >
-                                            <SelectTrigger className="h-8 w-36 text-xs">
-                                                <SelectValue placeholder="Assign to..." />
-                                            </SelectTrigger>
-                                            <SelectContent>
-                                                {staff.map((s) => (
-                                                    <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        );
-                    })}
-                    {rounds.length === 0 && (
-                        <Card className="sm:col-span-2 lg:col-span-3">
-                            <CardContent className="flex flex-col items-center py-12">
-                                <Clock className="mb-4 h-12 w-12 text-muted-foreground/30" />
-                                <p className="text-muted-foreground">No medication rounds scheduled for this date.</p>
-                            </CardContent>
-                        </Card>
-                    )}
-                </div>
+                <TabStrip value={activeTab} onChange={setActiveTab} items={TABS} ariaLabel="Medication rounds views" />
 
-                {/* Round Templates */}
-                <Card>
-                    <CardHeader className="pb-3">
+                {activeTab === 'board' && (
+                    <div className="flex flex-col gap-4">
                         <div className="flex items-center justify-between">
-                            <CardTitle className="text-base">Round Templates</CardTitle>
-                            <p className="text-xs text-muted-foreground">Auto-generation runs daily at 00:05 NZT for active templates</p>
+                            <p className="text-sm text-muted-foreground">Open a round to step through its doses with the safety gate.</p>
+                            <div className="inline-flex rounded-lg border bg-card p-0.5">
+                                {(['cards', 'list'] as const).map((v) => (
+                                    <Button key={v} size="sm" variant={boardView === v ? 'secondary' : 'ghost'} className="capitalize" onClick={() => setBoardView(v)}>
+                                        {v}
+                                    </Button>
+                                ))}
+                            </div>
                         </div>
-                    </CardHeader>
-                    <CardContent className="p-0">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b bg-muted/50">
-                                    <th className="p-3 text-left font-medium">Name</th>
-                                    <th className="p-3 text-left font-medium">Time</th>
-                                    <th className="p-3 text-left font-medium">Window</th>
-                                    <th className="p-3 text-left font-medium">Days</th>
-                                    <th className="p-3 text-left font-medium">Default Staff</th>
-                                    <th className="p-3 text-center font-medium">Auto-Generate</th>
-                                    <th className="p-3 text-right font-medium">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {templates.map((t) => {
-                                    const dayLabels = ['', 'Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
-                                    return (
-                                        <tr key={t.id} className="border-b last:border-0">
-                                            <td className="p-3 font-medium">{t.name}</td>
-                                            <td className="p-3">{t.scheduled_time}</td>
-                                            <td className="p-3">&plusmn;{t.window_minutes} min</td>
-                                            <td className="p-3 text-xs">{t.days_of_week && t.days_of_week.length > 0 ? t.days_of_week.map((d) => dayLabels[d]).join(', ') : 'Every day'}</td>
-                                            <td className="p-3 text-xs text-muted-foreground">{t.default_assigned_to?.name ?? 'Unassigned'}</td>
-                                            <td className="p-3 text-center">
-                                                <Switch
-                                                    checked={t.active}
-                                                    onCheckedChange={() => toggleTemplateActive(t)}
-                                                    aria-label={`Toggle auto-generate for ${t.name}`}
-                                                />
-                                            </td>
-                                            <td className="p-3 text-right">
-                                                <div className="flex items-center justify-end gap-1">
-                                                    <Button variant="ghost" size="icon" onClick={() => openEditTemplate(t)}>
-                                                        <Pencil className="h-4 w-4" />
-                                                    </Button>
-                                                    <Button variant="ghost" size="icon" className="text-status-critical hover:text-status-critical" onClick={() => deleteTemplate(t.id)}>
-                                                        <Trash2 className="h-4 w-4" />
-                                                    </Button>
-                                                </div>
-                                            </td>
+                        <RoundBoard rounds={rounds} view={boardView} staff={staff} canManage={signer.med_competent} onOpenGuided={openGuided} onAssign={assign} />
+                    </div>
+                )}
+
+                {activeTab === 'templates' && (
+                    <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+                        <div className="overflow-x-auto">
+                            <table className="w-full text-sm">
+                                <thead>
+                                    <tr className="border-b text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                                        <th className="px-4 py-2.5">Name</th>
+                                        <th className="px-4 py-2.5">Time</th>
+                                        <th className="px-4 py-2.5">Days</th>
+                                        <th className="px-4 py-2.5">Default staff</th>
+                                        <th className="px-4 py-2.5">Auto-gen</th>
+                                        <th className="px-4 py-2.5"></th>
+                                    </tr>
+                                </thead>
+                                <tbody>
+                                    {templates.length === 0 ? (
+                                        <tr>
+                                            <td colSpan={6} className="px-4 py-10 text-center text-muted-foreground">No templates yet.</td>
                                         </tr>
-                                    );
-                                })}
-                                {templates.length === 0 && <tr><td colSpan={7} className="p-6 text-center text-muted-foreground">No round templates configured.</td></tr>}
-                            </tbody>
-                        </table>
-                    </CardContent>
-                </Card>
+                                    ) : (
+                                        templates.map((t) => (
+                                            <tr key={t.id} className="border-b last:border-b-0">
+                                                <td className="px-4 py-3 font-medium">{t.name}</td>
+                                                <td className="px-4 py-3 text-muted-foreground">{t.scheduled_time} · ±{t.window_minutes}m</td>
+                                                <td className="px-4 py-3 text-muted-foreground">{daysLabel(t.days_of_week)}</td>
+                                                <td className="px-4 py-3 text-muted-foreground">{t.default_staff ?? '—'}</td>
+                                                <td className="px-4 py-3">
+                                                    {signer.med_competent ? (
+                                                        <Switch checked={t.active} onCheckedChange={() => toggleTemplateActive(t)} />
+                                                    ) : (
+                                                        <span className="text-muted-foreground">{t.active ? 'On' : 'Off'}</span>
+                                                    )}
+                                                </td>
+                                                <td className="px-4 py-3 text-right">
+                                                    {signer.med_competent && (
+                                                        <div className="flex items-center justify-end gap-1">
+                                                            <Button size="icon" variant="ghost" onClick={() => setTemplateEditing(t)} aria-label="Edit template">
+                                                                <Pencil className="h-4 w-4" />
+                                                            </Button>
+                                                            <Button size="icon" variant="ghost" onClick={() => deleteTemplate(t.id)} aria-label="Delete template">
+                                                                <Trash2 className="h-4 w-4 text-status-critical" />
+                                                            </Button>
+                                                        </div>
+                                                    )}
+                                                </td>
+                                            </tr>
+                                        ))
+                                    )}
+                                </tbody>
+                            </table>
+                        </div>
+                    </div>
+                )}
+
+                {activeTab === 'activity' && (
+                    <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+                        {activity.length === 0 ? (
+                            <div className="px-5 py-10 text-center text-sm text-muted-foreground">No round activity yet today.</div>
+                        ) : (
+                            <ul className="divide-y">
+                                {activity.map((a) => (
+                                    <li key={a.id} className="flex items-center justify-between px-5 py-3 text-sm">
+                                        <span>
+                                            <span className="font-medium capitalize">{a.status}</span> · {a.medication_name}
+                                        </span>
+                                        <span className="text-xs text-muted-foreground">
+                                            {a.time}
+                                            {a.staff ? ` · ${a.staff}` : ''}
+                                        </span>
+                                    </li>
+                                ))}
+                            </ul>
+                        )}
+                    </div>
+                )}
             </div>
 
-            {editingTemplate && (
-                <EditTemplateDialog
-                    template={editingTemplate}
+            {guidedRound && (
+                <GuidedRoundDialog
+                    guided={guidedRound}
+                    witnesses={witnesses}
+                    notGivenReasons={notGivenReasons}
+                    signer={{ med_competent: signer.med_competent, cd_witness: signer.cd_witness }}
+                    onClose={closeGuided}
+                />
+            )}
+
+            {generateOpen && <GenerateRoundsModal open onClose={() => setGenerateOpen(false)} defaultDate={date} />}
+
+            {templateEditing !== null && (
+                <RoundTemplateDialog
+                    template={templateEditing === 'new' ? null : templateEditing}
                     staff={staff}
-                    open={editTemplateOpen}
-                    onOpenChange={(open) => { setEditTemplateOpen(open); if (!open) setEditingTemplate(null); }}
+                    sites={sites}
+                    onClose={() => setTemplateEditing(null)}
                 />
             )}
         </AppLayout>
     );
+}
+
+const DAY_LABELS = ['Mon', 'Tue', 'Wed', 'Thu', 'Fri', 'Sat', 'Sun'];
+function daysLabel(days: number[]): string {
+    if (!days || days.length === 0) return 'Every day';
+    return days
+        .slice()
+        .sort((a, b) => a - b)
+        .map((d) => DAY_LABELS[d - 1] ?? '')
+        .filter(Boolean)
+        .join(', ');
 }

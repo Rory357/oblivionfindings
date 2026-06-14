@@ -8,7 +8,7 @@ isolated in their own worktrees `hr-m1-people` / `fin-wt`). Design bundles: `.de
 | # | Page | Route | Bundle folder | Status | Commit |
 |---|------|-------|---------------|--------|--------|
 | 1 | MAR Charts | `/emar/mar` | `Emar_Charts_Page/` | done* | `b6658602` + frontend |
-| 2 | Medication Rounds | `/emar/rounds` | `Emar_Medication_Rounds_Page/` | todo | — |
+| 2 | Medication Rounds | `/emar/rounds` | `Emar_Medication_Rounds_Page/` | done* | `628a1783` + frontend |
 | 3 | Medications Database | `/emar/medications` | `Medications_Page/` | todo | — |
 | 4 | Prescriptions & Orders | `/emar/prescriptions` | `Prescription_Page/` | todo | — |
 | 5 | PRN Records | `/emar/prn` | `PRN_Redesign/` | todo | — |
@@ -39,7 +39,7 @@ Status legend: `todo` / `in-progress` / `done`. `done*` = all automated gates gr
 
 ## Backlog / deferred
 
-- _none yet_
+**Page 2 (Rounds):** round **timeline** donut axis (most complex visual lens), **Chart** resident×round matrix tab (needs per-round items load — secondary lens), **audit-&-timeline** dialog, **right-click context menu** (board cards open via button), template-wizard **service-context** selector (site + default staff cover coverage), **Re-record** on already-recorded doses (backend dedup blocks it → shown read-only), and backend **G2/G3** (complete-with-pending guard + auto-miss scheduled job) + G5–G8/G10. Reasons: secondary lenses / separable miss-tracking infra; core shipped = hero + board (cards/list) + guided modal + templates wizard + generate + activity. Cross-module: `meds.round.show` deep links keep working via the redirect (repointing `RoundInfo.url` to skip the hop is a minor optimisation, deferred).
 
 ## Notes
 
