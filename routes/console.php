@@ -6,6 +6,7 @@ use App\Domain\Finance\Jobs\GenerateRecurringJournalsJob;
 use App\Domain\Finance\Jobs\PostLeaveProvisionJob;
 use App\Domain\Finance\Jobs\PostSiteRentJob;
 use App\Domain\Finance\Jobs\PostSiteUtilitiesJob;
+use App\Domain\Finance\Jobs\ProcessRecurringChargesJob;
 use App\Domain\Finance\Jobs\PruneFinanceAuditExportsJob;
 use App\Domain\Finance\Jobs\RunDepreciationJob;
 use App\Domain\Finance\Jobs\RunPaymentMatchingJob;
@@ -29,7 +30,6 @@ use App\Domain\Roadmap\Jobs\ScoreRoadmapInitiativesJob;
 use App\Domain\Roadmap\Jobs\SendRoadmapDigestJob;
 use App\Jobs\AutoEscalateControlRoomQueues;
 use App\Jobs\CheckControlRoomSlaBreaches;
-use App\Jobs\SyncResourceCalendarsJob;
 use App\Jobs\ChecklistDueJob;
 use App\Jobs\CheckLoneWorkerOverdueJob;
 use App\Jobs\CheckOverdueCorrectiveActionsJob;
@@ -49,6 +49,8 @@ use App\Jobs\ReconcileTimesheetsJob;
 use App\Jobs\SendEventReminderJob;
 use App\Jobs\ShiftAutoAlertJob;
 use App\Jobs\ShiftTaskDueJob;
+use App\Jobs\SyncResourceCalendarsJob;
+use App\Models\RecurringCharge;
 use App\Services\MedicationAlertService;
 use Illuminate\Console\Scheduling\Schedule;
 use Illuminate\Foundation\Inspiring;
@@ -300,6 +302,22 @@ app(Schedule::class)
     ->job(new CheckBillDueDatesJob)
     ->timezone('Pacific/Auckland')
     ->dailyAt('07:00')
+    ->withoutOverlapping();
+
+// Recurring charges: generate billing entries for due recurring charges, per org.
+app(Schedule::class)
+    ->call(function () {
+        RecurringCharge::query()
+            ->where('is_active', true)
+            ->whereDate('next_charge_at', '<=', now()->toDateString())
+            ->whereNotNull('organization_id')
+            ->distinct()
+            ->pluck('organization_id')
+            ->each(fn ($orgId) => ProcessRecurringChargesJob::dispatch((int) $orgId));
+    })
+    ->name('finance:process-recurring-charges')
+    ->timezone('Pacific/Auckland')
+    ->dailyAt('02:45')
     ->withoutOverlapping();
 
 // GST draft calculation: two-monthly, before the 28th filing cycle
