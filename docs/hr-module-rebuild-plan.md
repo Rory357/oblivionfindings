@@ -511,6 +511,12 @@ flat Send-Kudos dialog. M7-R3 (e08c55c5) — HrDemoSeeder feed/kudos demo data (
 - **M10-2 Demo seeders for every hub.** *Problem:* many hubs empty in demo. *Fix:* extend `HrDemoSeeder`
   so every hub renders populated (recognition, payroll run, performance, recruitment pipeline, etc.).
   *Acceptance:* fresh `migrate:fresh --seed` → no empty hubs on the dev server.
+  - Already seeded (pre-M10): leave, recruitment, cases, time, expenses, payroll, documents, performance, assets,
+    training, announcements+surveys, recognition feed.
+  - ✅ **DONE — Comp & Benefits (5dea5418):** seedCompensationAndBenefits — 3 salary bands + FY2026 review + 2 bonuses
+    + 2 benefit plans + 3 enrollments (idempotent). 1 test (CompensationBenefitsDemoSeederTest).
+  - REMAINING demo gaps (next ticks, same idempotent pattern): drivers (HrDriverEligibility), vetting
+    (StaffBackgroundCheck), approval chains (HrApprovalChain), saved reports (HrSavedReport).
 - **M10-3 Swallowed-fatal sweep.** Fix the silent catches listed in cross-cutting (notifications, webhooks,
   automation, EmployeeProfileController, frontend). *Acceptance:* failures log/surface; no silent `return []`.
 - **M10-4 a11y + responsive + empty/loading/error states.** Axe pass (no criticals) + mobile pass on every
