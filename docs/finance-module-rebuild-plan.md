@@ -334,7 +334,16 @@ KiwiSaver + net-pay liability) via `PostPayrollJournalJob`; `AllocatePayrollCost
   (+ exclude bill-paying runs from the bill sum) or the HR payroll-run model. Deferred (cross-module / schema).
 
 ### M9 — Cross-module capture + Finance calendar `[ ]`
-- **[~] M9-1 Finance calendar — BACKEND SHIPPED (main 0332c90c); page next tick.** Built a
+- **[x] M9-1 Finance calendar — COMPLETE (backend 0332c90c + page 98524f7e).** Part 2 added
+  `FinanceCalendarController@index` (Inertia `finance/Calendar`) + `finance.calendar.index` route +
+  `resources/js/pages/finance/Calendar.tsx` — a month/list calendar reusing the shared `CalendarView`
+  (FullCalendar) wrapper, loading obligations client-side from the JSON feed via FullCalendar's `datesSet`
+  (initial + month nav), design-token event colours (invoice→success / bill→warning / payment-run→
+  category-finance / GST→info; overdue overrides to critical), a clickable source legend/filter, per-range
+  hero stats (obligations/overdue/money-in/money-out), and a read-only detail dialog (ref, counterparty,
+  amount, status, direction, period, deep-link). Sidebar gained a Calendar entry under finance Overview
+  (gated `finance.dashboard`). types/eslint/build green; 6 calendar tests (35 assertions); both routes live.
+  Backend (part 1): a
   `FinanceCalendarAggregator` mirroring `SiteCalendarAggregator` (static `defaultProviders()` registry +
   optional injected override) unioning four real-data providers into one sorted, deep-linked feed of
   `FinanceCalendarItem`s: `InvoiceDueProvider` (AR `due_date`), `BillDueProvider` (AP `due_date`),
