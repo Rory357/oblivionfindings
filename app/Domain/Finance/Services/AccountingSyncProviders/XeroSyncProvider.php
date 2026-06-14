@@ -108,7 +108,7 @@ class XeroSyncProvider implements AccountingSyncProviderInterface
                 $journal->loadMissing('lines.account');
 
                 $response = $this->apiRequest($integration, 'PUT', '/ManualJournals', [
-                    'ManualJournals' => [$this->manualJournalPayload($journal)],
+                    'ManualJournals' => [$this->manualJournalPayload($journal, $integration)],
                 ]);
                 $xeroJournal = $this->firstEntity($response, 'ManualJournals');
                 $this->assertNoValidationErrors($xeroJournal, 'journal', $journal->id);
@@ -178,7 +178,7 @@ class XeroSyncProvider implements AccountingSyncProviderInterface
                 $bill->loadMissing(['vendor', 'lines.account']);
 
                 $response = $this->apiRequest($integration, 'PUT', '/Invoices', [
-                    'Invoices' => [$this->billPayload($bill)],
+                    'Invoices' => [$this->billPayload($bill, $integration)],
                 ]);
                 $xeroInvoice = $this->firstEntity($response, 'Invoices');
                 $this->assertNoValidationErrors($xeroInvoice, 'invoice', $bill->id);
@@ -382,14 +382,14 @@ class XeroSyncProvider implements AccountingSyncProviderInterface
         return $payload;
     }
 
-    private function manualJournalPayload(FinJournal $journal): array
+    private function manualJournalPayload(FinJournal $journal, FinAccountingIntegration $integration): array
     {
         $payload = [
             'Date' => $journal->journal_date->format('Y-m-d'),
             'Status' => 'POSTED',
             'Narration' => $journal->description ?? "Journal {$journal->journal_number}",
             'JournalLines' => $journal->lines
-                ->map(fn (FinJournalLine $line): array => $this->manualJournalLinePayload($line, $journal))
+                ->map(fn (FinJournalLine $line): array => $this->manualJournalLinePayload($line, $journal, $integration))
                 ->values()
                 ->all(),
         ];
@@ -405,7 +405,7 @@ class XeroSyncProvider implements AccountingSyncProviderInterface
         return $payload;
     }
 
-    private function manualJournalLinePayload(FinJournalLine $line, FinJournal $journal): array
+    private function manualJournalLinePayload(FinJournalLine $line, FinJournal $journal, FinAccountingIntegration $integration): array
     {
         $account = $line->account;
 
@@ -417,13 +417,13 @@ class XeroSyncProvider implements AccountingSyncProviderInterface
         $credit = (float) $line->credit;
 
         return [
-            'AccountCode' => $account->code,
+            ...$this->accountReference($integration, $account),
             'Description' => $line->description ?? $journal->description ?? "Journal {$journal->journal_number}",
             'LineAmount' => $debit > 0 ? $debit : -$credit,
         ];
     }
 
-    private function billPayload(FinBill $bill): array
+    private function billPayload(FinBill $bill, FinAccountingIntegration $integration): array
     {
         if (! $bill->vendor) {
             throw new RuntimeException("Bill #{$bill->id} has no vendor.");
@@ -443,7 +443,7 @@ class XeroSyncProvider implements AccountingSyncProviderInterface
                     'Description' => $line->description ?? $bill->bill_number,
                     'Quantity' => (float) $line->quantity,
                     'UnitAmount' => (float) $line->unit_price,
-                    'AccountCode' => $line->account?->code,
+                    ...$this->accountReference($integration, $line->account),
                     'TaxAmount' => (float) ($line->gst_amount ?? 0),
                 ])
                 ->values()
@@ -455,6 +455,31 @@ class XeroSyncProvider implements AccountingSyncProviderInterface
         }
 
         return $payload;
+    }
+
+    /**
+     * Resolve the Xero account reference for a posted line. A saved
+     * account_mapping entry (local account id → Xero AccountID, set when an
+     * account is pushed or mapped in the integration UI) WINS and is sent as
+     * `AccountID`, so the line posts to the exact mapped Xero account. When the
+     * account is unmapped we fall back to matching by the local account `code`
+     * via `AccountCode` (Xero resolves the code to its account) — the prior
+     * behaviour. This is the only place external account resolution happens; the
+     * GL journal itself is never altered.
+     *
+     * @return array{AccountID:string}|array{AccountCode:string|null}
+     */
+    private function accountReference(FinAccountingIntegration $integration, ?FinAccount $account): array
+    {
+        if (! $account) {
+            return ['AccountCode' => null];
+        }
+
+        $mapped = $integration->getAccountMappingForLocal($account->id);
+
+        return $mapped !== null && $mapped !== ''
+            ? ['AccountID' => $mapped]
+            : ['AccountCode' => $account->code];
     }
 
     private function contactPayload(FinVendor $vendor): array

@@ -157,6 +157,68 @@ class XeroAccountingSyncProviderTest extends TestCase
         });
     }
 
+    public function test_push_journals_honours_saved_account_mapping(): void
+    {
+        Http::fake([
+            'https://api.xero.com/api.xro/2.0/ManualJournals' => Http::response([
+                'ManualJournals' => [
+                    ['ManualJournalID' => 'xero-journal-456', 'Narration' => 'Mapped journal'],
+                ],
+            ]),
+        ]);
+
+        $integration = $this->xeroIntegration();
+        $mappedAccount = FinAccount::factory()->create([
+            'organization_id' => 1, 'code' => '5000', 'type' => 'expense',
+        ]);
+        $unmappedAccount = FinAccount::factory()->create([
+            'organization_id' => 1, 'code' => '2100', 'type' => 'liability',
+        ]);
+
+        // The integration mapping UI saved: local account id → Xero AccountID.
+        $integration->update([
+            'account_mapping' => [(string) $mappedAccount->id => 'xero-mapped-guid'],
+        ]);
+
+        $journal = FinJournal::factory()->create([
+            'organization_id' => 1,
+            'journal_number' => 'JNL-MAP-001',
+            'journal_date' => '2026-05-03',
+            'status' => 'posted',
+            'description' => 'Mapped journal',
+        ]);
+        FinJournalLine::create([
+            'journal_id' => $journal->id, 'account_id' => $mappedAccount->id,
+            'description' => 'Debit', 'debit' => 100, 'credit' => 0,
+        ]);
+        FinJournalLine::create([
+            'journal_id' => $journal->id, 'account_id' => $unmappedAccount->id,
+            'description' => 'Credit', 'debit' => 0, 'credit' => 100,
+        ]);
+
+        $result = app(XeroSyncProvider::class)->pushJournals($integration, collect([$journal]));
+
+        $this->assertSame(1, $result['success']);
+        $this->assertSame([], $result['errors']);
+
+        Http::assertSent(function (Request $request): bool {
+            if ($request->url() !== 'https://api.xero.com/api.xro/2.0/ManualJournals') {
+                return false;
+            }
+
+            $lines = $request->data()['ManualJournals'][0]['JournalLines'];
+            $mapped = $lines[0];
+            $unmapped = $lines[1];
+
+            // Mapped account → its Xero AccountID, never the local code.
+            // Unmapped account → falls back to matching by AccountCode.
+            return ($mapped['AccountID'] ?? null) === 'xero-mapped-guid'
+                && ! array_key_exists('AccountCode', $mapped)
+                && ($unmapped['AccountCode'] ?? null) === '2100'
+                && ! array_key_exists('AccountID', $unmapped);
+        });
+    }
+
     public function test_push_contacts_sends_supplier_payload_and_stores_external_id(): void
     {
         Http::fake([
