@@ -368,6 +368,11 @@ flat Send-Kudos dialog. M7-R3 (e08c55c5) — HrDemoSeeder feed/kudos demo data (
     modal (+ doc preview in sign.tsx — currently signs blind); documents.generate "Generate from template" modal
     (index "Generate from Template" link is a dead-end to the templates list); vetting.captureConsent "Record
     Consent" button on vetting/show.tsx (page already renders the consent badge/card, just nothing writes it).
+  - ✅ **DONE — vetting consent (cf77f871):** added a "Record Consent" button + dialog (affirmative-consent
+    checkbox matching the `accepted` rule + optional notes) to vetting/show.tsx Actions card → POSTs the existing
+    captureConsent endpoint (appends to notes; non-tenant-aware table; no migration). 3 tests (VettingConsentTest,
+    acting as provider_manager). REMAINING M8-2: signatures.request "Send for signature" modal (+ sign.tsx doc
+    preview — signs blind); documents.generate "Generate from template" modal (index link is a dead-end to the list).
 - **M8-3 Policies fixes.** *Problem:* `policies/show.tsx` reads `content`/`change_summary` the controller
   never persists (renders empty) + XSS via `dangerouslySetInnerHTML`; stats page-scoped. *Fix:* map real
   fields; sanitise/remove raw HTML; server-side totals. *Acceptance:* content renders; no XSS; correct totals.
