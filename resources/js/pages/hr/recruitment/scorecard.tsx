@@ -74,6 +74,7 @@ function StarRating({
                     type="button"
                     variant="ghost"
                     size="icon"
+                    aria-label={`Rate ${star} star${star === 1 ? '' : 's'}`}
                     onClick={() => onChange(star)}
                     className="h-auto w-auto p-0 hover:scale-110 hover:bg-transparent"
                 >

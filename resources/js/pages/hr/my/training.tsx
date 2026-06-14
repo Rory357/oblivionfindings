@@ -425,6 +425,7 @@ export default function MyTraining({ complianceStatuses, can }: Props) {
                                         type="button"
                                         variant="ghost"
                                         size="icon"
+                                        aria-label="Clear filter"
                                         onClick={() => setActiveFilter('all')}
                                         className="ml-1.5 h-4 w-4 p-0"
                                     >

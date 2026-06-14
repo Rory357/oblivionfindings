@@ -713,6 +713,7 @@ export default function CreateJobPosting({ positions, users, posting }: Props) {
                                                 type="button"
                                                 variant="ghost"
                                                 size="icon"
+                                                aria-label={`Remove ${email}`}
                                                 onClick={() =>
                                                     removeEmail(email)
                                                 }

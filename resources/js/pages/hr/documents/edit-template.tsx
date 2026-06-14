@@ -253,6 +253,7 @@ export default function EditTemplate({ template }: Props) {
                                             type="button"
                                             variant="ghost"
                                             size="icon"
+                                            aria-label="Remove merge field"
                                             onClick={() =>
                                                 removeMergeField(index)
                                             }

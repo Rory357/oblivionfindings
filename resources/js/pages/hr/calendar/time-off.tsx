@@ -141,6 +141,7 @@ export default function TimeOffCalendar({
                                 <Button
                                     variant="outline"
                                     size="icon"
+                                    aria-label="Previous month"
                                     onClick={() => navigateMonth(-1)}
                                     className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
                                 >
@@ -149,6 +150,7 @@ export default function TimeOffCalendar({
                                 <Button
                                     variant="outline"
                                     size="icon"
+                                    aria-label="Next month"
                                     onClick={() => navigateMonth(1)}
                                     className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
                                 >

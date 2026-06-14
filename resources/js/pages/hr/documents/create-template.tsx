@@ -228,6 +228,7 @@ export default function CreateTemplate() {
                                             type="button"
                                             variant="ghost"
                                             size="icon"
+                                            aria-label="Remove merge field"
                                             onClick={() =>
                                                 removeMergeField(index)
                                             }

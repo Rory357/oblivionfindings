@@ -80,6 +80,7 @@ function StarRating({
                         type="button"
                         variant="ghost"
                         size="icon"
+                        aria-label={`Rate ${star} star${star === 1 ? '' : 's'}`}
                         onClick={() => onChange(star)}
                         className="group/star h-8 w-8"
                     >

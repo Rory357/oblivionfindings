@@ -364,6 +364,7 @@ export default function RecruitmentIndex({
                                         type="button"
                                         variant="ghost"
                                         size="icon"
+                                        aria-label="Clear status filter"
                                         onClick={() =>
                                             router.get(
                                                 '/hr/recruitment',

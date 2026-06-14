@@ -555,6 +555,18 @@ flat Send-Kudos dialog. M7-R3 (e08c55c5) — HrDemoSeeder feed/kudos demo data (
   automation, EmployeeProfileController, frontend). *Acceptance:* failures log/surface; no silent `return []`.
 - **M10-4 a11y + responsive + empty/loading/error states.** Axe pass (no criticals) + mobile pass on every
   HR hub; consistent empty/loading/error states. *Acceptance:* axe clean; responsive; states present.
+  - ✅ **DONE — icon-only buttons get accessible names (S26):** static a11y sweep of pages/hr + components/hr.
+    Token/contrast side already clean (no same-token `bg-status-X text-status-X` killers — the `-bg`-suffixed
+    pairings are correct; `status-badge.tsx` + `hr-primitives.test.tsx` already guard the bug; no inline hex /
+    inline styles). HIGH-SIGNAL cluster = 12 icon-only `<Button size="icon">` with no accessible name across 11
+    files → added `aria-label`: time-off prev/next month, compensation/bands edit, recruitment/index clear-filter,
+    recruitment/scorecard + feedback/respond + exit-interviews/create star ratings (dynamic `Rate N star(s)`),
+    my/training clear-filter, documents/{create,edit}-template remove-merge-field, job-postings/create remove-email
+    (dynamic), org-chart-pane expand/collapse (dynamic). Already-labelled (skipped): employees/documents (4×
+    aria-label), succession/show (aria-label), compliance/matrix + directory-pane (title attr); skills/matrix has
+    visible proficiency-code text. Gates: types + eslint(touched) + build green. NOTE: live axe/mobile pass is
+    browser-blocked → deferred to USER. Remaining a11y static candidates: skills/matrix cell label, fill-amber-400
+    raw-palette star fills (non-token, cosmetic).
 - **M10-5 Final parity pass.** Side-by-side every HR hub vs Rostering on oblivionfindings.com. *Acceptance:*
   hero/tabs/modals visually match; no dead buttons; DoD met.
 
