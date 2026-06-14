@@ -64,12 +64,19 @@ interface Reconciliation {
     starting_balance: number;
 }
 
+interface AdjustmentAccount {
+    id: number;
+    code: string;
+    name: string;
+}
+
 interface Props {
     reconciliation: Reconciliation;
     matchedLines: MatchedLine[];
     unreconciledTransactions: BankTransaction[];
     unmatchedJournalLines: JournalLine[];
     suggestedMatches: SuggestedMatch[];
+    adjustmentAccounts: AdjustmentAccount[];
 }
 
 const confidenceColors: Record<string, string> = {
@@ -84,9 +91,11 @@ export default function Reconcile({
     unreconciledTransactions,
     unmatchedJournalLines,
     suggestedMatches,
+    adjustmentAccounts,
 }: Props) {
     const [selectedTransaction, setSelectedTransaction] = useState<number | null>(null);
     const [selectedJournalLine, setSelectedJournalLine] = useState<number | null>(null);
+    const [adjustmentAccountId, setAdjustmentAccountId] = useState<string>('');
     const [processing, setProcessing] = useState(false);
 
     const isCompleted = reconciliation.status === 'completed';
@@ -183,6 +192,7 @@ export default function Reconcile({
             {
                 bank_transaction_id: selectedTransaction,
                 journal_line_id: null,
+                adjustment_account_id: adjustmentAccountId ? Number(adjustmentAccountId) : null,
             },
             {
                 preserveScroll: true,
@@ -190,6 +200,7 @@ export default function Reconcile({
                     setProcessing(false);
                     setSelectedTransaction(null);
                     setSelectedJournalLine(null);
+                    setAdjustmentAccountId('');
                 },
             },
         );
@@ -282,12 +293,27 @@ export default function Reconcile({
                             <Link2 className="h-4 w-4 mr-2" />
                             Match Selected
                         </Button>
+                        <select
+                            value={adjustmentAccountId}
+                            onChange={(e) => setAdjustmentAccountId(e.target.value)}
+                            disabled={!selectedTransaction || processing}
+                            aria-label="Adjustment account"
+                            className="h-9 rounded-md border border-input bg-background px-2 text-sm text-foreground disabled:opacity-50"
+                        >
+                            <option value="">Adjustment account…</option>
+                            {adjustmentAccounts.map((acc) => (
+                                <option key={acc.id} value={String(acc.id)}>
+                                    {acc.code} · {acc.name}
+                                </option>
+                            ))}
+                        </select>
                         <Button
                             variant="outline"
                             onClick={handleMatchWithoutJournal}
                             disabled={!selectedTransaction || processing}
+                            title={adjustmentAccountId ? 'Posts a balanced adjustment journal against the chosen account' : 'Marks reconciled without a journal'}
                         >
-                            Match Without Journal Entry
+                            {adjustmentAccountId ? 'Match as Adjustment' : 'Match Without Journal Entry'}
                         </Button>
                         <div className="flex-1" />
                         <Button

@@ -2,6 +2,7 @@
 
 namespace App\Domain\Finance\Http\Controllers;
 
+use App\Domain\Finance\Models\FinAccount;
 use App\Domain\Finance\Models\FinBankAccount;
 use App\Domain\Finance\Models\FinBankReconciliation;
 use App\Domain\Finance\Models\FinBankReconciliationLine;
@@ -107,7 +108,7 @@ class BankReconciliationController extends Controller
             $suggestedMatches = $this->service->suggestMatches($reconciliation->id);
         }
 
-        $matchedLines = $reconciliation->lines->map(fn($line) => [
+        $matchedLines = $reconciliation->lines->map(fn ($line) => [
             'id' => $line->id,
             'bank_transaction' => $line->bankTransaction ? [
                 'id' => $line->bankTransaction->id,
@@ -126,7 +127,7 @@ class BankReconciliationController extends Controller
             ] : null,
         ]);
 
-        $transactions = $unreconciledItems['transactions']->map(fn($txn) => [
+        $transactions = $unreconciledItems['transactions']->map(fn ($txn) => [
             'id' => $txn->id,
             'transaction_date' => $txn->transaction_date->format('Y-m-d'),
             'amount' => (float) $txn->amount,
@@ -135,7 +136,7 @@ class BankReconciliationController extends Controller
             'source' => $txn->source,
         ]);
 
-        $journalLines = $unreconciledItems['journal_lines']->map(fn($line) => [
+        $journalLines = $unreconciledItems['journal_lines']->map(fn ($line) => [
             'id' => $line->id,
             'debit' => (float) $line->debit,
             'credit' => (float) $line->credit,
@@ -173,6 +174,13 @@ class BankReconciliationController extends Controller
             'unreconciledTransactions' => $transactions,
             'unmatchedJournalLines' => $journalLines,
             'suggestedMatches' => $suggestedMatches,
+            // Income/expense accounts for matching a statement line as an adjustment
+            // (bank fees → expense, interest → income).
+            'adjustmentAccounts' => FinAccount::forOrganization($bankAccount->organization_id)
+                ->active()
+                ->whereIn('type', ['expense', 'income', 'revenue'])
+                ->orderBy('code')
+                ->get(['id', 'code', 'name']),
         ]);
     }
 
@@ -183,12 +191,14 @@ class BankReconciliationController extends Controller
         $validated = $request->validate([
             'bank_transaction_id' => ['required', 'exists:fin_bank_transactions,id'],
             'journal_line_id' => ['nullable', 'exists:fin_journal_lines,id'],
+            'adjustment_account_id' => ['nullable', 'exists:fin_accounts,id'],
         ]);
 
         $this->service->matchTransaction(
             $reconciliation->id,
             $validated['bank_transaction_id'],
             $validated['journal_line_id'] ?? null,
+            $validated['adjustment_account_id'] ?? null,
         );
 
         return redirect()->back()
