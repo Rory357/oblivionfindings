@@ -14,13 +14,24 @@ import { Plus, Search, AlertTriangle, Send, DollarSign, Clock, FileText, CheckCi
 import { cn } from '@/lib/utils';
 import { useState } from 'react';
 
+interface InvoiceLine {
+    id: number;
+    description: string;
+    quantity: string;
+    unit_price: string;
+    tax_rate_id: number | null;
+}
+
 interface Invoice {
     id: number;
     invoice_number: string;
     invoice_date: string;
     due_date: string;
+    client_id: number | null;
     client_name: string;
     client_email: string | null;
+    funding_body: string | null;
+    notes: string | null;
     total_amount: string;
     currency_code: string;
     status: string;
@@ -28,6 +39,7 @@ interface Invoice {
     paid_at: string | null;
     amount_due?: number;
     amount_paid?: number;
+    lines: InvoiceLine[];
 }
 
 interface PaginatedInvoices {
@@ -87,6 +99,7 @@ export default function InvoicesIndex({ auth, invoices, filters, summary, canMan
     const [dateTo, setDateTo] = useState(filters.date_to ?? '');
     const [receiptInvoice, setReceiptInvoice] = useState<Invoice | null>(null);
     const [newInvoiceOpen, setNewInvoiceOpen] = useState(false);
+    const [editInvoice, setEditInvoice] = useState<Invoice | null>(null);
 
     const canReceipt = (invoice: Invoice) =>
         canManage &&
@@ -272,6 +285,18 @@ export default function InvoicesIndex({ auth, invoices, filters, summary, canMan
                                             )}
                                         </TableCell>
                                         <TableCell className="text-right">
+                                            {canManage && invoice.status === 'draft' && (
+                                                <Button
+                                                    size="sm"
+                                                    variant="ghost"
+                                                    onClick={(e) => {
+                                                        e.stopPropagation();
+                                                        setEditInvoice(invoice);
+                                                    }}
+                                                >
+                                                    Edit
+                                                </Button>
+                                            )}
                                             {canReceipt(invoice) && (
                                                 <Button
                                                     size="sm"
@@ -330,6 +355,17 @@ export default function InvoicesIndex({ auth, invoices, filters, summary, canMan
                 <NewInvoiceDialog
                     open={newInvoiceOpen}
                     onClose={() => setNewInvoiceOpen(false)}
+                    clients={clients}
+                    taxRates={taxRates}
+                />
+            )}
+
+            {canManage && editInvoice && (
+                <NewInvoiceDialog
+                    key={editInvoice.id}
+                    open
+                    invoice={editInvoice}
+                    onClose={() => setEditInvoice(null)}
                     clients={clients}
                     taxRates={taxRates}
                 />

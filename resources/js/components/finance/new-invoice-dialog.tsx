@@ -22,6 +22,24 @@ import {
 export type ClientOption = { id: number; name: string };
 export type TaxRateOption = { id: number; name: string; rate: string | number };
 
+/** An existing draft invoice to prefill the wizard with (edit mode). */
+export type EditableInvoiceLine = {
+    description: string;
+    quantity: string | number;
+    unit_price: string | number;
+    tax_rate_id: number | string | null;
+};
+export type EditableInvoice = {
+    id: number;
+    client_id: number | string | null;
+    client_name: string | null;
+    funding_body: string | null;
+    invoice_date: string;
+    due_date: string;
+    notes: string | null;
+    lines: EditableInvoiceLine[];
+};
+
 type LineForm = {
     description: string;
     quantity: string;
@@ -34,6 +52,14 @@ const emptyLine = (): LineForm => ({
     quantity: '1',
     unit_price: '',
     tax_rate_id: 'default',
+});
+
+/** Map a stored line (tax_rate_id FK or null) into the form shape ('default' = no rate). */
+const lineFromInvoice = (l: EditableInvoiceLine): LineForm => ({
+    description: l.description ?? '',
+    quantity: String(l.quantity ?? '1'),
+    unit_price: String(l.unit_price ?? ''),
+    tax_rate_id: l.tax_rate_id != null ? String(l.tax_rate_id) : 'default',
 });
 
 const STEPS: readonly WizardStep[] = [
@@ -63,12 +89,16 @@ export function NewInvoiceDialog({
     onClose,
     clients,
     taxRates,
+    invoice,
 }: {
     open: boolean;
     onClose: () => void;
     clients: ClientOption[];
     taxRates: TaxRateOption[];
+    /** When provided, the wizard opens in EDIT mode (prefilled, PUTs the update). */
+    invoice?: EditableInvoice | null;
 }) {
+    const isEdit = !!invoice;
     const wizard = useWizard(STEPS.length);
     const { index, goTo, next, back, isFirst, isLast, reset } = wizard;
 
@@ -81,7 +111,16 @@ export function NewInvoiceDialog({
         due_date: string;
         notes: string;
         lines: LineForm[];
-    }>({
+    }>(invoice ? {
+        bill_to: invoice.client_id ? 'client' : 'funder',
+        client_id: invoice.client_id != null ? String(invoice.client_id) : '',
+        client_name: invoice.client_name ?? '',
+        funding_body: invoice.funding_body ?? '',
+        invoice_date: String(invoice.invoice_date).slice(0, 10),
+        due_date: String(invoice.due_date).slice(0, 10),
+        notes: invoice.notes ?? '',
+        lines: invoice.lines.length ? invoice.lines.map(lineFromInvoice) : [emptyLine()],
+    } : {
         bill_to: 'client',
         client_id: '',
         client_name: '',
@@ -158,21 +197,26 @@ export function NewInvoiceDialog({
                 tax_rate_id: l.tax_rate_id, // 'default' → null server-side
             })),
         }));
-        form.post('/finance/invoices', {
+        const opts = {
             preserveScroll: true,
             onSuccess: () => close(),
             onError: () => goTo(0),
-        });
+        };
+        if (isEdit && invoice) {
+            form.put(`/finance/invoices/${invoice.id}`, opts);
+        } else {
+            form.post('/finance/invoices', opts);
+        }
     };
 
     return (
         <WizardShell
             open={open}
             onClose={close}
-            title="New invoice"
-            description="Create a draft AR invoice"
+            title={isEdit ? 'Edit invoice' : 'New invoice'}
+            description={isEdit ? 'Update this draft AR invoice' : 'Create a draft AR invoice'}
             railIcon={Receipt}
-            railTitle="New Invoice"
+            railTitle={isEdit ? 'Edit Invoice' : 'New Invoice'}
             railSub="Accounts receivable"
             steps={STEPS}
             stepIndex={index}
@@ -203,7 +247,7 @@ export function NewInvoiceDialog({
                     )}
                     {isLast && (
                         <Button type="button" onClick={submit} disabled={processing || !detailsValid || !linesValid}>
-                            Create invoice
+                            {isEdit ? 'Save changes' : 'Create invoice'}
                         </Button>
                     )}
                 </>
@@ -339,7 +383,7 @@ export function NewInvoiceDialog({
 
             {index === 2 && (
                 <div>
-                    <StepHead icon={ListChecks} title="Review & create" blurb="Creates a draft invoice you can then send." />
+                    <StepHead icon={ListChecks} title={isEdit ? 'Review & save' : 'Review & create'} blurb={isEdit ? 'Updates this draft invoice.' : 'Creates a draft invoice you can then send.'} />
                     <ReviewCard icon={FileText} title="Invoice">
                         <ReviewRow label="Bill to" value={billToName} />
                         {data.bill_to === 'funder' && data.funding_body && <ReviewRow label="Funding body" value={data.funding_body} />}
@@ -350,7 +394,7 @@ export function NewInvoiceDialog({
                         <ReviewRow label="GST" value={money(totals.tax)} />
                         <ReviewRow label="Total (NZD)" value={money(totals.total)} />
                     </ReviewCard>
-                    {processing && <p className="mt-3 text-[13px] text-muted-foreground">Creating…</p>}
+                    {processing && <p className="mt-3 text-[13px] text-muted-foreground">{isEdit ? 'Saving…' : 'Creating…'}</p>}
                 </div>
             )}
         </WizardShell>
