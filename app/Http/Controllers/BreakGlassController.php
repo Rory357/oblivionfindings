@@ -21,7 +21,7 @@ class BreakGlassController extends Controller
         ]);
 
         // Default: expire after 60 minutes unless explicitly set.
-        $minutes = !empty($data['minutes']) ? (int) $data['minutes'] : 60;
+        $minutes = ! empty($data['minutes']) ? (int) $data['minutes'] : 60;
         $expiresAt = now()->addMinutes($minutes);
 
         $access = ClientBreakGlassAccess::create([
@@ -50,6 +50,9 @@ class BreakGlassController extends Controller
         $isOwner = (int) $access->user_id === (int) $user->id;
         abort_unless($isManager || $isOwner, 403);
 
+        // Record the revoker, then soft-delete so the activation is retained for
+        // the break-glass audit trail (never hard-erased).
+        $access->forceFill(['revoked_by' => $user->id])->save();
         $access->delete();
 
         app(NotificationService::class)->notifyCrud($user, 'deleted', 'break-glass access', $access, $client, [
