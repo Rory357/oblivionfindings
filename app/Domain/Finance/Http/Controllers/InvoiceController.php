@@ -69,6 +69,22 @@ class InvoiceController extends Controller
 
         $invoices = $query->paginate(20)->withQueryString();
 
+        // Attach the outstanding balance to each row (one grouped query, no N+1) so
+        // the Record-Receipt modal can default + cap the receipt amount.
+        $pageIds = collect($invoices->items())->pluck('id');
+        $paidById = FinPaymentAllocation::where('allocatable_type', FinInvoice::class)
+            ->whereIn('allocatable_id', $pageIds)
+            ->groupBy('allocatable_id')
+            ->selectRaw('allocatable_id, SUM(amount) as total_paid')
+            ->pluck('total_paid', 'allocatable_id');
+        $invoices->through(function (FinInvoice $invoice) use ($paidById) {
+            $paid = (float) ($paidById[$invoice->id] ?? 0);
+            $invoice->amount_paid = round($paid, 2);
+            $invoice->amount_due = round((float) $invoice->total_amount - $paid, 2);
+
+            return $invoice;
+        });
+
         $allInvoices = FinInvoice::forOrganization($orgId)->get();
         $summary = [
             'total_outstanding' => $allInvoices->whereIn('status', ['sent', 'viewed', 'overdue'])->sum('total_amount'),
@@ -82,6 +98,7 @@ class InvoiceController extends Controller
             'invoices' => $invoices,
             'filters' => $request->only(['status', 'search', 'date_from', 'date_to']),
             'summary' => $summary,
+            'canManage' => (bool) $request->user()?->canDo('finance.ar.manage'),
         ]);
     }
 
