@@ -27,15 +27,25 @@ class OnboardingService
      * from the template's tasks JSON.
      *
      * @param  int  $createdBy  User ID initiating the onboarding
+     * @param  int|null  $templateId  Optional explicit template (overrides role/site auto-match)
      *
      * @throws \RuntimeException If no active template matches the employee's role
      */
-    public function generateChecklist(HrEmployeeProfile $profile, int $createdBy): HrOnboardingChecklist
+    public function generateChecklist(HrEmployeeProfile $profile, int $createdBy, ?int $templateId = null): HrOnboardingChecklist
     {
-        return DB::transaction(function () use ($profile, $createdBy) {
+        return DB::transaction(function () use ($profile, $createdBy, $templateId) {
             $profile->loadMissing('primarySite');
-            $siteType = $profile->primarySite?->type ?? 'all';
-            $template = $this->resolveTemplate($profile->tenant_id, $profile->position_role, $siteType);
+
+            if ($templateId !== null) {
+                $template = HrOnboardingTemplate::query()
+                    ->where('id', $templateId)
+                    ->where('tenant_id', $profile->tenant_id)
+                    ->where('is_active', true)
+                    ->first();
+            } else {
+                $siteType = $profile->primarySite?->type ?? 'all';
+                $template = $this->resolveTemplate($profile->tenant_id, $profile->position_role, $siteType);
+            }
 
             if (! $template) {
                 throw new \RuntimeException(

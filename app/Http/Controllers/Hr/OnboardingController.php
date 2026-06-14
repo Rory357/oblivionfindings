@@ -3,10 +3,13 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
+use App\Domain\Hr\Jobs\SendOnboardingEmailJob;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrOnboardingChecklist;
+use App\Domain\Hr\Models\HrOnboardingEmail;
 use App\Domain\Hr\Models\HrOnboardingTask;
 use App\Domain\Hr\Models\HrOnboardingTemplate;
+use App\Domain\Hr\Services\ComplianceMatrixService;
 use App\Domain\Hr\Services\OnboardingService;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
@@ -92,6 +95,8 @@ class OnboardingController extends Controller
             'checklists' => $checklists,
             'summary' => $summary,
             'templates' => $templates,
+            'employees' => $this->eligibleEmployees($tenantId),
+            'emailTemplates' => $this->emailTemplateOptions($tenantId),
             'templateRoleOptions' => [
                 'support_worker',
                 'team_lead',
@@ -142,27 +147,58 @@ class OnboardingController extends Controller
 
         $tenantId = $this->resolveHrTenantIdForUser($user);
 
+        return Inertia::render('hr/onboarding/create', [
+            'employees' => $this->eligibleEmployees($tenantId),
+        ]);
+    }
+
+    /**
+     * Active employee profiles that don't already have an in-flight onboarding
+     * checklist — the pickable set for the onboarding wizard. Carries the
+     * role/site/start-date the wizard needs to preview the matched template.
+     */
+    private function eligibleEmployees(int $tenantId): \Illuminate\Support\Collection
+    {
         $existingProfileIds = HrOnboardingChecklist::query()
             ->where('tenant_id', $tenantId)
             ->whereIn('status', ['pending', 'in_progress'])
             ->pluck('employee_profile_id');
 
-        $employees = HrEmployeeProfile::query()
-            ->with('user:id,name,email')
+        return HrEmployeeProfile::query()
+            ->with(['user:id,name,email', 'primarySite:id,name,type'])
             ->where('tenant_id', $tenantId)
             ->where('is_active', true)
             ->whereNotIn('id', $existingProfileIds)
             ->get()
-            ->map(fn ($profile) => [
+            ->map(fn (HrEmployeeProfile $profile) => [
                 'id' => $profile->id,
                 'name' => $profile->user?->name ?? 'Unknown',
                 'email' => $profile->user?->email,
                 'position_title' => $profile->position_title,
-            ]);
+                'position_role' => $profile->position_role,
+                'primary_site_name' => $profile->primarySite?->name,
+                'primary_site_type' => $profile->primarySite?->type,
+                'start_date' => optional($profile->start_date)->toDateString(),
+            ])
+            ->values();
+    }
 
-        return Inertia::render('hr/onboarding/create', [
-            'employees' => $employees,
-        ]);
+    /**
+     * Active onboarding email templates, for the wizard's welcome-email step.
+     */
+    private function emailTemplateOptions(int $tenantId): \Illuminate\Support\Collection
+    {
+        return HrOnboardingEmail::query()
+            ->where('is_active', true)
+            ->where(fn ($q) => $q->whereNull('tenant_id')->orWhere('tenant_id', $tenantId))
+            ->orderBy('send_days_before_start')
+            ->get(['id', 'template_name', 'send_days_before_start'])
+            ->map(fn (HrOnboardingEmail $email) => [
+                'id' => $email->id,
+                'template_name' => $email->template_name,
+                'send_days_before_start' => $email->send_days_before_start,
+            ])
+            ->values();
     }
 
     public function store(Request $request)
@@ -173,6 +209,10 @@ class OnboardingController extends Controller
 
         $validated = $request->validate([
             'employee_profile_id' => ['required', 'integer', 'exists:hr_employee_profiles,id'],
+            'template_id' => ['nullable', 'integer', 'exists:hr_onboarding_templates,id'],
+            'assign_compliance' => ['sometimes', 'boolean'],
+            'send_welcome_email' => ['sometimes', 'boolean'],
+            'welcome_email_id' => ['nullable', 'integer', 'exists:hr_onboarding_emails,id', 'required_if:send_welcome_email,true'],
         ]);
 
         $profile = HrEmployeeProfile::query()->findOrFail((int) $validated['employee_profile_id']);
@@ -188,9 +228,24 @@ class OnboardingController extends Controller
         }
 
         try {
-            $checklist = $this->onboardingService->generateChecklist($profile, $user->id);
+            $checklist = $this->onboardingService->generateChecklist(
+                $profile,
+                $user->id,
+                ! empty($validated['template_id']) ? (int) $validated['template_id'] : null,
+            );
         } catch (\RuntimeException $exception) {
             return redirect()->back()->with('error', $exception->getMessage());
+        }
+
+        // Seed the role's compliance requirements so the new hire shows up in the
+        // matrix from day one (idempotent updateOrCreate per requirement).
+        if (($validated['assign_compliance'] ?? false) && $profile->user) {
+            app(ComplianceMatrixService::class)->evaluateStaff($profile->user);
+        }
+
+        // Fire the welcome email immediately (bypasses the day-offset scheduler).
+        if (($validated['send_welcome_email'] ?? false) && ! empty($validated['welcome_email_id'])) {
+            SendOnboardingEmailJob::dispatch((int) $validated['welcome_email_id'], $profile->id);
         }
 
         return redirect()->back()->with('success', "Onboarding checklist created with {$checklist->tasks->count()} tasks.");
