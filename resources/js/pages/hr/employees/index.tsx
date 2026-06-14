@@ -4,6 +4,12 @@ import {
     DirectoryPane,
     HrTabs,
     type HrTabItem,
+    type PaginatedPositions,
+    type PositionFilters,
+    type PositionParent,
+    PositionDialog,
+    type PositionRow,
+    PositionsPane,
     useHrTab,
 } from '@/components/hr';
 import { PageHero, PageLayout } from '@/components/page';
@@ -79,6 +85,9 @@ interface Props {
         type_counts: Record<string, number>;
     };
     formData: AddEmployeeFormData | null;
+    positions: PaginatedPositions;
+    parentPositions: PositionParent[];
+    positionFilters: PositionFilters;
     can: { manage: boolean };
 }
 
@@ -229,10 +238,17 @@ export default function EmployeesIndex({
     filters,
     summary,
     formData,
+    positions,
+    parentPositions,
+    positionFilters,
     can,
 }: Props) {
     const [addOpen, setAddOpen] = useState(false);
     const [tab, setTab] = useHrTab('people');
+    const [posDialogOpen, setPosDialogOpen] = useState(false);
+    const [editingPosition, setEditingPosition] = useState<PositionRow | null>(
+        null,
+    );
 
     const tabItems: HrTabItem[] = [
         {
@@ -248,6 +264,13 @@ export default function EmployeesIndex({
             icon: Contact,
             tone: 'info',
             badge: profiles.total,
+        },
+        {
+            id: 'positions',
+            label: 'Positions',
+            icon: Briefcase,
+            tone: 'violet',
+            badge: positions.total,
         },
     ];
 
@@ -353,7 +376,7 @@ export default function EmployeesIndex({
                     ariaLabel="People views"
                 />
 
-                {tab === 'people' ? (
+                {tab === 'people' && (
                     <>
                 {/* Stats Cards */}
                 <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
@@ -697,8 +720,27 @@ export default function EmployeesIndex({
                     <LaravelPagination links={profiles.links} />
                 )}
                     </>
-                ) : (
+                )}
+
+                {tab === 'directory' && (
                     <DirectoryPane people={profiles.data} />
+                )}
+
+                {tab === 'positions' && (
+                    <PositionsPane
+                        positions={positions}
+                        departments={departments}
+                        filters={positionFilters}
+                        canManage={can.manage}
+                        onCreate={() => {
+                            setEditingPosition(null);
+                            setPosDialogOpen(true);
+                        }}
+                        onEdit={(p) => {
+                            setEditingPosition(p);
+                            setPosDialogOpen(true);
+                        }}
+                    />
                 )}
             </PageLayout>
 
@@ -709,6 +751,16 @@ export default function EmployeesIndex({
                     formData={formData}
                     departments={departments}
                     sites={sites}
+                />
+            ) : null}
+
+            {can.manage ? (
+                <PositionDialog
+                    open={posDialogOpen}
+                    onClose={() => setPosDialogOpen(false)}
+                    position={editingPosition}
+                    parentPositions={parentPositions}
+                    departments={departments}
                 />
             ) : null}
         </AppLayout>

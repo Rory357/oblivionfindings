@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Http\Requests\Hr\StoreEmployeeRequest;
 use App\Http\Requests\Hr\UpdateEmployeeProfileRequest;
 use App\Domain\Hr\Models\HrAssetAssignment;
@@ -35,6 +36,8 @@ use Inertia\Inertia;
 
 class EmployeeProfileController extends Controller
 {
+    use ResolvesHrTenant;
+
     /* ------------------------------------------------------------------ */
     /*  Index — paginated employee list                                    */
     /* ------------------------------------------------------------------ */
@@ -168,11 +171,63 @@ class EmployeeProfileController extends Controller
                 ->values(),
         ] : null;
 
+        // --- Positions tab (folds /hr/positions; namespaced filters + paginator) ---
+        // Resolve a real tenant id — users carry no tenant_id column, so the
+        // legacy $user->tenant_id was always null (forTenant(null) → empty).
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $posSearch = trim((string) $request->query('pq', ''));
+        $posDepartment = $request->query('pdepartment');
+        $posStatus = $request->query('pstatus');
+
+        $positions = HrPosition::forTenant($tenantId)
+            ->when($posStatus === 'active', fn ($q) => $q->where('is_active', true))
+            ->when($posStatus === 'inactive', fn ($q) => $q->where('is_active', false))
+            ->when($posDepartment, fn ($q) => $q->where('department', $posDepartment))
+            ->when($posSearch !== '', fn ($q) => $q->where(function ($sub) use ($posSearch) {
+                $sub->where('title', 'like', "%{$posSearch}%")
+                    ->orWhere('code', 'like', "%{$posSearch}%")
+                    ->orWhere('department', 'like', "%{$posSearch}%");
+            }))
+            ->withCount(['employees' => fn ($q) => $q->where('is_active', true)])
+            ->orderBy('department')
+            ->orderBy('title')
+            ->paginate(20, ['*'], 'pos_page')
+            ->withQueryString();
+
+        $positions->through(fn ($pos) => [
+            'id' => $pos->id,
+            'title' => $pos->title,
+            'code' => $pos->code,
+            'department' => $pos->department,
+            'team' => $pos->team,
+            'employment_type' => $pos->employment_type,
+            'fte' => (float) $pos->fte,
+            'headcount_budget' => $pos->headcount_budget,
+            'current_headcount' => $pos->employees_count,
+            'vacancies' => max(0, $pos->headcount_budget - $pos->employees_count),
+            'is_active' => (bool) $pos->is_active,
+            'description' => $pos->description,
+            'requirements' => $pos->requirements,
+            'reports_to_position_id' => $pos->reports_to_position_id,
+        ]);
+
+        $parentPositions = HrPosition::forTenant($tenantId)
+            ->where('is_active', true)
+            ->orderBy('title')
+            ->get(['id', 'title', 'code']);
+
         return Inertia::render('hr/employees/index', [
             'profiles' => $profiles,
             'sites' => $sites,
             'departments' => $departments,
             'formData' => $formData,
+            'positions' => $positions,
+            'parentPositions' => $parentPositions,
+            'positionFilters' => [
+                'q' => $posSearch,
+                'department' => $posDepartment,
+                'status' => $posStatus,
+            ],
             'filters' => [
                 'q' => $search,
                 'status' => $status,
