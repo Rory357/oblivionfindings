@@ -378,9 +378,15 @@ KiwiSaver + net-pay liability) via `PostPayrollJournalJob`; `AllocatePayrollCost
   **8-HUB CONSOLIDATION COMPLETE:** Ledger · Receivables · Payables · Banking · Tax · Reports · Settings (+ the
   Calendar feature surface). Remaining M10-1 scope (Tax/GST-config tab, finance-permissions UI) deferred — no
   existing surface to collapse; would be net-new (do only when the backend exists).
-- **[ ] M10-2 Wire Xero account mapping.** *Problem:* mapping UI saves `account_mapping` but the push reads
-  `account->code` only. *Fix:* consume the saved mapping in `XeroSyncProvider` push/export. Add a MYOB
-  "not yet supported" banner (no dead controls). *Acceptance:* a non-code mapping is honoured in sync.
+- **[x] M10-2 Wire Xero account mapping — SHIPPED (main 5a9e98bc).** Confirmed the bug: the integration mapping
+  UI saves `account_mapping` (JSON, cast array, keyed by `(string) local account id` → Xero **AccountID**) but
+  `XeroSyncProvider`'s `manualJournalLinePayload`/`billPayload` only ever emitted `account->code` as `AccountCode`,
+  so a saved mapping was ignored. *Fix:* a single `accountReference($integration, $account)` helper — a saved
+  mapping WINS and is sent as Xero `AccountID` (exact account); an unmapped account falls back to
+  `AccountCode => account->code` (prior behaviour). Threaded `$integration` through the journal/bill payload
+  builders; GL journal untouched (export-only, money-safe + idempotent). MyobSyncProvider already throws an explicit
+  "not supported yet" (no dead controls — left as-is). New test asserts mapped→AccountID + unmapped→AccountCode;
+  existing no-mapping test still green. Finance suite 119 green. *Acceptance met:* a non-code mapping is honoured in sync.
 - **[ ] M10-3 Final de-dup sweep (all three classes).** Verify every collapsed route redirects; extract any
   remaining near-identical finance hero/table/card code into `components/finance/`; confirm no cross-loop fork
   with HR (payroll bridge, expenses, approvals, calendar, primitives). *Acceptance:* no duplicate concept pages; dup map updated.
