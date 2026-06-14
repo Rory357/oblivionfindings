@@ -268,7 +268,23 @@ total_gross == GL wage expense. **M5-2 (net-pay payment run) is the remaining pi
   payday-filing feed from payroll. *Fix:* surface a payday-filing export/record from the posted run on the
   IRD filings screen. *Acceptance:* a posted run yields a payday-filing artefact visible under IRD filings.
 
-### M6 — Performance hub
+### M6 — Performance hub — 🟡 IN PROGRESS (ReviewWizardDialog shipped main c1b072b5, 2026-06-14)
+
+**Audit CORRECTION:** HrGoal (OKRs: user_id, key-results, progress_percentage) and HrDevelopmentGoal (competency
+growth: employee_user_id/manager_user_id, target_level/progress_percent) are **NOT duplicates** — distinct
+schemas/controllers/consumers, both live. Do NOT merge (HIGH risk). Confirmed dead backends (no UI): probation.*,
+goals.update, succession.candidates.store/update, competencies.update.
+- **M6-R1 ReviewWizardDialog** ✅ DONE (c1b072b5): WizardShell modal (Details → Assessment → Review) replaces the
+  page-based create-review + edit-review; hosted on the reviews list (hero + per-row Edit, wiring the previously
+  caller-less reviews.edit); controller ships staff+reviewTypes, create/edit pages redirect to the hub. 4 Pest tests.
+- **M6 REMAINING (next ticks):** (a) SupervisionDialog — replace create/edit-supervision page forms (mirror
+  ReviewWizardDialog; note hr_supervision_notes.topics_discussed is text NOT NULL but validated nullable → make it
+  required in the dialog + tighten the rule); (b) GoalDialog — create/edit OKR goal, wiring the dead goals.update;
+  (c) Performance hub shell — convert performance/index.tsx to PageHero+HrTabs (Overview·Reviews·Supervision·
+  Competencies·PIPs·Succession·Feedback) + extract panes + redirect /reviews,/competencies,/pips,/succession,
+  /feedback → ?tab= (bigger re-composition; merge PerformanceReviewController@index data into SupervisionController@
+  index; succession/goals controllers bypass ResolvesHrTenant — route through it when folding); (d) wire/hide the
+  dead backends (probation record dialog, succession candidate dialog, competency edit).
 
 - **M6-1 Performance hub tabs.** *Problem:* 9 sub-features across 24 pages, 3 tab primitives, 2 layout
   wrappers. *Fix:* one hub (`TabStrip`): Overview · Reviews (incl. Probation) · Supervision/1:1 ·
