@@ -101,6 +101,11 @@ class EmployeeProfileController extends Controller
                     'department' => $profile?->department,
                     'is_active' => $profile ? (bool) $profile->is_active : true,
                     'start_date' => $profile?->start_date?->toDateString(),
+                    // Directory-tab card fields (single source — the standalone directory is folded in).
+                    'preferred_name' => $profile?->preferred_name,
+                    'profile_photo_path' => $profile?->profile_photo_path,
+                    'work_email' => $profile?->work_email,
+                    'phone' => $profile?->work_phone,
                     'user' => [
                         'id' => $staffUser->id,
                         'name' => $staffUser->name,

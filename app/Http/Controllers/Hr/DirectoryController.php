@@ -17,61 +17,28 @@ class DirectoryController extends Controller
 {
     use ResolvesHrTenant;
 
+    /**
+     * The standalone employee directory has been folded into the People hub as a
+     * "Directory" tab (one list, one source). Preserve the route by redirecting,
+     * carrying the search/department filters across (site → site_id).
+     */
     public function index(Request $request)
     {
         $user = $request->user();
         abort_unless($user, 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $search = trim((string) $request->query('q', ''));
-        $department = $request->query('department');
-        $site = $request->query('site');
+        $params = ['tab' => 'directory'];
+        if ($q = trim((string) $request->query('q', ''))) {
+            $params['q'] = $q;
+        }
+        if ($department = $request->query('department')) {
+            $params['department'] = $department;
+        }
+        if ($site = $request->query('site')) {
+            $params['site_id'] = $site;
+        }
 
-        $employees = HrEmployeeProfile::forTenant($tenantId)
-            ->active()
-            ->when($search !== '', fn ($q) => $q->whereHas('user', fn ($u) =>
-                $u->where('name', 'like', "%{$search}%")
-            ))
-            ->when($department, fn ($q) => $q->where('department_id', (int) $department))
-            ->when($site, fn ($q) => $q->where('primary_site_id', $site))
-            ->with('user:id,name,email', 'primarySite:id,name', 'departmentRelation:id,name')
-            ->orderBy('position_title')
-            ->paginate(24)
-            ->withQueryString();
-
-        $employees->through(fn ($emp) => [
-            'id' => $emp->id,
-            'name' => $emp->preferred_name ?? $emp->user?->name ?? 'Unknown',
-            'full_name' => $emp->user?->name ?? 'Unknown',
-            'email' => $emp->work_email,
-            'phone' => $emp->work_phone,
-            'position_title' => $emp->position_title,
-            'department' => $emp->departmentRelation?->name ?? $emp->department,
-            'site' => $emp->primarySite?->name,
-            'profile_photo_path' => $emp->profile_photo_path,
-            'bio' => $emp->bio,
-        ]);
-
-        $departments = HrDepartment::query()
-            ->where(fn ($q) => $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id'))
-            ->where('is_active', true)
-            ->orderBy('name')
-            ->get(['id', 'name']);
-
-        $sites = Site::where('tenant_id', $tenantId)
-            ->orderBy('name')
-            ->get(['id', 'name']);
-
-        return Inertia::render('hr/directory/index', [
-            'employees' => $employees,
-            'departments' => $departments,
-            'sites' => $sites,
-            'filters' => [
-                'q' => $search,
-                'department' => $department,
-                'site' => $site,
-            ],
-        ]);
+        return redirect()->route('hr.people.index', $params);
     }
 
     public function show(Request $request, HrEmployeeProfile $profile)

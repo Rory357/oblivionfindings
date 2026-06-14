@@ -1,7 +1,11 @@
 import {
     AddEmployeeDialog,
     type AddEmployeeFormData,
-} from '@/components/hr/add-employee-dialog';
+    DirectoryPane,
+    HrTabs,
+    type HrTabItem,
+    useHrTab,
+} from '@/components/hr';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -21,6 +25,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import {
     Briefcase,
     Clock,
+    Contact,
     Download,
     Plus,
     Search,
@@ -227,6 +232,24 @@ export default function EmployeesIndex({
     can,
 }: Props) {
     const [addOpen, setAddOpen] = useState(false);
+    const [tab, setTab] = useHrTab('people');
+
+    const tabItems: HrTabItem[] = [
+        {
+            id: 'people',
+            label: 'People',
+            icon: Users,
+            tone: 'primary',
+            badge: profiles.total,
+        },
+        {
+            id: 'directory',
+            label: 'Directory',
+            icon: Contact,
+            tone: 'info',
+            badge: profiles.total,
+        },
+    ];
 
     function applyFilter(key: string, value: string | null) {
         router.get(
@@ -323,6 +346,15 @@ export default function EmployeesIndex({
                     />
                 }
             >
+                <HrTabs
+                    value={tab}
+                    onChange={setTab}
+                    items={tabItems}
+                    ariaLabel="People views"
+                />
+
+                {tab === 'people' ? (
+                    <>
                 {/* Stats Cards */}
                 <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
                     <StatCard
@@ -663,6 +695,10 @@ export default function EmployeesIndex({
 
                 {profiles.last_page > 1 && (
                     <LaravelPagination links={profiles.links} />
+                )}
+                    </>
+                ) : (
+                    <DirectoryPane people={profiles.data} />
                 )}
             </PageLayout>
 
