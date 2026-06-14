@@ -376,9 +376,12 @@ flat Send-Kudos dialog. M7-R3 (e08c55c5) — HrDemoSeeder feed/kudos demo data (
     (per-row on documents/index.tsx, checkbox list of staff by name → POST signatures.request; index ships
     employees.user_id). Fixed BLIND signing: sign.tsx now has a "View document" link backed by a NEW signer-scoped
     download route hr.signatures.document (authorises on signer_user_id, not hr.documents.view). 4 tests
-    (ESignatureRequestTest). REMAINING M8-2: documents.generate "Generate from template" modal (documents/index
-    "Generate from Template" hero button is a dead-end Link to the templates LIST — needs a template+employee picker
-    → POST documents.generate).
+    (ESignatureRequestTest).
+  - ✅ **DONE — documents.generate (11b99d68) → M8-2 COMPLETE:** documents/index "Generate from Template" hero
+    button was a dead-end Link to the templates LIST → now opens a "Generate from Template" dialog (template Select +
+    employee Select + optional title → POST documents.generate; HrDocumentMergeService writes an HTML doc to the
+    private disk). HrDocumentController@index ships an active `templates` prop; "Manage templates" link retained.
+    3 tests (DocumentGenerateTest, Storage::fake private). **All 4 dead compliance backends now reachable.**
 - **M8-3 Policies fixes.** *Problem:* `policies/show.tsx` reads `content`/`change_summary` the controller
   never persists (renders empty) + XSS via `dangerouslySetInnerHTML`; stats page-scoped. *Fix:* map real
   fields; sanitise/remove raw HTML; server-side totals. *Acceptance:* content renders; no XSS; correct totals.
