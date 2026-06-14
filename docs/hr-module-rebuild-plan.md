@@ -359,6 +359,15 @@ flat Send-Kudos dialog. M7-R3 (e08c55c5) — HrDemoSeeder feed/kudos demo data (
   (no doc preview, `ESignatureController:55`). *Fix:* add driver add/approve/suspend UI; "Send for
   signature" + "Generate from template" modals; consent capture; document preview in `sign.tsx`.
   *Acceptance:* each backend reachable; signer sees the document.
+  - ✅ **DONE — drivers (829cfb6b):** drivers/index.tsx was fully read-only (didn't even consume `can`); wired
+    Add-Driver dialog (staff dropdown + licence fields, endorsements comma→array) + per-row Approve + Suspend
+    dialog (required reason) on the existing store/approve/suspend endpoints; controller index() ships an
+    `employees` prop; fixed invisible status badges. 5 tests (DriverEligibilityTest). NOTE: hr.driver.view/manage
+    are granted to provider_manager (RbacSeeder), NOT the hr role. Audit verified all 4 compliance controllers
+    correctly use ResolvesHrTenant (no null-tenant bug). REMAINING M8-2: signatures.request "Send for signature"
+    modal (+ doc preview in sign.tsx — currently signs blind); documents.generate "Generate from template" modal
+    (index "Generate from Template" link is a dead-end to the templates list); vetting.captureConsent "Record
+    Consent" button on vetting/show.tsx (page already renders the consent badge/card, just nothing writes it).
 - **M8-3 Policies fixes.** *Problem:* `policies/show.tsx` reads `content`/`change_summary` the controller
   never persists (renders empty) + XSS via `dangerouslySetInnerHTML`; stats page-scoped. *Fix:* map real
   fields; sanitise/remove raw HTML; server-side totals. *Acceptance:* content renders; no XSS; correct totals.
