@@ -2,9 +2,9 @@
 
 namespace App\Http\Controllers\Emar;
 
-use App\Enums\Medication\NotGivenReason;
 use App\Http\Controllers\Concerns\HandlesOfflineSubmission;
 use App\Http\Controllers\Controller;
+use App\Http\Middleware\HandleInertiaRequests;
 use App\Models\Client;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
@@ -14,12 +14,11 @@ use App\Models\MedicationRound;
 use App\Models\Shift;
 use App\Models\TimelineEvent;
 use App\Models\User;
+use App\Services\Emar\MedsBoardPayloadService;
 use App\Services\EnhancedMarService;
 use App\Services\GuidedRoundService;
 use App\Services\MarScheduleService;
 use App\Services\Timeline\TimelineEmitter;
-use App\Support\EmarUrl;
-use App\Http\Middleware\HandleInertiaRequests;
 use Carbon\Carbon;
 use Illuminate\Http\RedirectResponse;
 use Illuminate\Http\Request;
@@ -53,15 +52,12 @@ class WorkerMedsController extends Controller
 {
     use HandlesOfflineSubmission;
 
-    /** Statuses that mean a dose slot has been actioned and needs no chasing. */
-    private const RECORDED_STATUSES = ['given', 'refused', 'withheld', 'missed'];
-
     public function __construct(
         protected GuidedRoundService $guidedRoundService,
         protected EnhancedMarService $marService,
         protected MarScheduleService $scheduleService,
-    ) {
-    }
+        protected MedsBoardPayloadService $boardPayload,
+    ) {}
 
     public function today(Request $request): Response
     {
@@ -83,16 +79,10 @@ class WorkerMedsController extends Controller
         // reused for (a) matching scheduled dose slots, and (b) deriving the
         // PRN follow-up queue — keeping the today() path at a single
         // client_medication_administrations query regardless of slot count.
-        $dayAdministrations = $this->administrationsForDay($assignedClientIds, $date);
-        $bySlot = $dayAdministrations
-            ->filter(fn (ClientMedicationAdministration $a) => $a->getRawOriginal('scheduled_for') !== null)
-            ->keyBy(fn (ClientMedicationAdministration $a) => $this->scheduleService->slotKey(
-                (int) $a->client_id,
-                (int) $a->client_medication_id,
-                $this->rawUtcInstant($a, 'scheduled_for'),
-            ));
+        $dayAdministrations = $this->boardPayload->administrationsForDay($assignedClientIds, $date);
+        $bySlot = $this->boardPayload->slotIndex($dayAdministrations);
 
-        $schedule = $this->scheduleForDate($assignedClientIds, $date, $now, $bySlot);
+        $schedule = $this->boardPayload->scheduleForDate($assignedClientIds, $date, $now, $bySlot);
 
         // Legacy due lists (kept for the established payload contract): the
         // operational "what needs me" window of -2h … +8h around now.
@@ -118,7 +108,7 @@ class WorkerMedsController extends Controller
             fn ($r) => in_array($r['status'], ['pending', 'in_progress'], true),
         ));
 
-        $prnMedications = $this->prnMedications($assignedClientIds, $now);
+        $prnMedications = $this->boardPayload->prnMedications($assignedClientIds, $now);
 
         return Inertia::render('meds/today/index', [
             'today' => $now->format('l, j F Y'),
@@ -140,22 +130,16 @@ class WorkerMedsController extends Controller
             'due_now' => $dueNow,
             'due_later' => $dueLater,
             'schedule' => $schedule,
-            'clients' => $this->clientsPayload($assignedClientIds),
-            'sites' => $this->sitesPayload($assignedClientIds),
+            'clients' => $this->boardPayload->clientsPayload($assignedClientIds),
+            'sites' => $this->boardPayload->sitesPayload($assignedClientIds),
             'prn_medications' => $prnMedications,
             'prn_follow_ups' => $this->prnFollowUps($dayAdministrations, $timezone),
             'stock_alerts' => $this->stockAlerts($assignedClientIds),
             'activity' => $this->activityForDate($assignedClientIds, $date, $dayAdministrations),
-            'witnesses' => $this->witnesses($user),
-            'not_given_reasons' => NotGivenReason::options(),
+            'witnesses' => $this->boardPayload->witnesses($user),
+            'not_given_reasons' => $this->boardPayload->notGivenReasons(),
             'shift_label' => $this->shiftLabel($user, $date, $timezone),
-            'board_user' => [
-                'first_name' => Str::before(trim((string) $user->name), ' ') ?: $user->name,
-                'name' => $user->name,
-                'role_label' => $user->role ? Str::headline($user->role) : null,
-                'med_competent' => $user->canDo('medications.administer.record'),
-                'cd_witness' => $user->canDo('medications.controlled.witness'),
-            ],
+            'board_user' => $this->boardPayload->boardUser($user),
             'board_can' => [
                 'view_emar' => $user->canDo('medications.view'),
                 'view_audit' => $user->canDo('medications.audit.view'),
@@ -212,8 +196,8 @@ class WorkerMedsController extends Controller
 
             $notes = trim((string) ($data['notes'] ?? ''));
             if (($data['cd_balance'] ?? null) !== null) {
-                $balanceLine = 'CD register balance after dose: ' . $data['cd_balance'];
-                $notes = $notes === '' ? $balanceLine : $notes . "\n" . $balanceLine;
+                $balanceLine = 'CD register balance after dose: '.$data['cd_balance'];
+                $notes = $notes === '' ? $balanceLine : $notes."\n".$balanceLine;
             }
 
             $result = $this->marService->recordAdministration(
@@ -248,7 +232,7 @@ class WorkerMedsController extends Controller
                 ]);
             }
 
-            $clientName = trim(($medication->client->first_name ?? '') . ' ' . ($medication->client->last_name ?? ''));
+            $clientName = trim(($medication->client->first_name ?? '').' '.($medication->client->last_name ?? ''));
 
             if ($result['duplicate'] ?? false) {
                 return back()->with('warning', 'This dose was already recorded — no changes made.');
@@ -269,7 +253,7 @@ class WorkerMedsController extends Controller
                 default => 'recorded to the MAR',
             };
 
-            return back()->with('success', $medication->name . ' ' . $outcome . ' for ' . $clientName);
+            return back()->with('success', $medication->name.' '.$outcome.' for '.$clientName);
         });
     }
 
@@ -351,7 +335,7 @@ class WorkerMedsController extends Controller
 
             return back()->with(
                 'success',
-                'Saved — ' . $medication->name . ' recorded for ' . trim(($medication->client->first_name ?? '') . ' ' . ($medication->client->last_name ?? '')),
+                'Saved — '.$medication->name.' recorded for '.trim(($medication->client->first_name ?? '').' '.($medication->client->last_name ?? '')),
             );
         });
     }
@@ -390,7 +374,7 @@ class WorkerMedsController extends Controller
         }
 
         $reviewMinutes = $administration->administered_at
-            ? max(0, (int) round($this->rawUtcInstant($administration, 'administered_at')->diffInMinutes(now('UTC'))))
+            ? max(0, (int) round($this->boardPayload->rawUtcInstant($administration, 'administered_at')->diffInMinutes(now('UTC'))))
             : null;
 
         MedicationPrnEffectiveness::create([
@@ -486,12 +470,12 @@ class WorkerMedsController extends Controller
                 'source_type' => ClientMedicationAdministration::class,
                 'source_id' => $administration->id,
                 'occurred_at' => $administration->administered_at ?? now(),
-                'type' => 'medication_' . $administration->status,
+                'type' => 'medication_'.$administration->status,
                 'actor_user_id' => $user->id,
                 'client_id' => $medication->client_id,
                 'shift_id' => $shiftId,
                 'site_id' => $medication->client?->site_id,
-                'subject' => $statusLabel . ': ' . $medication->name . ($medication->dosage ? ' ' . $medication->dosage : ''),
+                'subject' => $statusLabel.': '.$medication->name.($medication->dosage ? ' '.$medication->dosage : ''),
                 'body' => null,
                 'meta' => array_filter([
                     'medication_name' => $medication->name,
@@ -505,338 +489,6 @@ class WorkerMedsController extends Controller
         } catch (\Throwable $e) {
             report($e);
         }
-    }
-
-    /**
-     * Every administration touching the selected worker-local day, in one
-     * query: scheduled-slot rows (matched by `scheduled_for`) plus PRN rows
-     * (no slot — matched by `administered_at`).
-     *
-     * @return Collection<int, ClientMedicationAdministration>
-     */
-    private function administrationsForDay(array $clientIds, Carbon $date): Collection
-    {
-        if (empty($clientIds)) {
-            return collect();
-        }
-
-        try {
-            [$dayStartUtc, $dayEndUtc] = $this->scheduleService->utcDayWindow($date);
-
-            return ClientMedicationAdministration::query()
-                ->whereIn('client_id', $clientIds)
-                ->where(function ($query) use ($dayStartUtc, $dayEndUtc) {
-                    $query->whereBetween('scheduled_for', [$dayStartUtc, $dayEndUtc])
-                        ->orWhere(function ($query) use ($dayStartUtc, $dayEndUtc) {
-                            $query->whereNull('scheduled_for')
-                                ->whereBetween('administered_at', [$dayStartUtc, $dayEndUtc]);
-                        });
-                })
-                ->with([
-                    'administeredBy:id,name',
-                    'witnessedBy:id,name',
-                    'medication:id,client_id,name,dosage,route,is_prn,controlled_drug,witness_required',
-                    'prnEffectiveness:id,client_medication_administration_id',
-                ])
-                ->orderBy('id')
-                ->get();
-        } catch (\Throwable $e) {
-            report($e);
-
-            return collect();
-        }
-    }
-
-    /**
-     * The full-day medication board: every scheduled (non-PRN) dose slot for
-     * the selected day — recorded or not — for the assigned clients.
-     *
-     * @param  Collection<string, ClientMedicationAdministration>  $bySlot
-     */
-    private function scheduleForDate(array $clientIds, Carbon $date, Carbon $now, Collection $bySlot): array
-    {
-        if (empty($clientIds)) {
-            return [];
-        }
-
-        try {
-            $timezone = $this->scheduleService->workerTimezone();
-
-            $medications = ClientMedication::whereIn('client_id', $clientIds)
-                ->active()
-                ->where('is_prn', false)
-                ->where(function ($query) {
-                    $query->whereNotNull('dose_times')
-                        ->orWhereNotNull('frequency');
-                })
-                ->with('client:id,first_name,last_name,site_id')
-                ->get();
-
-            $rows = [];
-
-            foreach ($medications as $med) {
-                foreach ($this->scheduleService->scheduledTimesForDate($med, $date) as $scheduled) {
-                    $administration = $bySlot->get(
-                        $this->scheduleService->slotKey((int) $med->client_id, (int) $med->id, $scheduled),
-                    );
-
-                    if ($administration && ! in_array($administration->status, self::RECORDED_STATUSES, true)) {
-                        $administration = null;
-                    }
-
-                    if ($administration) {
-                        $status = $administration->status;
-                    } elseif ($scheduled->lt($now)) {
-                        $status = 'overdue';
-                    } elseif ($scheduled->lte($now->copy()->addHour())) {
-                        $status = 'due';
-                    } else {
-                        $status = 'upcoming';
-                    }
-
-                    $clientName = $med->client
-                        ? trim($med->client->first_name . ' ' . $med->client->last_name)
-                        : 'Unknown';
-
-                    $rows[] = [
-                        'key' => $med->id . ':' . $scheduled->copy()->utc()->format('YmdHi'),
-                        'client_id' => $med->client_id,
-                        'client_name' => $clientName,
-                        'medication_id' => $med->id,
-                        'medication_name' => $med->name,
-                        'dose' => $med->dosage,
-                        'route' => $med->route,
-                        'is_controlled' => (bool) ($med->controlled_drug ?? false),
-                        'requires_witness' => (bool) ($med->witness_required ?? false) || (bool) ($med->controlled_drug ?? false),
-                        'scheduled_for' => $scheduled->toIso8601String(),
-                        'time' => $scheduled->copy()->timezone($timezone)->format('H:i'),
-                        'round_label' => $this->roundLabelFor($scheduled->copy()->timezone($timezone)),
-                        'status' => $status,
-                        'recorded' => $administration ? $this->recordedPayload($administration, $timezone) : null,
-                        'mar_url' => EmarUrl::mar($med->client_id, $scheduled->toDateString()),
-                    ];
-                }
-            }
-
-            usort($rows, function ($a, $b) {
-                $timeCmp = strcmp($a['scheduled_for'], $b['scheduled_for']);
-                if ($timeCmp !== 0) {
-                    return $timeCmp;
-                }
-
-                return strcmp($a['client_name'], $b['client_name']);
-            });
-
-            return $rows;
-        } catch (\Throwable $e) {
-            report($e);
-
-            return [];
-        }
-    }
-
-    private function recordedPayload(ClientMedicationAdministration $administration, string $timezone): array
-    {
-        $administeredAt = $administration->getRawOriginal('administered_at')
-            ? $this->rawUtcInstant($administration, 'administered_at')->setTimezone($timezone)
-            : null;
-
-        return [
-            'id' => $administration->id,
-            'status' => $administration->status,
-            'administered_at' => $administeredAt?->toIso8601String(),
-            'time' => $administeredAt?->format('H:i'),
-            'by' => $administration->administeredBy?->name,
-            'witness' => $administration->witnessedBy?->name,
-            'reason' => $administration->reason,
-            'reason_label' => $administration->reason_code
-                ? NotGivenReason::tryFrom($administration->reason_code)?->label()
-                : null,
-            'notes' => $administration->notes,
-        ];
-    }
-
-    /** Friendly time-of-day bucket shown under the slot time. */
-    private function roundLabelFor(Carbon $localTime): string
-    {
-        $hour = (int) $localTime->format('G');
-
-        return match (true) {
-            $hour < 11 => 'Morning',
-            $hour < 14 => 'Midday',
-            $hour < 17 => 'Afternoon',
-            $hour < 21 => 'Evening',
-            default => 'Night',
-        };
-    }
-
-    /** @return array<int, array<string, mixed>> */
-    private function clientsPayload(array $clientIds): array
-    {
-        if (empty($clientIds)) {
-            return [];
-        }
-
-        try {
-            $timezone = $this->scheduleService->workerTimezone();
-
-            return Client::query()
-                ->whereIn('id', $clientIds)
-                ->with(['site:id,name', 'medicationAllergies' => fn ($q) => $q->whereNull('deleted_at')])
-                ->orderBy('first_name')
-                ->get()
-                ->map(function (Client $client) use ($timezone) {
-                    $name = trim($client->first_name . ' ' . $client->last_name);
-                    $dob = $client->date_of_birth;
-
-                    return [
-                        'id' => $client->id,
-                        'name' => $name,
-                        'preferred' => $client->preferred_name ?: $client->first_name,
-                        'nhi' => $client->nhi_number,
-                        'dob' => $dob?->format('j M Y'),
-                        'age' => $dob ? (int) $dob->copy()->timezone($timezone)->diffInYears(now($timezone)) : null,
-                        'site_id' => $client->site_id,
-                        'site_name' => $client->site?->name,
-                        'allergies' => $client->medicationAllergies
-                            ->map(fn ($a) => trim((string) $a->allergen))
-                            ->filter()
-                            ->values()
-                            ->all(),
-                    ];
-                })
-                ->values()
-                ->all();
-        } catch (\Throwable $e) {
-            report($e);
-
-            return [];
-        }
-    }
-
-    /** @return array<int, array{id: int, name: string}> */
-    private function sitesPayload(array $clientIds): array
-    {
-        if (empty($clientIds)) {
-            return [];
-        }
-
-        try {
-            return Client::query()
-                ->whereIn('id', $clientIds)
-                ->whereNotNull('site_id')
-                ->with('site:id,name')
-                ->get()
-                ->pluck('site')
-                ->filter()
-                ->unique('id')
-                ->sortBy('name')
-                ->map(fn ($site) => ['id' => $site->id, 'name' => $site->name])
-                ->values()
-                ->all();
-        } catch (\Throwable $e) {
-            report($e);
-
-            return [];
-        }
-    }
-
-    /**
-     * PRN (as-needed) medications available for quick recording. Scoped to
-     * the same assigned-client set the rest of the page uses, so a worker
-     * only ever sees PRN meds for people they're actively supporting.
-     */
-    private function prnMedications(array $clientIds, Carbon $now): array
-    {
-        if (empty($clientIds)) {
-            return [];
-        }
-
-        try {
-            $timezone = $this->scheduleService->workerTimezone();
-
-            $medications = ClientMedication::whereIn('client_id', $clientIds)
-                ->active()
-                ->prn()
-                ->with('client:id,first_name,last_name')
-                ->orderBy('client_id')
-                ->orderBy('name')
-                ->get();
-
-            // One grouped query for "last given" across every PRN med (the
-            // 24h pressure counts go through the model accessors as before).
-            $lastGivenByMed = $medications->isEmpty()
-                ? collect()
-                : ClientMedicationAdministration::query()
-                    ->whereIn('client_medication_id', $medications->pluck('id'))
-                    ->where('status', 'given')
-                    ->selectRaw('client_medication_id, MAX(administered_at) as last_given_at')
-                    ->groupBy('client_medication_id')
-                    ->pluck('last_given_at', 'client_medication_id');
-
-            $result = [];
-
-            foreach ($medications as $med) {
-                if (! $med->client) {
-                    continue;
-                }
-
-                $maxPerDay = $med->max_per_day ? (int) $med->max_per_day : null;
-                $givenLast24h = $med->prnCountLast24Hours;
-                $remaining = $maxPerDay !== null ? max(0, $maxPerDay - $givenLast24h) : null;
-
-                $lastGivenRaw = $lastGivenByMed->get($med->id);
-                $lastGiven = $lastGivenRaw ? Carbon::parse((string) $lastGivenRaw, 'UTC')->setTimezone($timezone) : null;
-                $minHours = $med->min_hours_between_doses ? (float) $med->min_hours_between_doses : null;
-                $nextAllowed = ($lastGiven && $minHours)
-                    ? $lastGiven->copy()->addMinutes((int) round($minHours * 60))
-                    : null;
-
-                $result[] = [
-                    'id' => $med->id,
-                    'client_id' => $med->client_id,
-                    'client_name' => trim($med->client->first_name . ' ' . $med->client->last_name),
-                    'name' => $med->name,
-                    'dose' => $med->dosage,
-                    'route' => $med->route,
-                    'form' => $med->form,
-                    'instructions' => $med->instructions,
-                    'prn_reason' => $med->prn_reason,
-                    'max_per_day' => $maxPerDay,
-                    'given_last_24h' => $givenLast24h,
-                    'remaining_today' => $remaining,
-                    'near_limit' => $med->isPrnNearLimit(),
-                    'over_limit' => $med->isPrnOverLimit(),
-                    'is_controlled' => (bool) ($med->controlled_drug ?? false),
-                    'requires_witness' => (bool) ($med->witness_required ?? false) || (bool) ($med->controlled_drug ?? false),
-                    'min_hours_between' => $minHours,
-                    'last_given_at' => $lastGiven?->toIso8601String(),
-                    'last_given_label' => $lastGiven ? $this->friendlyTimeLabel($lastGiven, $now) : null,
-                    'next_allowed_at' => $nextAllowed?->toIso8601String(),
-                    'interval_blocked' => $nextAllowed !== null && $nextAllowed->isAfter($now),
-                    'next_allowed_label' => $nextAllowed?->format('g:i a'),
-                ];
-            }
-
-            return $result;
-        } catch (\Throwable $e) {
-            report($e);
-
-            return [];
-        }
-    }
-
-    private function friendlyTimeLabel(Carbon $instant, Carbon $now): string
-    {
-        if ($instant->isSameDay($now)) {
-            return 'Today ' . $instant->format('g:i a');
-        }
-
-        if ($instant->isSameDay($now->copy()->subDay())) {
-            return 'Yesterday ' . $instant->format('g:i a');
-        }
-
-        return $instant->format('j M, g:i a');
     }
 
     /**
@@ -856,7 +508,7 @@ class WorkerMedsController extends Controller
                     && ! $a->prnEffectiveness)
                 ->map(function (ClientMedicationAdministration $a) use ($timezone) {
                     $givenAt = $a->getRawOriginal('administered_at')
-                        ? $this->rawUtcInstant($a, 'administered_at')->setTimezone($timezone)
+                        ? $this->boardPayload->rawUtcInstant($a, 'administered_at')->setTimezone($timezone)
                         : null;
 
                     return [
@@ -909,7 +561,7 @@ class WorkerMedsController extends Controller
                 ->map(function (ClientMedicationStock $stock) use ($today) {
                     $med = $stock->medication;
                     $clientName = $med?->client
-                        ? trim($med->client->first_name . ' ' . $med->client->last_name)
+                        ? trim($med->client->first_name.' '.$med->client->last_name)
                         : null;
 
                     $expired = $stock->expiry_date && $stock->expiry_date->lte($today);
@@ -919,23 +571,23 @@ class WorkerMedsController extends Controller
                     if ($expired) {
                         $type = 'expired';
                         $tone = 'crit';
-                        $detail = 'Expired ' . $stock->expiry_date->format('j M Y');
+                        $detail = 'Expired '.$stock->expiry_date->format('j M Y');
                     } elseif ($low) {
                         $type = 'stock_low';
                         $tone = $stock->on_hand <= 0 ? 'crit' : 'warn';
-                        $detail = $stock->on_hand . ' ' . ($stock->unit ?: 'units') . ' left · reorder at ' . $stock->reorder_level;
+                        $detail = $stock->on_hand.' '.($stock->unit ?: 'units').' left · reorder at '.$stock->reorder_level;
                     } else {
                         $type = 'expiring_soon';
                         $tone = 'warn';
-                        $detail = 'Expires ' . $stock->expiry_date->format('j M Y');
+                        $detail = 'Expires '.$stock->expiry_date->format('j M Y');
                     }
 
                     return [
                         'id' => $stock->id,
                         'type' => $type,
                         'tone' => $tone,
-                        'label' => trim(($med?->name ?? 'Medication') . ($med?->dosage ? ' ' . $med->dosage : '')) . ($clientName ? ' — ' . $clientName : ''),
-                        'detail' => $detail . ($expiringSoon && $low ? ' · low stock' : ''),
+                        'label' => trim(($med?->name ?? 'Medication').($med?->dosage ? ' '.$med->dosage : '')).($clientName ? ' — '.$clientName : ''),
+                        'detail' => $detail.($expiringSoon && $low ? ' · low stock' : ''),
                         'is_controlled' => (bool) ($med?->controlled_drug ?? false),
                     ];
                 })
@@ -986,7 +638,7 @@ class WorkerMedsController extends Controller
                     };
 
                     $clientName = $event->client
-                        ? trim($event->client->first_name . ' ' . $event->client->last_name)
+                        ? trim($event->client->first_name.' '.$event->client->last_name)
                         : null;
 
                     $witness = $source?->witnessedBy?->name;
@@ -996,35 +648,10 @@ class WorkerMedsController extends Controller
                         'occurred_at' => $event->occurred_at?->toIso8601String(),
                         'time' => $event->occurred_at?->copy()->setTimezone($timezone)->format('H:i'),
                         'icon' => $icon,
-                        'text' => trim(($event->subject ?: Str::headline($event->type)) . ($clientName ? ' — ' . $clientName : '')),
-                        'by' => trim(($event->actor?->name ?? 'System') . ($witness ? ' · wit. ' . $witness : '')),
+                        'text' => trim(($event->subject ?: Str::headline($event->type)).($clientName ? ' — '.$clientName : '')),
+                        'by' => trim(($event->actor?->name ?? 'System').($witness ? ' · wit. '.$witness : '')),
                     ];
                 })
-                ->values()
-                ->all();
-        } catch (\Throwable $e) {
-            report($e);
-
-            return [];
-        }
-    }
-
-    /**
-     * Staff authorised to witness controlled-drug administrations. The
-     * recording worker can't witness their own administration, so they're
-     * excluded from their own list.
-     *
-     * @return array<int, array{id: int, name: string}>
-     */
-    private function witnesses(User $user): array
-    {
-        try {
-            return User::staff()
-                ->orderBy('name')
-                ->get(['id', 'name'])
-                ->filter(fn (User $candidate) => $candidate->id !== $user->id
-                    && $candidate->canDo('medications.controlled.witness'))
-                ->map(fn (User $candidate) => ['id' => $candidate->id, 'name' => $candidate->name])
                 ->values()
                 ->all();
         } catch (\Throwable $e) {
@@ -1057,7 +684,7 @@ class WorkerMedsController extends Controller
                 return null;
             }
 
-            return $start->format('g:i a') . ($end ? ' – ' . $end->format('g:i a') : '');
+            return $start->format('g:i a').($end ? ' – '.$end->format('g:i a') : '');
         } catch (\Throwable $e) {
             report($e);
 
@@ -1159,19 +786,5 @@ class WorkerMedsController extends Controller
 
             return [];
         }
-    }
-
-    /**
-     * Read a datetime column back as a true UTC Carbon from the raw value —
-     * avoiding the Eloquent accessor, which can re-introduce the worker-tz
-     * offset (see the house timezone convention in MarScheduleService).
-     */
-    private function rawUtcInstant(ClientMedicationAdministration $administration, string $column): Carbon
-    {
-        $raw = $administration->getRawOriginal($column);
-
-        return $raw
-            ? Carbon::parse((string) $raw, 'UTC')
-            : Carbon::createFromTimestamp(0, 'UTC');
     }
 }

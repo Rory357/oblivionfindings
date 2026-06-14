@@ -33,6 +33,7 @@ use App\Models\ShiftHandover;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\DoseSchedulingService;
+use App\Services\Emar\MedsBoardPayloadService;
 use App\Services\MarScheduleService;
 use App\Services\MedicationAlertService;
 use App\Services\MedicationIncidentIntegrationService;
@@ -57,6 +58,7 @@ class EmarController extends Controller
     public function __construct(
         protected ShiftHandoverService $handoverService,
         protected MedicationScanVerificationService $scanVerificationService,
+        protected MedsBoardPayloadService $boardPayload,
     ) {}
 
     // ─── Helpers ──────────────────────────────────────────
@@ -762,9 +764,16 @@ class EmarController extends Controller
         $pendingCorrections = [];
         $alerts = [];
         $controlledDiscrepancies = [];
+        // Shared meds-board payload (reused by /meds/today) so the MAR chart
+        // records doses through the exact same RecordDoseWizard + pipeline.
+        $boardSchedule = [];
+        $boardPrn = [];
+        $selectedClientInfo = null;
+        $siteBrandColour = null;
 
         if ($request->filled('client_id')) {
             $selectedClient = Client::with([
+                'site:id,name,brand_colour',
                 'medications' => fn ($q) => $q->active()->orderBy('name'),
                 'medications.stock',
                 'medications.administrations' => fn ($q) => $q->where(function ($query) use ($dayStartUtc, $dayEndUtc) {
@@ -782,6 +791,20 @@ class EmarController extends Controller
             $pendingCorrections = $this->getPendingCorrections($selectedClient);
             $alerts = $this->getClientAlerts($selectedClient);
             $controlledDiscrepancies = $this->getOpenControlledDiscrepancies($selectedClient);
+
+            $boardClientIds = [$selectedClient->id];
+            $boardNow = Carbon::now($scheduleService->workerTimezone());
+            $boardSchedule = $this->boardPayload->scheduleForDate(
+                $boardClientIds,
+                $scheduleDate,
+                $boardNow,
+                $this->boardPayload->slotIndex(
+                    $this->boardPayload->administrationsForDay($boardClientIds, $scheduleDate)
+                ),
+            );
+            $boardPrn = $this->boardPayload->prnMedications($boardClientIds, $boardNow);
+            $selectedClientInfo = $this->boardPayload->clientsPayload($boardClientIds)[0] ?? null;
+            $siteBrandColour = $selectedClient->site?->brand_colour;
         }
 
         return Inertia::render('emar/MarCharts', [
@@ -801,6 +824,15 @@ class EmarController extends Controller
             'alerts' => $alerts,
             'controlledDiscrepancies' => $controlledDiscrepancies,
             'can' => $this->buildMedicationPermissions($request->user()),
+            // Shared meds-board payload (mirrors /meds/today) powering the
+            // time-grid + reused RecordDoseWizard / PrnWizard on the MAR chart.
+            'schedule' => $boardSchedule,
+            'prn_medications' => $boardPrn,
+            'selected_client_info' => $selectedClientInfo,
+            'site_brand_colour' => $siteBrandColour,
+            'witnesses' => $this->boardPayload->witnesses($request->user()),
+            'not_given_reasons' => $this->boardPayload->notGivenReasons(),
+            'board_user' => $this->boardPayload->boardUser($request->user()),
         ]);
     }
 
