@@ -41,6 +41,12 @@ interface Employee {
     employee_number: string | null;
 }
 
+interface DocumentTemplate {
+    id: number;
+    name: string;
+    category: string;
+}
+
 interface Props {
     documents: {
         data: HrDocument[];
@@ -51,6 +57,7 @@ interface Props {
         total: number;
     };
     employees: Employee[];
+    templates: DocumentTemplate[];
     filters: { type: string | null; q: string };
     can: { manage: boolean };
 }
@@ -73,11 +80,37 @@ const typeColors: Record<string, string> = {
 export default function DocumentsIndex({
     documents,
     employees,
+    templates,
     filters,
     can,
 }: Props) {
     const [signDoc, setSignDoc] = useState<HrDocument | null>(null);
     const [signerIds, setSignerIds] = useState<number[]>([]);
+    const [genOpen, setGenOpen] = useState(false);
+    const [genForm, setGenForm] = useState({
+        template_id: '',
+        employee_profile_id: '',
+        title: '',
+    });
+
+    const setGen = (key: string, value: string) =>
+        setGenForm((prev) => ({ ...prev, [key]: value }));
+
+    const submitGenerate = (e: FormEvent) => {
+        e.preventDefault();
+        if (!genForm.template_id || !genForm.employee_profile_id) return;
+        router.post('/hr/documents/generate', genForm, {
+            preserveScroll: true,
+            onSuccess: () => {
+                setGenOpen(false);
+                setGenForm({
+                    template_id: '',
+                    employee_profile_id: '',
+                    title: '',
+                });
+            },
+        });
+    };
 
     const signableEmployees = useMemo(
         () => employees.filter((e) => e.user_id),
@@ -135,11 +168,13 @@ export default function DocumentsIndex({
                         actions={
                             can.manage ? (
                                 <div className="flex items-center gap-2">
-                                    <Button variant="outline" asChild className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground">
-                                        <Link href="/hr/documents/templates">
-                                            <FileText className="mr-2 h-4 w-4" />
-                                            Generate from Template
-                                        </Link>
+                                    <Button
+                                        variant="outline"
+                                        onClick={() => setGenOpen(true)}
+                                        className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                    >
+                                        <FileText className="mr-2 h-4 w-4" />
+                                        Generate from Template
                                     </Button>
                                     <Button asChild>
                                         <Link href="/hr/documents/upload">
@@ -316,6 +351,115 @@ export default function DocumentsIndex({
                     </div>
                 )}
             </PageLayout>
+
+            {/* Generate from template dialog */}
+            <Dialog open={genOpen} onOpenChange={setGenOpen}>
+                <DialogContent className="sm:max-w-lg">
+                    <DialogHeader>
+                        <DialogTitle>Generate from Template</DialogTitle>
+                    </DialogHeader>
+                    <form onSubmit={submitGenerate} className="space-y-4">
+                        <div>
+                            <label className="mb-1 block text-sm font-medium">
+                                Template
+                            </label>
+                            <Select
+                                value={genForm.template_id}
+                                onValueChange={(v) => setGen('template_id', v)}
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select a template" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {templates.map((t) => (
+                                        <SelectItem
+                                            key={t.id}
+                                            value={String(t.id)}
+                                        >
+                                            {t.name}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div>
+                            <label className="mb-1 block text-sm font-medium">
+                                Employee
+                            </label>
+                            <Select
+                                value={genForm.employee_profile_id}
+                                onValueChange={(v) =>
+                                    setGen('employee_profile_id', v)
+                                }
+                            >
+                                <SelectTrigger>
+                                    <SelectValue placeholder="Select an employee" />
+                                </SelectTrigger>
+                                <SelectContent>
+                                    {employees.map((emp) => (
+                                        <SelectItem
+                                            key={emp.id}
+                                            value={String(emp.id)}
+                                        >
+                                            {emp.name ?? `Employee #${emp.id}`}
+                                            {emp.employee_number
+                                                ? ` (${emp.employee_number})`
+                                                : ''}
+                                        </SelectItem>
+                                    ))}
+                                </SelectContent>
+                            </Select>
+                        </div>
+                        <div>
+                            <label className="mb-1 block text-sm font-medium">
+                                Title (optional)
+                            </label>
+                            <Input
+                                value={genForm.title}
+                                onChange={(e) => setGen('title', e.target.value)}
+                                placeholder="Defaults to the template name"
+                            />
+                        </div>
+                        {templates.length === 0 && (
+                            <p className="text-sm text-muted-foreground">
+                                No active templates yet.{' '}
+                                <Link
+                                    href="/hr/documents/templates"
+                                    className="underline"
+                                >
+                                    Manage templates
+                                </Link>
+                            </p>
+                        )}
+                        <div className="flex items-center justify-between">
+                            <Link
+                                href="/hr/documents/templates"
+                                className="text-xs text-muted-foreground underline"
+                            >
+                                Manage templates
+                            </Link>
+                            <div className="flex gap-2">
+                                <Button
+                                    type="button"
+                                    variant="outline"
+                                    onClick={() => setGenOpen(false)}
+                                >
+                                    Cancel
+                                </Button>
+                                <Button
+                                    type="submit"
+                                    disabled={
+                                        !genForm.template_id ||
+                                        !genForm.employee_profile_id
+                                    }
+                                >
+                                    Generate
+                                </Button>
+                            </div>
+                        </div>
+                    </form>
+                </DialogContent>
+            </Dialog>
 
             {/* Send for signature dialog */}
             <Dialog

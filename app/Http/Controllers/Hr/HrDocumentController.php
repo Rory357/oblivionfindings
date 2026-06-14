@@ -95,9 +95,22 @@ class HrDocumentController extends Controller
             ])
             ->values();
 
+        $templates = HrDocumentTemplate::query()
+            ->when($tenantId !== null, fn (Builder $query) => $query->where('tenant_id', $tenantId))
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name', 'category'])
+            ->map(fn (HrDocumentTemplate $template) => [
+                'id' => $template->id,
+                'name' => $template->name,
+                'category' => $template->category,
+            ])
+            ->values();
+
         return Inertia::render('hr/documents/index', [
             'documents' => $documents,
             'employees' => $employees,
+            'templates' => $templates,
             'categories' => $this->documentCategories(),
             'filters' => [
                 'q' => $q,
