@@ -192,11 +192,20 @@ Land the spine M1–M10 build on. **No behaviour change**, design only.
 - **[x] M2-6 Recurring charges engine.** Corrected columns (`is_active`/`next_charge_at`), daily schedule, `BillingEntry`→`FinInvoice`; test. *(commit 892f32a9)*
 - **[x] M2-7 Retire dead AR code.** Deleted `BillingJournalService` + `PostBillingJournalJob` (orphaned — job dispatched nowhere; service referenced only by that job + a stale docblock). route:list/suite clean. *(commit 6f622e5f)*
 
-### M3 — Purchases & Payables hub `[ ]`
-- **[ ] M3-1 Payables hub + TabStrip + wizard modals.** Fold bills/POs/vendors/credit-notes(AP)/payment-runs;
-  New/Edit Bill, New PO, New Vendor, Schedule Payment Run, Approve Payment Run as modals.
-- **[ ] M3-2 Bills `partial` status bug.** *Fix:* `BillController:68-70` filter `'partially_paid'` not `'partial'`. *Acceptance:* summary counts partially-paid bills.
-- **[ ] M3-3 PO/bill-number dedup.** Single source for `generateBillNumber` (service, not duplicated in controller). *Acceptance:* one generator.
+### M3 — Purchases & Payables hub `[~]` (hub + P0 + dedup done; AP wizard modals remain)
+- **[~] M3-1 Payables hub + TabStrip + wizard modals.** *Hub DONE (commit 430c1cd5):* `PayablesTabsFooter`
+  (components/finance/payables-hub.tsx, mirrors receivables-hub.tsx) in all 5 AP sub-page heros so bills ·
+  purchase-orders · vendors · credit-notes · payment-runs read as one hub (every tab `finance.ap.view`).
+  `PayablesController` redirects `/finance/payables` → first openable AP tab (bills); sidebar AP group collapsed
+  to one "Payables" entry. 2 tests. *Remaining (next tick):* New/Edit Bill (multi-line, reuse the New Invoice
+  wizard template), New PO, New Vendor, Schedule/Approve Payment Run as `WizardShell` modals (reference data +
+  canManage from each index controller; NO empty-string Select values).
+- **[x] M3-2 Bills `partial` status bug (P0).** Fixed `'partial'`→`'partially_paid'` (the enum value) across
+  `BillController` summary (incl. total_overdue which only counted 'approved'), `CashFlowForecastService`
+  projectOutflows, and `GlSyncService` bill push — all three silently excluded partially-paid bills. Test. *(commit c2dd2b28)*
+- **[x] M3-3 PO/bill-number dedup.** Extracted `FinBill::nextNumber` + `FinPurchaseOrder::nextNumber` (robust
+  MAX-of-numeric-suffix, per org/month); `AccountsPayableService` + `PurchaseOrderController` (store + convertToBill)
+  use them; the controller's two duplicate string-orderBy generators (broke past 999/month) deleted. 3 tests. *(commit 5d627663)*
 
 ### M4 — Banking & Cash hub `[ ]`
 - **[ ] M4-1 Banking hub + TabStrip + Bank-Reconcile workspace + confirm modal.** Fold accounts/transactions/
