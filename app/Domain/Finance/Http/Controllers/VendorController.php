@@ -2,10 +2,10 @@
 
 namespace App\Domain\Finance\Http\Controllers;
 
-use App\Domain\Finance\Models\FinAccount;
-use App\Domain\Finance\Models\FinVendor;
 use App\Domain\Finance\Http\Requests\StoreVendorRequest;
 use App\Domain\Finance\Http\Requests\UpdateVendorRequest;
+use App\Domain\Finance\Models\FinAccount;
+use App\Domain\Finance\Models\FinVendor;
 use App\Http\Controllers\Controller;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -25,7 +25,7 @@ class VendorController extends Controller
             ->when($request->search, function ($query, $search) {
                 $query->where(function ($q) use ($search) {
                     $q->where('name', 'like', "%{$search}%")
-                      ->orWhere('email', 'like', "%{$search}%");
+                        ->orWhere('email', 'like', "%{$search}%");
                 });
             })
             ->when($request->vendor_type, function ($query, $type) {
@@ -38,6 +38,8 @@ class VendorController extends Controller
             ->paginate(15)
             ->withQueryString();
 
+        $canManage = (bool) $request->user()?->canDo('finance.ap.manage');
+
         return Inertia::render('finance/vendors/Index', [
             'vendors' => $vendors,
             'filters' => [
@@ -45,6 +47,12 @@ class VendorController extends Controller
                 'vendor_type' => $request->vendor_type ?? '',
                 'is_active' => $request->is_active ?? '',
             ],
+            'canManage' => $canManage,
+            // Expense accounts for the New Vendor modal's optional default account.
+            'expenseAccounts' => $canManage
+                ? FinAccount::query()->forOrganization($orgId)->ofType('expense')->active()
+                    ->orderBy('name')->get(['id', 'code', 'name'])
+                : [],
         ]);
     }
 

@@ -3,7 +3,7 @@ import { type PageProps } from '@/types';
 import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
-import { PayablesTabsFooter } from '@/components/finance';
+import { NewVendorDialog, PayablesTabsFooter, type AccountOption } from '@/components/finance';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -42,6 +42,8 @@ interface Filters {
 interface Props extends PageProps {
     vendors: PaginatedVendors;
     filters: Filters;
+    canManage: boolean;
+    expenseAccounts: AccountOption[];
 }
 
 const vendorTypeLabels: Record<string, string> = {
@@ -65,8 +67,9 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Vendors', href: '/finance/vendors' },
 ];
 
-export default function VendorsIndex({ vendors, filters }: Props) {
+export default function VendorsIndex({ vendors, filters, canManage, expenseAccounts }: Props) {
     const [search, setSearch] = useState(filters.search);
+    const [newVendorOpen, setNewVendorOpen] = useState(false);
 
     const applyFilters = useCallback(
         (newFilters: Partial<Filters>) => {
@@ -109,12 +112,12 @@ export default function VendorsIndex({ vendors, filters }: Props) {
                             { label: 'Active (this page)', value: activeCount },
                         ]}
                         actions={
-                            <Button asChild size="sm">
-                                <Link href="/finance/vendors/create">
+                            canManage && (
+                                <Button size="sm" onClick={() => setNewVendorOpen(true)}>
                                     <Plus className="w-4 h-4 mr-1.5" />
                                     Add Vendor
-                                </Link>
-                            </Button>
+                                </Button>
+                            )
                         }
                         footer={<PayablesTabsFooter active="vendors" />}
                     />
@@ -186,12 +189,12 @@ export default function VendorsIndex({ vendors, filters }: Props) {
                                 <p className="text-muted-foreground mb-4">
                                     Get started by adding your first vendor.
                                 </p>
-                                <Button asChild>
-                                    <Link href="/finance/vendors/create">
+                                {canManage && (
+                                    <Button onClick={() => setNewVendorOpen(true)}>
                                         <Plus className="w-4 h-4 mr-2" />
                                         Add Vendor
-                                    </Link>
-                                </Button>
+                                    </Button>
+                                )}
                             </div>
                         ) : (
                             <Table>
@@ -280,6 +283,14 @@ export default function VendorsIndex({ vendors, filters }: Props) {
                     </div>
                 )}
             </PageLayout>
+
+            {canManage && (
+                <NewVendorDialog
+                    open={newVendorOpen}
+                    onClose={() => setNewVendorOpen(false)}
+                    expenseAccounts={expenseAccounts}
+                />
+            )}
         </AppLayout>
     );
 }
