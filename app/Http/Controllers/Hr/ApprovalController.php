@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrApprovalChain;
 use App\Domain\Hr\Models\HrApprovalInstance;
 use App\Domain\Hr\Services\ApprovalWorkflowService;
@@ -12,6 +13,8 @@ use Inertia\Inertia;
 
 class ApprovalController extends Controller
 {
+    use ResolvesHrTenant;
+
     public function __construct(
         private readonly ApprovalWorkflowService $workflowService,
     ) {}
@@ -25,7 +28,7 @@ class ApprovalController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.approvals.manage'), 403);
 
-        $tenantId = $user->tenant_id;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $chains = HrApprovalChain::forTenant($tenantId)
             ->with(['steps', 'creator:id,name'])
@@ -84,7 +87,7 @@ class ApprovalController extends Controller
         ]);
 
         $chain = HrApprovalChain::create([
-            'tenant_id' => $user->tenant_id,
+            'tenant_id' => $this->resolveHrTenantIdForUser($user),
             'name' => $validated['name'],
             'process_type' => $validated['process_type'],
             'is_active' => $validated['is_active'] ?? true,
@@ -114,7 +117,7 @@ class ApprovalController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.approvals.view'), 403);
 
-        $tenantId = $user->tenant_id;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $instances = HrApprovalInstance::forTenant($tenantId)
             ->pending()
@@ -153,6 +156,7 @@ class ApprovalController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.approvals.view'), 403);
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $instance->tenant_id);
 
         $validated = $request->validate([
             'action' => ['required', 'string', Rule::in(['approved', 'rejected', 'escalated'])],
