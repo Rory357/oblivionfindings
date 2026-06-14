@@ -288,12 +288,22 @@ KiwiSaver + net-pay liability) via `PostPayrollJournalJob`; `AllocatePayrollCost
 - **[~] M6-5 Delete stale `FundingService`.** VERIFIED NOT DEAD — `App\Services\Operations\FundingService` is
   used by `CheckExpiringAgreementsJob::handle`. Not removable; closing as not-applicable.
 
-### M7 — Tax & Compliance hub `[ ]`
-- **[ ] M7-1 Tax hub + TabStrip + modals.** GST returns · IRD/payday filing · Audit exports · Consolidation ·
-  Intercompany. Prepare-GST, File-Payday/IRD, FX-reval, Period-close as modals.
-- **[ ] M7-2 PAYE/IR348 payday filing (links M5-5).** Surface payday filing from posted pay runs. *Acceptance:* payday-filing artefact assembles from a run.
-- **[ ] M7-3 IRD GST e-filing honesty.** Either wire the real IRD Gateway submission or clearly label the
-  current credential-gated simulation (no dead "submit" implying live filing). *Acceptance:* submit state is truthful.
+### M7 — Tax & Compliance hub `[~]` (hub + IRD-honesty done; M7-2 payday filing remains, cross-module)
+- **[x] M7-1 Tax hub + TabStrip.** *(commit 8459af91)* `TaxTabsFooter` (components/finance/tax-hub.tsx, mirrors
+  banking-hub) in the 4 tax sub-page heros — GST returns · IRD filing · audit exports · consolidation — read as
+  one hub. Heterogeneous gates (tax.view / tax.manage / reports.view / admin), so `TaxController` redirects
+  `/finance/tax` to the first openable tab (collect-first, like Ledger). consolidation/Index converted from a
+  bespoke header to PageLayout+PageHero so it joins the hub. Sidebar collapsed the scattered GST/IRD/Audit/
+  Consolidation entries into one "Tax & Compliance". 3 hub tests. (Modals — Prepare-GST etc. — deferred; the
+  prepare/create flows already work as pages.)
+- **[ ] M7-2 PAYE/IR348 payday filing (links M5-5).** Cross-module (payroll runs are HR-owned). Surface a
+  payday-filing artefact from a posted pay run on the IRD screen. `buildPaydayFilingPayload` exists but is unwired.
+  Deferred — needs the HR payroll-run boundary.
+- **[x] M7-3 IRD GST e-filing honesty.** *(commit f555d8a7)* The submit path FAKED success (random `IRD-xxxx`
+  reference + "received and queued") whenever any api_key was set, transmitting nothing — a user could believe a
+  return was filed with IRD. No live Gateway integration exists (SOAP + WS-Security X.509), so submission now
+  REFUSES unless `services.ird.simulation_enabled` is set, and a simulation is clearly labelled (SIM- reference,
+  status 'simulated', "NOT transmitted" message, warning flash). 2 tests + updated the status-flow test.
 
 ### M8 — Reports & Planning hub + budget unification `[ ]`
 - **[ ] M8-1 Reports hub + TabStrip + period selector.** P&L · BS · TB · Cash flow · Aged AR · Aged AP ·
