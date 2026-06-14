@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class MedicationCompetencyAssessment extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory;
 
     protected $fillable = [
         'user_id',
@@ -38,6 +38,9 @@ class MedicationCompetencyAssessment extends Model
         'observed_rounds',
         'can_administer_unsupervised',
         'can_witness_controlled',
+        'restricted',
+        'restriction_notes',
+        'not_seen_areas',
     ];
 
     protected $casts = [
@@ -60,6 +63,8 @@ class MedicationCompetencyAssessment extends Model
         'observed_rounds' => 'array',
         'can_administer_unsupervised' => 'boolean',
         'can_witness_controlled' => 'boolean',
+        'restricted' => 'boolean',
+        'not_seen_areas' => 'array',
     ];
 
     public function user()
@@ -99,7 +104,7 @@ class MedicationCompetencyAssessment extends Model
 
     public function isPassed(): bool
     {
-        return $this->status === 'passed' && !$this->isExpired();
+        return $this->status === 'passed' && ! $this->isExpired();
     }
 
     public function getCompetencyAreasAttribute(): array

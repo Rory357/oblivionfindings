@@ -1,567 +1,332 @@
-import PageShell from '@/components/page-shell';
-import { Badge } from '@/components/ui/badge';
+/* eslint-disable no-restricted-syntax -- competency tables, KPI cards, coverage matrix and the
+   hero search/chip controls are custom-layout bordered surfaces / chip buttons (not Card/Button);
+   all colours are semantic tokens. */
+import { PageHero, type PageHeroStat } from '@/components/page';
+import { EntityFilter, TabStrip, type RosterTabItem } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { TabsRoot as Tabs, TabsContent, TabsList, TabsTrigger } from '@/components/ui/tabs';
-import { Textarea } from '@/components/ui/textarea';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
-import { Head, router, useForm, usePage } from '@inertiajs/react';
-import { AlertTriangle, Award, CheckCircle, Clock, GraduationCap, Pencil, Plus, Trash2, UserX, XCircle } from 'lucide-react';
-import { useState } from 'react';
+import {
+    AssessmentWizardDialog,
+    COMPETENCY_AREAS,
+    statusChip,
+    ViewAssessmentDialog,
+    type AssessmentRow,
+    type StaffOpt,
+} from '@/pages/emar/_competency-dialogs';
+import { Head, router } from '@inertiajs/react';
+import { Award, AlertTriangle, CalendarClock, CheckCircle2, Download, Eye, GraduationCap, LayoutGrid, Lock, Pencil, Plus, RotateCcw, Search, ShieldCheck, UserX } from 'lucide-react';
+import { useMemo, useState } from 'react';
+
+type Kpis = { total_staff: number; in_date: number; in_date_pct: number; expiring: number; expired: number; unassessed: number; cd_witnesses: number };
+type UnassessedStaff = { id: number; name: string; role: string | null };
 
 type Props = {
-    assessments: { data: any[]; links: any };
-    expiringSoon: any[];
-    expired: any[];
-    staffWithoutAssessment: { id: number; name: string; email: string }[];
-    staff: { id: number; name: string }[];
-    filters: { status?: string };
+    assessments: AssessmentRow[];
+    staffWithoutAssessment: UnassessedStaff[];
+    staff: StaffOpt[];
+    kpis: Kpis;
+    sites: { id: number; name: string }[];
+    active_site: { id: number; name: string } | null;
+    site_brand_colour: string | null;
 };
 
-const statusConfig: Record<string, { icon: any; color: string }> = {
-    passed: { icon: CheckCircle, color: 'text-status-success' },
-    failed: { icon: XCircle, color: 'text-status-critical' },
-    pending: { icon: Clock, color: 'text-status-warning' },
-    in_progress: { icon: Clock, color: 'text-status-info' },
-    expired: { icon: AlertTriangle, color: 'text-status-critical' },
-};
+type Modal =
+    | { type: 'new'; userId?: number }
+    | { type: 'edit'; assessment: AssessmentRow }
+    | { type: 'renew'; assessment: AssessmentRow }
+    | { type: 'view'; assessment: AssessmentRow }
+    | null;
 
-const competencyFields = [
-    { key: 'medication_knowledge', label: 'Medication Knowledge' },
-    { key: 'five_rights', label: 'Five Rights' },
-    { key: 'safety_checks', label: 'Safety Checks' },
-    { key: 'documentation', label: 'Documentation' },
-    { key: 'controlled_drugs', label: 'Controlled Drugs' },
-    { key: 'prn_assessment', label: 'PRN Assessment' },
-    { key: 'insulin_competent', label: 'Insulin Competent' },
-    { key: 'inhaler_competent', label: 'Inhaler Competent' },
-    { key: 'topical_competent', label: 'Topical Competent' },
-    { key: 'covert_admin_knowledge', label: 'Covert Admin Knowledge' },
-    { key: 'error_reporting', label: 'Error Reporting' },
-    { key: 'allergy_awareness', label: 'Allergy Awareness' },
-] as const;
+const initials = (n: string) => n.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase() || '?';
+const fmtDate = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
+const daysTo = (iso: string | null) => (iso ? Math.round((new Date(iso).getTime() - Date.now()) / 86400000) : null);
+const STATUS_OPTS = [{ id: 0, name: 'In date' }, { id: 1, name: 'Supervised' }, { id: 2, name: 'Expired' }, { id: 3, name: 'Failed' }];
 
-function getDefaultExpiryDate() {
-    const d = new Date();
-    d.setFullYear(d.getFullYear() + 1);
-    return d.toISOString().split('T')[0];
+function csvCell(v: unknown): string { const s = v == null ? '' : String(v); return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s; }
+function exportCsv(rows: AssessmentRow[]) {
+    const head = ['Staff', 'Role', 'Type', 'Score', 'Status', 'Expiry', 'Unsupervised', 'CD witness', 'Restricted', 'Assessor'];
+    const lines = rows.map((a) => [a.user_name, a.user_role, a.assessment_type, `${a.total_score ?? 0}/${a.pass_threshold ?? 12}`, statusChip(a).label, a.expiry_date, a.can_administer_unsupervised ? 'Yes' : 'No', a.can_witness_controlled ? 'Yes' : 'No', a.restricted ? 'Yes' : 'No', a.assessor_name].map(csvCell).join(','));
+    const blob = new Blob([[head.join(','), ...lines].join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob); const link = document.createElement('a'); link.href = url; link.download = `competency-register-${new Date().toISOString().slice(0, 10)}.csv`; link.click(); URL.revokeObjectURL(url);
 }
 
-function getTodayDate() {
-    return new Date().toISOString().split('T')[0];
-}
+export default function Competency({ assessments, staffWithoutAssessment, staff, kpis, active_site: activeSite, site_brand_colour: brandColour }: Props) {
+    const [activeTab, setActiveTab] = useState('all');
+    const [search, setSearch] = useState('');
+    const [roleFilter, setRoleFilter] = useState<number | null>(null);
+    const [statusFilter, setStatusFilter] = useState<number | null>(null);
+    const [modal, setModal] = useState<Modal>(null);
 
-function NewAssessmentDialog({ staff, staffWithoutAssessment }: { staff: Props['staff']; staffWithoutAssessment: Props['staffWithoutAssessment'] }) {
-    const [open, setOpen] = useState(false);
+    const roleItems = useMemo(() => {
+        const set = new Set<string>();
+        assessments.forEach((a) => a.user_role && set.add(a.user_role));
+        staffWithoutAssessment.forEach((s) => s.role && set.add(s.role));
+        return [...set].sort().map((r, i) => ({ id: i, name: r }));
+    }, [assessments, staffWithoutAssessment]);
 
-    // Combine staffWithoutAssessment + all staff, deduplicate
-    const allStaffOptions = (() => {
-        const map = new Map<number, { id: number; name: string }>();
-        staffWithoutAssessment.forEach((s) => map.set(s.id, { id: s.id, name: s.name }));
-        staff.forEach((s) => map.set(s.id, s));
-        return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-    })();
-
-    const form = useForm<Record<string, any>>({
-        user_id: '',
-        assessment_type: '',
-        assessment_date: getTodayDate(),
-        expiry_date: getDefaultExpiryDate(),
-        medication_knowledge: false,
-        five_rights: false,
-        safety_checks: false,
-        documentation: false,
-        controlled_drugs: false,
-        prn_assessment: false,
-        insulin_competent: false,
-        inhaler_competent: false,
-        topical_competent: false,
-        covert_admin_knowledge: false,
-        error_reporting: false,
-        allergy_awareness: false,
-        can_administer_unsupervised: false,
-        can_witness_controlled: false,
-        strengths: '',
-        areas_for_improvement: '',
-        assessor_comments: '',
-    });
-
-    function submit(e: React.FormEvent) {
-        e.preventDefault();
-        form.post('/emar/competency', {
-            onSuccess: () => { setOpen(false); form.reset(); },
+    const visible = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        const role = roleFilter !== null ? roleItems[roleFilter]?.name : null;
+        const status = statusFilter !== null ? STATUS_OPTS[statusFilter]?.name : null;
+        return assessments.filter((a) => {
+            if (role && a.user_role !== role) return false;
+            if (status && statusChip(a).label !== status) return false;
+            if (q && !`${a.user_name} ${a.user_role ?? ''} ${a.assessor_name ?? ''}`.toLowerCase().includes(q)) return false;
+            return true;
         });
-    }
+    }, [assessments, search, roleFilter, statusFilter, roleItems]);
+
+    const inDate = visible.filter((a) => a.is_passed);
+    const expiringList = visible.filter((a) => a.is_passed && (daysTo(a.expiry_date) ?? 999) <= 30 && (daysTo(a.expiry_date) ?? -1) >= 0);
+    const expiredList = visible.filter((a) => a.is_expired);
+    const latestByUser = useMemo(() => { const m = new Map<number, AssessmentRow>(); assessments.forEach((a) => { if (!m.has(a.user_id)) m.set(a.user_id, a); }); return [...m.values()]; }, [assessments]);
+
+    const filteredUnassessed = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        const role = roleFilter !== null ? roleItems[roleFilter]?.name : null;
+        return staffWithoutAssessment.filter((s) => (!role || s.role === role) && (!q || s.name.toLowerCase().includes(q)));
+    }, [staffWithoutAssessment, search, roleFilter, roleItems]);
+
+    const firstExpired = expiredList[0];
+
+    const TABS: RosterTabItem[] = [
+        { id: 'all', label: 'All assessments', icon: LayoutGrid, tone: 'primary', badge: assessments.length || undefined },
+        { id: 'in_date', label: 'In date', icon: CheckCircle2, tone: 'success', badge: inDate.length || undefined },
+        { id: 'expiring', label: 'Expiring soon', icon: CalendarClock, tone: 'warning', badge: expiringList.length || undefined },
+        { id: 'expired', label: 'Expired', icon: AlertTriangle, tone: 'critical', badge: expiredList.length || undefined },
+        { id: 'unassessed', label: 'Unassessed staff', icon: UserX, tone: 'info', badge: staffWithoutAssessment.length || undefined },
+        { id: 'coverage', label: 'Coverage matrix', icon: ShieldCheck, tone: 'primary' },
+    ];
+
+    const heroStats: PageHeroStat[] = [
+        { label: 'In date', value: `${kpis.in_date_pct}%` },
+        { label: 'Expiring', value: kpis.expiring, tone: kpis.expiring > 0 ? 'warning' : 'neutral' },
+        { label: 'Unassessed', value: kpis.unassessed, tone: kpis.unassessed > 0 ? 'warning' : 'neutral' },
+        { label: 'CD witnesses', value: kpis.cd_witnesses },
+    ];
+    const description = `${kpis.in_date} of ${kpis.total_staff} staff are medication-competent and in date (${kpis.in_date_pct}%). ${kpis.expiring} expire within 30 days and ${kpis.unassessed} have no current assessment.`;
 
     return (
-        <Dialog open={open} onOpenChange={setOpen}>
-            <DialogTrigger asChild>
-                <Button><Plus className="mr-1 h-4 w-4" /> New Assessment</Button>
-            </DialogTrigger>
-            <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle>New Competency Assessment</DialogTitle>
-                    <DialogDescription>
-                        Record a staff member&apos;s medication competency,
-                        permissions, and renewal dates.
-                    </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={submit} className="space-y-4">
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <div className="space-y-2">
-                            <Label>Staff Member</Label>
-                            <Select value={form.data.user_id} onValueChange={(v) => form.setData('user_id', v)}>
-                                <SelectTrigger><SelectValue placeholder="Select staff" /></SelectTrigger>
-                                <SelectContent>
-                                    {allStaffOptions.map((s) => (
-                                        <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            {form.errors.user_id && <p className="text-sm text-status-critical">{form.errors.user_id}</p>}
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label>Assessment Type</Label>
-                            <Select value={form.data.assessment_type} onValueChange={(v) => form.setData('assessment_type', v)}>
-                                <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="initial">Initial</SelectItem>
-                                    <SelectItem value="annual">Annual</SelectItem>
-                                    <SelectItem value="refresher">Refresher</SelectItem>
-                                    <SelectItem value="remedial">Remedial</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            {form.errors.assessment_type && <p className="text-sm text-status-critical">{form.errors.assessment_type}</p>}
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label>Assessment Date</Label>
-                            <Input type="date" value={form.data.assessment_date} onChange={(e) => form.setData('assessment_date', e.target.value)} />
-                            {form.errors.assessment_date && <p className="text-sm text-status-critical">{form.errors.assessment_date}</p>}
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label>Expiry Date</Label>
-                            <Input type="date" value={form.data.expiry_date} onChange={(e) => form.setData('expiry_date', e.target.value)} />
-                            {form.errors.expiry_date && <p className="text-sm text-status-critical">{form.errors.expiry_date}</p>}
-                        </div>
-                    </div>
-
-                    {/* Competency Checkboxes */}
-                    <div className="space-y-2">
-                        <Label className="text-base font-semibold">Competencies</Label>
-                        <div className="grid grid-cols-2 gap-3">
-                            {competencyFields.map((field) => (
-                                <div key={field.key} className="flex items-center gap-2">
-                                    <Checkbox
-                                        id={`comp-${field.key}`}
-                                        checked={form.data[field.key] as boolean}
-                                        onCheckedChange={(checked) => form.setData(field.key, checked === true)}
-                                    />
-                                    <Label htmlFor={`comp-${field.key}`} className="text-sm font-normal">{field.label}</Label>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    {/* Permission Checkboxes */}
-                    <div className="space-y-3 rounded-lg border p-3">
-                        <Label className="text-base font-semibold">Permissions</Label>
-                        <div className="flex flex-col gap-3">
-                            <div className="flex items-center gap-2">
-                                <Checkbox
-                                    id="comp-unsupervised"
-                                    checked={form.data.can_administer_unsupervised as boolean}
-                                    onCheckedChange={(checked) => form.setData('can_administer_unsupervised', checked === true)}
-                                />
-                                <Label htmlFor="comp-unsupervised" className="text-sm font-normal">Can administer unsupervised</Label>
+        <AppLayout breadcrumbs={[{ title: 'eMAR', href: '/emar' }, { title: 'Competency', href: '/emar/competency' }]}>
+            <Head title="eMAR - Medication Competency" />
+            <div className="flex flex-col gap-6 p-6">
+                <PageHero
+                    variant="hero"
+                    category="ops"
+                    brandColour={brandColour}
+                    icon={GraduationCap}
+                    title={
+                        <span>
+                            <span className="flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-wide text-primary-foreground/80">
+                                <span aria-hidden className="relative inline-flex h-2 w-2">
+                                    <span className="absolute inset-0 animate-ping rounded-full bg-status-success/70" />
+                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success" />
+                                </span>
+                                Medication competency oversight · live
+                            </span>
+                            <span className="mt-1 block text-[26px] font-bold leading-tight">
+                                Team medication competency{activeSite ? ' for ' : ''}
+                                {activeSite && <span className="border-b-2 border-primary-foreground/40">{activeSite.name}</span>}
+                            </span>
+                        </span>
+                    }
+                    description={description}
+                    stats={heroStats}
+                    actions={
+                        <>
+                            <Button className="bg-primary-foreground text-primary hover:bg-primary-foreground/90" onClick={() => setModal({ type: 'new' })}>
+                                <Plus className="h-4 w-4" />
+                                New assessment
+                            </Button>
+                            <Button variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20" onClick={() => exportCsv(assessments)} disabled={assessments.length === 0}>
+                                <Download className="h-4 w-4" />
+                                Export register
+                            </Button>
+                        </>
+                    }
+                    footer={
+                        <div className="flex flex-col gap-3 py-3 lg:flex-row lg:items-center lg:justify-between">
+                            <div className="flex items-center gap-2 rounded-full bg-primary-foreground px-3 py-1.5">
+                                <Search className="h-3.5 w-3.5 text-muted-foreground" />
+                                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search staff, role or assessor…" className="w-56 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground" />
                             </div>
-                            <div className="flex items-center gap-2">
-                                <Checkbox
-                                    id="comp-witness"
-                                    checked={form.data.can_witness_controlled as boolean}
-                                    onCheckedChange={(checked) => form.setData('can_witness_controlled', checked === true)}
-                                />
-                                <Label htmlFor="comp-witness" className="text-sm font-normal">Can witness controlled drugs</Label>
+                            <div className="flex flex-wrap items-center gap-2">
+                                {roleItems.length > 0 && <EntityFilter label="Role" allLabel="All roles" items={roleItems} value={roleFilter} onChange={setRoleFilter} onDark />}
+                                <EntityFilter label="Status" allLabel="All statuses" items={STATUS_OPTS} value={statusFilter} onChange={setStatusFilter} onDark />
                             </div>
                         </div>
+                    }
+                />
+
+                {kpis.expired > 0 && firstExpired && (
+                    <div className="flex items-center justify-between gap-3 rounded-xl border border-status-critical/30 bg-status-critical-bg/60 px-4 py-3">
+                        <span className="text-sm text-status-critical">
+                            <span className="font-semibold">{firstExpired.user_name}'s competency lapsed {Math.abs(daysTo(firstExpired.expiry_date) ?? 0)} days ago.</span> A lapsed competency means that staff member must not administer medication unsupervised until reassessed.
+                        </span>
+                        <Button size="sm" variant="outline" onClick={() => setActiveTab('expired')}>Review expired</Button>
                     </div>
+                )}
 
-                    {/* Text Areas */}
-                    <div className="space-y-2">
-                        <Label>Strengths</Label>
-                        <Textarea value={form.data.strengths} onChange={(e) => form.setData('strengths', e.target.value)} placeholder="Staff strengths observed..." rows={3} />
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label>Areas for Improvement</Label>
-                        <Textarea value={form.data.areas_for_improvement} onChange={(e) => form.setData('areas_for_improvement', e.target.value)} placeholder="Areas requiring further development..." rows={3} />
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label>Assessor Comments</Label>
-                        <Textarea value={form.data.assessor_comments} onChange={(e) => form.setData('assessor_comments', e.target.value)} placeholder="Additional assessor notes..." rows={3} />
-                    </div>
-
-                    <div className="flex justify-end gap-2 pt-2">
-                        <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-                        <Button type="submit" disabled={form.processing}>Save Assessment</Button>
-                    </div>
-                </form>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-function EditAssessmentDialog({ assessment, staff, staffWithoutAssessment, open, onOpenChange }: { assessment: any; staff: Props['staff']; staffWithoutAssessment: Props['staffWithoutAssessment']; open: boolean; onOpenChange: (open: boolean) => void }) {
-    const allStaffOptions = (() => {
-        const map = new Map<number, { id: number; name: string }>();
-        staffWithoutAssessment.forEach((s) => map.set(s.id, { id: s.id, name: s.name }));
-        staff.forEach((s) => map.set(s.id, s));
-        return Array.from(map.values()).sort((a, b) => a.name.localeCompare(b.name));
-    })();
-
-    const form = useForm<Record<string, any>>({
-        user_id: assessment.user_id?.toString() ?? '',
-        assessment_type: assessment.assessment_type ?? '',
-        assessment_date: assessment.assessment_date ? assessment.assessment_date.split('T')[0] : '',
-        expiry_date: assessment.expiry_date ? assessment.expiry_date.split('T')[0] : '',
-        medication_knowledge: assessment.medication_knowledge ?? false,
-        five_rights: assessment.five_rights ?? false,
-        safety_checks: assessment.safety_checks ?? false,
-        documentation: assessment.documentation ?? false,
-        controlled_drugs: assessment.controlled_drugs ?? false,
-        prn_assessment: assessment.prn_assessment ?? false,
-        insulin_competent: assessment.insulin_competent ?? false,
-        inhaler_competent: assessment.inhaler_competent ?? false,
-        topical_competent: assessment.topical_competent ?? false,
-        covert_admin_knowledge: assessment.covert_admin_knowledge ?? false,
-        error_reporting: assessment.error_reporting ?? false,
-        allergy_awareness: assessment.allergy_awareness ?? false,
-        can_administer_unsupervised: assessment.can_administer_unsupervised ?? false,
-        can_witness_controlled: assessment.can_witness_controlled ?? false,
-        strengths: assessment.strengths ?? '',
-        areas_for_improvement: assessment.areas_for_improvement ?? '',
-        assessor_comments: assessment.assessor_comments ?? '',
-    });
-
-    function submit(e: React.FormEvent) {
-        e.preventDefault();
-        form.put(`/emar/competency/${assessment.id}`, {
-            onSuccess: () => { onOpenChange(false); form.reset(); },
-        });
-    }
-
-    return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle>Edit Competency Assessment</DialogTitle>
-                    <DialogDescription>
-                        Update the competency outcome, permissions, or renewal
-                        details for this assessment.
-                    </DialogDescription>
-                </DialogHeader>
-                <form onSubmit={submit} className="space-y-4">
-                    <div className="grid gap-4 sm:grid-cols-2">
-                        <div className="space-y-2">
-                            <Label>Staff Member</Label>
-                            <Select value={form.data.user_id} onValueChange={(v) => form.setData('user_id', v)}>
-                                <SelectTrigger><SelectValue placeholder="Select staff" /></SelectTrigger>
-                                <SelectContent>
-                                    {allStaffOptions.map((s) => (
-                                        <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
-                                    ))}
-                                </SelectContent>
-                            </Select>
-                            {form.errors.user_id && <p className="text-sm text-status-critical">{form.errors.user_id}</p>}
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label>Assessment Type</Label>
-                            <Select value={form.data.assessment_type} onValueChange={(v) => form.setData('assessment_type', v)}>
-                                <SelectTrigger><SelectValue placeholder="Select type" /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="initial">Initial</SelectItem>
-                                    <SelectItem value="annual">Annual</SelectItem>
-                                    <SelectItem value="refresher">Refresher</SelectItem>
-                                    <SelectItem value="remedial">Remedial</SelectItem>
-                                </SelectContent>
-                            </Select>
-                            {form.errors.assessment_type && <p className="text-sm text-status-critical">{form.errors.assessment_type}</p>}
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label>Assessment Date</Label>
-                            <Input type="date" value={form.data.assessment_date} onChange={(e) => form.setData('assessment_date', e.target.value)} />
-                            {form.errors.assessment_date && <p className="text-sm text-status-critical">{form.errors.assessment_date}</p>}
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label>Expiry Date</Label>
-                            <Input type="date" value={form.data.expiry_date} onChange={(e) => form.setData('expiry_date', e.target.value)} />
-                            {form.errors.expiry_date && <p className="text-sm text-status-critical">{form.errors.expiry_date}</p>}
-                        </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label className="text-base font-semibold">Competencies</Label>
-                        <div className="grid grid-cols-2 gap-3">
-                            {competencyFields.map((field) => (
-                                <div key={field.key} className="flex items-center gap-2">
-                                    <Checkbox
-                                        id={`edit-comp-${field.key}`}
-                                        checked={form.data[field.key] as boolean}
-                                        onCheckedChange={(checked) => form.setData(field.key, checked === true)}
-                                    />
-                                    <Label htmlFor={`edit-comp-${field.key}`} className="text-sm font-normal">{field.label}</Label>
-                                </div>
-                            ))}
-                        </div>
-                    </div>
-
-                    <div className="space-y-3 rounded-lg border p-3">
-                        <Label className="text-base font-semibold">Permissions</Label>
-                        <div className="flex flex-col gap-3">
-                            <div className="flex items-center gap-2">
-                                <Checkbox
-                                    id="edit-comp-unsupervised"
-                                    checked={form.data.can_administer_unsupervised as boolean}
-                                    onCheckedChange={(checked) => form.setData('can_administer_unsupervised', checked === true)}
-                                />
-                                <Label htmlFor="edit-comp-unsupervised" className="text-sm font-normal">Can administer unsupervised</Label>
-                            </div>
-                            <div className="flex items-center gap-2">
-                                <Checkbox
-                                    id="edit-comp-witness"
-                                    checked={form.data.can_witness_controlled as boolean}
-                                    onCheckedChange={(checked) => form.setData('can_witness_controlled', checked === true)}
-                                />
-                                <Label htmlFor="edit-comp-witness" className="text-sm font-normal">Can witness controlled drugs</Label>
-                            </div>
-                        </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label>Strengths</Label>
-                        <Textarea value={form.data.strengths} onChange={(e) => form.setData('strengths', e.target.value)} placeholder="Staff strengths observed..." rows={3} />
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label>Areas for Improvement</Label>
-                        <Textarea value={form.data.areas_for_improvement} onChange={(e) => form.setData('areas_for_improvement', e.target.value)} placeholder="Areas requiring further development..." rows={3} />
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label>Assessor Comments</Label>
-                        <Textarea value={form.data.assessor_comments} onChange={(e) => form.setData('assessor_comments', e.target.value)} placeholder="Additional assessor notes..." rows={3} />
-                    </div>
-
-                    <div className="flex justify-end gap-2 pt-2">
-                        <Button type="button" variant="outline" onClick={() => onOpenChange(false)}>Cancel</Button>
-                        <Button type="submit" disabled={form.processing}>Save Changes</Button>
-                    </div>
-                </form>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-export default function Competency({ assessments, expiringSoon, expired, staffWithoutAssessment, staff, filters }: Props) {
-    const { auth } = usePage().props as any;
-    const canManageCompetency = auth?.can?.medications?.ordersManage ?? false;
-    const [editOpen, setEditOpen] = useState(false);
-    const [editingAssessment, setEditingAssessment] = useState<any>(null);
-
-    function openEditAssessment(assessment: any) {
-        setEditingAssessment(assessment);
-        setEditOpen(true);
-    }
-    function deleteAssessment(id: number) {
-        if (!confirm('Are you sure you want to delete this assessment?')) return;
-        router.delete(`/emar/competency/${id}`);
-    }
-
-    return (
-        <AppLayout>
-            <Head title="eMAR - Competency" />
-            <PageHero
-                icon={GraduationCap}
-                title="Medication Competency"
-                description="Staff competency assessments for medication administration. Track certifications, renewals, and compliance."
-                stats={[
-                    { label: 'Expired', value: expired.length },
-                    { label: 'Expiring soon', value: expiringSoon.length },
-                    { label: 'Unassessed', value: staffWithoutAssessment.length },
-                ]}
-                actions={
-                    canManageCompetency ? (
-                        <NewAssessmentDialog staff={staff} staffWithoutAssessment={staffWithoutAssessment} />
-                    ) : null
-                }
-            />
-            <PageShell>
-                {/* Stats */}
-                <div className="mb-6 grid gap-4 sm:grid-cols-3">
-                    <Card>
-                        <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-status-critical-bg text-status-critical"><XCircle className="h-5 w-5" /></div>
-                            <div><p className="text-2xl font-bold">{expired.length}</p><p className="text-xs text-muted-foreground">Expired Assessments</p></div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-status-warning-bg text-status-warning"><Clock className="h-5 w-5" /></div>
-                            <div><p className="text-2xl font-bold">{expiringSoon.length}</p><p className="text-xs text-muted-foreground">Expiring Within 30 Days</p></div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-3 p-4">
-                            <div className="flex h-10 w-10 items-center justify-center rounded-xl bg-muted text-foreground dark:bg-muted/40"><UserX className="h-5 w-5" /></div>
-                            <div><p className="text-2xl font-bold">{staffWithoutAssessment.length}</p><p className="text-xs text-muted-foreground">Staff Without Assessment</p></div>
-                        </CardContent>
-                    </Card>
+                <div className="grid gap-3 sm:grid-cols-3 lg:grid-cols-6">
+                    <Kpi icon={CheckCircle2} label="In date" value={`${kpis.in_date_pct}%`} tone="success" />
+                    <Kpi icon={Award} label="Current" value={kpis.in_date} tone="info" />
+                    <Kpi icon={CalendarClock} label="Expiring 30d" value={kpis.expiring} tone="warning" />
+                    <Kpi icon={AlertTriangle} label="Expired" value={kpis.expired} tone="critical" />
+                    <Kpi icon={UserX} label="Never assessed" value={kpis.unassessed} tone="warning" />
+                    <Kpi icon={Lock} label="CD witnesses" value={kpis.cd_witnesses} tone="info" />
                 </div>
 
-                <Tabs defaultValue="assessments">
-                    <TabsList className="mb-4">
-                        <TabsTrigger value="assessments"><Award className="mr-1 h-3.5 w-3.5" /> All Assessments</TabsTrigger>
-                        <TabsTrigger value="expiring"><Clock className="mr-1 h-3.5 w-3.5" /> Expiring Soon ({expiringSoon.length})</TabsTrigger>
-                        <TabsTrigger value="unassessed"><UserX className="mr-1 h-3.5 w-3.5" /> Unassessed Staff ({staffWithoutAssessment.length})</TabsTrigger>
-                    </TabsList>
+                <TabStrip value={activeTab} onChange={setActiveTab} items={TABS} ariaLabel="Competency views" />
 
-                    <TabsContent value="assessments">
-                        <div className="mb-4 flex gap-3">
-                            <Select value={filters.status ?? ''} onValueChange={(v) => router.get('/emar/competency', { status: v || undefined }, { preserveState: true })}>
-                                <SelectTrigger className="w-40"><SelectValue placeholder="All statuses" /></SelectTrigger>
-                                <SelectContent>
-                                    <SelectItem value="passed">Passed</SelectItem>
-                                    <SelectItem value="failed">Failed</SelectItem>
-                                    <SelectItem value="pending">Pending</SelectItem>
-                                    <SelectItem value="in_progress">In Progress</SelectItem>
-                                </SelectContent>
-                            </Select>
-                        </div>
-                        <Card>
-                            <CardContent className="p-0">
-                                <table className="w-full text-sm">
-                                    <thead>
-                                        <tr className="border-b bg-muted/50">
-                                            <th className="p-3 text-left font-medium">Staff Member</th>
-                                            <th className="p-3 text-left font-medium">Type</th>
-                                            <th className="p-3 text-left font-medium">Date</th>
-                                            <th className="p-3 text-left font-medium">Status</th>
-                                            <th className="p-3 text-left font-medium">Expiry</th>
-                                            <th className="p-3 text-left font-medium">Assessor</th>
-                                            <th className="p-3 text-left font-medium">Permissions</th>
-                                            {canManageCompetency && <th className="p-3 text-left font-medium">Actions</th>}
-                                        </tr>
-                                    </thead>
-                                    <tbody>
-                                        {assessments.data.map((a: any) => {
-                                            const cfg = statusConfig[a.status] ?? statusConfig.pending;
-                                            const Icon = cfg.icon;
-                                            return (
-                                                <tr key={a.id} className="border-b last:border-0">
-                                                    <td className="p-3 font-medium">{a.user?.name}</td>
-                                                    <td className="p-3"><Badge variant="outline" className="text-xs">{a.assessment_type}</Badge></td>
-                                                    <td className="p-3 text-xs">{a.assessment_date ? new Date(a.assessment_date).toLocaleDateString('en-NZ') : '—'}</td>
-                                                    <td className="p-3"><div className="flex items-center gap-1"><Icon className={`h-4 w-4 ${cfg.color}`} /><span className="text-xs">{a.status}</span></div></td>
-                                                    <td className="p-3 text-xs">
-                                                        {a.expiry_date ? new Date(a.expiry_date).toLocaleDateString('en-NZ') : '—'}
-                                                        {a.expiry_date && new Date(a.expiry_date) < new Date() && <Badge variant="destructive" className="ml-1 text-[10px]">Expired</Badge>}
-                                                    </td>
-                                                    <td className="p-3 text-xs">{a.assessor?.name ?? '—'}</td>
-                                                    <td className="p-3">
-                                                        <div className="flex gap-1">
-                                                            {a.can_administer_unsupervised && <Badge className="bg-status-success-bg text-status-success text-[10px]">Unsupervised</Badge>}
-                                                            {a.can_witness_controlled && <Badge className="bg-status-info-bg text-status-info text-[10px]">CD Witness</Badge>}
-                                                        </div>
-                                                    </td>
-                                                    {canManageCompetency && (
-                                                        <td className="p-3">
-                                                            <div className="flex items-center gap-1">
-                                                                <Button size="icon" variant="ghost" onClick={() => openEditAssessment(a)}>
-                                                                    <Pencil className="h-3.5 w-3.5" />
-                                                                </Button>
-                                                                <Button size="icon" variant="ghost" className="text-status-critical hover:text-status-critical" onClick={() => deleteAssessment(a.id)}>
-                                                                    <Trash2 className="h-3.5 w-3.5" />
-                                                                </Button>
-                                                            </div>
-                                                        </td>
-                                                    )}
-                                                </tr>
-                                            );
-                                        })}
-                                        {assessments.data.length === 0 && <tr><td colSpan={canManageCompetency ? 8 : 7} className="p-6 text-center text-muted-foreground">No assessments found.</td></tr>}
-                                    </tbody>
-                                </table>
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
+                {['all', 'in_date', 'expired'].includes(activeTab) && (
+                    <AssessmentTable rows={activeTab === 'in_date' ? inDate : activeTab === 'expired' ? expiredList : visible} onView={(a) => setModal({ type: 'view', assessment: a })} onRenew={(a) => setModal({ type: 'renew', assessment: a })} onEdit={(a) => setModal({ type: 'edit', assessment: a })} onDelete={(a) => { if (confirm(`Delete ${a.user_name}'s assessment? This cannot be undone.`)) router.delete(`/emar/competency/${a.id}`, { preserveScroll: true }); }} />
+                )}
 
-                    <TabsContent value="expiring">
-                        <Card>
-                            <CardContent className="p-0">
-                                <div className="divide-y">
-                                    {expiringSoon.map((a: any) => (
-                                        <div key={a.id} className="flex items-center justify-between p-3">
-                                            <span className="font-medium">{a.user?.name}</span>
-                                            <div className="flex items-center gap-2">
-                                                <span className="text-sm">
-                                                    Expires: <span className="font-medium text-status-warning">{a.expiry_date ? new Date(a.expiry_date).toLocaleDateString('en-NZ') : '—'}</span>
-                                                </span>
-                                                {canManageCompetency && (
-                                                    <Button size="sm" variant="ghost" className="text-status-critical hover:text-status-critical" onClick={() => deleteAssessment(a.id)}>
-                                                        <Trash2 className="h-3.5 w-3.5" />
-                                                    </Button>
-                                                )}
-                                            </div>
-                                        </div>
-                                    ))}
-                                    {expiringSoon.length === 0 && <div className="p-6 text-center text-muted-foreground">No assessments expiring soon.</div>}
+                {activeTab === 'expiring' && (
+                    <ListCard empty={expiringList.length === 0 ? 'No assessments expiring in the next 30 days.' : null}>
+                        {expiringList.map((a) => (
+                            <div key={a.id} className="flex items-center justify-between gap-3 border-b px-4 py-3 last:border-b-0">
+                                <StaffCell a={a} sub={`Expires ${fmtDate(a.expiry_date)} · ${daysTo(a.expiry_date)}d`} />
+                                <Button size="sm" onClick={() => setModal({ type: 'renew', assessment: a })}><RotateCcw className="h-3.5 w-3.5" />Schedule reassessment</Button>
+                            </div>
+                        ))}
+                    </ListCard>
+                )}
+
+                {activeTab === 'unassessed' && (
+                    <ListCard empty={filteredUnassessed.length === 0 ? 'Every staff member has a current assessment.' : null}>
+                        {filteredUnassessed.map((s) => (
+                            <div key={s.id} className="flex items-center justify-between gap-3 border-b px-4 py-3 last:border-b-0">
+                                <div className="flex items-center gap-3">
+                                    <span className="flex h-9 w-9 items-center justify-center rounded-full bg-status-warning-bg text-xs font-bold text-status-warning">{initials(s.name)}</span>
+                                    <div><div className="text-sm font-medium">{s.name}</div><div className="text-xs text-muted-foreground">{s.role ?? 'Staff'} · no current assessment</div></div>
                                 </div>
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
+                                <Button size="sm" onClick={() => setModal({ type: 'new', userId: s.id })}><Plus className="h-3.5 w-3.5" />Start assessment</Button>
+                            </div>
+                        ))}
+                    </ListCard>
+                )}
 
-                    <TabsContent value="unassessed">
-                        <Card>
-                            <CardContent className="p-0">
-                                <div className="divide-y">
-                                    {staffWithoutAssessment.map((s) => (
-                                        <div key={s.id} className="flex items-center justify-between p-3">
-                                            <div>
-                                                <span className="font-medium">{s.name}</span>
-                                                <span className="ml-2 text-xs text-muted-foreground">{s.email}</span>
-                                            </div>
-                                            <Badge variant="destructive" className="text-xs">No Active Assessment</Badge>
-                                        </div>
-                                    ))}
-                                    {staffWithoutAssessment.length === 0 && <div className="p-6 text-center text-muted-foreground">All active staff have assessments.</div>}
-                                </div>
-                            </CardContent>
-                        </Card>
-                    </TabsContent>
-                </Tabs>
-            </PageShell>
+                {activeTab === 'coverage' && <CoverageMatrix rows={latestByUser} onView={(a) => setModal({ type: 'view', assessment: a })} />}
+            </div>
 
-            {canManageCompetency && editingAssessment && (
-                <EditAssessmentDialog
-                    assessment={editingAssessment}
-                    staff={staff}
-                    staffWithoutAssessment={staffWithoutAssessment}
-                    open={editOpen}
-                    onOpenChange={(open) => { setEditOpen(open); if (!open) setEditingAssessment(null); }}
-                />
-            )}
+            {modal?.type === 'new' && <AssessmentWizardDialog staff={staff} mode="new" defaultUserId={modal.userId} onClose={() => setModal(null)} />}
+            {modal?.type === 'edit' && <AssessmentWizardDialog staff={staff} mode="edit" assessment={modal.assessment} onClose={() => setModal(null)} />}
+            {modal?.type === 'renew' && <AssessmentWizardDialog staff={staff} mode="renew" assessment={modal.assessment} onClose={() => setModal(null)} />}
+            {modal?.type === 'view' && <ViewAssessmentDialog assessment={modal.assessment} onClose={() => setModal(null)} />}
         </AppLayout>
+    );
+}
+
+function Kpi({ icon: Icon, label, value, tone }: { icon: typeof Award; label: string; value: number | string; tone: 'critical' | 'warning' | 'success' | 'info' }) {
+    const cls = { critical: 'bg-status-critical-bg text-status-critical', warning: 'bg-status-warning-bg text-status-warning', success: 'bg-status-success-bg text-status-success', info: 'bg-status-info-bg text-status-info' }[tone];
+    return (
+        <div className="flex items-center gap-2.5 rounded-2xl border bg-card p-3 shadow-sm">
+            <span className={`flex h-9 w-9 items-center justify-center rounded-xl ${cls}`}><Icon className="h-5 w-5" /></span>
+            <div><div className="text-xl font-bold tabular-nums">{value}</div><div className="text-[11px] text-muted-foreground">{label}</div></div>
+        </div>
+    );
+}
+
+function StaffCell({ a, sub }: { a: AssessmentRow; sub?: string }) {
+    return (
+        <div className="flex items-center gap-3">
+            <span className="flex h-9 w-9 items-center justify-center rounded-full bg-primary/10 text-xs font-bold text-primary">{initials(a.user_name)}</span>
+            <div><div className="text-sm font-medium">{a.user_name}</div><div className="text-xs text-muted-foreground">{sub ?? `${a.user_role ?? 'Staff'}`}</div></div>
+        </div>
+    );
+}
+
+function permissionChips(a: AssessmentRow): { label: string; cls: string }[] {
+    const c: { label: string; cls: string }[] = [];
+    if (a.can_administer_unsupervised) c.push({ label: 'Unsupervised', cls: 'bg-status-success-bg text-status-success' });
+    else c.push({ label: 'Supervised', cls: 'bg-status-warning-bg text-status-warning' });
+    if (a.can_witness_controlled) c.push({ label: 'CD witness', cls: 'bg-accent text-primary' });
+    if (a.restricted) c.push({ label: 'Restricted', cls: 'bg-status-warning-bg text-status-warning' });
+    return c;
+}
+
+function AssessmentTable({ rows, onView, onRenew, onEdit, onDelete }: { rows: AssessmentRow[]; onView: (a: AssessmentRow) => void; onRenew: (a: AssessmentRow) => void; onEdit: (a: AssessmentRow) => void; onDelete: (a: AssessmentRow) => void }) {
+    return (
+        <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+            {rows.length === 0 ? <div className="px-5 py-12 text-center text-sm text-muted-foreground">No assessments match the current filters.</div> : (
+                <div className="overflow-x-auto">
+                    <table className="w-full min-w-[920px] text-sm">
+                        <thead>
+                            <tr className="bg-muted/50 text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                                <th className="px-4 py-2.5">Staff</th><th className="px-4 py-2.5">Type</th><th className="px-4 py-2.5">Score</th><th className="px-4 py-2.5">Observed</th><th className="px-4 py-2.5">Status</th><th className="px-4 py-2.5">Expiry</th><th className="px-4 py-2.5">Permissions</th><th className="px-4 py-2.5 text-right">Actions</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {rows.map((a) => {
+                                const sc = statusChip(a); const dte = daysTo(a.expiry_date);
+                                return (
+                                    <tr key={a.id} className="cursor-pointer border-b last:border-b-0 hover:bg-muted/30" onClick={() => onView(a)}>
+                                        <td className="px-4 py-3"><StaffCell a={a} /></td>
+                                        <td className="px-4 py-3"><span className="rounded-full border px-2 py-0.5 text-xs capitalize text-muted-foreground">{a.assessment_type ?? '—'}</span></td>
+                                        <td className="px-4 py-3">
+                                            <div className="flex items-center gap-2"><div className="h-1.5 w-16 overflow-hidden rounded-full bg-muted"><div className="h-full rounded-full bg-primary" style={{ width: `${((a.total_score ?? 0) / 12) * 100}%` }} /></div><span className="tabular-nums text-xs">{a.total_score ?? 0}/{a.pass_threshold ?? 12}</span></div>
+                                        </td>
+                                        <td className="px-4 py-3 text-muted-foreground"><span className="inline-flex items-center gap-1"><Eye className="h-3.5 w-3.5" />{a.observed_rounds.length}</span></td>
+                                        <td className="px-4 py-3"><span className={`rounded-full px-2 py-0.5 text-[11px] font-semibold ${sc.cls}`}>{sc.label}</span></td>
+                                        <td className="px-4 py-3 text-muted-foreground">{fmtDate(a.expiry_date)}{dte !== null && dte >= 0 && dte <= 30 && <span className="ml-1 text-status-warning">· {dte}d</span>}</td>
+                                        <td className="px-4 py-3"><div className="flex flex-wrap gap-1">{permissionChips(a).map((c) => <span key={c.label} className={`rounded-full px-1.5 py-0.5 text-[10px] font-semibold ${c.cls}`}>{c.label}</span>)}</div></td>
+                                        <td className="px-4 py-3" onClick={(e) => e.stopPropagation()}>
+                                            <div className="flex items-center justify-end gap-1">
+                                                <Button size="sm" variant="outline" onClick={() => onRenew(a)}><RotateCcw className="h-3.5 w-3.5" />Renew</Button>
+                                                <Button size="sm" variant="ghost" onClick={() => onEdit(a)} title="Edit"><Pencil className="h-3.5 w-3.5" /></Button>
+                                                <Button size="sm" variant="ghost" onClick={() => onDelete(a)} title="Delete"><span className="text-status-critical">✕</span></Button>
+                                            </div>
+                                        </td>
+                                    </tr>
+                                );
+                            })}
+                        </tbody>
+                    </table>
+                </div>
+            )}
+        </div>
+    );
+}
+
+function ListCard({ empty, children }: { empty: string | null; children?: React.ReactNode }) {
+    return <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">{empty ? <div className="px-5 py-12 text-center text-sm text-muted-foreground">{empty}</div> : <div className="flex flex-col">{children}</div>}</div>;
+}
+
+function CoverageMatrix({ rows, onView }: { rows: AssessmentRow[]; onView: (a: AssessmentRow) => void }) {
+    const cell = (a: AssessmentRow, key: string) => {
+        if (a.not_seen_areas.includes(key)) return <span className="text-muted-foreground/50">–</span>;
+        return (a as unknown as Record<string, boolean>)[key] ? <span className="text-status-success">✓</span> : <span className="text-status-critical">✕</span>;
+    };
+    return (
+        <div className="flex flex-col gap-3">
+            <div className="flex flex-wrap items-center gap-3 text-xs text-muted-foreground">
+                <span className="flex items-center gap-1"><span className="text-status-success">✓</span> Competent</span>
+                <span className="flex items-center gap-1"><span className="text-status-critical">✕</span> Not met</span>
+                <span className="flex items-center gap-1"><span className="text-muted-foreground/50">–</span> Not seen</span>
+            </div>
+            <div className="overflow-x-auto rounded-2xl border bg-card shadow-sm">
+                {rows.length === 0 ? <div className="px-5 py-12 text-center text-sm text-muted-foreground">No assessments to chart.</div> : (
+                    <table className="w-full min-w-[1100px] text-center text-xs">
+                        <thead>
+                            <tr className="bg-muted/50 text-muted-foreground">
+                                <th className="sticky left-0 bg-muted/50 px-3 py-2 text-left">Staff</th>
+                                {COMPETENCY_AREAS.map((a) => <th key={a.key} className="px-2 py-2 font-medium" title={a.label}>{a.label.split(' ').map((w) => w[0]).join('')}</th>)}
+                                <th className="px-3 py-2">Score</th>
+                            </tr>
+                        </thead>
+                        <tbody>
+                            {rows.map((a) => (
+                                <tr key={a.id} className="cursor-pointer border-b last:border-b-0 hover:bg-muted/30" onClick={() => onView(a)}>
+                                    <td className="sticky left-0 bg-card px-3 py-2 text-left font-medium">{a.user_name}</td>
+                                    {COMPETENCY_AREAS.map((ar) => <td key={ar.key} className="px-2 py-2 font-semibold">{cell(a, ar.key)}</td>)}
+                                    <td className="px-3 py-2 tabular-nums text-muted-foreground">{a.total_score ?? 0}/12</td>
+                                </tr>
+                            ))}
+                        </tbody>
+                    </table>
+                )}
+            </div>
+        </div>
     );
 }

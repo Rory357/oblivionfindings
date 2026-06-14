@@ -1655,27 +1655,84 @@ class EmarController extends Controller
     // ─── Competency Assessments ────────────────────────────
     public function competency(Request $request)
     {
-        $assessments = MedicationCompetencyAssessment::query()
-            ->with(['user:id,name,email', 'assessor:id,name'])
-            ->when($request->status, fn ($q, $s) => $q->where('status', $s))
-            ->latest('assessment_date')
-            ->paginate(50);
+        $siteFilter = $request->integer('site_id') ?: null;
 
-        $expiringSoon = MedicationCompetencyAssessment::expiringSoon(30)->with('user:id,name')->get();
-        $expired = MedicationCompetencyAssessment::expired()->with('user:id,name')->get();
+        // Flat, client-side-filterable register (drops pagination). Staff are not
+        // site-scoped, so the page facets by role/status/search; brand colour is
+        // still resolved from ?site_id for themed deep-links (§3b parity).
+        $models = MedicationCompetencyAssessment::query()
+            ->with(['user:id,name,email,role', 'assessor:id,name'])
+            ->latest('assessment_date')
+            ->limit(300)
+            ->get();
+
+        $assessments = $models->map(fn (MedicationCompetencyAssessment $a) => $this->serializeCompetency($a))->values();
+
+        // Latest assessment per staff member drives the headline KPIs.
+        $latestByUser = $models->groupBy('user_id')->map(fn ($g) => $g->first());
+        $inDate = $latestByUser->filter(fn (MedicationCompetencyAssessment $a) => $a->isPassed())->count();
+        $cdWitnesses = $latestByUser->filter(fn (MedicationCompetencyAssessment $a) => $a->isPassed() && $a->can_witness_controlled)->count();
 
         $staffWithoutAssessment = User::query()
             ->whereDoesntHave('medicationCompetencyAssessments', fn ($q) => $q->active())
-            ->get(['id', 'name', 'email']);
+            ->get(['id', 'name', 'email', 'role'])
+            ->map(fn (User $u) => ['id' => $u->id, 'name' => $u->name, 'role' => $u->role])
+            ->values();
+
+        $totalStaff = $latestByUser->keys()->merge($staffWithoutAssessment->pluck('id'))->unique()->count();
+        $activeSite = $siteFilter ? Site::find($siteFilter) : null;
 
         return Inertia::render('emar/Competency', [
             'assessments' => $assessments,
-            'expiringSoon' => $expiringSoon,
-            'expired' => $expired,
             'staffWithoutAssessment' => $staffWithoutAssessment,
             'staff' => $this->getStaffList(),
-            'filters' => $request->only(['status']),
+            'kpis' => [
+                'total_staff' => $totalStaff,
+                'in_date' => $inDate,
+                'in_date_pct' => $totalStaff > 0 ? (int) round($inDate / $totalStaff * 100) : 0,
+                'expiring' => MedicationCompetencyAssessment::expiringSoon(30)->count(),
+                'expired' => MedicationCompetencyAssessment::expired()->count(),
+                'unassessed' => $staffWithoutAssessment->count(),
+                'cd_witnesses' => $cdWitnesses,
+            ],
+            'sites' => Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'active_site' => $activeSite ? ['id' => $activeSite->id, 'name' => $activeSite->name] : null,
+            'site_brand_colour' => $activeSite?->brand_colour,
         ]);
+    }
+
+    private function serializeCompetency(MedicationCompetencyAssessment $a): array
+    {
+        $areas = ['medication_knowledge', 'five_rights', 'safety_checks', 'documentation', 'controlled_drugs', 'prn_assessment', 'insulin_competent', 'inhaler_competent', 'topical_competent', 'covert_admin_knowledge', 'error_reporting', 'allergy_awareness'];
+
+        return array_merge(
+            collect($areas)->mapWithKeys(fn ($k) => [$k => (bool) $a->{$k}])->all(),
+            [
+                'id' => $a->id,
+                'user_id' => $a->user_id,
+                'user_name' => $a->user?->name ?? 'Unknown',
+                'user_role' => $a->user?->role,
+                'assessor_name' => $a->assessor?->name,
+                'assessment_type' => $a->assessment_type,
+                'status' => $a->status,
+                'assessment_date' => $a->assessment_date?->toDateString(),
+                'expiry_date' => $a->expiry_date?->toDateString(),
+                'not_seen_areas' => $a->not_seen_areas ?? [],
+                'observed_rounds' => $a->observed_rounds ?? [],
+                'restricted' => (bool) $a->restricted,
+                'restriction_notes' => $a->restriction_notes,
+                'total_score' => $a->total_score,
+                'pass_threshold' => $a->pass_threshold,
+                'strengths' => $a->strengths,
+                'areas_for_improvement' => $a->areas_for_improvement,
+                'action_plan' => $a->action_plan,
+                'assessor_comments' => $a->assessor_comments,
+                'can_administer_unsupervised' => (bool) $a->can_administer_unsupervised,
+                'can_witness_controlled' => (bool) $a->can_witness_controlled,
+                'is_expired' => $a->isExpired(),
+                'is_passed' => $a->isPassed(),
+            ],
+        );
     }
 
     // ─── Medication Reviews ────────────────────────────────
@@ -2577,6 +2634,11 @@ class EmarController extends Controller
             'areas_for_improvement' => 'nullable|string',
             'action_plan' => 'nullable|string',
             'assessor_comments' => 'nullable|string',
+            'observed_rounds' => 'nullable|array',
+            'not_seen_areas' => 'nullable|array',
+            'not_seen_areas.*' => 'string',
+            'restricted' => 'nullable|boolean',
+            'restriction_notes' => 'nullable|string',
             'can_administer_unsupervised' => 'nullable|boolean',
             'can_witness_controlled' => 'nullable|boolean',
         ]);
@@ -2592,6 +2654,7 @@ class EmarController extends Controller
         $validated['total_score'] = $totalScore;
         $validated['pass_threshold'] = 10;
         $validated['status'] = $totalScore >= 10 ? 'passed' : 'failed';
+        $validated['restricted'] = (bool) ($validated['restricted'] ?? false);
         $validated['assessor_id'] = auth()->id();
         $validated['expiry_date'] = $validated['expiry_date']
             ?? Carbon::parse($validated['assessment_date'])->addYear()->toDateString();
@@ -2625,6 +2688,11 @@ class EmarController extends Controller
             'areas_for_improvement' => 'nullable|string',
             'action_plan' => 'nullable|string',
             'assessor_comments' => 'nullable|string',
+            'observed_rounds' => 'nullable|array',
+            'not_seen_areas' => 'nullable|array',
+            'not_seen_areas.*' => 'string',
+            'restricted' => 'nullable|boolean',
+            'restriction_notes' => 'nullable|string',
             'expiry_date' => 'nullable|date|after_or_equal:assessment_date',
             'can_administer_unsupervised' => 'nullable|boolean',
             'can_witness_controlled' => 'nullable|boolean',
