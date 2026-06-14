@@ -45,6 +45,7 @@ use App\Domain\Finance\Http\Controllers\PriceBookController;
 use App\Domain\Finance\Http\Controllers\PurchaseOrderController;
 use App\Domain\Finance\Http\Controllers\QuoteController;
 use App\Domain\Finance\Http\Controllers\RecurringChargeController;
+use App\Domain\Finance\Http\Controllers\ReportsController;
 use App\Domain\Finance\Http\Controllers\SiteFinancialDashboardController;
 use App\Domain\Finance\Http\Controllers\SitesFinancialOverviewController;
 use App\Domain\Finance\Http\Controllers\TaxController;
@@ -532,6 +533,11 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
         Route::get('/integrations/{integration}/mapping', [AccountingIntegrationController::class, 'mapping'])->name('integrations.mapping');
         Route::put('/integrations/{integration}/mapping', [AccountingIntegrationController::class, 'updateMapping'])->name('integrations.mapping.update');
     });
+
+    // ── Reports & Planning hub ──────────────────────────────────────────
+    // /finance/reports is the hub entry point; it redirects to the first report tab
+    // (P&L). The report routes themselves are the tabs below.
+    Route::get('/reports', [ReportsController::class, 'index'])->name('reports.index');
 
     // ── Financial Reports ───────────────────────────────────────────────
     Route::middleware('permission:finance.reports.view')->group(function () {

@@ -2,6 +2,7 @@ import { Head } from '@inertiajs/react';
 import { type BreadcrumbItem, PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
+import { ReportsTabsFooter } from '@/components/finance';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import { Button } from '@/components/ui/button';
@@ -107,6 +108,7 @@ export default function AgedReceivables({ report }: Props) {
                                 Print
                             </Button>
                         }
+                        footer={<ReportsTabsFooter active="aged-receivables" />}
                     />
                 }
             >

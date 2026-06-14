@@ -1706,32 +1706,14 @@ function buildFinanceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
 
     const reports: NavItem[] = [];
     if (can?.finance?.reports?.view) {
+        // Reports & Planning hub — P&L, balance sheet, trial balance, cash flow,
+        // aged AR/AP, funding summary, budget vs actuals and cash-flow forecast
+        // are now tabs here.
         reports.push({
-            title: 'Trial Balance',
-            href: '/finance/reports/trial-balance',
+            title: 'Reports',
+            href: '/finance/reports',
             icon: BarChart3,
         });
-        reports.push({
-            title: 'Profit & Loss',
-            href: '/finance/reports/profit-loss',
-            icon: BarChart3,
-        });
-        reports.push({
-            title: 'Balance Sheet',
-            href: '/finance/reports/balance-sheet',
-            icon: BarChart3,
-        });
-        reports.push({
-            title: 'Budget vs Actuals',
-            href: '/finance/reports/budget-vs-actuals',
-            icon: Target,
-        });
-        reports.push({
-            title: 'Cash Flow Forecast',
-            href: '/finance/cash-flow-forecast',
-            icon: TrendingUp,
-        });
-        // Audit Exports is now a tab in the Tax & Compliance hub.
     }
 
     if (can?.finance?.admin) {

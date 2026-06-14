@@ -1,6 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, router, usePage } from '@inertiajs/react';
 import { PageHero, PageLayout } from '@/components/page';
+import { ReportsTabsFooter } from '@/components/finance';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -280,6 +281,7 @@ export default function BudgetVsActuals({ budgets, selectedBudgetId, report }: P
                                 </Button>
                             </div>
                         }
+                        footer={<ReportsTabsFooter active="budget-vs-actuals" />}
                     />
                 }
             >
