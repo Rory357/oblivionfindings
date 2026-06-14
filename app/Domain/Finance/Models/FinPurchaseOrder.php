@@ -4,6 +4,7 @@ namespace App\Domain\Finance\Models;
 
 use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
+use Database\Factories\Finance\FinPurchaseOrderFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,11 +13,11 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class FinPurchaseOrder extends Model
 {
-    use HasFactory, SoftDeletes, AuditableChanges;
+    use AuditableChanges, HasFactory, SoftDeletes;
 
     protected static function newFactory()
     {
-        return \Database\Factories\Finance\FinPurchaseOrderFactory::new();
+        return FinPurchaseOrderFactory::new();
     }
 
     protected $table = 'fin_purchase_orders';
@@ -85,11 +86,29 @@ class FinPurchaseOrder extends Model
 
     public function scopeForOrganization($query, ?int $orgId)
     {
-        return $query->when($orgId, fn($q) => $q->where('organization_id', $orgId));
+        return $query->when($orgId, fn ($q) => $q->where('organization_id', $orgId));
     }
 
     public function scopeWithStatus($query, string $status)
     {
         return $query->where('status', $status);
+    }
+
+    /**
+     * Next sequential PO number for an organisation (PO-YYYYMM-001), scoped to the
+     * current month. MAX(numeric suffix) handles >999/month (the previous string
+     * orderBy broke past 999); the `unique(organization_id, po_number)` index
+     * guards concurrent races.
+     */
+    public static function nextNumber(?int $orgId): string
+    {
+        $prefix = 'PO-'.now()->format('Ym').'-';
+
+        $maxNumber = static::forOrganization($orgId)
+            ->where('po_number', 'like', $prefix.'%')
+            ->selectRaw('MAX(CAST(SUBSTRING(po_number, '.(strlen($prefix) + 1).') AS UNSIGNED)) as max_num')
+            ->value('max_num');
+
+        return $prefix.str_pad((string) (($maxNumber ?? 0) + 1), 3, '0', STR_PAD_LEFT);
     }
 }

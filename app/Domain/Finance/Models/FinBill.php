@@ -4,6 +4,7 @@ namespace App\Domain\Finance\Models;
 
 use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
+use Database\Factories\Finance\FinBillFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -17,7 +18,7 @@ class FinBill extends Model
 
     protected static function newFactory()
     {
-        return \Database\Factories\Finance\FinBillFactory::new();
+        return FinBillFactory::new();
     }
 
     protected $table = 'fin_bills';
@@ -113,5 +114,24 @@ class FinBill extends Model
     public function getAmountDue(): float
     {
         return (float) $this->total_amount - (float) $this->amount_paid;
+    }
+
+    /**
+     * Next sequential bill number for an organisation (BILL-YYYYMM-001), scoped to
+     * the current month. The canonical generator — both AccountsPayableService
+     * (direct bills) and PurchaseOrderController (PO→bill) use this, so the two
+     * paths can't drift or collide. MAX(numeric suffix) handles >999/month; the
+     * `unique(organization_id, bill_number)` index guards concurrent races.
+     */
+    public static function nextNumber(?int $orgId): string
+    {
+        $prefix = 'BILL-'.now()->format('Ym').'-';
+
+        $maxNumber = static::forOrganization($orgId)
+            ->where('bill_number', 'like', $prefix.'%')
+            ->selectRaw('MAX(CAST(SUBSTRING(bill_number, '.(strlen($prefix) + 1).') AS UNSIGNED)) as max_num')
+            ->value('max_num');
+
+        return $prefix.str_pad((string) (($maxNumber ?? 0) + 1), 3, '0', STR_PAD_LEFT);
     }
 }

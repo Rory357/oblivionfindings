@@ -2,16 +2,15 @@
 
 namespace App\Domain\Finance\Http\Controllers;
 
+use App\Domain\Finance\Http\Requests\StorePurchaseOrderRequest;
+use App\Domain\Finance\Http\Requests\UpdatePurchaseOrderRequest;
 use App\Domain\Finance\Models\FinAccount;
 use App\Domain\Finance\Models\FinBill;
 use App\Domain\Finance\Models\FinBillLine;
 use App\Domain\Finance\Models\FinCostCentre;
 use App\Domain\Finance\Models\FinFundingStream;
 use App\Domain\Finance\Models\FinPurchaseOrder;
-use App\Domain\Finance\Models\FinPurchaseOrderLine;
 use App\Domain\Finance\Models\FinVendor;
-use App\Domain\Finance\Http\Requests\StorePurchaseOrderRequest;
-use App\Domain\Finance\Http\Requests\UpdatePurchaseOrderRequest;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
@@ -38,7 +37,7 @@ class PurchaseOrderController extends Controller
         }
 
         if ($request->filled('search')) {
-            $query->where('po_number', 'like', '%' . $request->input('search') . '%');
+            $query->where('po_number', 'like', '%'.$request->input('search').'%');
         }
 
         $purchaseOrders = $query->paginate(15)->withQueryString();
@@ -78,7 +77,7 @@ class PurchaseOrderController extends Controller
         $validated = $request->validated();
 
         $orgId = $request->user()->organization_id;
-        $poNumber = $this->generatePoNumber($orgId);
+        $poNumber = FinPurchaseOrder::nextNumber($orgId);
 
         $po = DB::transaction(function () use ($validated, $orgId, $poNumber, $request) {
             $subtotal = 0;
@@ -259,7 +258,7 @@ class PurchaseOrderController extends Controller
         $purchaseOrder->load('lines');
 
         $orgId = $request->user()->organization_id;
-        $billNumber = $this->generateBillNumber($orgId);
+        $billNumber = FinBill::nextNumber($orgId);
 
         $bill = DB::transaction(function () use ($purchaseOrder, $orgId, $billNumber, $request) {
             $bill = FinBill::create([
@@ -300,43 +299,5 @@ class PurchaseOrderController extends Controller
 
         return redirect()->route('finance.bills.show', $bill)
             ->with('success', 'Bill created from purchase order.');
-    }
-
-    private function generatePoNumber(int $orgId): string
-    {
-        $prefix = 'PO-' . now()->format('Ym') . '-';
-
-        $latest = FinPurchaseOrder::forOrganization($orgId)
-            ->where('po_number', 'like', $prefix . '%')
-            ->orderBy('po_number', 'desc')
-            ->value('po_number');
-
-        if ($latest) {
-            $seq = (int) substr($latest, -3);
-            $next = $seq + 1;
-        } else {
-            $next = 1;
-        }
-
-        return $prefix . str_pad($next, 3, '0', STR_PAD_LEFT);
-    }
-
-    private function generateBillNumber(int $orgId): string
-    {
-        $prefix = 'BILL-' . now()->format('Ym') . '-';
-
-        $latest = FinBill::forOrganization($orgId)
-            ->where('bill_number', 'like', $prefix . '%')
-            ->orderBy('bill_number', 'desc')
-            ->value('bill_number');
-
-        if ($latest) {
-            $seq = (int) substr($latest, -3);
-            $next = $seq + 1;
-        } else {
-            $next = 1;
-        }
-
-        return $prefix . str_pad($next, 3, '0', STR_PAD_LEFT);
     }
 }

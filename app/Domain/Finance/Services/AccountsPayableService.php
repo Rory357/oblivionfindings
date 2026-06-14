@@ -494,16 +494,7 @@ class AccountsPayableService
      */
     private function generateBillNumber(?int $orgId): string
     {
-        $prefix = 'BILL-'.now()->format('Ym').'-';
-
-        $maxNumber = FinBill::where('organization_id', $orgId)
-            ->where('bill_number', 'like', $prefix.'%')
-            ->selectRaw('MAX(CAST(SUBSTRING(bill_number, '.(strlen($prefix) + 1).') AS UNSIGNED)) as max_num')
-            ->value('max_num');
-
-        $next = ($maxNumber ?? 0) + 1;
-
-        return $prefix.str_pad((string) $next, 3, '0', STR_PAD_LEFT);
+        return FinBill::nextNumber($orgId);
     }
 
     /**
