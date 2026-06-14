@@ -123,7 +123,7 @@ class GlSyncService
                 $externalIdColumn = $integration->provider === 'xero' ? 'xero_invoice_id' : 'myob_invoice_id';
 
                 $bills = FinBill::forOrganization($integration->organization_id)
-                    ->whereIn('status', ['approved', 'paid', 'partial'])
+                    ->whereIn('status', ['approved', 'paid', 'partially_paid'])
                     ->whereNull($externalIdColumn)
                     ->with(['vendor', 'lines'])
                     ->get();

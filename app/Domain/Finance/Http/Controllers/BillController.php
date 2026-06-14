@@ -2,6 +2,8 @@
 
 namespace App\Domain\Finance\Http\Controllers;
 
+use App\Domain\Finance\Http\Requests\StoreBillRequest;
+use App\Domain\Finance\Http\Requests\UpdateBillRequest;
 use App\Domain\Finance\Models\FinAccount;
 use App\Domain\Finance\Models\FinBill;
 use App\Domain\Finance\Models\FinCostCentre;
@@ -10,8 +12,6 @@ use App\Domain\Finance\Models\FinPurchaseOrder;
 use App\Domain\Finance\Models\FinTaxRate;
 use App\Domain\Finance\Models\FinVendor;
 use App\Domain\Finance\Services\AccountsPayableService;
-use App\Domain\Finance\Http\Requests\StoreBillRequest;
-use App\Domain\Finance\Http\Requests\UpdateBillRequest;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -65,9 +65,9 @@ class BillController extends Controller
 
         $allBills = FinBill::forOrganization($orgId)->get();
         $summary = [
-            'total_unpaid' => $allBills->whereIn('status', ['approved', 'partial'])->sum(fn($b) => $b->total_amount - $b->amount_paid),
-            'total_overdue' => $allBills->where('status', 'approved')->filter(fn($b) => $b->due_date < now())->sum(fn($b) => $b->total_amount - $b->amount_paid),
-            'due_this_week' => $allBills->whereIn('status', ['approved', 'partial'])->filter(fn($b) => $b->due_date >= now() && $b->due_date <= now()->addDays(7))->sum(fn($b) => $b->total_amount - $b->amount_paid),
+            'total_unpaid' => $allBills->whereIn('status', ['approved', 'partially_paid'])->sum(fn ($b) => $b->total_amount - $b->amount_paid),
+            'total_overdue' => $allBills->whereIn('status', ['approved', 'partially_paid'])->filter(fn ($b) => $b->due_date < now())->sum(fn ($b) => $b->total_amount - $b->amount_paid),
+            'due_this_week' => $allBills->whereIn('status', ['approved', 'partially_paid'])->filter(fn ($b) => $b->due_date >= now() && $b->due_date <= now()->addDays(7))->sum(fn ($b) => $b->total_amount - $b->amount_paid),
         ];
 
         return Inertia::render('finance/bills/Index', [
@@ -242,7 +242,7 @@ class BillController extends Controller
         } catch (\InvalidArgumentException $e) {
             return back()->withErrors(['bill' => $e->getMessage()]);
         } catch (\Exception $e) {
-            return back()->withErrors(['bill' => 'Failed to approve bill: ' . $e->getMessage()]);
+            return back()->withErrors(['bill' => 'Failed to approve bill: '.$e->getMessage()]);
         }
 
         return redirect()->route('finance.bills.show', $bill)

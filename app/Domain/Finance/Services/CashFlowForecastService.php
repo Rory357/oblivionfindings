@@ -9,7 +9,6 @@ use App\Domain\Finance\Models\FinGstReturn;
 use App\Domain\Finance\Models\FinInvoice;
 use App\Domain\Finance\Models\FinRecurringJournal;
 use Carbon\Carbon;
-use Carbon\CarbonPeriod;
 use Illuminate\Support\Facades\Auth;
 
 class CashFlowForecastService
@@ -48,7 +47,7 @@ class CashFlowForecastService
 
         $forecast = FinCashFlowForecast::create([
             'organization_id' => $orgId,
-            'name' => 'Cash Flow Forecast - ' . now()->format('d M Y'),
+            'name' => 'Cash Flow Forecast - '.now()->format('d M Y'),
             'forecast_date' => now()->toDateString(),
             'period_start' => $periodStart,
             'period_end' => $periodEnd,
@@ -97,8 +96,8 @@ class CashFlowForecastService
             };
 
             $label = match ($periodType) {
-                'weekly' => 'Week of ' . $current->format('d M'),
-                'fortnightly' => $current->format('d M') . ' - ' . $periodEnd_->format('d M'),
+                'weekly' => 'Week of '.$current->format('d M'),
+                'fortnightly' => $current->format('d M').' - '.$periodEnd_->format('d M'),
                 'monthly' => $current->format('M Y'),
             };
 
@@ -163,14 +162,14 @@ class CashFlowForecastService
     {
         // Bills due in this period (unpaid or partially paid)
         $billPayments = FinBill::forOrganization($orgId)
-            ->whereIn('status', ['approved', 'partial'])
+            ->whereIn('status', ['approved', 'partially_paid'])
             ->whereBetween('due_date', [$start, $end])
             ->selectRaw('COALESCE(SUM(total_amount - amount_paid), 0) as total')
             ->value('total') ?? '0.00';
 
         // Overdue bills expected to be paid
         $overdueBills = FinBill::forOrganization($orgId)
-            ->whereIn('status', ['approved', 'partial'])
+            ->whereIn('status', ['approved', 'partially_paid'])
             ->where('due_date', '<', $start)
             ->selectRaw('COALESCE(SUM(total_amount - amount_paid), 0) as total')
             ->value('total') ?? '0.00';
