@@ -95,10 +95,19 @@ Live-verify the HR gradient on oblivionfindings.com after deploy (next loop tick
   step machine. The first *real* HR wizard ships in M1 (`AddEmployeeDialog`) using this wrapper.
   *Acceptance:* shared wrapper + hook in place, tested; adoption begins M1.
 
-### M1 — People hub: directory + profile + org chart + positions/departments `[in progress — branch hr/m1-people]`
+### M1 — People hub: directory + profile + org chart + positions/departments `[CORE SHIPPED → main cf6a4879, 2026-06-14]`
 
-Done so far (committed on branch, gates green): **M1-2 Add-Employee wizard** + **M1-4 org-chart permission fix & reassign**.
-Remaining before merge: M1-1 (hub tabs + directory merge), M1-3 (profile edit modal + custom fields), M1-5 (photo + true totals).
+**Shipped** (worktree hr/m1-people → main, all gates green, 16 PHP tests):
+- **[x] M1-1** People hub with 5 standardised `HrTabs` (People · Directory · Positions · Departments · Org chart);
+  duplicate directory merged; positions/departments/orgchart folded into panes; old routes redirect to
+  `/hr/people?tab=…`; orphan index pages deleted. Reusable panes in `components/hr/` (+ `people/org-chart-pane`).
+- **[x] M1-2** Add-Employee wizard (`AddEmployeeDialog`) + `POST /hr/people`.
+- **[x] M1-4** Org-chart permission fix (ResolvesHrTenant) + reassign dialog + `OrgChartService::wouldCreateCycle` guard.
+- Bug fixes: positions/departments tenant scoping via `ResolvesHrTenant` (users carry no tenant_id); invisible
+  status-badge bug fixed via shared `StatusBadge`; Position/Department modal create/edit.
+
+**Remaining (next tick, then M1 fully done):** M1-3 (employees/edit → WizardShell modal + surface custom
+fields) · M1-5 (directory photo-upload UI; hub totals already real). Then M2.
 
 - **M1-1 Merge the two employee lists.** *Problem:* `DirectoryController`/`directory/*` and
   `EmployeeProfileController`/`employees/*` are parallel people lists with duplicated avatar helpers.
