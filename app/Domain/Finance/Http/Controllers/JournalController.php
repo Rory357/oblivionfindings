@@ -2,13 +2,13 @@
 
 namespace App\Domain\Finance\Http\Controllers;
 
+use App\Domain\Finance\Http\Requests\StoreJournalRequest;
 use App\Domain\Finance\Models\FinAccount;
 use App\Domain\Finance\Models\FinCostCentre;
 use App\Domain\Finance\Models\FinFundingStream;
 use App\Domain\Finance\Models\FinJournal;
 use App\Domain\Finance\Models\FinTaxRate;
 use App\Domain\Finance\Services\JournalPostingService;
-use App\Domain\Finance\Http\Requests\StoreJournalRequest;
 use App\Http\Controllers\Controller;
 use Illuminate\Http\Request;
 use Inertia\Inertia;
@@ -51,7 +51,7 @@ class JournalController extends Controller
             $search = $request->input('search');
             $query->where(function ($q) use ($search) {
                 $q->where('journal_number', 'like', "%{$search}%")
-                  ->orWhere('description', 'like', "%{$search}%");
+                    ->orWhere('description', 'like', "%{$search}%");
             });
         }
 
@@ -60,9 +60,23 @@ class JournalController extends Controller
             ->paginate(25)
             ->withQueryString();
 
+        // Reference data for the in-list New Journal wizard — only loaded for
+        // users who can actually create a journal (the modal trigger is gated too).
+        $canManage = $request->user()->can('create', FinJournal::class);
+
         return Inertia::render('finance/journals/Index', [
             'journals' => $journals,
             'filters' => $request->only(['status', 'type', 'date_from', 'date_to', 'search']),
+            'canManage' => $canManage,
+            'accounts' => $canManage
+                ? FinAccount::forOrganization($orgId)->active()->orderBy('code')->get(['id', 'code', 'name', 'type'])
+                : [],
+            'costCentres' => $canManage
+                ? FinCostCentre::forOrganization($orgId)->active()->orderBy('code')->get(['id', 'code', 'name'])
+                : [],
+            'fundingStreams' => $canManage
+                ? FinFundingStream::forOrganization($orgId)->active()->orderBy('code')->get(['id', 'code', 'name'])
+                : [],
         ]);
     }
 
