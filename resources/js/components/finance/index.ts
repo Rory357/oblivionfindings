@@ -9,6 +9,7 @@ export * from './finance-tabs';
 export * from './ledger-hub';
 export * from './money';
 export * from './new-account-dialog';
+export * from './new-bill-dialog';
 export * from './new-invoice-dialog';
 export * from './new-journal-dialog';
 export * from './payables-hub';

@@ -2,7 +2,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import { type BreadcrumbItem, PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
-import { PayablesTabsFooter } from '@/components/finance';
+import { NewBillDialog, PayablesTabsFooter, type AccountOption } from '@/components/finance';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -56,6 +56,8 @@ interface Props extends PageProps {
     vendors: Vendor[];
     filters: Filters;
     summary: Summary;
+    canManage: boolean;
+    accounts: AccountOption[];
 }
 
 const formatCurrency = (amount: string | number) =>
@@ -78,12 +80,13 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Bills', href: '/finance/bills' },
 ];
 
-export default function BillsIndex({ auth, bills, vendors, filters, summary }: Props) {
+export default function BillsIndex({ auth, bills, vendors, filters, summary, canManage, accounts }: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
     const [status, setStatus] = useState(filters.status ?? '');
     const [vendorId, setVendorId] = useState(filters.vendor_id ?? '');
     const [dateFrom, setDateFrom] = useState(filters.date_from ?? '');
     const [dateTo, setDateTo] = useState(filters.date_to ?? '');
+    const [newBillOpen, setNewBillOpen] = useState(false);
 
     const applyFilters = () => {
         const params: Record<string, string> = {};
@@ -126,12 +129,12 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary }: P
                             { label: 'Due this week', value: formatCurrency(summary.due_this_week) },
                         ]}
                         actions={
-                            <Button asChild size="sm">
-                                <Link href="/finance/bills/create">
+                            canManage && (
+                                <Button size="sm" onClick={() => setNewBillOpen(true)}>
                                     <Plus className="w-4 h-4 mr-1.5" />
                                     New Bill
-                                </Link>
-                            </Button>
+                                </Button>
+                            )
                         }
                         footer={<PayablesTabsFooter active="bills" />}
                     />
@@ -321,6 +324,15 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary }: P
                     )}
                 </Card>
             </PageLayout>
+
+            {canManage && (
+                <NewBillDialog
+                    open={newBillOpen}
+                    onClose={() => setNewBillOpen(false)}
+                    vendors={vendors}
+                    accounts={accounts}
+                />
+            )}
         </AppLayout>
     );
 }
