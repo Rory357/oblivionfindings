@@ -7,8 +7,6 @@ use App\Domain\Finance\Models\FinJournalLine;
 use App\Domain\Governance\Models\Budget;
 use App\Domain\Governance\Models\BudgetLineItem;
 use Carbon\Carbon;
-use Illuminate\Support\Facades\DB;
-use Illuminate\Support\Facades\Log;
 
 class BudgetActualsService
 {
@@ -90,6 +88,11 @@ class BudgetActualsService
             ->groupBy('category')
             ->sortKeys();
 
+        // Compute actuals LIVE from the GL (posted journal lines) rather than the
+        // denormalised actual_amount column, which is only fresh right after a
+        // manual syncActuals() run. The report is now always accurate.
+        [$startDate, $endDate] = $this->parseFiscalYear($budget->fiscal_year);
+
         $categories = [];
         $grandBudget = 0;
         $grandActual = 0;
@@ -101,9 +104,14 @@ class BudgetActualsService
 
             foreach ($items as $item) {
                 $budgetAmt = (float) $item->budget_amount;
-                $actualAmt = (float) $item->actual_amount;
-                $varianceAmt = (float) $item->variance_amount;
-                $variancePct = (float) $item->variance_pct;
+
+                $account = $this->mapAccountToLineItem($item, $orgId);
+                $actualAmt = $account
+                    ? $this->sumPostedJournalLines($account, $orgId, $startDate, $endDate)
+                    : 0.0;
+
+                $varianceAmt = $actualAmt - $budgetAmt;
+                $variancePct = $budgetAmt != 0.0 ? ($varianceAmt / $budgetAmt) * 100 : 0.0;
 
                 $lineItems[] = [
                     'id' => $item->id,
