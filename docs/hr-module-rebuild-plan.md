@@ -494,6 +494,14 @@ flat Send-Kudos dialog. M7-R3 (e08c55c5) — HrDemoSeeder feed/kudos demo data (
   Overview · Profile · Leave · Time · Pay · Expenses · Documents · Training · Policies · Reviews · Goals ·
   Surveys); fix my/training to include enrolments; fix attest. *Acceptance:* one tabbed ESS hub; training
   shows courses; policies attestable.
+  - ✅ **DONE (audit + 341533bd) → M9 CLOSED.** Audit (agent a5a327c8) verified the ESS hub is essentially sound:
+    all 12 my/* pages + 23 /hr/my routes resolve to real controller methods, self-scoped by user_id (no null-tenant
+    bug); policies-attest (uses currentVersion, post-M8-3) + payslip-list flows confirmed working; the stale plan
+    claims were false. ONE real dead item fixed: /hr/my/payslips "View/Download" buttons hit hr.payslips.view-gated
+    routes → 403 for staff; added ungated owner-authorised self-service routes (my.payslips.show/download) +
+    PayslipController@show owner-allowance. 3 tests (MyPayslipsSelfServiceTest). NOTE: the 11-page→TabStrip ESS-hub
+    consolidation + my/training LMS link + a my/leave cancel button (backend works) are UX-shell/feature gaps →
+    DEFERRED to M10 (consistent with the other hub-shell deferrals).
 
 ### M10 — De-dup sweep, demo seeders, a11y + responsive, final parity
 
