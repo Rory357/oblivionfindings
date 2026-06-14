@@ -94,11 +94,23 @@ class InvoiceController extends Controller
                 ->where('paid_at', '>=', now()->startOfMonth())->sum('total_amount'),
         ];
 
+        $canManage = (bool) $request->user()?->canDo('finance.ar.manage');
+
         return Inertia::render('finance/invoices/Index', [
             'invoices' => $invoices,
             'filters' => $request->only(['status', 'search', 'date_from', 'date_to']),
             'summary' => $summary,
-            'canManage' => (bool) $request->user()?->canDo('finance.ar.manage'),
+            'canManage' => $canManage,
+            // Reference data for the New Invoice modal — only for managers (the
+            // create route is finance.ar.manage), so view-only users skip the queries.
+            'clients' => $canManage
+                ? $this->clientOptions($orgId)
+                    ->map(fn ($c) => ['id' => $c->id, 'name' => trim($c->first_name.' '.$c->last_name)])
+                    ->values()
+                : [],
+            'taxRates' => $canManage
+                ? FinTaxRate::forOrganization($orgId)->active()->orderBy('name')->get(['id', 'name', 'rate'])
+                : [],
         ]);
     }
 

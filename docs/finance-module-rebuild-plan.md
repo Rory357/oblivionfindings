@@ -168,14 +168,18 @@ Land the spine M1–M10 build on. **No behaviour change**, design only.
   (code→intended-name keyword, single source of truth) + a name-parity gate in `VerifyFinanceChart`; fails
   when a code is seeded under a contradictory name (would have caught 5020). Test covers the failure case. *(commit db73bcdd)*
 
-### M2 — Sales & Receivables hub + AR data + recurring billing `[~]` (P0s done; wizard modals + dead-code sweep remain)
-- **[~] M2-1 Receivables hub + TabStrip + wizard modals.** *Hub DONE (commit bc1e2450):* shared
+### M2 — Sales & Receivables hub + AR data + recurring billing `[x]` COMPLETE (Edit-invoice modal deferred to M10 polish)
+- **[x] M2-1 Receivables hub + TabStrip + wizard modals.** *Hub (commit bc1e2450):* shared
   `ReceivablesTabsFooter` (components/finance/receivables-hub.tsx) dropped into all 8 AR sub-page heros so
   invoices · quotes · recurring · billing · aged-AR · statements · price-books · allocations read as one
   hub (every tab `finance.ar.view`; credit-notes stay in AP since they're `finance.ap.*`-gated). Sidebar AR
-  group collapsed to one "Receivables" entry. *Remaining:* New/Edit Invoice + Record Receipt as `WizardShell`
-  modals (line-item invoice = the multi-line wizard; reference data + canManage from the index controller; NO
-  empty-string Select option values — the M1 crash lesson). Next tick.
+  group collapsed to one "Receivables" entry. *Record Receipt modal (commit 2d121fe8):* RecordReceiptDialog
+  (WizardShell) on the invoices index → posts the existing finance.receivables.allocate (balanced DR Bank/CR AR
+  + FinPaymentAllocation, capped at outstanding); index now carries amount_due/amount_paid per row + canManage.
+  *New Invoice modal (commit cc49cfb7):* NewInvoiceDialog (Details → Line items → Review), bill a client or
+  funder, posts a draft to invoices.store with NZ GST per line; index passes clients + taxRates. NO empty-string
+  Select values ('default' tax sentinel → null). *Deferred:* Edit-invoice modal — the working full Edit page
+  stays; converting needs the invoice's lines which the index doesn't carry (M10 polish).
 - **[x] M2-2 Kill AR data-blindness (P0).** Migrated receivables/aged-AR/statements reads to `FinInvoice` +
   `FinPaymentAllocation`; partial payments net. *(commit 892f32a9)*
 - **[x] M2-3 `markPaid` posts a receipt journal (P0).** DR Bank / CR 1100 AR + `FinPaymentAllocation`, idempotent; balanced-receipt test. *(commit 892f32a9)*
@@ -186,7 +190,7 @@ Land the spine M1–M10 build on. **No behaviour change**, design only.
   → quote create failed). *(commit 1504d264)*
 - **[x] M2-5 AR credit-note GST reversal.** Reverses revenue + 2200 GST proportionally; balanced. *(commit 892f32a9)*
 - **[x] M2-6 Recurring charges engine.** Corrected columns (`is_active`/`next_charge_at`), daily schedule, `BillingEntry`→`FinInvoice`; test. *(commit 892f32a9)*
-- **[ ] M2-7 Retire dead AR code.** Delete `BillingJournalService` + `PostBillingJournalJob` (orphaned, only ever worked on legacy model). *Acceptance:* `route:list`/build clean; no callers.
+- **[x] M2-7 Retire dead AR code.** Deleted `BillingJournalService` + `PostBillingJournalJob` (orphaned — job dispatched nowhere; service referenced only by that job + a stale docblock). route:list/suite clean. *(commit 6f622e5f)*
 
 ### M3 — Purchases & Payables hub `[ ]`
 - **[ ] M3-1 Payables hub + TabStrip + wizard modals.** Fold bills/POs/vendors/credit-notes(AP)/payment-runs;
