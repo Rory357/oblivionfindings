@@ -320,9 +320,18 @@ KiwiSaver + net-pay liability) via `PostPayrollJournalJob`; `AllocatePayrollCost
   STORE unification — `BudgetActualsController` reads the Governance `Budget` model, not Finance `SiteBudgetLine`;
   retire the denormalised `actual_amount` write path (`syncActuals` is now optional for the report); implement+bind
   `BudgetSyncInterface`; collapse any double scheduled writer; unify category vocab. Cross-module Governance+Finance.
-- **[ ] M8-3 SpendApprovals → AP.** *Fix:* `SpendApproval::approve()` creates/links a `FinBill` (or gates the
-  AP bill/payment-run via the `source` morph) so approved spend reaches Finance. *Acceptance:* approving a spend creates a financial record.
-- **[ ] M8-4 Cash-flow forecast payroll feed.** Add payroll-due dates as an outflow source. *Acceptance:* forecast includes upcoming pay runs.
+- **[~] M8-3 SpendApprovals → AP — investigated; NOT a simple "create a bill on approve".** `SpendApproval` is a
+  GOVERNANCE pre-authorisation (has `valid_until`, `requires_board`, `resolution_id`, board-resolution link) with a
+  NULLABLE `source` morph and NO vendor field; `approve()` only flips status + audits. Creating a `FinBill` on
+  approve would be wrong accounting (a payable before the expense is incurred) AND impossible (FinBill.vendor_id is
+  a required FK the approval lacks). The correct integration is the OTHER direction — when a bill/PO is created it
+  links to its approval via the `source` morph — plus optionally ENFORCING approval on bills over a threshold.
+  Workflow-design call; deferred (not a contained finance fix).
+- **[~] M8-4 Cash-flow forecast payroll feed — investigated; needs a schema/HR change.** `FinPaymentRun` (status
+  draft/approved/processing/completed + payment_date + total_amount) is the only finance-side dated payment
+  obligation, but it has NO payroll-vs-vendor `type` column — so adding payment runs to `projectOutflows` would
+  double-count the vendor bills already summed by due_date. A clean payroll outflow needs either a `FinPaymentRun.type`
+  (+ exclude bill-paying runs from the bill sum) or the HR payroll-run model. Deferred (cross-module / schema).
 
 ### M9 — Cross-module capture + Finance calendar `[ ]`
 - **[ ] M9-1 Finance calendar (site-calendar parity).** Build `/finance/calendar` reusing the shared
@@ -333,9 +342,12 @@ KiwiSaver + net-pay liability) via `PostPayrollJournalJob`; `AllocatePayrollCost
   complete → HouseLedger groceries; Respite confirm → AR vs funder + funding drawdown; Asset capitalisation →
   `FinFixedAsset` + journal; operational AP → `FinBill`+`FinVendor` attribution; `SiteVendor.fin_vendor_id` FK.
   Each an Add-Client-style modal routing to existing paths; permission-gated + audited. *Acceptance:* each capture posts to the canonical path; no new ledger.
-- **[ ] M9-3 Scheduled-job + notification hygiene.** Delete the 4 orphaned jobs (`ImportBankTransactionsJob`,
-  `PostBillingJournalJob`, `PostExpenseJournalJob`, `ProcessPaymentRunJob`) or wire them; confirm bill-due +
-  variance notifications deliver. *Acceptance:* no orphaned job classes; notifications fire (tests).
+- **[~] M9-3 Orphaned-job sweep DONE; notification audit deferred.** All 4 jobs resolved: `PostBillingJournalJob`
+  already removed in M2-7; `PostExpenseJournalJob` is wired (HR `ExpenseService::approveClaim` dispatches it on
+  M8-S1); `ImportBankTransactionsJob` + `ProcessPaymentRunJob` were truly orphaned (never dispatched/scheduled/
+  referenced — thin async wrappers around `BankReconciliationService::importTransactions` and `PaymentRunService::
+  processPaymentRun`, both already called synchronously by their controllers) → DELETED (main 24ce6b34, route:list
+  clean, Finance suite 110 green). Remaining: confirm bill-due + budget-variance notifications deliver (own tick).
 
 ### M10 — Settings & Integrations + final de-dup + polish `[ ]`
 - **[ ] M10-1 Settings hub.** Integrations (Xero/MYOB) · Account mapping · Tax/GST config · Fiscal calendar ·
