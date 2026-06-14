@@ -11,7 +11,7 @@ isolated in their own worktrees `hr-m1-people` / `fin-wt`). Design bundles: `.de
 | 2 | Medication Rounds | `/emar/rounds` | `Emar_Medication_Rounds_Page/` | done* | `628a1783` + frontend |
 | 3 | Medications Database | `/emar/medications` | `Medications_Page/` | done* | `e85d3a13` + frontend |
 | 4 | Prescriptions & Orders | `/emar/prescriptions` | `Prescription_Page/` | done* | backend+frontend |
-| 5 | PRN Records | `/emar/prn` | `PRN_Redesign/` | todo | — |
+| 5 | PRN Records | `/emar/prn` | `PRN_Redesign/` | done* | backend+frontend |
 | 6 | Controlled Drugs | `/emar/controlled` | `Controlled_Drugs_Page/` | todo | — |
 | 7 | Destructions | `/emar/destructions` | `Destruction_Page/` | todo | — |
 | 8 | Stock Management | `/emar/stock` | `Stock_Management/` | todo | — |
@@ -38,6 +38,8 @@ Status legend: `todo` / `in-progress` / `done`. `done*` = all automated gates gr
 - **`resources/js/components/page/page-hero.tsx`** (brand-colour foundation): added optional `brandColour?: string | null` prop + resolved `heroBase` (brandColour → category → primary) driving `--hero-base`. Purely additive — existing `category`-only callers unchanged. ⚠️ Finance loop also edits this file.
 
 ## Backlog / deferred
+
+**Page 5 (PRN Records):** CSV **export register** (hero export button NOT rendered — hidden unbuilt action), full **date-range period picker** (used a recent 30-day window + site filter instead), Trends per-med **colour** bars (single-colour bars). The two modals are **REUSED verbatim**: `PrnWizard` (record dose → `meds.today.prn`) + `PrnEffectDialog` (effectiveness → `meds.today.prn_effect`) — the latter is the existing shared raw-`Dialog` effectiveness component (reused as the single effectiveness path, not migrated to MedsWizardDialog since meds/today shares it). Backend: `prn()` rebuilt to compose `MedsBoardPayloadService` (prn_medications/clients/witnesses/board_user) + a flat 30-day register + pending-review queue + site_brand_colour. NO new modals. Reasons: secondary; core = 4-tab actionable register reusing the existing PRN write + effectiveness paths.
 
 **Page 4 (Prescriptions & Orders):** right-click **context menu** (actions are inline buttons), covert **review/extend** workflow + reminder, order **expiry** scheduled job, Link→MAR **create-new-med** path (link-existing only), **Activity** tab = simple derived order feed (not full `TimelineEvent`). The covert wizard composes rich capacity/MDT input into the `clinical_justification`/`legal_basis`/`pharmacist_advice` text columns (no dedicated columns added). Backend: migration `2026_06_15_000000` (countersign_method + read_back_confirmed/witnessed_by) + flat payload + endpoint extensions (storePrescription read-back, updatePrescription client_medication_id link, countersignPrescription method+confirm). Reasons: secondary / separable infra; core shipped = 5-tab surface (Orders/Countersign/Dispensing/Covert/Activity) + dispensing lifecycle + covert client_medication_id fix + all-modal workflows.
 

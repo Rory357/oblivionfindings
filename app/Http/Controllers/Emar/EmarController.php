@@ -1065,45 +1065,86 @@ class EmarController extends Controller
     // ─── PRN Records ───────────────────────────────────────
     public function prn(Request $request)
     {
-        $dateFrom = $request->input('from', now()->subDays(7)->toDateString());
-        $dateTo = $request->input('to', today()->toDateString());
+        $user = $request->user();
+        $siteFilter = $request->integer('site_id') ?: null;
+        $scheduleService = app(MarScheduleService::class);
+        $timezone = $scheduleService->workerTimezone();
+        $now = Carbon::now($timezone);
 
-        $prnAdministrations = ClientMedicationAdministration::query()
+        // The register — recent PRN-given administrations (flat; the redesigned
+        // page filters by tab/search/status client-side).
+        $administrations = ClientMedicationAdministration::query()
             ->whereHas('medication', fn ($q) => $q->where('is_prn', true))
-            ->whereBetween('administered_at', [$dateFrom, $dateTo.' 23:59:59'])
-            ->with(['client:id,first_name,last_name', 'medication:id,name,dosage,max_per_day,indication', 'administeredBy:id,name'])
+            ->when($siteFilter, fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteFilter)))
+            ->where('administered_at', '>=', $now->copy()->subDays(30)->utc())
+            ->with(['client:id,first_name,last_name', 'medication:id,name,dosage,max_per_day,indication,controlled_drug', 'administeredBy:id,name', 'prnEffectiveness'])
             ->latest('administered_at')
-            ->paginate(50);
+            ->limit(200)
+            ->get()
+            ->map(function (ClientMedicationAdministration $a) use ($timezone) {
+                $at = $a->getRawOriginal('administered_at') ? $this->boardPayload->rawUtcInstant($a, 'administered_at') : null;
+                $eff = $a->prnEffectiveness;
 
-        $pendingEffectivenessReviews = ClientMedicationAdministration::query()
+                return [
+                    'id' => $a->id,
+                    'client_id' => $a->client_id,
+                    'client_name' => $a->client ? trim($a->client->first_name.' '.$a->client->last_name) : 'Unknown',
+                    'client_medication_id' => $a->client_medication_id,
+                    'medication_name' => $a->medication?->name,
+                    'controlled_drug' => (bool) ($a->medication?->controlled_drug ?? false),
+                    'dose_given' => $a->dose_given,
+                    'reason' => $a->reason,
+                    'indication' => $a->medication?->indication,
+                    'status' => $a->status,
+                    'administered_at' => $at?->toIso8601String(),
+                    'given_time' => $at ? $at->copy()->timezone($timezone)->format('H:i') : null,
+                    'given_date' => $at ? $at->copy()->timezone($timezone)->format('j M') : null,
+                    'given_by' => $a->administeredBy?->name,
+                    'effectiveness' => $eff?->effectiveness,
+                    'effectiveness_label' => $eff?->effectiveness_label,
+                ];
+            })->all();
+
+        // Pending effectiveness reviews — given PRN doses with no review yet
+        // (PrnFollowUp shape for the reused PrnEffectDialog).
+        $pendingReviews = ClientMedicationAdministration::query()
             ->whereHas('medication', fn ($q) => $q->where('is_prn', true))
+            ->when($siteFilter, fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteFilter)))
             ->where('status', 'given')
-            ->where('administered_at', '>=', now()->subHours(4))
+            ->where('administered_at', '>=', $now->copy()->subHours(24)->utc())
             ->whereDoesntHave('prnEffectiveness')
             ->with(['client:id,first_name,last_name', 'medication:id,name'])
             ->latest('administered_at')
-            ->limit(20)
-            ->get();
+            ->limit(50)
+            ->get()
+            ->map(function (ClientMedicationAdministration $a) use ($timezone) {
+                $at = $a->getRawOriginal('administered_at') ? $this->boardPayload->rawUtcInstant($a, 'administered_at') : null;
 
-        $prnStats = [
-            'total_given_period' => ClientMedicationAdministration::query()
-                ->whereHas('medication', fn ($q) => $q->where('is_prn', true))
-                ->whereBetween('administered_at', [$dateFrom, $dateTo.' 23:59:59'])
-                ->where('status', 'given')
-                ->count(),
-            'effectiveness_reviews_pending' => $pendingEffectivenessReviews->count(),
-            'near_limit_medications' => ClientMedication::active()->prn()
-                ->get()
-                ->filter(fn ($m) => $m->isPrnNearLimit())
-                ->count(),
-        ];
+                return [
+                    'administration_id' => $a->id,
+                    'client_id' => $a->client_id,
+                    'medication_name' => $a->medication?->name,
+                    'dose_given' => $a->dose_given,
+                    'given_at' => $at?->toIso8601String(),
+                    'given_time' => $at ? $at->copy()->timezone($timezone)->format('H:i') : null,
+                    'check_at' => null,
+                ];
+            })->all();
+
+        $prnClientIds = ClientMedication::active()->prn()->distinct()->pluck('client_id')->all();
+        $activeSite = $siteFilter ? Site::find($siteFilter) : null;
 
         return Inertia::render('emar/PrnRecords', [
-            'administrations' => $prnAdministrations,
-            'pendingReviews' => $pendingEffectivenessReviews,
-            'stats' => $prnStats,
-            'dateFrom' => $dateFrom,
-            'dateTo' => $dateTo,
+            'administrations' => $administrations,
+            'pending_reviews' => $pendingReviews,
+            'prn_medications' => $this->boardPayload->prnMedications($prnClientIds, $now),
+            'clients' => $this->boardPayload->clientsPayload($prnClientIds),
+            'witnesses' => $this->boardPayload->witnesses($user),
+            'board_user' => $this->boardPayload->boardUser($user),
+            'date' => $now->toDateString(),
+            'sites' => Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'active_site' => $activeSite ? ['id' => $activeSite->id, 'name' => $activeSite->name] : null,
+            'site_brand_colour' => $activeSite?->brand_colour,
         ]);
     }
 
