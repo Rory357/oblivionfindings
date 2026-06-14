@@ -385,6 +385,14 @@ flat Send-Kudos dialog. M7-R3 (e08c55c5) — HrDemoSeeder feed/kudos demo data (
 - **M8-3 Policies fixes.** *Problem:* `policies/show.tsx` reads `content`/`change_summary` the controller
   never persists (renders empty) + XSS via `dangerouslySetInnerHTML`; stats page-scoped. *Fix:* map real
   fields; sanitise/remove raw HTML; server-side totals. *Acceptance:* content renders; no XSS; correct totals.
+  - ✅ **DONE (b4dfe753):** root cause was deeper — show.tsx read `policy.currentVersion` (camelCase) but the
+    relation serialises `current_version` (snake_case, as index.tsx reads), so the WHOLE current-version section
+    (version badge, View/Download doc, summary) was dead. Plus the field is `content_summary` (not content/
+    change_summary), and it was piped through `dangerouslySetInnerHTML` (XSS on a plain-text textarea field).
+    Fixed all three: current_version + content_summary throughout; render summary as plain text (no HTML); card
+    shown only when a summary exists. Pure frontend (data was always persisted). 3 tests (PolicyShowContentTest:
+    payload ships content_summary, non-view 403, source guard that show.tsx has no dangerouslySetInnerHTML).
+    PolicyController already tenant-correct (ResolvesHrTenant). Stats deferred (low value).
 - **M8-4 Compensation hub + finish flows.** *Problem:* 5 disconnected comp pages, 1 nav entry; bonus create
   unreachable + `tenant_id=null`; `storeReview` redirects to a non-existent route name → exception; comp
   review approval flow missing (applyReview no-op). *Fix:* Compensation hub (`TabStrip`: Bands · Reviews ·
