@@ -5,6 +5,7 @@ namespace App\Domain\Finance\Models;
 use App\Models\Client;
 use App\Models\Concerns\AuditableChanges;
 use App\Models\User;
+use Database\Factories\Finance\FinInvoiceFactory;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -17,7 +18,7 @@ class FinInvoice extends Model
 
     protected static function newFactory()
     {
-        return \Database\Factories\Finance\FinInvoiceFactory::new();
+        return FinInvoiceFactory::new();
     }
 
     protected $table = 'fin_invoices';
@@ -105,5 +106,20 @@ class FinInvoice extends Model
     {
         return $query->where('due_date', '<', now())
             ->whereNotIn('status', ['paid', 'cancelled']);
+    }
+
+    /**
+     * Next sequential invoice number for an organisation (INV-00001).
+     */
+    public static function nextNumber(?int $orgId): string
+    {
+        $latest = static::forOrganization($orgId)
+            ->withTrashed()
+            ->orderBy('id', 'desc')
+            ->value('invoice_number');
+
+        $next = ($latest && preg_match('/INV-(\d+)$/', $latest, $m)) ? ((int) $m[1] + 1) : 1;
+
+        return 'INV-'.str_pad((string) $next, 5, '0', STR_PAD_LEFT);
     }
 }

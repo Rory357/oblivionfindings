@@ -511,18 +511,7 @@ class InvoiceController extends Controller
 
     private function generateInvoiceNumber(int $orgId): string
     {
-        $latest = FinInvoice::forOrganization($orgId)
-            ->withTrashed()
-            ->orderBy('id', 'desc')
-            ->value('invoice_number');
-
-        if ($latest && preg_match('/INV-(\d+)$/', $latest, $matches)) {
-            $next = (int) $matches[1] + 1;
-        } else {
-            $next = 1;
-        }
-
-        return 'INV-'.str_pad($next, 5, '0', STR_PAD_LEFT);
+        return FinInvoice::nextNumber($orgId);
     }
 
     private function clientOptions(?int $orgId)
