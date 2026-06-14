@@ -42,6 +42,7 @@ use App\Services\MedicationIncidentIntegrationService;
 use App\Services\MedicationOverviewService;
 use App\Services\MedicationRuleService;
 use App\Services\MedicationScanVerificationService;
+use App\Services\Operations\HandoverPresenter;
 use App\Services\ShiftHandoverService;
 use App\Services\UserSiteAccessService;
 use Carbon\Carbon;
@@ -2162,108 +2163,84 @@ class EmarController extends Controller
         $auth = $request->user();
         abort_unless($this->handoverService->canAccessWorkflow($auth), 403);
 
+        // The eMAR Handovers page is the medication-focused lens on the shared
+        // ShiftHandover workflow. It reuses the Operations HandoverPresenter so
+        // the payload matches the shared Handover/Catalogue contract consumed by
+        // the reused cards/rail/detail/wizard components — no second shape.
+        $presenter = app(HandoverPresenter::class);
+        $siteFilter = $request->integer('site_id') ?: null;
+
+        // Week (Mon–Sun) is the unit of navigation. Compute the window in the
+        // worker timezone, then query the UTC-stored columns with UTC bounds.
+        $tz = config('app.worker_timezone') ?: config('app.timezone', 'UTC');
+        $weekStart = $request->filled('week')
+            ? Carbon::parse((string) $request->input('week'), $tz)->startOfWeek(Carbon::MONDAY)
+            : Carbon::now($tz)->startOfWeek(Carbon::MONDAY);
+        $weekEnd = $weekStart->copy()->endOfWeek(Carbon::SUNDAY);
+        $startUtc = $weekStart->copy()->utc();
+        $endUtc = $weekEnd->copy()->utc();
+
+        $canViewAny = $this->handoverService->canViewAny($auth);
+
         $handovers = ShiftHandover::query()
-            ->when($auth->organization_id, fn ($query) => $query->where('organization_id', $auth->organization_id))
+            ->when($auth->organization_id, fn ($q) => $q->where('organization_id', $auth->organization_id))
             ->tap(fn ($query) => $this->siteAccess()->applyHandoverScope($query, $auth, $this->handoverBypassPermissions()))
-            ->with([
-                'client:id,first_name,last_name',
-                'outgoingShift:id,client_id,user_id,service_context_id,starts_at,ends_at,location,shift_type,is_sleepover,is_on_call,status',
-                'outgoingShift.staff:id,name',
-                'outgoingShift.serviceContext:id,name',
-                'incomingShift:id,user_id,starts_at,ends_at,status',
-                'incomingShift.staff:id,name',
-                'outgoingStaff:id,name',
-                'incomingStaff:id,name',
-                'acknowledger:id,name',
-            ])
-            ->when(! $this->handoverService->canViewAny($auth), function ($query) use ($auth) {
+            ->with($presenter->mapEagerLoads())
+            ->when($siteFilter, fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteFilter)))
+            ->where(function ($dateScope) use ($startUtc, $endUtc) {
+                $dateScope
+                    ->whereHas('outgoingShift', fn ($s) => $s->whereNotNull('starts_at')->whereBetween('starts_at', [$startUtc, $endUtc]))
+                    ->orWhere(fn ($noShift) => $noShift
+                        ->whereDoesntHave('outgoingShift', fn ($s) => $s->whereNotNull('starts_at'))
+                        ->whereBetween('created_at', [$startUtc, $endUtc]));
+            })
+            ->when(! $canViewAny, function ($query) use ($auth) {
                 $query->where(function ($nested) use ($auth) {
                     $nested->where('outgoing_staff_id', $auth->id)
-                        ->orWhere('incoming_staff_id', $auth->id)
-                        ->orWhereHas('outgoingShift', fn ($shiftQuery) => $shiftQuery->where('user_id', $auth->id))
-                        ->orWhereHas('incomingShift', fn ($shiftQuery) => $shiftQuery->where('user_id', $auth->id));
+                        ->orWhere(fn ($q) => $q->whereNull('incoming_shift_id')->where('incoming_staff_id', $auth->id))
+                        ->orWhereHas('outgoingShift', fn ($s) => $s->where('user_id', $auth->id))
+                        ->orWhereHas('incomingShift', fn ($s) => $s->where('user_id', $auth->id));
                 });
             })
-            ->latest('created_at')
-            ->paginate(25)
-            ->through(function (ShiftHandover $handover) use ($auth) {
-                $incomingStaff = $handover->incomingShift?->staff ?? $handover->incomingStaff;
-
-                return [
-                    'id' => $handover->id,
-                    'status' => $handover->status,
-                    'handover_notes' => $handover->handover_notes,
-                    'client_mood' => $handover->client_mood,
-                    'created_at' => $handover->created_at?->toIso8601String(),
-                    'submitted_at' => $handover->submitted_at?->toIso8601String(),
-                    'acknowledged_at' => $handover->acknowledged_at?->toIso8601String(),
-                    'client' => $handover->client ? [
-                        'id' => $handover->client->id,
-                        'name' => trim(($handover->client->first_name ?? '').' '.($handover->client->last_name ?? '')),
-                    ] : null,
-                    'outgoing_staff' => $handover->outgoingStaff ? [
-                        'id' => $handover->outgoingStaff->id,
-                        'name' => $handover->outgoingStaff->name,
-                    ] : null,
-                    'incoming_staff' => $incomingStaff ? [
-                        'id' => $incomingStaff->id,
-                        'name' => $incomingStaff->name,
-                    ] : null,
-                    'acknowledger' => $handover->acknowledger ? [
-                        'id' => $handover->acknowledger->id,
-                        'name' => $handover->acknowledger->name,
-                    ] : null,
-                    'outgoing_shift' => $handover->outgoingShift ? [
-                        'id' => $handover->outgoingShift->id,
-                        'starts_at' => $handover->outgoingShift->starts_at?->toIso8601String(),
-                        'ends_at' => $handover->outgoingShift->ends_at?->toIso8601String(),
-                        'location' => $handover->outgoingShift->location,
-                        'shift_type' => $handover->outgoingShift->shift_type,
-                        'service_context_name' => $handover->outgoingShift->serviceContext?->name,
-                    ] : null,
-                    'incoming_shift' => $handover->incomingShift ? [
-                        'id' => $handover->incomingShift->id,
-                        'starts_at' => $handover->incomingShift->starts_at?->toIso8601String(),
-                        'ends_at' => $handover->incomingShift->ends_at?->toIso8601String(),
-                    ] : null,
-                    'medications_due' => $this->stringifyStructuredItems($handover->medications_due),
-                    'follow_up_items' => $this->stringifyStructuredItems($handover->follow_up_items),
-                    'incidents_to_note' => $this->stringifyStructuredItems($handover->incidents_to_note),
-                    'tasks_pending' => $this->stringifyStructuredItems($handover->tasks_pending),
-                    'can_submit' => $this->handoverService->canSubmit($handover, $auth),
-                    'can_acknowledge' => $this->handoverService->canAcknowledge($handover, $auth),
-                    'can_edit' => $handover->status === ShiftHandoverService::STATUS_DRAFT
-                        && $this->handoverService->canSubmit($handover, $auth),
-                    'can_delete' => $handover->status === ShiftHandoverService::STATUS_DRAFT
-                        && $this->handoverService->canSubmit($handover, $auth),
-                ];
-            })
-            ->withQueryString();
-
-        $shifts = Shift::query()
-            ->with(['client:id,first_name,last_name', 'staff:id,name', 'serviceContext:id,name'])
-            ->whereBetween('starts_at', [now()->subDay(), now()->addDays(2)])
-            ->orderBy('starts_at')
-            ->limit(100)
+            ->orderByDesc('created_at')
+            ->limit(300)
             ->get()
-            ->map(fn (Shift $shift) => [
-                'id' => $shift->id,
-                'starts_at' => $shift->starts_at?->toISOString(),
-                'ends_at' => $shift->ends_at?->toISOString(),
-                'status' => $shift->status,
-                'shift_type' => $shift->shift_type ?? 'standard',
-                'is_sleepover' => (bool) $shift->is_sleepover,
-                'is_on_call' => (bool) $shift->is_on_call,
-                'location' => $shift->location,
-                'service_context_name' => $shift->serviceContext?->name,
-                'client_name' => trim(($shift->client?->first_name ?? '').' '.($shift->client?->last_name ?? '')),
-                'staff_name' => $shift->staff?->name,
-            ])
+            ->map(fn (ShiftHandover $handover) => $presenter->mapHandover($handover, $auth))
             ->values();
+
+        // Enrich the catalogue clients with their active medication orders so the
+        // wizard's "Medications due" step is MAR-bound (not free-hand) in eMAR.
+        $catalogue = $presenter->catalogue($auth);
+        $medsByClient = ClientMedication::query()
+            ->active()
+            ->whereIn('client_id', collect($catalogue['clients'])->pluck('id'))
+            ->orderBy('name')
+            ->get(['id', 'name', 'client_id'])
+            ->groupBy('client_id');
+        $catalogue['clients'] = collect($catalogue['clients'])->map(function ($client) use ($medsByClient) {
+            $client['medications'] = ($medsByClient[$client['id']] ?? collect())
+                ->map(fn ($m) => ['id' => $m->id, 'name' => $m->name])
+                ->values()
+                ->all();
+
+            return $client;
+        })->values()->all();
+
+        $activeSite = $siteFilter ? Site::find($siteFilter) : null;
 
         return Inertia::render('emar/Handovers', [
             'handovers' => $handovers,
-            'shifts' => $shifts,
+            'weekStart' => $weekStart->toDateString(),
+            'weekEnd' => $weekEnd->toDateString(),
+            'catalogue' => $catalogue,
+            'can' => [
+                'create' => $auth->canDo('handovers.create') || $auth->canDo('shifts.update') || $auth->canDo('shifts.manageAny'),
+                'manage' => $canViewAny || (bool) $auth->canDo('shifts.manageAny'),
+            ],
+            'currentUser' => ['id' => $auth->id, 'name' => $auth->name],
+            'sites' => Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'active_site' => $activeSite ? ['id' => $activeSite->id, 'name' => $activeSite->name] : null,
+            'site_brand_colour' => $activeSite?->brand_colour,
         ]);
     }
 

@@ -57,6 +57,10 @@ export type CatalogueClient = {
     last_name: string;
     service_context_id: number | null;
     site_id: number | null;
+    // eMAR medication-focused handovers enrich each client with their active
+    // medication orders so the wizard's meds step is MAR-bound (optional;
+    // Operations does not populate it).
+    medications?: { id: number; name: string }[];
 };
 export type CatalogueStaff = {
     id: number;

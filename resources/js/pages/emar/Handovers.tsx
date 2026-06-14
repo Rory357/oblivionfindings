@@ -1,989 +1,251 @@
-import PageShell from '@/components/page-shell';
-import { Badge } from '@/components/ui/badge';
+/* eslint-disable no-restricted-syntax -- the eMAR handovers hero + activity feed are custom-layout
+   bordered surfaces / chip buttons (not Card/Button); the cards/rail/detail/wizard are reused shared
+   components. All colours are semantic tokens. */
+import { AddClientDialog } from '@/components/clients/add-client-dialog';
+import { PageHero, type PageHeroStat } from '@/components/page';
+import { EntityFilter, TabStrip, type RosterTabItem } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
-import {
-    Dialog,
-    DialogContent,
-    DialogDescription,
-    DialogFooter,
-    DialogHeader,
-    DialogTitle,
-} from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { LaravelPagination } from '@/components/ui/laravel-pagination';
-import {
-    Select,
-    SelectContent,
-    SelectItem,
-    SelectTrigger,
-    SelectValue,
-} from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
-import { Head, router, useForm } from '@inertiajs/react';
-import {
-    ArrowLeftRight,
-    ArrowRightLeft,
-    CheckCircle2,
-    ClipboardList,
-    Clock3,
-    FilePenLine,
-    Pill,
-    Plus,
-    Trash2,
-    UserRoundCheck,
-} from 'lucide-react';
-import { useEffect, useMemo, useState } from 'react';
-
-type PaginationLink = {
-    url: string | null;
-    label: string;
-    active: boolean;
-};
-
-type ShiftOption = {
-    id: number;
-    starts_at: string | null;
-    ends_at: string | null;
-    status: string;
-    shift_type: string;
-    is_sleepover: boolean;
-    is_on_call: boolean;
-    location: string | null;
-    service_context_name: string | null;
-    client_name: string | null;
-    staff_name: string | null;
-};
-
-type HandoverShift = {
-    id: number;
-    starts_at: string | null;
-    ends_at: string | null;
-    location: string | null;
-    shift_type: string | null;
-    service_context_name: string | null;
-};
-
-type NamedPerson = {
-    id: number;
-    name: string;
-};
-
-type HandoverClient = {
-    id: number;
-    name: string;
-};
-
-type Handover = {
-    id: number;
-    status: string;
-    handover_notes: string;
-    client_mood: string | null;
-    created_at: string | null;
-    submitted_at: string | null;
-    acknowledged_at: string | null;
-    client: HandoverClient | null;
-    outgoing_staff: NamedPerson | null;
-    incoming_staff: NamedPerson | null;
-    acknowledger: NamedPerson | null;
-    outgoing_shift: HandoverShift | null;
-    incoming_shift: HandoverShift | null;
-    medications_due: string[];
-    follow_up_items: string[];
-    incidents_to_note: string[];
-    tasks_pending: string[];
-    can_submit: boolean;
-    can_acknowledge: boolean;
-    can_edit: boolean;
-    can_delete: boolean;
-};
+import { CardsView } from '@/pages/operations/handovers/components/cards-view';
+import { HandoverDetailDialog } from '@/pages/operations/handovers/components/handover-detail-dialog';
+import { HandoverRail } from '@/pages/operations/handovers/components/handover-rail';
+import { HandoverWizard } from '@/pages/operations/handovers/components/handover-wizard';
+import { clientName, ymd, type Catalogue, type Handover } from '@/pages/operations/handovers/components/shared';
+import { Head, router } from '@inertiajs/react';
+import { AlertTriangle, ArrowLeftRight, BellRing, CheckCircle2, ChevronLeft, ChevronRight, Clock3, FilePenLine, History, Layers, Pill, Plus, Search, Send, ShieldAlert } from 'lucide-react';
+import { useMemo, useState } from 'react';
+import { toast } from 'sonner';
 
 type Props = {
-    handovers: {
-        data: Handover[];
-        links: PaginationLink[];
-        meta?: {
-            total?: number;
-            last_page?: number;
-        };
-    };
-    shifts: ShiftOption[];
+    handovers: Handover[];
+    weekStart: string;
+    weekEnd: string;
+    catalogue: Catalogue;
+    can: { create: boolean; manage: boolean };
+    currentUser: { id: number; name: string };
+    sites: { id: number; name: string }[];
+    active_site: { id: number; name: string } | null;
+    site_brand_colour: string | null;
 };
 
-type FormState = {
-    shift_id: string;
-    incoming_shift_id: string;
-    handover_notes: string;
-    client_mood: string;
-    medications_due_text: string;
-    follow_up_items_text: string;
-    incidents_to_note_text: string;
-    tasks_pending_text: string;
-    submit: boolean;
+const fmtRange = (start: string, end: string) => {
+    const s = new Date(`${start}T00:00:00`);
+    const e = new Date(`${end}T00:00:00`);
+    const sM = s.toLocaleDateString('en-NZ', { month: 'short' });
+    const eM = e.toLocaleDateString('en-NZ', { month: 'short' });
+    return sM === eM ? `${s.getDate()} – ${e.getDate()} ${eM}` : `${s.getDate()} ${sM} – ${e.getDate()} ${eM}`;
 };
+const relative = (iso: string | null) => { if (!iso) return ''; const d = Math.floor((Date.now() - new Date(iso).getTime()) / 86400000); return d <= 0 ? 'today' : d === 1 ? 'yesterday' : `${d}d ago`; };
 
-function toMultiline(items: string[]): string {
-    return items.join('\n');
-}
+export default function Handovers({ handovers = [], weekStart, weekEnd, catalogue, can = { create: false, manage: false }, currentUser, sites, active_site: activeSite, site_brand_colour: brandColour }: Props) {
+    const weekStartDate = useMemo(() => new Date(`${weekStart}T00:00:00`), [weekStart]);
+    const [tab, setTab] = useState('all');
+    const [search, setSearch] = useState('');
+    const [siteFilter, setSiteFilter] = useState<number | null>(activeSite?.id ?? null);
+    const [wizardOpen, setWizardOpen] = useState(false);
+    const [editingId, setEditingId] = useState<number | null>(null);
+    const [detailId, setDetailId] = useState<number | null>(null);
+    const [addClientOpen, setAddClientOpen] = useState(false);
+    const [pendingClientId, setPendingClientId] = useState<number | null>(null);
 
-function buildFormState(handover: Handover | null): FormState {
-    return {
-        shift_id: handover?.outgoing_shift?.id
-            ? String(handover.outgoing_shift.id)
-            : '',
-        incoming_shift_id: handover?.incoming_shift?.id
-            ? String(handover.incoming_shift.id)
-            : '',
-        handover_notes: handover?.handover_notes ?? '',
-        client_mood: handover?.client_mood ?? '',
-        medications_due_text: toMultiline(handover?.medications_due ?? []),
-        follow_up_items_text: toMultiline(handover?.follow_up_items ?? []),
-        incidents_to_note_text: toMultiline(handover?.incidents_to_note ?? []),
-        tasks_pending_text: toMultiline(handover?.tasks_pending ?? []),
-        submit: true,
-    };
-}
+    const counts = useMemo(() => ({
+        total: handovers.length,
+        draft: handovers.filter((h) => h.status === 'draft').length,
+        submitted: handovers.filter((h) => h.status === 'submitted').length,
+        acknowledged: handovers.filter((h) => h.status === 'acknowledged').length,
+        openIncoming: handovers.filter((h) => h.incoming_staff == null).length,
+        needsAck: handovers.filter((h) => h.status === 'submitted' && h.incoming_staff?.id === currentUser?.id).length,
+        incidents: handovers.reduce((sum, h) => sum + (h.incidents_to_note?.length ?? 0), 0),
+    }), [handovers, currentUser]);
 
-function formatDateTime(value: string | null): string {
-    if (!value) {
-        return 'Not recorded';
-    }
+    const searched = useMemo(() => {
+        const q = search.trim().toLowerCase();
+        if (!q) return handovers;
+        return handovers.filter((h) => [h.handover_notes, clientName(h.client), h.outgoing_staff?.name, h.incoming_staff?.name, h.site?.name, h.client_mood, ...(h.medications_due ?? []), ...(h.incidents_to_note ?? [])].filter(Boolean).join(' ').toLowerCase().includes(q));
+    }, [handovers, search]);
 
-    return new Date(value).toLocaleString('en-NZ', {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-    });
-}
-
-function formatShiftTime(start: string | null, end: string | null): string {
-    if (!start) {
-        return 'Time not set';
-    }
-
-    const startLabel = new Date(start).toLocaleString('en-NZ', {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-    });
-
-    if (!end) {
-        return startLabel;
-    }
-
-    const endLabel = new Date(end).toLocaleString('en-NZ', {
-        dateStyle: 'medium',
-        timeStyle: 'short',
-    });
-
-    return `${startLabel} to ${endLabel}`;
-}
-
-function statusBadge(status: string) {
-    const label = status.charAt(0).toUpperCase() + status.slice(1);
-
-    switch (status) {
-        case 'acknowledged':
-            return (
-                <Badge className="bg-status-success-bg text-status-success">
-                    {label}
-                </Badge>
-            );
-        case 'submitted':
-            return (
-                <Badge className="bg-status-info-bg text-status-info">
-                    {label}
-                </Badge>
-            );
-        case 'draft':
-            return <Badge variant="secondary">{label}</Badge>;
-        default:
-            return <Badge variant="outline">{label}</Badge>;
-    }
-}
-
-function shiftLabel(shift: ShiftOption | HandoverShift | null): string {
-    if (!shift) {
-        return 'Shift not set';
-    }
-
-    const details = [
-        shift.shift_type ? shift.shift_type.replace(/_/g, ' ') : null,
-        shift.location ?? null,
-        shift.service_context_name ?? null,
-    ].filter(Boolean);
-
-    return `${formatShiftTime(shift.starts_at, shift.ends_at)}${details.length ? ` • ${details.join(' • ')}` : ''}`;
-}
-
-function ListSection({
-    title,
-    items,
-    emptyLabel,
-}: {
-    title: string;
-    items: string[];
-    emptyLabel: string;
-}) {
-    return (
-        <div className="space-y-2">
-            <div className="text-sm font-medium">{title}</div>
-            {items.length === 0 ? (
-                <div className="rounded-md border border-dashed px-3 py-2 text-sm text-muted-foreground">
-                    {emptyLabel}
-                </div>
-            ) : (
-                <div className="space-y-2">
-                    {items.map((item, index) => (
-                        <div
-                            key={`${title}-${index}`}
-                            className="rounded-md border bg-muted/20 px-3 py-2 text-sm"
-                        >
-                            {item}
-                        </div>
-                    ))}
-                </div>
-            )}
-        </div>
-    );
-}
-
-function HandoverDialog({
-    open,
-    onOpenChange,
-    editing,
-    shifts,
-}: {
-    open: boolean;
-    onOpenChange: (open: boolean) => void;
-    editing: Handover | null;
-    shifts: ShiftOption[];
-}) {
-    const form = useForm<FormState>(buildFormState(editing));
-
-    useEffect(() => {
-        if (!open) {
-            return;
+    const filtered = useMemo(() => {
+        switch (tab) {
+            case 'draft': return searched.filter((h) => h.status === 'draft');
+            case 'submitted': return searched.filter((h) => h.status === 'submitted');
+            case 'acknowledged': return searched.filter((h) => h.status === 'acknowledged');
+            case 'needs_ack': return searched.filter((h) => h.status === 'submitted' && h.incoming_staff?.id === currentUser?.id);
+            case 'open_incoming': return searched.filter((h) => h.incoming_staff == null);
+            default: return searched;
         }
+    }, [searched, tab, currentUser]);
 
-        form.setData(buildFormState(editing));
-        form.clearErrors();
-        // eslint-disable-next-line react-hooks/exhaustive-deps -- Inertia form helper is stable; hydrate only when the edited handover dialog opens.
-    }, [editing, open]);
-
-    const selectedShift = useMemo(
-        () =>
-            shifts.find((shift) => shift.id === Number(form.data.shift_id)) ??
-            null,
-        [form.data.shift_id, shifts],
-    );
-
-    const incomingShiftOptions = useMemo(() => {
-        if (!selectedShift) {
-            return shifts;
-        }
-
-        const matchingClient = shifts.filter(
-            (shift) =>
-                shift.id !== selectedShift.id &&
-                shift.client_name &&
-                selectedShift.client_name &&
-                shift.client_name === selectedShift.client_name &&
-                (shift.starts_at ?? '') >= (selectedShift.starts_at ?? ''),
-        );
-
-        if (matchingClient.length > 0) {
-            return matchingClient;
-        }
-
-        return shifts.filter((shift) => shift.id !== selectedShift.id);
-    }, [selectedShift, shifts]);
-
-    function closeDialog() {
-        onOpenChange(false);
-        form.reset();
-        form.clearErrors();
-    }
-
-    function submit(submitNow: boolean) {
-        const payload = {
-            shift_id: form.data.shift_id ? Number(form.data.shift_id) : null,
-            incoming_shift_id: form.data.incoming_shift_id
-                ? Number(form.data.incoming_shift_id)
-                : null,
-            handover_notes: form.data.handover_notes,
-            client_mood: form.data.client_mood || null,
-            medications_due_text: form.data.medications_due_text || null,
-            follow_up_items_text: form.data.follow_up_items_text || null,
-            incidents_to_note_text: form.data.incidents_to_note_text || null,
-            tasks_pending_text: form.data.tasks_pending_text || null,
-            submit: submitNow,
-        };
-
-        if (editing) {
-            router.put(`/emar/handovers/${editing.id}`, payload, {
-                preserveScroll: true,
-                onSuccess: closeDialog,
-            });
-
-            return;
-        }
-
-        router.post('/emar/handovers', payload, {
-            preserveScroll: true,
-            onSuccess: closeDialog,
+    const activity = useMemo(() => {
+        const items: { actor: string; verb: string; subject: string; at: string | null; icon: 'send' | 'ack' | 'draft' }[] = [];
+        handovers.forEach((h) => {
+            const subject = clientName(h.client);
+            if (h.acknowledged_at) items.push({ actor: h.acknowledger?.name ?? 'Incoming worker', verb: 'acknowledged the handover for', subject, at: h.acknowledged_at, icon: 'ack' });
+            if (h.submitted_at) items.push({ actor: h.outgoing_staff?.name ?? 'Outgoing worker', verb: 'submitted a handover for', subject, at: h.submitted_at, icon: 'send' });
+            if (h.status === 'draft' && h.created_at) items.push({ actor: h.outgoing_staff?.name ?? 'A worker', verb: 'started a draft handover for', subject, at: h.created_at, icon: 'draft' });
         });
-    }
+        return items.sort((a, b) => (b.at ?? '').localeCompare(a.at ?? '')).slice(0, 40);
+    }, [handovers]);
+
+    const detailHandover = detailId != null ? (handovers.find((h) => h.id === detailId) ?? null) : null;
+    const editingHandover = editingId != null ? (handovers.find((h) => h.id === editingId) ?? null) : null;
+    const firstName = currentUser?.name?.split(' ')?.[0] ?? 'team';
+
+    const goWeek = (week: Date) => { const target = ymd(week); if (target === weekStart) return; router.get('/emar/handovers', { week: target, ...(siteFilter ? { site_id: siteFilter } : {}) }, { preserveState: true, preserveScroll: true }); };
+    const stepWeek = (delta: number) => { const d = new Date(weekStartDate); d.setDate(d.getDate() + delta * 7); goWeek(d); };
+    const onSite = (id: number | null) => { setSiteFilter(id); router.get('/emar/handovers', { week: weekStart, ...(id ? { site_id: id } : {}) }, { preserveState: true, preserveScroll: true }); };
+
+    const openNew = () => { setEditingId(null); setPendingClientId(null); setWizardOpen(true); };
+    const openEdit = (h: Handover) => { setDetailId(null); setEditingId(h.id); setWizardOpen(true); };
+    const closeWizard = () => { setWizardOpen(false); setEditingId(null); setPendingClientId(null); };
+    const submitHandover = (h: Handover) => router.post(`/emar/handovers/${h.id}/submit`, {}, { preserveScroll: true, onSuccess: () => toast.success('Draft submitted to incoming worker') });
+    const acknowledgeHandover = (h: Handover) => router.post(`/emar/handovers/${h.id}/acknowledge`, {}, { preserveScroll: true, onSuccess: () => toast.success(`Handover for ${clientName(h.client)} acknowledged`) });
+    const handlers = { onOpen: (h: Handover) => setDetailId(h.id), onSubmit: submitHandover, onAcknowledge: acknowledgeHandover };
+
+    const TABS: RosterTabItem[] = [
+        { id: 'all', label: 'All', icon: Layers, tone: 'primary', badge: counts.total || undefined },
+        { id: 'draft', label: 'Drafts', icon: FilePenLine, tone: 'warning', badge: counts.draft || undefined },
+        { id: 'submitted', label: 'Submitted', icon: Clock3, tone: 'info', badge: counts.submitted || undefined },
+        { id: 'acknowledged', label: 'Acknowledged', icon: CheckCircle2, tone: 'success', badge: counts.acknowledged || undefined },
+        { id: 'needs_ack', label: 'Needs acknowledgement', icon: BellRing, tone: 'warning', badge: counts.needsAck || undefined },
+        { id: 'open_incoming', label: 'Open incoming', icon: ShieldAlert, tone: 'critical', badge: counts.openIncoming || undefined },
+        { id: 'activity', label: 'Activity', icon: History, tone: 'info' },
+    ];
+    const heroStats: PageHeroStat[] = [
+        { label: 'Total', value: counts.total },
+        { label: 'Submitted', value: counts.submitted },
+        { label: "Ack'd", value: counts.acknowledged },
+        { label: 'Open', value: counts.openIncoming, tone: counts.openIncoming > 0 ? 'critical' : 'neutral' },
+    ];
 
     return (
-        <Dialog open={open} onOpenChange={onOpenChange}>
-            <DialogContent className="max-h-[90vh] max-w-3xl overflow-y-auto">
-                <DialogHeader>
-                    <DialogTitle className="flex items-center gap-2">
-                        <ArrowRightLeft className="h-5 w-5" />
-                        {editing
-                            ? 'Edit Medication Handover'
-                            : 'New Medication Handover'}
-                    </DialogTitle>
-                    <DialogDescription>
-                        Capture medication-critical notes on the shared shift
-                        handover record so operations, eMAR, and alerts stay
-                        aligned.
-                    </DialogDescription>
-                </DialogHeader>
-
-                <div className="space-y-5">
-                    <div className="space-y-2">
-                        <Label htmlFor="handover_shift_id">
-                            Outgoing shift
-                        </Label>
-                        {editing ? (
-                            <div className="rounded-md border bg-muted/20 px-3 py-2 text-sm">
-                                {selectedShift
-                                    ? `${selectedShift.client_name || 'Unassigned client'} • ${shiftLabel(selectedShift)}`
-                                    : 'Shift not found'}
-                            </div>
-                        ) : (
-                            <>
-                                <Select
-                                    value={form.data.shift_id}
-                                    onValueChange={(value) =>
-                                        form.setData((current) => ({
-                                            ...current,
-                                            shift_id: value,
-                                            incoming_shift_id:
-                                                current.incoming_shift_id ===
-                                                value
-                                                    ? ''
-                                                    : current.incoming_shift_id,
-                                        }))
-                                    }
-                                >
-                                    <SelectTrigger id="handover_shift_id">
-                                        <SelectValue placeholder="Select outgoing shift" />
-                                    </SelectTrigger>
-                                    <SelectContent>
-                                        {shifts.map((shift) => (
-                                            <SelectItem
-                                                key={shift.id}
-                                                value={String(shift.id)}
-                                            >
-                                                {shift.client_name ||
-                                                    'Unassigned client'}{' '}
-                                                •{' '}
-                                                {shift.staff_name ||
-                                                    'Unassigned staff'}
-                                            </SelectItem>
-                                        ))}
-                                    </SelectContent>
-                                </Select>
-                                {form.errors.shift_id ? (
-                                    <div className="text-xs text-status-critical">
-                                        {form.errors.shift_id}
-                                    </div>
-                                ) : null}
-                            </>
-                        )}
-                        {selectedShift ? (
-                            <div className="text-xs text-muted-foreground">
-                                {shiftLabel(selectedShift)}
-                            </div>
-                        ) : null}
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="handover_incoming_shift_id">
-                            Incoming shift
-                        </Label>
-                        <Select
-                            value={form.data.incoming_shift_id || 'auto'}
-                            onValueChange={(value) =>
-                                form.setData(
-                                    'incoming_shift_id',
-                                    value === 'auto' ? '' : value,
-                                )
-                            }
-                        >
-                            <SelectTrigger id="handover_incoming_shift_id">
-                                <SelectValue placeholder="Select incoming shift or leave automatic" />
-                            </SelectTrigger>
-                            <SelectContent>
-                                <SelectItem value="auto">
-                                    Let the shared handover workflow infer it
-                                </SelectItem>
-                                {incomingShiftOptions.map((shift) => (
-                                    <SelectItem
-                                        key={shift.id}
-                                        value={String(shift.id)}
-                                    >
-                                        {shift.client_name ||
-                                            'Unassigned client'}{' '}
-                                        •{' '}
-                                        {shift.staff_name || 'Unassigned staff'}
-                                    </SelectItem>
-                                ))}
-                            </SelectContent>
-                        </Select>
-                        {form.errors.incoming_shift_id ? (
-                            <div className="text-xs text-status-critical">
-                                {form.errors.incoming_shift_id}
-                            </div>
-                        ) : null}
-                    </div>
-
-                    <div className="grid gap-4 md:grid-cols-2">
-                        <div className="space-y-2">
-                            <Label htmlFor="handover_client_mood">
-                                Client presentation / mood
-                            </Label>
-                            <Input
-                                id="handover_client_mood"
-                                value={form.data.client_mood}
-                                onChange={(event) =>
-                                    form.setData(
-                                        'client_mood',
-                                        event.target.value,
-                                    )
-                                }
-                                placeholder="Settled, anxious, sleepy, escalating..."
-                            />
-                            {form.errors.client_mood ? (
-                                <div className="text-xs text-status-critical">
-                                    {form.errors.client_mood}
-                                </div>
-                            ) : null}
-                        </div>
-
-                        <div className="rounded-md border bg-muted/20 p-3 text-sm text-muted-foreground">
-                            Save a draft if you need to come back to it. Submit
-                            once the medication handover is ready for the
-                            incoming shift to review.
-                        </div>
-                    </div>
-
-                    <div className="space-y-2">
-                        <Label htmlFor="handover_notes">
-                            Medication handover notes
-                        </Label>
-                        <Textarea
-                            id="handover_notes"
-                            value={form.data.handover_notes}
-                            onChange={(event) =>
-                                form.setData(
-                                    'handover_notes',
-                                    event.target.value,
-                                )
-                            }
-                            placeholder="Summarise changes, issues, risks, and anything the next shift must know."
-                            className="min-h-[130px]"
-                        />
-                        {form.errors.handover_notes ? (
-                            <div className="text-xs text-status-critical">
-                                {form.errors.handover_notes}
-                            </div>
-                        ) : null}
-                    </div>
-
-                    <div className="grid gap-4 md:grid-cols-2">
-                        <div className="space-y-2">
-                            <Label htmlFor="medications_due_text">
-                                Medications still due
-                            </Label>
-                            <Textarea
-                                id="medications_due_text"
-                                value={form.data.medications_due_text}
-                                onChange={(event) =>
-                                    form.setData(
-                                        'medications_due_text',
-                                        event.target.value,
-                                    )
-                                }
-                                placeholder="One item per line"
-                                className="min-h-[110px]"
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="follow_up_items_text">
-                                Follow-up items
-                            </Label>
-                            <Textarea
-                                id="follow_up_items_text"
-                                value={form.data.follow_up_items_text}
-                                onChange={(event) =>
-                                    form.setData(
-                                        'follow_up_items_text',
-                                        event.target.value,
-                                    )
-                                }
-                                placeholder="One item per line"
-                                className="min-h-[110px]"
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="incidents_to_note_text">
-                                Incidents and exceptions to note
-                            </Label>
-                            <Textarea
-                                id="incidents_to_note_text"
-                                value={form.data.incidents_to_note_text}
-                                onChange={(event) =>
-                                    form.setData(
-                                        'incidents_to_note_text',
-                                        event.target.value,
-                                    )
-                                }
-                                placeholder="One item per line"
-                                className="min-h-[110px]"
-                            />
-                        </div>
-
-                        <div className="space-y-2">
-                            <Label htmlFor="tasks_pending_text">
-                                Medication tasks still pending
-                            </Label>
-                            <Textarea
-                                id="tasks_pending_text"
-                                value={form.data.tasks_pending_text}
-                                onChange={(event) =>
-                                    form.setData(
-                                        'tasks_pending_text',
-                                        event.target.value,
-                                    )
-                                }
-                                placeholder="One item per line"
-                                className="min-h-[110px]"
-                            />
-                        </div>
-                    </div>
-                </div>
-
-                <DialogFooter className="gap-2">
-                    <Button
-                        type="button"
-                        variant="outline"
-                        onClick={closeDialog}
-                        disabled={form.processing}
-                    >
-                        Cancel
-                    </Button>
-                    <Button
-                        type="button"
-                        variant="secondary"
-                        onClick={() => submit(false)}
-                        disabled={form.processing}
-                    >
-                        {form.processing ? 'Saving...' : 'Save Draft'}
-                    </Button>
-                    <Button
-                        type="button"
-                        onClick={() => submit(true)}
-                        disabled={form.processing}
-                    >
-                        {form.processing ? 'Submitting...' : 'Submit Handover'}
-                    </Button>
-                </DialogFooter>
-            </DialogContent>
-        </Dialog>
-    );
-}
-
-export default function Handovers({ handovers, shifts }: Props) {
-    const [dialogOpen, setDialogOpen] = useState(false);
-    const [editing, setEditing] = useState<Handover | null>(null);
-
-    const totals = useMemo(
-        () =>
-            handovers.data.reduce(
-                (summary, handover) => {
-                    summary.total += 1;
-
-                    if (handover.status === 'draft') {
-                        summary.draft += 1;
-                    } else if (handover.status === 'submitted') {
-                        summary.submitted += 1;
-                    } else if (handover.status === 'acknowledged') {
-                        summary.acknowledged += 1;
+        <AppLayout breadcrumbs={[{ title: 'eMAR', href: '/emar' }, { title: 'Handovers', href: '/emar/handovers' }]}>
+            <Head title="eMAR - Medication Handovers" />
+            <div className="flex flex-col gap-6 p-6">
+                <PageHero
+                    variant="hero"
+                    category="ops"
+                    brandColour={brandColour}
+                    icon={ArrowLeftRight}
+                    title={
+                        <span>
+                            <span className="flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-wide text-primary-foreground/80">
+                                <span aria-hidden className="relative inline-flex h-2 w-2">
+                                    <span className="absolute inset-0 animate-ping rounded-full bg-status-success/70" />
+                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success" />
+                                </span>
+                                Live handovers · synced
+                            </span>
+                            <span className="mt-1 block text-[26px] font-bold leading-tight">
+                                Kia ora {firstName}, this week's medication handovers —{' '}
+                                <span className="border-b-2 border-primary-foreground/40">{fmtRange(weekStart, weekEnd)}</span>
+                            </span>
+                        </span>
                     }
-
-                    return summary;
-                },
-                {
-                    total: 0,
-                    draft: 0,
-                    submitted: 0,
-                    acknowledged: 0,
-                },
-            ),
-        [handovers.data],
-    );
-
-    function openCreateDialog() {
-        setEditing(null);
-        setDialogOpen(true);
-    }
-
-    function openEditDialog(handover: Handover) {
-        setEditing(handover);
-        setDialogOpen(true);
-    }
-
-    function submitHandover(handoverId: number) {
-        router.post(
-            `/emar/handovers/${handoverId}/submit`,
-            {},
-            { preserveScroll: true },
-        );
-    }
-
-    function acknowledgeHandover(handoverId: number) {
-        router.post(
-            `/emar/handovers/${handoverId}/acknowledge`,
-            {},
-            { preserveScroll: true },
-        );
-    }
-
-    function deleteHandover(handoverId: number) {
-        if (!window.confirm('Delete this medication handover draft?')) {
-            return;
-        }
-
-        router.delete(`/emar/handovers/${handoverId}`, {
-            preserveScroll: true,
-        });
-    }
-
-    return (
-        <AppLayout>
-            <Head title="eMAR - Handovers" />
-            <PageHero
-                icon={ArrowLeftRight}
-                title="Medication Handovers"
-                description="Medication-focused handover notes now run on the shared shift handover workflow so incoming teams, operations, and eMAR stay in sync."
-                stats={[
-                    { label: 'Total', value: totals.total },
-                    { label: 'Drafts', value: totals.draft },
-                    { label: 'Submitted', value: totals.submitted },
-                    { label: 'Acknowledged', value: totals.acknowledged },
-                ]}
-                actions={
-                    <Button
-                        onClick={openCreateDialog}
-                        disabled={shifts.length === 0}
-                    >
-                        <Plus className="mr-2 h-4 w-4" />
-                        New Handover
-                    </Button>
-                }
-            />
-            <PageShell>
-                <div className="grid gap-4 md:grid-cols-4">
-                    <Card>
-                        <CardContent className="flex items-center gap-3 p-4">
-                            <ArrowRightLeft className="h-8 w-8 text-status-info" />
-                            <div>
-                                <div className="text-sm text-muted-foreground">
-                                    This Page
-                                </div>
-                                <div className="text-2xl font-semibold">
-                                    {totals.total}
-                                </div>
+                    description={`${counts.total} handover${counts.total === 1 ? '' : 's'} this week. ${counts.needsAck} awaiting your acknowledgement, ${counts.openIncoming} with an open incoming shift.`}
+                    stats={heroStats}
+                    actions={
+                        can.create ? (
+                            <Button className="bg-primary-foreground text-primary hover:bg-primary-foreground/90" onClick={openNew}>
+                                <Plus className="h-4 w-4" />
+                                New handover
+                            </Button>
+                        ) : undefined
+                    }
+                    footer={
+                        <div className="flex flex-col gap-3 py-3 lg:flex-row lg:items-center lg:justify-between">
+                            <div className="flex items-center gap-2">
+                                <button onClick={() => stepWeek(-1)} className="rounded-full border border-primary-foreground/20 bg-primary-foreground/10 p-1.5 text-primary-foreground hover:bg-primary-foreground/20"><ChevronLeft className="h-3.5 w-3.5" /></button>
+                                <span className="rounded-full border border-primary-foreground/30 bg-primary-foreground/15 px-3 py-1 text-xs font-medium text-primary-foreground">Wk · {fmtRange(weekStart, weekEnd)}</span>
+                                <button onClick={() => stepWeek(1)} className="rounded-full border border-primary-foreground/20 bg-primary-foreground/10 p-1.5 text-primary-foreground hover:bg-primary-foreground/20"><ChevronRight className="h-3.5 w-3.5" /></button>
                             </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-3 p-4">
-                            <FilePenLine className="h-8 w-8 text-status-warning" />
-                            <div>
-                                <div className="text-sm text-muted-foreground">
-                                    Drafts
+                            <div className="flex flex-wrap items-center gap-2">
+                                <div className="flex items-center gap-2 rounded-full bg-primary-foreground px-3 py-1.5">
+                                    <Search className="h-3.5 w-3.5 text-muted-foreground" />
+                                    <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search client, staff or note…" className="w-52 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground" />
                                 </div>
-                                <div className="text-2xl font-semibold">
-                                    {totals.draft}
-                                </div>
+                                {sites.length > 0 && <EntityFilter label="Site" allLabel="All sites" items={sites} value={siteFilter} onChange={onSite} onDark />}
                             </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-3 p-4">
-                            <Clock3 className="h-8 w-8 text-status-info" />
-                            <div>
-                                <div className="text-sm text-muted-foreground">
-                                    Submitted
-                                </div>
-                                <div className="text-2xl font-semibold">
-                                    {totals.submitted}
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                    <Card>
-                        <CardContent className="flex items-center gap-3 p-4">
-                            <CheckCircle2 className="h-8 w-8 text-status-success" />
-                            <div>
-                                <div className="text-sm text-muted-foreground">
-                                    Acknowledged
-                                </div>
-                                <div className="text-2xl font-semibold">
-                                    {totals.acknowledged}
-                                </div>
-                            </div>
-                        </CardContent>
-                    </Card>
-                </div>
-
-                {shifts.length === 0 ? (
-                    <Card>
-                        <CardContent className="py-12 text-center">
-                            <ArrowRightLeft className="mx-auto mb-3 h-10 w-10 text-muted-foreground/30" />
-                            <div className="text-lg font-medium">
-                                No recent shifts available
-                            </div>
-                            <div className="mt-2 text-sm text-muted-foreground">
-                                As soon as shifts are available in the shared
-                                operations workflow, medication handovers can be
-                                created from here.
-                            </div>
-                        </CardContent>
-                    </Card>
-                ) : null}
-
-                <div className="space-y-4">
-                    {handovers.data.length === 0 ? (
-                        <Card>
-                            <CardContent className="py-14 text-center">
-                                <Pill className="mx-auto mb-3 h-10 w-10 text-muted-foreground/30" />
-                                <div className="text-lg font-medium">
-                                    No medication handovers yet
-                                </div>
-                                <div className="mt-2 text-sm text-muted-foreground">
-                                    Create the first medication handover to
-                                    capture due medicines, exceptions, and
-                                    follow-up tasks for the next shift.
-                                </div>
-                            </CardContent>
-                        </Card>
-                    ) : (
-                        handovers.data.map((handover) => (
-                            <Card key={handover.id}>
-                                <CardHeader className="gap-4">
-                                    <div className="flex flex-col gap-3 lg:flex-row lg:items-start lg:justify-between">
-                                        <div className="space-y-2">
-                                            <div className="flex flex-wrap items-center gap-2">
-                                                <CardTitle className="text-lg">
-                                                    {handover.client?.name ??
-                                                        'Medication handover'}
-                                                </CardTitle>
-                                                {statusBadge(handover.status)}
-                                            </div>
-                                            <div className="text-sm text-muted-foreground">
-                                                Outgoing shift:{' '}
-                                                {shiftLabel(
-                                                    handover.outgoing_shift,
-                                                )}
-                                            </div>
-                                            <div className="text-sm text-muted-foreground">
-                                                Incoming shift:{' '}
-                                                {handover.incoming_shift
-                                                    ? shiftLabel(
-                                                          handover.incoming_shift,
-                                                      )
-                                                    : 'Will be inferred by the shared shift workflow'}
-                                            </div>
-                                        </div>
-
-                                        <div className="flex flex-wrap gap-2">
-                                            {handover.can_edit ? (
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() =>
-                                                        openEditDialog(handover)
-                                                    }
-                                                >
-                                                    <FilePenLine className="mr-1.5 h-4 w-4" />
-                                                    Edit Draft
-                                                </Button>
-                                            ) : null}
-                                            {handover.can_submit ? (
-                                                <Button
-                                                    size="sm"
-                                                    onClick={() =>
-                                                        submitHandover(
-                                                            handover.id,
-                                                        )
-                                                    }
-                                                >
-                                                    Submit
-                                                </Button>
-                                            ) : null}
-                                            {handover.can_acknowledge ? (
-                                                <Button
-                                                    variant="secondary"
-                                                    size="sm"
-                                                    onClick={() =>
-                                                        acknowledgeHandover(
-                                                            handover.id,
-                                                        )
-                                                    }
-                                                >
-                                                    <UserRoundCheck className="mr-1.5 h-4 w-4" />
-                                                    Acknowledge
-                                                </Button>
-                                            ) : null}
-                                            {handover.can_delete ? (
-                                                <Button
-                                                    variant="outline"
-                                                    size="sm"
-                                                    onClick={() =>
-                                                        deleteHandover(
-                                                            handover.id,
-                                                        )
-                                                    }
-                                                >
-                                                    <Trash2 className="mr-1.5 h-4 w-4" />
-                                                    Delete
-                                                </Button>
-                                            ) : null}
-                                        </div>
-                                    </div>
-                                </CardHeader>
-
-                                <CardContent className="space-y-5">
-                                    <div className="grid gap-3 md:grid-cols-2 xl:grid-cols-4">
-                                        <div className="rounded-md border bg-muted/20 p-3">
-                                            <div className="text-xs tracking-wide text-muted-foreground uppercase">
-                                                Outgoing Staff
-                                            </div>
-                                            <div className="mt-1 text-sm font-medium">
-                                                {handover.outgoing_staff
-                                                    ?.name ?? 'Not set'}
-                                            </div>
-                                        </div>
-                                        <div className="rounded-md border bg-muted/20 p-3">
-                                            <div className="text-xs tracking-wide text-muted-foreground uppercase">
-                                                Incoming Staff
-                                            </div>
-                                            <div className="mt-1 text-sm font-medium">
-                                                {handover.incoming_staff
-                                                    ?.name ?? 'Not set'}
-                                            </div>
-                                        </div>
-                                        <div className="rounded-md border bg-muted/20 p-3">
-                                            <div className="text-xs tracking-wide text-muted-foreground uppercase">
-                                                Submitted
-                                            </div>
-                                            <div className="mt-1 text-sm font-medium">
-                                                {formatDateTime(
-                                                    handover.submitted_at,
-                                                )}
-                                            </div>
-                                        </div>
-                                        <div className="rounded-md border bg-muted/20 p-3">
-                                            <div className="text-xs tracking-wide text-muted-foreground uppercase">
-                                                Acknowledged
-                                            </div>
-                                            <div className="mt-1 text-sm font-medium">
-                                                {handover.acknowledger?.name
-                                                    ? `${handover.acknowledger.name} • ${formatDateTime(
-                                                          handover.acknowledged_at,
-                                                      )}`
-                                                    : formatDateTime(
-                                                          handover.acknowledged_at,
-                                                      )}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid gap-4 lg:grid-cols-[1.6fr_1fr]">
-                                        <div className="space-y-3">
-                                            <div className="flex items-center gap-2">
-                                                <ClipboardList className="h-4 w-4 text-muted-foreground" />
-                                                <div className="font-medium">
-                                                    Medication notes
-                                                </div>
-                                            </div>
-                                            <div className="rounded-md border p-4 text-sm leading-6">
-                                                {handover.handover_notes}
-                                            </div>
-                                        </div>
-
-                                        <div className="space-y-3">
-                                            <div className="flex items-center gap-2">
-                                                <Pill className="h-4 w-4 text-muted-foreground" />
-                                                <div className="font-medium">
-                                                    Client presentation
-                                                </div>
-                                            </div>
-                                            <div className="rounded-md border p-4 text-sm">
-                                                {handover.client_mood ||
-                                                    'No client presentation note recorded.'}
-                                            </div>
-                                        </div>
-                                    </div>
-
-                                    <div className="grid gap-4 xl:grid-cols-2">
-                                        <ListSection
-                                            title="Medications Due"
-                                            items={handover.medications_due}
-                                            emptyLabel="No due medications were listed."
-                                        />
-                                        <ListSection
-                                            title="Follow-up Items"
-                                            items={handover.follow_up_items}
-                                            emptyLabel="No follow-up items were listed."
-                                        />
-                                        <ListSection
-                                            title="Incidents To Note"
-                                            items={handover.incidents_to_note}
-                                            emptyLabel="No incidents or medication exceptions were listed."
-                                        />
-                                        <ListSection
-                                            title="Tasks Pending"
-                                            items={handover.tasks_pending}
-                                            emptyLabel="No pending medication tasks were listed."
-                                        />
-                                    </div>
-                                </CardContent>
-                            </Card>
-                        ))
-                    )}
-                </div>
-
-                <LaravelPagination
-                    links={handovers.links}
-                    lastPage={handovers.meta?.last_page}
+                        </div>
+                    }
                 />
-            </PageShell>
 
-            <HandoverDialog
-                open={dialogOpen}
-                onOpenChange={setDialogOpen}
-                editing={editing}
-                shifts={shifts}
+                {counts.needsAck > 0 && (
+                    <div className="flex items-center justify-between gap-3 rounded-xl border border-status-warning/30 bg-status-warning-bg/60 px-4 py-3">
+                        <span className="flex items-center gap-2 text-sm font-medium text-status-warning"><BellRing className="h-4 w-4" />{counts.needsAck} handover{counts.needsAck === 1 ? '' : 's'} awaiting your read-back acknowledgement.</span>
+                        <Button size="sm" variant="outline" onClick={() => setTab('needs_ack')}>Review</Button>
+                    </div>
+                )}
+
+                <TabStrip value={tab} onChange={setTab} items={TABS} ariaLabel="Handover views" />
+
+                {tab === 'activity' ? (
+                    <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+                        {activity.length === 0 ? <div className="px-5 py-12 text-center text-sm text-muted-foreground">No handover activity this week.</div> : (
+                            <div className="flex flex-col">
+                                {activity.map((e, i) => (
+                                    <div key={i} className="flex items-center gap-3 border-b px-4 py-3 last:border-b-0">
+                                        <span className={`flex h-8 w-8 items-center justify-center rounded-lg ${e.icon === 'ack' ? 'bg-status-success-bg text-status-success' : e.icon === 'send' ? 'bg-status-info-bg text-status-info' : 'bg-muted text-muted-foreground'}`}>
+                                            {e.icon === 'ack' ? <CheckCircle2 className="h-4 w-4" /> : e.icon === 'send' ? <Send className="h-4 w-4" /> : <FilePenLine className="h-4 w-4" />}
+                                        </span>
+                                        <div className="flex-1 text-sm"><span className="font-medium">{e.actor}</span> {e.verb} <span className="font-medium">{e.subject}</span></div>
+                                        <span className="text-xs text-muted-foreground">{relative(e.at)}</span>
+                                    </div>
+                                ))}
+                            </div>
+                        )}
+                    </div>
+                ) : (
+                    <div className="grid gap-5 lg:grid-cols-[minmax(0,1fr)_300px]">
+                        <main className="min-w-0">
+                            {filtered.length === 0 ? (
+                                <div className="rounded-2xl border border-dashed bg-card px-5 py-16 text-center">
+                                    <Pill className="mx-auto mb-3 h-8 w-8 text-muted-foreground/40" />
+                                    <div className="text-sm font-medium">No handovers in this view</div>
+                                    <div className="mt-1 text-sm text-muted-foreground">{can.create ? 'Create a medication handover to get started.' : 'Nothing matches the current filters.'}</div>
+                                    {can.create && <Button className="mt-4" size="sm" onClick={openNew}><Plus className="h-4 w-4" />New handover</Button>}
+                                </div>
+                            ) : (
+                                <CardsView handovers={filtered} {...handlers} />
+                            )}
+                        </main>
+                        <HandoverRail handovers={handovers} counts={counts} weekStart={weekStartDate} onOpen={(h) => setDetailId(h.id)} />
+                    </div>
+                )}
+            </div>
+
+            <HandoverDetailDialog
+                handover={detailHandover}
+                open={detailId != null}
+                onOpenChange={(open) => !open && setDetailId(null)}
+                onEdit={openEdit}
+                onSubmit={submitHandover}
+                onAcknowledge={acknowledgeHandover}
+            />
+
+            {wizardOpen && (
+                <HandoverWizard
+                    open={wizardOpen}
+                    onOpenChange={(open) => (open ? null : closeWizard())}
+                    editing={editingHandover}
+                    catalogue={catalogue}
+                    currentUser={currentUser}
+                    preselectClientId={pendingClientId}
+                    onAddClient={() => setAddClientOpen(true)}
+                    onSubmitted={(week) => goWeek(week)}
+                    basePath="/emar/handovers"
+                    medicationFocus
+                />
+            )}
+
+            <AddClientDialog
+                isOpen={addClientOpen}
+                onClose={() => setAddClientOpen(false)}
+                sites={catalogue.sites}
+                serviceContexts={catalogue.serviceContexts.map((s) => ({ id: s.id, name: s.name, type: s.type ?? undefined }))}
+                keyWorkers={catalogue.staff.map((s) => ({ id: s.id, name: s.name }))}
+                geofences={[]}
+                defaultServiceContextId={catalogue.serviceContexts[0]?.id ?? null}
+                onSaved={(id) => { setAddClientOpen(false); router.reload({ only: ['catalogue'], onSuccess: () => setPendingClientId(id) }); }}
             />
         </AppLayout>
     );

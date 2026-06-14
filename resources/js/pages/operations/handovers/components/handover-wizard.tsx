@@ -266,6 +266,8 @@ export function HandoverWizard({
     preselectClientId,
     onAddClient,
     onSubmitted,
+    basePath = '/operations/handovers',
+    medicationFocus = false,
 }: {
     open: boolean;
     onOpenChange: (open: boolean) => void;
@@ -275,6 +277,11 @@ export function HandoverWizard({
     preselectClientId: number | null;
     onAddClient: () => void;
     onSubmitted: (weekStart: Date) => void;
+    // eMAR reuse: post to the medication-handover endpoints and bind the meds
+    // step to the client's active medication orders. Defaults preserve the
+    // Operations behaviour.
+    basePath?: string;
+    medicationFocus?: boolean;
 }) {
     const [stepIndex, setStepIndex] = useState(0);
     const [f, setF] = useState<WizForm>(emptyForm);
@@ -460,10 +467,10 @@ export function HandoverWizard({
         };
 
         if (editing) {
-            router.put(`/operations/handovers/${editing.id}`, payload, opts);
+            router.put(`${basePath}/${editing.id}`, payload, opts);
         } else {
             router.post(
-                '/operations/handovers',
+                basePath,
                 { shift_id: Number(f.outgoing_shift), ...payload },
                 opts,
             );
@@ -889,16 +896,40 @@ export function HandoverWizard({
                                     blurb="Add discrete items — they appear as checklists for the incoming worker."
                                 />
                                 <div className="grid gap-4 lg:grid-cols-2">
-                                    <ListBuilder
-                                        icon={Pill}
-                                        tone="critical"
-                                        title="Medications due"
-                                        placeholder="e.g. Quetiapine 25mg — due 20:00"
-                                        items={f.medications}
-                                        onChange={(v) =>
-                                            set('medications', v)
-                                        }
-                                    />
+                                    <div className="space-y-2">
+                                        {medicationFocus && (
+                                            <div className="rounded-xl border border-border bg-card p-3">
+                                                <div className="mb-1.5 flex items-center gap-2 text-[13px] font-semibold">
+                                                    <span className="flex h-6 w-6 items-center justify-center rounded-md bg-status-critical-bg text-status-critical"><Pill className="h-3.5 w-3.5" /></span>
+                                                    Add from medication orders
+                                                </div>
+                                                <select
+                                                    className={SELECT_CLASS}
+                                                    value=""
+                                                    disabled={!client}
+                                                    onChange={(e) => {
+                                                        const name = e.target.value;
+                                                        if (name && !f.medications.includes(name)) set('medications', [...f.medications, name]);
+                                                    }}
+                                                >
+                                                    <option value="">{client ? 'Pulled from active medication orders…' : 'Select a client first'}</option>
+                                                    {(client?.medications ?? [])
+                                                        .filter((m) => !f.medications.includes(m.name))
+                                                        .map((m) => (
+                                                            <option key={m.id} value={m.name}>{m.name}</option>
+                                                        ))}
+                                                </select>
+                                            </div>
+                                        )}
+                                        <ListBuilder
+                                            icon={Pill}
+                                            tone="critical"
+                                            title="Medications due"
+                                            placeholder={medicationFocus ? 'Other / unscheduled medicine…' : 'e.g. Quetiapine 25mg — due 20:00'}
+                                            items={f.medications}
+                                            onChange={(v) => set('medications', v)}
+                                        />
+                                    </div>
                                     <ListBuilder
                                         icon={ShieldAlert}
                                         tone="critical"
