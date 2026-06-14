@@ -5,7 +5,6 @@ namespace App\Http\Controllers\Emar;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientControlledDrugDiscrepancy;
-use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
@@ -13,6 +12,7 @@ use App\Models\MedicationCompetencyAssessment;
 use App\Models\MedicationDestruction;
 use App\Models\MedicationError;
 use App\Models\MedicationRound;
+use App\Models\Site;
 use App\Services\MedicationReportingService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
@@ -26,9 +26,16 @@ class EmarReportController extends Controller
             'date_from' => ['nullable', 'date'],
             'date_to' => ['nullable', 'date'],
             'client_id' => ['nullable', 'integer'],
+            'site_id' => ['nullable', 'integer'],
             'care_level' => ['nullable', 'string', 'max:60'],
             'report_type' => ['nullable', 'string'],
         ]);
+
+        // §3b: a site filter scopes the client-linked panels (administration,
+        // reasons, PRN, controlled, errors) and themes the hero. Stock / rounds /
+        // competency stay point-in-time / org-wide.
+        $siteId = $filters['site_id'] ?? null;
+        $bySite = fn ($query) => $query->when($siteId, fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteId)));
 
         $dateFrom = isset($filters['date_from']) && $filters['date_from']
             ? Carbon::parse($filters['date_from'])->startOfDay()
@@ -49,6 +56,7 @@ class EmarReportController extends Controller
         if ($careLevel) {
             $adminQuery->whereHas('client', fn ($query) => $query->where('care_level', $careLevel));
         }
+        $bySite($adminQuery);
 
         $adminTotals = (clone $adminQuery)->selectRaw("
             COUNT(*) as total,
@@ -118,6 +126,24 @@ class EmarReportController extends Controller
             ])
             ->values();
 
+        // ─── Reason not given (coded reasons) ────────────────
+        $classOf = ['refused' => 'refusal', 'withheld' => 'clinical', 'missed' => 'omission'];
+        $reasonRows = (clone $adminQuery)
+            ->whereIn('status', ['refused', 'withheld', 'missed'])
+            ->selectRaw('status, reason_code, COUNT(*) as count')
+            ->groupBy('status', 'reason_code')
+            ->get();
+        $reasonBreakdown = [
+            'codes' => $reasonRows->map(fn ($r) => [
+                'code' => $r->reason_code ?: '—',
+                'class' => $classOf[$r->status] ?? 'refusal',
+                'count' => (int) $r->count,
+            ])->sortByDesc('count')->values(),
+            'by_class' => collect(['refusal', 'clinical', 'omission'])->mapWithKeys(fn ($c) => [
+                $c => (int) $reasonRows->filter(fn ($r) => ($classOf[$r->status] ?? '') === $c)->sum('count'),
+            ]),
+        ];
+
         // ─── PRN Usage ──────────────────────────────────────
         $prnQuery = ClientMedicationAdministration::query()
             ->join('client_medications', 'client_medications.id', '=', 'client_medication_administrations.client_medication_id')
@@ -131,6 +157,7 @@ class EmarReportController extends Controller
                 ->join('clients as prn_clients', 'prn_clients.id', '=', 'client_medication_administrations.client_id')
                 ->where('prn_clients.care_level', $careLevel);
         }
+        $bySite($prnQuery);
 
         $topPrnMeds = (clone $prnQuery)
             ->selectRaw('client_medications.name as medication_name, COUNT(*) as usage_count')
@@ -344,7 +371,8 @@ class EmarReportController extends Controller
         $errorQuery = MedicationError::query()
             ->whereBetween('reported_at', [$dateFrom, $dateTo])
             ->when($clientId, fn ($q) => $q->where('client_id', $clientId))
-            ->when($careLevel, fn ($q) => $q->whereHas('client', fn ($clientQuery) => $clientQuery->where('care_level', $careLevel)));
+            ->when($careLevel, fn ($q) => $q->whereHas('client', fn ($clientQuery) => $clientQuery->where('care_level', $careLevel)))
+            ->tap($bySite);
 
         $errorTotals = (clone $errorQuery)->selectRaw("
             COUNT(*) as total,
@@ -397,16 +425,46 @@ class EmarReportController extends Controller
             ->pluck('care_level')
             ->values();
 
+        // Controlled medications in the CdMedication shape, so the Controlled-drugs
+        // tab can reuse the shared ReportLossDialog (Page 6) for "Report CD loss".
+        $cdMedications = ClientMedication::query()
+            ->active()
+            ->controlled()
+            ->with(['client:id,first_name,last_name', 'stock'])
+            ->orderBy('name')
+            ->get()
+            ->map(fn (ClientMedication $m) => [
+                'id' => $m->id,
+                'name' => $m->name,
+                'controlled_drug' => (bool) $m->controlled_drug,
+                'client_id' => $m->client_id,
+                'client_name' => $m->client ? trim($m->client->first_name.' '.$m->client->last_name) : 'Unknown',
+                'stock' => $m->stock ? [
+                    'on_hand' => $m->stock->on_hand,
+                    'unit' => $m->stock->unit,
+                    'last_counted_at' => $m->stock->last_counted_at instanceof \DateTimeInterface ? $m->stock->last_counted_at->toIso8601String() : null,
+                ] : null,
+            ])
+            ->values();
+
+        $activeSite = $siteId ? Site::find($siteId) : null;
+
         return Inertia::render('emar/Reports', [
             'filters' => [
                 'date_from' => $dateFrom->toDateString(),
                 'date_to' => $dateTo->toDateString(),
                 'client_id' => $clientId ? (int) $clientId : null,
+                'site_id' => $siteId ? (int) $siteId : null,
                 'care_level' => $careLevel,
                 'report_type' => $filters['report_type'] ?? null,
             ],
             'clients' => $clients,
             'careLevels' => $careLevels,
+            'cdMedications' => $cdMedications,
+            'reasonBreakdown' => $reasonBreakdown,
+            'sites' => Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'active_site' => $activeSite ? ['id' => $activeSite->id, 'name' => $activeSite->name] : null,
+            'site_brand_colour' => $activeSite?->brand_colour,
             'adminSummary' => $adminSummary,
             'dailyAdmin' => $dailyAdmin,
             'clientBreakdown' => $clientBreakdown,
@@ -472,7 +530,7 @@ class EmarReportController extends Controller
         $careLevel = $filters['care_level'] ?? null;
         $type = $filters['report_type'] ?? 'administration';
 
-        $filename = "emar_{$type}_report_" . now()->format('Ymd_His') . '.csv';
+        $filename = "emar_{$type}_report_".now()->format('Ymd_His').'.csv';
 
         return response()->streamDownload(function () use ($type, $dateFrom, $dateTo, $clientId, $careLevel) {
             $out = fopen('php://output', 'w');
@@ -510,7 +568,7 @@ class EmarReportController extends Controller
             ->orderBy('administered_at')
             ->chunk(500, function ($rows) use ($out) {
                 foreach ($rows as $a) {
-                    $clientName = trim(($a->client?->first_name ?? '') . ' ' . ($a->client?->last_name ?? ''));
+                    $clientName = trim(($a->client?->first_name ?? '').' '.($a->client?->last_name ?? ''));
                     fputcsv($out, [
                         optional($a->administered_at)->toDateTimeString(),
                         $clientName,
@@ -543,7 +601,7 @@ class EmarReportController extends Controller
             ->orderBy('administered_at')
             ->chunk(500, function ($rows) use ($out) {
                 foreach ($rows as $a) {
-                    $clientName = trim(($a->client?->first_name ?? '') . ' ' . ($a->client?->last_name ?? ''));
+                    $clientName = trim(($a->client?->first_name ?? '').' '.($a->client?->last_name ?? ''));
                     fputcsv($out, [
                         optional($a->administered_at)->toDateTimeString(),
                         $clientName,
@@ -571,7 +629,7 @@ class EmarReportController extends Controller
             ->orderBy('administered_at')
             ->chunk(500, function ($rows) use ($out) {
                 foreach ($rows as $a) {
-                    $clientName = trim(($a->client?->first_name ?? '') . ' ' . ($a->client?->last_name ?? ''));
+                    $clientName = trim(($a->client?->first_name ?? '').' '.($a->client?->last_name ?? ''));
                     fputcsv($out, [
                         optional($a->administered_at)->toDateTimeString(),
                         $clientName,
@@ -624,7 +682,7 @@ class EmarReportController extends Controller
             ->orderBy('reported_at')
             ->chunk(500, function ($rows) use ($out) {
                 foreach ($rows as $e) {
-                    $clientName = trim(($e->client?->first_name ?? '') . ' ' . ($e->client?->last_name ?? ''));
+                    $clientName = trim(($e->client?->first_name ?? '').' '.($e->client?->last_name ?? ''));
                     fputcsv($out, [
                         optional($e->reported_at)->toDateTimeString(),
                         $clientName,
@@ -643,6 +701,7 @@ class EmarReportController extends Controller
         $records = $report['records'] ?? [];
         if (empty($records)) {
             fputcsv($out, ['No data available']);
+
             return;
         }
 
