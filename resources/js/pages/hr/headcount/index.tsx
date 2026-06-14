@@ -20,9 +20,9 @@ import {
 type Props = {
     current: {
         total: number;
-        by_department: Record<string, number>;
-        by_employment_type: Record<string, number>;
-        total_fte: number;
+        by_department: Array<{ department: string; count: number }>;
+        by_employment_type: Array<{ type: string; count: number }>;
+        fte_total: number;
     };
     budgetVsActual: {
         positions: Array<{
@@ -61,9 +61,10 @@ export default function HeadcountIndex({
     forecast,
     attritionRisk,
 }: Props) {
-    const deptData = Object.entries(current.by_department).map(
-        ([name, count]) => ({ name, count }),
-    );
+    const deptData = current.by_department.map((d) => ({
+        name: d.department,
+        count: d.count,
+    }));
 
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
@@ -75,7 +76,7 @@ export default function HeadcountIndex({
                     description="Workforce planning, forecasting, and attrition analysis."
                     stats={[
                         { label: 'Headcount', value: current.total },
-                        { label: 'Total FTE', value: current.total_fte },
+                        { label: 'Total FTE', value: current.fte_total },
                         { label: 'Vacancies', value: budgetVsActual.total_vacant },
                         { label: 'Attrition risk', value: attritionRisk.length },
                     ]}
@@ -105,7 +106,7 @@ export default function HeadcountIndex({
                         </CardHeader>
                         <CardContent>
                             <p className="text-2xl font-bold">
-                                {current.total_fte}
+                                {current.fte_total}
                             </p>
                         </CardContent>
                     </Card>
