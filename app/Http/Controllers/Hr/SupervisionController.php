@@ -46,7 +46,8 @@ class SupervisionController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        // Transform to match frontend SupervisionNote type
+        // Transform to match frontend SupervisionNote type. Includes the full
+        // editable fields so the SupervisionDialog can edit a note inline.
         $notes->getCollection()->transform(fn ($note) => [
             'id' => $note->id,
             'staff_user' => $note->employee ? ['id' => $note->employee->id, 'name' => $note->employee->name] : ['id' => 0, 'name' => 'Unknown'],
@@ -54,6 +55,14 @@ class SupervisionController extends Controller
             'date' => $note->session_date?->toDateString(),
             'summary' => $note->topics_discussed ? str($note->topics_discussed)->limit(120)->toString() : '',
             'status' => $note->employee_acknowledged ? 'completed' : 'pending',
+            'employee_user_id' => $note->employee_user_id,
+            'session_type' => $note->session_type,
+            'session_date' => $note->session_date?->toDateString(),
+            'duration_minutes' => $note->duration_minutes,
+            'topics_discussed' => $note->topics_discussed,
+            'actions_agreed' => $note->actions_agreed ?? [],
+            'next_session_date' => $note->next_session_date?->toDateString(),
+            'is_visible_to_employee' => (bool) $note->is_visible_to_employee,
         ]);
 
         // Upcoming / overdue reviews
@@ -256,10 +265,11 @@ class SupervisionController extends Controller
 
         $staff = $staffQuery
             ->orderBy('name')
-            ->get(['id', 'name']);
+            ->get(['id', 'name', 'email']);
 
         return Inertia::render('hr/performance/index', [
             'supervisionNotes' => $notes,
+            'sessionTypes' => $this->sessionTypeOptions(),
             'upcomingReviews' => $upcomingReviews,
             'recentNotes' => $recentNotes,
             'staff' => $staff,
@@ -292,32 +302,29 @@ class SupervisionController extends Controller
         ]);
     }
 
+    /** Supervision session-type options for the dialog. */
+    private function sessionTypeOptions(): array
+    {
+        return [
+            ['value' => 'one_to_one', 'label' => 'One-to-One'],
+            ['value' => 'supervision', 'label' => 'Supervision'],
+            ['value' => 'review', 'label' => 'Review'],
+            ['value' => 'check_in', 'label' => 'Check-in'],
+            ['value' => 'probation', 'label' => 'Probation Review'],
+            ['value' => 'other', 'label' => 'Other'],
+        ];
+    }
+
     /**
-     * Show form to create a new supervision note.
+     * The page-based create form was replaced by the SupervisionDialog on the
+     * performance hub. Preserve the route with a redirect.
      */
     public function create(Request $request)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $staffIds = $this->hrStaffUserIdsForTenant($tenantId);
 
-        $staff = User::staff()
-            ->when($staffIds !== [], fn ($query) => $query->whereIn('id', $staffIds))
-            ->orderBy('name')
-            ->get(['id', 'name', 'email']);
-
-        return Inertia::render('hr/performance/create-supervision', [
-            'staff' => $staff,
-            'sessionTypes' => [
-                ['value' => 'one_to_one', 'label' => 'One-to-One'],
-                ['value' => 'supervision', 'label' => 'Supervision'],
-                ['value' => 'review', 'label' => 'Review'],
-                ['value' => 'check_in', 'label' => 'Check-in'],
-                ['value' => 'probation', 'label' => 'Probation Review'],
-                ['value' => 'other', 'label' => 'Other'],
-            ],
-        ]);
+        return redirect()->route('hr.performance.index');
     }
 
     /**
@@ -354,7 +361,8 @@ class SupervisionController extends Controller
             'session_date' => ['required', 'date'],
             'session_type' => ['required', 'string', 'max:50'],
             'duration_minutes' => ['nullable', 'integer', 'min:1'],
-            'topics_discussed' => ['nullable', 'string', 'max:5000'],
+            // topics_discussed is NOT NULL at the DB level — require it.
+            'topics_discussed' => ['required', 'string', 'max:5000'],
             'actions_agreed' => ['nullable', 'array'],
             'actions_agreed.*' => ['string', 'max:500'],
             'next_session_date' => ['nullable', 'date', 'after:session_date'],
@@ -379,35 +387,15 @@ class SupervisionController extends Controller
     }
 
     /**
-     * Show form to edit a supervision note.
+     * The page-based edit form was replaced by the SupervisionDialog (edit mode)
+     * on the performance hub. Preserve the route with a redirect.
      */
     public function edit(Request $request, HrSupervisionNote $note)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $note->tenant_id);
 
-        $note->load(['employee:id,name', 'supervisor:id,name']);
-        $staffIds = $this->hrStaffUserIdsForTenant($tenantId);
-
-        $staff = User::staff()
-            ->when($staffIds !== [], fn ($query) => $query->whereIn('id', $staffIds))
-            ->orderBy('name')
-            ->get(['id', 'name', 'email']);
-
-        return Inertia::render('hr/performance/edit-supervision', [
-            'note' => $note,
-            'staff' => $staff,
-            'sessionTypes' => [
-                ['value' => 'one_to_one', 'label' => 'One-to-One'],
-                ['value' => 'supervision', 'label' => 'Supervision'],
-                ['value' => 'review', 'label' => 'Review'],
-                ['value' => 'check_in', 'label' => 'Check-in'],
-                ['value' => 'probation', 'label' => 'Probation Review'],
-                ['value' => 'other', 'label' => 'Other'],
-            ],
-        ]);
+        return redirect()->route('hr.performance.index');
     }
 
     /**
@@ -424,7 +412,8 @@ class SupervisionController extends Controller
             'session_date' => ['sometimes', 'date'],
             'session_type' => ['sometimes', 'string', 'max:50'],
             'duration_minutes' => ['nullable', 'integer', 'min:1'],
-            'topics_discussed' => ['nullable', 'string', 'max:5000'],
+            // NOT NULL at the DB level: if present it must be non-empty.
+            'topics_discussed' => ['sometimes', 'required', 'string', 'max:5000'],
             'actions_agreed' => ['nullable', 'array'],
             'actions_agreed.*' => ['string', 'max:500'],
             'employee_comments' => ['nullable', 'string', 'max:5000'],

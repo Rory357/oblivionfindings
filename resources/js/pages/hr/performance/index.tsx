@@ -41,6 +41,11 @@ import {
 } from 'lucide-react';
 import { useState } from 'react';
 import {
+    SupervisionDialog,
+    type ExistingSupervisionNote,
+    type SessionTypeOption,
+} from '@/components/hr/performance/supervision-dialog';
+import {
     Area,
     AreaChart,
     Bar,
@@ -65,6 +70,14 @@ type SupervisionNote = {
     date: string;
     summary: string;
     status?: string;
+    employee_user_id?: number | null;
+    session_type?: string;
+    session_date?: string | null;
+    duration_minutes?: number | null;
+    topics_discussed?: string | null;
+    actions_agreed?: string[] | null;
+    next_session_date?: string | null;
+    is_visible_to_employee?: boolean;
 };
 
 type UpcomingReview = {
@@ -90,7 +103,8 @@ type Props = {
     };
     upcomingReviews: UpcomingReview[];
     recentNotes: RecentNote[];
-    staff: Array<{ id: number; name: string }>;
+    staff: Array<{ id: number; name: string; email?: string }>;
+    sessionTypes: SessionTypeOption[];
     oneToOneSla: {
         due_soon_count: number;
         overdue_count: number;
@@ -184,6 +198,7 @@ export default function PerformanceIndex({
     upcomingReviews,
     recentNotes,
     staff,
+    sessionTypes,
     oneToOneSla,
     competencyGaps,
     engagementActionPlanSla,
@@ -197,6 +212,30 @@ export default function PerformanceIndex({
     can,
 }: Props) {
     const [processing, setProcessing] = useState(false);
+    const [noteOpen, setNoteOpen] = useState(false);
+    const [editingNote, setEditingNote] = useState<ExistingSupervisionNote | null>(
+        null,
+    );
+
+    const openCreateNote = () => {
+        setEditingNote(null);
+        setNoteOpen(true);
+    };
+    const openEditNote = (note: SupervisionNote) => {
+        setEditingNote({
+            id: note.id,
+            staff_user: note.staff_user,
+            employee_user_id: note.employee_user_id ?? note.staff_user?.id ?? null,
+            session_type: note.session_type ?? '',
+            session_date: note.session_date ?? note.date ?? null,
+            duration_minutes: note.duration_minutes ?? null,
+            topics_discussed: note.topics_discussed ?? '',
+            actions_agreed: note.actions_agreed ?? [],
+            next_session_date: note.next_session_date ?? null,
+            is_visible_to_employee: note.is_visible_to_employee ?? true,
+        });
+        setNoteOpen(true);
+    };
 
     const onFilter = (next: Partial<typeof filters>) => {
         router.get(
@@ -297,13 +336,15 @@ export default function PerformanceIndex({
                         actions={
                             can.manage ? (
                                 <div className="flex flex-wrap items-center gap-2">
-                                    <Link href="/hr/performance/supervision/create">
-                                        <Button size="sm" disabled={processing}>
-                                            <Plus className="mr-1.5 h-4 w-4" />
-                                            Add Note
-                                        </Button>
-                                    </Link>
-                                    <Link href="/hr/performance/reviews/create">
+                                    <Button
+                                        size="sm"
+                                        disabled={processing}
+                                        onClick={openCreateNote}
+                                    >
+                                        <Plus className="mr-1.5 h-4 w-4" />
+                                        Add Note
+                                    </Button>
+                                    <Link href="/hr/performance/reviews">
                                         <Button
                                             size="sm"
                                             variant="outline"
@@ -978,16 +1019,15 @@ export default function PerformanceIndex({
                                     1:1 Session Follow-up
                                 </CardTitle>
                                 {can.manage && (
-                                    <Link href="/hr/performance/supervision/create">
-                                        <Button
-                                            variant="ghost"
-                                            size="sm"
-                                            className="text-muted-foreground hover:text-foreground"
-                                        >
-                                            Schedule{' '}
-                                            <ArrowRight className="ml-1 h-3 w-3" />
-                                        </Button>
-                                    </Link>
+                                    <Button
+                                        variant="ghost"
+                                        size="sm"
+                                        className="text-muted-foreground hover:text-foreground"
+                                        onClick={openCreateNote}
+                                    >
+                                        Schedule{' '}
+                                        <ArrowRight className="ml-1 h-3 w-3" />
+                                    </Button>
                                 )}
                             </div>
                         </CardHeader>
@@ -1085,17 +1125,31 @@ export default function PerformanceIndex({
                                                 {note.summary}
                                             </TableCell>
                                             <TableCell>
-                                                <Link
-                                                    href={`/hr/performance/supervision/${note.id}`}
-                                                >
-                                                    <Button
-                                                        variant="ghost"
-                                                        size="sm"
-                                                        disabled={processing}
+                                                <div className="flex items-center gap-1">
+                                                    <Link
+                                                        href={`/hr/performance/supervision/${note.id}`}
                                                     >
-                                                        View
-                                                    </Button>
-                                                </Link>
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            disabled={processing}
+                                                        >
+                                                            View
+                                                        </Button>
+                                                    </Link>
+                                                    {can.manage && (
+                                                        <Button
+                                                            variant="ghost"
+                                                            size="sm"
+                                                            disabled={processing}
+                                                            onClick={() =>
+                                                                openEditNote(note)
+                                                            }
+                                                        >
+                                                            Edit
+                                                        </Button>
+                                                    )}
+                                                </div>
                                             </TableCell>
                                         </TableRow>
                                     ))}
@@ -1110,19 +1164,16 @@ export default function PerformanceIndex({
                                         : 'No supervision notes yet.'}
                                 </p>
                                 {can.manage && !filters.q && (
-                                    <Link
-                                        href="/hr/performance/supervision/create"
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
                                         className="mt-2"
+                                        disabled={processing}
+                                        onClick={openCreateNote}
                                     >
-                                        <Button
-                                            variant="outline"
-                                            size="sm"
-                                            disabled={processing}
-                                        >
-                                            <Plus className="mr-1.5 h-4 w-4" />{' '}
-                                            Add Note
-                                        </Button>
-                                    </Link>
+                                        <Plus className="mr-1.5 h-4 w-4" /> Add
+                                        Note
+                                    </Button>
                                 )}
                             </div>
                         )}
@@ -1132,6 +1183,20 @@ export default function PerformanceIndex({
                 {supervisionNotes?.links?.length ? (
                     <LaravelPagination links={supervisionNotes.links} />
                 ) : null}
+
+                {can.manage && (
+                    <SupervisionDialog
+                        key={editingNote?.id ?? 'new'}
+                        open={noteOpen}
+                        onClose={() => {
+                            setNoteOpen(false);
+                            setEditingNote(null);
+                        }}
+                        staff={staff}
+                        sessionTypes={sessionTypes}
+                        note={editingNote}
+                    />
+                )}
             </PageLayout>
         </AppLayout>
     );
