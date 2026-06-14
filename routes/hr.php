@@ -665,6 +665,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
 
         Route::middleware('permission:hr.benefits.manage')->group(function () {
             Route::post('/plans', [BenefitsController::class, 'storePlan'])->name('plans.store');
+            Route::put('/plans/{plan}', [BenefitsController::class, 'updatePlan'])->name('plans.update');
             Route::post('/enroll', [BenefitsController::class, 'enroll'])->name('enroll');
             Route::put('/enrollments/{enrollment}', [BenefitsController::class, 'updateEnrollment'])->name('enrollments.update');
         });

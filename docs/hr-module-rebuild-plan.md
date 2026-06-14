@@ -615,8 +615,14 @@ flat Send-Kudos dialog. M7-R3 (e08c55c5) — HrDemoSeeder feed/kudos demo data (
     file via `$file->store("hr/expense-receipts/{userId}", 'private')` (the disk all sensitive HR uploads use) and
     injects receipt_path into the item data (addItem already consumed it); create.tsx adds a per-item file input +
     `forceFormData:true`. createClaim already resolved tenant via a service resolver (no tenant bug here). 4 tests
-    (ExpenseReceiptUploadTest: stored+recorded, no-file→null, bad-mime rejected, oversize rejected). **Benefit plan
-    deactivate** — storePlan hardcodes is_active:true, no updatePlan route (low; missing transition, no dead button).
+    (ExpenseReceiptUploadTest: stored+recorded, no-file→null, bad-mime rejected, oversize rejected).
+  - ✅ **Benefit-plan deactivate DONE (S31) → category B COMPLETE:** storePlan hardcoded is_active:true with no
+    updatePlan route, so the Inactive badge was unreachable. Added BenefitsController@updatePlan (perm
+    hr.benefits.manage, assertHrTenantAccess like updateEnrollment, validates is_active bool) + PUT route
+    benefits.plans.update + plans.tsx per-row Activate/Deactivate toggle (gated can.manage). Honest semantics:
+    deactivating CLOSES a plan to new enrollments (index() loads active() plans for the enroll dropdown) but does
+    NOT orphan existing enrollments (they reference benefit_plan_id by id) — so a free toggle is safe, no guard
+    needed. BenefitsController already used ResolvesHrTenant (no tenant bug). 3 tests (BenefitPlanLifecycleTest).
   - *Orphan models/tables to drop (reversible migration, like HrCheckIn):* **HrSurvey\*** (4 tables — NOT a clean
     self-contained drop: adversarial check found it's wired into HrDemoSeeder + DuskDatabaseSeeder + HrSurveyFactory +
     HrDemoSeederTest + SurveySystemRetiredTest, so dropping requires editing all of those too). **HrDashboardConfig**
