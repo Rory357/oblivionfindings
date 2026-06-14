@@ -53,6 +53,14 @@ export interface PageHeroProps {
     /** Optional category-themed gradient — swaps the base from --primary to --category-*. */
     category?: PageHeroCategory;
 
+    /**
+     * Explicit hero base colour (e.g. the active site's brand colour, `#RRGGBB`).
+     * When set, overrides the category-derived `--hero-base`. Injected as a CSS
+     * variable value so the gradient stays token-based (no hex in className).
+     * Null/empty falls back to the category default, then `--primary`.
+     */
+    brandColour?: string | null;
+
     /** Top-of-hero back link. */
     backHref?: string;
     backLabel?: string;
@@ -113,6 +121,7 @@ function renderIcon(icon: IconLike | ReactNode, className: string): ReactNode {
 function HeroVariant(props: PageHeroProps) {
     const {
         category,
+        brandColour,
         backHref,
         backLabel = 'Back',
         icon,
@@ -133,11 +142,22 @@ function HeroVariant(props: PageHeroProps) {
     } = props;
     const supportingText = description ?? subtitle;
 
-    const style: CSSProperties | undefined = category
-        ? ({ ['--hero-base' as string]: `var(--category-${category})` } as CSSProperties)
+    // Resolve the hero's base colour: an explicit site brand colour wins, then
+    // the category token, else the --primary default gradient. The site colour
+    // is injected as a CSS variable *value* (runtime string) so the gradient
+    // utility stays token-based and the raw-colour ESLint guard stays green.
+    const heroBase =
+        brandColour && brandColour.trim() !== ''
+            ? brandColour.trim()
+            : category
+              ? `var(--category-${category})`
+              : null;
+
+    const style: CSSProperties | undefined = heroBase
+        ? ({ ['--hero-base' as string]: heroBase } as CSSProperties)
         : undefined;
 
-    const gradientClass = category
+    const gradientClass = heroBase
         ? 'bg-[linear-gradient(to_bottom_right,color-mix(in_oklch,var(--hero-base)_90%,transparent),var(--hero-base),color-mix(in_oklch,var(--hero-base)_80%,transparent))]'
         : 'bg-gradient-to-br from-primary/90 via-primary to-primary/80';
 

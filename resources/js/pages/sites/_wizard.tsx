@@ -127,6 +127,7 @@ export type DocumentRecord = {
 export type WizardData = {
     name: string;
     type: SiteType;
+    brand_colour: string;
     phone: string;
     email: string;
     emergency_plan_location: string;
@@ -416,6 +417,45 @@ export function StepBasics({
                 {errors.name && (
                     <p id="name-error" className="mt-1 text-sm text-status-critical">
                         {errors.name}
+                    </p>
+                )}
+            </div>
+
+            <div>
+                <FieldLabel htmlFor="brand_colour">Brand colour</FieldLabel>
+                <div className="mt-1 flex items-center gap-2">
+                    <input
+                        type="color"
+                        aria-label="Brand colour picker"
+                        value={data.brand_colour || '#7c3aed'}
+                        onChange={(e) => setData('brand_colour', e.target.value)}
+                        className="h-9 w-12 shrink-0 cursor-pointer rounded-md border bg-transparent p-1"
+                    />
+                    <Input
+                        id="brand_colour"
+                        value={data.brand_colour}
+                        onChange={(e) => setData('brand_colour', e.target.value)}
+                        placeholder="#RRGGBB — leave blank for theme default"
+                        aria-invalid={!!errors.brand_colour}
+                        className={`flex-1 ${errors.brand_colour ? 'border-status-critical ring-1 ring-status-critical/40' : ''}`}
+                    />
+                    {data.brand_colour ? (
+                        <Button
+                            type="button"
+                            variant="ghost"
+                            size="sm"
+                            onClick={() => setData('brand_colour', '')}
+                        >
+                            Reset
+                        </Button>
+                    ) : null}
+                </div>
+                <p className="mt-1 text-xs text-muted-foreground">
+                    Tints this site&apos;s medication (eMAR) page hero. Leave blank to inherit the default theme colour.
+                </p>
+                {errors.brand_colour && (
+                    <p className="mt-1 text-sm text-status-critical">
+                        {errors.brand_colour}
                     </p>
                 )}
             </div>

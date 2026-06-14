@@ -1198,6 +1198,7 @@ class SiteController extends Controller
                 'id' => $site->id,
                 'name' => $site->name,
                 'type' => $site->type,
+                'brand_colour' => $site->brand_colour,
                 'phone' => $site->phone,
                 'email' => $site->email,
                 'emergency_plan_location' => $site->emergency_plan_location,

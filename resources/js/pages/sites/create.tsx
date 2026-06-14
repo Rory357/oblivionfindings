@@ -58,6 +58,7 @@ const WORKFLOW_HELP = [
 const initialData: WizardData = {
     name: '',
     type: 'house',
+    brand_colour: '',
     phone: '',
     email: '',
     emergency_plan_location: '',

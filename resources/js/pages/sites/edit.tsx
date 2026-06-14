@@ -49,6 +49,7 @@ type Site = {
     id: number;
     name: string;
     type: SiteType;
+    brand_colour?: string | null;
     phone?: string;
     email?: string;
     emergency_plan_location?: string;
@@ -180,6 +181,7 @@ export default function EditSite() {
     const { data, setData, put, processing, errors, isDirty } = useForm<WizardData>({
         name: site.name,
         type: site.type,
+        brand_colour: site.brand_colour ?? '',
         phone: site.phone ?? '',
         email: site.email ?? '',
         emergency_plan_location: site.emergency_plan_location ?? '',

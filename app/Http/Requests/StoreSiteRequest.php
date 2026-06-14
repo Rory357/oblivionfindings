@@ -16,6 +16,7 @@ class StoreSiteRequest extends FormRequest
         return [
             'name' => ['required', 'string', 'max:255'],
             'type' => ['required', 'in:head_office,house,facility,residential'],
+            'brand_colour' => ['nullable', 'string', 'regex:/^#[0-9A-Fa-f]{6}$/'],
             'phone' => ['nullable', 'string', 'max:60'],
             'email' => ['nullable', 'string', 'email', 'max:255'],
             'emergency_plan_location' => ['nullable', 'string', 'max:255'],

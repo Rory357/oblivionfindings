@@ -750,6 +750,43 @@ class SiteControllerTest extends TestCase
         $this->assertFalse((bool) $site->is_active);
     }
 
+    // ──────────────────────────────────────
+    // Branding — per-site hero brand colour (eMAR §3b)
+    // ──────────────────────────────────────
+
+    public function test_site_brand_colour_accepts_valid_hex(): void
+    {
+        $site = Site::factory()->create(['type' => 'house', 'is_active' => true]);
+
+        $this->actingAs($this->admin)
+            ->put("/sites/{$site->id}", [
+                'name' => $site->name,
+                'type' => 'house',
+                'is_active' => true,
+                'brand_colour' => '#7C3AED',
+            ])
+            ->assertSessionHasNoErrors();
+
+        $this->assertSame('#7C3AED', $site->fresh()->brand_colour);
+    }
+
+    public function test_site_brand_colour_rejects_invalid_value(): void
+    {
+        $site = Site::factory()->create(['type' => 'house', 'is_active' => true]);
+
+        $this->actingAs($this->admin)
+            ->from("/sites/{$site->id}/edit")
+            ->put("/sites/{$site->id}", [
+                'name' => $site->name,
+                'type' => 'house',
+                'is_active' => true,
+                'brand_colour' => 'not-a-hex',
+            ])
+            ->assertSessionHasErrors('brand_colour');
+
+        $this->assertNull($site->fresh()->brand_colour);
+    }
+
     protected function scopeUserToSite(User $user, Site $site): void
     {
         HrEmployeeProfile::query()->updateOrCreate(

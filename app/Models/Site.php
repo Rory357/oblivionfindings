@@ -14,13 +14,14 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class Site extends Model
 {
-    use HasFactory;
     use AuditableChanges;
+    use HasFactory;
     use SoftDeletes;
 
     protected $fillable = [
         'name',
         'type',
+        'brand_colour',
         'tenant_id',
         'phone',
         'email',
@@ -252,14 +253,14 @@ class Site extends Model
         return $this->hasMany(SiteUtility::class);
     }
 
-    public function houseLedger(): \Illuminate\Database\Eloquent\Relations\HasOne
+    public function houseLedger(): HasOne
     {
         return $this->hasOne(HouseLedger::class);
     }
 
     public function serviceContexts(): HasMany
     {
-        return $this->hasMany(\App\Models\ServiceContext::class);
+        return $this->hasMany(ServiceContext::class);
     }
 
     public function siteNotes(): HasMany
@@ -307,7 +308,7 @@ class Site extends Model
             $this->city,
             $this->postcode,
             $this->country,
-        ], fn($v) => is_string($v) && trim($v) !== '');
+        ], fn ($v) => is_string($v) && trim($v) !== '');
 
         return implode(', ', $parts);
     }
@@ -331,6 +332,7 @@ class Site extends Model
         if ($this->is_high_needs) {
             $flags[] = 'High Needs';
         }
+
         return $flags;
     }
 
@@ -374,7 +376,7 @@ class Site extends Model
     {
         return $query->where(function ($q) {
             $q->where('is_high_risk', true)
-              ->orWhere('is_high_needs', true);
+                ->orWhere('is_high_needs', true);
         });
     }
 
@@ -383,6 +385,7 @@ class Site extends Model
         if ($tenantId === null) {
             return $query;
         }
+
         return $query->where('tenant_id', $tenantId);
     }
 }
