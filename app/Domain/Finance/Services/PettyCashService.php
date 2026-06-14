@@ -2,6 +2,7 @@
 
 namespace App\Domain\Finance\Services;
 
+use App\Domain\Finance\Models\FinAccount;
 use App\Domain\Finance\Models\FinPettyCashFund;
 use App\Domain\Finance\Models\FinPettyCashTransaction;
 use Illuminate\Support\Facades\Auth;
@@ -43,6 +44,42 @@ class PettyCashService
             // Update fund balance
             if ($type === 'top_up') {
                 $fund->increment('current_balance', $amount);
+
+                // Book the funding draw: DR Petty Cash (fund GL) / CR Bank. Without
+                // a top-up journal the bank + petty-cash GL balances drifted from the
+                // fund's recorded cash. Degrades gracefully if the GL/bank accounts
+                // aren't configured (balance-only, as before).
+                $bankAccount = FinAccount::forOrganization($fund->organization_id)
+                    ->where('code', '1000')
+                    ->where('is_active', true)
+                    ->first();
+
+                if ($fund->gl_account_id && $bankAccount) {
+                    $journal = $this->journalPostingService->createAndPost(
+                        $fund->organization_id,
+                        [
+                            'journal_date' => $data['transaction_date'],
+                            'type' => 'standard',
+                            'reference' => "PC-{$fund->id}",
+                            'description' => 'Petty cash top-up: '.($data['description'] ?? $fund->name),
+                            'lines' => [
+                                [
+                                    'account_id' => $fund->gl_account_id,
+                                    'description' => $data['description'] ?? 'Petty cash top-up',
+                                    'debit' => $amount,
+                                    'credit' => 0,
+                                ],
+                                [
+                                    'account_id' => $bankAccount->id,
+                                    'description' => $data['description'] ?? 'Petty cash top-up',
+                                    'debit' => 0,
+                                    'credit' => $amount,
+                                ],
+                            ],
+                        ]
+                    );
+                    $journalId = $journal->id;
+                }
             } elseif ($type === 'expense') {
                 $fund->decrement('current_balance', $amount);
 
@@ -83,7 +120,9 @@ class PettyCashService
                 'transaction_date' => $data['transaction_date'],
                 'type' => $type,
                 'amount' => abs($amount),
-                'description' => $data['description'] ?? null,
+                // description is NOT NULL but the request validates it nullable —
+                // coalesce to '' so a description-less transaction doesn't 500.
+                'description' => $data['description'] ?? '',
                 'receipt_path' => $data['receipt_path'] ?? null,
                 'account_id' => $data['account_id'] ?? null,
                 'journal_id' => $journalId,
