@@ -3,11 +3,12 @@
 namespace App\Domain\Finance\Services;
 
 use App\Domain\Finance\Models\FinAccount;
-use App\Domain\Finance\Models\FinBill;
 use App\Domain\Finance\Models\FinBankAccount;
+use App\Domain\Finance\Models\FinBill;
 use App\Domain\Finance\Models\FinFundingStream;
+use App\Domain\Finance\Models\FinInvoice;
 use App\Domain\Finance\Models\FinJournalLine;
-use App\Models\Invoice;
+use App\Domain\Finance\Models\FinPaymentAllocation;
 use Illuminate\Support\Facades\DB;
 
 class FinancialReportService
@@ -385,7 +386,7 @@ class FinancialReportService
             $amountDue = $bill->getAmountDue();
             $daysOverdue = $bill->due_date->gt($today) ? 0 : (int) $bill->due_date->diffInDays($today);
 
-            if (!isset($vendorBuckets[$vendorId])) {
+            if (! isset($vendorBuckets[$vendorId])) {
                 $vendorBuckets[$vendorId] = [
                     'vendor_name' => $vendorName,
                     'current' => 0,
@@ -438,22 +439,33 @@ class FinancialReportService
     {
         $today = now()->startOfDay();
 
-        $invoices = Invoice::where('organization_id', $orgId)
+        // Live FinInvoice (the legacy App\Models\Invoice table is a write-orphan).
+        $invoices = FinInvoice::where('organization_id', $orgId)
             ->where('status', 'sent')
             ->with('client:id,first_name,last_name')
             ->get();
+
+        // Net partial payments (FinPaymentAllocation rows tagged against FinInvoice).
+        $paidByInvoice = FinPaymentAllocation::where('allocatable_type', FinInvoice::class)
+            ->whereIn('allocatable_id', $invoices->pluck('id'))
+            ->groupBy('allocatable_id')
+            ->selectRaw('allocatable_id, SUM(amount) as total_paid')
+            ->pluck('total_paid', 'allocatable_id');
 
         $clientBuckets = [];
 
         foreach ($invoices as $invoice) {
             $clientName = $invoice->client
-                ? trim($invoice->client->first_name . ' ' . $invoice->client->last_name)
-                : 'Unknown';
-            $clientId = $invoice->client_id;
-            $amountDue = (float) $invoice->total_amount;
+                ? trim($invoice->client->first_name.' '.$invoice->client->last_name)
+                : ($invoice->client_name ?: 'Unknown');
+            $clientId = $invoice->client_id ?? ('name:'.$invoice->client_name);
+            $amountDue = round((float) $invoice->total_amount - (float) ($paidByInvoice[$invoice->id] ?? 0), 2);
+            if ($amountDue <= 0) {
+                continue;
+            }
             $daysOverdue = $invoice->due_date->gt($today) ? 0 : (int) $invoice->due_date->diffInDays($today);
 
-            if (!isset($clientBuckets[$clientId])) {
+            if (! isset($clientBuckets[$clientId])) {
                 $clientBuckets[$clientId] = [
                     'client_name' => $clientName,
                     'current' => 0,
@@ -540,7 +552,7 @@ class FinancialReportService
 
         foreach ($lines as $line) {
             $fsId = $line->funding_stream_id;
-            if (!isset($streamData[$fsId])) {
+            if (! isset($streamData[$fsId])) {
                 continue;
             }
 

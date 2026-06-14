@@ -34,9 +34,9 @@ class AccountsReceivableController extends Controller
             'id' => $inv->id,
             'invoice_number' => $inv->invoice_number,
             'client_name' => $inv->client
-                ? $inv->client->first_name . ' ' . $inv->client->last_name
-                : 'Unknown',
-            'issue_date' => $inv->issue_date->toDateString(),
+                ? $inv->client->first_name.' '.$inv->client->last_name
+                : ($inv->client_name ?: 'Unknown'),
+            'issue_date' => $inv->invoice_date->toDateString(),
             'due_date' => $inv->due_date->toDateString(),
             'total_amount' => (float) $inv->total_amount,
             'amount_paid' => $inv->amount_paid,
@@ -78,15 +78,15 @@ class AccountsReceivableController extends Controller
     {
         $orgId = $request->user()->organization_id;
 
-        // Get clients that have outstanding invoices
-        $clientsWithInvoices = Client::whereHas('invoices', function ($q) use ($orgId) {
+        // Get clients that have outstanding invoices (live FinInvoice, not legacy)
+        $clientsWithInvoices = Client::whereHas('finInvoices', function ($q) use ($orgId) {
             $q->where('organization_id', $orgId)->where('status', 'sent');
         })
             ->orderBy('first_name')
             ->get(['id', 'first_name', 'last_name', 'email'])
             ->map(fn ($c) => [
                 'id' => $c->id,
-                'name' => $c->first_name . ' ' . $c->last_name,
+                'name' => $c->first_name.' '.$c->last_name,
                 'email' => $c->email,
             ])
             ->values()
@@ -116,7 +116,7 @@ class AccountsReceivableController extends Controller
     public function allocate(Request $request)
     {
         $validated = $request->validate([
-            'invoice_id' => 'required|exists:invoices,id',
+            'invoice_id' => 'required|exists:fin_invoices,id',
             'amount' => 'required|numeric|min:0.01',
             'payment_date' => 'required|date',
             'notes' => 'nullable|string',
