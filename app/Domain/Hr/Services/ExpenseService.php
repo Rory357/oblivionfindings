@@ -2,6 +2,7 @@
 
 namespace App\Domain\Hr\Services;
 
+use App\Domain\Finance\Jobs\PostExpenseJournalJob;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrExpenseClaim;
 use App\Domain\Hr\Models\HrExpenseItem;
@@ -123,6 +124,13 @@ class ExpenseService
 
             return $claim->fresh();
         });
+
+        // Post the approved expense to the GL (DR expense accounts / CR accounts
+        // payable). Idempotent: the job + service both short-circuit if a journal
+        // already exists. Mirrors the payroll lock→PostPayrollJournalJob bridge.
+        if ($result->journal_id === null) {
+            PostExpenseJournalJob::dispatch($result);
+        }
 
         app(HrNotificationService::class)->notifyExpenseApproved($result);
 

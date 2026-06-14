@@ -138,7 +138,7 @@ class ExpenseController extends Controller
                 ]),
             ],
             'can' => [
-                'approve' => $user->canDo('hr.expenses.manage') && $expenseClaim->status === 'submitted',
+                'approve' => $user->canDo('hr.expenses.approve') && $expenseClaim->status === 'submitted',
                 'manage' => $user->canDo('hr.expenses.manage'),
             ],
         ]);
@@ -169,7 +169,7 @@ class ExpenseController extends Controller
     public function approve(Request $request, HrExpenseClaim $expenseClaim)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.expenses.manage'), 403);
+        abort_unless($user && $user->canDo('hr.expenses.approve'), 403);
 
         try {
             $this->expenseService->approveClaim($expenseClaim, $user);
@@ -187,7 +187,7 @@ class ExpenseController extends Controller
     public function reject(Request $request, HrExpenseClaim $expenseClaim)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.expenses.manage'), 403);
+        abort_unless($user && $user->canDo('hr.expenses.approve'), 403);
 
         $validated = $request->validate([
             'rejection_reason' => ['required', 'string', 'max:2000'],

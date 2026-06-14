@@ -33,6 +33,7 @@ class HrExpenseClaim extends Model
         'rejection_reason',
         'notes',
         'journal_id',
+        'gl_posted_at',
         'created_by',
     ];
 
@@ -41,6 +42,7 @@ class HrExpenseClaim extends Model
         'submitted_at' => 'datetime',
         'approved_at' => 'datetime',
         'paid_at' => 'datetime',
+        'gl_posted_at' => 'datetime',
     ];
 
     /* ------------------------------------------------------------------ */
