@@ -7,9 +7,11 @@ use App\Domain\Hr\Models\HrCandidate;
 use App\Domain\Hr\Models\HrDocument;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrOffer;
+use App\Domain\Hr\Models\HrOnboardingChecklist;
 use App\Models\Role;
 use App\Models\User;
 use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Facades\Log;
 use Illuminate\Support\Facades\Password;
 use Illuminate\Support\Str;
 
@@ -282,12 +284,38 @@ class RecruitmentService
             // Copy candidate documents to employee documents
             $this->transferCandidateDocuments($candidate, $profile, $convertedBy);
 
-            $this->onboardingService->generateChecklist($profile, $convertedBy);
+            $this->maybeGenerateOnboardingChecklist($profile, $convertedBy);
 
             Password::broker()->sendResetLink(['email' => $user->email]);
 
             return $profile->fresh();
         });
+    }
+
+    /**
+     * Generate the onboarding checklist on conversion — but only once per profile
+     * (so re-running convert is idempotent), and never let a missing onboarding
+     * template abort the whole conversion (the hire still succeeds; HR can start
+     * onboarding manually).
+     */
+    protected function maybeGenerateOnboardingChecklist(HrEmployeeProfile $profile, int $convertedBy): void
+    {
+        $alreadyOnboarding = HrOnboardingChecklist::query()
+            ->where('employee_profile_id', $profile->id)
+            ->exists();
+
+        if ($alreadyOnboarding) {
+            return;
+        }
+
+        try {
+            $this->onboardingService->generateChecklist($profile, $convertedBy);
+        } catch (\RuntimeException $exception) {
+            Log::warning('Onboarding checklist not auto-generated on conversion', [
+                'employee_profile_id' => $profile->id,
+                'error' => $exception->getMessage(),
+            ]);
+        }
     }
 
     /**
