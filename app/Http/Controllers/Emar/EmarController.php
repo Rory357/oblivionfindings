@@ -1151,9 +1151,13 @@ class EmarController extends Controller
     // ─── Controlled Drugs ──────────────────────────────────
     public function controlled(Request $request)
     {
+        $siteFilter = $request->integer('site_id') ?: null;
+        $bySite = fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteFilter));
+
         $controlledMedications = ClientMedication::query()
             ->active()
             ->controlled()
+            ->when($siteFilter, $bySite)
             ->with([
                 'client:id,first_name,last_name',
                 'stock',
@@ -1162,6 +1166,7 @@ class EmarController extends Controller
             ->get();
 
         $recentEntries = ClientControlledDrugEntry::query()
+            ->when($siteFilter, $bySite)
             ->with(['client:id,first_name,last_name', 'medication:id,name', 'recordedBy:id,name', 'witnessedBy:id,name'])
             ->latest('recorded_at')
             ->limit(50)
@@ -1169,6 +1174,7 @@ class EmarController extends Controller
 
         $discrepancies = ClientControlledDrugDiscrepancy::query()
             ->whereIn('status', ['open', 'under_review'])
+            ->when($siteFilter, $bySite)
             ->with([
                 'client:id,first_name,last_name',
                 'medication:id,name',
@@ -1179,22 +1185,53 @@ class EmarController extends Controller
 
         $destructions = MedicationDestruction::query()
             ->controlled()
+            ->when($siteFilter, $bySite)
             ->with(['client:id,first_name,last_name', 'destroyedByUser:id,name', 'witness1:id,name'])
             ->latest('destroyed_at')
             ->limit(20)
             ->get();
 
-        $lossReports = ControlledDrugLossReport::with([
-            'client:id,first_name,last_name',
-            'discoveredBy:id,name',
-            'attachments.uploadedBy:id,name',
-        ])
+        $lossReports = ControlledDrugLossReport::query()
+            ->when($siteFilter, $bySite)
+            ->with([
+                'client:id,first_name,last_name',
+                'discoveredBy:id,name',
+                'attachments.uploadedBy:id,name',
+            ])
             ->latest()
             ->get();
 
+        $activeSite = $siteFilter ? Site::find($siteFilter) : null;
+
         return Inertia::render('emar/ControlledDrugs', [
-            'medications' => $controlledMedications,
-            'recentEntries' => $recentEntries,
+            'medications' => $controlledMedications->map(fn (ClientMedication $m) => [
+                'id' => $m->id,
+                'name' => $m->name,
+                'controlled_drug' => (bool) $m->controlled_drug,
+                'client_id' => $m->client_id,
+                'client_name' => $m->client ? trim($m->client->first_name.' '.$m->client->last_name) : 'Unknown',
+                'stock' => $m->stock ? [
+                    'on_hand' => $m->stock->on_hand,
+                    'unit' => $m->stock->unit,
+                    'last_counted_at' => $m->stock->last_counted_at instanceof \DateTimeInterface ? $m->stock->last_counted_at->toIso8601String() : null,
+                ] : null,
+            ])->values(),
+            'recentEntries' => $recentEntries->map(fn (ClientControlledDrugEntry $e) => [
+                'id' => $e->id,
+                'client_id' => $e->client_id,
+                'client_name' => $e->client ? trim($e->client->first_name.' '.$e->client->last_name) : 'Unknown',
+                'medication_name' => $e->medication?->name,
+                'entry_type' => $e->entry_type,
+                'quantity' => $e->quantity,
+                'unit' => $e->unit,
+                'on_hand_before' => $e->on_hand_before,
+                'on_hand_after' => $e->on_hand_after,
+                'batch_number' => $e->batch_number,
+                'notes' => $e->notes,
+                'recorded_at' => $e->recorded_at instanceof \DateTimeInterface ? $e->recorded_at->toIso8601String() : null,
+                'recorded_by_name' => $e->recordedBy?->name,
+                'witnessed_by_name' => $e->witnessedBy?->name,
+            ])->values(),
             'discrepancies' => $discrepancies->map(fn (ClientControlledDrugDiscrepancy $discrepancy) => [
                 'id' => $discrepancy->id,
                 'client' => $discrepancy->client ? [
@@ -1219,7 +1256,19 @@ class EmarController extends Controller
                     ->values()
                     ->all(),
             ])->values(),
-            'destructions' => $destructions,
+            'destructions' => $destructions->map(fn (MedicationDestruction $d) => [
+                'id' => $d->id,
+                'client_name' => $d->client ? trim($d->client->first_name.' '.$d->client->last_name) : 'Unknown',
+                'medication_name' => $d->medication_name,
+                'quantity' => $d->quantity,
+                'unit' => $d->unit,
+                'reason' => $d->reason,
+                'disposal_method' => $d->disposal_method,
+                'destroyed_at' => $d->destroyed_at instanceof \DateTimeInterface ? $d->destroyed_at->toIso8601String() : null,
+                'destroyed_by_name' => $d->destroyedByUser?->name,
+                'witness_name' => $d->witness1?->name,
+                'notes' => $d->notes,
+            ])->values(),
             'lossReports' => $lossReports->map(fn (ControlledDrugLossReport $report) => [
                 'id' => $report->id,
                 'client' => $report->client ? [
@@ -1249,6 +1298,9 @@ class EmarController extends Controller
             ])->values(),
             'staff' => $this->getStaffList(),
             'clients' => $this->getClientsList(),
+            'sites' => Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'active_site' => $activeSite ? ['id' => $activeSite->id, 'name' => $activeSite->name] : null,
+            'site_brand_colour' => $activeSite?->brand_colour,
             'can' => [
                 'manage_evidence' => (bool) $request->user() && (
                     $request->user()->canDo('medications.controlled.record')
@@ -3197,6 +3249,23 @@ class EmarController extends Controller
         $onHandAfter = $validated['on_hand_after'] ?? $validated['balance_after'] ?? null;
         $unit = $validated['unit'] ?? $medication?->stock?->unit ?? 'tablets';
 
+        // Balance integrity (NZ CD register): for a directional movement the new
+        // running balance must equal the prior balance ± the signed quantity.
+        if ($onHandBefore !== null && $onHandAfter !== null) {
+            $qty = (float) $validated['quantity'];
+            $expectedAfter = match ($validated['entry_type']) {
+                'receipt', 'transfer_in' => (float) $onHandBefore + $qty,
+                'administration', 'disposal', 'transfer_out' => (float) $onHandBefore - $qty,
+                default => null, // balance_check / adjustment may legitimately differ
+            };
+
+            if ($expectedAfter !== null && abs($expectedAfter - (float) $onHandAfter) > 0.001) {
+                throw ValidationException::withMessages([
+                    'on_hand_after' => "Balance does not reconcile: {$onHandBefore} and a movement of {$qty} should leave {$expectedAfter}, not {$onHandAfter}.",
+                ]);
+            }
+        }
+
         if (
             $this->medicationSyncRequested($validated)
             && $medication?->stock
@@ -3226,7 +3295,7 @@ class EmarController extends Controller
             'reason' => ucwords(str_replace('_', ' ', $validated['entry_type'])),
             'recorded_by' => auth()->id(),
             'witnessed_by' => $validated['witnessed_by'],
-            'notes' => $validated['notes'],
+            'notes' => $validated['notes'] ?? null,
             'recorded_at' => now(),
         ]);
 

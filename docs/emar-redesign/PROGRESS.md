@@ -12,7 +12,7 @@ isolated in their own worktrees `hr-m1-people` / `fin-wt`). Design bundles: `.de
 | 3 | Medications Database | `/emar/medications` | `Medications_Page/` | done* | `e85d3a13` + frontend |
 | 4 | Prescriptions & Orders | `/emar/prescriptions` | `Prescription_Page/` | done* | backend+frontend |
 | 5 | PRN Records | `/emar/prn` | `PRN_Redesign/` | done* | backend+frontend |
-| 6 | Controlled Drugs | `/emar/controlled` | `Controlled_Drugs_Page/` | todo | — |
+| 6 | Controlled Drugs | `/emar/controlled` | `Controlled_Drugs_Page/` | done* | backend+frontend |
 | 7 | Destructions | `/emar/destructions` | `Destruction_Page/` | todo | — |
 | 8 | Stock Management | `/emar/stock` | `Stock_Management/` | todo | — |
 | 9 | Medication Reviews | `/emar/reviews` | `Medications_review/` | todo | — |
@@ -38,6 +38,8 @@ Status legend: `todo` / `in-progress` / `done`. `done*` = all automated gates gr
 - **`resources/js/components/page/page-hero.tsx`** (brand-colour foundation): added optional `brandColour?: string | null` prop + resolved `heroBase` (brandColour → category → primary) driving `--hero-base`. Purely additive — existing `category`-only callers unchanged. ⚠️ Finance loop also edits this file.
 
 ## Backlog / deferred
+
+**Page 6 (Controlled Drugs):** loss-index route **retirement** (kept the page; Loss Reports tab provides it), overdue-reconciliation **scheduled job** (gap 3), incident-id **surfacing** on discrepancy rows (gap 4), CD **offline-queue convergence** (gap 6), CD register **PDF** as hero "More" action. The **Destructions** tab here lists CD destructions + a **shared `RecordDestructionDialog`** (in `_cd-dialogs.tsx`) reused on Page 7 — Destructions stays its own page (NOT folded). Backend: balance-integrity **gap-1 validation** (directional after = before ± qty) + fixed a **pre-existing `storeCDEntry` `Undefined array key "notes"` 500** + site filter/brand colour + flat-mapped medications/recentEntries/destructions. 7-tab page (Register/Recent/Reconciliation/Discrepancies/Destructions/Loss/Audit). All CD safety (witness ≠ recorder, conflict, append-only, auto-discrepancy→incident) already enforced. Reasons: separable infra; core = 7-tab register + all CD wizards + balance-integrity.
 
 **Page 5 (PRN Records):** CSV **export register** (hero export button NOT rendered — hidden unbuilt action), full **date-range period picker** (used a recent 30-day window + site filter instead), Trends per-med **colour** bars (single-colour bars). The two modals are **REUSED verbatim**: `PrnWizard` (record dose → `meds.today.prn`) + `PrnEffectDialog` (effectiveness → `meds.today.prn_effect`) — the latter is the existing shared raw-`Dialog` effectiveness component (reused as the single effectiveness path, not migrated to MedsWizardDialog since meds/today shares it). Backend: `prn()` rebuilt to compose `MedsBoardPayloadService` (prn_medications/clients/witnesses/board_user) + a flat 30-day register + pending-review queue + site_brand_colour. NO new modals. Reasons: secondary; core = 4-tab actionable register reusing the existing PRN write + effectiveness paths.
 
