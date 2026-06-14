@@ -3,6 +3,7 @@ import { type PageProps } from '@/types';
 import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
+import { PayablesTabsFooter } from '@/components/finance';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Input } from '@/components/ui/input';
@@ -115,6 +116,7 @@ export default function VendorsIndex({ vendors, filters }: Props) {
                                 </Link>
                             </Button>
                         }
+                        footer={<PayablesTabsFooter active="vendors" />}
                     />
                 }
             >

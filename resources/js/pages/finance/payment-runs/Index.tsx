@@ -1,6 +1,7 @@
 import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
+import { PayablesTabsFooter } from '@/components/finance';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -87,6 +88,7 @@ export default function PaymentRunsIndex({ paymentRuns, filters }: PageProps) {
                                 </Button>
                             </Link>
                         }
+                        footer={<PayablesTabsFooter active="payment-runs" />}
                     />
                 }
             >

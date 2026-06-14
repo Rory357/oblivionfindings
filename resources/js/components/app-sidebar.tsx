@@ -1650,23 +1650,9 @@ function buildFinanceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
 
     const ap: NavItem[] = [];
     if (can?.finance?.ap?.view) {
-        ap.push({ title: 'Vendors', href: '/finance/vendors', icon: Users });
-        ap.push({
-            title: 'Purchase Orders',
-            href: '/finance/purchase-orders',
-            icon: ClipboardCheck,
-        });
-        ap.push({ title: 'Bills', href: '/finance/bills', icon: Receipt });
-        ap.push({
-            title: 'Credit Notes',
-            href: '/finance/credit-notes',
-            icon: FileText,
-        });
-        ap.push({
-            title: 'Payment Runs',
-            href: '/finance/payment-runs',
-            icon: ArrowLeftRight,
-        });
+        // Purchases & Payables hub — bills, purchase orders, vendors, credit notes
+        // and payment runs are now tabs here.
+        ap.push({ title: 'Payables', href: '/finance/payables', icon: Receipt });
     }
 
     const ar: NavItem[] = [];
