@@ -1,5 +1,38 @@
 # Finance Module — Rebuild Plan (Design Parity + Xero/MYOB Completeness + Payroll→Finance + Cross-module reconciliation)
 
+---
+
+## ✅ Finance rebuild — Definition of Done status (2026-06-15)
+
+The autonomous /loop has reached **steady state**: every finance-internal milestone achievable in a headless
+loop is shipped to `main`, gated (types/lint/pint/build + the Finance feature suite, **131 green**), and ticked
+below. The loop is **paused** — remaining work needs a browser or cross-module coordination (see below).
+
+**SHIPPED (M0–M10):**
+- **8-hub consolidation** (105 pages → Ledger · Receivables · Payables · Banking · Tax · Reports · Settings) — each
+  a Rostering-style hero + standardised TabStrip; every hub index redirects to its first openable tab (or is a
+  by-design landing page); sidebar collapsed; redirect/403 tests per hub.
+- **Finance obligation Calendar** (`/finance/calendar`) — `FinanceCalendarAggregator` + 4 real-data providers
+  (invoice/bill due, payment-run, NZ-GST deadline) → FullCalendar page reusing the shared wrapper, design-token
+  event colours, source legend, read-only detail dialog.
+- **GL integrity** — balance + open-fiscal-period enforced by `JournalPostingService::post()`; idempotency by
+  state-machine; M8-2 live GL actuals (budget-vs-actuals reads posted journal lines); end-to-end lock-in tests for
+  invoice/bill/payment-run/credit-note/expense/leave pipelines.
+- **Xero account_mapping** honoured in the GL push (mapped → AccountID, else AccountCode); MYOB explicitly unsupported.
+- **IRD honesty** (no fake live submission); **FinanceDemoSeeder** (every hub + the calendar render populated on
+  `migrate:fresh --seed`); **component de-dup** (`FinanceSummaryCard`); **Edit-via-modal** for draft bills + invoices.
+
+**DEFERRED — needs the live dev server / a browser (out of scope for the headless loop, → USER):** axe a11y +
+responsive sweep on every hub; side-by-side-vs-Rostering visual parity on oblivionfindings.com.
+
+**DEFERRED — cross-module (touch Governance/HR/Sites domains owned by other loops; need coordination):** M8-2 STORE
+unification (Governance `Budget` vs Finance `SiteBudgetLine`); M6 client-money/funding backend unification; M9-2
+capture-at-source modals (damages/catering/respite/asset → canonical finance paths); M7-2 payday filing (HR-owned).
+Investigated + intentionally NOT built (would be wrong/invented): M8-3 SpendApproval→bill (governance pre-auth),
+M8-4 payroll outflow (needs a FinPaymentRun.type / HR payroll model).
+
+---
+
 **Created:** 2026-06-14 · **Author:** Claude (Opus 4.8, autonomous /loop)
 **Companion:** `docs/finance-module-gap-analysis.md` (feature-by-feature, file:line evidence).
 **Basis:** 9 parallel adversarial code sweeps, all claims re-derived from current code; the 2026-05-01
@@ -420,7 +453,13 @@ KiwiSaver + net-pay liability) via `PostPayrollJournalJob`; `AllocatePayrollCost
   (DR Expense/CR AP; DR AP/CR Bank) and replaying throws + posts no second journal. Finance suite 126 green.
   *Remaining (deferred — needs the live dev server / browser, out of scope for the headless loop):* axe a11y +
   responsive sweep on every hub, side-by-side-vs-Rostering parity on oblivionfindings.com.
-- **[~] M10-6 Edit-via-modal — Bills DONE (main 28bc9d7f); Invoices needs a backend contract fix first.**
+- **[x] M10-6 Edit-via-modal — Bills + Invoices DONE (main 28bc9d7f + 11cba27a).** Invoices: aligned the update
+  contract with create (UpdateInvoiceRequest gained client_id/funding_body + required_without_all client_name + the
+  'default'→null `prepareForValidation`; `InvoiceController@update` resolves the client and derives
+  client_id/client_name/email/address like `store`; `@index` eager-loads lines), then added the `invoice` edit prop
+  to NewInvoiceDialog + a draft-only Edit row-action on the Receivables index. Draft-only + post-on-SEND keep it
+  GL-safe. 3 tests (client-billed derive + 'default' tax sentinel; funder-billed funding_body; non-draft refused);
+  suite 131 green. Earlier (Bills):
   `NewBillDialog` now takes an optional `bill` prop → EDIT mode (prefill, gst fraction→percentage, PUT
   `finance.bills.update`); Payables index gained a draft-only Edit row-action (keyed-per-row modal) and
   `BillController@index` eager-loads `lines` for prefill. GL-safe (update already rejects non-draft). 2 tests
