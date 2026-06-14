@@ -319,7 +319,15 @@ goals.update, succession.candidates.store/update, competencies.update.
   self-assessment though `employee_comments` is validated. *Fix:* a review-cycle object + bulk launch +
   employee self-assessment step. *Acceptance:* a cycle launches reviews in bulk; employee can self-assess.
 
-### M7 — Peer Recognition (explicit deliverable)
+### M7 — Peer Recognition (explicit deliverable) — ✅ DONE (main 6a8cc7af→e08c55c5, 2026-06-14)
+
+**Shipped (3 green sub-commits, 7 Pest tests):** M7-S1 (6a8cc7af) — SECURITY: the /hr/feed routes were
+permission-ungated (any auth user could post/kudos); gated feed.index→hr.recognition.view, feed.store+feed.kudos→
+hr.recognition.give (new keys in SeedHrPermissionsSeeder, granted to all staff roles, reseed-on-deploy). Same commit
+fixed a latent bug that made the feed WHOLLY non-functional: FeedController used $user->tenant_id (always null) vs a
+NOT-NULL column → empty reads + every insert silently failed; routed via ResolvesHrTenant. M7-R2 (7aa86d9e) —
+Give-recognition WizardShell modal (recipient PeoplePicker → category TilePicker → message → review) replacing the
+flat Send-Kudos dialog. M7-R3 (e08c55c5) — HrDemoSeeder feed/kudos demo data (idempotent). NO reactions (no backend).
 
 **Key finding:** partially built — `HrKudos` model + `FeedService::sendKudos` + `FeedController::sendKudos`
 + 2 flat dialogs + profile stats + leaderboard. This is "finish/upgrade", not "build".
