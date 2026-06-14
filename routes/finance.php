@@ -22,6 +22,7 @@ use App\Domain\Finance\Http\Controllers\CurrencyController;
 use App\Domain\Finance\Http\Controllers\DonorFundController;
 use App\Domain\Finance\Http\Controllers\EftposController;
 use App\Domain\Finance\Http\Controllers\ExecutiveFinancialDashboardController;
+use App\Domain\Finance\Http\Controllers\FinanceCalendarController;
 use App\Domain\Finance\Http\Controllers\FinanceDashboardController;
 use App\Domain\Finance\Http\Controllers\FinancialInsightsApiController;
 use App\Domain\Finance\Http\Controllers\FinancialReportController;
@@ -65,6 +66,12 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     // Executive Financial Dashboard
     Route::get('/executive-dashboard', [ExecutiveFinancialDashboardController::class, 'index'])
         ->name('executive-dashboard')
+        ->middleware('permission:finance.dashboard');
+
+    // Finance obligation calendar — JSON event feed (invoice/bill due dates,
+    // payment runs, GST deadlines). The page route follows in M9-1 part 2.
+    Route::get('/calendar/events', [FinanceCalendarController::class, 'events'])
+        ->name('calendar.events')
         ->middleware('permission:finance.dashboard');
 
     // All-Sites Financial Overview
