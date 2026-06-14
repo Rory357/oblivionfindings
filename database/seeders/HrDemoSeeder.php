@@ -13,6 +13,7 @@ use App\Domain\Hr\Models\HrCourseEnrollment;
 use App\Domain\Hr\Models\HrDocument;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrExpenseClaim;
+use App\Domain\Hr\Models\HrFeedPost;
 use App\Domain\Hr\Models\HrJobRequisition;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrPayrollRun;
@@ -21,6 +22,7 @@ use App\Domain\Hr\Models\HrSupervisionNote;
 use App\Domain\Hr\Models\HrSurvey;
 use App\Domain\Hr\Models\HrSurveyQuestion;
 use App\Domain\Hr\Models\HrTimeEntry;
+use App\Domain\Hr\Services\FeedService;
 use App\Models\User;
 use Illuminate\Database\Seeder;
 use Illuminate\Support\Carbon;
@@ -50,6 +52,66 @@ class HrDemoSeeder extends Seeder
         $this->seedAssets($tenantId, $manager, $profiles);
         $this->seedTraining($tenantId, $profiles);
         $this->seedAnnouncementsAndSurveys($tenantId, $admin);
+        $this->seedRecognitionFeed($tenantId, $admin, $manager, $profiles);
+    }
+
+    /**
+     * Seed the community feed: a couple of posts + a handful of peer kudos so
+     * the recognition feed isn't empty in demo. Idempotent — skips if the feed
+     * already has posts for this tenant.
+     *
+     * @param  Collection<int, HrEmployeeProfile>  $profiles
+     */
+    private function seedRecognitionFeed(int $tenantId, User $admin, User $manager, Collection $profiles): void
+    {
+        if (HrFeedPost::query()->where('tenant_id', $tenantId)->exists()) {
+            return;
+        }
+
+        $workers = $profiles->map(fn (HrEmployeeProfile $p) => $p->user)->filter()->values();
+        if ($workers->count() < 1) {
+            return;
+        }
+
+        // A couple of general feed posts.
+        HrFeedPost::create([
+            'tenant_id' => $tenantId,
+            'user_id' => $admin->id,
+            'post_type' => 'announcement',
+            'content' => 'Welcome to the community feed — share wins and recognise your teammates here!',
+            'is_pinned' => true,
+        ]);
+        HrFeedPost::create([
+            'tenant_id' => $tenantId,
+            'user_id' => $manager->id,
+            'post_type' => 'update',
+            'content' => 'Great effort covering the weekend roster, everyone. The new intake settled in smoothly.',
+            'is_pinned' => false,
+        ]);
+
+        // A handful of peer kudos (each also creates a kudos feed post).
+        $feed = app(FeedService::class);
+        $givers = collect([$manager, $admin])->merge($workers)->values();
+        $kudos = [
+            ['category' => 'teamwork', 'message' => 'Stepped in to cover a short-notice sleepover — huge help to the team.'],
+            ['category' => 'going_above', 'message' => 'Stayed back to support a client through a tough evening. Above and beyond.'],
+            ['category' => 'customer_focus', 'message' => 'The family specifically called out how supported they felt this week.'],
+            ['category' => 'innovation', 'message' => 'Reworked the handover checklist and it has saved everyone time.'],
+            ['category' => 'leadership', 'message' => 'Calmly led the team through a busy shift and kept everyone on track.'],
+        ];
+
+        foreach ($kudos as $index => $entry) {
+            $from = $givers[$index % $givers->count()];
+            $to = $workers[$index % $workers->count()];
+            if ($from->id === $to->id) {
+                $to = $workers[($index + 1) % $workers->count()];
+            }
+            if ($from->id === $to->id) {
+                continue; // not enough distinct users
+            }
+
+            $feed->sendKudos($from, $to->id, $entry['category'], $entry['message'], $tenantId);
+        }
     }
 
     private function resolveTenantId(): int
