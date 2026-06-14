@@ -2,6 +2,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import { type BreadcrumbItem, PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
+import { PayablesTabsFooter } from '@/components/finance';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
@@ -104,6 +105,7 @@ export default function CreditNotesIndex({ auth, creditNotes, filters }: Props) 
                                 </Link>
                             </Button>
                         }
+                        footer={<PayablesTabsFooter active="credit-notes" />}
                     />
                 }
             >

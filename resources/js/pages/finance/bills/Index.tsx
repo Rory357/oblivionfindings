@@ -2,6 +2,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import { type BreadcrumbItem, PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
+import { PayablesTabsFooter } from '@/components/finance';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -132,6 +133,7 @@ export default function BillsIndex({ auth, bills, vendors, filters, summary }: P
                                 </Link>
                             </Button>
                         }
+                        footer={<PayablesTabsFooter active="bills" />}
                     />
                 }
             >

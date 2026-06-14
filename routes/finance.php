@@ -35,6 +35,7 @@ use App\Domain\Finance\Http\Controllers\IrdFilingController;
 use App\Domain\Finance\Http\Controllers\JournalController;
 use App\Domain\Finance\Http\Controllers\LedgerController;
 use App\Domain\Finance\Http\Controllers\MatchRuleController;
+use App\Domain\Finance\Http\Controllers\PayablesController;
 use App\Domain\Finance\Http\Controllers\PaymentAllocationController;
 use App\Domain\Finance\Http\Controllers\PaymentMatchController;
 use App\Domain\Finance\Http\Controllers\PaymentRunController;
@@ -154,6 +155,12 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     Route::middleware('permission:finance.admin')->group(function () {
         Route::resource('currencies', CurrencyController::class)->except(['show', 'edit']);
     });
+
+    // ── Purchases & Payables hub ────────────────────────────────────────
+    // /finance/payables is the hub entry point; it redirects to the first AP tab
+    // the user can open (bills · purchase orders · vendors · credit notes ·
+    // payment runs). The tabs themselves are the routes below.
+    Route::get('/payables', [PayablesController::class, 'index'])->name('payables.index');
 
     // ── Vendors ─────────────────────────────────────────────────────────
     Route::get('/vendors', [VendorController::class, 'index'])

@@ -11,6 +11,7 @@ export * from './money';
 export * from './new-account-dialog';
 export * from './new-invoice-dialog';
 export * from './new-journal-dialog';
+export * from './payables-hub';
 export * from './posting-preview';
 export * from './receivables-hub';
 export * from './record-receipt-dialog';

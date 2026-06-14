@@ -2,6 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, usePage } from '@inertiajs/react';
 import { PageHero, PageLayout } from '@/components/page';
+import { PayablesTabsFooter } from '@/components/finance';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
 import { Label } from '@/components/ui/label';
@@ -82,6 +83,7 @@ export default function PurchaseOrderIndex() {
                                 </Button>
                             </Link>
                         }
+                        footer={<PayablesTabsFooter active="purchase-orders" />}
                     />
                 }
             >
