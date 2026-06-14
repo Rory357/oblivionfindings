@@ -12,6 +12,7 @@ export * from './new-account-dialog';
 export * from './new-journal-dialog';
 export * from './posting-preview';
 export * from './receivables-hub';
+export * from './record-receipt-dialog';
 export * from './wizard';
 
 // Reuse HR's legible StatusBadge (already covers paid/posted/overdue/approved/…)
