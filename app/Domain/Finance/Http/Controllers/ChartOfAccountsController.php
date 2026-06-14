@@ -31,9 +31,23 @@ class ChartOfAccountsController extends Controller
             ['value' => 'expense', 'label' => 'Expense'],
         ];
 
+        // Reference data for the in-list New Account wizard — only loaded for users
+        // who can create an account (the modal trigger is permission-gated too).
+        $canManage = $request->user()->can('create', FinAccount::class);
+
         return Inertia::render('finance/accounts/Index', [
             'accountTree' => $tree,
             'accountTypes' => $accountTypes,
+            'canManage' => $canManage,
+            'parentAccounts' => $canManage
+                ? FinAccount::forOrganization($orgId)->active()->orderBy('code')->get(['id', 'code', 'name', 'type'])
+                : [],
+            'taxRates' => $canManage
+                ? FinTaxRate::forOrganization($orgId)->active()->orderBy('name')->get(['id', 'name', 'code', 'rate'])
+                : [],
+            'fundingStreams' => $canManage
+                ? FinFundingStream::forOrganization($orgId)->active()->orderBy('name')->get(['id', 'code', 'name'])
+                : [],
         ]);
     }
 

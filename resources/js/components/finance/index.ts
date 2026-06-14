@@ -8,6 +8,7 @@ export * from './finance-hero';
 export * from './finance-tabs';
 export * from './ledger-hub';
 export * from './money';
+export * from './new-account-dialog';
 export * from './new-journal-dialog';
 export * from './posting-preview';
 export * from './wizard';

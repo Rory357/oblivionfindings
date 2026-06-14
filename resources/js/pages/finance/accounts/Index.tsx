@@ -1,4 +1,4 @@
-import { LedgerTabsFooter } from '@/components/finance';
+import { LedgerTabsFooter, NewAccountDialog } from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -9,7 +9,7 @@ import {
     CollapsibleTrigger,
 } from '@/components/ui/collapsible';
 import AppLayout from '@/layouts/app-layout';
-import { Head, Link, router } from '@inertiajs/react';
+import { Head, router } from '@inertiajs/react';
 import { ChevronDown, ChevronRight, DollarSign, Plus, Wallet } from 'lucide-react';
 import { useState } from 'react';
 
@@ -35,9 +35,15 @@ type AccountTree = {
     expense: Account[];
 };
 
+type RefItem = { id: number; code: string; name: string; type?: string };
+
 type PageProps = {
     accountTree: AccountTree;
     accountTypes: { value: string; label: string }[];
+    canManage?: boolean;
+    parentAccounts?: RefItem[];
+    taxRates?: { id: number; name: string; code: string; rate: string }[];
+    fundingStreams?: RefItem[];
 };
 
 const formatNZD = (amount: number) =>
@@ -193,7 +199,12 @@ function AccountTypeSection({
 export default function AccountsIndex({
     accountTree,
     accountTypes,
+    canManage = false,
+    parentAccounts = [],
+    taxRates = [],
+    fundingStreams = [],
 }: PageProps) {
+    const [createOpen, setCreateOpen] = useState(false);
     const breadcrumbs = [
         { title: 'Finance', href: '/finance' },
         { title: 'Chart of Accounts', href: '/finance/accounts' },
@@ -221,12 +232,12 @@ export default function AccountsIndex({
                             { label: 'Account types', value: accountTypes.length },
                         ]}
                         actions={
-                            <Link href={'/finance/accounts/create'}>
-                                <Button size="sm">
+                            canManage ? (
+                                <Button size="sm" onClick={() => setCreateOpen(true)}>
                                     <Plus className="mr-1.5 h-4 w-4" />
                                     Add Account
                                 </Button>
-                            </Link>
+                            ) : undefined
                         }
                         footer={<LedgerTabsFooter active="accounts" />}
                     />
@@ -257,6 +268,16 @@ export default function AccountsIndex({
                         ))}
                     </CardContent>
                 </Card>
+
+                {canManage && (
+                    <NewAccountDialog
+                        open={createOpen}
+                        onClose={() => setCreateOpen(false)}
+                        parentAccounts={parentAccounts}
+                        taxRates={taxRates}
+                        fundingStreams={fundingStreams}
+                    />
+                )}
             </PageLayout>
         </AppLayout>
     );
