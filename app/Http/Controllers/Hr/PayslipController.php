@@ -166,8 +166,8 @@ class PayslipController extends Controller
             || ($user && $user->id === $payslip->user_id);
         abort_unless($canView, 403);
 
-        // Generate PDF if not yet created
-        if (! $payslip->pdf_path) {
+        // Generate the PDF if not yet created, or upgrade a stale pre-PDF (.html) artefact.
+        if (! $payslip->pdf_path || ! str_ends_with($payslip->pdf_path, '.pdf')) {
             $this->payslipService->generatePayslipPdf($payslip);
             $payslip->refresh();
         }
@@ -178,8 +178,8 @@ class PayslipController extends Controller
 
         return Storage::disk('private')->download(
             $payslip->pdf_path,
-            "payslip_{$payslip->pay_period_start->format('Y-m-d')}_{$payslip->pay_period_end->format('Y-m-d')}.html",
-            ['Content-Type' => 'text/html'],
+            "payslip_{$payslip->pay_period_start->format('Y-m-d')}_{$payslip->pay_period_end->format('Y-m-d')}.pdf",
+            ['Content-Type' => 'application/pdf'],
         );
     }
 

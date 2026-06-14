@@ -5,10 +5,10 @@ namespace App\Domain\Hr\Services;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrPayrollRun;
 use App\Domain\Hr\Models\HrPayslip;
+use Barryvdh\DomPDF\Facade\Pdf;
 use Illuminate\Support\Collection;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Storage;
-use Illuminate\Support\Facades\View;
 
 class PayslipService
 {
@@ -154,21 +154,21 @@ class PayslipService
     {
         $payslip->load(['user', 'employeeProfile']);
 
-        $html = View::make('hr.payslip-pdf', [
+        $pdf = Pdf::loadView('hr.payslip-pdf', [
             'payslip' => $payslip,
             'employee' => $payslip->user,
             'profile' => $payslip->employeeProfile,
-        ])->render();
+        ])->setPaper('a4');
 
         $filename = sprintf(
-            'payslips/%s/%s_%s_%s.html',
+            'payslips/%s/%s_%s_%s.pdf',
             $payslip->tenant_id,
             $payslip->user_id,
             $payslip->pay_period_start->format('Y-m-d'),
             $payslip->pay_period_end->format('Y-m-d'),
         );
 
-        Storage::disk('private')->put($filename, $html);
+        Storage::disk('private')->put($filename, $pdf->output());
 
         $payslip->update(['pdf_path' => $filename]);
 
