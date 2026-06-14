@@ -181,8 +181,6 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             ->middleware('permission:hr.recruitment.manage');
         Route::post('/recruitment/jobs/{job}/sync-posting', [RecruitmentJobController::class, 'syncPosting'])->name('jobs.sync-posting')
             ->middleware('permission:hr.recruitment.manage');
-        Route::post('/recruitment/jobs/{job}/unpublish-posting', [RecruitmentJobController::class, 'unpublishPosting'])->name('jobs.unpublish-posting')
-            ->middleware('permission:hr.recruitment.manage');
 
         // Interview kits
         Route::post('/recruitment/kits', [InterviewKitController::class, 'store'])->name('kits.store')

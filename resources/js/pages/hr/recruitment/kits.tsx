@@ -19,6 +19,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { RecruitmentTabs } from '@/components/hr';
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, useForm } from '@inertiajs/react';
@@ -522,6 +523,8 @@ export default function InterviewKits({ kits, roles, can }: Props) {
                         </div>
                     }
                 />
+
+                <RecruitmentTabs active="kits" />
 
                 {/* Kit Cards */}
                 {kits.data.length === 0 ? (

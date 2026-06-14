@@ -1,3 +1,4 @@
+import { RecruitmentTabs } from '@/components/hr';
 import PageShell from '@/components/page-shell';
 import { ActivityItem } from '@/components/recruitment/activity-item';
 import { KpiCard } from '@/components/recruitment/kpi-card';
@@ -182,61 +183,17 @@ export default function RecruitmentIndex({
                     ]}
                     actions={
                         can.manage ? (
-                            <div className="flex items-center gap-2">
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                    asChild
-                                >
-                                    <Link href="/hr/recruitment/kanban">
-                                        <LayoutGrid className="mr-2 h-4 w-4" />
-                                        Kanban
-                                    </Link>
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                    asChild
-                                >
-                                    <Link href="/hr/recruitment/analytics">
-                                        <BarChart3 className="mr-2 h-4 w-4" />
-                                        Analytics
-                                    </Link>
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                    asChild
-                                >
-                                    <Link href="/hr/recruitment/jobs">
-                                        <Briefcase className="mr-2 h-4 w-4" />
-                                        Jobs
-                                    </Link>
-                                </Button>
-                                <Button
-                                    variant="outline"
-                                    size="sm"
-                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                    asChild
-                                >
-                                    <Link href="/hr/recruitment/kits">
-                                        <FileText className="mr-2 h-4 w-4" />
-                                        Interview Kits
-                                    </Link>
-                                </Button>
-                                <Button asChild>
-                                    <Link href="/hr/recruitment/candidates/create">
-                                        <Plus className="mr-2 h-4 w-4" />
-                                        Add Candidate
-                                    </Link>
-                                </Button>
-                            </div>
+                            <Button asChild>
+                                <Link href="/hr/recruitment/candidates/create">
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Add Candidate
+                                </Link>
+                            </Button>
                         ) : undefined
                     }
                 />
+
+                <RecruitmentTabs active="pipeline" />
 
                 {/* KPI Cards */}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">

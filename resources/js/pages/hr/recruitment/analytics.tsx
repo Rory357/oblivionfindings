@@ -13,6 +13,7 @@ import {
     TabsList,
     TabsTrigger,
 } from '@/components/ui/tabs';
+import { RecruitmentTabs } from '@/components/hr';
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
@@ -166,6 +167,8 @@ export default function RecruitmentAnalytics({
                         </Button>
                     }
                 />
+
+                <RecruitmentTabs active="analytics" />
 
                 {/* KPI Cards */}
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">

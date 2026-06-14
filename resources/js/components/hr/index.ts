@@ -11,5 +11,6 @@ export * from './people/org-chart-pane';
 export * from './photo-upload-button';
 export * from './position-dialog';
 export * from './positions-pane';
+export * from './recruitment-tabs';
 export * from './status-badge';
 export * from './wizard';
