@@ -47,6 +47,7 @@ use App\Domain\Finance\Http\Controllers\PurchaseOrderController;
 use App\Domain\Finance\Http\Controllers\QuoteController;
 use App\Domain\Finance\Http\Controllers\RecurringChargeController;
 use App\Domain\Finance\Http\Controllers\ReportsController;
+use App\Domain\Finance\Http\Controllers\SettingsController;
 use App\Domain\Finance\Http\Controllers\SiteFinancialDashboardController;
 use App\Domain\Finance\Http\Controllers\SitesFinancialOverviewController;
 use App\Domain\Finance\Http\Controllers\TaxController;
@@ -463,6 +464,10 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     // /finance/tax is the hub entry point; it redirects to the first tax tab the
     // user can open (GST returns · IRD filings · audit exports · consolidation).
     Route::get('/tax', [TaxController::class, 'index'])->name('tax.index');
+
+    // Settings hub entry — redirects to the first openable admin tab
+    // (integrations · funding streams). Mirrors the tax hub.
+    Route::get('/settings', [SettingsController::class, 'index'])->name('settings.index');
 
     // ── GST Returns ─────────────────────────────────────────────────────
     Route::get('/gst-returns', [GstReturnController::class, 'index'])

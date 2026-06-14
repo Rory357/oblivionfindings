@@ -1,6 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm, router } from '@inertiajs/react';
 import { PageHero, PageLayout } from '@/components/page';
+import { SettingsTabsFooter } from '@/components/finance/settings-hub';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -364,6 +365,7 @@ export default function FundingStreamsIndex({ fundingStreams, revenueAccounts }:
                             { label: 'Active', value: activeCount },
                         ]}
                         actions={<CreateFundingStreamDialog revenueAccounts={revenueAccounts} />}
+                        footer={<SettingsTabsFooter active="funding-streams" />}
                     />
                 }
             >

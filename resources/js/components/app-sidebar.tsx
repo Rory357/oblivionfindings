@@ -1726,16 +1726,13 @@ function buildFinanceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     }
 
     if (can?.finance?.admin) {
+        // Settings hub — accounting integrations (Xero/MYOB) and funding streams
+        // are now tabs here. (Fiscal periods, cost centres, currencies live in the
+        // Ledger hub; match rules in the Banking hub — not duplicated here.)
         other.push({
-            title: 'Funding Streams',
-            href: '/finance/funding-streams',
-            icon: GitBranch,
-        });
-        // Consolidation is now a tab in the Tax & Compliance hub.
-        other.push({
-            title: 'Integrations',
-            href: '/finance/integrations',
-            icon: Link2,
+            title: 'Settings',
+            href: '/finance/settings',
+            icon: Settings,
         });
     }
 
