@@ -437,6 +437,16 @@ flat Send-Kudos dialog. M7-R3 (e08c55c5) — HrDemoSeeder feed/kudos demo data (
   on the richer Engagement survey system (retire `/hr/surveys` via redirect); one announcement model;
   announcements create → modal; wire or drop `HrCheckIn`. *Acceptance:* one survey system; one announcement
   path; no orphan model.
+  - AUDIT (agent a1edcf43, re-derived): canonical survey system = HrEngagementSurvey (/hr/wellbeing) — richer
+    (anonymity, per-response scoring, eNPS, action plans + SLA reminder job SendEngagementActionPlanRemindersJob,
+    5 tests); HrSurvey (/hr/surveys) is the thin dup (+cross-tenant bug). Announcements (HrAnnouncement) vs feed
+    are COMPLEMENTARY, not dups (acknowledge fully wired, no null-tenant bug) — only gap = create.tsx is a page not
+    a modal. HrCheckIn = TRUE ORPHAN (referenced nowhere but model/migration; drop = M10, needs migration).
+  - ✅ **DONE — retire HrSurvey (a22ddb85):** SurveyController index/create/show/respond → redirect to
+    hr.wellbeing.index (routes+names preserved; store/submitResponse left gated-but-unreachable for M10 removal);
+    sidebar dropped "Surveys", renamed "Wellbeing"→"Surveys & Wellbeing" + broadened gate (wellbeing||analytics||
+    surveys .view; old item was mis-gated analytics.view only). 4 tests (SurveySystemRetiredTest). REMAINING M8-6:
+    announcements create page→modal (low-risk finisher); HrCheckIn drop deferred to M10.
 
 ### M9 — Reports/Analytics; unified Approvals inbox; My-HR self-service
 
