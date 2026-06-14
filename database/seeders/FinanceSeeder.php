@@ -157,6 +157,7 @@ class FinanceSeeder extends Seeder
             $this->account('5020', 'ACC Employer Levy', 'expense', 'expense'),
             $this->account('5030', 'Staff Training', 'expense', 'expense', true),
             $this->account('5040', 'Recruitment Costs', 'expense', 'expense', true),
+            $this->account('5050', 'Leave Expense', 'expense', 'expense'),
             $this->account('5100', 'Contractor Costs', 'expense', 'expense', true),
             $this->account('6000', 'Rent & Occupancy', 'expense', 'expense', true),
             $this->account('6010', 'Utilities', 'expense', 'expense', true),
