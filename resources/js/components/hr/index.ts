@@ -5,6 +5,7 @@ export * from './departments-pane';
 export * from './directory-pane';
 export * from './hr-hero';
 export * from './hr-tabs';
+export * from './offboarding-wizard-dialog';
 export * from './offer-wizard-dialog';
 export * from './onboarding-wizard-dialog';
 export * from './people-picker';
