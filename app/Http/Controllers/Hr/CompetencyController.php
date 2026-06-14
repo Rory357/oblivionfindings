@@ -61,15 +61,15 @@ class CompetencyController extends Controller
             'sort_order' => ['nullable', 'integer'],
         ]);
 
+        // NB: hr_competencies has no created_by column — don't write it.
         HrCompetency::create([
-            'tenant_id' => $user->tenant_id,
+            'tenant_id' => $this->resolveHrTenantIdForUser($user),
             'name' => $data['name'],
             'description' => $data['description'] ?? null,
             'category' => $data['category'],
             'proficiency_levels' => $data['proficiency_levels'] ?? ['Beginner', 'Developing', 'Competent', 'Advanced', 'Expert'],
             'is_active' => true,
             'sort_order' => $data['sort_order'] ?? 0,
-            'created_by' => $user->id,
         ]);
 
         return redirect()->back()->with('success', 'Competency created.');
