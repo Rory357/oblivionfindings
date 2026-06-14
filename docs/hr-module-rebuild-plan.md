@@ -514,6 +514,10 @@ flat Send-Kudos dialog. M7-R3 (e08c55c5) — HrDemoSeeder feed/kudos demo data (
     16 assertions. Shared-primitive extraction not needed (hubs already reuse components/hr spine + wizard kit).
   - ✅ **DONE — ESS my/leave cancel button (cefa24a2):** wired the existing cancelLeave (owner-only, pending/
     approved, restores balance) — my/leave.tsx now has a per-row Cancel control. 3 tests (MyLeaveCancelTest).
+  - ✅ **DONE — drop orphan HrCheckIn (d93766f1):** reversible drop migration + deleted the never-referenced model.
+    2 tests (HrCheckInDroppedTest).
+  - ✅ **DONE — my/training LMS catalog link (203dd983):** permission-gated "Browse training courses" action on
+    my/training.tsx (can.viewCatalog = hr.training.view||training.viewAny). 2 tests (MyTrainingCatalogLinkTest).
 - **M10-2 Demo seeders for every hub.** *Problem:* many hubs empty in demo. *Fix:* extend `HrDemoSeeder`
   so every hub renders populated (recognition, payroll run, performance, recruitment pipeline, etc.).
   *Acceptance:* fresh `migrate:fresh --seed` → no empty hubs on the dev server.
