@@ -268,7 +268,18 @@ total_gross == GL wage expense. **M5-2 (net-pay payment run) is the remaining pi
   payday-filing feed from payroll. *Fix:* surface a payday-filing export/record from the posted run on the
   IRD filings screen. *Acceptance:* a posted run yields a payday-filing artefact visible under IRD filings.
 
-### M6 — Performance hub — 🟡 IN PROGRESS (ReviewWizardDialog shipped main c1b072b5, 2026-06-14)
+### M6 — Performance hub — ✅ DONE (main c1b072b5→15b818b2, 2026-06-14)
+
+**Shipped (6 green sub-commits, ~22 Pest tests):** ReviewWizardDialog (c1b072b5) · SupervisionDialog (86c41f33,
++topics_discussed NOT-NULL fix) · GoalDialog (de2e2a9a, wired dead goals.update) · ProbationDialog (3031c971,
+wired dead probation.*) · SuccessionCandidateDialog (6f5855fe, wired dead candidates.* + blank-name fix) ·
+Competency edit (15b818b2, wired dead competencies.update + fixed a 500ing create path: created_by column didn't
+exist). Every page-based create/edit form → WizardShell modal with old routes redirected; all four flagged dead
+backends now wired. **DEFERRED to M10:** the Performance hub-tabs shell (performance/index.tsx → PageHero+HrTabs
+consolidation of Overview·Reviews·Supervision·Competencies·PIPs·Succession·Feedback) — alongside the other hub
+consolidations (leave HrTabs migration, my-calendar wrapper de-dup, time-off grid). HrGoal vs HrDevelopmentGoal
+confirmed NOT duplicates (kept separate).
+
 
 **Audit CORRECTION:** HrGoal (OKRs: user_id, key-results, progress_percentage) and HrDevelopmentGoal (competency
 growth: employee_user_id/manager_user_id, target_level/progress_percent) are **NOT duplicates** — distinct
