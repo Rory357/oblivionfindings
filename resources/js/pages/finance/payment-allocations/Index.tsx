@@ -2,6 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { Head, router } from '@inertiajs/react';
 import { type BreadcrumbItem } from '@/types';
 import { PageHero, PageLayout } from '@/components/page';
+import { ReceivablesTabsFooter } from '@/components/finance';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
 import {
@@ -92,6 +93,7 @@ export default function PaymentAllocationsIndex({ allocations, filters }: Props)
                                 </Select>
                             </div>
                         }
+                        footer={<ReceivablesTabsFooter active="allocations" />}
                     />
                 }
             >

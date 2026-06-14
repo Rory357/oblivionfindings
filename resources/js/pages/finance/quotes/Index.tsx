@@ -12,6 +12,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { PageHero } from '@/components/page';
+import { ReceivablesTabsFooter } from '@/components/finance';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { ArrowRightLeft, Calculator, CheckCircle2, Clock, Eye, FileText, Pencil, Plus, Search, Send } from 'lucide-react';
@@ -83,6 +84,7 @@ export default function QuotesIndex({ quotes = { data: [], links: [], current_pa
                     { label: 'Accepted', value: stats?.accepted ?? 0 },
                     { label: 'Converted', value: stats?.converted ?? 0 },
                 ]}
+                footer={<ReceivablesTabsFooter active="quotes" />}
             />
             <PageShell>
                 {/* Stats */}

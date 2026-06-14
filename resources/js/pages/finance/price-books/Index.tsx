@@ -12,6 +12,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { PageHero } from '@/components/page';
+import { ReceivablesTabsFooter } from '@/components/finance';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { BookOpen, CalendarDays, Eye, Hash, Pencil, Plus, Search, Star } from 'lucide-react';
@@ -70,6 +71,7 @@ export default function PriceBooksIndex({ price_books = { data: [], links: [], c
                     { label: 'Active items', value: stats?.active_items ?? 0 },
                     { label: 'Default book', value: stats?.default_book ?? 'None' },
                 ]}
+                footer={<ReceivablesTabsFooter active="price-books" />}
             />
             <PageShell>
                 {/* Stats */}
