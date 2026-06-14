@@ -529,6 +529,16 @@ flat Send-Kudos dialog. M7-R3 (e08c55c5) — HrDemoSeeder feed/kudos demo data (
     records + 2 background checks + 2 approval chains (w/ steps) + 2 saved reports (idempotent). Every HR hub now
     renders populated under migrate:fresh --seed. Tests in CompensationBenefitsDemoSeederTest (2 tests, run seeder
     twice). NOTE: saved reports seeded tenant_id=null to match ReportBuilderController's current whereNull scope.
+- **M10-6 Payslip true PDF (finish half-built feature).** *Problem:* `PayslipService::generatePayslipPdf`
+  rendered the `hr.payslip-pdf` Blade view to disk as raw HTML named `.html` and `PayslipController@download`
+  served it `text/html` — an honest stub, not a payslip document. *Fix:*
+  - ✅ **DONE — render via dompdf (S24, a23b31e1):** `barryvdh/laravel-dompdf ^3.1` is already installed (same
+    lib Finance's `InvoicePdfService` uses), so route the view through `Pdf::loadView(...)->setPaper('a4')->output()`,
+    store a `.pdf`, persist `pdf_path`. download() serves `application/pdf` and regenerates when the artefact is
+    missing OR a stale pre-PDF `.html` path (existing rows self-upgrade on next download). dompdf has no
+    flexbox/grid → converted the flex header to a 2-col table + dropped the unused `.info-grid` grid CSS.
+    3 tests (PayslipPdfTest: %PDF magic bytes under `.pdf`, download Content-Type `application/pdf`, `.html`→PDF
+    upgrade). Self-service download test still green.
 - **M10-3 Swallowed-fatal sweep.** Fix the silent catches listed in cross-cutting (notifications, webhooks,
   automation, EmployeeProfileController, frontend). *Acceptance:* failures log/surface; no silent `return []`.
 - **M10-4 a11y + responsive + empty/loading/error states.** Axe pass (no criticals) + mobile pass on every
