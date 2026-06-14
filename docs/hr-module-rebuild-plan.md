@@ -458,6 +458,12 @@ flat Send-Kudos dialog. M7-R3 (e08c55c5) — HrDemoSeeder feed/kudos demo data (
   to `.xlsx` (corrupt); analytics/headcount cross-tenant (`tenantId=null`). *Fix:* align props/shape; fix
   the run/export routes; real XLSX (or honest CSV); tenant-scope. *Acceptance:* headcount loads; saved
   reports run/export; XLSX opens; metrics tenant-scoped.
+  - ✅ **DONE — headcount crash + tenant (37f2233b):** controller shipped prop `currentHeadcount` but page reads
+    `current` → Object.entries(undefined) crash; +2 shape mismatches (page read `total_fte` [service ships
+    `fte_total`] + treated `by_department` [array of {department,count}] as a Record). Fixed: controller render key
+    → `current` + ResolvesHrTenant (was `$tenantId=null`); page type aligned to service shape, maps the array, reads
+    fte_total. 2 tests (HeadcountDashboardTest). REMAINING M9-1: saved-report Run/Export 404; exportToExcel CSV-in-xlsx;
+    AnalyticsDashboardController `$tenantId=null` cross-tenant (same null-tenant pattern — also uses it).
 - **M9-2 Reports hub + consolidate webhooks/scheduling.** *Problem:* 4 fragmented report pages; **three**
   webhook systems (`HrWebhookController`/`reports/webhooks` vs `WebhookController`/`settings/webhooks` vs
   automation actions); two scheduling systems (`HrReportSubscription` vs `HrSavedReport.is_scheduled`).
