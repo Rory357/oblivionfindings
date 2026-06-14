@@ -156,7 +156,10 @@ Land the spine M1–M10 build on. **No behaviour change**, design only.
     "Save & post" disabled until balanced. Wired into the journals Index (controller now passes `canManage` +
     accounts/cost-centres/funding-streams reference data, gated by the create permission). 2 index tests; full
     Finance suite 55 green; types/build/lint green.
-  - **[ ] New Account modal**, **[ ] FX-revaluation modal**, **[ ] Period-close modal** — next.
+  - **[x] New Account modal** — `components/finance/new-account-dialog.tsx`: 2-step WizardShell (Account →
+    Options); ChartOfAccountsController@index passes canManage + parentAccounts/taxRates/fundingStreams; opens
+    from the chart-of-accounts hero in place of the standalone Create page. 2 index tests; Finance suite 57 green.
+  - **[ ] FX-revaluation modal**, **[ ] Period-close modal** — next (completes M1-2 → M1).
 - **[x] M1-3 Fix `5020` leave-expense collision.** Added dedicated `5050 Leave Expense` (FinanceSeeder,
   idempotent) and repointed `config/finance.php` `event_accounts.leave_provision.debit` 5020→5050; `5020`
   stays ACC Employer Levy only. Test asserts a leave_provision event debits 5050/Leave Expense, balanced +
