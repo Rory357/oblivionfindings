@@ -1025,7 +1025,6 @@ function buildEmarSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
         label: 'Overview',
         items: [
             { title: 'Dashboard', href: '/emar', icon: LayoutGrid },
-            { title: 'Daily Overview', href: '/emar/daily', icon: Activity },
         ],
     });
 

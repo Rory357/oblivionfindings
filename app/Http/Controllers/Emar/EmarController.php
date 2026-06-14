@@ -9,12 +9,12 @@ use App\Models\ClientBreakGlassAccess;
 use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientDocument;
-use App\Models\ControlledDrugLossReport;
+use App\Models\ClientInrRecord;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationAlert;
 use App\Models\ClientMedicationStock;
-use App\Models\ClientInrRecord;
+use App\Models\ControlledDrugLossReport;
 use App\Models\MedicationCompetencyAssessment;
 use App\Models\MedicationCovertAuthorisation;
 use App\Models\MedicationDashboardAlert;
@@ -28,22 +28,24 @@ use App\Models\MedicationRound;
 use App\Models\MedicationRoundTemplate;
 use App\Models\MedicationSelfAdminAssessment;
 use App\Models\MedicationSyringeDriver;
-use App\Models\Site;
 use App\Models\Shift;
 use App\Models\ShiftHandover;
 use App\Models\User;
 use App\Services\AuditLogger;
 use App\Services\DoseSchedulingService;
+use App\Services\MarScheduleService;
 use App\Services\MedicationAlertService;
 use App\Services\MedicationIncidentIntegrationService;
-use App\Services\MarScheduleService;
+use App\Services\MedicationOverviewService;
 use App\Services\MedicationRuleService;
 use App\Services\MedicationScanVerificationService;
 use App\Services\ShiftHandoverService;
 use App\Services\UserSiteAccessService;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\DB;
 use Illuminate\Support\Facades\Hash;
+use Illuminate\Support\Str;
 use Illuminate\Validation\Rule;
 use Illuminate\Validation\ValidationException;
 use Inertia\Inertia;
@@ -55,8 +57,7 @@ class EmarController extends Controller
     public function __construct(
         protected ShiftHandoverService $handoverService,
         protected MedicationScanVerificationService $scanVerificationService,
-    ) {
-    }
+    ) {}
 
     // ─── Helpers ──────────────────────────────────────────
 
@@ -201,7 +202,7 @@ class EmarController extends Controller
             ->all();
 
         return [
-            'active' => !empty($accesses),
+            'active' => ! empty($accesses),
             'accesses' => $accesses,
         ];
     }
@@ -482,7 +483,7 @@ class EmarController extends Controller
         string $errorKey = 'scan_code'
     ): array {
         if (! ($payload['scan_verified'] ?? false) || blank($payload['scan_code'] ?? null)) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
+            throw ValidationException::withMessages([
                 $errorKey => 'Verify the medication code before continuing.',
             ]);
         }
@@ -494,7 +495,7 @@ class EmarController extends Controller
         );
 
         if (! $result['matched']) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
+            throw ValidationException::withMessages([
                 $errorKey => $result['message'],
             ]);
         }
@@ -503,7 +504,7 @@ class EmarController extends Controller
             filled($payload['scan_match_source'] ?? null)
             && ($payload['scan_match_source'] ?? null) !== $result['match_source']
         ) {
-            throw \Illuminate\Validation\ValidationException::withMessages([
+            throw ValidationException::withMessages([
                 $errorKey => 'The medication verification needs to be repeated.',
             ]);
         }
@@ -714,182 +715,31 @@ class EmarController extends Controller
         return ClientMedication::query()
             ->where('client_id', $clientId)
             ->controlled()
-            ->where('name', 'like', '%' . $medicationName . '%')
+            ->where('name', 'like', '%'.$medicationName.'%')
             ->first();
     }
 
     // ─── Dashboard ─────────────────────────────────────────
-    public function dashboard()
+    public function dashboard(Request $request, MedicationOverviewService $overview)
     {
-        $today = today();
+        $scheduleDate = app(MarScheduleService::class)->dateFromInput($request->input('date'));
 
-        // Today's administration stats
-        $todayAdmins = ClientMedicationAdministration::whereDate('scheduled_for', $today)
-            ->orWhereDate('administered_at', $today)
-            ->selectRaw("
-                COUNT(*) as total,
-                SUM(CASE WHEN status = 'given' THEN 1 ELSE 0 END) as given,
-                SUM(CASE WHEN status = 'refused' THEN 1 ELSE 0 END) as refused,
-                SUM(CASE WHEN status = 'withheld' THEN 1 ELSE 0 END) as withheld,
-                SUM(CASE WHEN status = 'missed' THEN 1 ELSE 0 END) as missed,
-                SUM(CASE WHEN status = 'pending' THEN 1 ELSE 0 END) as pending
-            ")->first();
+        $user = $request->user();
 
-        $totalToday = (int) ($todayAdmins->total ?? 0);
-        $givenToday = (int) ($todayAdmins->given ?? 0);
-        $adminRate = $totalToday > 0 ? round(($givenToday / $totalToday) * 100, 1) : 0;
-
-        // 7-day administration trend
-        $trend = [];
-        for ($i = 6; $i >= 0; $i--) {
-            $date = $today->copy()->subDays($i);
-            $dayStats = ClientMedicationAdministration::whereDate('scheduled_for', $date)
-                ->orWhereDate('administered_at', $date)
-                ->selectRaw("
-                    SUM(CASE WHEN status = 'given' THEN 1 ELSE 0 END) as given,
-                    SUM(CASE WHEN status = 'refused' THEN 1 ELSE 0 END) as refused,
-                    SUM(CASE WHEN status = 'missed' THEN 1 ELSE 0 END) as missed,
-                    COUNT(*) as total
-                ")->first();
-            $trend[] = [
-                'date' => $date->format('D'),
-                'given' => (int) ($dayStats->given ?? 0),
-                'refused' => (int) ($dayStats->refused ?? 0),
-                'missed' => (int) ($dayStats->missed ?? 0),
-                'total' => (int) ($dayStats->total ?? 0),
-            ];
-        }
-
-        // PRN stats
-        $prnToday = ClientMedicationAdministration::whereDate('administered_at', $today)
-            ->where('status', 'given')
-            ->whereHas('medication', fn ($q) => $q->where('is_prn', true))
-            ->count();
-        $prnNearLimit = ClientMedication::active()->prn()->get()->filter(fn ($m) => $m->isPrnNearLimit())->count();
-
-        // Controlled drugs
-        $controlledCount = ClientMedication::active()->controlled()->count();
-        $activeDiscrepancies = ClientControlledDrugDiscrepancy::whereIn('status', ['open', 'under_review'])->count();
-
-        // Overdue reviews
-        $overdueReviews = MedicationReview::where('status', 'scheduled')
-            ->where('scheduled_date', '<', $today->toDateString())
-            ->count();
-
-        // Expiring competencies
-        $expiringCompetencies = MedicationCompetencyAssessment::where('status', 'passed')
-            ->whereBetween('expiry_date', [$today->toDateString(), $today->copy()->addDays(30)->toDateString()])
-            ->count();
-
-        // Active alerts
-        $activeAlerts = MedicationDashboardAlert::where('status', 'active')->count();
-
-        // Low stock
-        $lowStock = ClientMedicationStock::whereHas('medication', fn ($q) => $q->active())
-            ->whereNotNull('reorder_level')
-            ->whereColumn('on_hand', '<=', 'reorder_level')
-            ->count();
-
-        // Active medications & clients
-        $activeMedications = ClientMedication::active()->count();
-        $activeClients = Client::whereHas('medications', fn ($q) => $q->active())->count();
-
-        // Rounds today
-        $roundsToday = MedicationRound::forDate($today)->count();
-        $roundsCompleted = MedicationRound::forDate($today)->where('status', 'completed')->count();
-
-        // Sparkline data (last 7 days given counts)
-        $givenTrend = array_map(fn ($d) => $d['given'], $trend);
-
-        // Overdue medications (scheduled but not administered, past their window)
-        $overdueMedications = ClientMedicationAdministration::where('status', 'pending')
-            ->where('scheduled_for', '<', now()->subMinutes(60))
-            ->whereDate('scheduled_for', $today)
-            ->with(['client:id,first_name,last_name', 'medication:id,client_id,name,dosage'])
-            ->limit(10)
-            ->get();
-
-        // Upcoming round (next pending round today)
-        $nextRound = MedicationRound::where('status', 'pending')
-            ->whereDate('round_date', $today)
-            ->orderBy('scheduled_time')
-            ->with('assignedTo:id,name')
-            ->first();
-
-        // Client status grid (per-client medication summary for today)
-        $clientStatuses = Client::query()
-            ->select(['id', 'first_name', 'last_name'])
-            ->withCount([
-                'medications as active_medications_count' => fn ($q) => $q->active(),
-                'medicationAdministrations as given_today' => fn ($q) => $q->whereDate('administered_at', $today)->where('status', 'given'),
-                'medicationAdministrations as pending_today' => fn ($q) => $q->whereDate('scheduled_for', $today)->where('status', 'pending'),
-                'medicationAdministrations as missed_today' => fn ($q) => $q->whereDate('scheduled_for', $today)->where('status', 'missed'),
-            ])
-            ->having('active_medications_count', '>', 0)
-            ->orderBy('last_name')
-            ->get();
-
-        // Recent activity feed (last 20 administrations)
-        $recentActivity = ClientMedicationAdministration::with([
-                'client:id,first_name,last_name',
-                'medication:id,client_id,name',
-                'administeredBy:id,name',
-            ])
-            ->latest('administered_at')
-            ->limit(20)
-            ->get();
-
-        // Active alerts from MedicationDashboardAlert
-        $activeAlertsList = MedicationDashboardAlert::active()
-            ->with(['client:id,first_name,last_name', 'medication:id,client_id,name'])
-            ->latest()
-            ->limit(10)
-            ->get();
-
-        // Compliance snapshot
-        $compliance = [
-            'competencyExpiring' => MedicationCompetencyAssessment::where('expiry_date', '<=', now()->addDays(30))->where('expiry_date', '>', now())->count(),
-            'competencyExpired' => MedicationCompetencyAssessment::where('expiry_date', '<', now())->count(),
-            'pendingReviews' => MedicationReview::where('status', 'scheduled')->where('scheduled_date', '<=', now())->count(),
-            'overdueReviews' => MedicationReview::where('status', 'overdue')->count(),
-        ];
-
-        return Inertia::render('emar/Index', [
-            'stats' => [
-                'totalToday' => $totalToday,
-                'givenToday' => $givenToday,
-                'refusedToday' => (int) ($todayAdmins->refused ?? 0),
-                'withheldToday' => (int) ($todayAdmins->withheld ?? 0),
-                'missedToday' => (int) ($todayAdmins->missed ?? 0),
-                'pendingToday' => (int) ($todayAdmins->pending ?? 0),
-                'adminRate' => $adminRate,
-                'prnToday' => $prnToday,
-                'prnNearLimit' => $prnNearLimit,
-                'controlledCount' => $controlledCount,
-                'activeDiscrepancies' => $activeDiscrepancies,
-                'overdueReviews' => $overdueReviews,
-                'expiringCompetencies' => $expiringCompetencies,
-                'activeAlerts' => $activeAlerts,
-                'lowStock' => $lowStock,
-                'activeMedications' => $activeMedications,
-                'activeClients' => $activeClients,
-                'roundsToday' => $roundsToday,
-                'roundsCompleted' => $roundsCompleted,
-                'givenTrend' => $givenTrend,
-            ],
-            'trend' => $trend,
-            'overdueMedications' => $overdueMedications,
-            'nextRound' => $nextRound,
-            'clientStatuses' => $clientStatuses,
-            'recentActivity' => $recentActivity,
-            'activeAlertsList' => $activeAlertsList,
-            'compliance' => $compliance,
-            'canManageSettings' => (bool) request()->user() && (
-                request()->user()->canDo('medications.settings.manage')
-                || request()->user()->canDo('medications.orders.manage')
-                || request()->user()->canDo('clients.update')
-            ),
-        ]);
+        return Inertia::render('emar/Index', array_merge(
+            $overview->payload($scheduleDate),
+            [
+                'canManageSettings' => (bool) $user && (
+                    $user->canDo('medications.settings.manage')
+                    || $user->canDo('medications.orders.manage')
+                    || $user->canDo('clients.update')
+                ),
+                'signedAs' => [
+                    'name' => $user?->name,
+                    'role_label' => $user && $user->role ? Str::headline($user->role) : null,
+                ],
+            ]
+        ));
     }
 
     // ─── MAR Charts ────────────────────────────────────────
@@ -954,7 +804,7 @@ class EmarController extends Controller
         ]);
     }
 
-    private function buildMarData(Client $client, \Carbon\Carbon $date): array
+    private function buildMarData(Client $client, Carbon $date): array
     {
         $ruleService = app(MedicationRuleService::class);
         $scheduleService = app(MarScheduleService::class);
@@ -977,66 +827,67 @@ class EmarController extends Controller
         $prn = $medications->where('is_prn', true)->values();
 
         $scheduledPayload = $scheduled->map(function ($med) use ($client, $date, $ruleService, $scheduleService) {
-                $adminRules = $ruleService->requirementsFor($med);
-                $scheduledSlots = $scheduleService->scheduledTimesForDate($med, $date);
-                $doseTimes = collect($scheduledSlots)
-                    ->map(fn (\Carbon\Carbon $slot) => $slot->format('H:i'))
-                    ->values()
-                    ->all();
-                $matchedAdministrationIds = [];
+            $adminRules = $ruleService->requirementsFor($med);
+            $scheduledSlots = $scheduleService->scheduledTimesForDate($med, $date);
+            $doseTimes = collect($scheduledSlots)
+                ->map(fn (Carbon $slot) => $slot->format('H:i'))
+                ->values()
+                ->all();
+            $matchedAdministrationIds = [];
 
-                // Build administration slots: for each dose_time, find matching admin record
-                $administrations = collect($scheduledSlots)->map(function (\Carbon\Carbon $scheduledAt) use ($med, &$matchedAdministrationIds, $scheduleService) {
-                    [$slotStartUtc, $slotEndUtc] = $scheduleService->utcSlotWindow($scheduledAt);
-                    // Find an administration record matching this time slot
-                    $admin = $med->administrations->first(function ($a) use ($slotStartUtc, $slotEndUtc) {
-                        $scheduledFor = $this->administrationDateUtc($a, 'scheduled_for');
+            // Build administration slots: for each dose_time, find matching admin record
+            $administrations = collect($scheduledSlots)->map(function (Carbon $scheduledAt) use ($med, &$matchedAdministrationIds, $scheduleService) {
+                [$slotStartUtc, $slotEndUtc] = $scheduleService->utcSlotWindow($scheduledAt);
+                // Find an administration record matching this time slot
+                $admin = $med->administrations->first(function ($a) use ($slotStartUtc, $slotEndUtc) {
+                    $scheduledFor = $this->administrationDateUtc($a, 'scheduled_for');
 
-                        return $scheduledFor?->betweenIncluded($slotStartUtc, $slotEndUtc) === true;
-                    });
+                    return $scheduledFor?->betweenIncluded($slotStartUtc, $slotEndUtc) === true;
+                });
 
-                    if ($admin) {
-                        $matchedAdministrationIds[] = $admin->id;
-                        return $this->serializeAdministration($admin);
-                    }
+                if ($admin) {
+                    $matchedAdministrationIds[] = $admin->id;
 
-                    // No record yet: determine if pending or missed
-                    $now = now($scheduleService->workerTimezone());
-                    $status = $now->greaterThan($scheduledAt->copy()->addHour()) ? 'missed' : 'pending';
+                    return $this->serializeAdministration($admin);
+                }
 
-                    return $this->serializeAdministration(null, $status, $scheduledAt->toIso8601String());
-                })->values();
+                // No record yet: determine if pending or missed
+                $now = now($scheduleService->workerTimezone());
+                $status = $now->greaterThan($scheduledAt->copy()->addHour()) ? 'missed' : 'pending';
 
-                // Also include any administration records that don't match a dose_time slot
-                $unmatchedAdmins = $med->administrations->filter(function ($a) use ($matchedAdministrationIds) {
-                    return ! in_array($a->id, $matchedAdministrationIds, true);
-                })->map(fn ($a) => $this->serializeAdministration($a));
-
-                return [
-                    'id' => $med->id,
-                    'name' => $med->name,
-                    'dosage' => $med->formatted_dose,
-                    'frequency' => $med->frequency,
-                    'route' => $med->route,
-                    'form' => $med->form,
-                    'instructions' => $med->instructions,
-                    'controlled_drug' => $med->controlled_drug,
-                    'high_risk' => $med->high_risk,
-                    'witness_required' => $med->requiresWitness() || $adminRules['requires_countersign'],
-                    'approval_status' => $med->approval_status ?? 'verified',
-                    'is_administrable' => $med->isAdministrable(),
-                    'admin_rules' => $adminRules,
-                    'pharmac_therapeutic_group' => $med->pharmac_therapeutic_group,
-                    'pharmac_subgroup' => $med->pharmac_subgroup,
-                    'dose_times' => $doseTimes,
-                    'administrations' => $administrations->merge($unmatchedAdmins)->values(),
-                    'scan_verification' => $this->buildMedicationScanPayload($client, $med),
-                    'stock' => $med->stock ? [
-                        'on_hand' => $med->stock->on_hand,
-                        'unit' => $med->stock->unit,
-                    ] : null,
-                ];
+                return $this->serializeAdministration(null, $status, $scheduledAt->toIso8601String());
             })->values();
+
+            // Also include any administration records that don't match a dose_time slot
+            $unmatchedAdmins = $med->administrations->filter(function ($a) use ($matchedAdministrationIds) {
+                return ! in_array($a->id, $matchedAdministrationIds, true);
+            })->map(fn ($a) => $this->serializeAdministration($a));
+
+            return [
+                'id' => $med->id,
+                'name' => $med->name,
+                'dosage' => $med->formatted_dose,
+                'frequency' => $med->frequency,
+                'route' => $med->route,
+                'form' => $med->form,
+                'instructions' => $med->instructions,
+                'controlled_drug' => $med->controlled_drug,
+                'high_risk' => $med->high_risk,
+                'witness_required' => $med->requiresWitness() || $adminRules['requires_countersign'],
+                'approval_status' => $med->approval_status ?? 'verified',
+                'is_administrable' => $med->isAdministrable(),
+                'admin_rules' => $adminRules,
+                'pharmac_therapeutic_group' => $med->pharmac_therapeutic_group,
+                'pharmac_subgroup' => $med->pharmac_subgroup,
+                'dose_times' => $doseTimes,
+                'administrations' => $administrations->merge($unmatchedAdmins)->values(),
+                'scan_verification' => $this->buildMedicationScanPayload($client, $med),
+                'stock' => $med->stock ? [
+                    'on_hand' => $med->stock->on_hand,
+                    'unit' => $med->stock->unit,
+                ] : null,
+            ];
+        })->values();
 
         $prnPayload = $prn->map(function ($med) use ($client, $ruleService) {
             $adminRules = $ruleService->requirementsFor($med);
@@ -1185,7 +1036,7 @@ class EmarController extends Controller
 
         $prnAdministrations = ClientMedicationAdministration::query()
             ->whereHas('medication', fn ($q) => $q->where('is_prn', true))
-            ->whereBetween('administered_at', [$dateFrom, $dateTo . ' 23:59:59'])
+            ->whereBetween('administered_at', [$dateFrom, $dateTo.' 23:59:59'])
             ->with(['client:id,first_name,last_name', 'medication:id,name,dosage,max_per_day,indication', 'administeredBy:id,name'])
             ->latest('administered_at')
             ->paginate(50);
@@ -1203,7 +1054,7 @@ class EmarController extends Controller
         $prnStats = [
             'total_given_period' => ClientMedicationAdministration::query()
                 ->whereHas('medication', fn ($q) => $q->where('is_prn', true))
-                ->whereBetween('administered_at', [$dateFrom, $dateTo . ' 23:59:59'])
+                ->whereBetween('administered_at', [$dateFrom, $dateTo.' 23:59:59'])
                 ->where('status', 'given')
                 ->count(),
             'effectiveness_reviews_pending' => $pendingEffectivenessReviews->count(),
@@ -1259,10 +1110,10 @@ class EmarController extends Controller
             ->get();
 
         $lossReports = ControlledDrugLossReport::with([
-                'client:id,first_name,last_name',
-                'discoveredBy:id,name',
-                'attachments.uploadedBy:id,name',
-            ])
+            'client:id,first_name,last_name',
+            'discoveredBy:id,name',
+            'attachments.uploadedBy:id,name',
+        ])
             ->latest()
             ->get();
 
@@ -1363,20 +1214,22 @@ class EmarController extends Controller
         $medsByClient = $medications->getCollection()->groupBy('client_id');
         foreach ($medsByClient as $clientId => $clientMeds) {
             $names = $clientMeds->pluck('name')->map(fn ($n) => strtolower($n))->toArray();
-            if (count($names) < 2) continue;
+            if (count($names) < 2) {
+                continue;
+            }
 
             $clientInteractions = MedicationInteraction::active()
                 ->where(function ($query) use ($names) {
                     foreach ($names as $name) {
                         $query->orWhere(function ($q) use ($name, $names) {
                             $q->whereRaw('LOWER(medication_a) LIKE ?', ["%{$name}%"])
-                              ->where(function ($inner) use ($names, $name) {
-                                  foreach ($names as $other) {
-                                      if ($other !== $name) {
-                                          $inner->orWhereRaw('LOWER(medication_b) LIKE ?', ["%{$other}%"]);
-                                      }
-                                  }
-                              });
+                                ->where(function ($inner) use ($names, $name) {
+                                    foreach ($names as $other) {
+                                        if ($other !== $name) {
+                                            $inner->orWhereRaw('LOWER(medication_b) LIKE ?', ["%{$other}%"]);
+                                        }
+                                    }
+                                });
                         });
                     }
                 })
@@ -1422,7 +1275,7 @@ class EmarController extends Controller
                 'id' => $s->id,
                 'medication_id' => $s->client_medication_id,
                 'medication_name' => $s->medication?->name,
-                'client_name' => $s->medication?->client?->first_name . ' ' . $s->medication?->client?->last_name,
+                'client_name' => $s->medication?->client?->first_name.' '.$s->medication?->client?->last_name,
                 'client_id' => $s->medication?->client_id,
                 'on_hand' => $s->on_hand,
                 'unit' => $s->unit,
@@ -1738,7 +1591,7 @@ class EmarController extends Controller
                 'is_on_call' => (bool) $shift->is_on_call,
                 'location' => $shift->location,
                 'service_context_name' => $shift->serviceContext?->name,
-                'client_name' => trim(($shift->client?->first_name ?? '') . ' ' . ($shift->client?->last_name ?? '')),
+                'client_name' => trim(($shift->client?->first_name ?? '').' '.($shift->client?->last_name ?? '')),
                 'staff_name' => $shift->staff?->name,
             ])
             ->values();
@@ -2139,7 +1992,7 @@ class EmarController extends Controller
             'status' => $validated['status'] ?? 'completed',
             'completed_at' => now(),
             'completed_by' => $request->user()->id,
-            'notes' => trim($driver->notes . "\n" . ($validated['notes'] ?? '')) ?: $driver->notes,
+            'notes' => trim($driver->notes."\n".($validated['notes'] ?? '')) ?: $driver->notes,
         ])->save();
 
         return redirect()->back()->with('success', 'Syringe driver completed.');
@@ -2180,14 +2033,14 @@ class EmarController extends Controller
             'topical_competent', 'covert_admin_knowledge', 'error_reporting', 'allergy_awareness',
         ];
 
-        $totalScore = collect($booleanFields)->filter(fn ($f) => !empty($validated[$f]))->count();
+        $totalScore = collect($booleanFields)->filter(fn ($f) => ! empty($validated[$f]))->count();
 
         $validated['total_score'] = $totalScore;
         $validated['pass_threshold'] = 10;
         $validated['status'] = $totalScore >= 10 ? 'passed' : 'failed';
         $validated['assessor_id'] = auth()->id();
         $validated['expiry_date'] = $validated['expiry_date']
-            ?? \Carbon\Carbon::parse($validated['assessment_date'])->addYear()->toDateString();
+            ?? Carbon::parse($validated['assessment_date'])->addYear()->toDateString();
         $validated['can_administer_unsupervised'] = (bool) ($validated['can_administer_unsupervised'] ?? false);
         $validated['can_witness_controlled'] = (bool) ($validated['can_witness_controlled'] ?? false);
 
@@ -2231,14 +2084,14 @@ class EmarController extends Controller
 
         if (collect($booleanFields)->contains(fn ($field) => array_key_exists($field, $validated))) {
             $merged = array_merge($assessment->only($booleanFields), $validated);
-            $totalScore = collect($booleanFields)->filter(fn ($field) => !empty($merged[$field]))->count();
+            $totalScore = collect($booleanFields)->filter(fn ($field) => ! empty($merged[$field]))->count();
             $validated['total_score'] = $totalScore;
             $validated['pass_threshold'] = 10;
             $validated['status'] = $totalScore >= 10 ? 'passed' : 'failed';
         }
 
-        if (!array_key_exists('expiry_date', $validated) && !empty($validated['assessment_date'])) {
-            $validated['expiry_date'] = \Carbon\Carbon::parse($validated['assessment_date'])->addYear()->toDateString();
+        if (! array_key_exists('expiry_date', $validated) && ! empty($validated['assessment_date'])) {
+            $validated['expiry_date'] = Carbon::parse($validated['assessment_date'])->addYear()->toDateString();
         }
 
         $assessment->update($validated);
@@ -2305,7 +2158,7 @@ class EmarController extends Controller
             'generate_all' => 'nullable|boolean',
         ]);
 
-        $date = \Carbon\Carbon::parse($validated['date']);
+        $date = Carbon::parse($validated['date']);
         $dayOfWeek = $date->dayOfWeekIso; // 1=Mon, 7=Sun
         $generateAll = (bool) ($validated['generate_all'] ?? false);
 
@@ -2313,7 +2166,7 @@ class EmarController extends Controller
         $created = 0;
 
         foreach ($templates as $template) {
-            if (!$generateAll && !$template->appliesToDay($dayOfWeek)) {
+            if (! $generateAll && ! $template->appliesToDay($dayOfWeek)) {
                 continue;
             }
 
@@ -2489,7 +2342,7 @@ class EmarController extends Controller
         ]);
 
         // For controlled drugs, require second witness and authorisation
-        if (!empty($validated['is_controlled_drug'])) {
+        if (! empty($validated['is_controlled_drug'])) {
             $request->validate([
                 'witness_2_id' => 'required|exists:users,id',
                 'authorised_by_name' => 'required|string|max:255',
@@ -2507,7 +2360,7 @@ class EmarController extends Controller
         DB::transaction(function () use ($validated) {
             MedicationDestruction::create($validated);
 
-            if (!empty($validated['client_medication_id'])) {
+            if (! empty($validated['client_medication_id'])) {
                 $stock = ClientMedicationStock::where('client_medication_id', $validated['client_medication_id'])->first();
                 if ($stock) {
                     $stock->decrement('on_hand', $validated['quantity']);
@@ -2623,7 +2476,7 @@ class EmarController extends Controller
             'expiry_date' => 'nullable|date',
         ]);
 
-        if (!isset($validated['batch_expiry']) && !empty($validated['expiry_date'])) {
+        if (! isset($validated['batch_expiry']) && ! empty($validated['expiry_date'])) {
             $validated['batch_expiry'] = $validated['expiry_date'];
         }
 
@@ -2650,7 +2503,7 @@ class EmarController extends Controller
             'expiry_date' => 'nullable|date',
         ]);
 
-        if (!isset($validated['batch_expiry']) && !empty($validated['expiry_date'])) {
+        if (! isset($validated['batch_expiry']) && ! empty($validated['expiry_date'])) {
             $validated['batch_expiry'] = $validated['expiry_date'];
         }
 
@@ -2671,7 +2524,7 @@ class EmarController extends Controller
 
         $nextStatus = $transitions[$order->status] ?? null;
 
-        if (!$nextStatus) {
+        if (! $nextStatus) {
             return redirect()->back()->withErrors(['status' => 'Order cannot be advanced from its current status.']);
         }
 
@@ -2861,7 +2714,7 @@ class EmarController extends Controller
             $stock->update([
                 'on_hand' => $validated['new_quantity'],
                 'last_counted_at' => now(),
-                'notes' => 'Stock adjustment: ' . $validated['reason'],
+                'notes' => 'Stock adjustment: '.$validated['reason'],
             ]);
         });
 
@@ -3050,7 +2903,7 @@ class EmarController extends Controller
             'on_hand_after' => 'nullable|numeric|min:0',
             'balance_before' => 'nullable|numeric|min:0',
             'balance_after' => 'nullable|numeric|min:0',
-            'witnessed_by' => 'required|exists:users,id|different:' . auth()->id(),
+            'witnessed_by' => 'required|exists:users,id|different:'.auth()->id(),
             'batch_number' => 'nullable|string|max:100',
             'expiry_date' => 'nullable|date',
             'notes' => 'nullable|string|max:2000',
@@ -3168,7 +3021,7 @@ class EmarController extends Controller
             'on_hand_after' => 'nullable|numeric|min:0',
             'expected_balance' => 'required|numeric|min:0',
             'actual_balance' => 'required|numeric|min:0',
-            'witnessed_by' => 'required|exists:users,id|different:' . auth()->id(),
+            'witnessed_by' => 'required|exists:users,id|different:'.auth()->id(),
             'discrepancy_notes' => 'nullable|string|max:2000',
             'client_request_uuid' => 'nullable|uuid',
             'captured_offline_at' => 'nullable|date',
@@ -3308,8 +3161,8 @@ class EmarController extends Controller
         $discrepancy->update([
             'status' => 'closed',
             'resolution_notes' => trim(
-                ($validated['resolution_action'] ? 'Action: ' . $validated['resolution_action'] . "\n\n" : '')
-                . $validated['resolution_notes']
+                ($validated['resolution_action'] ? 'Action: '.$validated['resolution_action']."\n\n" : '')
+                .$validated['resolution_notes']
             ),
             'resolved_by' => auth()->id(),
             'resolved_at' => now(),
@@ -3438,6 +3291,7 @@ class EmarController extends Controller
             // Expect: client_name, medication_name, dose, frequency, route
             if (count($row) < 4) {
                 $skipped++;
+
                 continue;
             }
 
@@ -3449,6 +3303,7 @@ class EmarController extends Controller
 
             if (! $clientName || ! $medicationName || ! $dose || ! $frequency) {
                 $skipped++;
+
                 continue;
             }
 
@@ -3470,6 +3325,7 @@ class EmarController extends Controller
 
             if (! $client) {
                 $skipped++;
+
                 continue;
             }
 
