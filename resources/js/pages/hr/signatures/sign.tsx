@@ -16,6 +16,7 @@ type SignatureData = {
     document_title: string;
     document_category: string | null;
     document_original_name: string | null;
+    document_download_url: string | null;
     requested_by: string;
     requested_at: string;
     signed_at: string | null;
@@ -215,13 +216,29 @@ export default function SignDocument({ signature, can }: Props) {
                                 <span>{signature.requested_at}</span>
                             </div>
                         </div>
-                        <div>
+                        <div className="flex items-center gap-3">
                             <Badge
                                 variant="outline"
                                 className={config.className}
                             >
                                 {config.label}
                             </Badge>
+                            {signature.document_download_url && (
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    asChild
+                                >
+                                    <a
+                                        href={signature.document_download_url}
+                                        target="_blank"
+                                        rel="noreferrer"
+                                    >
+                                        <FileText className="mr-1.5 h-4 w-4" />
+                                        View document
+                                    </a>
+                                </Button>
+                            )}
                         </div>
                         {signature.signed_at && (
                             <p className="text-sm text-status-success">

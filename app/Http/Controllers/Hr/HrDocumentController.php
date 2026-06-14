@@ -89,6 +89,7 @@ class HrDocumentController extends Controller
             ->get(['id', 'user_id', 'employee_number'])
             ->map(fn (HrEmployeeProfile $profile) => [
                 'id' => $profile->id,
+                'user_id' => $profile->user_id,
                 'name' => $profile->user?->name,
                 'employee_number' => $profile->employee_number,
             ])

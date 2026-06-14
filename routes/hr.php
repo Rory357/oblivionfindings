@@ -923,6 +923,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
     */
     Route::prefix('signatures')->name('signatures.')->group(function () {
         Route::get('/pending', [ESignatureController::class, 'pending'])->name('pending');
+        Route::get('/{signature}/document', [ESignatureController::class, 'downloadDocument'])->name('document');
         Route::get('/{signature}', [ESignatureController::class, 'show'])->name('show');
         Route::post('/{signature}/sign', [ESignatureController::class, 'sign'])->name('sign');
         Route::post('/{signature}/decline', [ESignatureController::class, 'decline'])->name('decline');
