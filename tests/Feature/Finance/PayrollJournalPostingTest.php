@@ -7,8 +7,8 @@ use App\Domain\Finance\Models\FinFiscalPeriod;
 use App\Domain\Finance\Models\FinJournal;
 use App\Domain\Finance\Services\PayrollJournalService;
 use App\Domain\Hr\Models\HrEmployeeProfile;
+use App\Domain\Hr\Models\HrPayslip;
 use App\Domain\Hr\Services\PayrollExportService;
-use App\Domain\Hr\Services\PayslipService;
 use App\Models\Client;
 use App\Models\Role;
 use App\Models\ServiceContext;
@@ -41,10 +41,21 @@ it('posts one balanced payroll journal with allocations when a payroll run is lo
     expect($run->items)->toHaveCount(2);
 
     $this->actingAs($hr);
-    app(PayslipService::class)->generateBulkPayslips($run->fresh('items'));
 
+    // Locking now generates the payslips itself (no manual pre-generation).
     $this->post(route('hr.payroll.runs.lock', $run))
         ->assertRedirect();
+
+    $payslips = HrPayslip::where('payroll_run_id', $run->id)->get();
+    expect($payslips)->toHaveCount(2);
+    foreach ($payslips as $payslip) {
+        expect(round((float) $payslip->net_pay, 2))
+            ->toBe(round((float) $payslip->gross_pay + (float) $payslip->holiday_pay - (float) $payslip->total_deductions, 2));
+    }
+    // Payslip gross ties to the run total (gross-parity override).
+    $run->refresh();
+    expect(round((float) $payslips->sum('gross_pay'), 2))
+        ->toBe(round((float) $run->total_gross, 2));
 
     $run->refresh();
     $journal = FinJournal::query()

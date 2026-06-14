@@ -33,6 +33,7 @@ class PayslipService
         string $periodStart,
         string $periodEnd,
         array $timeData = [],
+        ?float $grossOverride = null,
     ): HrPayslip {
         $annualSalary = (float) ($profile->annual_salary ?? 0);
         $hourlyRate = $profile->hourly_rate ? (float) $profile->hourly_rate : null;
@@ -60,6 +61,7 @@ class PayslipService
             employmentType: $employmentType,
             allowances: $allowances,
             deductions: $deductions,
+            grossOverride: $grossOverride,
         );
 
         return HrPayslip::create([
@@ -125,6 +127,10 @@ class PayslipService
                     $run->period_start->format('Y-m-d'),
                     $run->period_end->format('Y-m-d'),
                     $timeData,
+                    // Tie the payslip gross to the run item's authoritative
+                    // all-in gross (rule loadings included) so payslip totals
+                    // reconcile with the run total and the GL journal.
+                    $item->gross_pay !== null ? (float) $item->gross_pay : null,
                 );
 
                 $payslip->update(['payroll_run_id' => $run->id]);

@@ -190,6 +190,11 @@ class NzPayrollCalculatorService
      * @param  string  $employmentType  Employment type for holiday pay
      * @param  array   $allowances      Additional allowances [{name, amount}]
      * @param  array   $deductions      Additional deductions [{name, amount}]
+     * @param  float|null $grossOverride Authoritative all-in period gross. When
+     *         set (e.g. the payroll run item's rule-loaded gross_pay including
+     *         sleepover/on-call/public-holiday loadings), it replaces the
+     *         hours×rate computation so deductions are taken off the true gross
+     *         and the payslip ties to the run total + GL.
      * @return array   Comprehensive pay breakdown
      */
     public function calculatePayPeriod(
@@ -204,6 +209,7 @@ class NzPayrollCalculatorService
         string $employmentType,
         array $allowances = [],
         array $deductions = [],
+        ?float $grossOverride = null,
     ): array {
         // Determine periods per year
         $periodsPerYear = match (strtolower($payFrequency)) {
@@ -227,6 +233,16 @@ class NzPayrollCalculatorService
 
         $totalAllowances = round(collect($allowances)->sum('amount'), 2);
         $grossPay = $basePay + $overtimePay + $totalAllowances;
+
+        // An authoritative all-in gross (from the payroll run item) overrides the
+        // hours×rate computation so loadings (sleepover/on-call/public holiday)
+        // are reflected and the payslip ties to the run total + GL journal.
+        if ($grossOverride !== null) {
+            $grossPay = round($grossOverride, 2);
+            $basePay = $grossPay;
+            $overtimePay = 0.0;
+            $totalAllowances = 0.0;
+        }
 
         // Annualise for tax calculations
         $annualGross = $grossPay * $periodsPerYear;
