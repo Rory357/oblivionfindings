@@ -420,6 +420,17 @@ KiwiSaver + net-pay liability) via `PostPayrollJournalJob`; `AllocatePayrollCost
   (DR Expense/CR AP; DR AP/CR Bank) and replaying throws + posts no second journal. Finance suite 126 green.
   *Remaining (deferred — needs the live dev server / browser, out of scope for the headless loop):* axe a11y +
   responsive sweep on every hub, side-by-side-vs-Rostering parity on oblivionfindings.com.
+- **[~] M10-6 Edit-via-modal — Bills DONE (main 28bc9d7f); Invoices needs a backend contract fix first.**
+  `NewBillDialog` now takes an optional `bill` prop → EDIT mode (prefill, gst fraction→percentage, PUT
+  `finance.bills.update`); Payables index gained a draft-only Edit row-action (keyed-per-row modal) and
+  `BillController@index` eager-loads `lines` for prefill. GL-safe (update already rejects non-draft). 2 tests
+  (edit persists + gst-as-fraction; non-draft refused); suite 128 green. **Invoices NOT done:** the invoice
+  update contract is asymmetric with create — `UpdateInvoiceRequest` accepts `client_name` (required) but not the
+  create dialog's `client_id`/`funding_body`, and `update()` only writes `client_name`, so reusing `NewInvoiceDialog`
+  in edit mode would 422 on client-billed invoices. Doing it cleanly requires aligning the invoice update contract
+  to the create contract (accept `client_id`/`funding_body`, derive `client_name` from the client) + eager-loading
+  invoice lines in the index — a follow-up tick. Full-page `invoices.edit` already works, so this is a UX upgrade
+  not a gap.
 
 ---
 
