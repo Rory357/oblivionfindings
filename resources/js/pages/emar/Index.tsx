@@ -2,7 +2,7 @@
  * with the Dashboard clinical-watch / ops widgets. Replaces the old /emar
  * dashboard AND the retired /emar/daily page. Data comes from
  * MedicationOverviewService via EmarController::dashboard(). */
-import { DonutChart, OPS_COLORS, OpsStatCard } from '@/components/ops-stat-card';
+import { DonutChart, OPS_COLORS } from '@/components/ops-stat-card';
 import { PageHero } from '@/components/page';
 import type { PageHeroBadge } from '@/components/page/page-hero-badges';
 import type { PageHeroMetaItem } from '@/components/page/page-hero-meta';
@@ -19,7 +19,6 @@ import type { SharedData } from '@/types';
 import {
     Activity,
     AlertTriangle,
-    ArrowRight,
     Award,
     CalendarCheck,
     CalendarDays,
@@ -45,7 +44,7 @@ import {
     X,
     Zap,
 } from 'lucide-react';
-import { useMemo, useState } from 'react';
+import { useMemo, useState, type ComponentType, type ReactNode } from 'react';
 import {
     Area,
     AreaChart,
@@ -287,6 +286,86 @@ const HERO_TABS: { id: string; label: string; href: string | null }[] = [
     { id: 'errors', label: 'Errors', href: '/emar/errors' },
 ];
 
+type KpiTone = 'success' | 'critical' | 'warning' | 'primary' | 'neutral';
+
+const KPI_TONE: Record<KpiTone, string> = {
+    success: 'bg-status-success-bg text-status-success',
+    critical: 'bg-status-critical-bg text-status-critical',
+    warning: 'bg-status-warning-bg text-status-warning',
+    primary: 'bg-primary/10 text-primary',
+    neutral: 'bg-muted text-muted-foreground',
+};
+
+/** Responsive sparkline that inherits its colour from `currentColor`. */
+function MiniSparkline({ data, className }: { data: number[]; className?: string }) {
+    if (!data || data.length < 2) return null;
+    const max = Math.max(...data);
+    const min = Math.min(...data);
+    const range = max - min || 1;
+    const step = 100 / (data.length - 1);
+    const points = data
+        .map((v, i) => `${i * step},${20 - ((v - min) / range) * 20}`)
+        .join(' ');
+    return (
+        <svg
+            viewBox="0 0 100 22"
+            preserveAspectRatio="none"
+            aria-hidden="true"
+            className={cn('h-[22px] w-full', className)}
+        >
+            <polyline
+                points={points}
+                fill="none"
+                stroke="currentColor"
+                strokeWidth={2}
+                strokeLinecap="round"
+                strokeLinejoin="round"
+            />
+        </svg>
+    );
+}
+
+/** Design-spec KPI card: tinted icon chip + top-right pill + value + label + footer. */
+function KpiCard({
+    icon: Icon,
+    tone,
+    value,
+    label,
+    pill,
+    sub,
+    footer,
+}: {
+    icon: ComponentType<{ className?: string }>;
+    tone: KpiTone;
+    value: ReactNode;
+    label: string;
+    pill?: { label: string; tone: KpiTone } | null;
+    sub?: string;
+    footer?: ReactNode;
+}) {
+    return (
+        <div className="rounded-2xl border border-border bg-card p-4 shadow-sm">
+            <div className="mb-2.5 flex items-center justify-between gap-2">
+                <span className={cn('grid h-8 w-8 shrink-0 place-items-center rounded-lg', KPI_TONE[tone])}>
+                    <Icon className="h-4 w-4" />
+                </span>
+                {pill ? (
+                    <span className={cn('shrink-0 rounded-full px-2 py-0.5 text-[10.5px] font-bold', KPI_TONE[pill.tone])}>
+                        {pill.label}
+                    </span>
+                ) : null}
+            </div>
+            <div className="text-2xl font-bold tracking-tight tabular-nums">{value}</div>
+            <div className="text-xs text-muted-foreground">{label}</div>
+            {footer ? (
+                <div className="mt-2">{footer}</div>
+            ) : sub ? (
+                <p className="mt-1 text-[11px] text-muted-foreground">{sub}</p>
+            ) : null}
+        </div>
+    );
+}
+
 export default function EmarHome(props: Props) {
     const {
         date,
@@ -344,6 +423,44 @@ export default function EmarHome(props: Props) {
 
     // Witnesses for the reused RecordDoseWizard, excluding the signer.
     const recordWitnesses = witnesses.filter((w) => w.id !== currentUserId);
+
+    // Compliance delta across the 7-day window (for the card pill + the chart caption).
+    const complianceDelta =
+        complianceTrend.length >= 2
+            ? Number(
+                  (
+                      complianceTrend[complianceTrend.length - 1].rate -
+                      complianceTrend[0].rate
+                  ).toFixed(1),
+              )
+            : 0;
+    const deltaUp = complianceDelta >= 0;
+    const deltaLabel = `${deltaUp ? '▲' : '▼'} ${Math.abs(complianceDelta)}`;
+
+    // 6-segment severity bar for the "Doses due now" KPI card.
+    const dueSegments = Array.from({ length: 6 }, (_, i) =>
+        i < Math.min(6, stats.overdue)
+            ? 'bg-status-critical'
+            : i < Math.min(6, stats.dueNow)
+              ? 'bg-status-warning'
+              : 'bg-muted',
+    );
+    const segHeights = ['h-5', 'h-4', 'h-5', 'h-3', 'h-4', 'h-2.5'];
+
+    // First overdue dose — named in the critical ribbon, like the design.
+    const firstOverdue = actionCentre.find((i) => i.type === 'overdue_dose' && i.record);
+    const overdueDetail = (() => {
+        if (!firstOverdue?.record) return '';
+        const row = firstOverdue.record.row;
+        const med = `${row.medication_name}${row.dose ? ` ${row.dose}` : ''}`;
+        const mins = firstOverdue.opened_at
+            ? Math.max(
+                  0,
+                  Math.round((Date.now() - new Date(firstOverdue.opened_at).getTime()) / 60000),
+              )
+            : null;
+        return ` — ${firstOverdue.client}'s ${med} was scheduled for ${row.time}${mins != null ? ` (${mins} min ago)` : ''}.`;
+    })();
 
     const goDate = (ymd: string) =>
         router.get(
@@ -608,6 +725,7 @@ export default function EmarHome(props: Props) {
                         <div className="min-w-0 flex-1">
                             <p className="text-sm font-bold text-status-critical">
                                 {stats.overdue} dose{stats.overdue === 1 ? '' : 's'} past due
+                                {overdueDetail}
                             </p>
                             <p className="text-xs text-muted-foreground">
                                 Record now if given, or escalate. A missed dose must be recorded with a
@@ -622,12 +740,65 @@ export default function EmarHome(props: Props) {
 
                 {/* ── KPI strip ── */}
                 <div className="grid gap-3 sm:grid-cols-2 lg:grid-cols-3 xl:grid-cols-6">
-                    <OpsStatCard label="Admin rate · target 95%" value={`${stats.adminRate}%`} icon={TrendingUp} color="emerald" subtitle="recorded today" trend={stats.givenTrend} />
-                    <OpsStatCard label="Doses due now" value={stats.dueNow} icon={Clock} color="red" subtitle={`${stats.overdue} overdue`} />
-                    <OpsStatCard label="Controlled drugs active" value={stats.controlledCount} icon={Lock} color="indigo" subtitle={`${stats.activeDiscrepancies} discrepancy open`} />
-                    <OpsStatCard label="Chart reviews due" value={stats.reviewsDue} icon={ClipboardCheck} color="amber" subtitle={`${stats.overdueReviews} overdue`} />
-                    <OpsStatCard label="Competencies expiring" value={stats.competenciesExpiring} icon={Award} color="indigo" subtitle="next 30 days" />
-                    <OpsStatCard label="Stock alerts" value={stats.stockAlerts} icon={Package} color="amber" subtitle={`${stats.lowStock} low · ${stats.expiringStock} expiring`} />
+                    <KpiCard
+                        icon={TrendingUp}
+                        tone="success"
+                        value={`${stats.adminRate}%`}
+                        label="Admin rate · target 95%"
+                        pill={{ label: deltaLabel, tone: deltaUp ? 'success' : 'critical' }}
+                        footer={
+                            <MiniSparkline
+                                data={stats.givenTrend}
+                                className={deltaUp ? 'text-status-success' : 'text-status-critical'}
+                            />
+                        }
+                    />
+                    <KpiCard
+                        icon={Clock}
+                        tone="critical"
+                        value={stats.dueNow}
+                        label="Doses due now"
+                        pill={stats.overdue > 0 ? { label: `${stats.overdue} overdue`, tone: 'critical' } : null}
+                        footer={
+                            <div className="flex h-[22px] items-end gap-[3px]">
+                                {dueSegments.map((c, i) => (
+                                    <span key={i} className={cn('flex-1 rounded-sm', c, segHeights[i])} />
+                                ))}
+                            </div>
+                        }
+                    />
+                    <KpiCard
+                        icon={Lock}
+                        tone="primary"
+                        value={stats.controlledCount}
+                        label="Controlled drugs active"
+                        pill={stats.activeDiscrepancies > 0 ? { label: `${stats.activeDiscrepancies} discrepancy`, tone: 'critical' } : null}
+                        sub={`${stats.activeDiscrepancies} discrepancy open`}
+                    />
+                    <KpiCard
+                        icon={ClipboardCheck}
+                        tone="warning"
+                        value={stats.reviewsDue}
+                        label="Chart reviews due"
+                        pill={stats.overdueReviews > 0 ? { label: `${stats.overdueReviews} overdue`, tone: 'warning' } : null}
+                        sub="next 7 days"
+                    />
+                    <KpiCard
+                        icon={Award}
+                        tone="primary"
+                        value={stats.competenciesExpiring}
+                        label="Competencies expiring"
+                        pill={{ label: '30 days', tone: 'neutral' }}
+                        sub="med-competent staff"
+                    />
+                    <KpiCard
+                        icon={Package}
+                        tone="warning"
+                        value={stats.stockAlerts}
+                        label="Stock alerts"
+                        pill={stats.expiredStock > 0 ? { label: `${stats.expiredStock} expired`, tone: 'critical' } : null}
+                        sub={`${stats.lowStock} low · ${stats.expiringStock} expiring`}
+                    />
                 </div>
 
                 {/* ── Main grid: Action centre + right rail ── */}
@@ -765,14 +936,21 @@ export default function EmarHome(props: Props) {
                             <CardContent>
                                 <div className="flex items-end gap-2">
                                     <span className="text-3xl font-bold tracking-tight">{stats.adminRate}%</span>
-                                    <span className="mb-1 text-xs font-semibold text-status-success">▲ on target</span>
+                                    <span
+                                        className={cn(
+                                            'mb-1 text-xs font-semibold',
+                                            deltaUp ? 'text-status-success' : 'text-status-critical',
+                                        )}
+                                    >
+                                        {deltaLabel} vs last week
+                                    </span>
                                 </div>
                                 <div className="mt-2 h-[140px]">
                                     <ResponsiveContainer width="100%" height="100%">
                                         <AreaChart data={complianceTrend} margin={{ top: 6, right: 6, left: -22, bottom: 0 }}>
                                             <defs>
                                                 <linearGradient id="gradRate" x1="0" y1="0" x2="0" y2="1">
-                                                    <stop offset="5%" stopColor={OPS_COLORS.primary} stopOpacity={0.3} />
+                                                    <stop offset="5%" stopColor={OPS_COLORS.primary} stopOpacity={0.2} />
                                                     <stop offset="95%" stopColor={OPS_COLORS.primary} stopOpacity={0} />
                                                 </linearGradient>
                                             </defs>
@@ -780,7 +958,7 @@ export default function EmarHome(props: Props) {
                                             <XAxis dataKey="day" tick={{ fontSize: 10 }} />
                                             <YAxis domain={[0, 100]} tick={{ fontSize: 10 }} />
                                             <Tooltip contentStyle={{ borderRadius: 8, fontSize: 12 }} />
-                                            <ReferenceLine y={95} stroke={OPS_COLORS.success} strokeDasharray="4 4" />
+                                            <ReferenceLine y={95} stroke={OPS_COLORS.success} strokeDasharray="4 4" strokeOpacity={0.6} />
                                             <Area type="monotone" dataKey="rate" stroke={OPS_COLORS.primary} fill="url(#gradRate)" strokeWidth={2} name="Admin rate" />
                                         </AreaChart>
                                     </ResponsiveContainer>
@@ -1154,15 +1332,15 @@ export default function EmarHome(props: Props) {
                         <CardTitle className="text-sm">Quick access</CardTitle>
                     </CardHeader>
                     <CardContent>
-                        <div className="grid gap-2 sm:grid-cols-2 lg:grid-cols-6">
+                        <div className="grid gap-[10px] sm:grid-cols-2 lg:grid-cols-6">
                             {[
-                                { title: 'MAR charts', href: '/emar/mar', icon: Pill },
-                                { title: 'CD register', href: '/emar/controlled', icon: Lock },
-                                { title: 'Reviews', href: '/emar/reviews', icon: ClipboardCheck },
-                                { title: 'Reports', href: '/emar/reports', icon: Printer },
-                                { title: 'Handovers', href: '/emar/handovers', icon: FileText },
+                                { title: 'MAR charts', href: '/emar/mar', icon: Pill, tone: 'primary' as KpiTone },
+                                { title: 'CD register', href: '/emar/controlled', icon: Lock, tone: 'critical' as KpiTone },
+                                { title: 'Reviews', href: '/emar/reviews', icon: ClipboardCheck, tone: 'warning' as KpiTone },
+                                { title: 'Reports', href: '/emar/reports', icon: Printer, tone: 'primary' as KpiTone },
+                                { title: 'Handovers', href: '/emar/handovers', icon: FileText, tone: 'success' as KpiTone },
                                 ...(canManageSettings
-                                    ? [{ title: 'Admin rules', href: '/emar/settings', icon: Shield }]
+                                    ? [{ title: 'Admin rules', href: '/emar/settings', icon: Shield, tone: 'neutral' as KpiTone }]
                                     : []),
                             ].map((item) => {
                                 const Icon = item.icon;
@@ -1170,13 +1348,12 @@ export default function EmarHome(props: Props) {
                                     <Link
                                         key={item.href}
                                         href={item.href}
-                                        className="group flex items-center gap-3 rounded-lg border p-3 transition-all hover:bg-muted/50 hover:shadow-sm"
+                                        className="flex items-center gap-[10px] rounded-xl border border-border p-3 transition-colors hover:bg-muted"
                                     >
-                                        <span className="grid h-8 w-8 place-items-center rounded-lg bg-primary/10 text-primary">
+                                        <span className={cn('grid h-8 w-8 shrink-0 place-items-center rounded-[9px]', KPI_TONE[item.tone])}>
                                             <Icon className="h-4 w-4" />
                                         </span>
-                                        <span className="text-sm font-medium">{item.title}</span>
-                                        <ArrowRight className="ml-auto h-4 w-4 text-muted-foreground opacity-0 transition-opacity group-hover:opacity-100" />
+                                        <span className="text-[12.5px] font-semibold">{item.title}</span>
                                     </Link>
                                 );
                             })}
