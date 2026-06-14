@@ -169,26 +169,6 @@ class ReportBuilderService
         return $csv;
     }
 
-    /**
-     * Export data to an Excel-compatible file (CSV with .xlsx extension).
-     * Returns the file path to the generated file.
-     */
-    public function exportToExcel(array $data, array $fields, string $reportName): string
-    {
-        $csv = $this->exportToCsv($data, $fields);
-
-        $filename = str_replace(' ', '_', strtolower($reportName)) . '_' . now()->format('Y-m-d_His') . '.xlsx';
-        $path = storage_path("app/private/reports/{$filename}");
-
-        if (! is_dir(dirname($path))) {
-            mkdir(dirname($path), 0755, true);
-        }
-
-        file_put_contents($path, $csv);
-
-        return $path;
-    }
-
     /* ------------------------------------------------------------------ */
     /*  Private query builders per report type                             */
     /* ------------------------------------------------------------------ */

@@ -172,18 +172,11 @@ class ReportBuilderController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.reports.export'), 403);
 
-        $format = $request->input('format', 'csv');
         $data = $this->reportBuilderService->executeReport($report);
 
-        if ($format === 'excel') {
-            $path = $this->reportBuilderService->exportToExcel($data, $report->fields, $report->name);
-
-            return response()->download($path, basename($path), [
-                'Content-Type' => 'application/vnd.openxmlformats-officedocument.spreadsheetml.sheet',
-            ])->deleteFileAfterSend();
-        }
-
-        // Default: CSV
+        // Exported as CSV (opens natively in Excel). A true .xlsx writer is not a
+        // dependency here, so we emit an honest .csv rather than CSV-bytes named
+        // .xlsx (which downloaded a corrupt "Excel" file).
         $csv = $this->reportBuilderService->exportToCsv($data, $report->fields);
         $filename = str_replace(' ', '_', strtolower($report->name)) . '_' . now()->format('Y-m-d') . '.csv';
 

@@ -13,7 +13,7 @@ import {
 import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { BarChart3, Download, FileSpreadsheet, Play, Plus, Trash2 } from 'lucide-react';
+import { BarChart3, Download, Play, Plus, Trash2 } from 'lucide-react';
 import { useState } from 'react';
 
 type SavedReport = {
@@ -69,7 +69,7 @@ export default function SavedReports({ reports, sources }: Props) {
         setRunData(null);
 
         try {
-            const response = await fetch(`/hr/reports/${report.id}/run`, {
+            const response = await fetch(`/hr/reports/saved/${report.id}/run`, {
                 method: 'POST',
                 headers: {
                     'Content-Type': 'application/json',
@@ -93,34 +93,15 @@ export default function SavedReports({ reports, sources }: Props) {
         }
     };
 
-    const handleExport = (reportId: number, format: 'csv' | 'excel') => {
-        const form = document.createElement('form');
-        form.method = 'POST';
-        form.action = `/hr/reports/${reportId}/export`;
-
-        const csrfInput = document.createElement('input');
-        csrfInput.type = 'hidden';
-        csrfInput.name = '_token';
-        csrfInput.value =
-            document.querySelector<HTMLMetaElement>('meta[name="csrf-token"]')
-                ?.content || '';
-        form.appendChild(csrfInput);
-
-        const formatInput = document.createElement('input');
-        formatInput.type = 'hidden';
-        formatInput.name = 'format';
-        formatInput.value = format;
-        form.appendChild(formatInput);
-
-        document.body.appendChild(form);
-        form.submit();
-        document.body.removeChild(form);
+    const handleExport = (reportId: number) => {
+        // GET download (the export route is GET; CSV opens cleanly in Excel).
+        window.location.href = `/hr/reports/saved/${reportId}/export`;
     };
 
     const handleDelete = (reportId: number) => {
         if (!confirm('Are you sure you want to delete this saved report?'))
             return;
-        router.delete(`/hr/reports/${reportId}`);
+        router.delete(`/hr/reports/saved/${reportId}`);
     };
 
     const formatLabel = (field: string) =>
@@ -223,27 +204,11 @@ export default function SavedReports({ reports, sources }: Props) {
                                                     variant="ghost"
                                                     size="sm"
                                                     onClick={() =>
-                                                        handleExport(
-                                                            report.id,
-                                                            'csv',
-                                                        )
+                                                        handleExport(report.id)
                                                     }
                                                 >
                                                     <Download className="mr-1 h-3 w-3" />
-                                                    CSV
-                                                </Button>
-                                                <Button
-                                                    variant="ghost"
-                                                    size="sm"
-                                                    onClick={() =>
-                                                        handleExport(
-                                                            report.id,
-                                                            'excel',
-                                                        )
-                                                    }
-                                                >
-                                                    <FileSpreadsheet className="mr-1 h-3 w-3" />
-                                                    Excel
+                                                    Export CSV
                                                 </Button>
                                                 <Button
                                                     variant="ghost"
