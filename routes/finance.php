@@ -324,6 +324,7 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
         Route::post('/quotes/{quote}/send', [QuoteController::class, 'send'])->name('quotes.send');
         Route::post('/quotes/{quote}/accept', [QuoteController::class, 'accept'])->name('quotes.accept');
         Route::post('/quotes/{quote}/convert', [QuoteController::class, 'convertToAgreement'])->name('quotes.convert');
+        Route::post('/quotes/{quote}/convert-to-invoice', [QuoteController::class, 'convertToInvoice'])->name('quotes.convert-to-invoice');
     });
 
     // ── Recurring Charges ──────────────────────────────────────────────

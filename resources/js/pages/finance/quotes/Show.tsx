@@ -5,7 +5,7 @@ import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
-import { ArrowRight, CalendarDays, CheckCircle2, FileText, Mail, Pencil, Send } from 'lucide-react';
+import { ArrowRight, CalendarDays, CheckCircle2, FileText, Mail, Pencil, Receipt, Send } from 'lucide-react';
 
 type LineItem = {
     id: number;
@@ -98,9 +98,14 @@ export default function QuoteShow({ quote }: Props) {
                             </Button>
                         )}
                         {quote.status === 'accepted' && (
-                            <Button size="sm" onClick={() => handleAction('convert')}>
-                                <FileText className="mr-1.5 h-3.5 w-3.5" /> Convert to Agreement
-                            </Button>
+                            <>
+                                <Button size="sm" variant="outline" onClick={() => handleAction('convert')}>
+                                    <FileText className="mr-1.5 h-3.5 w-3.5" /> Convert to Agreement
+                                </Button>
+                                <Button size="sm" onClick={() => handleAction('convert-to-invoice')}>
+                                    <Receipt className="mr-1.5 h-3.5 w-3.5" /> Convert to Invoice
+                                </Button>
+                            </>
                         )}
                     </div>
                 </div>
