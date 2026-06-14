@@ -894,6 +894,9 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             Route::post('/', [AssetController::class, 'store'])->name('store');
             Route::post('/{asset}/assign', [AssetController::class, 'assign'])->name('assign');
             Route::post('/assignments/{assignment}/return', [AssetController::class, 'returnAsset'])->name('assignments.return');
+            Route::post('/{asset}/maintenance', [AssetController::class, 'sendToMaintenance'])->name('maintenance');
+            Route::post('/{asset}/return-from-maintenance', [AssetController::class, 'returnFromMaintenance'])->name('return-from-maintenance');
+            Route::post('/{asset}/retire', [AssetController::class, 'retire'])->name('retire');
         });
 
         Route::get('/{asset}', [AssetController::class, 'show'])->name('show');

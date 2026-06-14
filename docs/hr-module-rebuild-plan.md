@@ -600,9 +600,15 @@ flat Send-Kudos dialog. M7-R3 (e08c55c5) — HrDemoSeeder feed/kudos demo data (
     in-page Radix tabs (OK). LACKING tabs, ranked by cluster size: **Performance** (~8 surfaces/20+ pages — largest),
     **My-HR/ESS** (12 pages), **Compliance** (~7 surfaces), **Reports** (5), **Compensation** (3, no index),
     **Documents** (3), **Settings** (3, low). One hub/tick.
-  - *Half-built backends (finish or hide):* **Asset retire/maintenance** — index filter + status colours offer
-    maintenance/retired but AssetService only assign/return + no route/UI can set them (medium; either wire or hide
-    the filter options). **Expense receipt upload** — receipt_path column + service param + show-page "Attached" badge
+  - *Half-built backends (finish or hide):* ✅ **Asset retire/maintenance DONE (S29)** — wired
+    AssetService::{sendToMaintenance(available→maintenance), returnFromMaintenance(maintenance→available),
+    retireAsset(available|maintenance→retired, NOT while assigned)} + AssetController methods (hr.assets.manage,
+    LogicException→flash) + POST routes assets.{maintenance,return-from-maintenance,retire} + show.tsx
+    status-conditional buttons (Maintenance/Return-to-service/Retire). No schema invention (status enum already had
+    maintenance+retired; only status+notes cols touched; AuditableChanges records the timestamp). ALSO fixed the
+    null-tenant bug in the SAME controller (index/store/show used `$user->tenant_id`→always null→seeded tenant-1
+    assets never shown) → ResolvesHrTenant. 7 tests (AssetLifecycleTest incl. the index-tenant regression).
+    **Expense receipt upload** — receipt_path column + service param + show-page "Attached" badge
     exist, but create form has no file input, request has no rule, no upload route (medium). **Benefit plan
     deactivate** — storePlan hardcodes is_active:true, no updatePlan route (low; missing transition, no dead button).
   - *Orphan models/tables to drop (reversible migration, like HrCheckIn):* **HrSurvey\*** (4 tables — NOT a clean
