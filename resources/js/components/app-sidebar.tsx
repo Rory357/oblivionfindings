@@ -1667,31 +1667,17 @@ function buildFinanceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     }
 
     const banking: NavItem[] = [];
-    if (can?.finance?.bank?.view) {
+    if (
+        can?.finance?.bank?.view ||
+        can?.finance?.bank?.manage ||
+        can?.finance?.pettyCash?.view
+    ) {
+        // Banking & Cash hub — accounts, transactions, reconciliation, matching,
+        // feeds, EFTPOS, petty cash and match rules are now tabs here.
         banking.push({
-            title: 'Bank Accounts',
-            href: '/finance/bank-accounts',
+            title: 'Banking',
+            href: '/finance/banking',
             icon: Landmark,
-        });
-        banking.push({
-            title: 'Reconciliation',
-            href: '/finance/bank-reconciliation',
-            icon: CheckCircle2,
-        });
-        banking.push({
-            title: 'Payment Matching',
-            href: '/finance/payment-matching',
-            icon: ArrowLeftRight,
-        });
-        banking.push({
-            title: 'Bank Feeds',
-            href: '/finance/bank-feeds',
-            icon: Radio,
-        });
-        banking.push({
-            title: 'EFTPOS',
-            href: '/finance/eftpos/terminals',
-            icon: CreditCard,
         });
     }
 
@@ -1708,12 +1694,7 @@ function buildFinanceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             href: '/finance/ird-filings',
             icon: Send,
         });
-    if (can?.finance?.pettyCash?.view)
-        other.push({
-            title: 'Petty Cash',
-            href: '/finance/petty-cash',
-            icon: Banknote,
-        });
+    // Petty Cash is now a tab in the Banking & Cash hub (see `banking` above).
     if (can?.finance?.reports?.view)
         other.push({
             title: 'Donor Funds',

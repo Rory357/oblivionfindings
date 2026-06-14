@@ -2,6 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { Head, router, useForm } from '@inertiajs/react';
 import { type BreadcrumbItem } from '@/types';
 import { PageHero, PageLayout } from '@/components/page';
+import { BankingTabsFooter } from '@/components/finance';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -363,6 +364,7 @@ export default function BankTransactionsIndex({ transactions, bankAccounts, filt
                         </Dialog>
                             </div>
                         }
+                        footer={<BankingTabsFooter active="transactions" />}
                     />
                 }
             >

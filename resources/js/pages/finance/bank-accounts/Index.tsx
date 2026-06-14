@@ -1,6 +1,7 @@
 import { Head, Link } from '@inertiajs/react';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
+import { BankingTabsFooter } from '@/components/finance';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -80,6 +81,7 @@ export default function BankAccountsIndex({ bankAccounts }: Props) {
                                 </Link>
                             </Button>
                         }
+                        footer={<BankingTabsFooter active="accounts" />}
                     />
                 }
             >

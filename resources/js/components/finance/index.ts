@@ -4,6 +4,7 @@
 // WizardShell kit (wizard), StatusBadge (hr) — are reused, not duplicated, so
 // Finance tabs/modals/badges are visually identical to HR + Rostering. Only the
 // finance-specific pieces (hero category, money field, posting preview) are new.
+export * from './banking-hub';
 export * from './finance-hero';
 export * from './finance-tabs';
 export * from './ledger-hub';

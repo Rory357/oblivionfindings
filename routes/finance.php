@@ -5,6 +5,7 @@ use App\Domain\Finance\Http\Controllers\AccountsReceivableController;
 use App\Domain\Finance\Http\Controllers\AuditExportController;
 use App\Domain\Finance\Http\Controllers\BankAccountController;
 use App\Domain\Finance\Http\Controllers\BankFeedController;
+use App\Domain\Finance\Http\Controllers\BankingController;
 use App\Domain\Finance\Http\Controllers\BankReconciliationController;
 use App\Domain\Finance\Http\Controllers\BankTransactionController;
 use App\Domain\Finance\Http\Controllers\BillController;
@@ -345,6 +346,12 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
         Route::put('/recurring-charges/{charge}', [RecurringChargeController::class, 'update'])->name('recurring_charges.update');
         Route::delete('/recurring-charges/{charge}', [RecurringChargeController::class, 'destroy'])->name('recurring_charges.destroy');
     });
+
+    // ── Banking & Cash hub ──────────────────────────────────────────────
+    // /finance/banking is the hub entry point; it redirects to the first banking
+    // tab the user can open (accounts · transactions · reconciliation · matching ·
+    // feeds · EFTPOS · petty cash · match rules). The tabs are the routes below.
+    Route::get('/banking', [BankingController::class, 'index'])->name('banking.index');
 
     // ── Bank Accounts ───────────────────────────────────────────────────
     Route::get('/bank-accounts', [BankAccountController::class, 'index'])
