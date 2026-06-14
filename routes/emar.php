@@ -202,9 +202,9 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
     Route::post('/controlled/balance-check', [EmarController::class, 'storeBalanceCheck'])->name('emar.controlled.balance_check.store');
     Route::post('/controlled/discrepancies/{discrepancy}/resolve', [EmarController::class, 'resolveDiscrepancy'])->name('emar.controlled.discrepancies.resolve');
 
-    // Destructions
+    // Destructions — the register is immutable; erroneous records are voided, not deleted (MoD Regs 1977)
     Route::post('/destructions', [EmarController::class, 'storeDestruction'])->name('emar.destructions.store');
-    Route::delete('/destructions/{destruction}', [EmarController::class, 'destroyDestruction'])->name('emar.destructions.destroy');
+    Route::post('/destructions/{destruction}/void', [EmarController::class, 'voidDestruction'])->name('emar.destructions.void');
 
     // Pharmacy Orders + Stock
     Route::post('/stock/pharmacy-orders', [EmarController::class, 'storePharmacyOrder'])->name('emar.pharmacy_orders.store');

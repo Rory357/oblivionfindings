@@ -1,325 +1,323 @@
-import PageShell from '@/components/page-shell';
-import { Badge } from '@/components/ui/badge';
+/* eslint-disable no-restricted-syntax -- register tab tables/report cards are custom-layout
+   bordered surfaces (not Card/Button); all colours are semantic tokens. */
+import { type CdMedication, type StaffOption } from '@/components/emar/controlled/types';
+import { PageHero, type PageHeroStat } from '@/components/page';
+import { EntityFilter, TabStrip, type RosterTabItem } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
-import { Card, CardContent } from '@/components/ui/card';
-import { Checkbox } from '@/components/ui/checkbox';
-import { Dialog, DialogContent, DialogDescription, DialogHeader, DialogTitle, DialogTrigger } from '@/components/ui/dialog';
-import { Input } from '@/components/ui/input';
-import { Label } from '@/components/ui/label';
-import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
-import { Textarea } from '@/components/ui/textarea';
-import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
-import { Head, router, useForm } from '@inertiajs/react';
-import { Plus, Trash2 } from 'lucide-react';
-import { useState } from 'react';
+import { CdPill, RecordDestructionDialog, VoidDestructionDialog } from '@/pages/emar/_cd-dialogs';
+import { Head, router } from '@inertiajs/react';
+import { ClipboardCheck, Download, FileText, Lock, Package, Plus, Trash2 } from 'lucide-react';
+import { useMemo, useState } from 'react';
 
-type Props = {
-    destructions: { data: any[]; links: any };
-    filters: { controlled_only?: boolean };
-    staff: { id: number; name: string }[];
-    clients: { id: number; first_name: string; last_name: string }[];
-    medications: { id: number; name: string; client_id: number }[];
+type DestructionRow = {
+    id: number;
+    client_id: number | null;
+    client_name: string;
+    site_id: number | null;
+    site_name: string | null;
+    medication_name: string | null;
+    form: string | null;
+    strength: string | null;
+    quantity: number | string | null;
+    unit: string | null;
+    batch_number: string | null;
+    expiry_date: string | null;
+    reason: string | null;
+    reason_label: string | null;
+    disposal_method: string | null;
+    disposal_method_label: string | null;
+    is_controlled_drug: boolean;
+    controlled_drug_class: string | null;
+    authorised_by_name: string | null;
+    destroyed_at: string | null;
+    destroyed_by_name: string | null;
+    witness_1_name: string | null;
+    witness_2_name: string | null;
+    notes: string | null;
+    voided_at: string | null;
+    void_reason: string | null;
+    voided_by_name: string | null;
+    is_voided: boolean;
 };
 
-const REASONS = [
-    { value: 'expired', label: 'Expired' },
-    { value: 'ceased', label: 'Ceased' },
-    { value: 'contaminated', label: 'Contaminated' },
-    { value: 'damaged', label: 'Damaged' },
-    { value: 'deceased', label: 'Deceased' },
-    { value: 'discharged', label: 'Discharged' },
-    { value: 'surplus', label: 'Surplus' },
-];
+type Props = {
+    destructions: DestructionRow[];
+    medications: CdMedication[];
+    staff: StaffOption[];
+    clients: { id: number; first_name: string; last_name: string }[];
+    sites: { id: number; name: string }[];
+    active_site: { id: number; name: string } | null;
+    site_brand_colour: string | null;
+};
 
-const DISPOSAL_METHODS = [
-    { value: 'pharmacy_return', label: 'Pharmacy Return' },
-    { value: 'incineration', label: 'Incineration' },
-    { value: 'denaturing', label: 'Denaturing' },
-    { value: 'sharps_bin', label: 'Sharps Bin' },
-    { value: 'other', label: 'Other' },
-];
+type Modal = { type: 'record' } | { type: 'void'; row: DestructionRow } | null;
 
-export default function Destructions({ destructions, filters, staff, clients, medications }: Props) {
-    const [open, setOpen] = useState(false);
+const DAY = 1000 * 60 * 60 * 24;
 
-    const form = useForm({
-        client_id: '',
-        medication_name: '',
-        form: '',
-        strength: '',
-        quantity: 1,
-        unit: '',
-        batch_number: '',
-        expiry_date: '',
-        reason: '',
-        disposal_method: '',
-        is_controlled_drug: false,
-        controlled_drug_class: '',
-        authorised_by_name: '',
-        authorised_by_registration: '',
-        witness_1_id: '',
-        witness_2_id: '',
-        notes: '',
-    });
+function withinDays(iso: string | null, days: number): boolean {
+    if (!iso) return false;
+    const t = new Date(iso).getTime();
+    return !Number.isNaN(t) && Date.now() - t <= days * DAY;
+}
 
-    function submit(e: React.FormEvent) {
-        e.preventDefault();
-        form.post('/emar/destructions', {
-            onSuccess: () => {
-                setOpen(false);
-                form.reset();
-            },
-        });
-    }
+function relativeDays(iso: string | null): string {
+    if (!iso) return 'Never';
+    const t = new Date(iso).getTime();
+    if (Number.isNaN(t)) return '—';
+    const d = Math.floor((Date.now() - t) / DAY);
+    return d <= 0 ? 'Today' : d === 1 ? 'Yesterday' : `${d}d ago`;
+}
+
+const fmtDate = (iso: string | null) => (iso ? new Date(iso).toLocaleDateString('en-NZ', { day: 'numeric', month: 'short', year: 'numeric' }) : '—');
+
+function csvCell(value: unknown): string {
+    const s = value === null || value === undefined ? '' : String(value);
+    return /[",\n]/.test(s) ? `"${s.replace(/"/g, '""')}"` : s;
+}
+
+function exportCsv(rows: DestructionRow[]) {
+    const head = ['Date', 'Client', 'Site', 'Medication', 'Form', 'Strength', 'Quantity', 'Unit', 'Batch', 'Expiry', 'Reason', 'Method', 'Controlled drug', 'Destroyed by', 'Witness 1', 'Witness 2', 'Authorised by', 'Notes', 'Voided', 'Void reason'];
+    const lines = rows.map((d) => [
+        fmtDate(d.destroyed_at), d.client_name, d.site_name, d.medication_name, d.form, d.strength,
+        d.quantity, d.unit, d.batch_number, d.expiry_date, d.reason_label ?? d.reason, d.disposal_method_label ?? d.disposal_method,
+        d.is_controlled_drug ? `Yes${d.controlled_drug_class ? ` (Class ${d.controlled_drug_class})` : ''}` : 'No',
+        d.destroyed_by_name, d.witness_1_name, d.witness_2_name, d.authorised_by_name, d.notes,
+        d.is_voided ? 'Yes' : 'No', d.void_reason,
+    ].map(csvCell).join(','));
+    const blob = new Blob([[head.join(','), ...lines].join('\n')], { type: 'text/csv;charset=utf-8;' });
+    const url = URL.createObjectURL(blob);
+    const a = document.createElement('a');
+    a.href = url;
+    a.download = `destruction-register-${new Date().toISOString().slice(0, 10)}.csv`;
+    a.click();
+    URL.revokeObjectURL(url);
+}
+
+export default function Destructions({ destructions, medications, staff, sites, active_site: activeSite, site_brand_colour: brandColour }: Props) {
+    const [activeTab, setActiveTab] = useState('log');
+    const [siteFilter, setSiteFilter] = useState<number | null>(activeSite?.id ?? null);
+    const [modal, setModal] = useState<Modal>(null);
+
+    const live = useMemo(() => destructions.filter((d) => !d.is_voided), [destructions]);
+    const controlled = useMemo(() => destructions.filter((d) => d.is_controlled_drug), [destructions]);
+
+    const destroyed30 = live.filter((d) => withinDays(d.destroyed_at, 30)).length;
+    const cd30 = controlled.filter((d) => !d.is_voided && withinDays(d.destroyed_at, 30)).length;
+    const lastAt = live.map((d) => d.destroyed_at).filter(Boolean).sort().slice(-1)[0] ?? null;
+
+    // Report aggregates (live records only).
+    const byReason = useMemo(() => tally(live.map((d) => d.reason_label ?? d.reason ?? 'Unspecified')), [live]);
+    const byMethod = useMemo(() => tally(live.map((d) => d.disposal_method_label ?? d.disposal_method ?? 'Unspecified')), [live]);
+
+    const TABS: RosterTabItem[] = [
+        { id: 'log', label: 'Destruction log', icon: ClipboardCheck, tone: 'primary', badge: live.length || undefined },
+        { id: 'controlled', label: 'Controlled drugs', icon: Lock, tone: 'critical', badge: controlled.filter((d) => !d.is_voided).length || undefined },
+        { id: 'reports', label: 'Reports & export', icon: FileText, tone: 'info' },
+    ];
+
+    const heroStats: PageHeroStat[] = [
+        { label: 'Live records', value: live.length },
+        { label: 'Destroyed (30d)', value: destroyed30 },
+        { label: 'CD destructions (30d)', value: cd30, tone: cd30 > 0 ? 'warning' : 'neutral' },
+        { label: 'Last destruction', value: relativeDays(lastAt) },
+    ];
 
     return (
-        <AppLayout>
-            <Head title="eMAR - Destruction Records" />
-            <Dialog open={open} onOpenChange={setOpen}>
+        <AppLayout breadcrumbs={[{ title: 'eMAR', href: '/emar' }, { title: 'Destructions', href: '/emar/destructions' }]}>
+            <Head title="Medication Destruction Register" />
+            <div className="flex flex-col gap-6 p-6">
                 <PageHero
+                    variant="hero"
+                    category="ops"
+                    brandColour={brandColour}
                     icon={Trash2}
-                    title="Medication Destruction / Disposal"
-                    description="Records of medication destruction and disposal with dual-witness verification."
-                    stats={[
-                        { label: 'Total records', value: destructions.data.length },
-                        { label: 'Controlled drug', value: destructions.data.filter((d: any) => d.is_controlled_drug).length },
-                    ]}
+                    title={
+                        <span>
+                            <span className="flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-wide text-primary-foreground/80">
+                                <span aria-hidden className="relative inline-flex h-2 w-2">
+                                    <span className="absolute inset-0 animate-ping rounded-full bg-status-success/70" />
+                                    <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success" />
+                                </span>
+                                Disposal register · immutable
+                            </span>
+                            <span className="mt-1 block text-[26px] font-bold leading-tight">
+                                Medication disposal &amp; destruction for{' '}
+                                <span className="border-b-2 border-primary-foreground/40">{activeSite?.name ?? 'your services'}</span>
+                            </span>
+                        </span>
+                    }
+                    description="Witnessed disposal of medication and controlled drugs — append-only and retained. Erroneous entries are voided, never deleted."
+                    stats={heroStats}
                     actions={
-                        <DialogTrigger asChild>
-                            <Button size="sm"><Plus className="mr-1 h-4 w-4" /> Record Destruction</Button>
-                        </DialogTrigger>
+                        <>
+                            <Button className="bg-primary-foreground text-primary hover:bg-primary-foreground/90" onClick={() => setModal({ type: 'record' })}>
+                                <Plus className="h-4 w-4" />
+                                Record destruction
+                            </Button>
+                            <Button variant="outline" className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground hover:bg-primary-foreground/20" onClick={() => exportCsv(destructions)} disabled={destructions.length === 0}>
+                                <Download className="h-4 w-4" />
+                                Export register
+                            </Button>
+                        </>
+                    }
+                    footer={
+                        sites.length > 0 ? (
+                            <div className="flex items-center justify-end py-3">
+                                <EntityFilter label="Site" allLabel="All sites" items={sites} value={siteFilter} onChange={(id) => { setSiteFilter(id); router.get('/emar/destructions', id ? { site_id: id } : {}, { preserveState: true, preserveScroll: true }); }} onDark />
+                            </div>
+                        ) : undefined
                     }
                 />
-                <PageShell>
-                        <DialogContent className="max-h-[90vh] max-w-2xl overflow-y-auto">
-                            <DialogHeader>
-                                <DialogTitle>Record Medication Destruction</DialogTitle>
-                                <DialogDescription>
-                                    Capture disposal details, witnesses, and
-                                    controlled-drug authorisation where
-                                    required.
-                                </DialogDescription>
-                            </DialogHeader>
-                            <form onSubmit={submit} className="space-y-4">
-                                {/* Client */}
-                                <div>
-                                    <Label>Client</Label>
-                                    <Select value={form.data.client_id} onValueChange={(v) => form.setData('client_id', v)}>
-                                        <SelectTrigger><SelectValue placeholder="Select client" /></SelectTrigger>
-                                        <SelectContent>
-                                            {clients.map((c) => (
-                                                <SelectItem key={c.id} value={c.id.toString()}>{c.last_name}, {c.first_name}</SelectItem>
-                                            ))}
-                                        </SelectContent>
-                                    </Select>
-                                    {form.errors.client_id && <p className="mt-1 text-xs text-status-critical">{form.errors.client_id}</p>}
-                                </div>
 
-                                {/* Medication Details */}
-                                <div className="grid gap-3 sm:grid-cols-2">
-                                    <div>
-                                        <Label htmlFor="dest-med">Medication Name</Label>
-                                        <Input id="dest-med" value={form.data.medication_name} onChange={(e) => form.setData('medication_name', e.target.value)} />
-                                        {form.errors.medication_name && <p className="mt-1 text-xs text-status-critical">{form.errors.medication_name}</p>}
-                                    </div>
-                                    <div>
-                                        <Label htmlFor="dest-form">Form</Label>
-                                        <Input id="dest-form" value={form.data.form} onChange={(e) => form.setData('form', e.target.value)} placeholder="tablet, liquid, patch..." />
-                                        {form.errors.form && <p className="mt-1 text-xs text-status-critical">{form.errors.form}</p>}
-                                    </div>
-                                    <div>
-                                        <Label htmlFor="dest-strength">Strength</Label>
-                                        <Input id="dest-strength" value={form.data.strength} onChange={(e) => form.setData('strength', e.target.value)} placeholder="e.g. 500mg" />
-                                    </div>
-                                    <div className="grid grid-cols-2 gap-2">
-                                        <div>
-                                            <Label htmlFor="dest-qty">Quantity</Label>
-                                            <Input id="dest-qty" type="number" min={1} value={form.data.quantity} onChange={(e) => form.setData('quantity', parseInt(e.target.value) || 1)} />
-                                            {form.errors.quantity && <p className="mt-1 text-xs text-status-critical">{form.errors.quantity}</p>}
-                                        </div>
-                                        <div>
-                                            <Label htmlFor="dest-unit">Unit</Label>
-                                            <Input id="dest-unit" value={form.data.unit} onChange={(e) => form.setData('unit', e.target.value)} placeholder="tablets, mL..." />
-                                        </div>
-                                    </div>
-                                    <div>
-                                        <Label htmlFor="dest-batch">Batch Number</Label>
-                                        <Input id="dest-batch" value={form.data.batch_number} onChange={(e) => form.setData('batch_number', e.target.value)} />
-                                    </div>
-                                    <div>
-                                        <Label htmlFor="dest-expiry">Expiry Date</Label>
-                                        <Input id="dest-expiry" type="date" value={form.data.expiry_date} onChange={(e) => form.setData('expiry_date', e.target.value)} />
-                                    </div>
-                                </div>
+                <TabStrip value={activeTab} onChange={setActiveTab} items={TABS} ariaLabel="Destruction register views" />
 
-                                {/* Reason & Method */}
-                                <div className="grid gap-3 sm:grid-cols-2">
-                                    <div>
-                                        <Label>Reason</Label>
-                                        <Select value={form.data.reason} onValueChange={(v) => form.setData('reason', v)}>
-                                            <SelectTrigger><SelectValue placeholder="Select reason" /></SelectTrigger>
-                                            <SelectContent>
-                                                {REASONS.map((r) => (
-                                                    <SelectItem key={r.value} value={r.value}>{r.label}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        {form.errors.reason && <p className="mt-1 text-xs text-status-critical">{form.errors.reason}</p>}
-                                    </div>
-                                    <div>
-                                        <Label>Disposal Method</Label>
-                                        <Select value={form.data.disposal_method} onValueChange={(v) => form.setData('disposal_method', v)}>
-                                            <SelectTrigger><SelectValue placeholder="Select method" /></SelectTrigger>
-                                            <SelectContent>
-                                                {DISPOSAL_METHODS.map((m) => (
-                                                    <SelectItem key={m.value} value={m.value}>{m.label}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        {form.errors.disposal_method && <p className="mt-1 text-xs text-status-critical">{form.errors.disposal_method}</p>}
-                                    </div>
-                                </div>
+                {activeTab === 'log' && (
+                    <TableCard head={['Date', 'Client', 'Medication', 'Qty', 'Reason', 'Method', 'Destroyed by', 'Witness', '']} empty={destructions.length === 0 ? 'No destruction records yet.' : null}>
+                        {destructions.map((d) => (
+                            <LogRow key={d.id} d={d} onVoid={() => setModal({ type: 'void', row: d })} />
+                        ))}
+                    </TableCard>
+                )}
 
-                                {/* Controlled Drug */}
-                                <div className="space-y-3 rounded-md border p-3">
-                                    <label className="flex items-center gap-2 text-sm font-medium">
-                                        <Checkbox
-                                            checked={form.data.is_controlled_drug}
-                                            onCheckedChange={(v) => form.setData('is_controlled_drug', !!v)}
-                                        />
-                                        Controlled Drug
-                                    </label>
-                                    {form.data.is_controlled_drug && (
-                                        <div className="grid gap-3 sm:grid-cols-3">
-                                            <div>
-                                                <Label>Class</Label>
-                                                <Select value={form.data.controlled_drug_class} onValueChange={(v) => form.setData('controlled_drug_class', v)}>
-                                                    <SelectTrigger><SelectValue placeholder="Select class" /></SelectTrigger>
-                                                    <SelectContent>
-                                                        <SelectItem value="B">Class B</SelectItem>
-                                                        <SelectItem value="C">Class C</SelectItem>
-                                                    </SelectContent>
-                                                </Select>
-                                                {form.errors.controlled_drug_class && <p className="mt-1 text-xs text-status-critical">{form.errors.controlled_drug_class}</p>}
-                                            </div>
-                                            <div>
-                                                <Label htmlFor="dest-auth-name">Authorised By (Name)</Label>
-                                                <Input id="dest-auth-name" value={form.data.authorised_by_name} onChange={(e) => form.setData('authorised_by_name', e.target.value)} />
-                                                {form.errors.authorised_by_name && <p className="mt-1 text-xs text-status-critical">{form.errors.authorised_by_name}</p>}
-                                            </div>
-                                            <div>
-                                                <Label htmlFor="dest-auth-reg">Registration No.</Label>
-                                                <Input id="dest-auth-reg" value={form.data.authorised_by_registration} onChange={(e) => form.setData('authorised_by_registration', e.target.value)} />
-                                            </div>
-                                        </div>
-                                    )}
-                                </div>
+                {activeTab === 'controlled' && (
+                    <TableCard head={['Date', 'Client', 'Controlled drug', 'Qty', 'Witness 1', 'Witness 2', 'Authorised by', '']} empty={controlled.length === 0 ? 'No controlled-drug destructions recorded.' : null}>
+                        {controlled.map((d) => (
+                            <tr key={d.id} className={cnRow(d)}>
+                                <td className="px-4 py-3 text-muted-foreground">{fmtDate(d.destroyed_at)}</td>
+                                <td className="px-4 py-3">{d.client_name}</td>
+                                <td className="px-4 py-3 font-medium">
+                                    {d.medication_name}
+                                    {d.controlled_drug_class && <CdPill label={`Class ${d.controlled_drug_class}`} tone="ml-2 bg-status-critical-bg text-status-critical" />}
+                                </td>
+                                <td className="px-4 py-3 tabular-nums">{d.quantity} {d.unit}</td>
+                                <td className="px-4 py-3 text-muted-foreground">{d.witness_1_name ?? '—'}</td>
+                                <td className="px-4 py-3 text-muted-foreground">{d.witness_2_name ?? '—'}</td>
+                                <td className="px-4 py-3 text-muted-foreground">{d.authorised_by_name ?? '—'}</td>
+                                <td className="px-4 py-3 text-right">
+                                    {d.is_voided ? <CdPill label="Voided" tone="bg-muted text-muted-foreground" /> : <Button size="sm" variant="ghost" onClick={() => setModal({ type: 'void', row: d })}>Void</Button>}
+                                </td>
+                            </tr>
+                        ))}
+                    </TableCard>
+                )}
 
-                                {/* Witnesses */}
-                                <div className="grid gap-3 sm:grid-cols-2">
-                                    <div>
-                                        <Label>Witness 1 (required)</Label>
-                                        <Select value={form.data.witness_1_id} onValueChange={(v) => form.setData('witness_1_id', v)}>
-                                            <SelectTrigger><SelectValue placeholder="Select witness" /></SelectTrigger>
-                                            <SelectContent>
-                                                {staff.map((s) => (
-                                                    <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        {form.errors.witness_1_id && <p className="mt-1 text-xs text-status-critical">{form.errors.witness_1_id}</p>}
-                                    </div>
-                                    <div>
-                                        <Label>Witness 2 {form.data.is_controlled_drug ? '(required for CD)' : '(optional)'}</Label>
-                                        <Select value={form.data.witness_2_id} onValueChange={(v) => form.setData('witness_2_id', v)}>
-                                            <SelectTrigger><SelectValue placeholder="Select witness" /></SelectTrigger>
-                                            <SelectContent>
-                                                {staff.map((s) => (
-                                                    <SelectItem key={s.id} value={s.id.toString()}>{s.name}</SelectItem>
-                                                ))}
-                                            </SelectContent>
-                                        </Select>
-                                        {form.errors.witness_2_id && <p className="mt-1 text-xs text-status-critical">{form.errors.witness_2_id}</p>}
-                                    </div>
-                                </div>
+                {activeTab === 'reports' && (
+                    <div className="flex flex-col gap-4">
+                        <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-4">
+                            <StatCard label="Live records" value={live.length} hint="Excludes voided" />
+                            <StatCard label="Controlled-drug disposals" value={controlled.filter((d) => !d.is_voided).length} hint="All time" />
+                            <StatCard label="Destroyed (30 days)" value={destroyed30} hint="Rolling" />
+                            <StatCard label="Voided records" value={destructions.length - live.length} hint="Retained, superseded" />
+                        </div>
+                        <div className="grid gap-4 lg:grid-cols-2">
+                            <BreakdownCard title="By reason" rows={byReason} />
+                            <BreakdownCard title="By disposal method" rows={byMethod} />
+                        </div>
+                        <div className="flex items-center justify-between gap-3 rounded-2xl border bg-card p-4 shadow-sm">
+                            <div>
+                                <div className="text-sm font-medium">Export disposal register</div>
+                                <div className="text-xs text-muted-foreground">Download the full register (including voided records) as CSV for audit.</div>
+                            </div>
+                            <Button variant="outline" onClick={() => exportCsv(destructions)} disabled={destructions.length === 0}>
+                                <Download className="h-4 w-4" />
+                                Export CSV
+                            </Button>
+                        </div>
+                    </div>
+                )}
+            </div>
 
-                                {/* Notes */}
-                                <div>
-                                    <Label htmlFor="dest-notes">Notes</Label>
-                                    <Textarea id="dest-notes" rows={3} value={form.data.notes} onChange={(e) => form.setData('notes', e.target.value)} />
-                                </div>
-
-                                <div className="flex justify-end gap-2">
-                                    <Button type="button" variant="outline" onClick={() => setOpen(false)}>Cancel</Button>
-                                    <Button type="submit" disabled={form.processing}>Record Destruction</Button>
-                                </div>
-                            </form>
-                        </DialogContent>
-
-                <Card>
-                    <CardContent className="p-0">
-                        <table className="w-full text-sm">
-                            <thead>
-                                <tr className="border-b bg-muted/50">
-                                    <th className="p-3 text-left font-medium">Date</th>
-                                    <th className="p-3 text-left font-medium">Client</th>
-                                    <th className="p-3 text-left font-medium">Medication</th>
-                                    <th className="p-3 text-left font-medium">Form</th>
-                                    <th className="p-3 text-left font-medium">Qty</th>
-                                    <th className="p-3 text-left font-medium">Reason</th>
-                                    <th className="p-3 text-left font-medium">Method</th>
-                                    <th className="p-3 text-left font-medium">Destroyed By</th>
-                                    <th className="p-3 text-left font-medium">Witness 1</th>
-                                    <th className="p-3 text-left font-medium">Witness 2</th>
-                                    <th className="p-3 text-right font-medium">Actions</th>
-                                </tr>
-                            </thead>
-                            <tbody>
-                                {destructions.data.map((d: any) => (
-                                    <tr key={d.id} className="border-b last:border-0">
-                                        <td className="p-3 text-xs">{d.destroyed_at ? new Date(d.destroyed_at).toLocaleDateString('en-NZ') : '—'}</td>
-                                        <td className="p-3">{d.client ? `${d.client.last_name}, ${d.client.first_name}` : '—'}</td>
-                                        <td className="p-3">
-                                            <span className="font-medium">{d.medication_name}</span>
-                                            {d.is_controlled_drug && <Badge variant="destructive" className="ml-1 text-[10px]">CD {d.controlled_drug_class}</Badge>}
-                                        </td>
-                                        <td className="p-3 text-xs">{d.form ?? '—'} {d.strength ?? ''}</td>
-                                        <td className="p-3 font-mono">{d.quantity} {d.unit}</td>
-                                        <td className="p-3 text-xs">{d.reason}</td>
-                                        <td className="p-3 text-xs">{d.disposal_method}</td>
-                                        <td className="p-3 text-xs">{d.destroyed_by_user?.name ?? '—'}</td>
-                                        <td className="p-3 text-xs">{d.witness_1?.name ?? '—'}</td>
-                                        <td className="p-3 text-xs">{d.witness_2?.name ?? '—'}</td>
-                                        <td className="p-3 text-right">
-                                            <Button
-                                                variant="ghost"
-                                                size="icon"
-                                                onClick={() => {
-                                                    if (confirm('Are you sure you want to delete this destruction record?')) {
-                                                        router.delete(`/emar/destructions/${d.id}`);
-                                                    }
-                                                }}
-                                            >
-                                                <Trash2 className="h-4 w-4 text-status-critical" />
-                                            </Button>
-                                        </td>
-                                    </tr>
-                                ))}
-                                {destructions.data.length === 0 && (
-                                    <tr>
-                                        <td colSpan={11} className="p-6 text-center text-muted-foreground">
-                                            <Trash2 className="mx-auto mb-2 h-8 w-8 text-muted-foreground/30" />
-                                            No destruction records found.
-                                        </td>
-                                    </tr>
-                                )}
-                            </tbody>
-                        </table>
-                    </CardContent>
-                </Card>
-                </PageShell>
-            </Dialog>
+            {modal?.type === 'record' && <RecordDestructionDialog medications={medications} staff={staff} sites={sites} defaultSiteId={siteFilter} onClose={() => setModal(null)} />}
+            {modal?.type === 'void' && <VoidDestructionDialog destruction={modal.row} onClose={() => setModal(null)} />}
         </AppLayout>
+    );
+}
+
+function LogRow({ d, onVoid }: { d: DestructionRow; onVoid: () => void }) {
+    return (
+        <tr className={cnRow(d)}>
+            <td className="px-4 py-3 text-muted-foreground">{fmtDate(d.destroyed_at)}</td>
+            <td className="px-4 py-3">{d.client_name}</td>
+            <td className="px-4 py-3 font-medium">
+                <span className={d.is_voided ? 'line-through' : ''}>{d.medication_name}</span>
+                {d.is_controlled_drug && <CdPill label="CD" tone="ml-2 bg-status-critical-bg text-status-critical" />}
+                {d.is_voided && <span className="ml-2 align-middle"><CdPill label="Voided" tone="bg-muted text-muted-foreground" /></span>}
+                {d.is_voided && d.void_reason && <div className="mt-0.5 text-xs font-normal text-muted-foreground">Voided{d.voided_by_name ? ` by ${d.voided_by_name}` : ''}: {d.void_reason}</div>}
+            </td>
+            <td className="px-4 py-3 tabular-nums">{d.quantity} {d.unit}</td>
+            <td className="px-4 py-3 text-muted-foreground">{d.reason_label ?? d.reason ?? '—'}</td>
+            <td className="px-4 py-3 text-muted-foreground">{d.disposal_method_label ?? d.disposal_method ?? '—'}</td>
+            <td className="px-4 py-3 text-muted-foreground">{d.destroyed_by_name ?? '—'}</td>
+            <td className="px-4 py-3 text-muted-foreground">{[d.witness_1_name, d.witness_2_name].filter(Boolean).join(', ') || '—'}</td>
+            <td className="px-4 py-3 text-right">
+                {d.is_voided ? <span className="text-xs text-muted-foreground">{fmtDate(d.voided_at)}</span> : <Button size="sm" variant="ghost" onClick={onVoid}>Void</Button>}
+            </td>
+        </tr>
+    );
+}
+
+const cnRow = (d: DestructionRow) => `border-b last:border-b-0${d.is_voided ? ' bg-muted/30 text-muted-foreground' : ''}`;
+
+function tally(values: string[]): { label: string; count: number }[] {
+    const map = new Map<string, number>();
+    values.forEach((v) => map.set(v, (map.get(v) ?? 0) + 1));
+    return [...map.entries()].map(([label, count]) => ({ label, count })).sort((a, b) => b.count - a.count);
+}
+
+function TableCard({ head, empty, children }: { head: string[]; empty: string | null; children: React.ReactNode }) {
+    return (
+        <div className="overflow-hidden rounded-2xl border bg-card shadow-sm">
+            {empty ? (
+                <div className="px-5 py-12 text-center text-sm text-muted-foreground">{empty}</div>
+            ) : (
+                <div className="overflow-x-auto">
+                    <table className="w-full min-w-[720px] text-sm">
+                        <thead>
+                            <tr className="bg-muted text-left text-[11px] uppercase tracking-wide text-muted-foreground">
+                                {head.map((h, i) => (
+                                    <th key={i} className="px-4 py-2.5">{h}</th>
+                                ))}
+                            </tr>
+                        </thead>
+                        <tbody>{children}</tbody>
+                    </table>
+                </div>
+            )}
+        </div>
+    );
+}
+
+function StatCard({ label, value, hint }: { label: string; value: number | string; hint?: string }) {
+    return (
+        <div className="rounded-2xl border bg-card p-4 shadow-sm">
+            <div className="text-xs font-medium uppercase tracking-wide text-muted-foreground">{label}</div>
+            <div className="mt-1 text-2xl font-bold tabular-nums">{value}</div>
+            {hint && <div className="text-xs text-muted-foreground">{hint}</div>}
+        </div>
+    );
+}
+
+function BreakdownCard({ title, rows }: { title: string; rows: { label: string; count: number }[] }) {
+    const max = Math.max(1, ...rows.map((r) => r.count));
+    return (
+        <div className="rounded-2xl border bg-card p-4 shadow-sm">
+            <div className="mb-3 flex items-center gap-2 text-sm font-semibold"><Package className="h-4 w-4 text-muted-foreground" />{title}</div>
+            {rows.length === 0 ? (
+                <div className="py-6 text-center text-sm text-muted-foreground">No records.</div>
+            ) : (
+                <div className="flex flex-col gap-2">
+                    {rows.map((r) => (
+                        <div key={r.label} className="flex items-center gap-3">
+                            <div className="w-40 shrink-0 truncate text-sm">{r.label}</div>
+                            <div className="h-2 flex-1 overflow-hidden rounded-full bg-muted">
+                                <div className="h-full rounded-full bg-primary" style={{ width: `${(r.count / max) * 100}%` }} />
+                            </div>
+                            <div className="w-8 text-right text-sm tabular-nums text-muted-foreground">{r.count}</div>
+                        </div>
+                    ))}
+                </div>
+            )}
+        </div>
     );
 }

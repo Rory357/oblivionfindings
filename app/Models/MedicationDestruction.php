@@ -5,10 +5,11 @@ namespace App\Models;
 use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class MedicationDestruction extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory, SoftDeletes;
 
     protected $fillable = [
         'client_id',
@@ -33,11 +34,15 @@ class MedicationDestruction extends Model
         'destroyed_at',
         'notes',
         'photo_path',
+        'voided_at',
+        'void_reason',
+        'voided_by',
     ];
 
     protected $casts = [
         'expiry_date' => 'date',
         'destroyed_at' => 'datetime',
+        'voided_at' => 'datetime',
         'is_controlled_drug' => 'boolean',
         'quantity' => 'decimal:2',
     ];
@@ -72,9 +77,28 @@ class MedicationDestruction extends Model
         return $this->belongsTo(User::class, 'witness_2_id');
     }
 
+    public function voidedByUser()
+    {
+        return $this->belongsTo(User::class, 'voided_by');
+    }
+
     public function scopeControlled($query)
     {
         return $query->where('is_controlled_drug', true);
+    }
+
+    /**
+     * Records that have not been voided — the live disposal register. Voided
+     * records remain in the table (immutable, MoD Regs 1977) but are superseded.
+     */
+    public function scopeVerified($query)
+    {
+        return $query->whereNull('voided_at');
+    }
+
+    public function getIsVoidedAttribute(): bool
+    {
+        return $this->voided_at !== null;
     }
 
     public function getReasonLabelAttribute(): string

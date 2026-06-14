@@ -1783,18 +1783,83 @@ class EmarController extends Controller
     // ─── Destruction Records ───────────────────────────────
     public function destructions(Request $request)
     {
+        $siteFilter = $request->integer('site_id') ?: null;
+        $bySite = fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteFilter));
+
+        // Flat, client-side-filterable disposal register. Voided records remain
+        // in the list (struck through) — the register is immutable (MoD Regs 1977).
         $destructions = MedicationDestruction::query()
-            ->with(['client:id,first_name,last_name', 'medication:id,name', 'destroyedByUser:id,name', 'witness1:id,name', 'witness2:id,name'])
-            ->when($request->controlled_only, fn ($q) => $q->controlled())
+            ->when($siteFilter, $bySite)
+            ->with([
+                'client:id,first_name,last_name,site_id',
+                'client.site:id,name',
+                'destroyedByUser:id,name',
+                'witness1:id,name',
+                'witness2:id,name',
+                'voidedByUser:id,name',
+            ])
             ->latest('destroyed_at')
-            ->paginate(50);
+            ->limit(300)
+            ->get();
+
+        // Every active medication is destroyable — same CdMedication shape the
+        // shared RecordDestructionDialog consumes on the Controlled Drugs page.
+        $medications = ClientMedication::query()
+            ->active()
+            ->when($siteFilter, $bySite)
+            ->with(['client:id,first_name,last_name', 'stock'])
+            ->orderBy('name')
+            ->get();
+
+        $activeSite = $siteFilter ? Site::find($siteFilter) : null;
 
         return Inertia::render('emar/Destructions', [
-            'destructions' => $destructions,
+            'destructions' => $destructions->map(fn (MedicationDestruction $d) => [
+                'id' => $d->id,
+                'client_id' => $d->client_id,
+                'client_name' => $d->client ? trim($d->client->first_name.' '.$d->client->last_name) : 'Unknown',
+                'site_id' => $d->client?->site_id,
+                'site_name' => $d->client?->site?->name,
+                'medication_name' => $d->medication_name,
+                'form' => $d->form,
+                'strength' => $d->strength,
+                'quantity' => $d->quantity,
+                'unit' => $d->unit,
+                'batch_number' => $d->batch_number,
+                'expiry_date' => $d->expiry_date instanceof \DateTimeInterface ? $d->expiry_date->toDateString() : null,
+                'reason' => $d->reason,
+                'reason_label' => $d->reason_label,
+                'disposal_method' => $d->disposal_method,
+                'disposal_method_label' => $d->disposal_method_label,
+                'is_controlled_drug' => (bool) $d->is_controlled_drug,
+                'controlled_drug_class' => $d->controlled_drug_class,
+                'authorised_by_name' => $d->authorised_by_name,
+                'destroyed_at' => $d->destroyed_at instanceof \DateTimeInterface ? $d->destroyed_at->toIso8601String() : null,
+                'destroyed_by_name' => $d->destroyedByUser?->name,
+                'witness_1_name' => $d->witness1?->name,
+                'witness_2_name' => $d->witness2?->name,
+                'notes' => $d->notes,
+                'voided_at' => $d->voided_at instanceof \DateTimeInterface ? $d->voided_at->toIso8601String() : null,
+                'void_reason' => $d->void_reason,
+                'voided_by_name' => $d->voidedByUser?->name,
+                'is_voided' => $d->voided_at !== null,
+            ])->values(),
+            'medications' => $medications->map(fn (ClientMedication $m) => [
+                'id' => $m->id,
+                'name' => $m->name,
+                'controlled_drug' => (bool) $m->controlled_drug,
+                'client_id' => $m->client_id,
+                'client_name' => $m->client ? trim($m->client->first_name.' '.$m->client->last_name) : 'Unknown',
+                'stock' => $m->stock ? [
+                    'on_hand' => $m->stock->on_hand,
+                    'unit' => $m->stock->unit,
+                ] : null,
+            ])->values(),
             'staff' => $this->getStaffList(),
             'clients' => $this->getClientsList(),
-            'medications' => ClientMedication::active()->orderBy('name')->get(['id', 'name', 'client_id']),
-            'filters' => $request->only(['controlled_only']),
+            'sites' => Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'active_site' => $activeSite ? ['id' => $activeSite->id, 'name' => $activeSite->name] : null,
+            'site_brand_colour' => $activeSite?->brand_colour,
         ]);
     }
 
@@ -2642,6 +2707,7 @@ class EmarController extends Controller
         $validated = $request->validate([
             'client_id' => 'required|exists:clients,id',
             'client_medication_id' => 'nullable|exists:client_medications,id',
+            'site_id' => 'nullable|exists:sites,id',
             'medication_name' => 'required|string|max:255',
             'form' => 'nullable|string|max:255',
             'strength' => 'nullable|string|max:255',
@@ -2668,9 +2734,18 @@ class EmarController extends Controller
             ]);
         }
 
-        // Ensure witness 1 is not the current user
+        // Witness integrity (MoD Regs 1977): the destroyer cannot witness their
+        // own destruction, and the two witnesses must be distinct people.
         if ($validated['witness_1_id'] == auth()->id()) {
             return redirect()->back()->withErrors(['witness_1_id' => 'Witness must be a different person from the person destroying the medication.']);
+        }
+        if (! empty($validated['witness_2_id'])) {
+            if ($validated['witness_2_id'] == auth()->id()) {
+                return redirect()->back()->withErrors(['witness_2_id' => 'The second witness must be a different person from the person destroying the medication.']);
+            }
+            if ($validated['witness_2_id'] == $validated['witness_1_id']) {
+                return redirect()->back()->withErrors(['witness_2_id' => 'The second witness must be a different person from the first witness.']);
+            }
         }
 
         $validated['destroyed_by'] = auth()->id();
@@ -3585,13 +3660,31 @@ class EmarController extends Controller
         return redirect()->back()->with('success', 'Medication handover draft deleted.');
     }
 
-    // ─── Destruction Delete ──────────────────────────────
+    // ─── Destruction Void ────────────────────────────────
 
-    public function destroyDestruction(MedicationDestruction $destruction)
+    /**
+     * The destruction register is immutable and retained (MoD Regs 1977). A
+     * record is never hard-deleted; an erroneous entry is *voided* — it stays
+     * visible (struck through, with the reason) and is excluded from live
+     * counts/balances via scopeVerified.
+     */
+    public function voidDestruction(Request $request, MedicationDestruction $destruction)
     {
-        $destruction->delete();
+        $validated = $request->validate([
+            'void_reason' => 'required|string|max:1000',
+        ]);
 
-        return redirect()->back();
+        if ($destruction->voided_at !== null) {
+            return redirect()->back()->withErrors(['void_reason' => 'This destruction record has already been voided.']);
+        }
+
+        $destruction->update([
+            'voided_at' => now(),
+            'void_reason' => $validated['void_reason'],
+            'voided_by' => auth()->id(),
+        ]);
+
+        return redirect()->back()->with('success', 'Destruction record voided.');
     }
 
     // ─── Medications CSV Import ──────────────────────────

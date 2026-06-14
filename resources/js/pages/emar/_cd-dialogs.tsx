@@ -331,39 +331,75 @@ export function LossActionDialog({ report, action, onClose }: { report: CdLossRe
 }
 
 // ── Record destruction (3-step) — SHARED with Destructions page (Page 7) ─────
-export function RecordDestructionDialog({ medications, staff, onClose }: { medications: CdMedication[]; staff: StaffOption[]; onClose: () => void }) {
+const DESTRUCTION_REASONS = [
+    { value: 'expired', label: 'Expired' },
+    { value: 'ceased', label: 'Medication ceased' },
+    { value: 'contaminated', label: 'Contaminated' },
+    { value: 'damaged', label: 'Damaged' },
+    { value: 'deceased', label: 'Client deceased' },
+    { value: 'discharged', label: 'Client discharged' },
+    { value: 'surplus', label: 'Surplus stock' },
+];
+const DISPOSAL_METHODS = [
+    { value: 'pharmacy_return', label: 'Return to pharmacy' },
+    { value: 'incineration', label: 'Incineration' },
+    { value: 'denaturing', label: 'Denaturing' },
+    { value: 'sharps_bin', label: 'Sharps bin' },
+    { value: 'other', label: 'Other' },
+];
+
+/**
+ * Shared record-destruction wizard. Used by both the Controlled Drugs page
+ * (medications are all controlled → always two witnesses + authorisation) and
+ * the Destructions register (any active medication → witness 2 / authorisation
+ * become required only when the picked medication is a controlled drug). When a
+ * `sites` list is supplied the site is collected explicitly (gap 6).
+ */
+export function RecordDestructionDialog({ medications, staff, sites, defaultSiteId, onClose }: { medications: CdMedication[]; staff: StaffOption[]; sites?: { id: number; name: string }[]; defaultSiteId?: number | null; onClose: () => void }) {
     const [step, setStep] = useState(0);
     const form = useForm({
         medication_id: '',
         client_id: 0,
+        site_id: defaultSiteId ? String(defaultSiteId) : '',
         medication_name: '',
         quantity: '',
         unit: '',
         reason: '',
         disposal_method: '',
-        is_controlled_drug: true,
+        is_controlled_drug: false,
         witness_1_id: '',
         witness_2_id: '',
         authorised_by_name: '',
         notes: '',
     });
+    const isCd = form.data.is_controlled_drug;
     const pickMed = (id: string) => {
         const m = medications.find((x) => String(x.id) === id);
-        form.setData({ ...form.data, medication_id: id, client_id: m?.client_id ?? 0, medication_name: m?.name ?? '', unit: m?.stock?.unit ?? '' });
+        form.setData({ ...form.data, medication_id: id, client_id: m?.client_id ?? 0, medication_name: m?.name ?? '', unit: m?.stock?.unit ?? '', is_controlled_drug: !!m?.controlled_drug });
     };
     const submit = () => {
-        form.transform((d) => ({ ...d, witness_1_id: d.witness_1_id ? Number(d.witness_1_id) : null, witness_2_id: d.witness_2_id ? Number(d.witness_2_id) : null }));
-        form.post('/emar/destructions', { preserveScroll: true, onSuccess: () => { toast.success('Destruction recorded'); onClose(); }, onError: () => toast.error('Please check — CD destruction needs two witnesses + authorisation') });
+        form.transform((d) => ({
+            ...d,
+            site_id: d.site_id ? Number(d.site_id) : null,
+            witness_1_id: d.witness_1_id ? Number(d.witness_1_id) : null,
+            witness_2_id: d.witness_2_id ? Number(d.witness_2_id) : null,
+        }));
+        form.post('/emar/destructions', { preserveScroll: true, onSuccess: () => { toast.success('Destruction recorded'); onClose(); }, onError: () => toast.error(isCd ? 'Please check — CD destruction needs two distinct witnesses + authorisation' : 'Please check the destruction details') });
     };
-    const valid = [!!form.data.medication_name && !!form.data.quantity && !!form.data.unit && !!form.data.reason, !!form.data.disposal_method && !!form.data.witness_1_id && !!form.data.witness_2_id && !!form.data.authorised_by_name, true];
+    const valid = [
+        !!form.data.medication_name && !!form.data.quantity && !!form.data.unit && !!form.data.reason,
+        !!form.data.disposal_method && !!form.data.witness_1_id && (!isCd || (!!form.data.witness_2_id && !!form.data.authorised_by_name)),
+        true,
+    ];
     return (
-        <MedsWizardDialog open onClose={onClose} title="Record destruction" description="Record a controlled-drug destruction with two witnesses." railIcon={Trash2} railTitle="CD destruction" railSubtitle="Disposal register" steps={[{ key: 'item', label: 'Item', blurb: 'Drug & quantity', icon: Package }, { key: 'method', label: 'Method & witnesses', blurb: 'Two signatories', icon: ShieldCheck }, { key: 'review', label: 'Review', blurb: 'Confirm', icon: Trash2 }]} stepIndex={step} onStepClick={(i) => i < step && setStep(i)} footer={<><Button variant="ghost" onClick={step === 0 ? onClose : () => setStep(step - 1)} disabled={form.processing}>{step === 0 ? 'Cancel' : 'Back'}</Button>{step < 2 ? <Button onClick={() => setStep(step + 1)} disabled={!valid[step]}>Continue</Button> : <Button onClick={submit} disabled={form.processing}>Record destruction</Button>}</>}>
+        <MedsWizardDialog open onClose={onClose} title="Record destruction" description={isCd ? 'Record a controlled-drug destruction with two witnesses.' : 'Record a medication destruction for the disposal register.'} railIcon={Trash2} railTitle="Destruction" railSubtitle="Disposal register" steps={[{ key: 'item', label: 'Item', blurb: 'Drug & quantity', icon: Package }, { key: 'method', label: isCd ? 'Method & witnesses' : 'Method & witness', blurb: isCd ? 'Two signatories' : 'One witness', icon: ShieldCheck }, { key: 'review', label: 'Review', blurb: 'Confirm', icon: Trash2 }]} stepIndex={step} onStepClick={(i) => i < step && setStep(i)} footer={<><Button variant="ghost" onClick={step === 0 ? onClose : () => setStep(step - 1)} disabled={form.processing}>{step === 0 ? 'Cancel' : 'Back'}</Button>{step < 2 ? <Button onClick={() => setStep(step + 1)} disabled={!valid[step]}>Continue</Button> : <Button onClick={submit} disabled={form.processing}>Record destruction</Button>}</>}>
             {step === 0 && (
                 <>
                     <StepHead icon={Package} title="Item destroyed" blurb="What is being destroyed and why." />
-                    <Field label="Controlled drug" required span>
-                        <SelectInput value={form.data.medication_id} onChange={pickMed} placeholder="Select CD…" options={medOptions(medications)} />
+                    <Field label="Medication" required span>
+                        <SelectInput value={form.data.medication_id} onChange={pickMed} placeholder="Select medication…" options={medOptions(medications)} />
                     </Field>
+                    {isCd && <p className="mt-2 text-xs font-medium text-status-critical">Controlled drug — two witnesses and authorisation are required.</p>}
                     <div className="mt-4 grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <Field label="Quantity" required error={form.errors.quantity}>
                             <Input type="number" step="0.5" value={form.data.quantity} onChange={(e) => form.setData('quantity', e.target.value)} />
@@ -371,28 +407,37 @@ export function RecordDestructionDialog({ medications, staff, onClose }: { medic
                         <Field label="Unit" required error={form.errors.unit}>
                             <Input value={form.data.unit} onChange={(e) => form.setData('unit', e.target.value)} />
                         </Field>
-                        <Field label="Reason" required span error={form.errors.reason}>
-                            <Input value={form.data.reason} onChange={(e) => form.setData('reason', e.target.value)} placeholder="e.g. Expired / discontinued" />
+                        <Field label="Reason" required error={form.errors.reason}>
+                            <SelectInput value={form.data.reason} onChange={(v) => form.setData('reason', v)} placeholder="Why destroyed…" options={DESTRUCTION_REASONS} />
                         </Field>
+                        {sites && sites.length > 0 && (
+                            <Field label="Site" error={form.errors.site_id}>
+                                <SelectInput value={form.data.site_id} onChange={(v) => form.setData('site_id', v)} placeholder="Site…" options={sites.map((s) => ({ value: String(s.id), label: s.name }))} />
+                            </Field>
+                        )}
                     </div>
                 </>
             )}
             {step === 1 && (
                 <>
-                    <StepHead icon={ShieldCheck} title="Method & witnesses" blurb="CD destruction requires two witnesses and authorisation." />
+                    <StepHead icon={ShieldCheck} title={isCd ? 'Method & witnesses' : 'Method & witness'} blurb={isCd ? 'CD destruction requires two distinct witnesses and authorisation.' : 'Record the disposal method and a witness.'} />
                     <div className="grid grid-cols-1 gap-4 sm:grid-cols-2">
                         <Field label="Disposal method" required span error={form.errors.disposal_method}>
-                            <Segmented value={form.data.disposal_method} onChange={(v) => form.setData('disposal_method', v)} options={[{ value: 'denaturing_kit', label: 'Denaturing kit' }, { value: 'authorised_collector', label: 'Authorised collector' }, { value: 'returned_pharmacy', label: 'Returned to pharmacy' }]} />
+                            <SelectInput value={form.data.disposal_method} onChange={(v) => form.setData('disposal_method', v)} placeholder="How disposed…" options={DISPOSAL_METHODS} />
                         </Field>
                         <Field label="Witness 1" required error={form.errors.witness_1_id}>
                             <SelectInput value={form.data.witness_1_id} onChange={(v) => form.setData('witness_1_id', v)} placeholder="First witness…" options={staff.map((s) => ({ value: String(s.id), label: s.name }))} />
                         </Field>
-                        <Field label="Witness 2" required error={form.errors.witness_2_id}>
-                            <SelectInput value={form.data.witness_2_id} onChange={(v) => form.setData('witness_2_id', v)} placeholder="Second witness…" options={staff.map((s) => ({ value: String(s.id), label: s.name }))} />
-                        </Field>
-                        <Field label="Authorised by" required span error={form.errors.authorised_by_name}>
-                            <Input value={form.data.authorised_by_name} onChange={(e) => form.setData('authorised_by_name', e.target.value)} placeholder="Authorising person" />
-                        </Field>
+                        {isCd && (
+                            <Field label="Witness 2" required error={form.errors.witness_2_id}>
+                                <SelectInput value={form.data.witness_2_id} onChange={(v) => form.setData('witness_2_id', v)} placeholder="Second witness…" options={staff.map((s) => ({ value: String(s.id), label: s.name }))} />
+                            </Field>
+                        )}
+                        {isCd && (
+                            <Field label="Authorised by" required span error={form.errors.authorised_by_name}>
+                                <Input value={form.data.authorised_by_name} onChange={(e) => form.setData('authorised_by_name', e.target.value)} placeholder="Authorising person" />
+                            </Field>
+                        )}
                     </div>
                 </>
             )}
@@ -400,13 +445,39 @@ export function RecordDestructionDialog({ medications, staff, onClose }: { medic
                 <>
                     <StepHead icon={Trash2} title="Review" blurb="Confirm the destruction record." />
                     <div className="rounded-lg border px-4">
-                        <SummaryRow label="Drug" value={form.data.medication_name} />
+                        <SummaryRow label="Medication" value={form.data.medication_name} />
                         <SummaryRow label="Quantity" value={`${form.data.quantity} ${form.data.unit}`} />
-                        <SummaryRow label="Method" value={form.data.disposal_method} />
-                        <SummaryRow label="Witnesses" value={[form.data.witness_1_id, form.data.witness_2_id].map((id) => staff.find((s) => String(s.id) === id)?.name).filter(Boolean).join(', ')} />
+                        <SummaryRow label="Reason" value={DESTRUCTION_REASONS.find((r) => r.value === form.data.reason)?.label ?? form.data.reason} />
+                        <SummaryRow label="Method" value={DISPOSAL_METHODS.find((m) => m.value === form.data.disposal_method)?.label ?? form.data.disposal_method} />
+                        <SummaryRow label={isCd ? 'Witnesses' : 'Witness'} value={[form.data.witness_1_id, form.data.witness_2_id].map((id) => staff.find((s) => String(s.id) === id)?.name).filter(Boolean).join(', ')} />
+                        {isCd && <SummaryRow label="Authorised by" value={form.data.authorised_by_name} />}
                     </div>
                 </>
             )}
+        </MedsWizardDialog>
+    );
+}
+
+/**
+ * Void a destruction record. The register is immutable (MoD Regs 1977) — a record
+ * is never deleted; voiding supersedes it (kept visible, struck through, with the
+ * reason) and removes it from live counts.
+ */
+export function VoidDestructionDialog({ destruction, onClose }: { destruction: { id: number; medication_name: string | null; quantity: number | string | null; unit: string | null }; onClose: () => void }) {
+    const form = useForm({ void_reason: '' });
+    const submit = () => {
+        form.post(`/emar/destructions/${destruction.id}/void`, { preserveScroll: true, onSuccess: () => { toast.success('Destruction record voided'); onClose(); }, onError: () => toast.error('A reason is required to void a record') });
+    };
+    return (
+        <MedsWizardDialog open onClose={onClose} title="Void destruction record" description="Correct an erroneous entry. The record is retained and shown as voided — it is never deleted." railIcon={Ban} railTitle="Void record" railSubtitle="Immutable register" steps={[{ key: 'reason', label: 'Reason', blurb: 'Why void', icon: Ban }]} stepIndex={0} onStepClick={() => {}} footer={<><Button variant="ghost" onClick={onClose} disabled={form.processing}>Cancel</Button><Button variant="destructive" onClick={submit} disabled={form.processing || !form.data.void_reason.trim()}>Void record</Button></>}>
+            <StepHead icon={Ban} title="Void this record" blurb="Voiding keeps the original entry in the register, struck through, with this reason attached." />
+            <div className="mb-4 rounded-lg border px-4">
+                <SummaryRow label="Medication" value={destruction.medication_name ?? '—'} />
+                <SummaryRow label="Quantity" value={`${destruction.quantity ?? '—'} ${destruction.unit ?? ''}`} />
+            </div>
+            <Field label="Reason for voiding" required error={form.errors.void_reason} span>
+                <Input value={form.data.void_reason} onChange={(e) => form.setData('void_reason', e.target.value)} placeholder="e.g. Duplicate entry / wrong quantity recorded" />
+            </Field>
         </MedsWizardDialog>
     );
 }
