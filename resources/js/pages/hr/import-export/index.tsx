@@ -220,14 +220,14 @@ export default function ImportExportIndex() {
                             <div className="flex flex-wrap gap-3">
                                 <Badge
                                     variant="outline"
-                                    className="border-status-success/30 bg-status-success text-status-success"
+                                    className="border-status-success/30 bg-status-success-bg text-status-success"
                                 >
                                     <CheckCircle2 className="mr-1 h-3 w-3" />{' '}
                                     {importResult.created} created
                                 </Badge>
                                 <Badge
                                     variant="outline"
-                                    className="border-status-info/30 bg-status-info text-status-info"
+                                    className="border-status-info/30 bg-status-info-bg text-status-info"
                                 >
                                     <CheckCircle2 className="mr-1 h-3 w-3" />{' '}
                                     {importResult.updated} updated
@@ -235,7 +235,7 @@ export default function ImportExportIndex() {
                                 {importResult.errors.length > 0 && (
                                     <Badge
                                         variant="outline"
-                                        className="border-status-critical/30 bg-status-critical text-status-critical"
+                                        className="border-status-critical/30 bg-status-critical-bg text-status-critical"
                                     >
                                         <XCircle className="mr-1 h-3 w-3" />{' '}
                                         {importResult.errors.length} errors
@@ -243,7 +243,7 @@ export default function ImportExportIndex() {
                                 )}
                             </div>
                             {importResult.errors.length > 0 && (
-                                <div className="rounded-lg border border-status-critical/20 bg-status-critical p-4">
+                                <div className="rounded-lg border border-status-critical/20 bg-status-critical-bg p-4">
                                     <div className="mb-2 flex items-center gap-2 text-sm font-medium text-status-critical">
                                         <AlertTriangle className="h-4 w-4" />{' '}
                                         Errors

@@ -70,16 +70,16 @@ const ALL_FILTER_VALUE = '__all__';
 const statusConfig: Record<string, { className: string; label: string }> = {
     draft: {
         className:
-            'border-status-warning/30 text-status-warning bg-status-warning',
+            'border-status-warning/30 text-status-warning bg-status-warning-bg',
         label: 'Draft',
     },
     approved: {
-        className: 'border-status-info/30 text-status-info bg-status-info',
+        className: 'border-status-info/30 text-status-info bg-status-info-bg',
         label: 'Approved',
     },
     paid: {
         className:
-            'border-status-success/30 text-status-success bg-status-success',
+            'border-status-success/30 text-status-success bg-status-success-bg',
         label: 'Paid',
     },
 };

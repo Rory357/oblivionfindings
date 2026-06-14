@@ -707,7 +707,7 @@ export default function GoalsIndex({
                             <Card>
                                 <CardContent className="p-4">
                                     <div className="flex items-center gap-3">
-                                        <div className="rounded-lg bg-status-success p-2">
+                                        <div className="rounded-lg bg-status-success-bg p-2">
                                             <CheckCircle2 className="h-4 w-4 text-status-success" />
                                         </div>
                                         <div>
@@ -724,7 +724,7 @@ export default function GoalsIndex({
                             <Card>
                                 <CardContent className="p-4">
                                     <div className="flex items-center gap-3">
-                                        <div className="rounded-lg bg-status-info p-2">
+                                        <div className="rounded-lg bg-status-info-bg p-2">
                                             <TrendingUp className="h-4 w-4 text-status-info" />
                                         </div>
                                         <div>
@@ -741,7 +741,7 @@ export default function GoalsIndex({
                             <Card>
                                 <CardContent className="p-4">
                                     <div className="flex items-center gap-3">
-                                        <div className="rounded-lg bg-status-warning p-2">
+                                        <div className="rounded-lg bg-status-warning-bg p-2">
                                             <AlertTriangle className="h-4 w-4 text-status-warning" />
                                         </div>
                                         <div>

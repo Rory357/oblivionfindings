@@ -417,7 +417,7 @@ export default function ApprovalChains({
                                                 variant="outline"
                                                 className={
                                                     chain.is_active
-                                                        ? 'border-status-success/30 bg-status-success text-status-success'
+                                                        ? 'border-status-success/30 bg-status-success-bg text-status-success'
                                                         : 'bg-muted-foreground/80/10 border-border/30 text-muted-foreground'
                                                 }
                                             >

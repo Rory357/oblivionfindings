@@ -443,7 +443,7 @@ export default function DirectoryShow({
                                             href={`mailto:${employee.email}`}
                                             className="flex items-center gap-3 rounded-lg bg-muted/30 p-3 transition-colors hover:bg-muted/60"
                                         >
-                                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-info">
+                                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-info-bg">
                                                 <Mail className="h-4 w-4 text-status-info" />
                                             </div>
                                             <div className="min-w-0">
@@ -461,7 +461,7 @@ export default function DirectoryShow({
                                             href={`tel:${employee.phone}`}
                                             className="flex items-center gap-3 rounded-lg bg-muted/30 p-3 transition-colors hover:bg-muted/60"
                                         >
-                                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-success">
+                                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-success-bg">
                                                 <Phone className="h-4 w-4 text-status-success" />
                                             </div>
                                             <div>
@@ -490,7 +490,7 @@ export default function DirectoryShow({
                                         </div>
                                     )}
                                     <div className="flex items-center gap-3 rounded-lg bg-muted/30 p-3">
-                                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-warning">
+                                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-warning-bg">
                                             <Calendar className="h-4 w-4 text-status-warning" />
                                         </div>
                                         <div>
@@ -505,7 +505,7 @@ export default function DirectoryShow({
                                         </div>
                                     </div>
                                     <div className="flex items-center gap-3 rounded-lg bg-muted/30 p-3">
-                                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-info">
+                                        <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-info-bg">
                                             <Briefcase className="h-4 w-4 text-status-info" />
                                         </div>
                                         <div>
@@ -521,7 +521,7 @@ export default function DirectoryShow({
                                     </div>
                                     {employee.department && (
                                         <div className="flex items-center gap-3 rounded-lg bg-muted/30 p-3">
-                                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-critical">
+                                            <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-critical-bg">
                                                 <Users className="h-4 w-4 text-status-critical" />
                                             </div>
                                             <div>
@@ -541,7 +541,7 @@ export default function DirectoryShow({
                                                 href={`tel:${employee.cellphone}`}
                                                 className="flex items-center gap-3 rounded-lg bg-muted/30 p-3 transition-colors hover:bg-muted/60"
                                             >
-                                                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-info">
+                                                <div className="flex h-9 w-9 items-center justify-center rounded-lg bg-status-info-bg">
                                                     <Phone className="h-4 w-4 text-status-info" />
                                                 </div>
                                                 <div>

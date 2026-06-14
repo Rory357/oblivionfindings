@@ -85,7 +85,7 @@ export default function PreviewJobPosting({ posting }: Props) {
                 }
             >
                 {/* Preview Banner */}
-                <div className="flex items-center justify-between gap-4 rounded-lg border border-status-warning/30 bg-status-warning p-4">
+                <div className="flex items-center justify-between gap-4 rounded-lg border border-status-warning/30 bg-status-warning-bg p-4">
                     <div className="flex items-center gap-2">
                         <Eye className="h-5 w-5 text-status-warning" />
                         <div>
@@ -159,7 +159,7 @@ export default function PreviewJobPosting({ posting }: Props) {
                                 {posting.is_remote && (
                                     <Badge
                                         variant="outline"
-                                        className="gap-1 border-status-info/30 bg-status-info text-status-info"
+                                        className="gap-1 border-status-info/30 bg-status-info-bg text-status-info"
                                     >
                                         <Wifi className="h-3 w-3" /> Remote
                                     </Badge>

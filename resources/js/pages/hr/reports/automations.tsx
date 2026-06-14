@@ -75,8 +75,8 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const statusClass: Record<string, string> = {
-    success: 'border-status-success/30 text-status-success bg-status-success',
-    failed: 'border-status-critical/30 text-status-critical bg-status-critical',
+    success: 'border-status-success/30 text-status-success bg-status-success-bg',
+    failed: 'border-status-critical/30 text-status-critical bg-status-critical-bg',
     skipped: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
 };
 

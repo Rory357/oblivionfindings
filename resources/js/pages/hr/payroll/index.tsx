@@ -89,16 +89,16 @@ const breadcrumbs: BreadcrumbItem[] = [
 const statusConfig: Record<string, { className: string; label: string }> = {
     draft: {
         className:
-            'border-status-warning/30 text-status-warning bg-status-warning',
+            'border-status-warning/30 text-status-warning bg-status-warning-bg',
         label: 'Draft',
     },
     locked: {
-        className: 'border-status-info/30 text-status-info bg-status-info',
+        className: 'border-status-info/30 text-status-info bg-status-info-bg',
         label: 'Locked',
     },
     exported: {
         className:
-            'border-status-success/30 text-status-success bg-status-success',
+            'border-status-success/30 text-status-success bg-status-success-bg',
         label: 'Exported',
     },
 };
@@ -363,7 +363,7 @@ export default function PayrollIndex({
                 </div>
 
                 {lockError ? (
-                    <Card className="border-status-critical/40 bg-status-critical">
+                    <Card className="border-status-critical/40 bg-status-critical-bg">
                         <CardContent className="py-3 text-sm text-status-critical">
                             {Array.isArray(lockError)
                                 ? lockError.join(' ')
@@ -372,7 +372,7 @@ export default function PayrollIndex({
                     </Card>
                 ) : null}
                 {exportError ? (
-                    <Card className="border-status-critical/40 bg-status-critical">
+                    <Card className="border-status-critical/40 bg-status-critical-bg">
                         <CardContent className="py-3 text-sm text-status-critical">
                             {Array.isArray(exportError)
                                 ? exportError.join(' ')

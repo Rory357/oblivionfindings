@@ -85,7 +85,7 @@ export default function JobPostingShow({
                                 {posting.is_remote && (
                                     <Badge
                                         variant="outline"
-                                        className="gap-1 border-status-info/30 bg-status-info text-status-info"
+                                        className="gap-1 border-status-info/30 bg-status-info-bg text-status-info"
                                     >
                                         <Wifi className="h-3 w-3" /> Remote
                                     </Badge>
@@ -194,7 +194,7 @@ export default function JobPostingShow({
                 <div className="mx-auto max-w-4xl space-y-6">
                 {/* Public URL */}
                 {publicUrl && posting.status === 'published' && (
-                    <div className="flex items-center gap-2 rounded-lg border border-status-success/20 bg-status-success p-3">
+                    <div className="flex items-center gap-2 rounded-lg border border-status-success/20 bg-status-success-bg p-3">
                         <Globe className="h-4 w-4 shrink-0 text-status-success" />
                         <code className="flex-1 truncate text-sm text-status-success">
                             {publicUrl}
@@ -223,7 +223,7 @@ export default function JobPostingShow({
                     <Card>
                         <CardContent className="p-4">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-status-info p-2">
+                                <div className="rounded-lg bg-status-info-bg p-2">
                                     <Eye className="h-4 w-4 text-status-info" />
                                 </div>
                                 <div>
@@ -257,7 +257,7 @@ export default function JobPostingShow({
                     <Card>
                         <CardContent className="p-4">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-status-success p-2">
+                                <div className="rounded-lg bg-status-success-bg p-2">
                                     <BarChart3 className="h-4 w-4 text-status-success" />
                                 </div>
                                 <div>
@@ -274,7 +274,7 @@ export default function JobPostingShow({
                     <Card>
                         <CardContent className="p-4">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-status-warning p-2">
+                                <div className="rounded-lg bg-status-warning-bg p-2">
                                     <Clock className="h-4 w-4 text-status-warning" />
                                 </div>
                                 <div>

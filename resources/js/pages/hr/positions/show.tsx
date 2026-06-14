@@ -78,14 +78,14 @@ export default function ShowPosition({ position, can }: Props) {
                                 {position.is_active ? (
                                     <Badge
                                         variant="outline"
-                                        className="border-status-success/30 bg-status-success text-status-success"
+                                        className="border-status-success/30 bg-status-success-bg text-status-success"
                                     >
                                         Active
                                     </Badge>
                                 ) : (
                                     <Badge
                                         variant="outline"
-                                        className="border-status-critical/30 bg-status-critical text-status-critical"
+                                        className="border-status-critical/30 bg-status-critical-bg text-status-critical"
                                     >
                                         Inactive
                                     </Badge>

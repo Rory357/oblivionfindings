@@ -178,13 +178,13 @@ const statusConfig: Record<
     pending: {
         variant: 'outline',
         className:
-            'border-status-warning/30 text-status-warning bg-status-warning',
+            'border-status-warning/30 text-status-warning bg-status-warning-bg',
         label: 'Pending',
     },
     approved: {
         variant: 'outline',
         className:
-            'border-status-success/30 text-status-success bg-status-success',
+            'border-status-success/30 text-status-success bg-status-success-bg',
         label: 'Approved',
     },
     declined: { variant: 'destructive', className: '', label: 'Declined' },
@@ -237,7 +237,7 @@ function SlaBadge({ request }: { request: LeaveRequest }) {
         return (
             <Badge
                 variant="outline"
-                className="ml-2 gap-1 border-status-warning/30 bg-status-warning text-status-warning"
+                className="ml-2 gap-1 border-status-warning/30 bg-status-warning-bg text-status-warning"
             >
                 <Clock className="h-3 w-3" /> Due in 24h
             </Badge>
@@ -801,8 +801,8 @@ export default function LeaveIndex({
                                                             className={
                                                                 row.hours_waiting >
                                                                 48
-                                                                    ? 'border-status-critical/30 bg-status-critical text-status-critical'
-                                                                    : 'border-status-warning/30 bg-status-warning text-status-warning'
+                                                                    ? 'border-status-critical/30 bg-status-critical-bg text-status-critical'
+                                                                    : 'border-status-warning/30 bg-status-warning-bg text-status-warning'
                                                             }
                                                         >
                                                             {row.hours_waiting.toFixed(
@@ -878,7 +878,7 @@ export default function LeaveIndex({
                     <TabsContent value="requests" className="space-y-4">
                         {/* Pending Approval Section */}
                         {can.approve && pendingRequests.length > 0 && (
-                            <Card className="border-status-warning/20 bg-status-warning">
+                            <Card className="border-status-warning/20 bg-status-warning-bg">
                                 <CardHeader>
                                     <div className="flex flex-wrap items-center justify-between gap-2">
                                         <CardTitle className="flex items-center gap-2">
@@ -905,7 +905,7 @@ export default function LeaveIndex({
                                             <Button
                                                 variant="outline"
                                                 size="sm"
-                                                className="border-status-critical/30 text-status-critical hover:bg-status-critical"
+                                                className="border-status-critical/30 text-status-critical hover:bg-status-critical-bg"
                                                 onClick={handleBulkDecline}
                                                 disabled={
                                                     selectedPendingIds.length ===
@@ -1008,7 +1008,7 @@ export default function LeaveIndex({
                                                                 <Button
                                                                     variant="outline"
                                                                     size="sm"
-                                                                    className="h-7 border-status-success/30 text-status-success hover:bg-status-success"
+                                                                    className="h-7 border-status-success/30 text-status-success hover:bg-status-success-bg"
                                                                     onClick={() =>
                                                                         handleApprove(
                                                                             r.id,
@@ -1024,7 +1024,7 @@ export default function LeaveIndex({
                                                                 <Button
                                                                     variant="outline"
                                                                     size="sm"
-                                                                    className="h-7 border-status-critical/30 text-status-critical hover:bg-status-critical"
+                                                                    className="h-7 border-status-critical/30 text-status-critical hover:bg-status-critical-bg"
                                                                     onClick={() =>
                                                                         handleDecline(
                                                                             r.id,

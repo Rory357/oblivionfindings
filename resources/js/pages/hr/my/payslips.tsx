@@ -276,7 +276,7 @@ export default function MyPayslips({ payslips }: Props) {
                                             </p>
                                         )}
                                     </div>
-                                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-status-success transition-transform group-hover:scale-110">
+                                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-status-success-bg transition-transform group-hover:scale-110">
                                         <Banknote className="h-5 w-5 text-status-success" />
                                     </div>
                                 </div>
@@ -300,7 +300,7 @@ export default function MyPayslips({ payslips }: Props) {
                                             date
                                         </p>
                                     </div>
-                                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-status-info">
+                                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-status-info-bg">
                                         <TrendingUp className="h-5 w-5 text-status-info" />
                                     </div>
                                 </div>
@@ -323,7 +323,7 @@ export default function MyPayslips({ payslips }: Props) {
                                             Tax paid this year
                                         </p>
                                     </div>
-                                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-status-warning">
+                                    <div className="flex h-11 w-11 items-center justify-center rounded-xl bg-status-warning-bg">
                                         <Landmark className="h-5 w-5 text-status-warning" />
                                     </div>
                                 </div>

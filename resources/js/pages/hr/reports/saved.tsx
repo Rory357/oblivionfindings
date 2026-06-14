@@ -49,12 +49,12 @@ const breadcrumbs = [
 ];
 
 const typeColors: Record<string, string> = {
-    employee: 'border-status-info/30 text-status-info bg-status-info',
-    leave: 'border-status-warning/30 text-status-warning bg-status-warning',
+    employee: 'border-status-info/30 text-status-info bg-status-info-bg',
+    leave: 'border-status-warning/30 text-status-warning bg-status-warning-bg',
     compliance:
-        'border-status-success/30 text-status-success bg-status-success',
+        'border-status-success/30 text-status-success bg-status-success-bg',
     time: 'border-primary/30 text-primary bg-primary/10',
-    training: 'border-status-warning/30 text-status-warning bg-status-warning',
+    training: 'border-status-warning/30 text-status-warning bg-status-warning-bg',
 };
 
 export default function SavedReports({ reports, sources }: Props) {

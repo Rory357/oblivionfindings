@@ -97,12 +97,12 @@ const categoryIcons: Record<string, React.ElementType> = {
 };
 
 const categoryColors: Record<string, string> = {
-    headcount: 'border-status-info/30 text-status-info bg-status-info',
+    headcount: 'border-status-info/30 text-status-info bg-status-info-bg',
     turnover:
-        'border-status-critical/30 text-status-critical bg-status-critical',
+        'border-status-critical/30 text-status-critical bg-status-critical-bg',
     compliance:
-        'border-status-success/30 text-status-success bg-status-success',
-    leave: 'border-status-warning/30 text-status-warning bg-status-warning',
+        'border-status-success/30 text-status-success bg-status-success-bg',
+    leave: 'border-status-warning/30 text-status-warning bg-status-warning-bg',
     training: 'border-primary/30 text-primary bg-primary/10',
 };
 

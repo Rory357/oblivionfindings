@@ -224,7 +224,7 @@ function SurveyCard({ survey }: { survey: Survey }) {
                         {survey.has_responded && (
                             <Badge
                                 variant="outline"
-                                className="border-status-success/30 bg-status-success text-xs text-status-success"
+                                className="border-status-success/30 bg-status-success-bg text-xs text-status-success"
                             >
                                 <CheckCircle2 className="mr-1 h-3 w-3" />
                                 Completed

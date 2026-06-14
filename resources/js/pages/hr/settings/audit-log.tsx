@@ -69,15 +69,15 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const actionColors: Record<string, string> = {
-    created: 'border-status-success/30 text-status-success bg-status-success',
-    updated: 'border-status-info/30 text-status-info bg-status-info',
+    created: 'border-status-success/30 text-status-success bg-status-success-bg',
+    updated: 'border-status-info/30 text-status-info bg-status-info-bg',
     deleted:
-        'border-status-critical/30 text-status-critical bg-status-critical',
+        'border-status-critical/30 text-status-critical bg-status-critical-bg',
     viewed: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
-    approved: 'border-status-success/30 text-status-success bg-status-success',
-    rejected: 'border-status-warning/30 text-status-warning bg-status-warning',
+    approved: 'border-status-success/30 text-status-success bg-status-success-bg',
+    rejected: 'border-status-warning/30 text-status-warning bg-status-warning-bg',
     signed: 'border-primary/30 text-primary bg-primary/10',
-    exported: 'border-status-info/30 text-status-info bg-status-info',
+    exported: 'border-status-info/30 text-status-info bg-status-info-bg',
 };
 
 const formatDate = (value?: string | null) => {

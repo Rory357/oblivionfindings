@@ -49,11 +49,11 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const typeColors: Record<string, string> = {
-    contract: 'border-status-info/30 text-status-info bg-status-info',
-    letter: 'border-status-warning/30 text-status-warning bg-status-warning',
+    contract: 'border-status-info/30 text-status-info bg-status-info-bg',
+    letter: 'border-status-warning/30 text-status-warning bg-status-warning-bg',
     policy: 'border-primary/30 text-primary bg-primary/10',
     certificate:
-        'border-status-success/30 text-status-success bg-status-success',
+        'border-status-success/30 text-status-success bg-status-success-bg',
     offer: 'border-primary/30 text-primary bg-primary/10',
     other: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
 };

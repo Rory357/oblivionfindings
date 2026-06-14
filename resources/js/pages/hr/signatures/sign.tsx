@@ -37,17 +37,17 @@ const breadcrumbs: BreadcrumbItem[] = [
 const statusConfig: Record<string, { className: string; label: string }> = {
     pending: {
         className:
-            'border-status-warning/30 text-status-warning bg-status-warning',
+            'border-status-warning/30 text-status-warning bg-status-warning-bg',
         label: 'Pending',
     },
     signed: {
         className:
-            'border-status-success/30 text-status-success bg-status-success',
+            'border-status-success/30 text-status-success bg-status-success-bg',
         label: 'Signed',
     },
     declined: {
         className:
-            'border-status-critical/30 text-status-critical bg-status-critical',
+            'border-status-critical/30 text-status-critical bg-status-critical-bg',
         label: 'Declined',
     },
 };

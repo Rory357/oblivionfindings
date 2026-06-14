@@ -78,22 +78,22 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const postTypeBadge: Record<string, { className: string; label: string }> = {
     update: {
-        className: 'border-status-info/30 text-status-info bg-status-info',
+        className: 'border-status-info/30 text-status-info bg-status-info-bg',
         label: 'Update',
     },
     milestone: {
         className:
-            'border-status-warning/30 text-status-warning bg-status-warning',
+            'border-status-warning/30 text-status-warning bg-status-warning-bg',
         label: 'Milestone',
     },
     kudos: {
         className:
-            'border-status-critical/30 text-status-critical bg-status-critical',
+            'border-status-critical/30 text-status-critical bg-status-critical-bg',
         label: 'Kudos',
     },
     announcement: {
         className:
-            'border-status-success/30 text-status-success bg-status-success',
+            'border-status-success/30 text-status-success bg-status-success-bg',
         label: 'Announcement',
     },
 };

@@ -111,9 +111,9 @@ const recColors: Record<string, string> = {
 };
 
 const refStatusColors: Record<string, string> = {
-    completed: 'border-status-success/30 text-status-success bg-status-success',
-    received: 'border-status-info/30 text-status-info bg-status-info',
-    requested: 'border-status-warning/30 text-status-warning bg-status-warning',
+    completed: 'border-status-success/30 text-status-success bg-status-success-bg',
+    received: 'border-status-info/30 text-status-info bg-status-info-bg',
+    requested: 'border-status-warning/30 text-status-warning bg-status-warning-bg',
     pending: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
 };
 
@@ -374,7 +374,7 @@ export default function CreateOffer({ application, sites, roles }: Props) {
                                 {jp &&
                                     (jp.salary_range_min ||
                                         jp.salary_range_max) && (
-                                        <div className="flex items-center gap-2 rounded-lg border border-status-success/20 bg-status-success p-3 text-sm">
+                                        <div className="flex items-center gap-2 rounded-lg border border-status-success/20 bg-status-success-bg p-3 text-sm">
                                             <DollarSign className="h-4 w-4 shrink-0 text-status-success" />
                                             <span>
                                                 <strong>
@@ -681,7 +681,7 @@ export default function CreateOffer({ application, sites, roles }: Props) {
                                 <CardContent className="space-y-2">
                                     {avgRating && (
                                         <div className="flex items-center gap-2">
-                                            <div className="flex items-center gap-1 rounded-lg bg-status-warning px-2.5 py-1">
+                                            <div className="flex items-center gap-1 rounded-lg bg-status-warning-bg px-2.5 py-1">
                                                 <Star className="h-4 w-4 fill-amber-400 text-status-warning" />
                                                 <span className="text-sm font-bold">
                                                     {avgRating}

@@ -194,27 +194,27 @@ const breadcrumbs = [
 
 const statusConfig: Record<string, { className: string; label: string }> = {
     active: {
-        className: 'border-status-info/30 text-status-info bg-status-info',
+        className: 'border-status-info/30 text-status-info bg-status-info-bg',
         label: 'Active',
     },
     submitted: {
         className:
-            'border-status-warning/30 text-status-warning bg-status-warning',
+            'border-status-warning/30 text-status-warning bg-status-warning-bg',
         label: 'Submitted',
     },
     approved: {
         className:
-            'border-status-success/30 text-status-success bg-status-success',
+            'border-status-success/30 text-status-success bg-status-success-bg',
         label: 'Approved',
     },
     rejected: {
         className:
-            'border-status-critical/30 text-status-critical bg-status-critical',
+            'border-status-critical/30 text-status-critical bg-status-critical-bg',
         label: 'Rejected',
     },
     returned: {
         className:
-            'border-status-warning/30 text-status-warning bg-status-warning',
+            'border-status-warning/30 text-status-warning bg-status-warning-bg',
         label: 'Returned',
     },
     draft: {
@@ -240,15 +240,15 @@ const payTypeConfig: Record<string, { className: string; label: string }> = {
     },
     public_holiday: {
         className:
-            'border-status-warning/30 text-status-warning bg-status-warning',
+            'border-status-warning/30 text-status-warning bg-status-warning-bg',
         label: 'Public Holiday',
     },
     night: {
-        className: 'border-status-info/30 text-status-info bg-status-info',
+        className: 'border-status-info/30 text-status-info bg-status-info-bg',
         label: 'Night',
     },
     weekend: {
-        className: 'border-status-info/30 text-status-info bg-status-info',
+        className: 'border-status-info/30 text-status-info bg-status-info-bg',
         label: 'Weekend',
     },
     evening: {
@@ -1087,7 +1087,7 @@ export default function TimeIndex({
                                     </p>
                                 </div>
                             ) : (
-                                <Card className="border-status-warning/20 bg-status-warning">
+                                <Card className="border-status-warning/20 bg-status-warning-bg">
                                     <CardHeader className="pb-3">
                                         <CardTitle className="text-base">
                                             Pending Approval (
@@ -1149,11 +1149,11 @@ export default function TimeIndex({
                                                                         className={
                                                                             ts.hours_waiting >
                                                                             48
-                                                                                ? 'border-status-critical/30 bg-status-critical text-status-critical'
+                                                                                ? 'border-status-critical/30 bg-status-critical-bg text-status-critical'
                                                                                 : ts.hours_waiting >
                                                                                     24
-                                                                                  ? 'border-status-warning/30 bg-status-warning text-status-warning'
-                                                                                  : 'border-status-info/30 bg-status-info text-status-info'
+                                                                                  ? 'border-status-warning/30 bg-status-warning-bg text-status-warning'
+                                                                                  : 'border-status-info/30 bg-status-info-bg text-status-info'
                                                                         }
                                                                     >
                                                                         {ts.hours_waiting >
