@@ -133,6 +133,9 @@ export function MedicationEventDrawer({ event, onClose }: { event: AuditEvent; o
     const [active, setActive] = useState('what');
     const [integrity, setIntegrity] = useState<Integrity | null>(null);
     const [flagging, setFlagging] = useState(false);
+    const [flash, setFlash] = useState<string | null>(null);
+    const flashTimer = useRef<ReturnType<typeof setTimeout> | null>(null);
+    useEffect(() => () => { if (flashTimer.current) clearTimeout(flashTimer.current); }, []);
 
     // Lazy-load the integrity panel from the AuditLog-backed endpoint.
     useEffect(() => {
@@ -166,11 +169,19 @@ export function MedicationEventDrawer({ event, onClose }: { event: AuditEvent; o
         // eslint-disable-next-line react-hooks/exhaustive-deps
     }, [event.id, changes.length]);
 
-    const scrollTo = (key: string) => {
+    const goToSection = (key: string) => {
         const el = sectionEls.current[key];
         const body = bodyRef.current;
-        if (el && body) body.scrollTo({ top: Math.max(0, el.offsetTop - 8), behavior: 'smooth' });
+        // Scroll only when there's room — many events are short and fit without a
+        // scrollbar — but always flash the target section so the click is visibly
+        // acknowledged regardless.
+        if (el && body && body.scrollHeight > body.clientHeight + 2) {
+            body.scrollTo({ top: Math.max(0, el.offsetTop - 8), behavior: 'smooth' });
+        }
         setActive(key);
+        setFlash(key);
+        if (flashTimer.current) clearTimeout(flashTimer.current);
+        flashTimer.current = setTimeout(() => setFlash(null), 1000);
     };
 
     const onFlag = () => {
@@ -216,7 +227,7 @@ export function MedicationEventDrawer({ event, onClose }: { event: AuditEvent; o
                                 <button
                                     key={s.key}
                                     type="button"
-                                    onClick={() => scrollTo(s.key)}
+                                    onClick={() => goToSection(s.key)}
                                     className={cn(
                                         'flex items-center gap-2.5 rounded-md p-2 text-left text-[13px] font-semibold transition-colors',
                                         isActive ? 'bg-primary/10 text-primary' : 'text-muted-foreground hover:bg-sidebar-accent',
@@ -260,7 +271,7 @@ export function MedicationEventDrawer({ event, onClose }: { event: AuditEvent; o
 
                         <div ref={bodyRef} className="relative min-h-0 flex-1 overflow-y-auto overflow-x-hidden px-6 py-5">
                             {/* What happened */}
-                            <Section refCb={(el) => (sectionEls.current.what = el)} title="What happened">
+                            <Section refCb={(el) => (sectionEls.current.what = el)} flash={flash === 'what'} title="What happened">
                                 {event.flags.includes('missing_witness') && (
                                     <div className="mb-3 rounded-lg border border-status-critical/30 bg-status-critical-bg/60 px-3 py-2 text-xs text-status-critical">
                                         Controlled-drug transaction without a recorded second signature — investigate and countersign in the CD register.
@@ -280,7 +291,7 @@ export function MedicationEventDrawer({ event, onClose }: { event: AuditEvent; o
                             </Section>
 
                             {/* People & sign-off */}
-                            <Section refCb={(el) => (sectionEls.current.people = el)} title="People & sign-off">
+                            <Section refCb={(el) => (sectionEls.current.people = el)} flash={flash === 'people'} title="People & sign-off">
                                 <div className="grid grid-cols-1 gap-3 sm:grid-cols-2">
                                     <div className={cn('rounded-lg border px-3 py-2.5', event.performed_by ? '' : 'border-status-warning/40 bg-status-warning-bg/40')}>
                                         <div className="text-[11px] font-semibold uppercase tracking-wide text-muted-foreground">Performed by</div>
@@ -297,7 +308,7 @@ export function MedicationEventDrawer({ event, onClose }: { event: AuditEvent; o
 
                             {/* Before → after */}
                             {changes.length > 0 && (
-                                <Section refCb={(el) => (sectionEls.current.changes = el)} title="Before → after">
+                                <Section refCb={(el) => (sectionEls.current.changes = el)} flash={flash === 'changes'} title="Before → after">
                                     <div className="flex flex-col gap-2">
                                         {changes.map((c, i) => (
                                             <div key={i} className="rounded-lg border px-3 py-2">
@@ -314,7 +325,7 @@ export function MedicationEventDrawer({ event, onClose }: { event: AuditEvent; o
                             )}
 
                             {/* Device & integrity */}
-                            <Section refCb={(el) => (sectionEls.current.integrity = el)} title="Device & integrity">
+                            <Section refCb={(el) => (sectionEls.current.integrity = el)} flash={flash === 'integrity'} title="Device & integrity">
                                 {integrity === null ? (
                                     <div className="rounded-lg border px-4 py-3 text-sm text-muted-foreground">Loading integrity…</div>
                                 ) : !integrity.backed ? (
@@ -339,7 +350,7 @@ export function MedicationEventDrawer({ event, onClose }: { event: AuditEvent; o
                             </Section>
 
                             {/* Linked records */}
-                            <Section refCb={(el) => (sectionEls.current.linked = el)} title="Linked records">
+                            <Section refCb={(el) => (sectionEls.current.linked = el)} flash={flash === 'linked'} title="Linked records">
                                 <div className="flex flex-wrap gap-2">
                                     {link && <a href={link.href} className="rounded-full border px-3 py-1 text-xs font-medium text-primary hover:bg-accent">{link.label}</a>}
                                     {event.client_id && <a href={`/clients/${event.client_id}`} className="rounded-full border px-3 py-1 text-xs font-medium text-primary hover:bg-accent">Client profile</a>}
@@ -377,10 +388,10 @@ export function MedicationEventDrawer({ event, onClose }: { event: AuditEvent; o
     );
 }
 
-function Section({ title, refCb, children }: { title: string; refCb: (el: HTMLDivElement | null) => void; children: React.ReactNode }) {
+function Section({ title, refCb, flash, children }: { title: string; refCb: (el: HTMLDivElement | null) => void; flash?: boolean; children: React.ReactNode }) {
     return (
-        <div ref={refCb} className="scroll-mt-4 border-t border-border/60 pt-5 first:border-0 first:pt-0">
-            <div className="mb-2 text-xs font-semibold uppercase tracking-wide text-muted-foreground">{title}</div>
+        <div ref={refCb} className={cn('scroll-mt-4 border-t border-border/60 pt-5 transition-colors duration-300 first:border-0 first:pt-0', flash && '-mx-3 rounded-lg bg-primary/[0.06] px-3')}>
+            <div className={cn('mb-2 text-xs font-semibold uppercase tracking-wide transition-colors', flash ? 'text-primary' : 'text-muted-foreground')}>{title}</div>
             {children}
         </div>
     );

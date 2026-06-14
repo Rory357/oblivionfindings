@@ -26,14 +26,18 @@ class MarOmissionService
     /** Dose statuses that count as "recorded" — a slot with one of these is not an omission. */
     private const RECORDED_STATUSES = ['given', 'refused', 'withheld', 'missed'];
 
-    /** Default lookback when no explicit `from` is given. */
-    private const DEFAULT_LOOKBACK_DAYS = 14;
+    /**
+     * Default lookback when no explicit `from` is given. Kept short: a blank MAR
+     * slot is most actionable while recent, and a tight window keeps the unified
+     * feed readable rather than flooding it with omissions on data-sparse sites.
+     */
+    private const DEFAULT_LOOKBACK_DAYS = 7;
 
     /** Never scan further back than this, regardless of the requested window. */
     private const MAX_LOOKBACK_DAYS = 31;
 
-    /** Hard cap on emitted omission events. */
-    private const MAX_RESULTS = 500;
+    /** Hard cap on emitted omission events (bounds payload + keeps the feed usable). */
+    private const MAX_RESULTS = 200;
 
     public function __construct(private readonly MarScheduleService $schedule) {}
 
