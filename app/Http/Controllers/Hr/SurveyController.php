@@ -7,7 +7,6 @@ use App\Domain\Hr\Models\HrSurvey;
 use App\Domain\Hr\Services\SurveyService;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use Inertia\Inertia;
 
 class SurveyController extends Controller
 {
@@ -21,43 +20,10 @@ class SurveyController extends Controller
 
     public function index(Request $request)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.surveys.view'), 403);
-
-        $tenantId = null;
-        $status = $request->query('status');
-
-        $surveys = HrSurvey::forTenant($tenantId)
-            ->when($status, fn ($q) => $q->where('status', $status))
-            ->withCount('responses')
-            ->with('creator:id,name')
-            ->orderByDesc('created_at')
-            ->paginate(20)
-            ->withQueryString();
-
-        $surveys->through(fn ($survey) => [
-            'id' => $survey->id,
-            'title' => $survey->title,
-            'survey_type' => $survey->survey_type,
-            'status' => $survey->status,
-            'is_anonymous' => $survey->is_anonymous,
-            'starts_at' => $survey->starts_at?->toDateString(),
-            'ends_at' => $survey->ends_at?->toDateString(),
-            'responses_count' => $survey->responses_count,
-            'created_by' => $survey->creator?->name,
-            'created_at' => $survey->created_at?->toDateString(),
-        ]);
-
-        return Inertia::render('hr/surveys/index', [
-            'surveys' => $surveys,
-            'filters' => [
-                'status' => $status,
-            ],
-            'can' => [
-                'create' => $user->canDo('hr.surveys.manage'),
-                'manage' => $user->canDo('hr.surveys.manage'),
-            ],
-        ]);
+        // RETIRED: the standalone HrSurvey system is superseded by the richer
+        // Wellbeing engagement-survey system (anonymity, scoring, eNPS, action
+        // plans + SLA reminders). Route preserved as a redirect for any bookmarks.
+        return redirect()->route('hr.wellbeing.index');
     }
 
     /* ------------------------------------------------------------------ */
@@ -66,13 +32,7 @@ class SurveyController extends Controller
 
     public function create(Request $request)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.surveys.manage'), 403);
-
-        return Inertia::render('hr/surveys/create', [
-            'surveyTypes' => SurveyService::SURVEY_TYPES,
-            'questionTypes' => SurveyService::QUESTION_TYPES,
-        ]);
+        return redirect()->route('hr.wellbeing.index');
     }
 
     /* ------------------------------------------------------------------ */
@@ -116,33 +76,7 @@ class SurveyController extends Controller
 
     public function show(Request $request, HrSurvey $survey)
     {
-        $user = $request->user();
-        abort_unless($user && $user->canDo('hr.surveys.view'), 403);
-
-        $results = $this->surveyService->calculateResults($survey);
-        $enps = $survey->survey_type === 'enps'
-            ? $this->surveyService->getENPSScore($survey)
-            : null;
-
-        $survey->load('questions');
-
-        return Inertia::render('hr/surveys/results', [
-            'survey' => [
-                'id' => $survey->id,
-                'title' => $survey->title,
-                'description' => $survey->description,
-                'survey_type' => $survey->survey_type,
-                'status' => $survey->status,
-                'is_anonymous' => $survey->is_anonymous,
-                'starts_at' => $survey->starts_at?->toDateString(),
-                'ends_at' => $survey->ends_at?->toDateString(),
-            ],
-            'results' => $results,
-            'enps' => $enps,
-            'can' => [
-                'manage' => $user->canDo('hr.surveys.manage'),
-            ],
-        ]);
+        return redirect()->route('hr.wellbeing.index');
     }
 
     /* ------------------------------------------------------------------ */
@@ -151,29 +85,7 @@ class SurveyController extends Controller
 
     public function respond(Request $request, HrSurvey $survey)
     {
-        $user = $request->user();
-        abort_unless($user, 403);
-        abort_unless($survey->status === 'active', 404);
-
-        $survey->load(['questions' => fn ($q) => $q->orderBy('sort_order')]);
-
-        return Inertia::render('hr/surveys/respond', [
-            'survey' => [
-                'id' => $survey->id,
-                'title' => $survey->title,
-                'description' => $survey->description,
-                'survey_type' => $survey->survey_type,
-                'is_anonymous' => $survey->is_anonymous,
-                'ends_at' => $survey->ends_at?->toDateString(),
-                'questions' => $survey->questions->map(fn ($q) => [
-                    'id' => $q->id,
-                    'question_text' => $q->question_text,
-                    'question_type' => $q->question_type,
-                    'options' => $q->options,
-                    'is_required' => $q->is_required,
-                ]),
-            ],
-        ]);
+        return redirect()->route('hr.wellbeing.index');
     }
 
     /* ------------------------------------------------------------------ */

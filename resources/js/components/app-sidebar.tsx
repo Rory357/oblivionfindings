@@ -2230,13 +2230,6 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             icon: MessageSquareText,
         });
     }
-    if (can?.hr?.surveys?.view) {
-        engagement.items.push({
-            title: 'Surveys',
-            href: '/hr/surveys',
-            icon: ClipboardList,
-        });
-    }
     if (can?.hr?.announcements?.view) {
         engagement.items.push({
             title: 'Announcements',
@@ -2244,9 +2237,15 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             icon: MessageSquareText,
         });
     }
-    if (can?.hr?.analytics?.view) {
+    // Surveys & Wellbeing unified on the richer engagement-survey system
+    // (the standalone /hr/surveys system was retired and redirects here).
+    if (
+        can?.hr?.wellbeing?.view ||
+        can?.hr?.analytics?.view ||
+        can?.hr?.surveys?.view
+    ) {
         engagement.items.push({
-            title: 'Wellbeing',
+            title: 'Surveys & Wellbeing',
             href: '/hr/wellbeing',
             icon: Target,
         });
