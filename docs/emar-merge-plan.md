@@ -140,11 +140,17 @@ InfoCard, SelectInput, SummaryRow`), matching `add-client-dialog.tsx`.
 2. [x] Re-run modal discovery scan; finalise §4 decisions.
 3. [x] Build `MedicationOverviewService` + action-centre feed (+ feature tests). ✅ 6 tests / 46 assertions green.
 4. [~] Extend `dashboard()` payload (DONE — service-backed). TS Inertia prop types pending in page rebuild.
-5. [ ] Rebuild `emar/Index.tsx` to the merged composition (hero → quick access).
-6. [ ] Wire reused modals (record-dose-wizard, prn-wizard, recorded-detail) into the Action centre + board.
-7. [ ] Build the BUILD-NEW modals on the shared shell (Generate rounds, CD entry, Stock, Review, Error,
-       Add med, Reports, Audit).
-8. [ ] Migrate raw `Dialog`/`Sheet` modals reachable from `/emar` (prn-effect; refusal follow-up).
+5. [x] Rebuild `emar/Index.tsx` to the merged composition (hero → quick access). ✅ committed 0eefdadd.
+6. [ ] Wire reused modals into the Action centre + board. record-dose-wizard reuse needs the meds/today
+       `ScheduleRow` + witnesses + not-given-reasons + client allergy payload (significant coupling) —
+       interim: Record/Investigate/Review action buttons + client tiles deep-link to the kept /emar/*
+       pages (functional, not stubs). FOLLOW-UP: enrich payload + lift record-dose-wizard onto rows.
+7. [~] Build BUILD-NEW modals on the shared shell. DONE: Generate rounds (hero), Report med error
+       (Action-centre header → emar.errors.store, + `clientOptions` payload). TODO: CD entry, Stock,
+       Medication review, Add med, Reports & exports, Audit log.
+8. [ ] Migrate raw `Dialog`/`Sheet` modals reachable from `/emar` (prn-effect; refusal follow-up). NOTE:
+       none are currently reachable from the merged `/emar` (page deep-links to pages); migrations land
+       when those modals are surfaced in-page.
 9. [~] Redirect `/emar/daily` ✅ (MedicationsController@index → 301 emar.index). Nav removal + delete
        `medications/index.tsx` pending.
 10. [ ] Verification (§9): `npm run types`, `npm run lint`, `vendor/bin/pint`, `php artisan test`,

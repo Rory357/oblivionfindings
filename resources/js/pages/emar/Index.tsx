@@ -63,6 +63,7 @@ import {
     parseYmd,
 } from '@/pages/meds/today/components/day-picker-chip';
 import { GenerateRoundsModal } from './components/generate-rounds-modal';
+import { ReportErrorModal, type ClientOption } from './components/report-error-modal';
 
 /* ── Types (mirror MedicationOverviewService::payload) ───────────────── */
 
@@ -190,6 +191,7 @@ type Props = {
     reviewsDue: ReviewDueItem[];
     medicationErrors: MedicationErrors;
     recentActivity: ActivityItem[];
+    clientOptions: ClientOption[];
     canManageSettings?: boolean;
 };
 
@@ -281,6 +283,7 @@ export default function EmarHome(props: Props) {
         reviewsDue,
         medicationErrors,
         recentActivity,
+        clientOptions,
         canManageSettings,
     } = props;
 
@@ -291,7 +294,7 @@ export default function EmarHome(props: Props) {
     const [search, setSearch] = useState('');
     const [siteFilter, setSiteFilter] = useState<number | null>(null);
     const [dismissed, setDismissed] = useState<Set<string>>(new Set());
-    const [modal, setModal] = useState<null | 'generate-rounds'>(null);
+    const [modal, setModal] = useState<null | 'generate-rounds' | 'report-error'>(null);
 
     const goDate = (ymd: string) =>
         router.get(
@@ -597,9 +600,20 @@ export default function EmarHome(props: Props) {
                                         </p>
                                     </div>
                                 </div>
-                                <span className="shrink-0 rounded-full border border-status-critical/30 bg-status-critical-bg px-2.5 py-0.5 text-[11px] font-bold text-status-critical">
-                                    {acCounts.all} open
-                                </span>
+                                <div className="flex shrink-0 items-center gap-2">
+                                    <Button
+                                        variant="outline"
+                                        size="sm"
+                                        className="h-7 gap-1.5 px-2.5 text-xs"
+                                        onClick={() => setModal('report-error')}
+                                    >
+                                        <AlertTriangle className="h-3.5 w-3.5" />
+                                        Report error
+                                    </Button>
+                                    <span className="rounded-full border border-status-critical/30 bg-status-critical-bg px-2.5 py-0.5 text-[11px] font-bold text-status-critical">
+                                        {acCounts.all} open
+                                    </span>
+                                </div>
                             </div>
                             <TabStrip
                                 ariaLabel="Action centre filter"
@@ -1083,6 +1097,11 @@ export default function EmarHome(props: Props) {
                 open={modal === 'generate-rounds'}
                 onClose={() => setModal(null)}
                 defaultDate={date}
+            />
+            <ReportErrorModal
+                open={modal === 'report-error'}
+                onClose={() => setModal(null)}
+                clients={clientOptions}
             />
         </AppLayout>
     );

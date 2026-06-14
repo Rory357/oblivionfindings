@@ -65,7 +65,27 @@ class MedicationOverviewService
             'recentActivity' => $this->recentActivity(),
             'activeAlertsList' => $this->activeAlertsList(),
             'compliance' => $this->complianceSnapshot(),
+            'clientOptions' => $this->clientOptions(),
         ];
+    }
+
+    /**
+     * Lightweight client picker list for the page's modals (clients with an
+     * active medication chart). id + display name + site.
+     */
+    public function clientOptions(): array
+    {
+        return Client::query()
+            ->whereHas('medications', fn ($q) => $q->active())
+            ->with('site:id,name')
+            ->orderBy('last_name')
+            ->get(['id', 'first_name', 'last_name', 'site_id'])
+            ->map(fn ($client) => [
+                'id' => $client->id,
+                'name' => $this->clientName($client),
+                'site' => $client->site?->name,
+            ])
+            ->all();
     }
 
     // ─── KPI stats ─────────────────────────────────────────
