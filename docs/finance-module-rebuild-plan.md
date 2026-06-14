@@ -390,7 +390,16 @@ KiwiSaver + net-pay liability) via `PostPayrollJournalJob`; `AllocatePayrollCost
 - **[ ] M10-3 Final de-dup sweep (all three classes).** Verify every collapsed route redirects; extract any
   remaining near-identical finance hero/table/card code into `components/finance/`; confirm no cross-loop fork
   with HR (payroll bridge, expenses, approvals, calendar, primitives). *Acceptance:* no duplicate concept pages; dup map updated.
-- **[ ] M10-4 Demo seeders.** Extend a `FinanceDemoSeeder` so every hub renders populated. *Acceptance:* fresh `migrate:fresh --seed` → no empty finance hub on the dev server.
+- **[x] M10-4 Demo seeders — SHIPPED (main 8519cce0).** Root cause: `DatabaseSeeder` called only
+  `FinancePermissionsSeeder` (permissions, no data) so every finance hub + the new Calendar rendered EMPTY on a
+  fresh seed. Added `FinanceDemoSeeder` (wired into `DatabaseSeeder` after the other `*DemoSeeder`s), modelled on
+  the DuskDatabaseSeeder factory recipe but with NEAR-TERM invoice/bill/payment-run/GST dates (+ one overdue
+  invoice and bill) so the Finance Calendar shows live, correctly-coloured events in the current view. Scoped to
+  org 1, idempotent (skips when demo invoices exist). Seeds chart of accounts + posted journals (Ledger), bank
+  accounts + petty cash (Banking), vendors + bills + PO + payment run (Payables), invoices + credit note
+  (Receivables), a recent GST return (Tax + Calendar), plus a fixed asset + donor fund. 3 tests (every hub
+  populates · calendar returns live events incl. overdue · idempotent). Finance suite 122 green. *Acceptance met.*
+  (Not seeded — no factory: FinFundingStream / FinAccountingIntegration; Settings is a config hub, empty-OK.)
 - **[ ] M10-5 a11y + responsive + end-to-end pipeline tests + final parity.** Axe (no criticals) + mobile on
   every hub; consistent empty/loading/error states; end-to-end finance pipeline tests; side-by-side every hub
   vs Rostering on oblivionfindings.com. *Acceptance:* axe clean; responsive; DoD met.
