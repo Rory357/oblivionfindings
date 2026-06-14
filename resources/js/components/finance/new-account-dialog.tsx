@@ -126,20 +126,13 @@ export function NewAccountDialog({
         value: s.value,
         label: s.label,
     }));
-    const parentOptions = [
-        { value: '', label: 'None (top-level account)' },
-        ...parentAccounts
-            .filter((p) => !data.type || p.type === data.type)
-            .map((p) => ({ value: String(p.id), label: `${p.code} - ${p.name}` })),
-    ];
-    const taxOptions = [
-        { value: '', label: 'None' },
-        ...taxRates.map((t) => ({ value: String(t.id), label: `${t.name} (${t.rate}%)` })),
-    ];
-    const fsOptions = [
-        { value: '', label: 'None' },
-        ...fundingStreams.map((f) => ({ value: String(f.id), label: `${f.code} - ${f.name}` })),
-    ];
+    // No empty-string option values — Radix Select forbids them. The placeholder
+    // ("None") conveys the unselected state for these optional fields.
+    const parentOptions = parentAccounts
+        .filter((p) => !data.type || p.type === data.type)
+        .map((p) => ({ value: String(p.id), label: `${p.code} - ${p.name}` }));
+    const taxOptions = taxRates.map((t) => ({ value: String(t.id), label: `${t.name} (${t.rate}%)` }));
+    const fsOptions = fundingStreams.map((f) => ({ value: String(f.id), label: `${f.code} - ${f.name}` }));
 
     return (
         <WizardShell

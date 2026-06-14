@@ -2,6 +2,7 @@
 
 namespace App\Models;
 
+use App\Domain\Finance\Models\FinInvoice;
 use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
@@ -386,6 +387,15 @@ class Client extends Model
     public function invoices()
     {
         return $this->hasMany(Invoice::class);
+    }
+
+    /**
+     * Live finance invoices (FinInvoice). The legacy `invoices()` relation above
+     * points at the orphaned App\Models\Invoice table that nothing writes to.
+     */
+    public function finInvoices()
+    {
+        return $this->hasMany(FinInvoice::class);
     }
 
     public function personalAssets()

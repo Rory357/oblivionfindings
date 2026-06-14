@@ -4,58 +4,29 @@ namespace App\Http\Controllers\Hr;
 
 use App\Domain\Hr\Models\HrDepartment;
 use App\Http\Controllers\Controller;
-use App\Models\User;
 use Illuminate\Http\Request;
 use Illuminate\Validation\Rule;
-use Inertia\Inertia;
 
 class DepartmentController extends Controller
 {
+    /**
+     * Departments are folded into the People hub "Departments" tab. Preserve the
+     * route by redirecting, carrying filters across as the namespaced hub keys.
+     */
     public function index(Request $request)
     {
         $user = $request->user();
         abort_unless($user && ($user->canDo('hr.settings.manage') || $user->canDo('hr.employees.manage')), 403);
 
-        $tenantId = $user->tenant_id;
-        $search = trim((string) $request->query('q', ''));
-        $status = $request->query('status');
+        $params = ['tab' => 'departments'];
+        if ($q = trim((string) $request->query('q', ''))) {
+            $params['dept_q'] = $q;
+        }
+        if ($status = $request->query('status')) {
+            $params['dept_status'] = $status;
+        }
 
-        $departments = HrDepartment::query()
-            ->where(fn ($q) => $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id'))
-            ->with(['manager:id,name', 'parent:id,name'])
-            ->withCount(['employees' => fn ($q) => $q->where('is_active', true)])
-            ->when($search !== '', fn ($q) =>
-                $q->where(function ($inner) use ($search) {
-                    $inner->where('name', 'like', "%{$search}%")
-                        ->orWhere('code', 'like', "%{$search}%");
-                })
-            )
-            ->when($status === 'active', fn ($q) => $q->where('is_active', true))
-            ->when($status === 'inactive', fn ($q) => $q->where('is_active', false))
-            ->orderBy('sort_order')
-            ->orderBy('name')
-            ->paginate(25)
-            ->withQueryString();
-
-        $managers = User::staff()
-            ->orderBy('name')
-            ->get(['id', 'name']);
-
-        $parentOptions = HrDepartment::query()
-            ->where(fn ($q) => $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id'))
-            ->where('is_active', true)
-            ->orderBy('name')
-            ->get(['id', 'name']);
-
-        return Inertia::render('hr/departments/index', [
-            'departments' => $departments,
-            'managers' => $managers,
-            'parentOptions' => $parentOptions,
-            'filters' => [
-                'q' => $search,
-                'status' => $status,
-            ],
-        ]);
+        return redirect()->route('hr.people.index', $params);
     }
 
     public function store(Request $request)

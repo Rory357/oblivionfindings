@@ -1,3 +1,9 @@
+import {
+    OfferRespondDialog,
+    OfferWizardDialog,
+    type OfferRole,
+    type OfferSite,
+} from '@/components/hr';
 import { PageHero, type PageHeroBadge, type PageHeroMetaItem } from '@/components/page';
 import { ActivityItem } from '@/components/recruitment/activity-item';
 import { PipelineStepper } from '@/components/recruitment/pipeline-stepper';
@@ -194,6 +200,8 @@ interface Props {
     documents: CandidateDocument[];
     documentCategories: Record<string, string>;
     stages?: string[];
+    offerSites?: OfferSite[];
+    offerRoles?: OfferRole[];
 }
 
 const interviewStatusVariants: Record<
@@ -246,12 +254,24 @@ export default function CandidateShow({
     documents,
     documentCategories,
     stages,
+    offerSites = [],
+    offerRoles = [],
 }: Props) {
     const fullName = `${candidate.first_name} ${candidate.last_name}`;
     const initials = (
         (candidate.first_name?.[0] ?? '') + (candidate.last_name?.[0] ?? '')
     ).toUpperCase();
     const [noteText, setNoteText] = useState('');
+    const [offerWizard, setOfferWizard] = useState<{
+        open: boolean;
+        applicationId: number;
+        positionTitle: string;
+        positionRole: string | null;
+    }>({ open: false, applicationId: 0, positionTitle: '', positionRole: null });
+    const [respondOffer, setRespondOffer] = useState<{
+        open: boolean;
+        offerId: number;
+    }>({ open: false, offerId: 0 });
     const [expandedCoverLetters, setExpandedCoverLetters] = useState<
         Record<number, boolean>
     >({});
@@ -344,20 +364,6 @@ export default function CandidateShow({
         router.post(
             `/hr/recruitment/offers/${offerId}/send`,
             {},
-            { preserveScroll: true },
-        );
-    }
-    function recordOfferResponse(
-        offerId: number,
-        response: 'accepted' | 'declined' | 'withdrawn',
-    ) {
-        const notes =
-            response !== 'accepted'
-                ? (prompt('Optional notes:') ?? '').trim()
-                : '';
-        router.post(
-            `/hr/recruitment/offers/${offerId}/respond`,
-            { response, response_notes: notes || null },
             { preserveScroll: true },
         );
     }
@@ -890,13 +896,19 @@ export default function CandidateShow({
                             <p className="text-xs text-muted-foreground">
                                 Create an offer for this candidate.
                             </p>
-                            <Button size="sm" className="w-full" asChild>
-                                <Link
-                                    href={`/hr/recruitment/applications/${app.id}/offer/create`}
-                                >
-                                    <Gift className="mr-1 h-3.5 w-3.5" /> Create
-                                    Offer
-                                </Link>
+                            <Button
+                                size="sm"
+                                className="w-full"
+                                onClick={() =>
+                                    setOfferWizard({
+                                        open: true,
+                                        applicationId: app.id,
+                                        positionTitle: app.position_title,
+                                        positionRole: app.position_role,
+                                    })
+                                }
+                            >
+                                <Gift className="mr-1 h-3.5 w-3.5" /> Create Offer
                             </Button>
                         </div>
                     )}
@@ -1223,15 +1235,17 @@ export default function CandidateShow({
                                                                     <Button
                                                                         size="sm"
                                                                         variant="outline"
-                                                                        asChild
+                                                                        onClick={() =>
+                                                                            setOfferWizard({
+                                                                                open: true,
+                                                                                applicationId: app.id,
+                                                                                positionTitle: app.position_title,
+                                                                                positionRole: app.position_role,
+                                                                            })
+                                                                        }
                                                                     >
-                                                                        <Link
-                                                                            href={`/hr/recruitment/applications/${app.id}/offer/create`}
-                                                                        >
-                                                                            <Gift className="mr-1 h-3 w-3" />{' '}
-                                                                            Create
-                                                                            Offer
-                                                                        </Link>
+                                                                        <Gift className="mr-1 h-3 w-3" />{' '}
+                                                                        Create Offer
                                                                     </Button>
                                                                 )}
                                                         </>
@@ -1802,50 +1816,22 @@ export default function CandidateShow({
                                                         {app.offer.sent_at &&
                                                             !app.offer
                                                                 .response && (
-                                                                <>
-                                                                    <Button
-                                                                        size="sm"
-                                                                        onClick={() =>
-                                                                            recordOfferResponse(
-                                                                                app
-                                                                                    .offer!
-                                                                                    .id,
-                                                                                'accepted',
-                                                                            )
-                                                                        }
-                                                                    >
-                                                                        Mark
-                                                                        Accepted
-                                                                    </Button>
-                                                                    <Button
-                                                                        size="sm"
-                                                                        variant="secondary"
-                                                                        onClick={() =>
-                                                                            recordOfferResponse(
-                                                                                app
-                                                                                    .offer!
-                                                                                    .id,
-                                                                                'declined',
-                                                                            )
-                                                                        }
-                                                                    >
-                                                                        Declined
-                                                                    </Button>
-                                                                    <Button
-                                                                        size="sm"
-                                                                        variant="ghost"
-                                                                        onClick={() =>
-                                                                            recordOfferResponse(
-                                                                                app
-                                                                                    .offer!
-                                                                                    .id,
-                                                                                'withdrawn',
-                                                                            )
-                                                                        }
-                                                                    >
-                                                                        Withdrawn
-                                                                    </Button>
-                                                                </>
+                                                                <Button
+                                                                    size="sm"
+                                                                    onClick={() =>
+                                                                        setRespondOffer(
+                                                                            {
+                                                                                open: true,
+                                                                                offerId:
+                                                                                    app
+                                                                                        .offer!
+                                                                                        .id,
+                                                                            },
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    Record Response
+                                                                </Button>
                                                             )}
                                                         {app.offer.response ===
                                                             'accepted' && (
@@ -2313,6 +2299,30 @@ export default function CandidateShow({
                     </TabsContent>
                 </Tabs>
             </div>
+
+            {can.manage && offerWizard.applicationId > 0 && (
+                <OfferWizardDialog
+                    open={offerWizard.open}
+                    onClose={() =>
+                        setOfferWizard((s) => ({ ...s, open: false }))
+                    }
+                    applicationId={offerWizard.applicationId}
+                    positionTitle={offerWizard.positionTitle}
+                    positionRole={offerWizard.positionRole}
+                    sites={offerSites}
+                    roles={offerRoles}
+                />
+            )}
+
+            {can.manage && respondOffer.offerId > 0 && (
+                <OfferRespondDialog
+                    open={respondOffer.open}
+                    onClose={() =>
+                        setRespondOffer((s) => ({ ...s, open: false }))
+                    }
+                    offerId={respondOffer.offerId}
+                />
+            )}
         </AppLayout>
     );
 }

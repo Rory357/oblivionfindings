@@ -1,3 +1,4 @@
+import { RecruitmentTabs } from '@/components/hr';
 import PageShell from '@/components/page-shell';
 import { CandidateCard } from '@/components/recruitment/candidate-card';
 import {
@@ -10,7 +11,7 @@ import { Input } from '@/components/ui/input';
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link } from '@inertiajs/react';
-import { LayoutGrid, List, Plus, Search } from 'lucide-react';
+import { LayoutGrid, Plus, Search } from 'lucide-react';
 import { useState } from 'react';
 
 type KanbanCard = {
@@ -72,33 +73,18 @@ export default function RecruitmentKanban({ columns, stages, can }: Props) {
                         { label: 'Stages', value: stages.length },
                     ]}
                     actions={
-                        <div className="flex gap-2">
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                asChild
-                            >
-                                <Link href="/hr/recruitment">
-                                    <List className="mr-2 h-4 w-4" />
-                                    List View
+                        can.manage ? (
+                            <Button size="sm" asChild>
+                                <Link href="/hr/recruitment/candidates/create">
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Add candidate
                                 </Link>
                             </Button>
-                            <Button variant="secondary" size="sm" disabled>
-                                <LayoutGrid className="mr-2 h-4 w-4" />
-                                Kanban
-                            </Button>
-                            {can.manage && (
-                                <Button size="sm" asChild>
-                                    <Link href="/hr/recruitment/candidates/create">
-                                        <Plus className="mr-2 h-4 w-4" />
-                                        Add
-                                    </Link>
-                                </Button>
-                            )}
-                        </div>
+                        ) : undefined
                     }
                 />
+
+                <RecruitmentTabs active="board" />
 
                 {/* Search */}
                 <div className="relative max-w-sm">

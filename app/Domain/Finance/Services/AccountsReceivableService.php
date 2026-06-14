@@ -3,9 +3,9 @@
 namespace App\Domain\Finance\Services;
 
 use App\Domain\Finance\Models\FinAccount;
+use App\Domain\Finance\Models\FinInvoice;
 use App\Domain\Finance\Models\FinPaymentAllocation;
 use App\Models\Client;
-use App\Models\Invoice;
 use Carbon\Carbon;
 use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Support\Facades\Auth;
@@ -20,13 +20,17 @@ class AccountsReceivableService
     /**
      * Get aged receivables grouped by client with aging buckets.
      *
+     * Reads the live FinInvoice table (the legacy App\Models\Invoice table is a
+     * write-orphan — nothing creates rows in it any more), netting partial
+     * payments tracked as FinPaymentAllocation rows.
+     *
      * @return array{clients: array, totals: array}
      */
     public function getAgedReceivables(?int $orgId): array
     {
         $today = Carbon::today();
 
-        $invoices = Invoice::where('organization_id', $orgId)
+        $invoices = FinInvoice::where('organization_id', $orgId)
             ->where('status', 'sent')
             ->with('client:id,first_name,last_name')
             ->get();
@@ -42,19 +46,18 @@ class AccountsReceivableService
         ];
 
         foreach ($invoices as $invoice) {
-            $clientId = $invoice->client_id;
+            // Funder invoices carry a client_name but no client_id; group those by name.
+            $bucketKey = $invoice->client_id ?? ('name:'.$invoice->client_name);
             $amountDue = $this->calculateAmountDue($invoice);
 
             if (bccomp((string) $amountDue, '0', 2) <= 0) {
                 continue;
             }
 
-            if (! isset($clientBuckets[$clientId])) {
-                $clientBuckets[$clientId] = [
-                    'client_id' => $clientId,
-                    'client_name' => $invoice->client
-                        ? $invoice->client->first_name.' '.$invoice->client->last_name
-                        : 'Unknown',
+            if (! isset($clientBuckets[$bucketKey])) {
+                $clientBuckets[$bucketKey] = [
+                    'client_id' => $invoice->client_id,
+                    'client_name' => $this->invoiceClientName($invoice),
                     'current' => '0',
                     '1_30' => '0',
                     '31_60' => '0',
@@ -76,8 +79,8 @@ class AccountsReceivableService
                 default => '90_plus',
             };
 
-            $clientBuckets[$clientId][$bucket] = bcadd($clientBuckets[$clientId][$bucket], (string) $amountDue, 2);
-            $clientBuckets[$clientId]['total'] = bcadd($clientBuckets[$clientId]['total'], (string) $amountDue, 2);
+            $clientBuckets[$bucketKey][$bucket] = bcadd($clientBuckets[$bucketKey][$bucket], (string) $amountDue, 2);
+            $clientBuckets[$bucketKey]['total'] = bcadd($clientBuckets[$bucketKey]['total'], (string) $amountDue, 2);
 
             $grandTotals[$bucket] = bcadd($grandTotals[$bucket], (string) $amountDue, 2);
             $grandTotals['total'] = bcadd($grandTotals['total'], (string) $amountDue, 2);
@@ -114,7 +117,7 @@ class AccountsReceivableService
     public function allocatePayment(?int $orgId, array $data): FinPaymentAllocation
     {
         return DB::transaction(function () use ($orgId, $data) {
-            $invoice = Invoice::where('organization_id', $orgId)
+            $invoice = FinInvoice::where('organization_id', $orgId)
                 ->where('id', $data['invoice_id'])
                 ->lockForUpdate()
                 ->firstOrFail();
@@ -136,7 +139,7 @@ class AccountsReceivableService
                 'type' => 'standard',
                 'reference' => "PMT-{$invoice->invoice_number}",
                 'description' => "Payment received for invoice {$invoice->invoice_number}",
-                'source_type' => Invoice::class,
+                'source_type' => FinInvoice::class,
                 'source_id' => $invoice->id,
                 'lines' => [
                     [
@@ -160,7 +163,7 @@ class AccountsReceivableService
                 'type' => 'receivable',
                 'payment_date' => $data['payment_date'],
                 'amount' => $data['amount'],
-                'allocatable_type' => Invoice::class,
+                'allocatable_type' => FinInvoice::class,
                 'allocatable_id' => $invoice->id,
                 'journal_id' => $journal->id,
                 'notes' => $data['notes'] ?? null,
@@ -168,14 +171,14 @@ class AccountsReceivableService
             ]);
 
             // Check if invoice is fully paid
-            $totalPaid = FinPaymentAllocation::where('allocatable_type', Invoice::class)
+            $totalPaid = FinPaymentAllocation::where('allocatable_type', FinInvoice::class)
                 ->where('allocatable_id', $invoice->id)
                 ->sum('amount');
 
             if (bccomp((string) $totalPaid, (string) $invoice->total_amount, 2) >= 0) {
                 $invoice->update([
                     'status' => 'paid',
-                    'paid_date' => $data['payment_date'],
+                    'paid_at' => $data['payment_date'],
                 ]);
             }
 
@@ -193,18 +196,18 @@ class AccountsReceivableService
         $client = Client::findOrFail($clientId);
         $asOf = Carbon::parse($asOfDate);
 
-        $invoices = Invoice::where('organization_id', $orgId)
+        $invoices = FinInvoice::where('organization_id', $orgId)
             ->where('client_id', $clientId)
             ->where('status', 'sent')
-            ->where('issue_date', '<=', $asOf)
-            ->orderBy('issue_date')
+            ->where('invoice_date', '<=', $asOf)
+            ->orderBy('invoice_date')
             ->get();
 
         $statementInvoices = [];
         $totalOutstanding = '0';
 
         foreach ($invoices as $invoice) {
-            $amountPaid = (float) FinPaymentAllocation::where('allocatable_type', Invoice::class)
+            $amountPaid = (float) FinPaymentAllocation::where('allocatable_type', FinInvoice::class)
                 ->where('allocatable_id', $invoice->id)
                 ->where('payment_date', '<=', $asOf)
                 ->sum('amount');
@@ -217,7 +220,7 @@ class AccountsReceivableService
 
             $statementInvoices[] = [
                 'invoice_number' => $invoice->invoice_number,
-                'issue_date' => $invoice->issue_date->toDateString(),
+                'issue_date' => $invoice->invoice_date->toDateString(),
                 'due_date' => $invoice->due_date->toDateString(),
                 'total' => (float) $invoice->total_amount,
                 'amount_paid' => $amountPaid,
@@ -249,7 +252,7 @@ class AccountsReceivableService
      */
     public function getOutstandingInvoices(?int $orgId, ?int $clientId = null): Collection
     {
-        $query = Invoice::where('organization_id', $orgId)
+        $query = FinInvoice::where('organization_id', $orgId)
             ->where('status', 'sent')
             ->with('client:id,first_name,last_name');
 
@@ -262,7 +265,7 @@ class AccountsReceivableService
         // Add computed amount_due and amount_paid to each invoice
         $invoiceIds = $invoices->pluck('id');
 
-        $paymentTotals = FinPaymentAllocation::where('allocatable_type', Invoice::class)
+        $paymentTotals = FinPaymentAllocation::where('allocatable_type', FinInvoice::class)
             ->whereIn('allocatable_id', $invoiceIds)
             ->groupBy('allocatable_id')
             ->selectRaw('allocatable_id, SUM(amount) as total_paid')
@@ -274,7 +277,8 @@ class AccountsReceivableService
             $invoice->amount_due = round((float) $invoice->total_amount - $paid, 2);
         }
 
-        return $invoices;
+        // Drop fully-paid invoices whose status hasn't caught up to their allocations.
+        return $invoices->filter(fn ($invoice) => $invoice->amount_due > 0)->values();
     }
 
     /**
@@ -300,11 +304,24 @@ class AccountsReceivableService
     }
 
     /**
+     * Display name for an invoice's customer (Client relation, else the
+     * denormalised client_name used for funder invoices).
+     */
+    private function invoiceClientName(FinInvoice $invoice): string
+    {
+        if ($invoice->client) {
+            return trim($invoice->client->first_name.' '.$invoice->client->last_name);
+        }
+
+        return $invoice->client_name ?: 'Unknown';
+    }
+
+    /**
      * Calculate the amount still due on an invoice.
      */
-    private function calculateAmountDue(Invoice $invoice): float
+    private function calculateAmountDue(FinInvoice $invoice): float
     {
-        $totalPaid = (float) FinPaymentAllocation::where('allocatable_type', Invoice::class)
+        $totalPaid = (float) FinPaymentAllocation::where('allocatable_type', FinInvoice::class)
             ->where('allocatable_id', $invoice->id)
             ->sum('amount');
 

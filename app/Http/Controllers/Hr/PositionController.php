@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrDepartment;
 use App\Domain\Hr\Models\HrPosition;
 use App\Domain\Hr\Services\PositionService;
@@ -12,67 +13,33 @@ use Inertia\Inertia;
 
 class PositionController extends Controller
 {
+    use ResolvesHrTenant;
+
     public function __construct(
         private readonly PositionService $positionService,
     ) {}
 
+    /**
+     * Positions are folded into the People hub "Positions" tab. Preserve the
+     * route by redirecting, carrying filters across as the namespaced hub keys.
+     */
     public function index(Request $request)
     {
         $user = $request->user();
         abort_unless($this->canView($user), 403);
 
-        $tenantId = $user->tenant_id;
-        $search = trim((string) $request->query('q', ''));
-        $department = $request->query('department');
-        $status = $request->query('status');
+        $params = ['tab' => 'positions'];
+        if ($q = trim((string) $request->query('q', ''))) {
+            $params['pq'] = $q;
+        }
+        if ($department = $request->query('department')) {
+            $params['pdepartment'] = $department;
+        }
+        if ($status = $request->query('status')) {
+            $params['pstatus'] = $status;
+        }
 
-        $positions = HrPosition::forTenant($tenantId)
-            ->when($status === 'active', fn ($q) => $q->active())
-            ->when($status === 'inactive', fn ($q) => $q->where('is_active', false))
-            ->when($department, fn ($q) => $q->inDepartment($department))
-            ->when($search !== '', fn ($q) => $q->where(function ($sub) use ($search) {
-                $sub->where('title', 'like', "%{$search}%")
-                    ->orWhere('code', 'like', "%{$search}%")
-                    ->orWhere('department', 'like', "%{$search}%");
-            }))
-            ->withCount(['employees' => fn ($q) => $q->where('is_active', true)])
-            ->orderBy('department')
-            ->orderBy('title')
-            ->paginate(20)
-            ->withQueryString();
-
-        $positions->through(fn ($pos) => [
-            'id' => $pos->id,
-            'title' => $pos->title,
-            'code' => $pos->code,
-            'department' => $pos->department,
-            'team' => $pos->team,
-            'employment_type' => $pos->employment_type,
-            'fte' => (float) $pos->fte,
-            'headcount_budget' => $pos->headcount_budget,
-            'current_headcount' => $pos->employees_count,
-            'vacancies' => max(0, $pos->headcount_budget - $pos->employees_count),
-            'is_active' => $pos->is_active,
-        ]);
-
-        $departments = HrDepartment::query()
-            ->where(fn ($q) => $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id'))
-            ->where('is_active', true)
-            ->orderBy('name')
-            ->get(['id', 'name']);
-
-        return Inertia::render('hr/positions/index', [
-            'positions' => $positions,
-            'departments' => $departments,
-            'filters' => [
-                'q' => $search,
-                'department' => $department,
-                'status' => $status,
-            ],
-            'can' => [
-                'manage' => $this->canManage($user),
-            ],
-        ]);
+        return redirect()->route('hr.people.index', $params);
     }
 
     public function create(Request $request)
@@ -80,7 +47,7 @@ class PositionController extends Controller
         $user = $request->user();
         abort_unless($this->canManage($user), 403);
 
-        $tenantId = $user->tenant_id;
+        $tenantId = $this->resolveHrTenantIdForUser($user);
         $parentPositions = HrPosition::forTenant($tenantId)->active()->orderBy('title')->get(['id', 'title', 'code']);
         $departments = HrDepartment::query()
             ->where(fn ($q) => $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id'))
@@ -99,9 +66,11 @@ class PositionController extends Controller
         $user = $request->user();
         abort_unless($this->canManage($user), 403);
 
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
-            'code' => ['required', 'string', 'max:50', Rule::unique('hr_positions')->where('tenant_id', $user->tenant_id)],
+            'code' => ['required', 'string', 'max:50', Rule::unique('hr_positions')->where('tenant_id', $tenantId)],
             'department' => ['nullable', 'string', 'max:255'],
             'team' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
@@ -114,11 +83,13 @@ class PositionController extends Controller
 
         $this->positionService->createPosition([
             ...$validated,
-            'tenant_id' => $user->tenant_id,
+            'tenant_id' => $tenantId,
             'created_by' => $user->id,
         ]);
 
-        return redirect()->route('hr.positions.index')->with('success', 'Position created.');
+        // back() so the modal closes onto the hub Positions tab it was opened from
+        // (falls back to the standalone create page when used directly).
+        return redirect()->back()->with('success', 'Position created.');
     }
 
     public function show(Request $request, HrPosition $position)
@@ -174,14 +145,16 @@ class PositionController extends Controller
         $user = $request->user();
         abort_unless($this->canManage($user), 403);
 
-        $parentPositions = HrPosition::forTenant($user->tenant_id)
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
+        $parentPositions = HrPosition::forTenant($tenantId)
             ->active()
             ->where('id', '!=', $position->id)
             ->orderBy('title')
             ->get(['id', 'title', 'code']);
 
         $departments = HrDepartment::query()
-            ->when($user->tenant_id, fn ($q) => $q->where('tenant_id', $user->tenant_id), fn ($q) => $q->whereNull('tenant_id'))
+            ->where(fn ($q) => $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id'))
             ->where('is_active', true)
             ->orderBy('name')
             ->get(['id', 'name']);
@@ -202,9 +175,11 @@ class PositionController extends Controller
         $user = $request->user();
         abort_unless($this->canManage($user), 403);
 
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
         $validated = $request->validate([
             'title' => ['required', 'string', 'max:255'],
-            'code' => ['required', 'string', 'max:50', Rule::unique('hr_positions')->where('tenant_id', $user->tenant_id)->ignore($position->id)],
+            'code' => ['required', 'string', 'max:50', Rule::unique('hr_positions')->where('tenant_id', $tenantId)->ignore($position->id)],
             'department' => ['nullable', 'string', 'max:255'],
             'team' => ['nullable', 'string', 'max:255'],
             'description' => ['nullable', 'string', 'max:5000'],
@@ -218,7 +193,7 @@ class PositionController extends Controller
 
         $this->positionService->updatePosition($position, $validated);
 
-        return redirect()->route('hr.positions.show', $position)->with('success', 'Position updated.');
+        return redirect()->back()->with('success', 'Position updated.');
     }
 
     private function canView($user): bool

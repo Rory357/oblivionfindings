@@ -154,14 +154,10 @@ export function NewJournalDialog({
         value: String(a.id),
         label: `${a.code} - ${a.name}`,
     }));
-    const ccOptions = [
-        { value: '', label: 'None' },
-        ...costCentres.map((c) => ({ value: String(c.id), label: `${c.code} - ${c.name}` })),
-    ];
-    const fsOptions = [
-        { value: '', label: 'None' },
-        ...fundingStreams.map((f) => ({ value: String(f.id), label: `${f.code} - ${f.name}` })),
-    ];
+    // No empty-string option values — Radix Select forbids them (it reserves ''
+    // for "cleared"). The placeholder ("None") conveys the unselected state.
+    const ccOptions = costCentres.map((c) => ({ value: String(c.id), label: `${c.code} - ${c.name}` }));
+    const fsOptions = fundingStreams.map((f) => ({ value: String(f.id), label: `${f.code} - ${f.name}` }));
 
     return (
         <WizardShell

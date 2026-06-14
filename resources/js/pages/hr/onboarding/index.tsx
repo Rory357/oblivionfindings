@@ -14,6 +14,11 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import {
+    OnboardingWizardDialog,
+    type OnboardingEmailOption,
+    type OnboardingEmployee,
+} from '@/components/hr/onboarding-wizard-dialog';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
@@ -77,6 +82,8 @@ interface Props {
         total: number;
     };
     templates: TemplateRow[];
+    employees: OnboardingEmployee[];
+    emailTemplates: OnboardingEmailOption[];
     templateRoleOptions: string[];
     siteTypeOptions: string[];
     filters: { status: string | null; q: string };
@@ -123,6 +130,8 @@ const createTemplateTask = (sortOrder = 1): TemplateTask => ({
 export default function OnboardingIndex({
     checklists,
     templates,
+    employees,
+    emailTemplates,
     templateRoleOptions,
     siteTypeOptions,
     filters,
@@ -131,6 +140,7 @@ export default function OnboardingIndex({
     const [editingTemplateId, setEditingTemplateId] = useState<number | null>(
         null,
     );
+    const [wizardOpen, setWizardOpen] = useState(false);
     const { data, setData, put, processing, errors, reset, transform } =
         useForm({
             template_id: '',
@@ -257,11 +267,9 @@ export default function OnboardingIndex({
                         ]}
                         actions={
                             can.manage ? (
-                                <Button asChild>
-                                    <Link href="/hr/onboarding/create">
-                                        <Plus className="mr-2 h-4 w-4" />
-                                        Create Checklist
-                                    </Link>
+                                <Button onClick={() => setWizardOpen(true)}>
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Start onboarding
                                 </Button>
                             ) : undefined
                         }
@@ -879,14 +887,14 @@ export default function OnboardingIndex({
                                                     !filters.q &&
                                                     !filters.status && (
                                                         <Button
-                                                            asChild
                                                             size="sm"
                                                             className="mt-2"
+                                                            onClick={() =>
+                                                                setWizardOpen(true)
+                                                            }
                                                         >
-                                                            <Link href="/hr/onboarding/create">
-                                                                <Plus className="mr-2 h-4 w-4" />
-                                                                Create Checklist
-                                                            </Link>
+                                                            <Plus className="mr-2 h-4 w-4" />
+                                                            Start onboarding
                                                         </Button>
                                                     )}
                                             </div>
@@ -917,6 +925,16 @@ export default function OnboardingIndex({
                             <LaravelPagination links={checklists.links} />
                         )}
                     </div>
+                )}
+
+                {can.manage && (
+                    <OnboardingWizardDialog
+                        open={wizardOpen}
+                        onClose={() => setWizardOpen(false)}
+                        employees={employees}
+                        templates={templates}
+                        emailTemplates={emailTemplates}
+                    />
                 )}
             </PageLayout>
         </AppLayout>

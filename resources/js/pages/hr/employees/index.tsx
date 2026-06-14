@@ -1,3 +1,25 @@
+import {
+    AddEmployeeDialog,
+    type AddEmployeeFormData,
+    type Department,
+    DepartmentDialog,
+    type DepartmentFilters,
+    DepartmentsPane,
+    DirectoryPane,
+    HrTabs,
+    type HrTabItem,
+    type OrgNode,
+    type OrgPerson,
+    OrgChartPane,
+    type PaginatedDepartments,
+    type PaginatedPositions,
+    type PositionFilters,
+    type PositionParent,
+    PositionDialog,
+    type PositionRow,
+    PositionsPane,
+    useHrTab,
+} from '@/components/hr';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -16,14 +38,19 @@ import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
 import {
     Briefcase,
+    Building2,
     Clock,
+    Contact,
     Download,
+    Network,
+    Plus,
     Search,
     ShieldAlert,
     UserPlus,
     Users,
     X,
 } from 'lucide-react';
+import { useState } from 'react';
 
 /* ------------------------------------------------------------------ */
 /*  Types                                                              */
@@ -67,6 +94,18 @@ interface Props {
         compliance_alerts: number;
         type_counts: Record<string, number>;
     };
+    formData: AddEmployeeFormData | null;
+    positions: PaginatedPositions;
+    parentPositions: PositionParent[];
+    positionFilters: PositionFilters;
+    departmentsPane: PaginatedDepartments;
+    departmentManagers: Array<{ id: number; name: string }>;
+    departmentParents: Array<{ id: number; name: string }>;
+    departmentFilters: DepartmentFilters;
+    canDept: boolean;
+    orgHierarchy: OrgNode[];
+    orgPeople: OrgPerson[];
+    canOrgManage: boolean;
     can: { manage: boolean };
 }
 
@@ -216,8 +255,66 @@ export default function EmployeesIndex({
     departments,
     filters,
     summary,
+    formData,
+    positions,
+    parentPositions,
+    positionFilters,
+    departmentsPane,
+    departmentManagers,
+    departmentParents,
+    departmentFilters,
+    canDept,
+    orgHierarchy,
+    orgPeople,
+    canOrgManage,
     can,
 }: Props) {
+    const [addOpen, setAddOpen] = useState(false);
+    const [tab, setTab] = useHrTab('people');
+    const [posDialogOpen, setPosDialogOpen] = useState(false);
+    const [editingPosition, setEditingPosition] = useState<PositionRow | null>(
+        null,
+    );
+    const [deptDialogOpen, setDeptDialogOpen] = useState(false);
+    const [editingDept, setEditingDept] = useState<Department | null>(null);
+
+    const tabItems: HrTabItem[] = [
+        {
+            id: 'people',
+            label: 'People',
+            icon: Users,
+            tone: 'primary',
+            badge: profiles.total,
+        },
+        {
+            id: 'directory',
+            label: 'Directory',
+            icon: Contact,
+            tone: 'info',
+            badge: profiles.total,
+        },
+        {
+            id: 'positions',
+            label: 'Positions',
+            icon: Briefcase,
+            tone: 'violet',
+            badge: positions.total,
+        },
+        {
+            id: 'departments',
+            label: 'Departments',
+            icon: Building2,
+            tone: 'success',
+            badge: departmentsPane.total,
+        },
+        {
+            id: 'orgchart',
+            label: 'Org chart',
+            icon: Network,
+            tone: 'warning',
+        },
+    ];
+
     function applyFilter(key: string, value: string | null) {
         router.get(
             '/hr/people',
@@ -288,19 +385,40 @@ export default function EmployeesIndex({
                             { label: 'Compliance alerts', value: summary.compliance_alerts },
                         ]}
                         actions={can.manage ? (
-                            <Button
-                                variant="outline"
-                                size="sm"
-                                onClick={submitExport}
-                                className="gap-1.5 border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                            >
-                                <Download className="h-4 w-4" />
-                                Export
-                            </Button>
+                            <div className="flex items-center gap-2">
+                                {formData ? (
+                                    <Button
+                                        size="sm"
+                                        onClick={() => setAddOpen(true)}
+                                        className="gap-1.5 bg-primary-foreground text-primary hover:bg-primary-foreground/90"
+                                    >
+                                        <Plus className="h-4 w-4" />
+                                        Add employee
+                                    </Button>
+                                ) : null}
+                                <Button
+                                    variant="outline"
+                                    size="sm"
+                                    onClick={submitExport}
+                                    className="gap-1.5 border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                >
+                                    <Download className="h-4 w-4" />
+                                    Export
+                                </Button>
+                            </div>
                         ) : null}
                     />
                 }
             >
+                <HrTabs
+                    value={tab}
+                    onChange={setTab}
+                    items={tabItems}
+                    ariaLabel="People views"
+                />
+
+                {tab === 'people' && (
+                    <>
                 {/* Stats Cards */}
                 <div className="grid grid-cols-2 gap-4 lg:grid-cols-4">
                     <StatCard
@@ -642,7 +760,84 @@ export default function EmployeesIndex({
                 {profiles.last_page > 1 && (
                     <LaravelPagination links={profiles.links} />
                 )}
+                    </>
+                )}
+
+                {tab === 'directory' && (
+                    <DirectoryPane people={profiles.data} />
+                )}
+
+                {tab === 'positions' && (
+                    <PositionsPane
+                        positions={positions}
+                        departments={departments}
+                        filters={positionFilters}
+                        canManage={can.manage}
+                        onCreate={() => {
+                            setEditingPosition(null);
+                            setPosDialogOpen(true);
+                        }}
+                        onEdit={(p) => {
+                            setEditingPosition(p);
+                            setPosDialogOpen(true);
+                        }}
+                    />
+                )}
+
+                {tab === 'departments' && (
+                    <DepartmentsPane
+                        departments={departmentsPane}
+                        filters={departmentFilters}
+                        canManage={canDept}
+                        onCreate={() => {
+                            setEditingDept(null);
+                            setDeptDialogOpen(true);
+                        }}
+                        onEdit={(d) => {
+                            setEditingDept(d);
+                            setDeptDialogOpen(true);
+                        }}
+                    />
+                )}
+
+                {tab === 'orgchart' && (
+                    <OrgChartPane
+                        hierarchy={orgHierarchy}
+                        people={orgPeople}
+                        canManage={canOrgManage}
+                    />
+                )}
             </PageLayout>
+
+            {formData ? (
+                <AddEmployeeDialog
+                    open={addOpen}
+                    onClose={() => setAddOpen(false)}
+                    formData={formData}
+                    departments={departments}
+                    sites={sites}
+                />
+            ) : null}
+
+            {can.manage ? (
+                <PositionDialog
+                    open={posDialogOpen}
+                    onClose={() => setPosDialogOpen(false)}
+                    position={editingPosition}
+                    parentPositions={parentPositions}
+                    departments={departments}
+                />
+            ) : null}
+
+            {canDept ? (
+                <DepartmentDialog
+                    open={deptDialogOpen}
+                    onClose={() => setDeptDialogOpen(false)}
+                    department={editingDept}
+                    managers={departmentManagers}
+                    parentOptions={departmentParents}
+                />
+            ) : null}
         </AppLayout>
     );
 }

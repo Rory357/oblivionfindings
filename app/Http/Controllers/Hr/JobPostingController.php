@@ -23,65 +23,10 @@ class JobPostingController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.recruitment.view'), 403);
 
-        $tenantId = $user->tenant_id ?? 1;
-        $status = $request->query('status');
-        $search = trim((string) $request->query('search', ''));
-
-        $query = HrJobPosting::forTenant($tenantId)
-            ->when($status, fn ($q) => $q->where('status', $status))
-            ->when($search, fn ($q) => $q->where(function ($q2) use ($search) {
-                $q2->where('title', 'like', "%{$search}%")
-                    ->orWhere('department', 'like', "%{$search}%")
-                    ->orWhere('location', 'like', "%{$search}%");
-            }))
-            ->with('position:id,title,code')
-            ->with('creator:id,name')
-            ->with('hiringManager:id,name')
-            ->orderByDesc('created_at');
-
-        $postings = $query->paginate(20)->withQueryString();
-
-        $postings->through(fn ($posting) => [
-            'id' => $posting->id,
-            'title' => $posting->title,
-            'slug' => $posting->slug,
-            'department' => $posting->department,
-            'location' => $posting->location,
-            'employment_type' => $posting->employment_type,
-            'is_remote' => $posting->is_remote,
-            'is_internal' => $posting->is_internal,
-            'status' => $posting->status,
-            'published_at' => $posting->published_at?->toDateString(),
-            'closes_at' => $posting->closes_at?->toDateString(),
-            'applications_count' => $posting->applications_count,
-            'views_count' => $posting->views_count,
-            'position' => $posting->position ? ['id' => $posting->position->id, 'title' => $posting->position->title] : null,
-            'hiring_manager' => $posting->hiringManager?->name,
-            'created_by' => $posting->creator?->name,
-            'created_at' => $posting->created_at?->toDateString(),
-        ]);
-
-        // Summary stats
-        $statsQuery = HrJobPosting::forTenant($tenantId);
-        $stats = [
-            'total' => (clone $statsQuery)->count(),
-            'published' => (clone $statsQuery)->where('status', 'published')->count(),
-            'draft' => (clone $statsQuery)->where('status', 'draft')->count(),
-            'pending_approval' => (clone $statsQuery)->where('status', 'pending_approval')->count(),
-            'closed' => (clone $statsQuery)->where('status', 'closed')->count(),
-        ];
-
-        return Inertia::render('hr/job-postings/index', [
-            'postings' => $postings,
-            'stats' => $stats,
-            'filters' => [
-                'status' => $status,
-                'search' => $search,
-            ],
-            'can' => [
-                'manage' => $user->canDo('hr.recruitment.manage'),
-            ],
-        ]);
+        // The standalone job-postings list duplicated the live requisition jobs
+        // UI (/hr/recruitment/jobs). Consolidated — redirect. The richer
+        // HrJobPosting authoring model is slated for removal in the M10 de-dup sweep.
+        return redirect()->route('hr.jobs.index');
     }
 
     /* ------------------------------------------------------------------ */

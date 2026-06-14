@@ -3,6 +3,8 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
+use App\Http\Requests\Hr\StoreEmployeeRequest;
 use App\Http\Requests\Hr\UpdateEmployeeProfileRequest;
 use App\Domain\Hr\Models\HrAssetAssignment;
 use App\Domain\Hr\Models\HrCase;
@@ -13,6 +15,7 @@ use App\Domain\Hr\Models\HrDevelopmentGoal;
 use App\Domain\Hr\Models\HrDriverEligibility;
 use App\Domain\Hr\Models\HrEmployeeProfile;
 use App\Domain\Hr\Models\HrEmployeeSkill;
+use App\Domain\Hr\Models\HrPosition;
 use App\Domain\Hr\Models\HrLeaveBalance;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Domain\Hr\Models\HrOnboardingChecklist;
@@ -22,14 +25,20 @@ use App\Domain\Hr\Models\HrPolicyAttestation;
 use App\Domain\Hr\Models\HrProbationReview;
 use App\Domain\Hr\Models\HrStaffComplianceStatus;
 use App\Domain\Hr\Models\HrSupervisionNote;
+use App\Domain\Hr\Services\OrgChartService;
+use App\Models\Role;
 use App\Models\Site;
 use App\Models\StaffBackgroundCheck;
 use App\Models\User;
 use Illuminate\Http\Request;
+use Illuminate\Support\Facades\DB;
+use Illuminate\Support\Str;
 use Inertia\Inertia;
 
 class EmployeeProfileController extends Controller
 {
+    use ResolvesHrTenant;
+
     /* ------------------------------------------------------------------ */
     /*  Index — paginated employee list                                    */
     /* ------------------------------------------------------------------ */
@@ -96,6 +105,11 @@ class EmployeeProfileController extends Controller
                     'department' => $profile?->department,
                     'is_active' => $profile ? (bool) $profile->is_active : true,
                     'start_date' => $profile?->start_date?->toDateString(),
+                    // Directory-tab card fields (single source — the standalone directory is folded in).
+                    'preferred_name' => $profile?->preferred_name,
+                    'profile_photo_path' => $profile?->profile_photo_path,
+                    'work_email' => $profile?->work_email,
+                    'phone' => $profile?->work_phone,
                     'user' => [
                         'id' => $staffUser->id,
                         'name' => $staffUser->name,
@@ -138,10 +152,135 @@ class EmployeeProfileController extends Controller
             ->orderBy('name')
             ->get(['id', 'name']);
 
+        // Option data for the Add-Employee wizard (manager-only surface).
+        $canManage = $user->canDo('hr.employees.manage');
+        $formData = $canManage ? [
+            'positions' => HrPosition::query()
+                ->where(fn ($q) => $q->where('tenant_id', $user->tenant_id)->orWhereNull('tenant_id'))
+                ->orderBy('title')
+                ->get(['id', 'title'])
+                ->map(fn ($p) => ['id' => $p->id, 'title' => $p->title])
+                ->values(),
+            'managers' => User::query()->staff()->orderBy('name')->get(['id', 'name'])
+                ->map(fn ($u) => ['value' => (string) $u->id, 'label' => $u->name])
+                ->values(),
+            'roles' => Role::query()->orderBy('name')->get(['name'])
+                ->map(fn ($r) => ['value' => $r->name, 'label' => ucwords(str_replace('_', ' ', $r->name))])
+                ->values(),
+            'employmentTypes' => collect(['full_time', 'part_time', 'casual', 'fixed_term', 'contractor'])
+                ->map(fn ($v) => ['value' => $v, 'label' => ucwords(str_replace('_', ' ', $v))])
+                ->values(),
+        ] : null;
+
+        // --- Positions tab (folds /hr/positions; namespaced filters + paginator) ---
+        // Resolve a real tenant id — users carry no tenant_id column, so the
+        // legacy $user->tenant_id was always null (forTenant(null) → empty).
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        $posSearch = trim((string) $request->query('pq', ''));
+        $posDepartment = $request->query('pdepartment');
+        $posStatus = $request->query('pstatus');
+
+        $positions = HrPosition::forTenant($tenantId)
+            ->when($posStatus === 'active', fn ($q) => $q->where('is_active', true))
+            ->when($posStatus === 'inactive', fn ($q) => $q->where('is_active', false))
+            ->when($posDepartment, fn ($q) => $q->where('department', $posDepartment))
+            ->when($posSearch !== '', fn ($q) => $q->where(function ($sub) use ($posSearch) {
+                $sub->where('title', 'like', "%{$posSearch}%")
+                    ->orWhere('code', 'like', "%{$posSearch}%")
+                    ->orWhere('department', 'like', "%{$posSearch}%");
+            }))
+            ->withCount(['employees' => fn ($q) => $q->where('is_active', true)])
+            ->orderBy('department')
+            ->orderBy('title')
+            ->paginate(20, ['*'], 'pos_page')
+            ->withQueryString();
+
+        $positions->through(fn ($pos) => [
+            'id' => $pos->id,
+            'title' => $pos->title,
+            'code' => $pos->code,
+            'department' => $pos->department,
+            'team' => $pos->team,
+            'employment_type' => $pos->employment_type,
+            'fte' => (float) $pos->fte,
+            'headcount_budget' => $pos->headcount_budget,
+            'current_headcount' => $pos->employees_count,
+            'vacancies' => max(0, $pos->headcount_budget - $pos->employees_count),
+            'is_active' => (bool) $pos->is_active,
+            'description' => $pos->description,
+            'requirements' => $pos->requirements,
+            'reports_to_position_id' => $pos->reports_to_position_id,
+        ]);
+
+        $parentPositions = HrPosition::forTenant($tenantId)
+            ->where('is_active', true)
+            ->orderBy('title')
+            ->get(['id', 'title', 'code']);
+
+        // --- Departments tab (folds /hr/departments; own filters + paginator) ---
+        $deptSearch = trim((string) $request->query('dept_q', ''));
+        $deptStatus = $request->query('dept_status');
+
+        $departmentsPane = HrDepartment::query()
+            ->where(fn ($q) => $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id'))
+            ->with(['manager:id,name', 'parent:id,name'])
+            ->withCount(['employees' => fn ($q) => $q->where('is_active', true)])
+            ->when($deptSearch !== '', fn ($q) => $q->where(fn ($i) => $i
+                ->where('name', 'like', "%{$deptSearch}%")
+                ->orWhere('code', 'like', "%{$deptSearch}%")))
+            ->when($deptStatus === 'active', fn ($q) => $q->where('is_active', true))
+            ->when($deptStatus === 'inactive', fn ($q) => $q->where('is_active', false))
+            ->orderBy('sort_order')
+            ->orderBy('name')
+            ->paginate(25, ['*'], 'dept_page')
+            ->withQueryString();
+
+        $departmentManagers = User::query()->staff()->orderBy('name')->get(['id', 'name']);
+        $departmentParents = HrDepartment::query()
+            ->where(fn ($q) => $q->where('tenant_id', $tenantId)->orWhereNull('tenant_id'))
+            ->where('is_active', true)
+            ->orderBy('name')
+            ->get(['id', 'name']);
+        $canDept = $user->canDo('hr.settings.manage') || $user->canDo('hr.employees.manage');
+
+        // --- Org chart tab (folds /hr/orgchart) ---
+        $orgHierarchy = app(OrgChartService::class)->getHierarchy($tenantId);
+        $orgPeople = HrEmployeeProfile::forTenant($tenantId)
+            ->active()
+            ->with('user:id,name')
+            ->orderBy('position_title')
+            ->get()
+            ->map(fn ($p) => [
+                'user_id' => $p->user_id,
+                'name' => $p->user?->name ?? 'Unknown',
+                'position_title' => $p->position_title,
+            ])
+            ->values();
+        $canOrgManage = $user->canDo('hr.orgchart.manage') || $user->canDo('hr.employees.manage');
+
         return Inertia::render('hr/employees/index', [
             'profiles' => $profiles,
             'sites' => $sites,
             'departments' => $departments,
+            'formData' => $formData,
+            'positions' => $positions,
+            'parentPositions' => $parentPositions,
+            'positionFilters' => [
+                'q' => $posSearch,
+                'department' => $posDepartment,
+                'status' => $posStatus,
+            ],
+            'departmentsPane' => $departmentsPane,
+            'departmentManagers' => $departmentManagers,
+            'departmentParents' => $departmentParents,
+            'departmentFilters' => [
+                'q' => $deptSearch,
+                'status' => $deptStatus,
+            ],
+            'canDept' => $canDept,
+            'orgHierarchy' => $orgHierarchy,
+            'orgPeople' => $orgPeople,
+            'canOrgManage' => $canOrgManage,
             'filters' => [
                 'q' => $search,
                 'status' => $status,
@@ -161,6 +300,72 @@ class EmployeeProfileController extends Controller
                 'manage' => $user->canDo('hr.employees.manage'),
             ],
         ]);
+    }
+
+    /* ------------------------------------------------------------------ */
+    /*  Store — create a new employee (User + profile + role)               */
+    /* ------------------------------------------------------------------ */
+
+    public function store(StoreEmployeeRequest $request)
+    {
+        $actor = $request->user();
+        $data = $request->validated();
+        $roleName = $data['role'] ?? 'support_worker';
+
+        $positionTitle = $data['position_title'] ?? null;
+        if (empty($positionTitle) && ! empty($data['position_id'])) {
+            $positionTitle = HrPosition::find($data['position_id'])?->title;
+        }
+
+        $profile = DB::transaction(function () use ($data, $actor, $roleName, $positionTitle) {
+            $newUser = User::create([
+                'name' => $data['name'],
+                'email' => $data['email'],
+                'role' => $roleName,
+                'password' => bcrypt(Str::random(40)),
+                'approved_at' => now(),
+                'approved_by' => $actor->id,
+            ]);
+
+            $role = Role::where('name', $roleName)->first();
+            if ($role) {
+                $newUser->roles()->syncWithoutDetaching([$role->id]);
+            }
+
+            // hr_employee_profiles requires position_title / position_role /
+            // employment_type / start_date (NOT NULL). Quick-add fills sensible
+            // defaults the user can refine on the profile.
+            return HrEmployeeProfile::create([
+                'tenant_id' => $actor->tenant_id ?? 1,
+                'user_id' => $newUser->id,
+                'employee_number' => $this->generateEmployeeNumber(),
+                'preferred_name' => $data['preferred_name'] ?? null,
+                'position_id' => $data['position_id'] ?? null,
+                'position_title' => $positionTitle ?: 'New starter',
+                'position_role' => $roleName,
+                'employment_type' => $data['employment_type'] ?? 'full_time',
+                'department' => $data['department'] ?? null,
+                'primary_site_id' => $data['primary_site_id'] ?? null,
+                'manager_user_id' => $data['manager_user_id'] ?? null,
+                'start_date' => $data['start_date'] ?? now()->toDateString(),
+                'work_email' => $data['email'],
+                'work_phone' => $data['work_phone'] ?? null,
+                'is_active' => true,
+                'created_by' => $actor->id,
+                'updated_by' => $actor->id,
+            ]);
+        });
+
+        return redirect()
+            ->route('hr.people.show', $profile->id)
+            ->with('success', "{$data['name']} has been added to your team.");
+    }
+
+    private function generateEmployeeNumber(): string
+    {
+        $next = (int) (HrEmployeeProfile::withTrashed()->max('id') ?? 0) + 1;
+
+        return 'EMP-' . str_pad((string) $next, 5, '0', STR_PAD_LEFT);
     }
 
     /* ------------------------------------------------------------------ */

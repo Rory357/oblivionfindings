@@ -20,6 +20,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { RecruitmentTabs } from '@/components/hr';
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router, useForm } from '@inertiajs/react';
@@ -714,6 +715,8 @@ export default function RecruitmentJobs({
                         </div>
                     }
                 />
+
+                <RecruitmentTabs active="jobs" />
 
                 <div className="grid gap-4 sm:grid-cols-2 lg:grid-cols-5">
                     <KpiCard

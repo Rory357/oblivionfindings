@@ -9,7 +9,9 @@ use App\Domain\Finance\Jobs\SendInvoiceEmailJob;
 use App\Domain\Finance\Models\FinAccount;
 use App\Domain\Finance\Models\FinBill;
 use App\Domain\Finance\Models\FinInvoice;
+use App\Domain\Finance\Models\FinPaymentAllocation;
 use App\Domain\Finance\Models\FinTaxRate;
+use App\Domain\Finance\Services\AccountsReceivableService;
 use App\Domain\Finance\Services\FinInvoiceJournalService;
 use App\Domain\Finance\Services\InvoicePdfService;
 use App\Http\Controllers\Controller;
@@ -433,10 +435,10 @@ class InvoiceController extends Controller
         );
     }
 
-    public function markPaid(Request $request, int $invoiceId)
+    public function markPaid(Request $request, int $invoiceId, AccountsReceivableService $arService)
     {
-        $invoice = FinInvoice::forOrganization($request->user()->organization_id)
-            ->findOrFail($invoiceId);
+        $orgId = $request->user()->organization_id;
+        $invoice = FinInvoice::forOrganization($orgId)->findOrFail($invoiceId);
 
         $this->authorize('update', $invoice);
 
@@ -444,12 +446,38 @@ class InvoiceController extends Controller
             return back()->withErrors(['invoice' => 'Cannot mark a cancelled invoice as paid.']);
         }
 
-        $invoice->update([
-            'status' => 'paid',
-            'paid_at' => now(),
-        ]);
+        // Idempotent: a paid invoice has already posted its receipt journal.
+        if ($invoice->status === 'paid') {
+            return redirect()->route('finance.invoices.show', $invoice)
+                ->with('success', 'Invoice already marked as paid.');
+        }
 
-        return redirect()->route('finance.invoices.show', $invoice)
+        // Outstanding = total − already-allocated receipts. Posting a receipt for
+        // this amount (DR Bank / CR AR) clears the AR balance the send-journal
+        // raised; without it AR stays overstated forever. allocatePayment also
+        // flips the invoice to paid when fully settled.
+        $alreadyPaid = (string) FinPaymentAllocation::where('allocatable_type', FinInvoice::class)
+            ->where('allocatable_id', $invoice->id)
+            ->sum('amount');
+        $amountDue = bcsub((string) $invoice->total_amount, $alreadyPaid, 2);
+
+        try {
+            if (bccomp($amountDue, '0', 2) > 0) {
+                $arService->allocatePayment($orgId, [
+                    'invoice_id' => $invoice->id,
+                    'amount' => $amountDue,
+                    'payment_date' => now()->toDateString(),
+                    'notes' => 'Marked as paid',
+                ]);
+            } else {
+                // Fully allocated already; just flag the status.
+                $invoice->update(['status' => 'paid', 'paid_at' => now()]);
+            }
+        } catch (\Throwable $e) {
+            return back()->withErrors(['invoice' => 'Could not record the receipt: '.$e->getMessage()]);
+        }
+
+        return redirect()->route('finance.invoices.show', $invoice->fresh())
             ->with('success', 'Invoice marked as paid.');
     }
 

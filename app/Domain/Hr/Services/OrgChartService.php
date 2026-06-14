@@ -53,6 +53,36 @@ class OrgChartService
         $profile->update(['manager_user_id' => $managerUserId]);
     }
 
+    /**
+     * True if assigning $managerUserId as $profile's manager would create a
+     * reporting loop (manager is the employee itself, or one of its reports).
+     * Walks up from the proposed manager — if it reaches the employee, it's a cycle.
+     */
+    public function wouldCreateCycle(HrEmployeeProfile $profile, ?int $managerUserId): bool
+    {
+        if ($managerUserId === null) {
+            return false;
+        }
+        if ((int) $managerUserId === (int) $profile->user_id) {
+            return true;
+        }
+
+        $seen = [];
+        $current = $managerUserId;
+        while ($current !== null) {
+            if ((int) $current === (int) $profile->user_id) {
+                return true;
+            }
+            if (in_array((int) $current, $seen, true)) {
+                break; // pre-existing loop — stop walking
+            }
+            $seen[] = (int) $current;
+            $current = HrEmployeeProfile::where('user_id', $current)->value('manager_user_id');
+        }
+
+        return false;
+    }
+
     private function buildNode(HrEmployeeProfile $employee, Collection $all): array
     {
         $reports = $all->where('manager_user_id', $employee->user_id);

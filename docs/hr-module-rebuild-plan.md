@@ -95,7 +95,24 @@ Live-verify the HR gradient on oblivionfindings.com after deploy (next loop tick
   step machine. The first *real* HR wizard ships in M1 (`AddEmployeeDialog`) using this wrapper.
   *Acceptance:* shared wrapper + hook in place, tested; adoption begins M1.
 
-### M1 — People hub: directory + profile + org chart + positions/departments
+### M1 — People hub: directory + profile + org chart + positions/departments `[CORE SHIPPED → main cf6a4879, 2026-06-14]`
+
+**Shipped** (worktree hr/m1-people → main, all gates green, 16 PHP tests):
+- **[x] M1-1** People hub with 5 standardised `HrTabs` (People · Directory · Positions · Departments · Org chart);
+  duplicate directory merged; positions/departments/orgchart folded into panes; old routes redirect to
+  `/hr/people?tab=…`; orphan index pages deleted. Reusable panes in `components/hr/` (+ `people/org-chart-pane`).
+- **[x] M1-2** Add-Employee wizard (`AddEmployeeDialog`) + `POST /hr/people`.
+- **[x] M1-4** Org-chart permission fix (ResolvesHrTenant) + reassign dialog + `OrgChartService::wouldCreateCycle` guard.
+- Bug fixes: positions/departments tenant scoping via `ResolvesHrTenant` (users carry no tenant_id); invisible
+  status-badge bug fixed via shared `StatusBadge`; Position/Department modal create/edit.
+- **[x] M1-5** Directory/profile photo upload (`PhotoUploadButton` on the profile hero → existing
+  `directory.uploadPhoto`); hub stat counts confirmed server-side totals.
+
+**M1 = DONE.** Deferred to **M10 parity pass** (the profile edit *page* works today — modal-izing it is
+parity polish best batched with the a11y/responsive sweep): **M1-3** convert `employees/edit` → WizardShell
+modal (also fix the pre-existing `department_id`/`pay_rate` field-name bugs vs `UpdateEmployeeProfileRequest`)
++ surface `HrCustomFieldDefinition`/`HrCustomFieldValue` on the profile (needs value-storage plumbing — a
+self-contained sub-feature). Tracked in M10.
 
 - **M1-1 Merge the two employee lists.** *Problem:* `DirectoryController`/`directory/*` and
   `EmployeeProfileController`/`employees/*` are parallel people lists with duplicated avatar helpers.

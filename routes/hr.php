@@ -181,8 +181,6 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
             ->middleware('permission:hr.recruitment.manage');
         Route::post('/recruitment/jobs/{job}/sync-posting', [RecruitmentJobController::class, 'syncPosting'])->name('jobs.sync-posting')
             ->middleware('permission:hr.recruitment.manage');
-        Route::post('/recruitment/jobs/{job}/unpublish-posting', [RecruitmentJobController::class, 'unpublishPosting'])->name('jobs.unpublish-posting')
-            ->middleware('permission:hr.recruitment.manage');
 
         // Interview kits
         Route::post('/recruitment/kits', [InterviewKitController::class, 'store'])->name('kits.store')
@@ -206,6 +204,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::get('/people/{profile}/documents/{document}/download', [HrDocumentController::class, 'download'])->name('people.documents.download');
 
         Route::middleware('permission:hr.employees.manage')->group(function () {
+            Route::post('/people', [EmployeeProfileController::class, 'store'])->name('people.store');
             Route::get('/people/{profile}/edit', [EmployeeProfileController::class, 'edit'])->name('people.edit');
             Route::put('/people/{profile}', [EmployeeProfileController::class, 'update'])->name('people.update');
             Route::post('/people/{profile}/documents', [HrDocumentController::class, 'storeForProfile'])->name('people.documents.store');
