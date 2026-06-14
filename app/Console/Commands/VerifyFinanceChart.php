@@ -22,9 +22,14 @@ class VerifyFinanceChart extends Command
         $references = $this->financeConfigAccountCodeReferences();
         $requiredCodes = array_keys($references);
 
+        /** @var array<string, string> $nameAssertions code => required name keyword */
+        $nameAssertions = config('finance.account_names', []);
+
+        $lookupCodes = array_values(array_unique(array_merge($requiredCodes, array_keys($nameAssertions))));
+
         $accounts = DB::table('fin_accounts')
             ->where('organization_id', $organizationId)
-            ->whereIn('code', $requiredCodes)
+            ->whereIn('code', $lookupCodes)
             ->whereNull('deleted_at')
             ->get(['code', 'name', 'is_active'])
             ->keyBy('code');
@@ -35,10 +40,25 @@ class VerifyFinanceChart extends Command
             ->values()
             ->all();
 
+        // Name parity: a seeded account whose name contradicts the configured
+        // intent silently mis-posts (e.g. leave_provision debiting an account
+        // named "ACC Employer Levy"). Only checked for codes that exist.
+        $nameMismatches = [];
+        foreach ($nameAssertions as $code => $keyword) {
+            $code = (string) $code;
+            if (! isset($accounts[$code])) {
+                continue;
+            }
+            if (stripos((string) $accounts[$code]->name, (string) $keyword) === false) {
+                $nameMismatches[$code] = [$accounts[$code]->name, $keyword];
+            }
+        }
+
         $this->line("Finance chart check for organization #{$organizationId}");
         $this->line(sprintf('Finance config account codes checked: %d', count($requiredCodes)));
+        $this->line(sprintf('Account name assertions checked: %d', count($nameAssertions)));
 
-        if ($missingCodes !== [] || $inactiveCodes !== []) {
+        if ($missingCodes !== [] || $inactiveCodes !== [] || $nameMismatches !== []) {
             if ($missingCodes !== []) {
                 $this->error('Missing required finance GL accounts:');
                 $this->table(
@@ -55,10 +75,21 @@ class VerifyFinanceChart extends Command
                 );
             }
 
+            if ($nameMismatches !== []) {
+                $this->error('Finance GL account names contradict their configured intent:');
+                $this->table(
+                    ['Code', 'Seeded name', 'Expected to contain'],
+                    array_map(
+                        fn (string $code): array => [$code, $nameMismatches[$code][0], $nameMismatches[$code][1]],
+                        array_keys($nameMismatches),
+                    ),
+                );
+            }
+
             return self::FAILURE;
         }
 
-        $this->info('Finance chart verified: every finance config account code exists and is active.');
+        $this->info('Finance chart verified: every finance config account code exists, is active, and is named as intended.');
 
         return self::SUCCESS;
     }

@@ -52,7 +52,7 @@ return [
         ],
 
         'leave_provision' => [
-            'debit' => '5020',   // Leave Expense
+            'debit' => '5050',   // Leave Expense (dedicated — NOT 5020 ACC Employer Levy)
             'credit' => '2400',  // Accrued Leave Liability
             'journal_type' => 'standard',
         ],
@@ -110,6 +110,61 @@ return [
             'credit' => '2510',  // Provision for Claims
             'journal_type' => 'standard',
         ],
+    ],
+
+    /*
+    |--------------------------------------------------------------------------
+    | Account Name Assertions (config-driven name-parity check)
+    |--------------------------------------------------------------------------
+    |
+    | The single source of truth for the *intended name* of each operationally
+    | posted GL code. `finance:verify-chart` asserts the seeded account's name
+    | contains the keyword below (case-insensitive). This catches a code being
+    | seeded under a contradictory name — the bug class where `leave_provision`
+    | once debited `5020` "ACC Employer Levy" instead of a real Leave Expense
+    | account. Existence + active is checked separately from the codes that
+    | actually appear as values elsewhere in this config.
+    |
+    */
+
+    'account_names' => [
+        '1000' => 'Bank',
+        '1010' => 'Trust',
+        '1100' => 'Accounts Receivable',
+        '1110' => 'Whaikaha',
+        '1120' => 'ACC',
+        '1130' => 'NASC',
+        '1180' => 'Card Clearing',
+        '2000' => 'Accounts Payable',
+        '2310' => 'Expense Claims Payable',
+        '2400' => 'Accrued Leave',
+        '2510' => 'Provision for Claims',
+        '4100' => 'Funding Income',
+        '4200' => 'House Income',
+        '4210' => 'Resident Contributions',
+        '4220' => 'Donations',
+        '5010' => 'KiwiSaver',
+        '5020' => 'ACC Employer Levy',
+        '5050' => 'Leave Expense',
+        '6200' => 'Fuel',
+        '6210' => 'Vehicle Maintenance',
+        '6300' => 'Equipment Maintenance',
+        '6400' => 'Rent',
+        '6410' => 'Utilities',
+        '6420' => 'Property Maintenance',
+        '6430' => 'House Operating',
+        '6431' => 'Groceries',
+        '6432' => 'Activities',
+        '6433' => 'Petty Cash',
+        '6434' => 'Transport',
+        '6435' => 'Medical',
+        '6436' => 'Clothing',
+        '6437' => 'Household',
+        '6440' => 'Client Personal',
+        '6500' => 'Staff Expenses',
+        '6510' => 'Training',
+        '6520' => 'Travel',
+        '6600' => 'Incident Remediation',
     ],
 
     /*
