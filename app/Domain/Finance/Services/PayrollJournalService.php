@@ -3,6 +3,7 @@
 namespace App\Domain\Finance\Services;
 
 use App\Domain\Finance\Models\FinAccount;
+use App\Domain\Finance\Models\FinBankAccount;
 use App\Domain\Finance\Models\FinJournal;
 use App\Domain\Hr\Models\HrPayrollRun;
 use App\Domain\Hr\Models\HrPayslip;
@@ -198,6 +199,120 @@ class PayrollJournalService
 
             return $journal;
         });
+    }
+
+    /* ------------------------------------------------------------------
+     |  Pay employee net pay (clear the accrued-wages liability)
+     | ------------------------------------------------------------------ */
+
+    /**
+     * Post the employee net-pay disbursement for a GL-posted payroll run:
+     * DR 2300 Accrued Wages / CR bank for the total net pay, mark every payslip
+     * paid, and stamp the run. Idempotent — a second call returns the existing
+     * payment journal without double-posting.
+     */
+    public function postNetPayPayment(HrPayrollRun $payrollRun): FinJournal
+    {
+        return DB::transaction(function () use ($payrollRun) {
+            $payrollRun = HrPayrollRun::query()
+                ->whereKey($payrollRun->id)
+                ->lockForUpdate()
+                ->firstOrFail();
+
+            if ($payrollRun->journal_id === null) {
+                throw new RuntimeException(
+                    "Payroll run #{$payrollRun->id} must be posted to the GL before net pay can be paid."
+                );
+            }
+
+            if ($payrollRun->payment_journal_id !== null) {
+                return FinJournal::query()->findOrFail($payrollRun->payment_journal_id);
+            }
+
+            $orgId = $payrollRun->tenant_id;
+
+            $payslips = HrPayslip::where('payroll_run_id', $payrollRun->id)->get();
+
+            if ($payslips->isEmpty()) {
+                throw new RuntimeException(
+                    "Payroll run #{$payrollRun->id} has no payslips to pay."
+                );
+            }
+
+            $totalNet = '0';
+            foreach ($payslips as $payslip) {
+                $totalNet = bcadd($totalNet, (string) $payslip->net_pay, 2);
+            }
+
+            if (bccomp($totalNet, '0', 2) <= 0) {
+                throw new RuntimeException(
+                    "Payroll run #{$payrollRun->id} has no positive net pay to disburse."
+                );
+            }
+
+            $accruedWagesAccountId = $this->findAccountByCode($orgId, '2300')->id;
+            $bankAccountId = $this->resolveBankGlAccountId($orgId);
+
+            $lines = [
+                [
+                    'account_id' => $accruedWagesAccountId,
+                    'description' => 'Net pay disbursement',
+                    'debit' => $totalNet,
+                    'credit' => 0,
+                ],
+                [
+                    'account_id' => $bankAccountId,
+                    'description' => 'Net pay disbursement',
+                    'debit' => 0,
+                    'credit' => $totalNet,
+                ],
+            ];
+
+            $periodStart = $payrollRun->period_start->toDateString();
+            $periodEnd = $payrollRun->period_end->toDateString();
+
+            $journal = $this->journalPostingService->createAndPost($orgId, [
+                'journal_date' => $periodEnd,
+                'type' => 'payroll',
+                'source_type' => 'payroll_net_pay',
+                'source_id' => $payrollRun->id,
+                'description' => "Payroll net pay - {$periodStart} to {$periodEnd}",
+                'lines' => $lines,
+            ]);
+
+            HrPayslip::where('payroll_run_id', $payrollRun->id)->update([
+                'status' => 'paid',
+                'payment_date' => now()->toDateString(),
+            ]);
+
+            $payrollRun->update([
+                'net_paid_at' => now(),
+                'payment_journal_id' => $journal->id,
+            ]);
+
+            return $journal;
+        });
+    }
+
+    /**
+     * Resolve the GL account to credit for a net-pay disbursement: the org's
+     * primary active bank account, else any active bank account.
+     */
+    private function resolveBankGlAccountId(?int $orgId): int
+    {
+        $bank = FinBankAccount::query()
+            ->where('organization_id', $orgId)
+            ->where('is_active', true)
+            ->orderByDesc('is_primary')
+            ->first();
+
+        if (! $bank || ! $bank->gl_account_id) {
+            throw new RuntimeException(
+                "No active bank account with a linked GL account is configured for organisation #{$orgId}."
+            );
+        }
+
+        return (int) $bank->gl_account_id;
     }
 
     /* ------------------------------------------------------------------

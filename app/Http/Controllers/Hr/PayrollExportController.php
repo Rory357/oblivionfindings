@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Domain\Finance\Jobs\PostPayrollJournalJob;
+use App\Domain\Finance\Services\PayrollJournalService;
 use App\Domain\Hr\Models\HrPayrollExportProfile;
 use App\Domain\Hr\Models\HrPayrollRun;
 use App\Domain\Hr\Services\HrWebhookService;
@@ -24,6 +25,7 @@ class PayrollExportController extends Controller
     public function __construct(
         protected PayrollExportService $payrollService,
         protected HrWebhookService $webhookService,
+        protected PayrollJournalService $payrollJournalService,
     ) {}
 
     /**
@@ -56,6 +58,8 @@ class PayrollExportController extends Controller
             'created_at' => optional($run->created_at)->toDateString(),
             'locked_at' => optional($run->locked_at)->toDateTimeString(),
             'exported_at' => optional($run->exported_at)->toDateTimeString(),
+            'gl_posted_at' => optional($run->gl_posted_at)->toDateTimeString(),
+            'net_paid_at' => optional($run->net_paid_at)->toDateTimeString(),
             'export_profile' => $run->exportProfile ? [
                 'id' => $run->exportProfile->id,
                 'name' => $run->exportProfile->name,
@@ -169,6 +173,43 @@ class PayrollExportController extends Controller
         ]);
 
         return redirect()->back()->with('success', 'Payroll run locked.');
+    }
+
+    /**
+     * Pay employee net pay for a GL-posted run: post the DR Accrued Wages /
+     * CR bank journal and mark payslips paid.
+     */
+    public function payNet(Request $request, HrPayrollRun $run)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.payroll.export'), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+        if ($run->tenant_id !== $tenantId) {
+            abort(404);
+        }
+
+        if ($run->journal_id === null) {
+            return redirect()->back()->with('error', 'Post the payroll run to the GL before paying net pay.');
+        }
+
+        if ($run->net_paid_at !== null) {
+            return redirect()->back()->with('error', 'Net pay for this run has already been paid.');
+        }
+
+        try {
+            $journal = $this->payrollJournalService->postNetPayPayment($run);
+        } catch (\RuntimeException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+
+        $this->webhookService->publish($run->tenant_id, 'payroll.run.paid', [
+            'payroll_run_id' => $run->id,
+            'payment_journal_id' => $journal->id,
+            'paid_by' => $user->id,
+            'status' => 'paid',
+        ]);
+
+        return redirect()->back()->with('success', 'Net pay disbursed and payslips marked paid.');
     }
 
     /**

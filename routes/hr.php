@@ -518,6 +518,7 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         Route::middleware('permission:hr.payroll.export')->group(function () {
             Route::post('/payroll/runs', [PayrollExportController::class, 'createRun'])->name('payroll.runs.store');
             Route::post('/payroll/runs/{run}/lock', [PayrollExportController::class, 'lockRun'])->name('payroll.runs.lock');
+            Route::post('/payroll/runs/{run}/pay', [PayrollExportController::class, 'payNet'])->name('payroll.runs.pay');
             Route::post('/payroll/runs/{run}/export', [PayrollExportController::class, 'export'])->name('payroll.runs.export');
             Route::post('/payroll/export-profiles', [PayrollExportController::class, 'storeProfile'])->name('payroll.profiles.store');
             Route::put('/payroll/export-profiles/{profile}', [PayrollExportController::class, 'updateProfile'])->name('payroll.profiles.update');
