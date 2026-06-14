@@ -6,7 +6,12 @@ use App\Domain\Hr\Models\HrAnnouncement;
 use App\Domain\Hr\Models\HrApplication;
 use App\Domain\Hr\Models\HrAsset;
 use App\Domain\Hr\Models\HrAssetAssignment;
+use App\Domain\Hr\Models\HrBenefitEnrollment;
+use App\Domain\Hr\Models\HrBenefitPlan;
+use App\Domain\Hr\Models\HrBonusPayment;
 use App\Domain\Hr\Models\HrCandidate;
+use App\Domain\Hr\Models\HrCompensationReview;
+use App\Domain\Hr\Models\HrSalaryBand;
 use App\Domain\Hr\Models\HrCase;
 use App\Domain\Hr\Models\HrCourse;
 use App\Domain\Hr\Models\HrCourseEnrollment;
@@ -53,6 +58,128 @@ class HrDemoSeeder extends Seeder
         $this->seedTraining($tenantId, $profiles);
         $this->seedAnnouncementsAndSurveys($tenantId, $admin);
         $this->seedRecognitionFeed($tenantId, $admin, $manager, $profiles);
+        $this->seedCompensationAndBenefits($tenantId, $admin, $manager, $profiles);
+    }
+
+    /**
+     * Seed the Compensation & Benefits hubs (salary bands, a comp review, bonus
+     * payments, benefit plans + enrollments) so they aren't empty in demo.
+     * Idempotent via updateOrCreate on natural keys.
+     *
+     * @param  Collection<int, HrEmployeeProfile>  $profiles
+     */
+    private function seedCompensationAndBenefits(int $tenantId, User $admin, User $manager, Collection $profiles): void
+    {
+        if ($profiles->isEmpty()) {
+            return;
+        }
+
+        // Salary bands by role.
+        $bands = [
+            ['role' => 'support_worker', 'name' => 'Support Worker', 'min' => 50000, 'mid' => 58000, 'max' => 66000, 'minH' => 24.0, 'maxH' => 32.0],
+            ['role' => 'team_lead', 'name' => 'Team Lead', 'min' => 66000, 'mid' => 74000, 'max' => 82000, 'minH' => 32.0, 'maxH' => 40.0],
+            ['role' => 'provider_manager', 'name' => 'Manager', 'min' => 90000, 'mid' => 105000, 'max' => 120000, 'minH' => 43.0, 'maxH' => 58.0],
+        ];
+
+        foreach ($bands as $band) {
+            HrSalaryBand::updateOrCreate(
+                ['tenant_id' => $tenantId, 'position_role' => $band['role'], 'band_name' => $band['name']],
+                [
+                    'min_salary' => $band['min'],
+                    'mid_salary' => $band['mid'],
+                    'max_salary' => $band['max'],
+                    'min_hourly' => $band['minH'],
+                    'max_hourly' => $band['maxH'],
+                    'currency' => 'NZD',
+                    'effective_from' => '2026-04-01',
+                    'created_by' => $admin->id,
+                ],
+            );
+        }
+
+        // An annual compensation review cycle.
+        HrCompensationReview::updateOrCreate(
+            ['tenant_id' => $tenantId, 'title' => 'FY2026 Annual Review'],
+            [
+                'review_cycle' => 'annual',
+                'effective_date' => '2026-07-01',
+                'status' => 'planning',
+                'budget_amount' => 25000,
+                'notes' => 'Seeded annual compensation review for HR demo.',
+                'created_by' => $admin->id,
+            ],
+        );
+
+        // A couple of bonus payments.
+        $bonuses = [
+            ['profile' => 0, 'type' => 'spot', 'amount' => 500, 'date' => '2026-05-20', 'status' => 'approved', 'reason' => 'Outstanding shift cover'],
+            ['profile' => 1, 'type' => 'performance', 'amount' => 1200, 'date' => '2026-06-01', 'status' => 'pending', 'reason' => 'Annual performance bonus'],
+        ];
+
+        foreach ($bonuses as $bonus) {
+            HrBonusPayment::updateOrCreate(
+                [
+                    'tenant_id' => $tenantId,
+                    'employee_profile_id' => $profiles[$bonus['profile']]->id,
+                    'bonus_type' => $bonus['type'],
+                    'payment_date' => $bonus['date'],
+                ],
+                [
+                    'amount' => $bonus['amount'],
+                    'currency' => 'NZD',
+                    'reason' => $bonus['reason'],
+                    'status' => $bonus['status'],
+                    'approved_by' => $bonus['status'] === 'approved' ? $manager->id : null,
+                    'approved_at' => $bonus['status'] === 'approved' ? Carbon::parse($bonus['date'].' 09:00:00') : null,
+                    'created_by' => $admin->id,
+                ],
+            );
+        }
+
+        // Benefit plans + enrollments.
+        $kiwiSaver = HrBenefitPlan::updateOrCreate(
+            ['tenant_id' => $tenantId, 'name' => 'KiwiSaver (Employer 3%)'],
+            [
+                'type' => 'kiwisaver',
+                'provider' => 'Default KiwiSaver Scheme',
+                'description' => 'Standard KiwiSaver with 3% employer contribution.',
+                'employer_contribution_rate' => 3,
+                'is_active' => true,
+            ],
+        );
+
+        $health = HrBenefitPlan::updateOrCreate(
+            ['tenant_id' => $tenantId, 'name' => 'Southern Cross Health'],
+            [
+                'type' => 'health_insurance',
+                'provider' => 'Southern Cross',
+                'description' => 'Subsidised health insurance.',
+                'employer_contribution_rate' => 50,
+                'is_active' => true,
+            ],
+        );
+
+        foreach ([0, 1] as $i) {
+            HrBenefitEnrollment::updateOrCreate(
+                ['tenant_id' => $tenantId, 'employee_profile_id' => $profiles[$i]->id, 'benefit_plan_id' => $kiwiSaver->id],
+                [
+                    'enrollment_date' => '2026-01-15',
+                    'status' => 'active',
+                    'employee_contribution_rate' => 3,
+                    'employer_contribution_rate' => 3,
+                ],
+            );
+        }
+
+        HrBenefitEnrollment::updateOrCreate(
+            ['tenant_id' => $tenantId, 'employee_profile_id' => $profiles[0]->id, 'benefit_plan_id' => $health->id],
+            [
+                'enrollment_date' => '2026-02-01',
+                'status' => 'active',
+                'employee_contribution_rate' => 0,
+                'employer_contribution_rate' => 50,
+            ],
+        );
     }
 
     /**
