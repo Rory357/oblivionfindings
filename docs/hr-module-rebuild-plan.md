@@ -462,8 +462,13 @@ flat Send-Kudos dialog. M7-R3 (e08c55c5) — HrDemoSeeder feed/kudos demo data (
     `current` → Object.entries(undefined) crash; +2 shape mismatches (page read `total_fte` [service ships
     `fte_total`] + treated `by_department` [array of {department,count}] as a Record). Fixed: controller render key
     → `current` + ResolvesHrTenant (was `$tenantId=null`); page type aligned to service shape, maps the array, reads
-    fte_total. 2 tests (HeadcountDashboardTest). REMAINING M9-1: saved-report Run/Export 404; exportToExcel CSV-in-xlsx;
-    AnalyticsDashboardController `$tenantId=null` cross-tenant (same null-tenant pattern — also uses it).
+    fte_total. 2 tests (HeadcountDashboardTest).
+  - ✅ **DONE — saved-report 404s + corrupt xlsx (e8496951):** reports/saved.tsx hit /hr/reports/{id}/run|export +
+    deleted /hr/reports/{id}, but routes are /hr/reports/**saved**/{id}/... → run/export/delete all 404'd (export also
+    POSTed a GET route). Fixed all three page paths (run POST, export GET, delete DELETE). exportToExcel wrote CSV
+    bytes into a .xlsx (no xlsx-writer dep) → corrupt; made export emit an honest .csv (text/csv), removed the
+    misleading "Excel" button + the dead exportToExcel service method. 4 tests (SavedReportActionsTest).
+    REMAINING M9-1: AnalyticsDashboardController `$tenantId=null` cross-tenant (same null-tenant pattern → ResolvesHrTenant).
 - **M9-2 Reports hub + consolidate webhooks/scheduling.** *Problem:* 4 fragmented report pages; **three**
   webhook systems (`HrWebhookController`/`reports/webhooks` vs `WebhookController`/`settings/webhooks` vs
   automation actions); two scheduling systems (`HrReportSubscription` vs `HrSavedReport.is_scheduled`).
