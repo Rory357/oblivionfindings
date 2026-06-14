@@ -7,6 +7,7 @@ export * from './hr-hero';
 export * from './hr-tabs';
 export * from './people-picker';
 export * from './people/org-chart-pane';
+export * from './photo-upload-button';
 export * from './position-dialog';
 export * from './positions-pane';
 export * from './status-badge';

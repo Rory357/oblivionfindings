@@ -1,3 +1,4 @@
+import { PhotoUploadButton } from '@/components/hr';
 import { PageHero, type PageHeroBadge, type PageHeroMetaItem } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -668,16 +669,22 @@ export default function EmployeeShow({
                                         </Button>
                                     </a>
                                     {can.manage && (
-                                        <Link href={`/hr/people/${p.id}/edit`}>
-                                            <Button
-                                                size="sm"
-                                                variant="outline"
-                                                className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
-                                            >
-                                                <Pencil className="mr-1.5 h-3.5 w-3.5" />
-                                                Edit
-                                            </Button>
-                                        </Link>
+                                        <>
+                                            <PhotoUploadButton
+                                                profileId={p.id}
+                                                onDark
+                                            />
+                                            <Link href={`/hr/people/${p.id}/edit`}>
+                                                <Button
+                                                    size="sm"
+                                                    variant="outline"
+                                                    className="border-primary-foreground/30 bg-primary-foreground/10 text-primary-foreground backdrop-blur-sm hover:bg-primary-foreground/20 hover:text-primary-foreground"
+                                                >
+                                                    <Pencil className="mr-1.5 h-3.5 w-3.5" />
+                                                    Edit
+                                                </Button>
+                                            </Link>
+                                        </>
                                     )}
                                 </>
                             }
