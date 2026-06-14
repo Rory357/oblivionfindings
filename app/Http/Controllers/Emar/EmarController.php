@@ -1951,27 +1951,126 @@ class EmarController extends Controller
     // ─── Self-Administration Assessments ───────────────────
     public function selfAdmin(Request $request)
     {
-        $assessments = MedicationSelfAdminAssessment::query()
-            ->with(['client:id,first_name,last_name', 'assessor:id,name'])
-            ->when($request->client_id, fn ($q, $id) => $q->where('client_id', $id))
-            ->latest('assessment_date')
-            ->paginate(50);
+        $siteFilter = $request->integer('site_id') ?: null;
+        $bySite = fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteFilter));
 
-        $dueReassessments = MedicationSelfAdminAssessment::query()
-            ->where('status', 'completed')
-            ->where('reassessment_date', '<=', today()->toDateString())
-            ->with('client:id,first_name,last_name')
+        $models = MedicationSelfAdminAssessment::query()
+            ->with(['client:id,first_name,last_name,nhi_number,site_id', 'client.site:id,name', 'assessor:id,name', 'agreementSigner:id,name'])
+            ->when($siteFilter, $bySite)
+            ->latest('assessment_date')
+            ->limit(300)
             ->get();
 
-        $clients = Client::orderBy('last_name')->get(['id', 'first_name', 'last_name']);
+        // A reassessment supersedes the prior record — the live register shows
+        // only the current assessment per client (records not superseded by another).
+        $supersededIds = $models->pluck('supersedes_id')->filter()->unique()->all();
+        $live = $models->reject(fn (MedicationSelfAdminAssessment $a) => in_array($a->id, $supersededIds, true));
+
+        // The self-managing clients' active medications power the per-med scope tab.
+        $medsByClient = ClientMedication::query()
+            ->active()
+            ->whereIn('client_id', $live->pluck('client_id')->unique()->filter()->all())
+            ->orderBy('name')
+            ->get(['id', 'name', 'client_id', 'dosage', 'controlled_drug'])
+            ->groupBy('client_id');
+
+        $assessments = $live->map(fn (MedicationSelfAdminAssessment $a) => $this->serializeSelfAdmin($a, $medsByClient))->values();
+
+        $today = today();
+        $activity = $models->flatMap(function (MedicationSelfAdminAssessment $a) {
+            $client = $a->client ? trim($a->client->first_name.' '.$a->client->last_name) : 'a client';
+            $events = [[
+                'actor' => $a->assessor?->name ?? 'System',
+                'text' => $a->supersedes_id ? 'reassessed' : 'assessed',
+                'subject' => $client,
+                'at' => $a->created_at?->toIso8601String(),
+                'icon' => 'clipboard',
+            ]];
+            if ($a->agreement_signed_at) {
+                $events[] = ['actor' => $a->agreementSigner?->name ?? 'Staff', 'text' => 'signed the self-administration agreement for', 'subject' => $client, 'at' => $a->agreement_signed_at->toIso8601String(), 'icon' => 'file'];
+            }
+
+            return $events;
+        })->sortByDesc('at')->take(40)->values();
+
+        $activeSite = $siteFilter ? Site::find($siteFilter) : null;
 
         return Inertia::render('emar/SelfAdmin', [
             'assessments' => $assessments,
-            'dueReassessments' => $dueReassessments,
-            'clients' => $clients,
+            'activity' => $activity,
+            'kpis' => [
+                'self_managing' => $live->whereIn('outcome', ['independent', 'prompted'])->count(),
+                'supervised' => $live->where('outcome', 'supervised')->count(),
+                'administered' => $live->where('outcome', 'administered')->count(),
+                'due_now' => $live->filter(fn ($a) => $a->reassessment_date && $a->reassessment_date->lte($today))->count(),
+                'independent' => $live->where('outcome', 'independent')->count(),
+                'independent_pct' => $live->count() > 0 ? (int) round($live->where('outcome', 'independent')->count() / $live->count() * 100) : 0,
+                'unsigned' => $live->whereIn('outcome', ['independent', 'prompted'])->whereNull('agreement_signed_at')->count(),
+                'total' => $live->count(),
+            ],
+            'clients' => Client::orderBy('last_name')->get(['id', 'first_name', 'last_name']),
             'staff' => $this->getStaffList(),
-            'filters' => $request->only(['client_id']),
+            'sites' => Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'active_site' => $activeSite ? ['id' => $activeSite->id, 'name' => $activeSite->name] : null,
+            'site_brand_colour' => $activeSite?->brand_colour,
         ]);
+    }
+
+    private function serializeSelfAdmin(MedicationSelfAdminAssessment $a, $medsByClient): array
+    {
+        $scope = collect($a->med_scope ?? [])->keyBy('med_id');
+
+        return [
+            'id' => $a->id,
+            'client_id' => $a->client_id,
+            'client_name' => $a->client ? trim($a->client->first_name.' '.$a->client->last_name) : 'Unknown',
+            'nhi' => $a->client?->nhi_number,
+            'site_id' => $a->client?->site_id,
+            'site_name' => $a->client?->site?->name,
+            'status' => $a->status,
+            'outcome' => $a->outcome,
+            'outcome_label' => $a->outcome_label,
+            'wishes_to_self_administer' => (bool) $a->wishes_to_self_administer,
+            'people_involved' => $a->people_involved ?? [],
+            'cognitive_capacity' => $a->cognitive_capacity,
+            'physical_dexterity' => $a->physical_dexterity,
+            'vision_ability' => $a->vision_ability,
+            'swallowing_ability' => $a->swallowing_ability,
+            'understanding_score' => $a->understanding_score,
+            'total_score' => $a->total_score,
+            'can_identify_medications' => (bool) $a->can_identify_medications,
+            'can_read_labels' => (bool) $a->can_read_labels,
+            'can_open_packaging' => (bool) $a->can_open_packaging,
+            'can_manage_timing' => (bool) $a->can_manage_timing,
+            'can_store_safely' => (bool) $a->can_store_safely,
+            'willing_to_self_admin' => (bool) $a->willing_to_self_admin,
+            'risk_factors' => $a->risk_factors,
+            'support_needed' => $a->support_needed,
+            'support_adjustments' => $a->support_adjustments ?? [],
+            'safe_storage_notes' => $a->safe_storage_notes,
+            'storage_location' => $a->storage_location,
+            'assessor_notes' => $a->assessor_notes,
+            'assessor_name' => $a->assessor?->name,
+            'assessment_date' => $a->assessment_date?->toDateString(),
+            'reassessment_date' => $a->reassessment_date?->toDateString(),
+            'reassessment_interval_months' => $a->reassessment_interval_months,
+            'reassessment_trigger' => $a->reassessment_trigger,
+            'reassessment_due' => $a->isReassessmentDue(),
+            'med_scope' => $a->med_scope ?? [],
+            'ordering_responsibility' => $a->ordering_responsibility,
+            'agreement_responsibilities' => $a->agreement_responsibilities,
+            'agreement_signed_at' => $a->agreement_signed_at?->toIso8601String(),
+            'agreement_signed_by_name' => $a->agreementSigner?->name,
+            'client_medications' => $a->outcome !== 'administered'
+                ? collect($medsByClient->get($a->client_id) ?? [])->map(fn ($m) => [
+                    'id' => $m->id,
+                    'name' => $m->name,
+                    'dosage' => $m->dosage,
+                    'controlled' => (bool) $m->controlled_drug,
+                    'scope' => $scope->get($m->id)['scope'] ?? null,
+                ])->values()->all()
+                : [],
+        ];
     }
 
     // ─── Destruction Records ───────────────────────────────
@@ -2865,6 +2964,9 @@ class EmarController extends Controller
     {
         $validated = $request->validate([
             'client_id' => 'required|exists:clients,id',
+            'wishes_to_self_administer' => 'nullable|boolean',
+            'people_involved' => 'nullable|array',
+            'people_involved.*' => 'string',
             'cognitive_capacity' => 'required|integer|min:1|max:5',
             'physical_dexterity' => 'required|integer|min:1|max:5',
             'vision_ability' => 'required|integer|min:1|max:5',
@@ -2878,10 +2980,15 @@ class EmarController extends Controller
             'willing_to_self_admin' => 'required|boolean',
             'risk_factors' => 'nullable|string',
             'support_needed' => 'nullable|string',
+            'support_adjustments' => 'nullable|array',
+            'support_adjustments.*' => 'string',
             'safe_storage_notes' => 'nullable|string',
+            'storage_location' => 'nullable|string|max:64',
             'assessor_notes' => 'nullable|string',
             'reassessment_date' => 'nullable|date',
+            'reassessment_interval_months' => 'nullable|integer|min:1|max:24',
             'reassessment_trigger' => 'nullable|string',
+            'supersedes_id' => 'nullable|exists:medication_self_admin_assessments,id',
         ]);
 
         $totalScore = $validated['cognitive_capacity']
@@ -2890,12 +2997,17 @@ class EmarController extends Controller
             + $validated['swallowing_ability']
             + $validated['understanding_score'];
 
-        $validated['outcome'] = match (true) {
-            $totalScore >= 21 => 'independent',
-            $totalScore >= 16 => 'prompted',
-            $totalScore >= 11 => 'supervised',
-            default => 'administered',
-        };
+        $validated['wishes_to_self_administer'] = (bool) ($validated['wishes_to_self_administer'] ?? true);
+        $validated['outcome'] = MedicationSelfAdminAssessment::computeOutcome(
+            $validated['wishes_to_self_administer'],
+            (bool) $validated['willing_to_self_admin'],
+            $totalScore,
+        );
+
+        // Derive the reassessment date from the cadence when one wasn't given.
+        if (empty($validated['reassessment_date']) && ! empty($validated['reassessment_interval_months'])) {
+            $validated['reassessment_date'] = today()->addMonthsNoOverflow((int) $validated['reassessment_interval_months'])->toDateString();
+        }
 
         $validated['assessed_by'] = auth()->id();
         $validated['assessment_date'] = today();
@@ -2909,6 +3021,9 @@ class EmarController extends Controller
     public function updateSelfAdmin(Request $request, MedicationSelfAdminAssessment $assessment)
     {
         $validated = $request->validate([
+            'wishes_to_self_administer' => 'nullable|boolean',
+            'people_involved' => 'nullable|array',
+            'people_involved.*' => 'string',
             'cognitive_capacity' => 'nullable|integer|min:1|max:5',
             'physical_dexterity' => 'nullable|integer|min:1|max:5',
             'vision_ability' => 'nullable|integer|min:1|max:5',
@@ -2922,12 +3037,41 @@ class EmarController extends Controller
             'willing_to_self_admin' => 'nullable|boolean',
             'risk_factors' => 'nullable|string',
             'support_needed' => 'nullable|string',
+            'support_adjustments' => 'nullable|array',
+            'support_adjustments.*' => 'string',
             'safe_storage_notes' => 'nullable|string',
+            'storage_location' => 'nullable|string|max:64',
             'assessor_notes' => 'nullable|string',
             'reassessment_date' => 'nullable|date',
+            'reassessment_interval_months' => 'nullable|integer|min:1|max:24',
             'reassessment_trigger' => 'nullable|string',
-            'outcome' => 'nullable|string|in:independent,prompted,supervised,administered',
+            'med_scope' => 'nullable|array',
+            'ordering_responsibility' => 'nullable|string|max:64',
+            'agreement_responsibilities' => 'nullable|string',
+            'sign_agreement' => 'nullable|boolean',
         ]);
+
+        $signAgreement = (bool) ($validated['sign_agreement'] ?? false);
+        unset($validated['sign_agreement']);
+
+        // Recompute the consent-first category whenever a score or consent flag
+        // changes — never trust a client-supplied outcome (gap: stale category).
+        $scoreKeys = ['cognitive_capacity', 'physical_dexterity', 'vision_ability', 'swallowing_ability', 'understanding_score'];
+        $consentKeys = ['wishes_to_self_administer', 'willing_to_self_admin'];
+        if (collect([...$scoreKeys, ...$consentKeys])->contains(fn ($k) => array_key_exists($k, $validated))) {
+            $merged = array_merge($assessment->only([...$scoreKeys, ...$consentKeys]), $validated);
+            $total = collect($scoreKeys)->sum(fn ($k) => (int) ($merged[$k] ?? 0));
+            $validated['outcome'] = MedicationSelfAdminAssessment::computeOutcome(
+                (bool) ($merged['wishes_to_self_administer'] ?? true),
+                (bool) ($merged['willing_to_self_admin'] ?? false),
+                $total,
+            );
+        }
+
+        if ($signAgreement) {
+            $validated['agreement_signed_at'] = now();
+            $validated['agreement_signed_by'] = auth()->id();
+        }
 
         $assessment->update($validated);
 
@@ -2936,6 +3080,8 @@ class EmarController extends Controller
 
     public function destroySelfAdmin(MedicationSelfAdminAssessment $assessment)
     {
+        // Soft delete — self-administration assessments are clinical records and
+        // are retained (reassessments supersede rather than overwrite).
         $assessment->delete();
 
         return redirect()->back();

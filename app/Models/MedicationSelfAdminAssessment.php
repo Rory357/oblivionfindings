@@ -5,10 +5,11 @@ namespace App\Models;
 use App\Models\Concerns\AuditableChanges;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
+use Illuminate\Database\Eloquent\SoftDeletes;
 
 class MedicationSelfAdminAssessment extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory, SoftDeletes;
 
     protected $table = 'medication_self_admin_assessments';
 
@@ -16,6 +17,8 @@ class MedicationSelfAdminAssessment extends Model
         'client_id',
         'status',
         'outcome',
+        'wishes_to_self_administer',
+        'people_involved',
         'cognitive_capacity',
         'physical_dexterity',
         'vision_ability',
@@ -29,28 +32,43 @@ class MedicationSelfAdminAssessment extends Model
         'willing_to_self_admin',
         'risk_factors',
         'support_needed',
+        'support_adjustments',
         'safe_storage_notes',
+        'storage_location',
         'assessor_notes',
         'assessed_by',
         'assessment_date',
         'reassessment_date',
+        'reassessment_interval_months',
         'reassessment_trigger',
+        'med_scope',
+        'ordering_responsibility',
+        'agreement_responsibilities',
+        'agreement_signed_at',
+        'agreement_signed_by',
+        'supersedes_id',
     ];
 
     protected $casts = [
         'assessment_date' => 'date',
         'reassessment_date' => 'date',
+        'agreement_signed_at' => 'datetime',
         'can_identify_medications' => 'boolean',
         'can_read_labels' => 'boolean',
         'can_open_packaging' => 'boolean',
         'can_manage_timing' => 'boolean',
         'can_store_safely' => 'boolean',
         'willing_to_self_admin' => 'boolean',
+        'wishes_to_self_administer' => 'boolean',
         'cognitive_capacity' => 'integer',
         'physical_dexterity' => 'integer',
         'vision_ability' => 'integer',
         'swallowing_ability' => 'integer',
         'understanding_score' => 'integer',
+        'reassessment_interval_months' => 'integer',
+        'people_involved' => 'array',
+        'support_adjustments' => 'array',
+        'med_scope' => 'array',
     ];
 
     public function client()
@@ -61,6 +79,29 @@ class MedicationSelfAdminAssessment extends Model
     public function assessor()
     {
         return $this->belongsTo(User::class, 'assessed_by');
+    }
+
+    public function agreementSigner()
+    {
+        return $this->belongsTo(User::class, 'agreement_signed_by');
+    }
+
+    /**
+     * Consent-first category (NZ MOH Cat 1–4): a person who does not wish to
+     * self-administer (or is unwilling) is Category 4 regardless of score.
+     */
+    public static function computeOutcome(bool $wishes, bool $willing, int $total): string
+    {
+        if (! $wishes || ! $willing) {
+            return 'administered';
+        }
+
+        return match (true) {
+            $total >= 21 => 'independent',
+            $total >= 16 => 'prompted',
+            $total >= 11 => 'supervised',
+            default => 'administered',
+        };
     }
 
     public function getTotalScoreAttribute(): int
