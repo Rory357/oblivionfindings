@@ -242,8 +242,14 @@ total_gross == GL wage expense. **M5-2 (net-pay payment run) is the remaining pi
   `HrPayslip` rows but `lockRun` never generated them → "no payslips to post". *Fixed:* lockRun generates them
   idempotently; updated `PayrollJournalPostingTest` to drop the manual pre-generation (proving lock does it) +
   assert payslip count, net = gross+holiday−deductions, and gross parity. 10 payroll regression tests still green.
-- **M5-2 Employee net-pay payment run (BLOCKER for "no re-keying").** *Problem:* `PaymentRunService` only
-  pays vendor `FinBill`s; net pay is computed but never disbursed. *Fix:* payroll-sourced payment run /
+- **M5-2 Employee net-pay payment run.** ✅ DONE (main 1723eb19, 2026-06-14). *Was:* `PaymentRunService` only
+  pays vendor `FinBill`s; net pay was computed but never disbursed (the 2300 Accrued Wages liability never
+  cleared). *Fixed:* `PayrollJournalService::postNetPayPayment` posts a second BALANCED journal DR 2300 / CR bank
+  for Σ net_pay, flips payslips→paid, stamps `net_paid_at`+`payment_journal_id` (idempotent); bank GL resolved
+  from the org's primary `FinBankAccount`. Route `hr.payroll.runs.pay` + `payNet` action (gated, tenant-checked,
+  blocks not-GL-posted/already-paid); "Pay net" button shows only on GL-posted, unpaid runs + a "Paid" badge.
+  Test asserts the second journal balances == Σnet_pay, payslips paid, idempotent. M5 COMPLETE. *(orig:)*
+  payroll-sourced payment run /
   NZ direct-credit bank file from payslip `net_pay` + employee bank account (DR 2300 Accrued Wages / CR
   Bank). *Acceptance:* an approved pay run produces a Finance payment run / bank file paying each employee's net.
 - **M5-3 Pay-run lifecycle UI + modal process.** *Problem:* `payroll/index.tsx` is a list with inline
