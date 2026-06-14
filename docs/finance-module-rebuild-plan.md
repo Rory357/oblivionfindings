@@ -197,9 +197,14 @@ Land the spine M1–M10 build on. **No behaviour change**, design only.
   (components/finance/payables-hub.tsx, mirrors receivables-hub.tsx) in all 5 AP sub-page heros so bills ·
   purchase-orders · vendors · credit-notes · payment-runs read as one hub (every tab `finance.ap.view`).
   `PayablesController` redirects `/finance/payables` → first openable AP tab (bills); sidebar AP group collapsed
-  to one "Payables" entry. 2 tests. *Remaining (next tick):* New/Edit Bill (multi-line, reuse the New Invoice
-  wizard template), New PO, New Vendor, Schedule/Approve Payment Run as `WizardShell` modals (reference data +
-  canManage from each index controller; NO empty-string Select values).
+  to one "Payables" entry. 2 tests. *New Bill modal (commit 8aa7c64e):* NewBillDialog (Details → Line items →
+  Review) on /finance/bills, each line requires an expense account + GST rate, posts a draft to bills.store;
+  index passes accounts + canManage. **Surfaced + fixed a pre-existing P0** — `AccountsPayableService` stored the
+  gst_rate PERCENTAGE (15) into the `decimal(5,4)` FRACTION column → 500 on every standard-GST bill (createBill/
+  updateBill/credit-notes); also fixed `FinBillFactory`'s invalid `'void'` status (flaky). *New Vendor modal
+  (commit 39067ecc):* NewVendorDialog (Details → Terms & review) on /finance/vendors → vendors.store.
+  *Remaining (next tick):* New PO (multi-line, reuse NewBillDialog template) + Schedule/Approve Payment Run modals;
+  Edit-Bill modal deferred to M10 (like Edit-Invoice — needs lines the index doesn't carry). 2 store tests.
 - **[x] M3-2 Bills `partial` status bug (P0).** Fixed `'partial'`→`'partially_paid'` (the enum value) across
   `BillController` summary (incl. total_overdue which only counted 'approved'), `CashFlowForecastService`
   projectOutflows, and `GlSyncService` bill push — all three silently excluded partially-paid bills. Test. *(commit c2dd2b28)*
