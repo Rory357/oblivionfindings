@@ -1,19 +1,19 @@
 <?php
 
+use App\Http\Controllers\BreakGlassController;
 use App\Http\Controllers\Emar\AuditLogController;
 use App\Http\Controllers\Emar\CDLossReportController;
 use App\Http\Controllers\Emar\EmarController;
 use App\Http\Controllers\Emar\EmarPdfController;
-use App\Http\Controllers\Emar\GuidedRoundController;
 use App\Http\Controllers\Emar\EmarReportController;
+use App\Http\Controllers\Emar\GuidedRoundController;
 use App\Http\Controllers\Emar\MedicationErrorController;
 use App\Http\Controllers\Emar\MedicationSettingsController;
 use App\Http\Controllers\Emar\RefusalFollowUpController;
 use App\Http\Controllers\Emar\WorkerMedsController;
-use App\Http\Controllers\BreakGlassController;
 use App\Http\Controllers\EmergencyAccessController;
-use App\Http\Controllers\MedicationAuditController;
 use App\Http\Controllers\MedicationAdministrationCorrectionController;
+use App\Http\Controllers\MedicationAuditController;
 use App\Http\Controllers\MedicationsController;
 use App\Http\Controllers\MedicationsReportController;
 use Illuminate\Support\Facades\Route;
@@ -143,79 +143,80 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
 
     Route::middleware('permission:medications.orders.manage')->group(function () {
 
-    // Prescriber Orders
-    Route::post('/prescriptions', [EmarController::class, 'storePrescription'])->name('emar.prescriptions.store');
-    Route::put('/prescriptions/{order}', [EmarController::class, 'updatePrescription'])->name('emar.prescriptions.update');
-    Route::post('/prescriptions/{order}/countersign', [EmarController::class, 'countersignPrescription'])->name('emar.prescriptions.countersign');
-    Route::delete('/prescriptions/{order}', [EmarController::class, 'destroyPrescription'])->name('emar.prescriptions.destroy');
+        // Prescriber Orders
+        Route::post('/prescriptions', [EmarController::class, 'storePrescription'])->name('emar.prescriptions.store');
+        Route::put('/prescriptions/{order}', [EmarController::class, 'updatePrescription'])->name('emar.prescriptions.update');
+        Route::post('/prescriptions/{order}/countersign', [EmarController::class, 'countersignPrescription'])->name('emar.prescriptions.countersign');
+        Route::delete('/prescriptions/{order}', [EmarController::class, 'destroyPrescription'])->name('emar.prescriptions.destroy');
 
-    // Covert Authorisations
-    Route::post('/prescriptions/covert', [EmarController::class, 'storeCovert'])->name('emar.covert.store');
-    Route::post('/prescriptions/covert/{authorisation}/revoke', [EmarController::class, 'revokeCovert'])->name('emar.covert.revoke');
+        // Covert Authorisations
+        Route::post('/prescriptions/covert', [EmarController::class, 'storeCovert'])->name('emar.covert.store');
+        Route::post('/prescriptions/covert/{authorisation}/revoke', [EmarController::class, 'revokeCovert'])->name('emar.covert.revoke');
 
-    // Reviews
-    Route::post('/reviews', [EmarController::class, 'storeReview'])->name('emar.reviews.store');
-    Route::put('/reviews/{review}', [EmarController::class, 'updateReview'])->name('emar.reviews.update');
-    Route::post('/reviews/{review}/complete', [EmarController::class, 'completeReview'])->name('emar.reviews.complete');
-    Route::delete('/reviews/{review}', [EmarController::class, 'destroyReview'])->name('emar.reviews.destroy');
+        // Reviews
+        Route::post('/reviews', [EmarController::class, 'storeReview'])->name('emar.reviews.store');
+        Route::put('/reviews/{review}', [EmarController::class, 'updateReview'])->name('emar.reviews.update');
+        Route::post('/reviews/{review}/complete', [EmarController::class, 'completeReview'])->name('emar.reviews.complete');
+        Route::post('/reviews/{review}/actions/advance', [EmarController::class, 'advanceReviewAction'])->name('emar.reviews.actions.advance');
+        Route::delete('/reviews/{review}', [EmarController::class, 'destroyReview'])->name('emar.reviews.destroy');
 
-    // 1CHART attention, INR, and syringe-driver workflows
-    Route::post('/clients/{client}/attention-alerts', [EmarController::class, 'storeAttentionAlert'])->name('emar.clients.attention_alerts.store');
-    Route::put('/attention-alerts/{alert}', [EmarController::class, 'updateAttentionAlert'])->name('emar.attention_alerts.update');
-    Route::post('/attention-alerts/{alert}/resolve', [EmarController::class, 'resolveAttentionAlert'])->name('emar.attention_alerts.resolve');
-    Route::post('/clients/{client}/alert-suppression', [EmarController::class, 'toggleMedicationAlertSuppression'])->name('emar.clients.alert_suppression');
-    Route::post('/clients/{client}/medication-settings', [EmarController::class, 'updateMedicationSettings'])->name('emar.clients.medication_settings');
-    Route::post('/clients/{client}/inr', [EmarController::class, 'storeInr'])->name('emar.clients.inr.store');
-    Route::post('/inr/{inr}/disable', [EmarController::class, 'disableInr'])->name('emar.inr.disable');
-    Route::post('/clients/{client}/syringe-drivers', [EmarController::class, 'storeSyringeDriver'])->name('emar.clients.syringe_drivers.store');
-    Route::post('/syringe-drivers/{driver}/checks', [EmarController::class, 'addSyringeDriverCheck'])->name('emar.syringe_drivers.checks.store');
-    Route::post('/syringe-drivers/{driver}/complete', [EmarController::class, 'completeSyringeDriver'])->name('emar.syringe_drivers.complete');
+        // 1CHART attention, INR, and syringe-driver workflows
+        Route::post('/clients/{client}/attention-alerts', [EmarController::class, 'storeAttentionAlert'])->name('emar.clients.attention_alerts.store');
+        Route::put('/attention-alerts/{alert}', [EmarController::class, 'updateAttentionAlert'])->name('emar.attention_alerts.update');
+        Route::post('/attention-alerts/{alert}/resolve', [EmarController::class, 'resolveAttentionAlert'])->name('emar.attention_alerts.resolve');
+        Route::post('/clients/{client}/alert-suppression', [EmarController::class, 'toggleMedicationAlertSuppression'])->name('emar.clients.alert_suppression');
+        Route::post('/clients/{client}/medication-settings', [EmarController::class, 'updateMedicationSettings'])->name('emar.clients.medication_settings');
+        Route::post('/clients/{client}/inr', [EmarController::class, 'storeInr'])->name('emar.clients.inr.store');
+        Route::post('/inr/{inr}/disable', [EmarController::class, 'disableInr'])->name('emar.inr.disable');
+        Route::post('/clients/{client}/syringe-drivers', [EmarController::class, 'storeSyringeDriver'])->name('emar.clients.syringe_drivers.store');
+        Route::post('/syringe-drivers/{driver}/checks', [EmarController::class, 'addSyringeDriverCheck'])->name('emar.syringe_drivers.checks.store');
+        Route::post('/syringe-drivers/{driver}/complete', [EmarController::class, 'completeSyringeDriver'])->name('emar.syringe_drivers.complete');
 
-    // Competency Assessments
-    Route::post('/competency', [EmarController::class, 'storeCompetency'])->name('emar.competency.store');
-    Route::put('/competency/{assessment}', [EmarController::class, 'updateCompetency'])->name('emar.competency.update');
-    Route::delete('/competency/{assessment}', [EmarController::class, 'destroyCompetency'])->name('emar.competency.destroy');
+        // Competency Assessments
+        Route::post('/competency', [EmarController::class, 'storeCompetency'])->name('emar.competency.store');
+        Route::put('/competency/{assessment}', [EmarController::class, 'updateCompetency'])->name('emar.competency.update');
+        Route::delete('/competency/{assessment}', [EmarController::class, 'destroyCompetency'])->name('emar.competency.destroy');
 
-    // Round Templates + Workflow
-    Route::post('/rounds/templates', [EmarController::class, 'storeRoundTemplate'])->name('emar.rounds.templates.store');
-    Route::put('/rounds/templates/{template}', [EmarController::class, 'updateRoundTemplate'])->name('emar.rounds.templates.update');
-    Route::delete('/rounds/templates/{template}', [EmarController::class, 'destroyRoundTemplate'])->name('emar.rounds.templates.destroy');
-    Route::post('/rounds/generate', [EmarController::class, 'generateRounds'])->name('emar.rounds.generate');
-    Route::post('/rounds/{round}/start', [EmarController::class, 'startRound'])->name('emar.rounds.start');
-    Route::post('/rounds/{round}/complete', [EmarController::class, 'completeRound'])->name('emar.rounds.complete');
-    Route::put('/rounds/{round}/assign', [EmarController::class, 'assignRound'])->name('emar.rounds.assign');
+        // Round Templates + Workflow
+        Route::post('/rounds/templates', [EmarController::class, 'storeRoundTemplate'])->name('emar.rounds.templates.store');
+        Route::put('/rounds/templates/{template}', [EmarController::class, 'updateRoundTemplate'])->name('emar.rounds.templates.update');
+        Route::delete('/rounds/templates/{template}', [EmarController::class, 'destroyRoundTemplate'])->name('emar.rounds.templates.destroy');
+        Route::post('/rounds/generate', [EmarController::class, 'generateRounds'])->name('emar.rounds.generate');
+        Route::post('/rounds/{round}/start', [EmarController::class, 'startRound'])->name('emar.rounds.start');
+        Route::post('/rounds/{round}/complete', [EmarController::class, 'completeRound'])->name('emar.rounds.complete');
+        Route::put('/rounds/{round}/assign', [EmarController::class, 'assignRound'])->name('emar.rounds.assign');
 
-    // Self-Admin Assessments
-    Route::post('/self-admin', [EmarController::class, 'storeSelfAdmin'])->name('emar.self_admin.store');
-    Route::put('/self-admin/{assessment}', [EmarController::class, 'updateSelfAdmin'])->name('emar.self_admin.update');
-    Route::delete('/self-admin/{assessment}', [EmarController::class, 'destroySelfAdmin'])->name('emar.self_admin.destroy');
+        // Self-Admin Assessments
+        Route::post('/self-admin', [EmarController::class, 'storeSelfAdmin'])->name('emar.self_admin.store');
+        Route::put('/self-admin/{assessment}', [EmarController::class, 'updateSelfAdmin'])->name('emar.self_admin.update');
+        Route::delete('/self-admin/{assessment}', [EmarController::class, 'destroySelfAdmin'])->name('emar.self_admin.destroy');
 
-    // Medications CRUD
-    Route::post('/medications', [EmarController::class, 'storeMedication'])->name('emar.medications.store');
-    Route::post('/medications/import', [EmarController::class, 'importMedications'])->name('emar.medications.import');
-    Route::put('/medications/{medication}', [EmarController::class, 'updateMedication'])->name('emar.medications.update');
-    Route::post('/medications/{medication}/discontinue', [EmarController::class, 'discontinueMedication'])->name('emar.medications.discontinue');
-    Route::post('/alerts/{alert}/dismiss', [EmarController::class, 'dismissAlert'])->name('emar.alerts.dismiss');
+        // Medications CRUD
+        Route::post('/medications', [EmarController::class, 'storeMedication'])->name('emar.medications.store');
+        Route::post('/medications/import', [EmarController::class, 'importMedications'])->name('emar.medications.import');
+        Route::put('/medications/{medication}', [EmarController::class, 'updateMedication'])->name('emar.medications.update');
+        Route::post('/medications/{medication}/discontinue', [EmarController::class, 'discontinueMedication'])->name('emar.medications.discontinue');
+        Route::post('/alerts/{alert}/dismiss', [EmarController::class, 'dismissAlert'])->name('emar.alerts.dismiss');
 
-    // Controlled Drug Entries
-    Route::post('/controlled/entries', [EmarController::class, 'storeCDEntry'])->name('emar.controlled.entries.store');
-    Route::post('/controlled/balance-check', [EmarController::class, 'storeBalanceCheck'])->name('emar.controlled.balance_check.store');
-    Route::post('/controlled/discrepancies/{discrepancy}/resolve', [EmarController::class, 'resolveDiscrepancy'])->name('emar.controlled.discrepancies.resolve');
+        // Controlled Drug Entries
+        Route::post('/controlled/entries', [EmarController::class, 'storeCDEntry'])->name('emar.controlled.entries.store');
+        Route::post('/controlled/balance-check', [EmarController::class, 'storeBalanceCheck'])->name('emar.controlled.balance_check.store');
+        Route::post('/controlled/discrepancies/{discrepancy}/resolve', [EmarController::class, 'resolveDiscrepancy'])->name('emar.controlled.discrepancies.resolve');
 
-    // Destructions — the register is immutable; erroneous records are voided, not deleted (MoD Regs 1977)
-    Route::post('/destructions', [EmarController::class, 'storeDestruction'])->name('emar.destructions.store');
-    Route::post('/destructions/{destruction}/void', [EmarController::class, 'voidDestruction'])->name('emar.destructions.void');
+        // Destructions — the register is immutable; erroneous records are voided, not deleted (MoD Regs 1977)
+        Route::post('/destructions', [EmarController::class, 'storeDestruction'])->name('emar.destructions.store');
+        Route::post('/destructions/{destruction}/void', [EmarController::class, 'voidDestruction'])->name('emar.destructions.void');
 
-    // Pharmacy Orders + Stock
-    Route::post('/stock/pharmacy-orders', [EmarController::class, 'storePharmacyOrder'])->name('emar.pharmacy_orders.store');
-    Route::put('/stock/pharmacy-orders/{order}', [EmarController::class, 'updatePharmacyOrder'])->name('emar.pharmacy_orders.update');
-    Route::post('/stock/pharmacy-orders/{order}/advance', [EmarController::class, 'advancePharmacyOrder'])->name('emar.pharmacy_orders.advance');
-    Route::patch('/stock/{stock}', [EmarController::class, 'updateStockItem'])->name('emar.stock.update');
-    Route::post('/stock/receive', [EmarController::class, 'receiveStock'])->name('emar.stock.receive');
-    Route::post('/stock/adjust', [EmarController::class, 'adjustStock'])->name('emar.stock.adjust');
+        // Pharmacy Orders + Stock
+        Route::post('/stock/pharmacy-orders', [EmarController::class, 'storePharmacyOrder'])->name('emar.pharmacy_orders.store');
+        Route::put('/stock/pharmacy-orders/{order}', [EmarController::class, 'updatePharmacyOrder'])->name('emar.pharmacy_orders.update');
+        Route::post('/stock/pharmacy-orders/{order}/advance', [EmarController::class, 'advancePharmacyOrder'])->name('emar.pharmacy_orders.advance');
+        Route::patch('/stock/{stock}', [EmarController::class, 'updateStockItem'])->name('emar.stock.update');
+        Route::post('/stock/receive', [EmarController::class, 'receiveStock'])->name('emar.stock.receive');
+        Route::post('/stock/adjust', [EmarController::class, 'adjustStock'])->name('emar.stock.adjust');
 
-    // PRN Effectiveness
-    Route::post('/prn/effectiveness', [EmarController::class, 'storePrnEffectiveness'])->name('emar.prn_effectiveness.store');
+        // PRN Effectiveness
+        Route::post('/prn/effectiveness', [EmarController::class, 'storePrnEffectiveness'])->name('emar.prn_effectiveness.store');
 
     }); // end medications.orders.manage middleware group
 

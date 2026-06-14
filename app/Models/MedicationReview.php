@@ -8,7 +8,7 @@ use Illuminate\Database\Eloquent\Model;
 
 class MedicationReview extends Model
 {
-    use HasFactory, AuditableChanges;
+    use AuditableChanges, HasFactory;
 
     protected $fillable = [
         'client_id',
@@ -23,6 +23,8 @@ class MedicationReview extends Model
         'trigger_reason',
         'medications_reviewed',
         'clinical_summary',
+        'drug_burden_index',
+        'falls_last_quarter',
         'recommendations',
         'actions',
         'whanau_involved',
@@ -37,6 +39,8 @@ class MedicationReview extends Model
         'medications_reviewed' => 'array',
         'actions' => 'array',
         'whanau_involved' => 'boolean',
+        'drug_burden_index' => 'decimal:2',
+        'falls_last_quarter' => 'integer',
     ];
 
     public function client()

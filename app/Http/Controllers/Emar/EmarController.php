@@ -1681,31 +1681,95 @@ class EmarController extends Controller
     // ─── Medication Reviews ────────────────────────────────
     public function reviews(Request $request)
     {
-        $reviews = MedicationReview::query()
-            ->with(['client:id,first_name,last_name', 'reviewer:id,name', 'requestedBy:id,name'])
-            ->when($request->status, fn ($q, $s) => $q->where('status', $s))
-            ->when($request->client_id, fn ($q, $id) => $q->where('client_id', $id))
+        $siteFilter = $request->integer('site_id') ?: null;
+        $bySite = fn ($q) => $q->whereHas('client', fn ($c) => $c->where('site_id', $siteFilter));
+
+        // Flat, client-side-filterable feed — the redesigned page facets by tab,
+        // search, site and reviewer with live counts.
+        $models = MedicationReview::query()
+            ->with(['client:id,first_name,last_name,site_id', 'client.site:id,name', 'reviewer:id,name', 'requestedBy:id,name'])
+            ->when($siteFilter, $bySite)
             ->latest('scheduled_date')
-            ->paginate(50);
-
-        $overdueReviews = MedicationReview::overdue()
-            ->with('client:id,first_name,last_name')
+            ->limit(250)
             ->get();
 
-        $upcomingReviews = MedicationReview::upcoming(30)
-            ->with('client:id,first_name,last_name')
-            ->get();
+        $today = now()->startOfDay();
+        $reviews = $models->map(fn (MedicationReview $r) => $this->serializeReview($r))->values();
 
-        $clients = Client::orderBy('last_name')->get(['id', 'first_name', 'last_name']);
+        // Deprescribing pipeline (G1/G2): every non-"Continue" recommendation on a
+        // completed review becomes a tracked card keyed by review + action index.
+        $deprescribing = $models
+            ->where('status', 'completed')
+            ->flatMap(function (MedicationReview $r) {
+                return collect($r->actions ?? [])
+                    ->map(fn ($a, $i) => is_array($a) ? array_merge($a, ['__i' => $i]) : null)
+                    ->filter(fn ($a) => $a && ($a['action'] ?? 'Continue') !== 'Continue')
+                    ->map(fn ($a) => [
+                        'review_id' => $r->id,
+                        'index' => $a['__i'],
+                        'drug' => $a['drug'] ?? '—',
+                        'action' => $a['action'] ?? 'Monitor',
+                        'rationale' => $a['rationale'] ?? null,
+                        'gp_status' => $a['gp_status'] ?? 'pending',
+                        'stage' => $a['stage'] ?? 'gp',
+                        'client_name' => $r->client ? trim($r->client->first_name.' '.$r->client->last_name) : 'Unknown',
+                        'reviewer_name' => $r->reviewer?->name ?? $r->reviewer_name,
+                    ]);
+            })
+            ->values();
+
+        // GP acceptance rate across decided recommendations (KPI, gap G8).
+        $decided = $deprescribing->whereIn('gp_status', ['accepted', 'declined']);
+        $gpAcceptance = $decided->count() > 0 ? (int) round($decided->where('gp_status', 'accepted')->count() / $decided->count() * 100) : null;
+
+        $activeSite = $siteFilter ? Site::find($siteFilter) : null;
 
         return Inertia::render('emar/Reviews', [
             'reviews' => $reviews,
-            'overdueReviews' => $overdueReviews,
-            'upcomingReviews' => $upcomingReviews,
-            'clients' => $clients,
+            'deprescribing' => $deprescribing,
+            'kpis' => [
+                'overdue' => $models->filter(fn (MedicationReview $r) => $r->status === 'scheduled' && $r->scheduled_date && $r->scheduled_date->lt($today))->count(),
+                'due_30' => $models->filter(fn (MedicationReview $r) => $r->status === 'scheduled' && $r->scheduled_date && $r->scheduled_date->gte($today) && $r->scheduled_date->lte($today->copy()->addDays(30)))->count(),
+                'completed_quarter' => $models->filter(fn (MedicationReview $r) => $r->status === 'completed' && $r->completed_date && $r->completed_date->gte(now()->firstOfQuarter()))->count(),
+                'gp_acceptance' => $gpAcceptance,
+                'in_monitoring' => $deprescribing->where('stage', 'monitor')->count(),
+                'awaiting_gp' => $deprescribing->where('stage', 'gp')->count(),
+            ],
+            'clients' => Client::orderBy('last_name')->get(['id', 'first_name', 'last_name']),
             'staff' => $this->getStaffList(),
-            'filters' => $request->only(['status', 'client_id']),
+            'sites' => Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'active_site' => $activeSite ? ['id' => $activeSite->id, 'name' => $activeSite->name] : null,
+            'site_brand_colour' => $activeSite?->brand_colour,
         ]);
+    }
+
+    private function serializeReview(MedicationReview $r): array
+    {
+        return [
+            'id' => $r->id,
+            'client_id' => $r->client_id,
+            'client_name' => $r->client ? trim($r->client->first_name.' '.$r->client->last_name) : 'Unknown',
+            'site_id' => $r->client?->site_id,
+            'site_name' => $r->client?->site?->name,
+            'review_type' => $r->review_type,
+            'status' => $r->status,
+            'scheduled_date' => $r->scheduled_date?->toDateString(),
+            'completed_date' => $r->completed_date?->toDateString(),
+            'reviewer_name' => $r->reviewer?->name ?? $r->reviewer_name,
+            'reviewer_role' => $r->reviewer_role,
+            'reviewer_user_id' => $r->reviewer_user_id,
+            'trigger_reason' => $r->trigger_reason,
+            'medications_reviewed' => $r->medications_reviewed ?? [],
+            'actions' => $r->actions ?? [],
+            'clinical_summary' => $r->clinical_summary,
+            'recommendations' => $r->recommendations,
+            'drug_burden_index' => $r->drug_burden_index,
+            'falls_last_quarter' => $r->falls_last_quarter,
+            'whanau_involved' => (bool) $r->whanau_involved,
+            'whanau_notes' => $r->whanau_notes,
+            'next_review_date' => $r->next_review_date?->toDateString(),
+            'is_overdue' => $r->status === 'scheduled' && $r->scheduled_date && $r->scheduled_date->isPast(),
+        ];
     }
 
     // ─── Medication Rounds ─────────────────────────────────
@@ -2203,6 +2267,8 @@ class EmarController extends Controller
         $validated = $request->validate([
             'clinical_summary' => 'required|string',
             'medications_reviewed' => 'nullable|array',
+            'drug_burden_index' => 'nullable|numeric|min:0|max:99.99',
+            'falls_last_quarter' => 'nullable|integer|min:0',
             'recommendations' => 'nullable|string',
             'actions' => 'nullable|array',
             'whanau_involved' => 'nullable|boolean',
@@ -2226,6 +2292,40 @@ class EmarController extends Controller
     public function destroyReview(MedicationReview $review)
     {
         $review->update(['status' => 'cancelled']);
+
+        return redirect()->back();
+    }
+
+    /**
+     * Advance a single deprescribing recommendation through its lifecycle
+     * (gp → implemented → monitor → done). Accepting a recommendation as it
+     * leaves "Awaiting GP" records the GP decision (gap G2).
+     */
+    public function advanceReviewAction(Request $request, MedicationReview $review)
+    {
+        $validated = $request->validate([
+            'index' => 'required|integer|min:0',
+        ]);
+
+        $actions = $review->actions ?? [];
+        $index = $validated['index'];
+
+        abort_unless(isset($actions[$index]) && is_array($actions[$index]), 404, 'Recommendation not found.');
+
+        $flow = ['gp' => 'implemented', 'implemented' => 'monitor', 'monitor' => 'done'];
+        $current = $actions[$index]['stage'] ?? 'gp';
+        $next = $flow[$current] ?? null;
+
+        if (! $next) {
+            return redirect()->back();
+        }
+
+        $actions[$index]['stage'] = $next;
+        if ($current === 'gp') {
+            $actions[$index]['gp_status'] = 'accepted';
+        }
+
+        $review->update(['actions' => $actions]);
 
         return redirect()->back();
     }
