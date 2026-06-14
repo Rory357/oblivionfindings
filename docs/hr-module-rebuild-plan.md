@@ -370,9 +370,13 @@ flat Send-Kudos dialog. M7-R3 (e08c55c5) — HrDemoSeeder feed/kudos demo data (
   approved + applied.
   - ✅ **DONE (41a26edc):** `storeReview`/`storeBand` null-tenant fixed (was dead on MySQL — `tenant_id`
     NOT NULL) via `ResolvesHrTenant`; `storeReview` dead redirect (`hr.compensation.reviews.index` →
-    `hr.compensation.reviews`) fixed. 3 tests (CompensationReviewCreationTest). REMAINING: Compensation
-    hub TabStrip; bonus create modal (gap: `bonuses.store` backend live but no UI; `employees` prop unused;
-    `BonusController::show` orphaned dead code); review-item approve + status transition.
+    `hr.compensation.reviews`) fixed. 3 tests (CompensationReviewCreationTest).
+  - ✅ **DONE (551ee277):** bonus create UI — `bonuses.tsx` ignored the `employees` prop + had no create
+    control (the live `bonuses.store` was UI-unreachable); added a "Record Bonus" dialog (employee dropdown
+    by name, type/amount/date/reason). `BonusController::store` wrote `tenant_id=null` (nullable col but
+    escapes `scopeForTenant` + the `['tenant_id','status']` index) → `ResolvesHrTenant`; dropped orphaned
+    `show()`; fixed invisible status badges (`bg-status-*` → `bg-status-*-bg`). 3 tests (BonusCreationTest).
+    REMAINING: Compensation hub TabStrip; review-item approve + status transition.
 - **M8-5 Benefits + Assets + Expenses.** *Problem:* benefits enrol uses raw profile-ID input; no plan
   edit/lifecycle; assets create standalone + no retire/maintenance; expenses "Mark Paid" 404
   (`markPaid` unrouted), no receipt upload, **expense→Finance bridge orphaned** (`PostExpenseJournalJob`
