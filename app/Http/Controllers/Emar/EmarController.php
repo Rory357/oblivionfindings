@@ -1221,33 +1221,24 @@ class EmarController extends Controller
     // ─── Medications Database ──────────────────────────────
     public function medications(Request $request)
     {
-        $selectedClient = null;
+        $user = $request->user();
+        $clientFilter = $request->integer('client_id') ?: null;
+        $siteFilter = $request->integer('site_id') ?: null;
 
-        $medications = ClientMedication::query()
-            ->with(['client:id,first_name,last_name', 'stock'])
-            ->when($request->search, fn ($q, $s) => $q->where('name', 'like', "%{$s}%"))
-            ->when($request->status === 'active', fn ($q) => $q->active())
-            ->when($request->status === 'ceased', fn ($q) => $q->where('state', 'ceased'))
-            ->when($request->status === 'paused', fn ($q) => $q->where('state', 'paused'))
-            ->when($request->type === 'prn', fn ($q) => $q->prn())
-            ->when($request->type === 'controlled', fn ($q) => $q->controlled())
-            ->when($request->type === 'high_risk', fn ($q) => $q->highRisk())
-            ->when($request->client_id, fn ($q, $id) => $q->where('client_id', $id))
-            ->latest()
-            ->paginate(50);
+        // Flat register of current (non-superseded) medications — the redesigned
+        // page filters by tab/search/client/sort entirely client-side, with live
+        // facet counts, so the whole register is served at once.
+        $meds = ClientMedication::query()
+            ->current()
+            ->with(['client:id,first_name,last_name,site_id', 'stock'])
+            ->when($clientFilter, fn ($q, $id) => $q->where('client_id', $id))
+            ->orderBy('name')
+            ->get();
 
-        $clients = Client::orderBy('last_name')->get(['id', 'first_name', 'last_name']);
-
-        if ($request->filled('client_id')) {
-            $selectedClient = Client::findOrFail($request->client_id);
-            $this->authorize('viewMedications', $selectedClient);
-        }
-
-        // Build a map of medication IDs that have known interactions with other active meds for the same client
+        // Map medication IDs that interact with another current med for the same client.
         $interactionMap = [];
-        $medsByClient = $medications->getCollection()->groupBy('client_id');
-        foreach ($medsByClient as $clientId => $clientMeds) {
-            $names = $clientMeds->pluck('name')->map(fn ($n) => strtolower($n))->toArray();
+        foreach ($meds->groupBy('client_id') as $clientMeds) {
+            $names = $clientMeds->pluck('name')->map(fn ($n) => strtolower($n))->all();
             if (count($names) < 2) {
                 continue;
             }
@@ -1282,19 +1273,56 @@ class EmarController extends Controller
             }
         }
 
+        $rows = $meds->map(function (ClientMedication $m) use ($interactionMap) {
+            $start = $m->start_date instanceof \DateTimeInterface ? $m->start_date->format('Y-m-d') : ($m->start_date ?: null);
+
+            return [
+                'id' => $m->id,
+                'client_id' => $m->client_id,
+                'client_name' => $m->client ? trim($m->client->last_name.', '.$m->client->first_name) : 'Unknown',
+                'name' => $m->name,
+                'brand_name' => $m->brand_name,
+                'dosage' => $m->dosage,
+                'dose_unit' => $m->dose_unit,
+                'frequency' => $m->frequency,
+                'route' => $m->route,
+                'form' => $m->form,
+                'instructions' => $m->instructions,
+                'indication' => $m->indication,
+                'prescriber' => $m->prescriber,
+                'is_prn' => (bool) $m->is_prn,
+                'prn_reason' => $m->prn_reason,
+                'max_per_day' => $m->max_per_day,
+                'min_hours_between_doses' => $m->min_hours_between_doses,
+                'controlled_drug' => (bool) $m->controlled_drug,
+                'high_risk' => (bool) $m->high_risk,
+                'witness_required' => (bool) $m->witness_required,
+                'state' => $m->state,
+                'approval_status' => $m->approval_status,
+                'rejection_reason' => $m->rejection_reason,
+                'pharmac_therapeutic_group' => $m->pharmac_therapeutic_group,
+                'start_date' => $start,
+                'stock' => $m->stock ? [
+                    'on_hand' => $m->stock->on_hand,
+                    'unit' => $m->stock->unit,
+                    'low' => $m->stock->reorder_level !== null && $m->stock->on_hand !== null
+                        && (float) $m->stock->on_hand <= (float) $m->stock->reorder_level,
+                ] : null,
+                'interaction_severity' => $interactionMap[$m->id] ?? null,
+            ];
+        })->all();
+
+        $activeSite = $siteFilter ? Site::find($siteFilter) : null;
+
         return Inertia::render('emar/Medications', [
-            'medications' => $medications,
-            'clients' => $clients,
+            'medications' => $rows,
+            'clients' => Client::orderBy('last_name')->get(['id', 'first_name', 'last_name']),
             'staff' => $this->getStaffList(),
-            'filters' => $request->only(['search', 'status', 'type', 'client_id']),
-            'interactionMap' => $interactionMap,
-            'selectedClient' => $selectedClient ? [
-                'id' => $selectedClient->id,
-                'first_name' => $selectedClient->first_name,
-                'last_name' => $selectedClient->last_name,
-            ] : null,
-            'clientContext' => $selectedClient ? $this->buildClientMedicationContext($selectedClient) : null,
-            'can' => $this->buildMedicationPermissions($request->user()),
+            'sites' => Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
+            'active_site' => $activeSite ? ['id' => $activeSite->id, 'name' => $activeSite->name] : null,
+            'site_brand_colour' => $activeSite?->brand_colour,
+            'witnesses' => $this->boardPayload->witnesses($user),
+            'can' => $this->buildMedicationPermissions($user),
         ]);
     }
 
@@ -3000,8 +3028,10 @@ class EmarController extends Controller
 
     public function discontinueMedication(Request $request, ClientMedication $medication)
     {
+        // A documented reason for ceasing an order is required — an undocumented
+        // cessation is a governance gap in NZ medication practice.
         $request->validate([
-            'reason' => 'nullable|string|max:500',
+            'reason' => 'required|string|max:500',
         ]);
 
         $medication->update([
