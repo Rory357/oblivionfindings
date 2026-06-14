@@ -225,7 +225,7 @@ export default function CostCentresIndex({ costCentres }: PageProps) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={Layers}
                         title="Cost Centres"
                         description="Manage cost centres for expense tracking and allocation"

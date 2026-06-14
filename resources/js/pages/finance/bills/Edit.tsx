@@ -198,7 +198,7 @@ export default function BillEdit({ auth, bill, vendors, accounts, costCentres, f
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref={`/finance/bills/${bill.id}`}
                         title={`Edit Bill ${bill.bill_number}`}

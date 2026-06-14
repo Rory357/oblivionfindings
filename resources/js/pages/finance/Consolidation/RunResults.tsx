@@ -147,7 +147,7 @@ export default function RunResults({ group, run }: PageProps) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref={`/finance/consolidation/${group.id}`}
                         backLabel="Back to Group"

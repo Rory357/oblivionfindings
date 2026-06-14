@@ -75,7 +75,7 @@ export default function CashFlowForecastIndex({ forecasts }: PageProps) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={TrendingUp}
                         title="Cash Flow Forecast"
                         description="Project future cash positions based on outstanding invoices, bills, and recurring transactions"

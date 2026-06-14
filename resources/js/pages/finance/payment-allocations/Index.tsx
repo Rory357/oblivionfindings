@@ -61,7 +61,7 @@ export default function PaymentAllocationsIndex({ allocations, filters }: Props)
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={ArrowLeftRight}
                         title="Payment Allocations"
                         description="Track how incoming payments have been allocated across invoices and bills."

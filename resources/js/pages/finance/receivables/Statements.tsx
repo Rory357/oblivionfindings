@@ -130,7 +130,7 @@ export default function Statements({ clients, statement, filters }: PageProps) {
             <PageLayout
                 hero={
                     <div className="print:hidden">
-                        <PageHero
+                        <PageHero category="finance"
                             icon={FileText}
                             title="Client Statements"
                             description="Generate and view outstanding invoice statements by client."

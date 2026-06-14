@@ -303,7 +303,7 @@ export default function ConsolidationShow({ group, entities, recentRuns, mapping
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref="/finance/consolidation"
                         title={group.name}

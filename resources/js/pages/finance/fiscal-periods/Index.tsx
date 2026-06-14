@@ -218,7 +218,7 @@ export default function FiscalPeriodsIndex({ periods }: PageProps) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={CalendarRange}
                         title="Fiscal Periods"
                         description="Manage accounting periods for your organisation"

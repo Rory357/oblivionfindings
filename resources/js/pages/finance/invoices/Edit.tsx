@@ -174,7 +174,7 @@ export default function InvoiceEdit({ auth, invoice, accounts, taxRates, bills }
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref={`/finance/invoices/${invoice.id}`}
                         title={`Edit ${invoice.invoice_number}`}

@@ -247,7 +247,7 @@ export default function BillCreate({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref="/finance/bills"
                         title="New Bill"

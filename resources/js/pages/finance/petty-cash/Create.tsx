@@ -44,7 +44,7 @@ export default function PettyCashCreate({ accounts, users }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref="/finance/petty-cash"
                         title="New Petty Cash Fund"

@@ -99,7 +99,7 @@ export default function AccountShow({ account, ledger, filters }: PageProps) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref="/finance/accounts"
                         title={`${account.code} - ${account.name}`}

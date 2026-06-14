@@ -80,7 +80,7 @@ export default function ProfitAndLoss({ report, filters }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={TrendingUp}
                         title="Profit & Loss Statement"
                         description="Revenue and expense summary for the selected period."

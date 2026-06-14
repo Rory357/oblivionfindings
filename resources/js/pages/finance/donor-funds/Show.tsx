@@ -179,7 +179,7 @@ export default function DonorFundShow({ fund, transactions, reports, expenseAcco
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref="/finance/donor-funds"
                         title={fund.fund_name}

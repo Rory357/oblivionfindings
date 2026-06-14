@@ -96,7 +96,7 @@ export default function AuditExportsIndex({ exports: exportData }: PageProps) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={History}
                         title="Audit Exports"
                         description="Generate audit trail reports for external auditors"

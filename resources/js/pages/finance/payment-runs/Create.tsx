@@ -90,7 +90,7 @@ export default function PaymentRunCreate({ bankAccounts, bills }: PageProps) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref="/finance/payment-runs"
                         title="New Payment Run"

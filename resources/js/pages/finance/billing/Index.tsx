@@ -82,7 +82,7 @@ export default function BillingIndex({ stats = {} as any, entries = { data: [], 
     return (
         <AppLayout>
             <Head title="Billing" />
-            <PageHero
+            <PageHero category="finance"
                 icon={Receipt}
                 title="Billing"
                 description="Manage billing entries, revenue tracking, and payment status."

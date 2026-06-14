@@ -230,7 +230,7 @@ export default function BudgetVsActuals({ budgets, selectedBudgetId, report }: P
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={BarChart3}
                         title="Budget vs Actuals"
                         description={

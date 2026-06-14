@@ -318,7 +318,7 @@ export default function MatchRulesIndex({ rules }: PageProps) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={SlidersHorizontal}
                         title="Match Rules"
                         description="Configure rules for automatic payment matching and auto-confirmation thresholds"

@@ -89,7 +89,7 @@ export default function ReconciliationIndex({ reconciliations, bankAccounts, fil
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={Scale}
                         title="Bank Reconciliation"
                         description="Reconcile bank statements against your ledger"

@@ -73,7 +73,7 @@ export default function QuotesIndex({ quotes = { data: [], links: [], current_pa
     return (
         <AppLayout>
             <Head title="Quotes" />
-            <PageHero
+            <PageHero category="finance"
                 icon={Calculator}
                 title="Quotes"
                 description="Create and manage service quotes for clients."

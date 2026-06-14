@@ -207,7 +207,7 @@ export default function Reconcile({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={Banknote}
                         backHref="/finance/bank-reconciliation"
                         title="Bank Reconciliation"

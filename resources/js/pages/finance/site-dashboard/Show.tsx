@@ -90,7 +90,7 @@ export default function SiteFinancialDashboard({ site, dashboard, variance, insi
 
             <div className="flex flex-col gap-6 p-6">
                 {/* Hero */}
-                <PageHero
+                <PageHero category="finance"
                     title="Financial Dashboard"
                     description={`Operational financial overview for ${site.name}`}
                     icon={<DollarSign className="h-7 w-7 text-white" />}

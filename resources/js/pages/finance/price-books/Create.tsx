@@ -25,7 +25,7 @@ export default function PriceBookCreate() {
     return (
         <AppLayout>
             <Head title="Create Price Book" />
-            <PageHero variant="compact" title="Create Price Book" description="Create a new price book for service rates." backHref="/finance/price-books" />
+            <PageHero category="finance" variant="compact" title="Create Price Book" description="Create a new price book for service rates." backHref="/finance/price-books" />
             <PageShell>
                 <form onSubmit={handleSubmit}>
                     <Card>

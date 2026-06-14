@@ -115,7 +115,7 @@ export default function BankAccountShow({ bankAccount, transactions, reconciliat
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref="/finance/bank-accounts"
                         title={bankAccount.name}

@@ -60,7 +60,7 @@ export default function BankAccountEdit({ bankAccount, glAccounts }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref={`/finance/bank-accounts/${bankAccount.id}`}
                         title="Edit Bank Account"

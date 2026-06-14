@@ -128,7 +128,7 @@ export default function IrdFilingShow({ filing }: PageProps) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref="/finance/ird-filings"
                         title={

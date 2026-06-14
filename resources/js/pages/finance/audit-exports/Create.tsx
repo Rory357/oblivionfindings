@@ -60,7 +60,7 @@ export default function AuditExportCreate() {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref="/finance/audit-exports"
                         title="New Audit Export"

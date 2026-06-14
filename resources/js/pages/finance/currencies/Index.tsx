@@ -319,7 +319,7 @@ export default function CurrenciesIndex({ currencies }: PageProps) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={Coins}
                         title="Currencies"
                         description="Manage currencies and exchange rates for multi-currency transactions"

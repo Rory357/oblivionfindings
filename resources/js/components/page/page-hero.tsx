@@ -32,7 +32,8 @@ export type PageHeroCategory =
     | 'incidents'
     | 'governance'
     | 'sites'
-    | 'fleet';
+    | 'fleet'
+    | 'finance';
 
 type IconLike = ComponentType<{ className?: string }>;
 

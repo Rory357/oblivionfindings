@@ -125,7 +125,7 @@ export default function AccountCreate({ parentAccounts, taxRates, fundingStreams
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref="/finance/accounts"
                         title="Create Account"

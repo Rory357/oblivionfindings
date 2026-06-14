@@ -217,7 +217,7 @@ export default function InvoiceCreate({ auth, accounts, taxRates, bills, clients
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         variant="compact"
                         backHref="/finance/invoices"
                         title="New Invoice"

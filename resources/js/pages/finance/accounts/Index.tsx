@@ -210,7 +210,7 @@ export default function AccountsIndex({
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={Wallet}
                         title="Chart of Accounts"
                         description="Manage your organisation's account structure"

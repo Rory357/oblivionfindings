@@ -92,7 +92,7 @@ export default function AgedReceivables({ report }: Props) {
 
             <PageLayout
                 hero={
-                    <PageHero
+                    <PageHero category="finance"
                         icon={ArrowUpFromLine}
                         title="Aged Receivables"
                         description="Outstanding receivables by client and aging period."
