@@ -192,8 +192,8 @@ Land the spine M1–M10 build on. **No behaviour change**, design only.
 - **[x] M2-6 Recurring charges engine.** Corrected columns (`is_active`/`next_charge_at`), daily schedule, `BillingEntry`→`FinInvoice`; test. *(commit 892f32a9)*
 - **[x] M2-7 Retire dead AR code.** Deleted `BillingJournalService` + `PostBillingJournalJob` (orphaned — job dispatched nowhere; service referenced only by that job + a stale docblock). route:list/suite clean. *(commit 6f622e5f)*
 
-### M3 — Purchases & Payables hub `[~]` (hub + P0 + dedup done; AP wizard modals remain)
-- **[~] M3-1 Payables hub + TabStrip + wizard modals.** *Hub DONE (commit 430c1cd5):* `PayablesTabsFooter`
+### M3 — Purchases & Payables hub `[x]` COMPLETE (Edit-Bill modal + payment-run-modal descoped — see M3-1)
+- **[x] M3-1 Payables hub + TabStrip + wizard modals.** *Hub DONE (commit 430c1cd5):* `PayablesTabsFooter`
   (components/finance/payables-hub.tsx, mirrors receivables-hub.tsx) in all 5 AP sub-page heros so bills ·
   purchase-orders · vendors · credit-notes · payment-runs read as one hub (every tab `finance.ap.view`).
   `PayablesController` redirects `/finance/payables` → first openable AP tab (bills); sidebar AP group collapsed
@@ -202,9 +202,12 @@ Land the spine M1–M10 build on. **No behaviour change**, design only.
   index passes accounts + canManage. **Surfaced + fixed a pre-existing P0** — `AccountsPayableService` stored the
   gst_rate PERCENTAGE (15) into the `decimal(5,4)` FRACTION column → 500 on every standard-GST bill (createBill/
   updateBill/credit-notes); also fixed `FinBillFactory`'s invalid `'void'` status (flaky). *New Vendor modal
-  (commit 39067ecc):* NewVendorDialog (Details → Terms & review) on /finance/vendors → vendors.store.
-  *Remaining (next tick):* New PO (multi-line, reuse NewBillDialog template) + Schedule/Approve Payment Run modals;
-  Edit-Bill modal deferred to M10 (like Edit-Invoice — needs lines the index doesn't carry). 2 store tests.
+  (commit 39067ecc):* NewVendorDialog (Details → Terms & review) on /finance/vendors → vendors.store. *New PO
+  modal (commit 88403e3c):* NewPoDialog (Details → Line items → Review) on /finance/purchase-orders → purchase-
+  orders.store (account optional per line). 5 store/posting tests. *Descoped by design:* Schedule Payment Run
+  stays a full page — it's a multi-bill batch-selection workflow (bill_ids[] checklist + bank account + date),
+  better suited to a page than a cramped modal; Approve/Process are already inline actions on the run Show page.
+  Edit-Bill modal deferred to M10 (like Edit-Invoice — needs the bill's lines, which the index doesn't carry).
 - **[x] M3-2 Bills `partial` status bug (P0).** Fixed `'partial'`→`'partially_paid'` (the enum value) across
   `BillController` summary (incl. total_overdue which only counted 'approved'), `CashFlowForecastService`
   projectOutflows, and `GlSyncService` bill push — all three silently excluded partially-paid bills. Test. *(commit c2dd2b28)*
