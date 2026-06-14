@@ -366,8 +366,18 @@ KiwiSaver + net-pay liability) via `PostPayrollJournalJob`; `AllocatePayrollCost
   clean, Finance suite 110 green). Remaining: confirm bill-due + budget-variance notifications deliver (own tick).
 
 ### M10 — Settings & Integrations + final de-dup + polish `[ ]`
-- **[ ] M10-1 Settings hub.** Integrations (Xero/MYOB) · Account mapping · Tax/GST config · Fiscal calendar ·
-  Finance permissions, as TabStrip + modals.
+- **[x] M10-1 Settings hub — SHIPPED (main 2bf7b622); the 8th/final hub.** `SettingsController@index` redirects
+  `/finance/settings` to the first openable admin tab (mirror TaxController; a tab LIST not a perm-keyed map so
+  order survives a future differently-gated tab), and a `SettingsTabsFooter` (`components/finance/settings-hub.tsx`)
+  drops into each sub-page's `PageHero footer`. Scope is the TWO genuinely standalone `finance.admin` surfaces —
+  accounting **Integrations** (Xero/MYOB) and **Funding Streams** — which sat loose in the sidebar "Other" group;
+  they collapse into one "Settings" sidebar entry. *Deliberately NOT pulled in (would fork the concept — already
+  hub tabs):* fiscal periods / cost centres / currencies (Ledger hub) and match rules (Banking hub). Account
+  mapping already lives as the Integrations→Mapping detail; standalone Tax/GST-config + fiscal-calendar surfaces
+  don't exist (not invented — no stubs). types/eslint/build green; SettingsHubTest (redirect+403); suite 118 green.
+  **8-HUB CONSOLIDATION COMPLETE:** Ledger · Receivables · Payables · Banking · Tax · Reports · Settings (+ the
+  Calendar feature surface). Remaining M10-1 scope (Tax/GST-config tab, finance-permissions UI) deferred — no
+  existing surface to collapse; would be net-new (do only when the backend exists).
 - **[ ] M10-2 Wire Xero account mapping.** *Problem:* mapping UI saves `account_mapping` but the push reads
   `account->code` only. *Fix:* consume the saved mapping in `XeroSyncProvider` push/export. Add a MYOB
   "not yet supported" banner (no dead controls). *Acceptance:* a non-code mapping is honoured in sync.
