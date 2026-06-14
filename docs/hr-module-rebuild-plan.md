@@ -368,6 +368,11 @@ flat Send-Kudos dialog. M7-R3 (e08c55c5) — HrDemoSeeder feed/kudos demo data (
   Bonuses); bonus create modal + tenant scope; fix the route-name; add review-item approve + status
   transition. *Acceptance:* bonus created from UI (tenant-scoped); review create works; review can be
   approved + applied.
+  - ✅ **DONE (41a26edc):** `storeReview`/`storeBand` null-tenant fixed (was dead on MySQL — `tenant_id`
+    NOT NULL) via `ResolvesHrTenant`; `storeReview` dead redirect (`hr.compensation.reviews.index` →
+    `hr.compensation.reviews`) fixed. 3 tests (CompensationReviewCreationTest). REMAINING: Compensation
+    hub TabStrip; bonus create modal (gap: `bonuses.store` backend live but no UI; `employees` prop unused;
+    `BonusController::show` orphaned dead code); review-item approve + status transition.
 - **M8-5 Benefits + Assets + Expenses.** *Problem:* benefits enrol uses raw profile-ID input; no plan
   edit/lifecycle; assets create standalone + no retire/maintenance; expenses "Mark Paid" 404
   (`markPaid` unrouted), no receipt upload, **expense→Finance bridge orphaned** (`PostExpenseJournalJob`
@@ -375,6 +380,13 @@ flat Send-Kudos dialog. M7-R3 (e08c55c5) — HrDemoSeeder feed/kudos demo data (
   enrol + plan lifecycle; asset modals + retire/maintenance; route+wire `markPaid`; receipt upload;
   dispatch `PostExpenseJournalJob` on approve. *Acceptance:* benefits enrol via picker; asset lifecycle;
   expense paid + posts to Finance GL.
+  - ✅ **DONE (6e8e52c9):** expense→Finance GL bridge wired — `ExpenseService::approveClaim` now dispatches
+    `PostExpenseJournalJob` (idempotent via `journal_id` guard); `HrExpenseClaim` `gl_posted_at` made
+    fillable+cast (was silently dropped); `ExpenseController` approve/reject/show permission keys aligned to
+    `hr.expenses.approve`. 3 tests (ExpenseJournalPostingTest — balanced journal DR 6100/7010 CR 2000=300,
+    double-post guard, non-approver 403). REMAINING: Benefits hub + PeoplePicker enrol + plan lifecycle +
+    `enrollments.update` edit UI (backend live, no UI); asset modals/retire; `markPaid` route+UI; receipt
+    upload; expenses create page→modal.
 - **M8-6 Engagement consolidation.** *Problem:* two survey systems (`HrSurvey` vs `HrEngagementSurvey`),
   two announcement paths (`HrAnnouncement` vs feed post_type), `HrCheckIn` orphan model. *Fix:* consolidate
   on the richer Engagement survey system (retire `/hr/surveys` via redirect); one announcement model;
