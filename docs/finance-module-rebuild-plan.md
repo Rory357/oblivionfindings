@@ -215,9 +215,15 @@ Land the spine M1–M10 build on. **No behaviour change**, design only.
   MAX-of-numeric-suffix, per org/month); `AccountsPayableService` + `PurchaseOrderController` (store + convertToBill)
   use them; the controller's two duplicate string-orderBy generators (broke past 999/month) deleted. 3 tests. *(commit 5d627663)*
 
-### M4 — Banking & Cash hub `[ ]`
-- **[ ] M4-1 Banking hub + TabStrip + Bank-Reconcile workspace + confirm modal.** Fold accounts/transactions/
-  reconciliation/matching/feeds/eftpos/petty-cash/match-rules.
+### M4 — Banking & Cash hub `[~]` (hub done; reconcile-workspace audit + M4-2/3/4 remain)
+- **[~] M4-1 Banking hub + TabStrip + Bank-Reconcile workspace + confirm modal.** *Hub DONE (commit 93f81c1c):*
+  `BankingTabsFooter` (components/finance/banking-hub.tsx, mirrors ledger-hub) in all 8 banking sub-page heros so
+  accounts · transactions · reconciliation · matching · feeds · EFTPOS · petty-cash · match-rules read as one hub.
+  Heterogeneous gates (bank.view / bank.manage / petty_cash.view→camelCase pettyCash in auth.can), so
+  `BankingController` redirects `/finance/banking` to the first openable tab (mirrors LedgerController); sidebar
+  Banking group collapsed + the separate Petty Cash entry folded into one "Banking" entry. 3 tests. *Remaining
+  (next tick):* audit the bank-reconciliation workspace (create/show flow) + add a confirm modal / fill any real
+  wiring gap (no stubs).
 - **[ ] M4-2 Activate match-rule engine.** *Problem:* `rule_type`/`conditions`/`priority` ignored;
   hardcoded score. *Evidence:* `PaymentMatchingService.php:51,162-176`. *Fix:* evaluate rules in scoring,
   increment `match_count`. *Acceptance:* a rule changes which txns auto-confirm; test.
