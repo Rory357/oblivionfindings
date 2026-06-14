@@ -163,7 +163,14 @@ self-contained sub-feature). Tracked in M10.
   `job-postings.reject-approval` have no UI. *Fix:* add interviewer field; wire or remove the dead
   routes/links (house rule: hide if no backend). *Acceptance:* interviewer captured; no 404 links; no dead buttons.
 
-### M3 — Onboarding + Offboarding modal workflows (explicit deliverable)
+### M3 — Onboarding + Offboarding modal workflows (explicit deliverable) — ✅ DONE (main 13ab554d→ba2c953a, 2026-06-14)
+
+**Shipped in 4 green sub-commits (≈19 Pest tests):** M3-2 email engine (13ab554d) → M3-1 OnboardingWizardDialog
+(0ef97489) → M3-4 OffboardingWizardDialog + exit-interview link (f9561f07) → M3-3 offer→onboarding auto-flow
+(ba2c953a). M3-1 compliance assignment uses `ComplianceMatrixService::evaluateStaff`; "docs-to-sign" step
+folded into the template task preview (no separate e-sign request — deferred to M8 compliance). Onboarding/
+offboarding `create.tsx` pages kept as no-JS fallback routes. Incidental fix: respondOffer `terms_accepted`
+was validated `accepted` (rejected the dialog's default `false`) → relaxed to `boolean`.
 
 - **M3-1 Onboarding wizard.** *Problem:* onboarding "create" is a one-field employee picker
   (`onboarding/create.tsx`); template editor is an always-open inline form on the index. *Fix:*
