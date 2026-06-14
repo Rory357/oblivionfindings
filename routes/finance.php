@@ -47,6 +47,7 @@ use App\Domain\Finance\Http\Controllers\QuoteController;
 use App\Domain\Finance\Http\Controllers\RecurringChargeController;
 use App\Domain\Finance\Http\Controllers\SiteFinancialDashboardController;
 use App\Domain\Finance\Http\Controllers\SitesFinancialOverviewController;
+use App\Domain\Finance\Http\Controllers\TaxController;
 use App\Domain\Finance\Http\Controllers\VendorController;
 use Illuminate\Support\Facades\Route;
 
@@ -446,6 +447,11 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
     Route::post('/bank-reconciliation/{reconciliation}/complete', [BankReconciliationController::class, 'complete'])
         ->name('bank-reconciliation.complete')
         ->middleware('permission:finance.bank.manage');
+
+    // ── Tax & Compliance hub ────────────────────────────────────────────
+    // /finance/tax is the hub entry point; it redirects to the first tax tab the
+    // user can open (GST returns · IRD filings · audit exports · consolidation).
+    Route::get('/tax', [TaxController::class, 'index'])->name('tax.index');
 
     // ── GST Returns ─────────────────────────────────────────────────────
     Route::get('/gst-returns', [GstReturnController::class, 'index'])

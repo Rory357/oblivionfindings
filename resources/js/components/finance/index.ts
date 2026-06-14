@@ -18,6 +18,7 @@ export * from './new-vendor-dialog';
 export * from './payables-hub';
 export * from './posting-preview';
 export * from './receivables-hub';
+export * from './tax-hub';
 export * from './record-receipt-dialog';
 export * from './wizard';
 

@@ -1682,18 +1682,20 @@ function buildFinanceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
     }
 
     const other: NavItem[] = [];
-    if (can?.finance?.tax?.view)
+    // Tax & Compliance hub — GST returns, IRD filings, audit exports and
+    // consolidation are now tabs here.
+    if (
+        can?.finance?.tax?.view ||
+        can?.finance?.tax?.manage ||
+        can?.finance?.reports?.view ||
+        can?.finance?.admin
+    ) {
         other.push({
-            title: 'GST Returns',
-            href: '/finance/gst-returns',
+            title: 'Tax & Compliance',
+            href: '/finance/tax',
             icon: Receipt,
         });
-    if (can?.finance?.tax?.manage)
-        other.push({
-            title: 'IRD E-Filing',
-            href: '/finance/ird-filings',
-            icon: Send,
-        });
+    }
     // Petty Cash is now a tab in the Banking & Cash hub (see `banking` above).
     if (can?.finance?.reports?.view)
         other.push({
@@ -1729,11 +1731,7 @@ function buildFinanceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             href: '/finance/cash-flow-forecast',
             icon: TrendingUp,
         });
-        reports.push({
-            title: 'Audit Exports',
-            href: '/finance/audit-exports',
-            icon: Download,
-        });
+        // Audit Exports is now a tab in the Tax & Compliance hub.
     }
 
     if (can?.finance?.admin) {
@@ -1742,11 +1740,7 @@ function buildFinanceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             href: '/finance/funding-streams',
             icon: GitBranch,
         });
-        other.push({
-            title: 'Consolidation',
-            href: '/finance/consolidation',
-            icon: Building2,
-        });
+        // Consolidation is now a tab in the Tax & Compliance hub.
         other.push({
             title: 'Integrations',
             href: '/finance/integrations',

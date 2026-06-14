@@ -2,6 +2,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import { type BreadcrumbItem } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
+import { TaxTabsFooter } from '@/components/finance';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Table, TableBody, TableCell, TableHead, TableHeader, TableRow } from '@/components/ui/table';
@@ -114,6 +115,7 @@ export default function AuditExportsIndex({ exports: exportData }: PageProps) {
                                 </Link>
                             </Button>
                         }
+                        footer={<TaxTabsFooter active="audit-exports" />}
                     />
                 }
             >

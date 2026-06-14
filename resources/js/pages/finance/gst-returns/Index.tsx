@@ -2,6 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
 import { PageHero, PageLayout } from '@/components/page';
+import { TaxTabsFooter } from '@/components/finance';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
@@ -116,6 +117,7 @@ export default function GstReturnsIndex({ gstReturns, filters }: PageProps) {
                                 </Button>
                             </Link>
                         }
+                        footer={<TaxTabsFooter active="gst-returns" />}
                     />
                 }
             >
