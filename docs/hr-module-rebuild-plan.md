@@ -508,6 +508,12 @@ flat Send-Kudos dialog. M7-R3 (e08c55c5) — HrDemoSeeder feed/kudos demo data (
 - **M10-1 De-dup sweep close-out.** Verify every merge in M1–M9 kept old routes alive via redirect; extract
   any remaining near-identical hero/table/card code into shared HR primitives. *Acceptance:* no duplicate
   concept pages remain; all old routes 301/redirect; dup map in this doc updated.
+  - ✅ **DONE — redirects verified (2720731d):** RetiredRoutesRedirectTest asserts all 8 retired routes still
+    redirect (no 404): /hr/{directory,positions,orgchart,departments}→/hr/people; /hr/job-postings→/hr/recruitment/jobs
+    (hr.jobs.index); /hr/surveys + /hr/surveys/create→/hr/wellbeing; /hr/announcements/create→/hr/announcements.
+    16 assertions. Shared-primitive extraction not needed (hubs already reuse components/hr spine + wizard kit).
+  - ✅ **DONE — ESS my/leave cancel button (cefa24a2):** wired the existing cancelLeave (owner-only, pending/
+    approved, restores balance) — my/leave.tsx now has a per-row Cancel control. 3 tests (MyLeaveCancelTest).
 - **M10-2 Demo seeders for every hub.** *Problem:* many hubs empty in demo. *Fix:* extend `HrDemoSeeder`
   so every hub renders populated (recognition, payroll run, performance, recruitment pipeline, etc.).
   *Acceptance:* fresh `migrate:fresh --seed` → no empty hubs on the dev server.
