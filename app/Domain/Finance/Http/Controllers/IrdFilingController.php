@@ -118,8 +118,13 @@ class IrdFilingController extends Controller
                     ->withErrors(['submission' => $filing->error_message]);
             }
 
+            $simulated = (bool) ($filing->ird_response['simulated'] ?? false);
+            $message = $simulated
+                ? "SIMULATED submission recorded ({$filing->ird_reference}) — NOT transmitted to IRD. File via myIR for a real submission."
+                : 'Filing submitted to IRD. Reference: '.$filing->ird_reference;
+
             return redirect()->route('finance.ird-filings.show', $filing)
-                ->with('success', 'Filing submitted to IRD. Reference: ' . $filing->ird_reference);
+                ->with($simulated ? 'warning' : 'success', $message);
         } catch (\InvalidArgumentException $e) {
             return redirect()->back()
                 ->withErrors(['status' => $e->getMessage()]);

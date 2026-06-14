@@ -15,7 +15,9 @@ class IrdFilingStatusFlowTest extends TestCase
 
     public function test_gst_filing_moves_from_draft_to_validated_to_submitted(): void
     {
-        config(['services.ird.api_key' => 'test-api-key']);
+        // Live IRD submission isn't wired; an explicit simulation lets the status
+        // flow reach 'submitted' without faking a real transmission.
+        config(['services.ird.simulation_enabled' => true]);
 
         $user = User::factory()->create(['organization_id' => 1]);
         $this->actingAs($user);
@@ -52,8 +54,9 @@ class IrdFilingStatusFlowTest extends TestCase
 
         $this->assertSame('submitted', $submitted->status);
         $this->assertNotNull($submitted->submitted_at);
-        $this->assertStringStartsWith('IRD-', $submitted->ird_reference);
-        $this->assertSame('received', $submitted->ird_response['status']);
+        $this->assertStringStartsWith('SIM-', $submitted->ird_reference);
+        $this->assertSame('simulated', $submitted->ird_response['status']);
+        $this->assertTrue($submitted->ird_response['simulated']);
         $this->assertNull($submitted->error_message);
     }
 
