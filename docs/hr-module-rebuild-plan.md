@@ -445,8 +445,11 @@ flat Send-Kudos dialog. M7-R3 (e08c55c5) — HrDemoSeeder feed/kudos demo data (
   - ✅ **DONE — retire HrSurvey (a22ddb85):** SurveyController index/create/show/respond → redirect to
     hr.wellbeing.index (routes+names preserved; store/submitResponse left gated-but-unreachable for M10 removal);
     sidebar dropped "Surveys", renamed "Wellbeing"→"Surveys & Wellbeing" + broadened gate (wellbeing||analytics||
-    surveys .view; old item was mis-gated analytics.view only). 4 tests (SurveySystemRetiredTest). REMAINING M8-6:
-    announcements create page→modal (low-risk finisher); HrCheckIn drop deferred to M10.
+    surveys .view; old item was mis-gated analytics.view only). 4 tests (SurveySystemRetiredTest).
+  - ✅ **DONE — announcements create→modal (36197574) → M8-6 COMPLETE:** "New Announcement" hero button now opens an
+    in-page dialog on announcements/index (title/content/priority/audience/target-value/publish+expiry/pin/ack);
+    AnnouncementController@index ships PRIORITIES/AUDIENCES consts; @create redirects to index (route preserved);
+    deleted dead create.tsx. 4 tests (AnnouncementCreateModalTest). HrCheckIn orphan drop → M10.
 
 ### M9 — Reports/Analytics; unified Approvals inbox; My-HR self-service
 
