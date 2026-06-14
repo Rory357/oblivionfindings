@@ -322,6 +322,17 @@ class CandidateController extends Controller
             'created_at' => $doc->created_at?->toDateString(),
         ])->values();
 
+        // Option data for the in-page Offer wizard (manager-only surface).
+        $offerTenantId = $this->resolveHrTenantIdForUser($user);
+        $offerSites = Site::query()
+            ->when($offerTenantId !== null, fn ($query) => $query->where('tenant_id', $offerTenantId))
+            ->orderBy('name')
+            ->get(['id', 'name']);
+        $offerRoles = collect(['support_worker', 'team_lead', 'coordinator', 'provider_manager', 'admin'])
+            ->map(fn ($role) => ['value' => $role, 'label' => str($role)->replace('_', ' ')->title()->toString()])
+            ->values()
+            ->toArray();
+
         return Inertia::render('hr/candidates/show', [
             'candidate' => $candidateData,
             'documents' => $documents,
@@ -329,6 +340,8 @@ class CandidateController extends Controller
             'activityLog' => $activityLog,
             'totalDaysInPipeline' => $candidate->created_at ? (int) $candidate->created_at->diffInDays(now()) : 0,
             'stages' => RecruitmentService::STAGES,
+            'offerSites' => $offerSites,
+            'offerRoles' => $offerRoles,
             'can' => [
                 'manage' => $user->canDo('hr.recruitment.manage'),
             ],
