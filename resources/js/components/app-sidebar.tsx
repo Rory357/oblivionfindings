@@ -2210,11 +2210,6 @@ function buildHrSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             href: '/hr/recruitment',
             icon: Users,
         });
-        people.items.push({
-            title: 'Job Postings',
-            href: '/hr/job-postings',
-            icon: Briefcase,
-        });
     }
     groups.push(people);
 

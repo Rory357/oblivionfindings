@@ -154,7 +154,7 @@ class CandidateController extends Controller
 
         $candidate->load([
             'applications.targetSite:id,name',
-            'applications.jobPosting:id,title,slug,department,location',
+            'applications.requisition:id,title,slug',
             'applications.interviewKit:id,name,role,criteria',
             'applications.interviews.completedBy:id,name',
             'applications.interviews.scores.interviewer:id,name',
@@ -192,12 +192,12 @@ class CandidateController extends Controller
                     'position_role' => $application->position_role,
                     'stage' => $candidateStage,
                     'status' => $status,
-                    'job_posting' => $application->jobPosting ? [
-                        'id' => $application->jobPosting->id,
-                        'title' => $application->jobPosting->title,
-                        'slug' => $application->jobPosting->slug,
-                        'department' => $application->jobPosting->department,
-                        'location' => $application->jobPosting->location,
+                    'job_posting' => $application->requisition ? [
+                        'id' => $application->requisition->id,
+                        'title' => $application->requisition->title,
+                        'slug' => $application->requisition->slug,
+                        'department' => $application->requisition->department,
+                        'location' => null,
                     ] : null,
                     'cover_letter' => $application->cover_letter,
                     'screening_answers' => $application->screening_answers,
@@ -631,7 +631,7 @@ class CandidateController extends Controller
 
         $application->load([
             'candidate.documents',
-            'jobPosting:id,title,department,location,salary_range_min,salary_range_max,show_salary',
+            'requisition:id,title,slug',
             'interviews.scores',
             'referenceChecks',
         ]);
@@ -661,13 +661,13 @@ class CandidateController extends Controller
                     'personal_phone' => $candidate?->personal_phone,
                     'source' => $candidate?->source,
                 ],
-                'job_posting' => $application->jobPosting ? [
-                    'title' => $application->jobPosting->title,
-                    'department' => $application->jobPosting->department,
-                    'location' => $application->jobPosting->location,
-                    'salary_range_min' => $application->jobPosting->salary_range_min,
-                    'salary_range_max' => $application->jobPosting->salary_range_max,
-                    'show_salary' => $application->jobPosting->show_salary,
+                'job_posting' => $application->requisition ? [
+                    'title' => $application->requisition->title,
+                    'department' => $application->requisition->department,
+                    'location' => null,
+                    'salary_range_min' => null,
+                    'salary_range_max' => null,
+                    'show_salary' => false,
                 ] : null,
                 'interviews' => $application->interviews->map(fn ($i) => [
                     'type' => $i->interview_type,
