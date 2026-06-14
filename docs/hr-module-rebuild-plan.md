@@ -163,7 +163,14 @@ self-contained sub-feature). Tracked in M10.
   `job-postings.reject-approval` have no UI. *Fix:* add interviewer field; wire or remove the dead
   routes/links (house rule: hide if no backend). *Acceptance:* interviewer captured; no 404 links; no dead buttons.
 
-### M3 — Onboarding + Offboarding modal workflows (explicit deliverable)
+### M3 — Onboarding + Offboarding modal workflows (explicit deliverable) — ✅ DONE (main 13ab554d→ba2c953a, 2026-06-14)
+
+**Shipped in 4 green sub-commits (≈19 Pest tests):** M3-2 email engine (13ab554d) → M3-1 OnboardingWizardDialog
+(0ef97489) → M3-4 OffboardingWizardDialog + exit-interview link (f9561f07) → M3-3 offer→onboarding auto-flow
+(ba2c953a). M3-1 compliance assignment uses `ComplianceMatrixService::evaluateStaff`; "docs-to-sign" step
+folded into the template task preview (no separate e-sign request — deferred to M8 compliance). Onboarding/
+offboarding `create.tsx` pages kept as no-JS fallback routes. Incidental fix: respondOffer `terms_accepted`
+was validated `accepted` (rejected the dialog's default `false`) → relaxed to `boolean`.
 
 - **M3-1 Onboarding wizard.** *Problem:* onboarding "create" is a one-field employee picker
   (`onboarding/create.tsx`); template editor is an always-open inline form on the index. *Fix:*
@@ -182,7 +189,24 @@ self-contained sub-feature). Tracked in M10.
   (checklist + asset return + access revoke); exit-interview task creates/links the record. *Acceptance:*
   offboarding launched from a modal; exit-interview task opens a real exit interview.
 
-### M4 — Time & Leave hub + leave calendar = site calendar
+### M4 — Time & Leave hub + leave calendar = site calendar — ✅ CORE DONE (main cb8d8ad8 + b3ffb973, 2026-06-14)
+
+**Shipped (2 green sub-commits, 7 Pest tests):** M4-1 + M4-2 (cb8d8ad8) — shared `components/calendar/calendar-view.tsx`
+wrapper (themed FullCalendar, hardcoded hex→`--primary`/`--status-critical` tokens, Monday-first) now used by the
+HR company calendar; fixed the create **405** (was POSTing `/hr/calendar`, GET-only → now `/hr/calendar/events`),
+added event-click→edit/**delete** modal (PUT/DELETE were unused), fixed a Radix `SelectItem value=""` crash on the
+Site picker, and moved `CalendarController` to `ResolvesHrTenant` (+ tenant-access guards). M4-3 leave-request modal
+(b3ffb973) — `components/hr/leave-request-dialog.tsx` (WizardShell) replaces the page-based `leave/create` (route
+redirects to the hub); fixed the blank Balances columns (controller mapped raw `balance/used/pending` → expected
+`entitlement/taken/remaining`).
+
+**AUDIT CORRECTION:** only `my-calendar.tsx` is FullCalendar; `calendar/global.tsx` wraps the hand-rolled
+`SiteCalendar.tsx` (different engine) — so "adopt the wrapper across site calendars" is N/A for the global site
+calendar. **DEFERRED to M10 de-dup/parity sweep** (refactor risk on working, non-browser-verifiable pages): adopt
+the wrapper inside `my-calendar.tsx` itself (de-dup its ~85-line inline FC CSS; keep its context-menu CSS); migrate
+`leave/index` Radix Tabs → `HrTabs`; rebuild `hr/calendar/time-off.tsx` (hand-rolled `grid grid-cols-7`) on the
+shared calendar or fold leave into the unified calendar; M4-4 (leave cancel button, .ics subscribe, replace
+native confirm()/alert()).
 
 - **M4-1 Shared FullCalendar wrapper.** *Problem:* no shared wrapper; `my-calendar.tsx`, `calendar/global.tsx`,
   `hr/calendar/index.tsx` each re-instantiate FullCalendar; `hr/calendar/time-off.tsx` is a hand-rolled

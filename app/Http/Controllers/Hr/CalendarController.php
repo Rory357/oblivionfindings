@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrCalendarEvent;
 use App\Domain\Hr\Models\HrLeaveRequest;
 use App\Models\Site;
@@ -11,6 +12,8 @@ use Inertia\Inertia;
 
 class CalendarController extends Controller
 {
+    use ResolvesHrTenant;
+
     /**
      * Combined calendar view showing events and approved leave.
      */
@@ -19,17 +22,18 @@ class CalendarController extends Controller
         $user = $request->user();
         abort_unless($this->canView($user), 403);
 
+        $tenantId = $this->resolveHrTenantIdForUser($user);
         $start = $request->query('start', now()->startOfMonth()->toDateString());
         $end = $request->query('end', now()->endOfMonth()->toDateString());
 
-        $events = HrCalendarEvent::forTenant($user->tenant_id)
+        $events = HrCalendarEvent::forTenant($tenantId)
             ->inRange($start, $end)
             ->with(['creator:id,name', 'site:id,name'])
             ->orderBy('starts_at')
             ->get();
 
         // Merge approved leave as calendar events
-        $leaveEvents = HrLeaveRequest::where('tenant_id', $user->tenant_id)
+        $leaveEvents = HrLeaveRequest::where('tenant_id', $tenantId)
             ->where('status', 'approved')
             ->where('starts_at', '<=', $end)
             ->where('ends_at', '>=', $start)
@@ -45,7 +49,7 @@ class CalendarController extends Controller
                 'color' => '#94a3b8',
             ]);
 
-        $sites = Site::where('tenant_id', $user->tenant_id)->get(['id', 'name']);
+        $sites = Site::where('tenant_id', $tenantId)->get(['id', 'name']);
 
         return Inertia::render('hr/calendar/index', [
             'events' => $events,
@@ -68,6 +72,7 @@ class CalendarController extends Controller
     {
         $user = $request->user();
         abort_unless($this->canManage($user), 403);
+        $tenantId = $this->resolveHrTenantIdForUser($user);
 
         $data = $request->validate([
             'title' => ['required', 'string', 'max:255'],
@@ -82,7 +87,7 @@ class CalendarController extends Controller
         ]);
 
         HrCalendarEvent::create([
-            'tenant_id' => $user->tenant_id,
+            'tenant_id' => $tenantId,
             'created_by' => $user->id,
             ...$data,
         ]);
@@ -97,6 +102,7 @@ class CalendarController extends Controller
     {
         $user = $request->user();
         abort_unless($this->canManage($user), 403);
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $event->tenant_id);
 
         $data = $request->validate([
             'title' => ['sometimes', 'string', 'max:255'],
@@ -122,6 +128,7 @@ class CalendarController extends Controller
     {
         $user = $request->user();
         abort_unless($this->canManage($user), 403);
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $event->tenant_id);
 
         $event->delete();
 

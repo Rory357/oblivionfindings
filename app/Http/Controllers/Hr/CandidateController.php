@@ -885,7 +885,10 @@ class CandidateController extends Controller
             'response' => ['required', 'string', Rule::in(['accepted', 'declined', 'withdrawn'])],
             'response_notes' => ['nullable', 'string', 'max:5000'],
             'signature_name' => ['nullable', 'string', 'max:255'],
-            'terms_accepted' => ['nullable', 'accepted'],
+            // Boolean, not `accepted`: the dialog always posts this (default false)
+            // for unsigned acceptances. The must-be-true rule is enforced by the
+            // signature guard below only when a signature is actually applied.
+            'terms_accepted' => ['nullable', 'boolean'],
         ]);
 
         if (! $offer->sent_at) {
@@ -954,6 +957,35 @@ class CandidateController extends Controller
             'response' => $offer->response,
             'response_at' => optional($offer->response_at)->toDateTimeString(),
         ]);
+
+        // Accepting an offer flows straight into employment + onboarding. The
+        // conversion is idempotent (firstOrCreate user / updateOrCreate profile /
+        // onboarding generated at most once), so a later manual "Convert" is safe.
+        if ($offer->response === 'accepted') {
+            $candidate = $application->candidate?->fresh();
+
+            if ($candidate) {
+                try {
+                    $profile = $this->recruitmentService->convertToEmployee($candidate, $offer->fresh(), $user->id);
+
+                    $this->webhookService->publish($application->tenant_id, 'recruitment.offer.converted', [
+                        'offer_id' => $offer->id,
+                        'application_id' => $application->id,
+                        'candidate_id' => $candidate->id,
+                        'employee_profile_id' => $profile->id,
+                        'converted_by' => $user->id,
+                    ]);
+
+                    return redirect()->back()->with('success', 'Offer accepted — employee profile created and onboarding started.');
+                } catch (\Throwable $exception) {
+                    report($exception);
+
+                    // The acceptance is saved; conversion can be retried via the
+                    // Convert action without losing anything.
+                    return redirect()->back()->with('success', 'Offer accepted. Converting to an employee could not complete automatically — use Convert to finish.');
+                }
+            }
+        }
 
         return redirect()->back()->with('success', 'Offer response recorded.');
     }

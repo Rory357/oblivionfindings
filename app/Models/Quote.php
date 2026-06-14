@@ -29,6 +29,7 @@ class Quote extends Model
         'sent_at',
         'accepted_at',
         'converted_to_agreement_id',
+        'converted_to_invoice_id',
         'created_by',
     ];
 

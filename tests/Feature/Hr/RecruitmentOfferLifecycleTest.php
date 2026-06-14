@@ -104,7 +104,11 @@ test('hr user can approve send and accept an offer workflow', function () {
     expect($offer->response)->toBe('accepted');
     expect($offer->signed_full_name)->toBe('Mia Candidate');
     expect($offer->signed_at)->not->toBeNull();
-    expect($candidate->status)->toBe('offer_accepted');
+    // Accepting now flows straight into employment + onboarding.
+    expect($candidate->status)->toBe('hired');
+    expect(
+        HrEmployeeProfile::query()->where('candidate_id', $candidate->id)->exists()
+    )->toBeTrue();
 });
 
 function hrAcceptedOfferFixture(User $hr, Site $site, string $email, string $role = 'support_worker'): array

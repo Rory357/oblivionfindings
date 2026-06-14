@@ -243,12 +243,34 @@ class LeaveController extends Controller
                 'totalActiveStaff' => $totalActiveStaff,
                 'rosterImpact' => $rosterImpact,
             ],
+            'staff' => $this->leaveFormStaff($tenantId),
+            'leaveTypes' => $this->leaveTypeOptions(),
             'can' => [
                 'approve' => $canApprove,
                 'manage'  => $canManage,
                 'create'  => $user->canDo('hr.leave.manage'),
             ],
         ]);
+    }
+
+    /** Staff selectable in the leave-request form (tenant-scoped). */
+    private function leaveFormStaff(int $tenantId): Collection
+    {
+        $staffIds = $this->hrStaffUserIdsForTenant($tenantId);
+
+        return User::staff()
+            ->when($staffIds !== [], fn ($query) => $query->whereIn('id', $staffIds))
+            ->orderBy('name')
+            ->get(['id', 'name', 'email']);
+    }
+
+    /** Leave-type options as {value,label} for the request form. */
+    private function leaveTypeOptions(): array
+    {
+        return array_map(fn ($type) => [
+            'value' => $type,
+            'label' => ucwords(str_replace('_', ' ', $type)),
+        ], LeaveService::LEAVE_TYPES);
     }
 
     /* ------------------------------------------------------------------ */
@@ -277,6 +299,23 @@ class LeaveController extends Controller
             ->paginate(50)
             ->withQueryString();
 
+        // The page reads entitlement/taken/remaining; the model stores
+        // balance/used/pending. Map so the columns aren't blank.
+        $balances->through(fn (HrLeaveBalance $b) => [
+            'id' => $b->id,
+            'user' => [
+                'id' => $b->user?->id,
+                'name' => $b->user?->name ?? 'Unknown',
+                'email' => $b->user?->email,
+            ],
+            'leave_type' => $b->leave_type,
+            'year' => $b->year,
+            'entitlement_hours' => (float) $b->balance_hours,
+            'taken_hours' => (float) $b->used_hours,
+            'pending_hours' => (float) $b->pending_hours,
+            'remaining_hours' => (float) ($b->balance_hours - $b->used_hours - $b->pending_hours),
+        ]);
+
         return Inertia::render('hr/leave/balances', [
             'balances' => $balances,
             'year' => $year,
@@ -300,20 +339,8 @@ class LeaveController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.leave.manage'), 403);
 
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $staffIds = $this->hrStaffUserIdsForTenant($tenantId);
-        $staff = User::staff()
-            ->when($staffIds !== [], fn ($query) => $query->whereIn('id', $staffIds))
-            ->orderBy('name')
-            ->get(['id', 'name', 'email']);
-
-        return Inertia::render('hr/leave/create', [
-            'staff' => $staff,
-            'leaveTypes' => array_map(fn ($type) => [
-                'value' => $type,
-                'label' => ucwords(str_replace('_', ' ', $type)),
-            ], LeaveService::LEAVE_TYPES),
-        ]);
+        // The page-based form was replaced by the LeaveRequestDialog on the hub.
+        return redirect()->route('hr.leave.index');
     }
 
     /* ------------------------------------------------------------------ */

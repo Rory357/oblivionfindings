@@ -1,6 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { PageHero, PageLayout } from '@/components/page';
+import { ReceivablesTabsFooter } from '@/components/finance';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -151,6 +152,7 @@ export default function Statements({ clients, statement, filters }: PageProps) {
                                     </Button>
                                 </Link>
                             }
+                            footer={<ReceivablesTabsFooter active="statements" />}
                         />
                     </div>
                 }

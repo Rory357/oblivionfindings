@@ -36,6 +36,11 @@ import {
     TabsTrigger,
 } from '@/components/ui/tabs';
 import { Textarea } from '@/components/ui/textarea';
+import {
+    LeaveRequestDialog,
+    type LeaveStaff,
+    type LeaveTypeOption,
+} from '@/components/hr/leave-request-dialog';
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
@@ -150,6 +155,8 @@ type Props = {
         hours_waiting: number;
     }>;
     dashboardData: DashboardData;
+    staff: LeaveStaff[];
+    leaveTypes: LeaveTypeOption[];
     can: { approve?: boolean; manage?: boolean; create?: boolean };
 };
 
@@ -249,8 +256,11 @@ export default function LeaveIndex({
     sla,
     pendingAging,
     dashboardData,
+    staff,
+    leaveTypes,
     can,
 }: Props) {
+    const [requestOpen, setRequestOpen] = useState(false);
     const pendingRequests = requests.data.filter((r) => r.status === 'pending');
     const allRequests = requests.data;
     const [selectedRequestIds, setSelectedRequestIds] = useState<number[]>([]);
@@ -399,11 +409,12 @@ export default function LeaveIndex({
                                 </Button>
                             )}
                             {can.create && (
-                                <Button size="sm" asChild>
-                                    <Link href="/hr/leave/create">
-                                        <Plus className="mr-1.5 h-4 w-4" /> New
-                                        Request
-                                    </Link>
+                                <Button
+                                    size="sm"
+                                    onClick={() => setRequestOpen(true)}
+                                >
+                                    <Plus className="mr-1.5 h-4 w-4" /> New
+                                    Request
                                 </Button>
                             )}
                         </div>
@@ -1430,6 +1441,15 @@ export default function LeaveIndex({
                     </DialogFooter>
                 </DialogContent>
             </Dialog>
+
+            {can.create && (
+                <LeaveRequestDialog
+                    open={requestOpen}
+                    onClose={() => setRequestOpen(false)}
+                    staff={staff}
+                    leaveTypes={leaveTypes}
+                />
+            )}
         </AppLayout>
     );
 }

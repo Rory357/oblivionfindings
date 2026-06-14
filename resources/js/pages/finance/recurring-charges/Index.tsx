@@ -12,6 +12,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { PageHero } from '@/components/page';
+import { ReceivablesTabsFooter } from '@/components/finance';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { CalendarDays, DollarSign, Eye, Pencil, Plus, RefreshCw, Search } from 'lucide-react';
@@ -79,6 +80,7 @@ export default function RecurringChargesIndex({ charges = { data: [], links: [],
                     { label: 'Monthly total', value: nzd.format(stats?.monthly_total ?? 0) },
                     { label: 'Next due', value: stats?.next_due ?? 0 },
                 ]}
+                footer={<ReceivablesTabsFooter active="recurring-charges" />}
             />
             <PageShell>
                 {/* Stats */}

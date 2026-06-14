@@ -168,22 +168,24 @@ Land the spine M1–M10 build on. **No behaviour change**, design only.
   (code→intended-name keyword, single source of truth) + a name-parity gate in `VerifyFinanceChart`; fails
   when a code is seeded under a contradictory name (would have caught 5020). Test covers the failure case. *(commit db73bcdd)*
 
-### M2 — Sales & Receivables hub + AR data + recurring billing `[ ]` (contains P0s)
-- **[ ] M2-1 Receivables hub + TabStrip + wizard modals.** Fold invoices/quotes/credit-notes(AR)/recurring/
-  billing/price-books/allocations/receivables into `/finance/receivables`; New/Edit Invoice, New Quote,
-  Credit Note, Record Receipt, Allocate Payment as `WizardShell` modals (line-item invoice = the multi-line wizard).
-- **[ ] M2-2 Kill AR data-blindness (P0).** *Problem:* receivables index, aged-AR report, statements read the
-  orphaned legacy `Invoice`. *Evidence:* `AccountsReceivableService.php:29,117,196`, `FinancialReportService.php:441`,
-  `Client.php:388`. *Fix:* migrate these reads to `FinInvoice` (+ `FinPaymentAllocation` tagged `FinInvoice`);
-  net partial payments. *Acceptance:* receivables/aged-AR/statements show real invoices; partial payments reduce balance.
-- **[ ] M2-3 `markPaid` posts a receipt journal (P0).** *Problem:* `InvoiceController::markPaid:436` sets
-  status only → AR overstated. *Fix:* post DR Bank/CR 1100 AR + write `FinPaymentAllocation` (reuse
-  `PaymentMatchingService::postInvoiceReceiptJournal`), idempotent. *Acceptance:* marking paid clears AR in GL; test asserts balanced receipt.
-- **[ ] M2-4 Quote→Invoice conversion.** *Problem:* `quotes.convert`→ServiceAgreement only. *Fix:* add accepted-quote→`FinInvoice`. *Acceptance:* accepted quote converts to a draft invoice with lines.
-- **[ ] M2-5 AR credit-note GST reversal.** *Problem:* `approveCreditNote` AR branch omits 2200. *Fix:* reverse GST proportionally. *Acceptance:* AR credit note reverses revenue + GST; balanced.
-- **[ ] M2-6 Recurring charges engine.** *Problem:* `RecurringChargeService` queries non-existent columns;
-  `ProcessRecurringChargesJob` unscheduled. *Evidence:* `RecurringChargeService.php:13-41`. *Fix:* correct
-  columns (`is_active`/`next_charge_at`), schedule the job (daily), generate `BillingEntry`→`FinInvoice`. *Acceptance:* a due recurring charge auto-generates an invoice on schedule; test.
+### M2 — Sales & Receivables hub + AR data + recurring billing `[~]` (P0s done; wizard modals + dead-code sweep remain)
+- **[~] M2-1 Receivables hub + TabStrip + wizard modals.** *Hub DONE (commit bc1e2450):* shared
+  `ReceivablesTabsFooter` (components/finance/receivables-hub.tsx) dropped into all 8 AR sub-page heros so
+  invoices · quotes · recurring · billing · aged-AR · statements · price-books · allocations read as one
+  hub (every tab `finance.ar.view`; credit-notes stay in AP since they're `finance.ap.*`-gated). Sidebar AR
+  group collapsed to one "Receivables" entry. *Remaining:* New/Edit Invoice + Record Receipt as `WizardShell`
+  modals (line-item invoice = the multi-line wizard; reference data + canManage from the index controller; NO
+  empty-string Select option values — the M1 crash lesson). Next tick.
+- **[x] M2-2 Kill AR data-blindness (P0).** Migrated receivables/aged-AR/statements reads to `FinInvoice` +
+  `FinPaymentAllocation`; partial payments net. *(commit 892f32a9)*
+- **[x] M2-3 `markPaid` posts a receipt journal (P0).** DR Bank / CR 1100 AR + `FinPaymentAllocation`, idempotent; balanced-receipt test. *(commit 892f32a9)*
+- **[x] M2-4 Quote→Invoice conversion.** `QuoteController::convertToInvoice` (route quotes.convert-to-invoice,
+  gated finance.ar.manage) builds a draft `FinInvoice` + lines from an accepted quote (net=amount, GST 15%),
+  idempotent + links `converted_to_invoice_id`; "Convert to Invoice" action on quotes/Show. Also fixed a
+  pre-existing bug where `QuoteController::store` wrote a non-existent `total` key (NOT-NULL `amount` never set
+  → quote create failed). *(commit 1504d264)*
+- **[x] M2-5 AR credit-note GST reversal.** Reverses revenue + 2200 GST proportionally; balanced. *(commit 892f32a9)*
+- **[x] M2-6 Recurring charges engine.** Corrected columns (`is_active`/`next_charge_at`), daily schedule, `BillingEntry`→`FinInvoice`; test. *(commit 892f32a9)*
 - **[ ] M2-7 Retire dead AR code.** Delete `BillingJournalService` + `PostBillingJournalJob` (orphaned, only ever worked on legacy model). *Acceptance:* `route:list`/build clean; no callers.
 
 ### M3 — Purchases & Payables hub `[ ]`

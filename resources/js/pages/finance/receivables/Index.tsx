@@ -2,6 +2,7 @@ import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, useForm, router } from '@inertiajs/react';
 import { PageHero, PageLayout } from '@/components/page';
+import { ReceivablesTabsFooter } from '@/components/finance';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
 import { Input } from '@/components/ui/input';
@@ -179,6 +180,7 @@ export default function ReceivablesIndex({ summary, invoices }: PageProps) {
                                 </Link>
                             </div>
                         }
+                        footer={<ReceivablesTabsFooter active="aged-ar" />}
                     />
                 }
             >

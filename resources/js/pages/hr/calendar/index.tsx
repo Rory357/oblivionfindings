@@ -18,13 +18,14 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { Textarea } from '@/components/ui/textarea';
+import { CalendarView } from '@/components/calendar/calendar-view';
 import { PageHero } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import dayGridPlugin from '@fullcalendar/daygrid';
 import interactionPlugin from '@fullcalendar/interaction';
-import FullCalendar from '@fullcalendar/react';
+import type { EventClickArg } from '@fullcalendar/core';
 import { Head, router, useForm } from '@inertiajs/react';
-import { Calendar, Plus } from 'lucide-react';
+import { Calendar, Plus, Trash2 } from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 type BreadcrumbItem = { title: string; href: string };
@@ -97,7 +98,8 @@ export default function CalendarIndex({
     can,
 }: Props) {
     const [showCreateDialog, setShowCreateDialog] = useState(false);
-    const [selectedDate, setSelectedDate] = useState<string | null>(null);
+    const [editingId, setEditingId] = useState<number | null>(null);
+    const [, setSelectedDate] = useState<string | null>(null);
 
     const form = useForm({
         title: '',
@@ -110,6 +112,17 @@ export default function CalendarIndex({
         department: '',
         site_id: '',
     });
+
+    function closeDialog() {
+        setShowCreateDialog(false);
+        setEditingId(null);
+        form.reset();
+        form.clearErrors();
+    }
+
+    // datetime-local inputs want `YYYY-MM-DDTHH:mm`; trim server ISO strings.
+    const toLocalInput = (value: string | null) =>
+        value ? value.substring(0, 16) : '';
 
     const calendarEvents = useMemo(() => {
         const mapped = events.map((e) => ({
@@ -144,14 +157,51 @@ export default function CalendarIndex({
 
     function handleDateClick(info: { dateStr: string }) {
         if (!can.manage) return;
+        setEditingId(null);
         setSelectedDate(info.dateStr);
         form.setData({
-            ...form.data,
+            title: '',
+            description: '',
+            event_type: 'company',
             starts_at: info.dateStr + 'T09:00',
             ends_at: info.dateStr + 'T17:00',
             is_all_day: false,
+            location: '',
+            department: '',
+            site_id: '',
         });
         setShowCreateDialog(true);
+    }
+
+    function handleEventClick(info: EventClickArg) {
+        if (!can.manage) return;
+        // Leave-derived events (id `leave-{n}`) aren't editable HR events.
+        if (info.event.id.startsWith('leave-')) return;
+
+        const hrEvent = events.find((e) => String(e.id) === info.event.id);
+        if (!hrEvent) return;
+
+        setEditingId(hrEvent.id);
+        form.setData({
+            title: hrEvent.title,
+            description: hrEvent.description ?? '',
+            event_type: hrEvent.event_type,
+            starts_at: toLocalInput(hrEvent.starts_at),
+            ends_at: toLocalInput(hrEvent.ends_at),
+            is_all_day: hrEvent.is_all_day,
+            location: hrEvent.location ?? '',
+            department: hrEvent.department ?? '',
+            site_id: hrEvent.site_id ? String(hrEvent.site_id) : '',
+        });
+        setShowCreateDialog(true);
+    }
+
+    function handleDelete() {
+        if (editingId === null) return;
+        router.delete(`/hr/calendar/events/${editingId}`, {
+            preserveScroll: true,
+            onSuccess: closeDialog,
+        });
     }
 
     function handleDatesSet(info: { startStr: string; endStr: string }) {
@@ -171,13 +221,23 @@ export default function CalendarIndex({
 
     function handleSubmit(e: React.FormEvent) {
         e.preventDefault();
-        form.post('/hr/calendar', {
-            preserveScroll: true,
-            onSuccess: () => {
-                setShowCreateDialog(false);
-                form.reset();
-            },
-        });
+        // site_id '' would fail the nullable-integer-exists rule → send null.
+        form.transform((data) => ({
+            ...data,
+            site_id: data.site_id === '' ? null : data.site_id,
+        }));
+
+        if (editingId !== null) {
+            form.put(`/hr/calendar/events/${editingId}`, {
+                preserveScroll: true,
+                onSuccess: closeDialog,
+            });
+        } else {
+            form.post('/hr/calendar/events', {
+                preserveScroll: true,
+                onSuccess: closeDialog,
+            });
+        }
     }
 
     return (
@@ -198,7 +258,12 @@ export default function CalendarIndex({
                         can.manage && (
                             <Button
                                 size="sm"
-                                onClick={() => setShowCreateDialog(true)}
+                                onClick={() => {
+                                    setEditingId(null);
+                                    form.reset();
+                                    form.clearErrors();
+                                    setShowCreateDialog(true);
+                                }}
                             >
                                 <Plus className="mr-1.5 h-4 w-4" />
                                 New Event
@@ -227,18 +292,18 @@ export default function CalendarIndex({
 
                 <Card>
                     <CardContent className="p-4">
-                        <FullCalendar
+                        <CalendarView
                             plugins={[dayGridPlugin, interactionPlugin]}
                             initialView="dayGridMonth"
                             events={calendarEvents}
                             dateClick={handleDateClick}
+                            eventClick={handleEventClick}
                             datesSet={handleDatesSet}
                             headerToolbar={{
                                 left: 'prev,next today',
                                 center: 'title',
                                 right: 'dayGridMonth,dayGridWeek',
                             }}
-                            height="auto"
                             eventDisplay="block"
                         />
                     </CardContent>
@@ -247,11 +312,15 @@ export default function CalendarIndex({
                 {/* Create Event Dialog */}
                 <Dialog
                     open={showCreateDialog}
-                    onOpenChange={setShowCreateDialog}
+                    onOpenChange={(o) => (o ? setShowCreateDialog(true) : closeDialog())}
                 >
                     <DialogContent className="max-w-lg">
                         <DialogHeader>
-                            <DialogTitle>Create Calendar Event</DialogTitle>
+                            <DialogTitle>
+                                {editingId !== null
+                                    ? 'Edit Calendar Event'
+                                    : 'Create Calendar Event'}
+                            </DialogTitle>
                         </DialogHeader>
 
                         <form onSubmit={handleSubmit} className="space-y-4">
@@ -393,16 +462,19 @@ export default function CalendarIndex({
                                 <div>
                                     <Label>Site</Label>
                                     <Select
-                                        value={form.data.site_id}
+                                        value={form.data.site_id || 'none'}
                                         onValueChange={(v) =>
-                                            form.setData('site_id', v)
+                                            form.setData(
+                                                'site_id',
+                                                v === 'none' ? '' : v,
+                                            )
                                         }
                                     >
                                         <SelectTrigger>
                                             <SelectValue placeholder="Select site (optional)" />
                                         </SelectTrigger>
                                         <SelectContent>
-                                            <SelectItem value="">
+                                            <SelectItem value="none">
                                                 None
                                             </SelectItem>
                                             {sites.map((s) => (
@@ -418,20 +490,38 @@ export default function CalendarIndex({
                                 </div>
                             )}
 
-                            <DialogFooter>
-                                <Button
-                                    type="button"
-                                    variant="outline"
-                                    onClick={() => setShowCreateDialog(false)}
-                                >
-                                    Cancel
-                                </Button>
-                                <Button
-                                    type="submit"
-                                    disabled={form.processing}
-                                >
-                                    Create Event
-                                </Button>
+                            <DialogFooter className="gap-2 sm:justify-between">
+                                {editingId !== null ? (
+                                    <Button
+                                        type="button"
+                                        variant="ghost"
+                                        className="text-status-critical hover:text-status-critical"
+                                        onClick={handleDelete}
+                                        disabled={form.processing}
+                                    >
+                                        <Trash2 className="mr-1.5 h-4 w-4" />
+                                        Delete
+                                    </Button>
+                                ) : (
+                                    <span />
+                                )}
+                                <div className="flex gap-2">
+                                    <Button
+                                        type="button"
+                                        variant="outline"
+                                        onClick={closeDialog}
+                                    >
+                                        Cancel
+                                    </Button>
+                                    <Button
+                                        type="submit"
+                                        disabled={form.processing}
+                                    >
+                                        {editingId !== null
+                                            ? 'Save Changes'
+                                            : 'Create Event'}
+                                    </Button>
+                                </div>
                             </DialogFooter>
                         </form>
                     </DialogContent>

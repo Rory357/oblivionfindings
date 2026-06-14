@@ -12,6 +12,7 @@ import {
     SelectValue,
 } from '@/components/ui/select';
 import { PageHero } from '@/components/page';
+import { ReceivablesTabsFooter } from '@/components/finance';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
 import { ArrowRight, DollarSign, FileText, Receipt, Search } from 'lucide-react';
@@ -92,6 +93,7 @@ export default function BillingIndex({ stats = {} as any, entries = { data: [], 
                     { label: 'Paid this month', value: formatCurrency(s.paid_this_month) },
                     { label: 'Pending', value: s.pending_count },
                 ]}
+                footer={<ReceivablesTabsFooter active="billing" />}
             />
             <PageShell>
                 {/* Stats */}
