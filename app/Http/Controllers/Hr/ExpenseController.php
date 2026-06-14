@@ -94,6 +94,19 @@ class ExpenseController extends Controller
 
         $validated = $request->validated();
 
+        // Persist any uploaded per-item receipts to the private disk and replace the
+        // raw upload with its stored path — addItem() consumes receipt_path, and the
+        // UploadedFile object must never reach the model.
+        foreach ($validated['items'] as $index => $item) {
+            unset($validated['items'][$index]['receipt']);
+
+            if ($request->hasFile("items.{$index}.receipt")) {
+                $validated['items'][$index]['receipt_path'] = $request
+                    ->file("items.{$index}.receipt")
+                    ->store("hr/expense-receipts/{$user->id}", 'private');
+            }
+        }
+
         try {
             $claim = $this->expenseService->createClaim($user, $validated);
         } catch (\Exception $e) {

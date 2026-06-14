@@ -608,8 +608,14 @@ flat Send-Kudos dialog. M7-R3 (e08c55c5) — HrDemoSeeder feed/kudos demo data (
     maintenance+retired; only status+notes cols touched; AuditableChanges records the timestamp). ALSO fixed the
     null-tenant bug in the SAME controller (index/store/show used `$user->tenant_id`→always null→seeded tenant-1
     assets never shown) → ResolvesHrTenant. 7 tests (AssetLifecycleTest incl. the index-tenant regression).
-    **Expense receipt upload** — receipt_path column + service param + show-page "Attached" badge
-    exist, but create form has no file input, request has no rule, no upload route (medium). **Benefit plan
+  - ✅ **Expense receipt upload DONE (S30)** — the receipt_path column + ExpenseService::addItem param + show-page
+    "Attached" badge existed but were unreachable (create form had no file input, no validation rule, no Storage
+    write → badge permanently dead). Receipt is per-ITEM (hr_expense_items.receipt_path). Wired: StoreExpenseClaimRequest
+    `items.*.receipt` => nullable|file|mimes:pdf,jpg,jpeg,png|max:5120; ExpenseController@store stores each uploaded
+    file via `$file->store("hr/expense-receipts/{userId}", 'private')` (the disk all sensitive HR uploads use) and
+    injects receipt_path into the item data (addItem already consumed it); create.tsx adds a per-item file input +
+    `forceFormData:true`. createClaim already resolved tenant via a service resolver (no tenant bug here). 4 tests
+    (ExpenseReceiptUploadTest: stored+recorded, no-file→null, bad-mime rejected, oversize rejected). **Benefit plan
     deactivate** — storePlan hardcodes is_active:true, no updatePlan route (low; missing transition, no dead button).
   - *Orphan models/tables to drop (reversible migration, like HrCheckIn):* **HrSurvey\*** (4 tables — NOT a clean
     self-contained drop: adversarial check found it's wired into HrDemoSeeder + DuskDatabaseSeeder + HrSurveyFactory +
