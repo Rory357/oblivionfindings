@@ -54,9 +54,23 @@ class DriverEligibilityController extends Controller
             'pending'   => (clone $base)->where('status', 'pending_review')->count(),
         ];
 
+        $employees = HrEmployeeProfile::query()
+            ->where('tenant_id', $tenantId)
+            ->where('is_active', true)
+            ->with('user:id,name')
+            ->orderBy('user_id')
+            ->get(['id', 'user_id', 'position_title'])
+            ->map(fn ($p) => [
+                'user_id' => $p->user_id,
+                'name' => $p->user?->name ?? ('Profile #'.$p->id),
+                'position_title' => $p->position_title,
+            ])
+            ->values();
+
         return Inertia::render('hr/drivers/index', [
             'records' => $records,
             'summary' => $summary,
+            'employees' => $employees,
             'filters' => [
                 'status' => $status,
                 'q' => $search,
