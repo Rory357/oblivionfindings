@@ -6,6 +6,7 @@
 // finance-specific pieces (hero category, money field, posting preview) are new.
 export * from './finance-hero';
 export * from './finance-tabs';
+export * from './ledger-hub';
 export * from './money';
 export * from './posting-preview';
 export * from './wizard';

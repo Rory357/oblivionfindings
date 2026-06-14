@@ -1,5 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm, router } from '@inertiajs/react';
+import { LedgerTabsFooter } from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -219,6 +220,7 @@ export default function FiscalPeriodsIndex({ periods }: PageProps) {
             <PageLayout
                 hero={
                     <PageHero category="finance"
+                        footer={<LedgerTabsFooter active="fiscal-periods" />}
                         icon={CalendarRange}
                         title="Fiscal Periods"
                         description="Manage accounting periods for your organisation"

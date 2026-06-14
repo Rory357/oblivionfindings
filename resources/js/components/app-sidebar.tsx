@@ -1634,15 +1634,17 @@ function buildFinanceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
         icon: LayoutDashboard,
     });
 
-    if (can?.finance?.ledger?.view) {
+    if (
+        can?.finance?.ledger?.view ||
+        can?.finance?.ledger?.manage ||
+        can?.finance?.admin ||
+        can?.finance?.assets?.view
+    ) {
+        // General Ledger hub — chart of accounts, journals, cost centres, fiscal
+        // periods, currencies, FX revaluations and fixed assets are now tabs here.
         overview.push({
-            title: 'Chart of Accounts',
-            href: '/finance/accounts',
-            icon: ClipboardList,
-        });
-        overview.push({
-            title: 'Journals',
-            href: '/finance/journals',
+            title: 'General Ledger',
+            href: '/finance/ledger',
             icon: BookOpen,
         });
     }
@@ -1744,12 +1746,6 @@ function buildFinanceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             href: '/finance/ird-filings',
             icon: Send,
         });
-    if (can?.finance?.assets?.view)
-        other.push({
-            title: 'Fixed Assets',
-            href: '/finance/fixed-assets',
-            icon: Package,
-        });
     if (can?.finance?.pettyCash?.view)
         other.push({
             title: 'Petty Cash',
@@ -1791,11 +1787,6 @@ function buildFinanceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
             icon: TrendingUp,
         });
         reports.push({
-            title: 'FX Revaluations',
-            href: '/finance/fx-revaluations',
-            icon: ArrowLeftRight,
-        });
-        reports.push({
             title: 'Audit Exports',
             href: '/finance/audit-exports',
             icon: Download,
@@ -1804,24 +1795,9 @@ function buildFinanceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
 
     if (can?.finance?.admin) {
         other.push({
-            title: 'Fiscal Periods',
-            href: '/finance/fiscal-periods',
-            icon: CalendarDays,
-        });
-        other.push({
-            title: 'Cost Centres',
-            href: '/finance/cost-centres',
-            icon: Building2,
-        });
-        other.push({
             title: 'Funding Streams',
             href: '/finance/funding-streams',
             icon: GitBranch,
-        });
-        other.push({
-            title: 'Currencies',
-            href: '/finance/currencies',
-            icon: Coins,
         });
         other.push({
             title: 'Consolidation',

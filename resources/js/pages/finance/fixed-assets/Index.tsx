@@ -1,6 +1,7 @@
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router, useForm } from '@inertiajs/react';
+import { LedgerTabsFooter } from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -161,6 +162,7 @@ export default function FixedAssetsIndex({ assets, summary, filters }: Props) {
             <PageLayout
                 hero={
                     <PageHero category="finance"
+                        footer={<LedgerTabsFooter active="fixed-assets" />}
                         icon={Package}
                         title="Fixed Assets"
                         description="Manage your organisation's fixed asset register"

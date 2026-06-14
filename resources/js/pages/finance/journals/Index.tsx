@@ -1,6 +1,7 @@
 import { Head, Link, router } from '@inertiajs/react';
 import { PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
+import { LedgerTabsFooter } from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 import { Card, CardContent } from '@/components/ui/card';
 import { Button } from '@/components/ui/button';
@@ -118,6 +119,7 @@ export default function JournalsIndex({ auth, journals, filters }: Props) {
             <PageLayout
                 hero={
                     <PageHero category="finance"
+                        footer={<LedgerTabsFooter active="journals" />}
                         icon={BookOpen}
                         title="Journals"
                         description="General ledger journal entries"

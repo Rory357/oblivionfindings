@@ -1,5 +1,6 @@
 import AppLayout from '@/layouts/app-layout';
 import { Head, useForm, router } from '@inertiajs/react';
+import { LedgerTabsFooter } from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
@@ -226,6 +227,7 @@ export default function CostCentresIndex({ costCentres }: PageProps) {
             <PageLayout
                 hero={
                     <PageHero category="finance"
+                        footer={<LedgerTabsFooter active="cost-centres" />}
                         icon={Layers}
                         title="Cost Centres"
                         description="Manage cost centres for expense tracking and allocation"

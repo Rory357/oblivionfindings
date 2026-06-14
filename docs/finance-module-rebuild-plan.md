@@ -141,12 +141,18 @@ Land the spine M1–M10 build on. **No behaviour change**, design only.
   to all **104** finance `<PageHero>` tags. Gates: types ✓, vitest 10/10 ✓, eslint (components + 104 pages) ✓, build ✓.
 
 ### M1 — Ledger hub + GL hardening `[in progress — branch finance/m1-ledger]`
-**Part A (GL hardening) DONE — gates green, merging as a verified increment.** Part B (hub UI) next.
-- **[ ] M1-1 Ledger hub + TabStrip.** Fold accounts/journals/cost-centres/fiscal-periods/currencies/
-  fx-revaluations/fixed-assets into `/finance/ledger` with TabStrip; old routes redirect. *Acceptance:* one hub; redirects resolve.
-- **[ ] M1-2 New Account / New Journal / FX-reval / Period-close as wizard modals.** Replace standalone
-  pages + dialogs with `WizardShell` (New Journal = the multi-line DR/CR wizard with live balance check +
-  `PostingPreview`). *Acceptance:* create/post in modals; journal won't submit unbalanced.
+**Part A (GL hardening) + Part B (Ledger hub) DONE & merged as verified increments.** Part C (wizard modals) next.
+- **[x] M1-1 Ledger hub + TabStrip.** Built `/finance/ledger` (LedgerController redirects to the first tab the
+  user can open) + a shared `LedgerTabsFooter` (components/finance/ledger-hub.tsx) dropped into every ledger
+  sub-page's `PageHero footer` slot — so chart of accounts · journals · cost centres · fiscal periods ·
+  currencies · FX revaluations · fixed assets all read as one hub with the finance TabStrip. Tabs are
+  permission-filtered (no 403 dead tabs); each sub-route keeps its own controller/data and stays live (no
+  hard redirect needed — the URLs now render the hub). Sidebar collapsed the scattered ledger items into one
+  "General Ledger" entry. 3 LedgerHubRedirect tests; full Finance suite 53 green; types/build/lint/route:list green.
+- **[ ] M1-2 New Account / New Journal / FX-reval / Period-close as wizard modals.** Replace the standalone
+  Create pages + dialogs with `WizardShell` (New Journal = the multi-line DR/CR wizard with live balance check +
+  `PostingPreview`). *Acceptance:* create/post in modals; journal won't submit unbalanced. *(Part C — old
+  Create pages still work today, so no dead buttons in the interim.)*
 - **[x] M1-3 Fix `5020` leave-expense collision.** Added dedicated `5050 Leave Expense` (FinanceSeeder,
   idempotent) and repointed `config/finance.php` `event_accounts.leave_provision.debit` 5020→5050; `5020`
   stays ACC Employer Levy only. Test asserts a leave_provision event debits 5050/Leave Expense, balanced +

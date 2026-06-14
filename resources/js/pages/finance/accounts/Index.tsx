@@ -1,3 +1,4 @@
+import { LedgerTabsFooter } from '@/components/finance';
 import { PageHero, PageLayout } from '@/components/page';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
@@ -210,7 +211,8 @@ export default function AccountsIndex({
 
             <PageLayout
                 hero={
-                    <PageHero category="finance"
+                    <PageHero
+                        category="finance"
                         icon={Wallet}
                         title="Chart of Accounts"
                         description="Manage your organisation's account structure"
@@ -226,6 +228,7 @@ export default function AccountsIndex({
                                 </Button>
                             </Link>
                         }
+                        footer={<LedgerTabsFooter active="accounts" />}
                     />
                 }
             >
