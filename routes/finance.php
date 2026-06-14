@@ -68,8 +68,11 @@ Route::middleware(['auth'])->prefix('finance')->name('finance.')->group(function
         ->name('executive-dashboard')
         ->middleware('permission:finance.dashboard');
 
-    // Finance obligation calendar — JSON event feed (invoice/bill due dates,
-    // payment runs, GST deadlines). The page route follows in M9-1 part 2.
+    // Finance obligation calendar — page shell + JSON event feed (invoice/bill
+    // due dates, payment runs, GST deadlines).
+    Route::get('/calendar', [FinanceCalendarController::class, 'index'])
+        ->name('calendar.index')
+        ->middleware('permission:finance.dashboard');
     Route::get('/calendar/events', [FinanceCalendarController::class, 'events'])
         ->name('calendar.events')
         ->middleware('permission:finance.dashboard');

@@ -7,6 +7,8 @@ use App\Http\Controllers\Controller;
 use Illuminate\Http\JsonResponse;
 use Illuminate\Http\Request;
 use Illuminate\Support\Carbon;
+use Inertia\Inertia;
+use Inertia\Response;
 
 /**
  * Finance obligation calendar — a read-only month view of upcoming money
@@ -18,6 +20,19 @@ class FinanceCalendarController extends Controller
     public function __construct(
         private FinanceCalendarAggregator $aggregator,
     ) {}
+
+    /**
+     * The calendar page shell. Events are loaded client-side from the JSON feed
+     * (events()) as the user navigates months, so this only hands the page the
+     * feed URL and the source legend.
+     */
+    public function index(): Response
+    {
+        return Inertia::render('finance/Calendar', [
+            'eventsUrl' => route('finance.calendar.events', [], false),
+            'sources' => $this->aggregator->sources(),
+        ]);
+    }
 
     /**
      * JSON event feed consumed by the calendar grid, scoped to [start, end].

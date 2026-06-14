@@ -1633,6 +1633,15 @@ function buildFinanceSubPanelGroups({ can }: { can?: any }): SubPanelGroup[] {
         icon: LayoutDashboard,
     });
 
+    if (can?.finance?.dashboard) {
+        // Obligation calendar — invoice/bill due dates, payment runs, GST deadlines.
+        overview.push({
+            title: 'Calendar',
+            href: '/finance/calendar',
+            icon: CalendarDays,
+        });
+    }
+
     if (
         can?.finance?.ledger?.view ||
         can?.finance?.ledger?.manage ||

@@ -9,6 +9,7 @@ use App\Domain\Finance\Services\Calendar\Providers\GstReturnProvider;
 use App\Models\Permission;
 use App\Models\User;
 use Illuminate\Support\Carbon;
+use Inertia\Testing\AssertableInertia as Assert;
 
 /**
  * The finance calendar aggregates read-only money obligations (AR invoice due
@@ -139,5 +140,25 @@ it('feeds events as JSON to a finance.dashboard user and 403s others', function 
     $other = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
     $this->actingAs($other)
         ->getJson(route('finance.calendar.events'))
+        ->assertForbidden();
+});
+
+it('renders the calendar page shell for a finance.dashboard user and 403s others', function () {
+    $permission = Permission::firstOrCreate(['key' => 'finance.dashboard'], ['description' => 'finance.dashboard']);
+    $user = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
+    $user->permissionOverrides()->syncWithoutDetaching([$permission->id => ['allowed' => true]]);
+
+    $this->actingAs($user)
+        ->get(route('finance.calendar.index'))
+        ->assertOk()
+        ->assertInertia(fn (Assert $page) => $page
+            ->component('finance/Calendar')
+            ->has('eventsUrl')
+            ->where('sources', ['invoice_due', 'bill_due', 'payment_run', 'gst_due']),
+        );
+
+    $other = User::factory()->create(['organization_id' => 1, 'approved_at' => now()]);
+    $this->actingAs($other)
+        ->get(route('finance.calendar.index'))
         ->assertForbidden();
 });
