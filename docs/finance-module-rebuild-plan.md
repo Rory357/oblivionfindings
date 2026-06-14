@@ -334,10 +334,17 @@ KiwiSaver + net-pay liability) via `PostPayrollJournalJob`; `AllocatePayrollCost
   (+ exclude bill-paying runs from the bill sum) or the HR payroll-run model. Deferred (cross-module / schema).
 
 ### M9 — Cross-module capture + Finance calendar `[ ]`
-- **[ ] M9-1 Finance calendar (site-calendar parity).** Build `/finance/calendar` reusing the shared
-  FullCalendar wrapper (HR M4-1's `calendar-view.tsx`), surfacing invoice/bill due dates, payment runs,
-  recurring charges, pay-run dates, GST periods+due, IRD payday dates, period close, depreciation runs,
-  budget periods. Click day/entry → modal. *Acceptance:* visually/behaviourally matches the site calendar; events real.
+- **[~] M9-1 Finance calendar — BACKEND SHIPPED (main 0332c90c); page next tick.** Built a
+  `FinanceCalendarAggregator` mirroring `SiteCalendarAggregator` (static `defaultProviders()` registry +
+  optional injected override) unioning four real-data providers into one sorted, deep-linked feed of
+  `FinanceCalendarItem`s: `InvoiceDueProvider` (AR `due_date`), `BillDueProvider` (AP `due_date`),
+  `PaymentRunProvider` (`payment_date`), `GstReturnProvider` (NZ GST deadline computed from period end —
+  28th-of-next-month with Nov→15 Jan / Mar→7 May concessions). `FinanceCalendarController@events` serves the
+  JSON feed (`finance.calendar.events`, gated `finance.dashboard`, `?sources=` filter). 5 tests; suite 115 green.
+  Deliberately omitted (no invented dates): IRD income-tax filing (no stored deadline), pay-run payday dates
+  (HR-owned M7-2), budget-period bands. **NEXT (part 2):** `@index` Inertia page reusing the shared
+  `calendar-view.tsx` wrapper (month grid + source legend + day/entry → read detail modal) + `finance.calendar.index`
+  route + sidebar nav entry. *Acceptance:* visually/behaviourally matches the site calendar; events real.
 - **[ ] M9-2 Capture-at-source modals.** Damages → AP maintenance + optional insurance AR; Catering shopping
   complete → HouseLedger groceries; Respite confirm → AR vs funder + funding drawdown; Asset capitalisation →
   `FinFixedAsset` + journal; operational AP → `FinBill`+`FinVendor` attribution; `SiteVendor.fin_vendor_id` FK.
