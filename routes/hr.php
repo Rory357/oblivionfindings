@@ -947,8 +947,11 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
         });
     });
 
-    // My Payslips (self-service)
+    // My Payslips (self-service) — owner-authorised in the controller, so these
+    // are NOT behind hr.payslips.view (which only HR/admin hold).
     Route::get('/my/payslips', [PayslipController::class, 'myPayslips'])->name('my.payslips');
+    Route::get('/my/payslips/{payslip}', [PayslipController::class, 'show'])->name('my.payslips.show');
+    Route::get('/my/payslips/{payslip}/download', [PayslipController::class, 'download'])->name('my.payslips.download');
 
     /*
     |--------------------------------------------------------------------------

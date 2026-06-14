@@ -117,7 +117,11 @@ class PayslipController extends Controller
     public function show(Request $request, HrPayslip $payslip)
     {
         $user = $request->user();
-        abort_unless($user && $user->canDo('hr.payslips.view'), 403);
+
+        // HR admins, or the employee viewing their own payslip (self-service).
+        $canView = ($user && $user->canDo('hr.payslips.view'))
+            || ($user && $user->id === $payslip->user_id);
+        abort_unless($canView, 403);
 
         $payslip->load([
             'user:id,name,email',
