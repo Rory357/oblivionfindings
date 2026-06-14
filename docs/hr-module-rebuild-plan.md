@@ -388,9 +388,15 @@ flat Send-Kudos dialog. M7-R3 (e08c55c5) — HrDemoSeeder feed/kudos demo data (
     `PostExpenseJournalJob` (idempotent via `journal_id` guard); `HrExpenseClaim` `gl_posted_at` made
     fillable+cast (was silently dropped); `ExpenseController` approve/reject/show permission keys aligned to
     `hr.expenses.approve`. 3 tests (ExpenseJournalPostingTest — balanced journal DR 6100/7010 CR 2000=300,
-    double-post guard, non-approver 403). REMAINING: Benefits hub + PeoplePicker enrol + plan lifecycle +
-    `enrollments.update` edit UI (backend live, no UI); asset modals/retire; `markPaid` route+UI; receipt
-    upload; expenses create page→modal.
+    double-post guard, non-approver 403).
+  - ✅ **DONE (a1efcc75):** Benefits enrollment edit UI — `benefits/index.tsx` table was read-only; added a
+    per-row Edit dialog (status/contribution rates/notes → PUT `enrollments.update`) + replaced the raw
+    "Employee Profile ID" input with an employee name dropdown. Fixed 3 null-tenant bugs (all `$user->tenant_id`):
+    index/plans/summary used `forTenant(null)`→`whereNull` so real enrollments NEVER showed (list always empty);
+    `storePlan` wrote `tenant_id=null` into a NOT-NULL col (plan create dead on MySQL); added cross-tenant guard
+    on update. Routed via `ResolvesHrTenant` + ships `employees` prop. 4 tests (BenefitsEnrollmentTest).
+    REMAINING: benefits plan edit/lifecycle; asset modals/retire; `markPaid` route+UI; receipt upload; expenses
+    create page→modal + "Posted to GL" badge.
 - **M8-6 Engagement consolidation.** *Problem:* two survey systems (`HrSurvey` vs `HrEngagementSurvey`),
   two announcement paths (`HrAnnouncement` vs feed post_type), `HrCheckIn` orphan model. *Fix:* consolidate
   on the richer Engagement survey system (retire `/hr/surveys` via redirect); one announcement model;
