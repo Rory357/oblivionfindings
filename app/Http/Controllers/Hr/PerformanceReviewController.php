@@ -93,36 +93,46 @@ class PerformanceReviewController extends Controller
                 'status' => $request->query('status'),
                 'q' => $search,
             ],
+            'staff' => $this->reviewStaff($tenantId),
+            'reviewTypes' => $this->reviewTypeOptions(),
             'can' => [
                 'manage' => $user->canDo('hr.performance.manage'),
             ],
         ]);
     }
 
+    /** Staff selectable in the review wizard (tenant-scoped). */
+    private function reviewStaff(int $tenantId)
+    {
+        $staffIds = $this->hrStaffUserIdsForTenant($tenantId);
+
+        return User::staff()
+            ->when($staffIds !== [], fn ($query) => $query->whereIn('id', $staffIds))
+            ->orderBy('name')
+            ->get(['id', 'name', 'email']);
+    }
+
+    /** Review-type options for the wizard. */
+    private function reviewTypeOptions(): array
+    {
+        return [
+            ['value' => 'annual', 'label' => 'Annual Review'],
+            ['value' => 'mid_year', 'label' => 'Mid-Year Review'],
+            ['value' => 'quarterly', 'label' => 'Quarterly Review'],
+            ['value' => 'ad_hoc', 'label' => 'Ad Hoc Review'],
+        ];
+    }
+
     /**
-     * Show form to create a new performance review.
+     * The page-based create form was replaced by the ReviewWizardDialog on the
+     * reviews hub. Preserve the route with a redirect.
      */
     public function create(Request $request)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $staffIds = $this->hrStaffUserIdsForTenant($tenantId);
 
-        $staff = User::staff()
-            ->whereIn('id', $staffIds)
-            ->orderBy('name')
-            ->get(['id', 'name', 'email']);
-
-        return Inertia::render('hr/performance/create-review', [
-            'staff' => $staff,
-            'reviewTypes' => [
-                ['value' => 'annual', 'label' => 'Annual Review'],
-                ['value' => 'mid_year', 'label' => 'Mid-Year Review'],
-                ['value' => 'quarterly', 'label' => 'Quarterly Review'],
-                ['value' => 'ad_hoc', 'label' => 'Ad Hoc Review'],
-            ],
-        ]);
+        return redirect()->route('hr.performance.reviews.index');
     }
 
     /**
@@ -146,26 +156,15 @@ class PerformanceReviewController extends Controller
     }
 
     /**
-     * Show form to edit a performance review.
+     * The page-based edit form was replaced by the ReviewWizardDialog (edit mode)
+     * on the reviews hub. Preserve the route with a redirect.
      */
     public function edit(Request $request, HrPerformanceReview $review)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.performance.manage'), 403);
-        $tenantId = $this->resolveHrTenantIdForUser($user);
-        $this->assertHrTenantAccess($tenantId, $review->tenant_id);
 
-        $review->load(['employee:id,name', 'reviewer:id,name']);
-
-        return Inertia::render('hr/performance/edit-review', [
-            'review' => $review,
-            'reviewTypes' => [
-                ['value' => 'annual', 'label' => 'Annual Review'],
-                ['value' => 'mid_year', 'label' => 'Mid-Year Review'],
-                ['value' => 'quarterly', 'label' => 'Quarterly Review'],
-                ['value' => 'ad_hoc', 'label' => 'Ad Hoc Review'],
-            ],
-        ]);
+        return redirect()->route('hr.performance.reviews.index');
     }
 
     /**

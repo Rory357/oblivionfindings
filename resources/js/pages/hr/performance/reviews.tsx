@@ -19,9 +19,16 @@ import {
     TableHeader,
     TableRow,
 } from '@/components/ui/table';
+import {
+    ReviewWizardDialog,
+    type ExistingReview,
+    type ReviewStaff,
+    type ReviewTypeOption,
+} from '@/components/hr/performance/review-wizard-dialog';
 import { PageHero, PageLayout } from '@/components/page';
 import AppLayout from '@/layouts/app-layout';
 import { Head, Link, router } from '@inertiajs/react';
+import { useState } from 'react';
 import {
     AlertTriangle,
     CheckCircle,
@@ -54,11 +61,17 @@ type PerformanceReview = {
     staff_user?: { id: number; name: string };
     employee?: { id: number; name: string };
     reviewer: { id: number; name: string };
+    review_type: string;
     review_period_start: string;
     review_period_end: string;
+    next_review_date: string | null;
     status: string;
     overall_rating: number | null;
     scheduled_at: string | null;
+    strengths: string | null;
+    development_areas: string | null;
+    goals: string[] | null;
+    training_recommendations: string[] | null;
 };
 
 type ProbationReview = {
@@ -89,6 +102,8 @@ type Props = {
         status: string | null;
         q: string | null;
     };
+    staff: ReviewStaff[];
+    reviewTypes: ReviewTypeOption[];
     can: { manage: boolean };
 };
 
@@ -184,9 +199,13 @@ export default function PerformanceReviews({
     ratingDistribution = [],
     statusDistribution = [],
     filters,
+    staff,
+    reviewTypes,
     can,
 }: Props) {
     const NONE = '__none__';
+    const [createOpen, setCreateOpen] = useState(false);
+    const [editing, setEditing] = useState<ExistingReview | null>(null);
 
     const onFilter = (next: Partial<typeof filters>) => {
         router.get(
@@ -238,11 +257,15 @@ export default function PerformanceReviews({
                                     </Button>
                                 </Link>
                                 {can.manage && (
-                                    <Link href="/hr/performance/reviews/create">
-                                        <Button size="sm">
-                                            <Plus className="mr-1.5 h-4 w-4" /> New Review
-                                        </Button>
-                                    </Link>
+                                    <Button
+                                        size="sm"
+                                        onClick={() => {
+                                            setEditing(null);
+                                            setCreateOpen(true);
+                                        }}
+                                    >
+                                        <Plus className="mr-1.5 h-4 w-4" /> New Review
+                                    </Button>
                                 )}
                             </>
                         }
@@ -590,12 +613,51 @@ export default function PerformanceReviews({
                                             )}
                                         </TableCell>
                                         <TableCell>
-                                            <Link
-                                                href={`/hr/performance/reviews/${review.id}`}
-                                                className="rounded-md border px-3 py-1.5 text-xs hover:bg-muted"
-                                            >
-                                                View
-                                            </Link>
+                                            <div className="flex items-center gap-1.5">
+                                                <Link
+                                                    href={`/hr/performance/reviews/${review.id}`}
+                                                    className="rounded-md border px-3 py-1.5 text-xs hover:bg-muted"
+                                                >
+                                                    View
+                                                </Link>
+                                                {can.manage && (
+                                                    // eslint-disable-next-line no-restricted-syntax -- chip-styled row action matching the adjacent View link
+                                                    <button
+                                                        type="button"
+                                                        onClick={() => {
+                                                            setEditing({
+                                                                id: review.id,
+                                                                employee:
+                                                                    review.employee ??
+                                                                    review.staff_user ??
+                                                                    null,
+                                                                review_type:
+                                                                    review.review_type,
+                                                                review_period_start:
+                                                                    review.review_period_start,
+                                                                review_period_end:
+                                                                    review.review_period_end,
+                                                                next_review_date:
+                                                                    review.next_review_date,
+                                                                overall_rating:
+                                                                    review.overall_rating,
+                                                                strengths:
+                                                                    review.strengths,
+                                                                development_areas:
+                                                                    review.development_areas,
+                                                                goals: review.goals,
+                                                                training_recommendations:
+                                                                    review.training_recommendations,
+                                                            });
+                                                            setCreateOpen(true);
+                                                        }}
+                                                        className="inline-flex items-center gap-1 rounded-md border px-3 py-1.5 text-xs hover:bg-muted"
+                                                    >
+                                                        <FileEdit className="h-3.5 w-3.5" />
+                                                        Edit
+                                                    </button>
+                                                )}
+                                            </div>
                                         </TableCell>
                                     </TableRow>
                                 ))}
@@ -686,6 +748,20 @@ export default function PerformanceReviews({
                             </Table>
                         </CardContent>
                     </Card>
+                )}
+
+                {can.manage && (
+                    <ReviewWizardDialog
+                        key={editing?.id ?? 'new'}
+                        open={createOpen}
+                        onClose={() => {
+                            setCreateOpen(false);
+                            setEditing(null);
+                        }}
+                        staff={staff}
+                        reviewTypes={reviewTypes}
+                        review={editing}
+                    />
                 )}
             </PageLayout>
         </AppLayout>
