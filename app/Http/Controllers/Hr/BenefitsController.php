@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrBenefitEnrollment;
 use App\Domain\Hr\Models\HrBenefitPlan;
 use App\Domain\Hr\Models\HrEmployeeProfile;
@@ -12,6 +13,8 @@ use Inertia\Inertia;
 
 class BenefitsController extends Controller
 {
+    use ResolvesHrTenant;
+
     public function __construct(
         protected BenefitsService $benefitsService,
     ) {}
@@ -24,8 +27,10 @@ class BenefitsController extends Controller
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.benefits.view'), 403);
 
+        $tenantId = $this->resolveHrTenantIdForUser($user);
+
         $enrollments = HrBenefitEnrollment::query()
-            ->forTenant($user->tenant_id)
+            ->forTenant($tenantId)
             ->with(['employeeProfile.user:id,name', 'benefitPlan'])
             ->when($request->query('status'), fn ($q, $status) => $q->where('status', $status))
             ->when($request->query('plan_id'), fn ($q, $planId) => $q->where('benefit_plan_id', $planId))
@@ -33,13 +38,21 @@ class BenefitsController extends Controller
             ->paginate(20)
             ->withQueryString();
 
-        $plans = HrBenefitPlan::forTenant($user->tenant_id)->active()->get(['id', 'name', 'type']);
+        $plans = HrBenefitPlan::forTenant($tenantId)->active()->get(['id', 'name', 'type']);
 
-        $summary = $this->benefitsService->getEnrollmentSummary($user->tenant_id);
+        $employees = HrEmployeeProfile::query()
+            ->where('tenant_id', $tenantId)
+            ->where('is_active', true)
+            ->with('user:id,name')
+            ->orderBy('user_id')
+            ->get(['id', 'user_id', 'position_title']);
+
+        $summary = $this->benefitsService->getEnrollmentSummary($tenantId);
 
         return Inertia::render('hr/benefits/index', [
             'enrollments' => $enrollments,
             'plans' => $plans,
+            'employees' => $employees,
             'summary' => $summary,
             'filters' => [
                 'status' => $request->query('status'),
@@ -60,7 +73,7 @@ class BenefitsController extends Controller
         abort_unless($user && $user->canDo('hr.benefits.view'), 403);
 
         $plans = HrBenefitPlan::query()
-            ->forTenant($user->tenant_id)
+            ->forTenant($this->resolveHrTenantIdForUser($user))
             ->withCount(['enrollments' => fn ($q) => $q->where('status', 'active')])
             ->when($request->query('type'), fn ($q, $type) => $q->where('type', $type))
             ->orderBy('name')
@@ -102,7 +115,7 @@ class BenefitsController extends Controller
         ]);
 
         HrBenefitPlan::create([
-            'tenant_id' => $user->tenant_id,
+            'tenant_id' => $this->resolveHrTenantIdForUser($user),
             ...$data,
         ]);
 
@@ -141,6 +154,8 @@ class BenefitsController extends Controller
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('hr.benefits.manage'), 403);
+
+        $this->assertHrTenantAccess($this->resolveHrTenantIdForUser($user), $enrollment->tenant_id);
 
         $data = $request->validate([
             'status' => ['sometimes', 'string', 'in:active,opted_out,suspended,terminated'],
