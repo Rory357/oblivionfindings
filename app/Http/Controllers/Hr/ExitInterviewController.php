@@ -122,6 +122,11 @@ class ExitInterviewController extends Controller
             ...$data,
         ]);
 
+        // When recorded from an offboarding checklist, stay on that page.
+        if ($request->boolean('from_offboarding')) {
+            return redirect()->back()->with('success', 'Exit interview recorded.');
+        }
+
         return redirect()->route('hr.exit-interviews.index')->with('success', 'Exit interview recorded.');
     }
 

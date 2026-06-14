@@ -12,10 +12,18 @@ import {
     SelectTrigger,
     SelectValue,
 } from '@/components/ui/select';
+import {
+    OffboardingWizardDialog,
+    type DepartureReason,
+    type OffboardingEmployee,
+    type OffboardingInterviewer,
+    type OffboardingTaskPreview,
+} from '@/components/hr/offboarding-wizard-dialog';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, Link, router } from '@inertiajs/react';
 import { Plus, UserMinus } from 'lucide-react';
+import { useState } from 'react';
 
 interface Checklist {
     id: number;
@@ -49,6 +57,11 @@ interface Props {
         due_next_7_days: number;
         total: number;
     };
+    employees: OffboardingEmployee[];
+    interviewers: OffboardingInterviewer[];
+    departureReasons: DepartureReason[];
+    defaultTasks: OffboardingTaskPreview[];
+    defaultEndDate: string;
     filters: { status: string | null; q: string };
     can: { manage: boolean };
 }
@@ -88,9 +101,16 @@ const statusConfig: Record<string, { className: string; label: string }> = {
 export default function OffboardingIndex({
     checklists,
     summary,
+    employees,
+    interviewers,
+    departureReasons,
+    defaultTasks,
+    defaultEndDate,
     filters,
     can,
 }: Props) {
+    const [wizardOpen, setWizardOpen] = useState(false);
+
     function applyFilter(key: string, value: string | null) {
         router.get(
             '/hr/offboarding',
@@ -117,11 +137,9 @@ export default function OffboardingIndex({
                         ]}
                         actions={
                             can.manage && (
-                                <Button asChild>
-                                    <Link href="/hr/offboarding/create">
-                                        <Plus className="mr-2 h-4 w-4" />
-                                        Start Offboarding
-                                    </Link>
+                                <Button onClick={() => setWizardOpen(true)}>
+                                    <Plus className="mr-2 h-4 w-4" />
+                                    Start offboarding
                                 </Button>
                             )
                         }
@@ -352,6 +370,18 @@ export default function OffboardingIndex({
                         </p>
                         <LaravelPagination links={checklists.links} />
                     </div>
+                )}
+
+                {can.manage && (
+                    <OffboardingWizardDialog
+                        open={wizardOpen}
+                        onClose={() => setWizardOpen(false)}
+                        employees={employees}
+                        defaultTasks={defaultTasks}
+                        departureReasons={departureReasons}
+                        interviewers={interviewers}
+                        defaultEndDate={defaultEndDate}
+                    />
                 )}
             </PageLayout>
         </AppLayout>

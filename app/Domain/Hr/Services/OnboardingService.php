@@ -540,6 +540,32 @@ class OnboardingService
     }
 
     /**
+     * Public view of the standard offboarding tasks, for previewing in the
+     * offboarding wizard before a checklist is generated.
+     *
+     * @return array<int, array<string, mixed>>
+     */
+    public function defaultOffboardingTasks(): array
+    {
+        return $this->getDefaultOffboardingTasks();
+    }
+
+    /**
+     * Active company assets assigned to a staff member, surfaced for the
+     * offboarding wizard's asset-return preview.
+     *
+     * @return \Illuminate\Support\Collection<int, array<string, mixed>>
+     */
+    public function previewAssetReturns(HrEmployeeProfile $profile): \Illuminate\Support\Collection
+    {
+        return $this->getActiveStaffAssetAssignments($profile)->map(fn ($assignment) => [
+            'id' => $assignment->id,
+            'name' => $assignment->asset?->name ?? 'Asset',
+            'asset_tag' => $assignment->asset?->asset_tag,
+        ])->values();
+    }
+
+    /**
      * Default offboarding tasks used when no template is configured.
      *
      * @return array<int, array{category: string, title: string, description: string, is_required: bool, assigned_to_role?: string, sign_off_required?: bool}>

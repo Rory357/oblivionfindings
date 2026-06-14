@@ -1,11 +1,24 @@
+import { SelectInput } from '@/components/hr/wizard';
 import { Badge } from '@/components/ui/badge';
 import { Button } from '@/components/ui/button';
 import { Card, CardContent, CardHeader, CardTitle } from '@/components/ui/card';
+import {
+    Dialog,
+    DialogContent,
+    DialogDescription,
+    DialogFooter,
+    DialogHeader,
+    DialogTitle,
+} from '@/components/ui/dialog';
+import { Input } from '@/components/ui/input';
+import { Label } from '@/components/ui/label';
 import { Progress } from '@/components/ui/progress';
+import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
-import { Head, Link, router, usePage } from '@inertiajs/react';
-import { ArrowLeft } from 'lucide-react';
+import { Head, Link, router, useForm, usePage } from '@inertiajs/react';
+import { ArrowLeft, MessageSquare } from 'lucide-react';
+import { useState } from 'react';
 
 interface Task {
     id: number;
@@ -35,6 +48,15 @@ interface Checklist {
     tasks: Task[];
 }
 
+interface Interviewer {
+    id: number;
+    name: string;
+}
+interface DepartureReason {
+    value: string;
+    label: string;
+}
+
 interface Props {
     checklist: Checklist;
     progress: {
@@ -43,7 +65,188 @@ interface Props {
         pending: number;
         percent: number;
     };
+    interviewers: Interviewer[];
+    departureReasons: DepartureReason[];
     can: { manage: boolean };
+}
+
+const isExitInterviewTask = (task: Task) =>
+    task.category === 'hr' && /exit interview/i.test(task.title);
+
+/** Record a real HrExitInterview from the offboarding checklist's task. */
+function ExitInterviewDialog({
+    open,
+    onClose,
+    employeeProfileId,
+    interviewers,
+    departureReasons,
+}: {
+    open: boolean;
+    onClose: () => void;
+    employeeProfileId: number;
+    interviewers: Interviewer[];
+    departureReasons: DepartureReason[];
+}) {
+    const form = useForm<{
+        employee_profile_id: number;
+        interviewer_user_id: string;
+        interview_date: string;
+        departure_reason: string;
+        overall_satisfaction: string;
+        what_went_well: string;
+        what_could_improve: string;
+        from_offboarding: boolean;
+    }>({
+        employee_profile_id: employeeProfileId,
+        interviewer_user_id: '',
+        interview_date: '',
+        departure_reason: '',
+        overall_satisfaction: '',
+        what_went_well: '',
+        what_could_improve: '',
+        from_offboarding: true,
+    });
+
+    const close = () => {
+        form.reset();
+        form.clearErrors();
+        onClose();
+    };
+
+    const submit = (e: React.FormEvent) => {
+        e.preventDefault();
+        form.transform((data) => ({
+            ...data,
+            overall_satisfaction: data.overall_satisfaction || null,
+        }));
+        form.post('/hr/exit-interviews', {
+            preserveScroll: true,
+            onSuccess: close,
+        });
+    };
+
+    const canSubmit =
+        form.data.interviewer_user_id !== '' &&
+        form.data.interview_date !== '' &&
+        form.data.departure_reason !== '';
+
+    return (
+        <Dialog open={open} onOpenChange={(o) => !o && close()}>
+            <DialogContent className="max-h-[90vh] overflow-y-auto sm:max-w-lg">
+                <DialogHeader>
+                    <DialogTitle>Record exit interview</DialogTitle>
+                    <DialogDescription>
+                        Capture the departing employee's exit interview.
+                    </DialogDescription>
+                </DialogHeader>
+                <form onSubmit={submit} className="space-y-4">
+                    <div className="grid gap-4 sm:grid-cols-2">
+                        <div className="space-y-1.5">
+                            <Label>Interviewer</Label>
+                            <SelectInput
+                                value={form.data.interviewer_user_id}
+                                onChange={(v) =>
+                                    form.setData('interviewer_user_id', v)
+                                }
+                                placeholder="Select an interviewer"
+                                options={interviewers.map((i) => ({
+                                    value: String(i.id),
+                                    label: i.name,
+                                }))}
+                            />
+                            {form.errors.interviewer_user_id && (
+                                <p className="text-xs text-status-critical">
+                                    {form.errors.interviewer_user_id}
+                                </p>
+                            )}
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label htmlFor="interview_date">Interview date</Label>
+                            <Input
+                                id="interview_date"
+                                type="date"
+                                value={form.data.interview_date}
+                                onChange={(e) =>
+                                    form.setData('interview_date', e.target.value)
+                                }
+                            />
+                            {form.errors.interview_date && (
+                                <p className="text-xs text-status-critical">
+                                    {form.errors.interview_date}
+                                </p>
+                            )}
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label>Departure reason</Label>
+                            <SelectInput
+                                value={form.data.departure_reason}
+                                onChange={(v) =>
+                                    form.setData('departure_reason', v)
+                                }
+                                placeholder="Select a reason"
+                                options={departureReasons}
+                            />
+                            {form.errors.departure_reason && (
+                                <p className="text-xs text-status-critical">
+                                    {form.errors.departure_reason}
+                                </p>
+                            )}
+                        </div>
+                        <div className="space-y-1.5">
+                            <Label>Overall satisfaction (1–5)</Label>
+                            <Input
+                                type="number"
+                                min={1}
+                                max={5}
+                                value={form.data.overall_satisfaction}
+                                onChange={(e) =>
+                                    form.setData(
+                                        'overall_satisfaction',
+                                        e.target.value,
+                                    )
+                                }
+                            />
+                        </div>
+                    </div>
+                    <div className="space-y-1.5">
+                        <Label htmlFor="what_went_well">What went well</Label>
+                        <Textarea
+                            id="what_went_well"
+                            rows={3}
+                            value={form.data.what_went_well}
+                            onChange={(e) =>
+                                form.setData('what_went_well', e.target.value)
+                            }
+                        />
+                    </div>
+                    <div className="space-y-1.5">
+                        <Label htmlFor="what_could_improve">
+                            What could improve
+                        </Label>
+                        <Textarea
+                            id="what_could_improve"
+                            rows={3}
+                            value={form.data.what_could_improve}
+                            onChange={(e) =>
+                                form.setData('what_could_improve', e.target.value)
+                            }
+                        />
+                    </div>
+                    <DialogFooter>
+                        <Button type="button" variant="ghost" onClick={close}>
+                            Cancel
+                        </Button>
+                        <Button
+                            type="submit"
+                            disabled={!canSubmit || form.processing}
+                        >
+                            {form.processing ? 'Saving…' : 'Record interview'}
+                        </Button>
+                    </DialogFooter>
+                </form>
+            </DialogContent>
+        </Dialog>
+    );
 }
 
 const statusConfig: Record<string, { className: string; label: string }> = {
@@ -73,7 +276,14 @@ const statusConfig: Record<string, { className: string; label: string }> = {
     },
 };
 
-export default function OffboardingShow({ checklist, progress, can }: Props) {
+export default function OffboardingShow({
+    checklist,
+    progress,
+    interviewers,
+    departureReasons,
+    can,
+}: Props) {
+    const [exitDialogOpen, setExitDialogOpen] = useState(false);
     const breadcrumbs: BreadcrumbItem[] = [
         { title: 'HR', href: '/hr' },
         { title: 'Offboarding', href: '/hr/offboarding' },
@@ -255,25 +465,45 @@ export default function OffboardingShow({ checklist, progress, can }: Props) {
                                                         </div>
                                                     </div>
 
-                                                    <Button
-                                                        size="sm"
-                                                        variant={
-                                                            completed
-                                                                ? 'secondary'
-                                                                : 'default'
-                                                        }
-                                                        disabled={
-                                                            !can.manage ||
-                                                            completed
-                                                        }
-                                                        onClick={() =>
-                                                            completeTask(task)
-                                                        }
-                                                    >
-                                                        {completed
-                                                            ? 'Done'
-                                                            : 'Complete'}
-                                                    </Button>
+                                                    <div className="flex shrink-0 items-center gap-2">
+                                                        {can.manage &&
+                                                            isExitInterviewTask(
+                                                                task,
+                                                            ) && (
+                                                                <Button
+                                                                    size="sm"
+                                                                    variant="outline"
+                                                                    onClick={() =>
+                                                                        setExitDialogOpen(
+                                                                            true,
+                                                                        )
+                                                                    }
+                                                                >
+                                                                    <MessageSquare className="mr-1.5 h-4 w-4" />
+                                                                    Record exit
+                                                                    interview
+                                                                </Button>
+                                                            )}
+                                                        <Button
+                                                            size="sm"
+                                                            variant={
+                                                                completed
+                                                                    ? 'secondary'
+                                                                    : 'default'
+                                                            }
+                                                            disabled={
+                                                                !can.manage ||
+                                                                completed
+                                                            }
+                                                            onClick={() =>
+                                                                completeTask(task)
+                                                            }
+                                                        >
+                                                            {completed
+                                                                ? 'Done'
+                                                                : 'Complete'}
+                                                        </Button>
+                                                    </div>
                                                 </div>
                                             </div>
                                         );
@@ -283,6 +513,16 @@ export default function OffboardingShow({ checklist, progress, can }: Props) {
                     </CardContent>
                 </Card>
             </div>
+
+            {can.manage && (
+                <ExitInterviewDialog
+                    open={exitDialogOpen}
+                    onClose={() => setExitDialogOpen(false)}
+                    employeeProfileId={checklist.employee_profile.id}
+                    interviewers={interviewers}
+                    departureReasons={departureReasons}
+                />
+            )}
         </AppLayout>
     );
 }
