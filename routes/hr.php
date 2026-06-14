@@ -59,7 +59,6 @@ use App\Http\Controllers\Hr\ScorecardController;
 use App\Http\Controllers\Hr\SkillsController;
 use App\Http\Controllers\Hr\SuccessionController;
 use App\Http\Controllers\Hr\SupervisionController;
-use App\Http\Controllers\Hr\SurveyController;
 use App\Http\Controllers\Hr\TimeOffCalendarController;
 use App\Http\Controllers\Hr\TimeTrackingController;
 use App\Http\Controllers\Hr\TrainingController;
@@ -813,20 +812,18 @@ Route::middleware(['auth'])->prefix('hr')->name('hr.')->group(function () {
 
     /*
     |--------------------------------------------------------------------------
-    | Surveys
+    | Surveys (RETIRED — superseded by the Wellbeing engagement-survey system)
     |--------------------------------------------------------------------------
+    | The standalone HrSurvey module was retired (S11): the Wellbeing system
+    | covers anonymity, scoring, eNPS, action plans + SLA reminders. The routes
+    | are kept alive as redirects so bookmarks + route() helpers still resolve;
+    | route names are preserved.
     */
-    Route::middleware('permission:hr.surveys.view')->prefix('surveys')->name('surveys.')->group(function () {
-        Route::get('/', [SurveyController::class, 'index'])->name('index');
-
-        Route::middleware('permission:hr.surveys.manage')->group(function () {
-            Route::get('/create', [SurveyController::class, 'create'])->name('create');
-            Route::post('/', [SurveyController::class, 'store'])->name('store');
-        });
-
-        Route::get('/{survey}/respond', [SurveyController::class, 'respond'])->name('respond');
-        Route::post('/{survey}/respond', [SurveyController::class, 'submitResponse'])->name('respond.store');
-        Route::get('/{survey}', [SurveyController::class, 'show'])->name('show');
+    Route::prefix('surveys')->name('surveys.')->group(function () {
+        Route::redirect('/', '/hr/wellbeing')->name('index');
+        Route::redirect('/create', '/hr/wellbeing')->name('create');
+        Route::redirect('/{survey}/respond', '/hr/wellbeing')->name('respond');
+        Route::redirect('/{survey}', '/hr/wellbeing')->name('show');
     });
 
     /*

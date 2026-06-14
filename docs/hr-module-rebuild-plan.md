@@ -518,6 +518,18 @@ flat Send-Kudos dialog. M7-R3 (e08c55c5) — HrDemoSeeder feed/kudos demo data (
     2 tests (HrCheckInDroppedTest).
   - ✅ **DONE — my/training LMS catalog link (203dd983):** permission-gated "Browse training courses" action on
     my/training.tsx (can.viewCatalog = hr.training.view||training.viewAny). 2 tests (MyTrainingCatalogLinkTest).
+  - ✅ **DONE — HrSurvey controller/service/pages removal (S25):** the standalone HrSurvey system was retired in
+    S11 (GET methods already redirected to /hr/wellbeing). Finished the cleanup: the `surveys.` route group now
+    uses `Route::redirect('/hr/surveys{,/create,/{survey}/respond,/{survey}}', '/hr/wellbeing')` (route NAMES
+    preserved: hr.surveys.index/create/respond/show; permission middleware dropped so bookmarks redirect even
+    without the perm). Deleted `SurveyController` + `SurveyService` (used ONLY by that controller) + the 4
+    `pages/hr/surveys/*.tsx`. Dropped the unreferenced POST routes (hr.surveys.store/respond.store — grep found
+    zero route()/UI refs; only `hr.wellbeing.surveys.show` exists, a different namespace). KEPT: HrSurvey* models
+    (orphaned now — dropping their tables is a separate migration like HrCheckIn, future tick) and the
+    `hr.surveys.view` permission exposure in HandleInertiaRequests (the sidebar still reads `can.hr.surveys.view`
+    as one OR-branch to show the "Surveys & Wellbeing" → /hr/wellbeing nav item). Wayfinder regenerated (pruned the
+    SurveyController action TS; generated TS is gitignored). Gates: types + build + RetiredRoutesRedirectTest +
+    SurveySystemRetiredTest (5 tests, incl. route-names-still-resolve) green.
 - **M10-2 Demo seeders for every hub.** *Problem:* many hubs empty in demo. *Fix:* extend `HrDemoSeeder`
   so every hub renders populated (recognition, payroll run, performance, recruitment pipeline, etc.).
   *Acceptance:* fresh `migrate:fresh --seed` → no empty hubs on the dev server.
