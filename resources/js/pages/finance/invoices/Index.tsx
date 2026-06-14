@@ -2,7 +2,7 @@ import { Head, Link, router } from '@inertiajs/react';
 import { type BreadcrumbItem, PageProps } from '@/types';
 import AppLayout from '@/layouts/app-layout';
 import { PageHero, PageLayout } from '@/components/page';
-import { ReceivablesTabsFooter, RecordReceiptDialog } from '@/components/finance';
+import { NewInvoiceDialog, ReceivablesTabsFooter, RecordReceiptDialog, type ClientOption, type TaxRateOption } from '@/components/finance';
 import { Button } from '@/components/ui/button';
 import { Badge } from '@/components/ui/badge';
 import { Input } from '@/components/ui/input';
@@ -55,6 +55,8 @@ interface Props extends PageProps {
     filters: Filters;
     summary: Summary;
     canManage: boolean;
+    clients: ClientOption[];
+    taxRates: TaxRateOption[];
 }
 
 const formatCurrency = (amount: string | number, currency = 'NZD') =>
@@ -77,12 +79,13 @@ const breadcrumbs: BreadcrumbItem[] = [
     { title: 'Invoices', href: '/finance/invoices' },
 ];
 
-export default function InvoicesIndex({ auth, invoices, filters, summary, canManage }: Props) {
+export default function InvoicesIndex({ auth, invoices, filters, summary, canManage, clients, taxRates }: Props) {
     const [search, setSearch] = useState(filters.search ?? '');
     const [status, setStatus] = useState(filters.status ?? '');
     const [dateFrom, setDateFrom] = useState(filters.date_from ?? '');
     const [dateTo, setDateTo] = useState(filters.date_to ?? '');
     const [receiptInvoice, setReceiptInvoice] = useState<Invoice | null>(null);
+    const [newInvoiceOpen, setNewInvoiceOpen] = useState(false);
 
     const canReceipt = (invoice: Invoice) =>
         canManage &&
@@ -129,12 +132,12 @@ export default function InvoicesIndex({ auth, invoices, filters, summary, canMan
                             { label: 'Paid this month', value: formatCurrency(summary.paid_this_month) },
                         ]}
                         actions={
-                            <Button asChild size="sm">
-                                <Link href="/finance/invoices/create">
+                            canManage && (
+                                <Button size="sm" onClick={() => setNewInvoiceOpen(true)}>
                                     <Plus className="w-4 h-4 mr-1.5" />
                                     New Invoice
-                                </Link>
-                            </Button>
+                                </Button>
+                            )
                         }
                         footer={<ReceivablesTabsFooter active="invoices" />}
                     />
@@ -367,6 +370,15 @@ export default function InvoicesIndex({ auth, invoices, filters, summary, canMan
                         total_amount: receiptInvoice.total_amount,
                         amount_due: Number(receiptInvoice.amount_due ?? 0),
                     }}
+                />
+            )}
+
+            {canManage && (
+                <NewInvoiceDialog
+                    open={newInvoiceOpen}
+                    onClose={() => setNewInvoiceOpen(false)}
+                    clients={clients}
+                    taxRates={taxRates}
                 />
             )}
         </AppLayout>
