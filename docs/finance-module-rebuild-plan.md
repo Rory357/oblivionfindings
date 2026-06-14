@@ -224,13 +224,18 @@ Land the spine M1–M10 build on. **No behaviour change**, design only.
   Banking group collapsed + the separate Petty Cash entry folded into one "Banking" entry. 3 tests. *Remaining
   (next tick):* audit the bank-reconciliation workspace (create/show flow) + add a confirm modal / fill any real
   wiring gap (no stubs).
-- **[ ] M4-2 Activate match-rule engine.** *Problem:* `rule_type`/`conditions`/`priority` ignored;
-  hardcoded score. *Evidence:* `PaymentMatchingService.php:51,162-176`. *Fix:* evaluate rules in scoring,
-  increment `match_count`. *Acceptance:* a rule changes which txns auto-confirm; test.
+- **[x] M4-2 Activate match-rule engine.** `calculateMatchScore` now tags each candidate with the rule_type
+  dimensions it satisfied; `matchUnmatchedTransactions` picks the highest-priority active rule whose rule_type the
+  candidate satisfied (+ optional JSON conditions: min/max amount, description_contains) as the governing rule,
+  uses ITS auto_confirm_threshold, and increments that rule's match_count on auto-confirm. 3 tests. *(commit bf5a3efe)*
 - **[ ] M4-3 Bank feeds: honest state.** *Problem:* providers throw; no token exchange. *Fix:* implement
   OAuth token exchange for at least one provider **or** hide bank-feed UI behind a feature flag and document
   CSV import as supported (house rule: no stub UI). *Acceptance:* no dead "sync" buttons; CSV path clearly primary.
-- **[ ] M4-4 Petty cash top-up/adjustment booking.** *Fix:* book the funding-side journal on top-up. *Acceptance:* top-up posts; balanced.
+- **[x] M4-4 Petty cash top-up/adjustment booking.** Top-up now posts a balanced DR Petty Cash (fund GL) / CR
+  Bank (1000) journal (graceful balance-only fallback if accounts unconfigured). Also fixed a NOT-NULL
+  `description` column vs nullable validation → 500 on description-less transactions (coalesce to ''). 2 tests. *(commit 501edb07)*
+- **[ ] M4-5 Reconcile-workspace audit (next tick).** Read BankReconciliationController create/show + the
+  reconciliation Show page; if a confirm/finalise lacks a balanced adjustment journal, fix it + add a confirm modal.
 
 ### M5 — Payroll end-to-end → Finance bridge `[ ]` `[headline — coordinate with HR]`
 **Read HR's M5 status first (`git fetch`, `hr/*`, plan doc).** Bridge is ~95% wired + tested.
