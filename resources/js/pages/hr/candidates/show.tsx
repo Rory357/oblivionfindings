@@ -1626,7 +1626,7 @@ export default function CandidateShow({
 
                                         {/* Offer */}
                                         {app.offer && (
-                                            <div className="rounded-xl border-2 border-status-success/20 bg-status-success p-4">
+                                            <div className="rounded-xl border-2 border-status-success/20 bg-status-success-bg p-4">
                                                 <h4 className="mb-3 flex items-center gap-2 text-sm font-semibold">
                                                     <Gift className="h-4 w-4 text-status-success" />
                                                     Employment Offer

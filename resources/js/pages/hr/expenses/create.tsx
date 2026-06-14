@@ -24,6 +24,7 @@ type ExpenseItem = {
     expense_date: string;
     tax_amount: string;
     notes: string;
+    receipt: File | null;
 };
 
 type Props = {
@@ -52,6 +53,7 @@ const emptyItem: ExpenseItem = {
     expense_date: '',
     tax_amount: '',
     notes: '',
+    receipt: null,
 };
 
 export default function CreateExpense({ categories }: Props) {
@@ -69,12 +71,20 @@ export default function CreateExpense({ categories }: Props) {
 
     const updateItem = (
         index: number,
-        key: keyof ExpenseItem,
+        key: 'description' | 'category' | 'amount' | 'expense_date' | 'tax_amount' | 'notes',
         value: string,
     ) => {
         setItems((prev) =>
             prev.map((item, i) =>
                 i === index ? { ...item, [key]: value } : item,
+            ),
+        );
+    };
+
+    const updateItemReceipt = (index: number, file: File | null) => {
+        setItems((prev) =>
+            prev.map((item, i) =>
+                i === index ? { ...item, receipt: file } : item,
             ),
         );
     };
@@ -100,9 +110,12 @@ export default function CreateExpense({ categories }: Props) {
                         ? parseFloat(item.tax_amount)
                         : null,
                     notes: item.notes || null,
+                    receipt: item.receipt,
                 })),
             },
             {
+                // A receipt File on any item requires a multipart submission.
+                forceFormData: true,
                 onFinish: () => setProcessing(false),
             },
         );
@@ -365,6 +378,34 @@ export default function CreateExpense({ categories }: Props) {
                                                     {
                                                         errors[
                                                             `items.${index}.tax_amount`
+                                                        ]
+                                                    }
+                                                </p>
+                                            )}
+                                        </div>
+                                        <div className="space-y-2 sm:col-span-3">
+                                            <Label>Receipt (optional)</Label>
+                                            <Input
+                                                type="file"
+                                                accept=".pdf,.jpg,.jpeg,.png"
+                                                onChange={(e) =>
+                                                    updateItemReceipt(
+                                                        index,
+                                                        e.target.files?.[0] ??
+                                                            null,
+                                                    )
+                                                }
+                                            />
+                                            <p className="text-xs text-muted-foreground">
+                                                PDF or image, up to 5MB.
+                                            </p>
+                                            {errors[
+                                                `items.${index}.receipt`
+                                            ] && (
+                                                <p className="text-sm text-status-critical">
+                                                    {
+                                                        errors[
+                                                            `items.${index}.receipt`
                                                         ]
                                                     }
                                                 </p>

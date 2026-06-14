@@ -59,6 +59,61 @@ class AssetService
     }
 
     /**
+     * Send an available asset to maintenance.
+     */
+    public function sendToMaintenance(HrAsset $asset, array $data = []): HrAsset
+    {
+        if ($asset->status !== 'available') {
+            throw new \LogicException("Only an available asset can be sent to maintenance (current status: {$asset->status}).");
+        }
+
+        $attrs = ['status' => 'maintenance'];
+        if (! empty($data['notes'])) {
+            $attrs['notes'] = $data['notes'];
+        }
+        $asset->update($attrs);
+
+        return $asset->fresh();
+    }
+
+    /**
+     * Return an asset from maintenance back to the available pool.
+     */
+    public function returnFromMaintenance(HrAsset $asset, array $data = []): HrAsset
+    {
+        if ($asset->status !== 'maintenance') {
+            throw new \LogicException("Only an asset in maintenance can be returned to service (current status: {$asset->status}).");
+        }
+
+        $attrs = ['status' => 'available'];
+        if (! empty($data['notes'])) {
+            $attrs['notes'] = $data['notes'];
+        }
+        $asset->update($attrs);
+
+        return $asset->fresh();
+    }
+
+    /**
+     * Retire (decommission) an asset. It must not be currently assigned — return
+     * it from the employee first so no open assignment is orphaned.
+     */
+    public function retireAsset(HrAsset $asset, array $data = []): HrAsset
+    {
+        if (! in_array($asset->status, ['available', 'maintenance'], true)) {
+            throw new \LogicException("Cannot retire a '{$asset->status}' asset. Return it from assignment first.");
+        }
+
+        $attrs = ['status' => 'retired'];
+        if (! empty($data['notes'])) {
+            $attrs['notes'] = $data['notes'];
+        }
+        $asset->update($attrs);
+
+        return $asset->fresh();
+    }
+
+    /**
      * Get all assets currently assigned to an employee.
      */
     public function getAssetsForEmployee(HrEmployeeProfile $profile): Collection

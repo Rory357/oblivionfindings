@@ -567,6 +567,18 @@ flat Send-Kudos dialog. M7-R3 (e08c55c5) — HrDemoSeeder feed/kudos demo data (
     visible proficiency-code text. Gates: types + eslint(touched) + build green. NOTE: live axe/mobile pass is
     browser-blocked → deferred to USER. Remaining a11y static candidates: skills/matrix cell label, fill-amber-400
     raw-palette star fills (non-token, cosmetic).
+  - ✅ **DONE — same-token contrast-killer sweep (S28):** the exact `bg-status-X text-status-X` (same colour, no
+    `-bg`) invisible-text bug the brief flagged and `status-badge.tsx` guards. Verified the tokens are distinct
+    (`--status-success` 45%L vs `--status-success-bg` 94%L; `info`→primary/accent), so the pairing really is
+    illegible. S26 missed it because the class order is `text-…` BEFORE `bg-…`. Fixed **162 swaps across 44 files**
+    (`bg-status-X` → `bg-status-X-bg`, keeping the saturated `text-status-X`): same-line badge maps (131, via an
+    LF-safe Node line-scoped same-token script) + cross-line parent/child icon-chips, callout boxes, and
+    "Pending Approval" status Cards (directory contact tiles, exit-interviews/trends + job-postings + my/payslips
+    chips, candidates/goals/import-export callouts, leave/time warning cards, payroll critical cards). Left LEGIT
+    solid fills untouched: progress bars/dividers (`rounded-l-full`, `h-0.5`, `transition-all`), solid action
+    buttons + status `<Badge>`s (light `text-primary-foreground`), and feedback/summary's separate `bar`/`text`
+    config keys. Final detection scan: 0 remaining. Gates: types + eslint(44 files) + build (NO Pest — pure
+    className swaps).
 - **M10-7 Finish-half-built: compensation review APPROVE (no dead button).** *Problem (verified by a parallel
   audit + adversarial check, S27):* a comp review is created `planning` with items `pending`, but `applyReview`/
   `applyCompensationReview` require status `approved` (items `approved`) and the review-detail "Apply Review"
@@ -588,19 +600,30 @@ flat Send-Kudos dialog. M7-R3 (e08c55c5) — HrDemoSeeder feed/kudos demo data (
     in-page Radix tabs (OK). LACKING tabs, ranked by cluster size: **Performance** (~8 surfaces/20+ pages — largest),
     **My-HR/ESS** (12 pages), **Compliance** (~7 surfaces), **Reports** (5), **Compensation** (3, no index),
     **Documents** (3), **Settings** (3, low). One hub/tick.
-  - *Half-built backends (finish or hide):* **Asset retire/maintenance** — index filter + status colours offer
-    maintenance/retired but AssetService only assign/return + no route/UI can set them (medium; either wire or hide
-    the filter options). **Expense receipt upload** — receipt_path column + service param + show-page "Attached" badge
-    exist, but create form has no file input, request has no rule, no upload route (medium). **Benefit plan
+  - *Half-built backends (finish or hide):* ✅ **Asset retire/maintenance DONE (S29)** — wired
+    AssetService::{sendToMaintenance(available→maintenance), returnFromMaintenance(maintenance→available),
+    retireAsset(available|maintenance→retired, NOT while assigned)} + AssetController methods (hr.assets.manage,
+    LogicException→flash) + POST routes assets.{maintenance,return-from-maintenance,retire} + show.tsx
+    status-conditional buttons (Maintenance/Return-to-service/Retire). No schema invention (status enum already had
+    maintenance+retired; only status+notes cols touched; AuditableChanges records the timestamp). ALSO fixed the
+    null-tenant bug in the SAME controller (index/store/show used `$user->tenant_id`→always null→seeded tenant-1
+    assets never shown) → ResolvesHrTenant. 7 tests (AssetLifecycleTest incl. the index-tenant regression).
+  - ✅ **Expense receipt upload DONE (S30)** — the receipt_path column + ExpenseService::addItem param + show-page
+    "Attached" badge existed but were unreachable (create form had no file input, no validation rule, no Storage
+    write → badge permanently dead). Receipt is per-ITEM (hr_expense_items.receipt_path). Wired: StoreExpenseClaimRequest
+    `items.*.receipt` => nullable|file|mimes:pdf,jpg,jpeg,png|max:5120; ExpenseController@store stores each uploaded
+    file via `$file->store("hr/expense-receipts/{userId}", 'private')` (the disk all sensitive HR uploads use) and
+    injects receipt_path into the item data (addItem already consumed it); create.tsx adds a per-item file input +
+    `forceFormData:true`. createClaim already resolved tenant via a service resolver (no tenant bug here). 4 tests
+    (ExpenseReceiptUploadTest: stored+recorded, no-file→null, bad-mime rejected, oversize rejected). **Benefit plan
     deactivate** — storePlan hardcodes is_active:true, no updatePlan route (low; missing transition, no dead button).
   - *Orphan models/tables to drop (reversible migration, like HrCheckIn):* **HrSurvey\*** (4 tables — NOT a clean
     self-contained drop: adversarial check found it's wired into HrDemoSeeder + DuskDatabaseSeeder + HrSurveyFactory +
     HrDemoSeederTest + SurveySystemRetiredTest, so dropping requires editing all of those too). **HrDashboardConfig**
     (fully standalone leaf — cleanest drop, zero test fallout). HrEmployeeProfileVersion/HrEmployeeStatusChange +
     HrCompensationReviewItem are dead *relationships on LIVE parents* (lower priority / future scope — leave).
-  - *Static a11y/token (build+eslint-verifiable):* **same-token contrast killers** — ~15 page files pair `bg-status-X`
-    with `text-status-X` (NO `-bg` suffix) → invisible text (the exact bug status-badge.tsx guards; S26 grep MISSED
-    these because the order is `text-…` before `bg-…`). Fix = swap `bg-status-X`→`bg-status-X-bg`. Plus raw-palette
+  - *Static a11y/token (build+eslint-verifiable):* ✅ **same-token contrast killers DONE (S28)** — was actually 162
+    instances across 44 files (not ~15); all swapped `bg-status-X`→`bg-status-X-bg`. REMAINING: raw-palette
     `fill-amber-400/fill-yellow-400` star fills (token `amberx` exists) and 3 residual unlabelled controls
     (leave select checkboxes ×2, goals chevron toggle).
 - **M10-5 Final parity pass.** Side-by-side every HR hub vs Rostering on oblivionfindings.com. *Acceptance:*

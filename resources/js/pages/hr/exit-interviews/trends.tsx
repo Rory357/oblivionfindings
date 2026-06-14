@@ -168,7 +168,7 @@ export default function ExitInterviewTrends({ trends, filters }: Props) {
                 <div className="mb-4 grid grid-cols-1 gap-4 sm:grid-cols-2 lg:grid-cols-4">
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="rounded-lg bg-status-info p-2">
+                            <div className="rounded-lg bg-status-info-bg p-2">
                                 <Users className="h-5 w-5 text-status-info" />
                             </div>
                             <div>
@@ -183,7 +183,7 @@ export default function ExitInterviewTrends({ trends, filters }: Props) {
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="rounded-lg bg-status-warning p-2">
+                            <div className="rounded-lg bg-status-warning-bg p-2">
                                 <Star className="h-5 w-5 text-status-warning" />
                             </div>
                             <div>
@@ -198,7 +198,7 @@ export default function ExitInterviewTrends({ trends, filters }: Props) {
                     </Card>
                     <Card>
                         <CardContent className="flex items-center gap-3 p-4">
-                            <div className="rounded-lg bg-status-success p-2">
+                            <div className="rounded-lg bg-status-success-bg p-2">
                                 <ThumbsUp className="h-5 w-5 text-status-success" />
                             </div>
                             <div>

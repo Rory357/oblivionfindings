@@ -147,7 +147,7 @@ export default function JobPostingIndex({
                     >
                         <CardContent className="p-4">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-status-success p-2">
+                                <div className="rounded-lg bg-status-success-bg p-2">
                                     <Globe className="h-4 w-4 text-status-success" />
                                 </div>
                                 <div>
@@ -187,7 +187,7 @@ export default function JobPostingIndex({
                     >
                         <CardContent className="p-4">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-status-warning p-2">
+                                <div className="rounded-lg bg-status-warning-bg p-2">
                                     <Clock className="h-4 w-4 text-status-warning" />
                                 </div>
                                 <div>
@@ -207,7 +207,7 @@ export default function JobPostingIndex({
                     >
                         <CardContent className="p-4">
                             <div className="flex items-center gap-3">
-                                <div className="rounded-lg bg-status-critical p-2">
+                                <div className="rounded-lg bg-status-critical-bg p-2">
                                     <XCircle className="h-4 w-4 text-status-critical" />
                                 </div>
                                 <div>
@@ -305,7 +305,7 @@ export default function JobPostingIndex({
                                                 {posting.is_remote && (
                                                     <Badge
                                                         variant="outline"
-                                                        className="gap-1 border-status-info/30 bg-status-info text-xs text-status-info"
+                                                        className="gap-1 border-status-info/30 bg-status-info-bg text-xs text-status-info"
                                                     >
                                                         <Wifi className="h-3 w-3" />{' '}
                                                         Remote

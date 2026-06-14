@@ -26,6 +26,7 @@ class StoreExpenseClaimRequest extends FormRequest
             'items.*.expense_date' => ['required', 'date'],
             'items.*.tax_amount' => ['nullable', 'numeric', 'min:0'],
             'items.*.notes' => ['nullable', 'string', 'max:500'],
+            'items.*.receipt' => ['nullable', 'file', 'mimes:pdf,jpg,jpeg,png', 'max:5120'],
         ];
     }
 }

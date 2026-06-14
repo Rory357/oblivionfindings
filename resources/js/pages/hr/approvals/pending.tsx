@@ -48,16 +48,16 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const processTypeConfig: Record<string, { className: string }> = {
     leave: {
-        className: 'border-status-info/30 text-status-info bg-status-info',
+        className: 'border-status-info/30 text-status-info bg-status-info-bg',
     },
     expense: {
         className:
-            'border-status-success/30 text-status-success bg-status-success',
+            'border-status-success/30 text-status-success bg-status-success-bg',
     },
     timesheet: { className: 'border-primary/30 text-primary bg-primary/10' },
     document: {
         className:
-            'border-status-warning/30 text-status-warning bg-status-warning',
+            'border-status-warning/30 text-status-warning bg-status-warning-bg',
     },
 };
 

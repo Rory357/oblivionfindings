@@ -48,10 +48,10 @@ const readinessLabels: Record<string, string> = {
     developing: 'Developing',
 };
 const readinessColors: Record<string, string> = {
-    ready_now: 'border-status-success/30 text-status-success bg-status-success',
-    ready_1_year: 'border-status-info/30 text-status-info bg-status-info',
+    ready_now: 'border-status-success/30 text-status-success bg-status-success-bg',
+    ready_1_year: 'border-status-info/30 text-status-info bg-status-info-bg',
     ready_2_years:
-        'border-status-warning/30 text-status-warning bg-status-warning',
+        'border-status-warning/30 text-status-warning bg-status-warning-bg',
     developing: 'border-border/30 text-muted-foreground',
 };
 

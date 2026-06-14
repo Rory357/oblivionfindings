@@ -36,22 +36,22 @@ const breadcrumbs = [
 const riskConfig: Record<string, { className: string; label: string }> = {
     critical: {
         className:
-            'border-status-critical/30 text-status-critical bg-status-critical',
+            'border-status-critical/30 text-status-critical bg-status-critical-bg',
         label: 'Critical',
     },
     high: {
         className:
-            'border-status-warning/30 text-status-warning bg-status-warning',
+            'border-status-warning/30 text-status-warning bg-status-warning-bg',
         label: 'High',
     },
     medium: {
         className:
-            'border-status-warning/30 text-status-warning bg-status-warning',
+            'border-status-warning/30 text-status-warning bg-status-warning-bg',
         label: 'Medium',
     },
     low: {
         className:
-            'border-status-success/30 text-status-success bg-status-success',
+            'border-status-success/30 text-status-success bg-status-success-bg',
         label: 'Low',
     },
 };

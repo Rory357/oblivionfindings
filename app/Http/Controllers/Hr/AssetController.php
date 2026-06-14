@@ -3,6 +3,7 @@
 namespace App\Http\Controllers\Hr;
 
 use App\Http\Controllers\Controller;
+use App\Http\Controllers\Hr\Concerns\ResolvesHrTenant;
 use App\Domain\Hr\Models\HrAsset;
 use App\Domain\Hr\Models\HrAssetAssignment;
 use App\Domain\Hr\Models\HrEmployeeProfile;
@@ -12,6 +13,8 @@ use Inertia\Inertia;
 
 class AssetController extends Controller
 {
+    use ResolvesHrTenant;
+
     public function __construct(
         protected AssetService $assetService,
     ) {}
@@ -25,7 +28,7 @@ class AssetController extends Controller
         abort_unless($user && $user->canDo('hr.assets.view'), 403);
 
         $assets = HrAsset::query()
-            ->forTenant($user->tenant_id)
+            ->forTenant($this->resolveHrTenantIdForUser($user))
             ->with('currentAssignment.employeeProfile.user:id,name')
             ->when($request->query('status'), fn ($q, $s) => $q->where('status', $s))
             ->when($request->query('category'), fn ($q, $c) => $q->where('category', $c))
@@ -105,7 +108,7 @@ class AssetController extends Controller
         ]);
 
         HrAsset::create([
-            'tenant_id' => $user->tenant_id,
+            'tenant_id' => $this->resolveHrTenantIdForUser($user),
             'status' => 'available',
             ...$data,
         ]);
@@ -130,7 +133,7 @@ class AssetController extends Controller
         ]);
 
         $employees = HrEmployeeProfile::with('user:id,name')
-            ->where('tenant_id', $user->tenant_id)
+            ->where('tenant_id', $this->resolveHrTenantIdForUser($user))
             ->where('is_active', true)
             ->get(['id', 'user_id', 'position_title']);
 
@@ -185,5 +188,68 @@ class AssetController extends Controller
         $this->assetService->returnAsset($assignment, $data);
 
         return redirect()->back()->with('success', 'Asset returned.');
+    }
+
+    /**
+     * Send an available asset to maintenance.
+     */
+    public function sendToMaintenance(Request $request, HrAsset $asset)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.assets.manage'), 403);
+
+        $data = $request->validate([
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        try {
+            $this->assetService->sendToMaintenance($asset, $data);
+        } catch (\LogicException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->back()->with('success', 'Asset sent to maintenance.');
+    }
+
+    /**
+     * Return an asset from maintenance to the available pool.
+     */
+    public function returnFromMaintenance(Request $request, HrAsset $asset)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.assets.manage'), 403);
+
+        $data = $request->validate([
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        try {
+            $this->assetService->returnFromMaintenance($asset, $data);
+        } catch (\LogicException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->back()->with('success', 'Asset returned to service.');
+    }
+
+    /**
+     * Retire (decommission) an asset.
+     */
+    public function retire(Request $request, HrAsset $asset)
+    {
+        $user = $request->user();
+        abort_unless($user && $user->canDo('hr.assets.manage'), 403);
+
+        $data = $request->validate([
+            'notes' => ['nullable', 'string', 'max:2000'],
+        ]);
+
+        try {
+            $this->assetService->retireAsset($asset, $data);
+        } catch (\LogicException $e) {
+            return redirect()->back()->with('error', $e->getMessage());
+        }
+
+        return redirect()->back()->with('success', 'Asset retired.');
     }
 }

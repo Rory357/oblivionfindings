@@ -62,9 +62,9 @@ const breadcrumbs: BreadcrumbItem[] = [
 
 const statusClass: Record<string, string> = {
     pending: 'border-border/30 text-muted-foreground bg-muted-foreground/80/10',
-    retrying: 'border-status-warning/30 text-status-warning bg-status-warning',
-    success: 'border-status-success/30 text-status-success bg-status-success',
-    failed: 'border-status-critical/30 text-status-critical bg-status-critical',
+    retrying: 'border-status-warning/30 text-status-warning bg-status-warning-bg',
+    success: 'border-status-success/30 text-status-success bg-status-success-bg',
+    failed: 'border-status-critical/30 text-status-critical bg-status-critical-bg',
 };
 
 export default function HrWebhookIndex({

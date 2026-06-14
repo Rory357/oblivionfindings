@@ -57,17 +57,17 @@ const statusConfig: Record<string, { className: string; label: string }> = {
         label: 'Draft',
     },
     in_progress: {
-        className: 'border-status-info/30 text-status-info bg-status-info',
+        className: 'border-status-info/30 text-status-info bg-status-info-bg',
         label: 'In Progress',
     },
     completed: {
         className:
-            'border-status-warning/30 text-status-warning bg-status-warning',
+            'border-status-warning/30 text-status-warning bg-status-warning-bg',
         label: 'Completed',
     },
     signed_off: {
         className:
-            'border-status-success/30 text-status-success bg-status-success',
+            'border-status-success/30 text-status-success bg-status-success-bg',
         label: 'Signed Off',
     },
 };
@@ -138,7 +138,7 @@ function ReviewCard({ review }: { review: Review }) {
                                 {review.employee_signed_off && (
                                     <Badge
                                         variant="outline"
-                                        className="border-status-success/30 bg-status-success text-xs text-status-success"
+                                        className="border-status-success/30 bg-status-success-bg text-xs text-status-success"
                                     >
                                         You signed off
                                     </Badge>

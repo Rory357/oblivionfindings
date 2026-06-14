@@ -99,7 +99,7 @@ const breadcrumbs: BreadcrumbItem[] = [
 ];
 
 const defaultStatusConfig = {
-    className: 'border-status-info/30 text-status-info bg-status-info',
+    className: 'border-status-info/30 text-status-info bg-status-info-bg',
     label: 'Active',
 };
 
@@ -107,17 +107,17 @@ const statusConfig: Record<string, { className: string; label: string }> = {
     active: defaultStatusConfig,
     submitted: {
         className:
-            'border-status-warning/30 text-status-warning bg-status-warning',
+            'border-status-warning/30 text-status-warning bg-status-warning-bg',
         label: 'Submitted',
     },
     approved: {
         className:
-            'border-status-success/30 text-status-success bg-status-success',
+            'border-status-success/30 text-status-success bg-status-success-bg',
         label: 'Approved',
     },
     rejected: {
         className:
-            'border-status-critical/30 text-status-critical bg-status-critical',
+            'border-status-critical/30 text-status-critical bg-status-critical-bg',
         label: 'Rejected',
     },
 };
@@ -139,12 +139,12 @@ const shiftTypeConfig: Record<string, { className: string; label: string }> = {
         label: 'On-Call',
     },
     split: {
-        className: 'border-status-info/30 text-status-info bg-status-info',
+        className: 'border-status-info/30 text-status-info bg-status-info-bg',
         label: 'Split',
     },
     travel: {
         className:
-            'border-status-warning/30 text-status-warning bg-status-warning',
+            'border-status-warning/30 text-status-warning bg-status-warning-bg',
         label: 'Travel',
     },
 };

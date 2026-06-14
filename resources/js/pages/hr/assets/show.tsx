@@ -29,7 +29,7 @@ import { Textarea } from '@/components/ui/textarea';
 import AppLayout from '@/layouts/app-layout';
 import { type BreadcrumbItem } from '@/types';
 import { Head, router } from '@inertiajs/react';
-import { RotateCcw, UserPlus } from 'lucide-react';
+import { Archive, RotateCcw, UserPlus, Wrench } from 'lucide-react';
 import { FormEvent, useState } from 'react';
 
 interface Assignment {
@@ -173,6 +173,32 @@ export default function AssetShow({ asset, employees, can }: Props) {
         );
     };
 
+    const sendToMaintenance = () => {
+        if (
+            confirm(
+                'Send this asset to maintenance? It will be marked unavailable until returned to service.',
+            )
+        ) {
+            router.post(`/hr/assets/${asset.id}/maintenance`);
+        }
+    };
+
+    const returnFromMaintenance = () => {
+        if (confirm('Return this asset to service (back to available)?')) {
+            router.post(`/hr/assets/${asset.id}/return-from-maintenance`);
+        }
+    };
+
+    const retireAsset = () => {
+        if (
+            confirm(
+                'Retire this asset? This decommissions it and removes it from the active pool.',
+            )
+        ) {
+            router.post(`/hr/assets/${asset.id}/retire`);
+        }
+    };
+
     return (
         <AppLayout breadcrumbs={breadcrumbs}>
             <Head title={`${asset.asset_tag} - ${asset.name}`} />
@@ -230,6 +256,37 @@ export default function AssetShow({ asset, employees, can }: Props) {
                                                 Return
                                             </Button>
                                         )}
+                                    {asset.status === 'available' && (
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={sendToMaintenance}
+                                        >
+                                            <Wrench className="mr-1.5 h-4 w-4" />
+                                            Maintenance
+                                        </Button>
+                                    )}
+                                    {asset.status === 'maintenance' && (
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={returnFromMaintenance}
+                                        >
+                                            <RotateCcw className="mr-1.5 h-4 w-4" />
+                                            Return to service
+                                        </Button>
+                                    )}
+                                    {(asset.status === 'available' ||
+                                        asset.status === 'maintenance') && (
+                                        <Button
+                                            size="sm"
+                                            variant="outline"
+                                            onClick={retireAsset}
+                                        >
+                                            <Archive className="mr-1.5 h-4 w-4" />
+                                            Retire
+                                        </Button>
+                                    )}
                                 </>
                             ) : undefined
                         }
