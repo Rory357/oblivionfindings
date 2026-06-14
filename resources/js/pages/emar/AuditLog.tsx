@@ -1,12 +1,33 @@
 /* eslint-disable no-restricted-syntax -- the audit timeline/table/gaps surfaces + hero footer are
    custom-layout bordered rows / chip buttons (not Card/Button); all colours are semantic tokens. */
-import { PageHero, type PageHeroStat } from '@/components/page';
+import { PageHero, type PageHeroBadge, type PageHeroMetaItem, type PageHeroStat } from '@/components/page';
 import { EntityFilter, TabStrip, type RosterTabItem } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
+import { Select, SelectContent, SelectItem, SelectTrigger, SelectValue } from '@/components/ui/select';
+import { addDays, DayPickerChip, parseYmd, toYmd } from '@/components/meds/day-picker-chip';
 import AppLayout from '@/layouts/app-layout';
 import { eventMeta, FLAG_META, MedicationEventDrawer, type AuditEvent } from '@/components/emar/medication-event-drawer';
 import { Head, router } from '@inertiajs/react';
-import { Activity, AlertOctagon, ClipboardCheck, Download, History, Lock, Package, Pill, Printer, Search, ShieldAlert, Table } from 'lucide-react';
+import {
+    Activity,
+    AlertOctagon,
+    AlertTriangle,
+    ChevronLeft,
+    ChevronRight,
+    ClipboardCheck,
+    Clock,
+    Download,
+    History,
+    Lock,
+    Package,
+    Pill,
+    Printer,
+    Search,
+    ShieldAlert,
+    ShieldCheck,
+    Table,
+    Users,
+} from 'lucide-react';
 import { useMemo, useState } from 'react';
 
 type Stats = { total: number; this_week: number; this_month: number; open_gaps: number };
@@ -18,6 +39,7 @@ type Props = {
     sites: { id: number; name: string }[];
     active_site: { id: number; name: string } | null;
     site_brand_colour: string | null;
+    user_first_name: string | null;
 };
 
 const CATEGORIES = [
@@ -29,12 +51,13 @@ const CATEGORIES = [
     { id: 'errors', label: 'Errors', icon: AlertOctagon, tone: 'critical' as const },
 ];
 const RANGES = [{ v: '7', l: '7 days' }, { v: '30', l: '30 days' }, { v: '90', l: '90 days' }];
-const SELECT_CLASS = 'h-9 rounded-lg border border-input bg-card px-2.5 text-sm outline-none focus:border-ring';
 const fmtTime = (iso: string) => new Date(iso).toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' });
 const dayKey = (iso: string) => new Date(iso).toLocaleDateString('en-NZ', { weekday: 'long', day: 'numeric', month: 'long' });
+const fmtShort = (d: Date) => d.toLocaleDateString('en-NZ', { day: 'numeric', month: 'short' });
+const stepLabel = (ymd: string) => parseYmd(ymd).toLocaleDateString('en-NZ', { weekday: 'short', day: 'numeric' });
 const initials = (n: string) => n.split(' ').filter(Boolean).slice(0, 2).map((p) => p[0]).join('').toUpperCase() || '?';
 
-export default function AuditLog({ events, stats, clients, staff, sites, active_site: activeSite, site_brand_colour: brandColour }: Props) {
+export default function AuditLog({ events, stats, clients, staff, sites, active_site: activeSite, site_brand_colour: brandColour, user_first_name: userFirstName }: Props) {
     const [view, setView] = useState('timeline');
     const [cat, setCat] = useState('all');
     const [search, setSearch] = useState('');
@@ -42,29 +65,40 @@ export default function AuditLog({ events, stats, clients, staff, sites, active_
     const [staffName, setStaffName] = useState('');
     const [range, setRange] = useState('90');
     const [source, setSource] = useState('');
+    const [anchor, setAnchor] = useState(() => toYmd(new Date()));
     const [siteFilter, setSiteFilter] = useState<number | null>(activeSite?.id ?? null);
     const [selected, setSelected] = useState<AuditEvent | null>(null);
 
+    const todayYmd = toYmd(new Date());
+    const isToday = anchor === todayYmd;
     const sources = useMemo(() => [...new Set(events.map((e) => e.source))].sort(), [events]);
 
     const filtered = useMemo(() => {
         const q = search.trim().toLowerCase();
-        const cutoff = Date.now() - Number(range) * 86400000;
+        // The day-stepper sets the window's *end* (anchor); the range select sets
+        // how far back it reaches — "the {range} days ending {anchor}".
+        const end = parseYmd(anchor);
+        end.setHours(23, 59, 59, 999);
+        const windowEnd = end.getTime();
+        const windowStart = windowEnd - Number(range) * 86400000;
         return events.filter((e) => {
             if (cat !== 'all' && e.category !== cat) return false;
             if (clientId && String(e.client_id) !== clientId) return false;
             if (staffName && e.performed_by !== staffName) return false;
             if (source && e.source !== source) return false;
-            if (new Date(e.timestamp).getTime() < cutoff) return false;
+            const t = new Date(e.timestamp).getTime();
+            if (t < windowStart || t > windowEnd) return false;
             if (q && !`${e.description} ${e.client_name} ${e.performed_by ?? ''}`.toLowerCase().includes(q)) return false;
             return true;
         });
-    }, [events, cat, clientId, staffName, source, range, search]);
+    }, [events, cat, clientId, staffName, source, range, search, anchor]);
 
     const gaps = useMemo(() => filtered.filter((e) => e.flags.length > 0), [filtered]);
     const rows = view === 'gaps' ? gaps : filtered;
-    const hasFilters = !!(search || clientId || staffName || source || range !== '90' || cat !== 'all');
-    const clearFilters = () => { setSearch(''); setClientId(''); setStaffName(''); setSource(''); setRange('90'); setCat('all'); };
+    const hasFilters = !!(search || clientId || staffName || source || range !== '90' || cat !== 'all' || !isToday);
+    const clearFilters = () => { setSearch(''); setClientId(''); setStaffName(''); setSource(''); setRange('90'); setCat('all'); setAnchor(todayYmd); };
+
+    const missingWitness = useMemo(() => events.filter((e) => e.flags.includes('missing_witness')).length, [events]);
 
     const catCounts = useMemo(() => {
         const base = events.filter((e) => {
@@ -98,6 +132,24 @@ export default function AuditLog({ events, stats, clients, staff, sites, active_
         { label: 'Open gaps', value: stats.open_gaps, tone: stats.open_gaps > 0 ? 'warning' : 'neutral' },
     ];
 
+    const windowFrom = fmtShort(new Date(parseYmd(anchor).getTime() - Number(range) * 86400000));
+    const windowTo = fmtShort(parseYmd(anchor));
+    const heroMeta: PageHeroMetaItem[] = [
+        { icon: Clock, label: `${range}-day window · ${windowFrom} – ${windowTo}` },
+        { icon: ShieldCheck, label: 'Append-only · immutable source records' },
+        { icon: Users, label: `${stats.total} actions · ${staff.length} staff · ${sites.length} site${sites.length === 1 ? '' : 's'}` },
+    ];
+
+    const heroBadges: PageHeroBadge[] = [];
+    if (stats.open_gaps > 0) {
+        heroBadges.push({ icon: AlertTriangle, label: `${stats.open_gaps} unexplained MAR gap${stats.open_gaps === 1 ? '' : 's'}`, tone: 'critical', onClick: () => setView('gaps'), 'aria-label': 'View compliance gaps' });
+    }
+    if (missingWitness > 0) {
+        heroBadges.push({ icon: Lock, label: `${missingWitness} CD ${missingWitness === 1 ? 'entry' : 'entries'} missing witness`, tone: 'critical', onClick: () => { setCat('controlled'); setView('gaps'); }, 'aria-label': 'View controlled-drug entries missing a witness' });
+    }
+
+    const refreshed = new Date().toLocaleTimeString('en-NZ', { hour: '2-digit', minute: '2-digit' });
+
     return (
         <AppLayout breadcrumbs={[{ title: 'eMAR', href: '/emar' }, { title: 'Audit Trail', href: '/emar/audit' }]}>
             <Head title="eMAR - Audit Trail" />
@@ -107,6 +159,8 @@ export default function AuditLog({ events, stats, clients, staff, sites, active_
                     category="ops"
                     brandColour={brandColour}
                     icon={History}
+                    meta={heroMeta}
+                    badges={heroBadges}
                     title={
                         <span>
                             <span className="flex items-center gap-2 text-[10.5px] font-semibold uppercase tracking-wide text-primary-foreground/80">
@@ -114,10 +168,11 @@ export default function AuditLog({ events, stats, clients, staff, sites, active_
                                     <span className="absolute inset-0 animate-ping rounded-full bg-status-success/70" />
                                     <span className="relative inline-flex h-2 w-2 rounded-full bg-status-success" />
                                 </span>
-                                Tamper-evident audit trail · live
+                                Append-only audit trail · live · refreshed {refreshed}
                             </span>
                             <span className="mt-1 block text-[26px] font-bold leading-tight">
-                                Every medication action across{' '}
+                                {userFirstName ? <span className="font-normal text-primary-foreground/80">Kia ora {userFirstName} — </span> : null}
+                                {userFirstName ? 'every' : 'Every'} medication action across{' '}
                                 <span className="border-b-2 border-primary-foreground/40">{activeSite?.name ?? 'your services'}</span>
                             </span>
                         </span>
@@ -132,21 +187,30 @@ export default function AuditLog({ events, stats, clients, staff, sites, active_
                     }
                     footer={
                         <div className="flex flex-col gap-3 py-3 lg:flex-row lg:items-center lg:justify-between">
-                            <div className="flex items-center gap-2 rounded-full bg-primary-foreground px-3 py-1.5">
-                                <Search className="h-3.5 w-3.5 text-muted-foreground" />
-                                <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search client, medication, staff or NHI…" className="w-64 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground" />
+                            <div className="flex flex-wrap items-center gap-1.5">
+                                <button type="button" onClick={() => setAnchor(addDays(anchor, -1))} className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-foreground/20">
+                                    <ChevronLeft className="h-3.5 w-3.5" />{stepLabel(addDays(anchor, -1))}
+                                </button>
+                                <DayPickerChip date={anchor} isToday={isToday} onPick={setAnchor} label="audit window" caption="The audit window ends on the selected day; the range filter sets how far back it reaches." />
+                                <button type="button" onClick={() => setAnchor(addDays(anchor, 1))} disabled={isToday} className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/20 bg-primary-foreground/10 px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-foreground/20 disabled:cursor-not-allowed disabled:opacity-40">
+                                    {stepLabel(addDays(anchor, 1))}<ChevronRight className="h-3.5 w-3.5" />
+                                </button>
+                                {!isToday ? (
+                                    <button type="button" onClick={() => setAnchor(todayYmd)} className="inline-flex items-center gap-1 rounded-md border border-primary-foreground/35 bg-primary-foreground/20 px-3 py-1.5 text-xs font-semibold text-primary-foreground hover:bg-primary-foreground/30">
+                                        Back to today
+                                    </button>
+                                ) : null}
                             </div>
-                            {sites.length > 0 && <EntityFilter label="Site" allLabel="All sites" items={sites} value={siteFilter} onChange={onSite} onDark />}
+                            <div className="flex flex-wrap items-center gap-2">
+                                <div className="flex items-center gap-2 rounded-full bg-primary-foreground px-3 py-1.5">
+                                    <Search className="h-3.5 w-3.5 text-muted-foreground" />
+                                    <input value={search} onChange={(e) => setSearch(e.target.value)} placeholder="Search client, medication, staff or NHI…" className="w-64 bg-transparent text-sm text-foreground outline-none placeholder:text-muted-foreground" />
+                                </div>
+                                {sites.length > 0 && <EntityFilter label="Site" allLabel="All sites" items={sites} value={siteFilter} onChange={onSite} onDark />}
+                            </div>
                         </div>
                     }
                 />
-
-                {stats.open_gaps > 0 && (
-                    <div className="flex items-center justify-between gap-3 rounded-xl border border-status-critical/30 bg-status-critical-bg/60 px-4 py-3">
-                        <span className="flex items-center gap-2 text-sm font-medium text-status-critical"><ShieldAlert className="h-4 w-4" />{stats.open_gaps} compliance gap{stats.open_gaps === 1 ? '' : 's'} (missing witness or MAR omission) need a clinician's attention.</span>
-                        <Button size="sm" variant="outline" onClick={() => setView('gaps')}>Review gaps</Button>
-                    </div>
-                )}
 
                 <div className="flex flex-wrap items-center justify-between gap-3">
                     <TabStrip value={view} onChange={setView} items={VIEW_TABS} ariaLabel="Audit views" />
@@ -161,21 +225,33 @@ export default function AuditLog({ events, stats, clients, staff, sites, active_
                         <div className="flex flex-col gap-3 border-b p-4">
                             <TabStrip value={cat} onChange={setCat} items={CAT_TABS} ariaLabel="Event categories" />
                             <div className="flex flex-wrap gap-2">
-                                <select className={SELECT_CLASS} value={clientId} onChange={(e) => setClientId(e.target.value)}>
-                                    <option value="">All clients</option>
-                                    {clients.map((c) => <option key={c.id} value={String(c.id)}>{c.name}</option>)}
-                                </select>
-                                <select className={SELECT_CLASS} value={staffName} onChange={(e) => setStaffName(e.target.value)}>
-                                    <option value="">All staff</option>
-                                    {staff.map((s) => <option key={s.id} value={s.name}>{s.name}</option>)}
-                                </select>
-                                <select className={SELECT_CLASS} value={range} onChange={(e) => setRange(e.target.value)}>
-                                    {RANGES.map((r) => <option key={r.v} value={r.v}>{r.l}</option>)}
-                                </select>
-                                <select className={SELECT_CLASS} value={source} onChange={(e) => setSource(e.target.value)}>
-                                    <option value="">All sources</option>
-                                    {sources.map((s) => <option key={s} value={s}>{s}</option>)}
-                                </select>
+                                <Select value={clientId || 'all'} onValueChange={(v) => setClientId(v === 'all' ? '' : v)}>
+                                    <SelectTrigger className="h-9 w-[160px]"><SelectValue placeholder="All clients" /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All clients</SelectItem>
+                                        {clients.map((c) => <SelectItem key={c.id} value={String(c.id)}>{c.name}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                                <Select value={staffName || 'all'} onValueChange={(v) => setStaffName(v === 'all' ? '' : v)}>
+                                    <SelectTrigger className="h-9 w-[160px]"><SelectValue placeholder="All staff" /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All staff</SelectItem>
+                                        {staff.map((s) => <SelectItem key={s.id} value={s.name}>{s.name}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                                <Select value={range} onValueChange={setRange}>
+                                    <SelectTrigger className="h-9 w-[130px]"><SelectValue /></SelectTrigger>
+                                    <SelectContent>
+                                        {RANGES.map((r) => <SelectItem key={r.v} value={r.v}>{r.l}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
+                                <Select value={source || 'all'} onValueChange={(v) => setSource(v === 'all' ? '' : v)}>
+                                    <SelectTrigger className="h-9 w-[150px]"><SelectValue placeholder="All sources" /></SelectTrigger>
+                                    <SelectContent>
+                                        <SelectItem value="all">All sources</SelectItem>
+                                        {sources.map((s) => <SelectItem key={s} value={s}>{s}</SelectItem>)}
+                                    </SelectContent>
+                                </Select>
                             </div>
                         </div>
                     )}

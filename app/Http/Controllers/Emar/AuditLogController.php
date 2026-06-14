@@ -2,6 +2,7 @@
 
 namespace App\Http\Controllers\Emar;
 
+use App\Enums\Medication\NotGivenReason;
 use App\Http\Controllers\Controller;
 use App\Models\Client;
 use App\Models\ClientControlledDrugEntry;
@@ -10,15 +11,17 @@ use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationDestruction;
 use App\Models\MedicationError;
 use App\Models\MedicationOrderVersion;
+use App\Models\MedicationPharmacyOrder;
 use App\Models\MedicationPrescriberOrder;
 use App\Models\MedicationReview;
 use App\Models\Site;
+use App\Services\Emar\MarOmissionService;
 use Carbon\Carbon;
 use Illuminate\Http\Request;
 
 class AuditLogController extends Controller
 {
-    public function index(Request $request)
+    public function index(Request $request, MarOmissionService $omissions)
     {
         $user = $request->user();
         abort_unless($user && $user->canDo('medications.audit.view'), 403);
@@ -36,8 +39,8 @@ class AuditLogController extends Controller
         // 1. ClientMedication — started / ceased
         if (empty($eventTypes) || array_intersect(['medication_started', 'medication_ceased'], $eventTypes)) {
             $medQuery = ClientMedication::query()
-                ->with(['client:id,first_name,last_name'])
-                ->select('id', 'client_id', 'name', 'dosage', 'created_at', 'ceased_at', 'ceased_reason');
+                ->with(['client:id,first_name,last_name', 'createdByUser:id,name', 'ceasedByUser:id,name'])
+                ->select('id', 'client_id', 'created_by', 'name', 'dosage', 'created_at', 'ceased_at', 'ceased_reason', 'ceased_by');
 
             if ($clientId) {
                 $medQuery->where('client_id', $clientId);
@@ -56,7 +59,7 @@ class AuditLogController extends Controller
                             'event_type' => 'medication_started',
                             'timestamp' => $ts->toIso8601String(),
                             'description' => "{$med->name} {$med->dosage} started for {$clientName}",
-                            'performed_by' => null,
+                            'performed_by' => $med->createdByUser->name ?? null,
                             'client_id' => $med->client_id,
                             'client_name' => $clientName,
                             'details' => [
@@ -75,7 +78,7 @@ class AuditLogController extends Controller
                             'event_type' => 'medication_ceased',
                             'timestamp' => $ts->toIso8601String(),
                             'description' => "{$med->name} ceased for {$clientName}",
-                            'performed_by' => null,
+                            'performed_by' => $med->ceasedByUser->name ?? null,
                             'client_id' => $med->client_id,
                             'client_name' => $clientName,
                             'details' => [
@@ -92,8 +95,8 @@ class AuditLogController extends Controller
         $adminTypes = ['dose_administered', 'dose_refused', 'dose_missed'];
         if (empty($eventTypes) || array_intersect($adminTypes, $eventTypes)) {
             $adminQuery = ClientMedicationAdministration::query()
-                ->with(['client:id,first_name,last_name', 'medication:id,name,dosage', 'administeredBy:id,name'])
-                ->select('id', 'client_id', 'client_medication_id', 'administered_by', 'administered_at', 'status', 'reason', 'dose_given', 'notes');
+                ->with(['client:id,first_name,last_name', 'medication:id,name,dosage', 'administeredBy:id,name', 'witnessedBy:id,name'])
+                ->select('id', 'client_id', 'client_medication_id', 'administered_by', 'witnessed_by', 'scheduled_for', 'administered_at', 'status', 'reason', 'reason_code', 'dose_given', 'notes');
 
             if ($clientId) {
                 $adminQuery->where('client_id', $clientId);
@@ -128,17 +131,23 @@ class AuditLogController extends Controller
                     'dose_missed' => "{$medName} dose missed for {$clientName}",
                 ];
 
+                $reasonLabel = $admin->reason_code
+                    ? (NotGivenReason::tryFrom($admin->reason_code)?->label() ?? $admin->reason_code)
+                    : null;
+
                 $events->push([
                     'id' => 'admin_'.$admin->id,
                     'event_type' => $eventType,
                     'timestamp' => ($admin->administered_at ?? $admin->scheduled_for ?? $admin->created_at ?? now())->toIso8601String(),
                     'description' => $descMap[$eventType],
                     'performed_by' => $performedBy,
+                    'witness' => $admin->witnessedBy->name ?? null,
                     'client_id' => $admin->client_id,
                     'client_name' => $clientName,
                     'details' => [
                         'medication' => $medName,
                         'dose' => $admin->dose_given,
+                        'reason_code' => $reasonLabel,
                         'reason' => $admin->reason,
                         'notes' => $admin->notes,
                     ],
@@ -264,7 +273,7 @@ class AuditLogController extends Controller
             $versionQuery = MedicationOrderVersion::query()
                 ->with(['client:id,first_name,last_name', 'changedBy:id,name'])
                 ->where('version_number', '>', 1)
-                ->select('id', 'client_id', 'client_medication_id', 'version_number', 'name', 'dosage', 'change_reason', 'changed_by', 'created_at');
+                ->select('id', 'client_id', 'client_medication_id', 'version_number', 'name', 'dosage', 'frequency', 'route', 'instructions', 'is_prn', 'dose_times', 'change_reason', 'changed_by', 'created_at');
 
             if ($clientId) {
                 $versionQuery->where('client_id', $clientId);
@@ -276,9 +285,26 @@ class AuditLogController extends Controller
                 $versionQuery->where('created_at', '<=', Carbon::parse($dateTo)->endOfDay());
             }
 
-            foreach ($versionQuery->get() as $ver) {
+            $versions = $versionQuery->get();
+
+            // Load every version of the affected medications so each change can be
+            // diffed against its immediate predecessor (vN vs vN-1) — the data for
+            // a real before→after already lives in the full per-version snapshots.
+            $medIds = $versions->pluck('client_medication_id')->filter()->unique()->values();
+            $byMedVersion = $medIds->isEmpty()
+                ? collect()
+                : MedicationOrderVersion::query()
+                    ->whereIn('client_medication_id', $medIds)
+                    ->get(['id', 'client_medication_id', 'version_number', 'name', 'dosage', 'frequency', 'route', 'instructions', 'is_prn', 'dose_times'])
+                    ->groupBy('client_medication_id')
+                    ->map(fn ($group) => $group->keyBy('version_number'));
+
+            foreach ($versions as $ver) {
                 $clientName = $ver->client ? trim($ver->client->first_name.' '.$ver->client->last_name) : 'Unknown';
                 $performedBy = $ver->changedBy->name ?? null;
+
+                $previous = $byMedVersion[$ver->client_medication_id][$ver->version_number - 1] ?? null;
+                $changes = $previous ? $this->diffVersions($previous, $ver) : [];
 
                 $events->push([
                     'id' => 'ver_'.$ver->id,
@@ -293,13 +319,14 @@ class AuditLogController extends Controller
                         'dosage' => $ver->dosage,
                         'version' => $ver->version_number,
                         'reason' => $ver->change_reason,
+                        'changes' => $changes,
                     ],
                 ]);
             }
         }
 
         // 7. ClientControlledDrugEntry — controlled-drug movements (with witness)
-        if (empty($eventTypes) || array_intersect(['cd_given', 'cd_balance_check'], $eventTypes)) {
+        if (empty($eventTypes) || array_intersect(['cd_given', 'cd_received', 'cd_wasted', 'cd_balance_check', 'cd_adjustment'], $eventTypes)) {
             $cdQuery = ClientControlledDrugEntry::query()
                 ->with(['client:id,first_name,last_name', 'medication:id,name', 'recordedBy:id,name', 'witnessedBy:id,name']);
 
@@ -313,33 +340,65 @@ class AuditLogController extends Controller
                 $cdQuery->where('recorded_at', '<=', Carbon::parse($dateTo)->endOfDay());
             }
 
+            // The CD register uses two naming conventions across its write paths
+            // (storeCDEntry vs the MAR administration flow). Map every real
+            // entry_type to a distinct audit event so receipts, disposals, counts
+            // and adjustments are no longer mislabelled "given".
+            $cdEventMap = [
+                'administered' => 'cd_given',
+                'administration' => 'cd_given',
+                'receipt' => 'cd_received',
+                'received' => 'cd_received',
+                'transfer_in' => 'cd_received',
+                'disposal' => 'cd_wasted',
+                'wasted' => 'cd_wasted',
+                'transfer_out' => 'cd_wasted',
+                'balance_check' => 'cd_balance_check',
+                'stock_count' => 'cd_balance_check',
+                'adjustment' => 'cd_adjustment',
+            ];
+
             foreach ($cdQuery->get() as $entry) {
-                $eventType = $entry->entry_type === 'balance_check' ? 'cd_balance_check' : 'cd_given';
+                $eventType = $cdEventMap[$entry->entry_type] ?? 'cd_given';
                 if (! empty($eventTypes) && ! in_array($eventType, $eventTypes)) {
                     continue;
                 }
 
                 $clientName = $entry->client ? trim($entry->client->first_name.' '.$entry->client->last_name) : 'Unknown';
                 $medName = $entry->medication->name ?? 'Controlled drug';
+                $qty = trim(($entry->quantity ?? '').' '.($entry->unit ?? ''));
+
+                // Two-person sign-off is the NICE SC1 / CD-policy requirement for
+                // administration and disposal of a controlled drug. Receipts,
+                // counts and adjustments are not flagged for a missing witness.
+                $witnessRequired = in_array($eventType, ['cd_given', 'cd_wasted'], true);
+
+                $descMap = [
+                    'cd_given' => "Controlled drug {$medName} ({$qty}) administered — {$clientName}",
+                    'cd_received' => "Controlled drug {$medName} ({$qty}) received into stock — {$clientName}",
+                    'cd_wasted' => "Controlled drug {$medName} ({$qty}) disposed / wasted — {$clientName}",
+                    'cd_balance_check' => "CD balance check — {$medName} for {$clientName}",
+                    'cd_adjustment' => "CD stock adjustment — {$medName} ({$qty}) for {$clientName}",
+                ];
 
                 $events->push([
                     'id' => 'cd_'.$entry->id,
                     'event_type' => $eventType,
                     'timestamp' => ($entry->recorded_at ?? $entry->created_at ?? now())->toIso8601String(),
-                    'description' => $eventType === 'cd_balance_check'
-                        ? "CD balance check — {$medName} for {$clientName}"
-                        : "Controlled drug {$medName} ({$entry->quantity} {$entry->unit}) — {$clientName}",
+                    'description' => $descMap[$eventType] ?? "Controlled drug {$medName} ({$qty}) — {$clientName}",
                     'performed_by' => $entry->recordedBy->name ?? null,
                     'witness' => $entry->witnessedBy->name ?? null,
-                    'witness_required' => true,
+                    'witness_required' => $witnessRequired,
                     'client_id' => $entry->client_id,
                     'client_name' => $clientName,
                     'details' => [
                         'medication' => $medName,
-                        'entry_type' => $entry->entry_type,
+                        'entry_type' => str_replace('_', ' ', (string) $entry->entry_type),
                         'quantity' => $entry->quantity,
                         'unit' => $entry->unit,
+                        'balance_before' => $entry->on_hand_before,
                         'balance_after' => $entry->on_hand_after,
+                        'reason' => $entry->reason,
                     ],
                 ]);
             }
@@ -381,24 +440,76 @@ class AuditLogController extends Controller
             }
         }
 
+        // 9. MedicationPharmacyOrder — stock received (real delivery receipts only;
+        //    non-CD ad-hoc stock has no movement log, so nothing is invented here).
+        if (empty($eventTypes) || in_array('stock_received', $eventTypes)) {
+            $stockQuery = MedicationPharmacyOrder::query()
+                ->with(['client:id,first_name,last_name', 'medication:id,name', 'receivedByUser:id,name'])
+                ->whereNotNull('delivered_at');
+
+            if ($clientId) {
+                $stockQuery->where('client_id', $clientId);
+            }
+            if ($dateFrom) {
+                $stockQuery->where('delivered_at', '>=', Carbon::parse($dateFrom)->startOfDay());
+            }
+            if ($dateTo) {
+                $stockQuery->where('delivered_at', '<=', Carbon::parse($dateTo)->endOfDay());
+            }
+
+            foreach ($stockQuery->get() as $order) {
+                $clientName = $order->client ? trim($order->client->first_name.' '.$order->client->last_name) : 'Unknown';
+                $medName = $order->medication->name ?? 'Medication';
+
+                $events->push([
+                    'id' => 'stock_recv_'.$order->id,
+                    'event_type' => 'stock_received',
+                    'timestamp' => $order->delivered_at->toIso8601String(),
+                    'description' => "{$medName} delivery received ({$order->quantity_received} units) — {$clientName}",
+                    'performed_by' => $order->receivedByUser->name ?? null,
+                    'client_id' => $order->client_id,
+                    'client_name' => $clientName,
+                    'details' => [
+                        'medication' => $medName,
+                        'pharmacy' => $order->pharmacy_name,
+                        'quantity_received' => $order->quantity_received,
+                        'batch_number' => $order->batch_number,
+                    ],
+                ]);
+            }
+        }
+
+        // 10. Omissions — scheduled doses never recorded (real "blank MAR slot"
+        //     detection over a bounded recent window; reuses MarScheduleService).
+        if (empty($eventTypes) || in_array('omission', $eventTypes)) {
+            foreach ($omissions->omissionsForRange(
+                $dateFrom ? Carbon::parse($dateFrom) : null,
+                $dateTo ? Carbon::parse($dateTo) : null,
+                $clientId ? (int) $clientId : null,
+            ) as $omission) {
+                $events->push($omission);
+            }
+        }
+
         // ── Enrich every event with category / source / site / flags so the
         //    redesigned page can facet, surface compliance gaps and render the
         //    read-only detail drawer. (See docs/emar-redesign/audit-plan.md.)
         $clientSite = Client::query()->pluck('site_id', 'id');
         $siteNames = Site::query()->pluck('name', 'id');
         $categoryOf = [
-            'dose_administered' => 'doses', 'dose_refused' => 'doses', 'dose_missed' => 'doses',
-            'cd_given' => 'controlled', 'cd_balance_check' => 'controlled',
+            'dose_administered' => 'doses', 'dose_refused' => 'doses', 'dose_missed' => 'doses', 'omission' => 'doses',
+            'cd_given' => 'controlled', 'cd_received' => 'controlled', 'cd_wasted' => 'controlled',
+            'cd_balance_check' => 'controlled', 'cd_adjustment' => 'controlled',
             'medication_started' => 'clinical', 'medication_ceased' => 'clinical', 'medication_changed' => 'clinical',
             'prescriber_order' => 'clinical', 'review_completed' => 'clinical',
-            'destruction' => 'stock', 'medication_error' => 'errors',
+            'destruction' => 'stock', 'stock_received' => 'stock', 'medication_error' => 'errors',
         ];
         $sourceOf = [
-            'dose_administered' => 'MAR', 'dose_refused' => 'MAR', 'dose_missed' => 'MAR',
-            'cd_given' => 'CD', 'cd_balance_check' => 'CD',
+            'dose_administered' => 'MAR', 'dose_refused' => 'MAR', 'dose_missed' => 'MAR', 'omission' => 'MAR',
+            'cd_given' => 'CD', 'cd_received' => 'CD', 'cd_wasted' => 'CD', 'cd_balance_check' => 'CD', 'cd_adjustment' => 'CD',
             'medication_started' => 'MAR', 'medication_ceased' => 'MAR', 'medication_changed' => 'MAR',
             'prescriber_order' => 'Orders', 'review_completed' => 'Clinical',
-            'destruction' => 'Stock', 'medication_error' => 'Errors',
+            'destruction' => 'Stock', 'stock_received' => 'Stock', 'medication_error' => 'Errors',
         ];
 
         $events = $events->map(function (array $e) use ($categoryOf, $sourceOf, $clientSite, $siteNames) {
@@ -409,13 +520,17 @@ class AuditLogController extends Controller
             if (($e['witness_required'] ?? false) && empty($e['witness'])) {
                 $flags[] = 'missing_witness';
             }
-            if ($type === 'dose_missed') {
+            if (in_array($type, ['dose_missed', 'omission'], true)) {
                 $flags[] = 'omission';
             }
             if (in_array($type, ['medication_started', 'medication_ceased'], true) && empty($e['performed_by'])) {
                 $flags[] = 'no_actor';
             }
-            if (in_array($type, ['dose_refused', 'dose_missed'], true) && empty($e['details']['reason'] ?? null)) {
+            // A refusal/omission must carry a coded reason (NotGivenReason) — only
+            // when neither the code nor a free-text reason is present is it a gap.
+            if (in_array($type, ['dose_refused', 'dose_missed'], true)
+                && empty($e['details']['reason_code'] ?? null)
+                && empty($e['details']['reason'] ?? null)) {
                 $flags[] = 'no_reason';
             }
 
@@ -480,6 +595,7 @@ class AuditLogController extends Controller
             'sites' => Site::query()->where('is_active', true)->orderBy('name')->get(['id', 'name']),
             'active_site' => $activeSite ? ['id' => $activeSite->id, 'name' => $activeSite->name] : null,
             'site_brand_colour' => $activeSite?->brand_colour,
+            'user_first_name' => $user ? (explode(' ', trim((string) $user->name))[0] ?: null) : null,
             'filters' => [
                 'client_id' => $clientId,
                 'date_from' => $dateFrom,
@@ -505,5 +621,47 @@ class AuditLogController extends Controller
         }
 
         return true;
+    }
+
+    /**
+     * Field-by-field diff between two medication order versions, for the audit
+     * drawer's before→after section. Only changed fields are returned.
+     *
+     * @return array<int, array{field: string, from: string, to: string}>
+     */
+    private function diffVersions(MedicationOrderVersion $from, MedicationOrderVersion $to): array
+    {
+        $labels = [
+            'name' => 'Name',
+            'dosage' => 'Dose',
+            'frequency' => 'Frequency',
+            'route' => 'Route',
+            'instructions' => 'Instructions',
+            'is_prn' => 'PRN (as-needed)',
+            'dose_times' => 'Dose times',
+        ];
+
+        $changes = [];
+        foreach ($labels as $field => $label) {
+            $a = $this->formatVersionField($from->$field);
+            $b = $this->formatVersionField($to->$field);
+            if ($a !== $b) {
+                $changes[] = ['field' => $label, 'from' => $a, 'to' => $b];
+            }
+        }
+
+        return $changes;
+    }
+
+    private function formatVersionField($value): string
+    {
+        if (is_bool($value)) {
+            return $value ? 'Yes' : 'No';
+        }
+        if (is_array($value)) {
+            return implode(', ', $value);
+        }
+
+        return trim((string) ($value ?? ''));
     }
 }

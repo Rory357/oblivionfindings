@@ -6,7 +6,7 @@ import { PageHero, type PageHeroBadge, type PageHeroMetaItem, type PageHeroStat 
 import { EntityFilter, TabStrip, type RosterTabItem } from '@/components/rostering';
 import { Button } from '@/components/ui/button';
 import AppLayout from '@/layouts/app-layout';
-import { addDays, DayPickerChip, toYmd } from '@/pages/meds/today/components/day-picker-chip';
+import { addDays, DayPickerChip, toYmd } from '@/components/meds/day-picker-chip';
 import { PrnWizard } from '@/pages/meds/today/components/prn-wizard';
 import { RecordDoseWizard } from '@/pages/meds/today/components/record-dose-wizard';
 import type { ClientInfo, NotGivenReasonOption, PrnMedication, ScheduleRow, WitnessOption } from '@/pages/meds/today/types';

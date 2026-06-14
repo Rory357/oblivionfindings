@@ -5,7 +5,10 @@ namespace Tests\Feature\Emar;
 use App\Models\Client;
 use App\Models\ClientControlledDrugEntry;
 use App\Models\ClientMedication;
+use App\Models\ClientMedicationAdministration;
 use App\Models\MedicationError;
+use App\Models\MedicationOrderVersion;
+use App\Models\MedicationPharmacyOrder;
 use App\Models\Permission;
 use App\Models\Role;
 use App\Models\Site;
@@ -79,6 +82,207 @@ class AuditTrailTest extends TestCase
                 ->component('emar/AuditLog')
                 ->where('events', fn ($events) => collect($events)->contains(fn ($e) => $e['event_type'] === 'medication_error' && $e['category'] === 'errors'))
             );
+    }
+
+    public function test_start_and_cease_carry_the_acting_staff_member(): void
+    {
+        ['user' => $user, 'client' => $client] = $this->seedAudit();
+        $creator = User::factory()->create(['name' => 'Aroha Ngata']);
+        $ceaser = User::factory()->create(['name' => 'Tom Reka']);
+        ClientMedication::query()->create([
+            'client_id' => $client->id, 'name' => 'Paracetamol', 'dosage' => '500mg', 'frequency' => 'BD',
+            'is_prn' => true, 'active' => false, 'state' => 'ceased', 'approval_status' => 'verified',
+            'created_by' => $creator->id, 'ceased_by' => $ceaser->id,
+            'ceased_at' => now()->subDay(), 'ceased_reason' => 'No longer required',
+        ]);
+
+        $this->actingAs($user)->get('/emar/audit')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('events', function ($events) {
+                $started = collect($events)->firstWhere('event_type', 'medication_started');
+                $ceased = collect($events)->firstWhere('event_type', 'medication_ceased');
+
+                return $started && $started['performed_by'] === 'Aroha Ngata'
+                    && ! in_array('no_actor', $started['flags'])
+                    && $ceased && $ceased['performed_by'] === 'Tom Reka';
+            })
+        );
+    }
+
+    public function test_medication_change_carries_a_before_after_diff(): void
+    {
+        ['user' => $user, 'client' => $client] = $this->seedAudit();
+        $med = ClientMedication::query()->create([
+            'client_id' => $client->id, 'name' => 'Sertraline', 'dosage' => '100mg', 'frequency' => 'OD',
+            'is_prn' => true, 'active' => true, 'state' => 'active', 'approval_status' => 'verified', 'version' => 2,
+        ]);
+        MedicationOrderVersion::query()->create([
+            'client_medication_id' => $med->id, 'client_id' => $client->id, 'version_number' => 1,
+            'name' => 'Sertraline', 'dosage' => '50mg', 'frequency' => 'OD',
+            'changed_by' => $user->id, 'changed_at' => now()->subDays(2),
+        ]);
+        MedicationOrderVersion::query()->create([
+            'client_medication_id' => $med->id, 'client_id' => $client->id, 'version_number' => 2,
+            'name' => 'Sertraline', 'dosage' => '100mg', 'frequency' => 'OD',
+            'change_reason' => 'Dose increased', 'changed_by' => $user->id, 'changed_at' => now(),
+        ]);
+
+        $this->actingAs($user)->get('/emar/audit')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('events', function ($events) {
+                $changed = collect($events)->firstWhere('event_type', 'medication_changed');
+                $changes = $changed['details']['changes'] ?? [];
+
+                return collect($changes)->contains(fn ($c) => $c['field'] === 'Dose' && $c['from'] === '50mg' && $c['to'] === '100mg');
+            })
+        );
+    }
+
+    public function test_coded_refusal_is_not_flagged_as_missing_reason(): void
+    {
+        ['user' => $user, 'client' => $client] = $this->seedAudit();
+        $med = ClientMedication::query()->create([
+            'client_id' => $client->id, 'name' => 'Aspirin', 'dosage' => '75mg', 'frequency' => 'PRN',
+            'is_prn' => true, 'active' => true, 'state' => 'active', 'approval_status' => 'verified',
+        ]);
+        $coded = ClientMedicationAdministration::query()->create([
+            'client_id' => $client->id, 'client_medication_id' => $med->id, 'administered_by' => $user->id,
+            'status' => 'refused', 'reason_code' => 'absent', 'administered_at' => now(), 'scheduled_for' => now(),
+        ]);
+        $uncoded = ClientMedicationAdministration::query()->create([
+            'client_id' => $client->id, 'client_medication_id' => $med->id, 'administered_by' => $user->id,
+            'status' => 'refused', 'administered_at' => now(), 'scheduled_for' => now(),
+        ]);
+
+        $this->actingAs($user)->get('/emar/audit')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('events', function ($events) use ($coded, $uncoded) {
+                $c = collect($events)->firstWhere('id', 'admin_'.$coded->id);
+                $u = collect($events)->firstWhere('id', 'admin_'.$uncoded->id);
+
+                return $c && ! in_array('no_reason', $c['flags'])
+                    && $u && in_array('no_reason', $u['flags']);
+            })
+        );
+    }
+
+    public function test_unrecorded_scheduled_dose_becomes_an_omission(): void
+    {
+        ['user' => $user, 'client' => $client] = $this->seedAudit();
+        // Scheduled (non-PRN) med, active for 3 days, due daily at 08:00.
+        ClientMedication::query()->create([
+            'client_id' => $client->id, 'name' => 'Metformin', 'dosage' => '500mg', 'frequency' => 'Morning',
+            'dose_times' => ['08:00'], 'is_prn' => false, 'active' => true, 'state' => 'active',
+            'approval_status' => 'verified', 'start_date' => now()->subDays(3)->toDateString(),
+        ]);
+        // A PRN med must NOT generate omissions.
+        ClientMedication::query()->create([
+            'client_id' => $client->id, 'name' => 'Lorazepam', 'dosage' => '1mg', 'frequency' => 'PRN',
+            'is_prn' => true, 'active' => true, 'state' => 'active', 'approval_status' => 'verified',
+            'start_date' => now()->subDays(3)->toDateString(),
+        ]);
+
+        $this->actingAs($user)->get('/emar/audit')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('events', function ($events) {
+                $omissions = collect($events)->where('event_type', 'omission');
+
+                return $omissions->isNotEmpty()
+                    && $omissions->every(fn ($e) => str_contains($e['description'], 'Metformin'))
+                    && $omissions->every(fn ($e) => in_array('omission', $e['flags']));
+            })
+        );
+    }
+
+    public function test_cd_receipt_and_count_are_not_mislabelled_or_witness_flagged(): void
+    {
+        ['user' => $user, 'client' => $client] = $this->seedAudit();
+        $med = ClientMedication::query()->create([
+            'client_id' => $client->id, 'name' => 'Oxycodone', 'dosage' => '5mg', 'frequency' => 'PRN',
+            'controlled_drug' => true, 'is_prn' => true, 'active' => true, 'state' => 'active', 'approval_status' => 'verified',
+        ]);
+        $receipt = ClientControlledDrugEntry::query()->create([
+            'client_id' => $client->id, 'client_medication_id' => $med->id, 'entry_type' => 'receipt',
+            'quantity' => 20, 'unit' => 'tablets', 'on_hand_before' => 0, 'on_hand_after' => 20,
+            'recorded_by' => $user->id, 'witnessed_by' => null, 'recorded_at' => now(),
+        ]);
+        $count = ClientControlledDrugEntry::query()->create([
+            'client_id' => $client->id, 'client_medication_id' => $med->id, 'entry_type' => 'stock_count',
+            'quantity' => 20, 'unit' => 'tablets', 'on_hand_before' => 20, 'on_hand_after' => 20,
+            'recorded_by' => $user->id, 'witnessed_by' => null, 'recorded_at' => now(),
+        ]);
+
+        $this->actingAs($user)->get('/emar/audit')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('stats.open_gaps', 0)
+            ->where('events', function ($events) use ($receipt, $count) {
+                $r = collect($events)->firstWhere('id', 'cd_'.$receipt->id);
+                $c = collect($events)->firstWhere('id', 'cd_'.$count->id);
+
+                return $r && $r['event_type'] === 'cd_received' && ! in_array('missing_witness', $r['flags'])
+                    && $c && $c['event_type'] === 'cd_balance_check' && ! in_array('missing_witness', $c['flags']);
+            })
+        );
+    }
+
+    public function test_pharmacy_delivery_appears_as_stock_received(): void
+    {
+        ['user' => $user, 'client' => $client] = $this->seedAudit();
+        $med = ClientMedication::query()->create([
+            'client_id' => $client->id, 'name' => 'Insulin', 'dosage' => '10u', 'frequency' => 'PRN',
+            'is_prn' => true, 'active' => true, 'state' => 'active', 'approval_status' => 'verified',
+        ]);
+        MedicationPharmacyOrder::query()->create([
+            'client_id' => $client->id, 'client_medication_id' => $med->id, 'pharmacy_name' => 'City Pharmacy',
+            'order_type' => 'repeat', 'status' => 'delivered', 'quantity_received' => 30,
+            'ordered_by' => $user->id, 'received_by' => $user->id, 'delivered_at' => now(),
+        ]);
+
+        $this->actingAs($user)->get('/emar/audit')->assertOk()->assertInertia(fn (Assert $page) => $page
+            ->where('events', fn ($events) => collect($events)->contains(fn ($e) => $e['event_type'] === 'stock_received' && $e['category'] === 'stock'))
+        );
+    }
+
+    public function test_integrity_endpoint_returns_fingerprint_and_derived_for_omission(): void
+    {
+        ['user' => $user, 'client' => $client] = $this->seedAudit();
+        $med = ClientMedication::query()->create([
+            'client_id' => $client->id, 'name' => 'Warfarin', 'dosage' => '3mg', 'frequency' => 'PRN',
+            'is_prn' => true, 'active' => true, 'state' => 'active', 'approval_status' => 'verified',
+        ]);
+        $admin = ClientMedicationAdministration::query()->create([
+            'client_id' => $client->id, 'client_medication_id' => $med->id, 'administered_by' => $user->id,
+            'status' => 'given', 'dose_given' => '3mg', 'administered_at' => now(), 'scheduled_for' => now(),
+        ]);
+
+        $this->actingAs($user)->getJson('/emar/audit/event/admin_'.$admin->id.'/integrity')
+            ->assertOk()
+            ->assertJson(['backed' => true])
+            ->assertJsonStructure(['backed', 'fingerprint', 'edited', 'recorded_at']);
+
+        $this->actingAs($user)->getJson('/emar/audit/event/omission_999_202601010800/integrity')
+            ->assertOk()
+            ->assertJson(['backed' => false]);
+    }
+
+    public function test_flag_endpoint_opens_a_medication_error(): void
+    {
+        ['user' => $user, 'client' => $client] = $this->seedAudit();
+        $this->grantPermissions($user, ['medications.administer.record']);
+        $med = ClientMedication::query()->create([
+            'client_id' => $client->id, 'name' => 'Codeine', 'dosage' => '30mg', 'frequency' => 'PRN',
+            'controlled_drug' => true, 'is_prn' => true, 'active' => true, 'state' => 'active', 'approval_status' => 'verified',
+        ]);
+        $cd = ClientControlledDrugEntry::query()->create([
+            'client_id' => $client->id, 'client_medication_id' => $med->id, 'entry_type' => 'administration',
+            'quantity' => 1, 'unit' => 'tablet', 'recorded_by' => $user->id, 'witnessed_by' => null, 'recorded_at' => now(),
+        ]);
+
+        $this->actingAs($user)
+            ->post('/emar/audit/event/cd_'.$cd->id.'/flag', ['flag' => 'missing_witness'])
+            ->assertRedirect();
+
+        $this->assertDatabaseHas('medication_errors', [
+            'client_id' => $client->id,
+            'reported_by' => $user->id,
+            'status' => 'reported',
+            'error_type' => 'documentation',
+        ]);
     }
 
     protected function makeRoleUser(string $roleName): User

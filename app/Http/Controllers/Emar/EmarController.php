@@ -3543,6 +3543,7 @@ class EmarController extends Controller
         $medication = ClientMedication::create(array_merge(
             $this->buildMedicationPayload($validated),
             [
+                'created_by' => $request->user()?->id,
                 'start_date' => $validated['start_date'] ?? now()->toDateString(),
                 'state' => 'active',
                 'active' => true,
@@ -3645,6 +3646,7 @@ class EmarController extends Controller
             'end_date' => now()->toDateString(),
             'ceased_reason' => $request->reason,
             'ceased_at' => now(),
+            'ceased_by' => $request->user()?->id,
         ]);
 
         return redirect()->back();
@@ -4132,6 +4134,7 @@ class EmarController extends Controller
 
             ClientMedication::create([
                 'client_id' => $client->id,
+                'created_by' => $request->user()?->id,
                 'name' => $medicationName,
                 'dosage' => $dose,
                 'frequency' => $frequency,

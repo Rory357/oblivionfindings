@@ -82,7 +82,7 @@ import {
 } from '@/components/ui/select';
 import AppLayout from '@/layouts/app-layout';
 
-import { DayPickerChip, addDays, parseYmd } from './components/day-picker-chip';
+import { DayPickerChip, addDays, parseYmd } from '@/components/meds/day-picker-chip';
 import { PrnEffectDialog } from './components/prn-effect-dialog';
 import { PrnWizard } from './components/prn-wizard';
 import { RecordDoseWizard } from './components/record-dose-wizard';

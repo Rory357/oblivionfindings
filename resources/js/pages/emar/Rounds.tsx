@@ -10,7 +10,7 @@ import AppLayout from '@/layouts/app-layout';
 import GuidedRoundDialog from '@/pages/emar/components/guided-round-dialog';
 import GenerateRoundsModal from '@/pages/emar/components/generate-rounds-modal';
 import RoundTemplateDialog from '@/pages/emar/components/round-template-dialog';
-import { addDays, DayPickerChip, toYmd } from '@/pages/meds/today/components/day-picker-chip';
+import { addDays, DayPickerChip, toYmd } from '@/components/meds/day-picker-chip';
 import type { NotGivenReasonOption, WitnessOption } from '@/pages/meds/today/types';
 import { Head, router } from '@inertiajs/react';
 import { Activity, CalendarCheck, CalendarDays, LayoutList, Pencil, Pill, Plus, RefreshCw, Trash2 } from 'lucide-react';

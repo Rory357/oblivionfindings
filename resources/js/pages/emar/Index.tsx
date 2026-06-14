@@ -60,7 +60,7 @@ import {
     addDays,
     DayPickerChip,
     parseYmd,
-} from '@/pages/meds/today/components/day-picker-chip';
+} from '@/components/meds/day-picker-chip';
 import { RecordDoseWizard } from '@/pages/meds/today/components/record-dose-wizard';
 import type {
     ClientInfo,

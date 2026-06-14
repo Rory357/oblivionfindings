@@ -3,6 +3,7 @@
 namespace App\Models;
 
 use App\Models\Concerns\AuditableChanges;
+use Illuminate\Database\Eloquent\Collection;
 use Illuminate\Database\Eloquent\Factories\HasFactory;
 use Illuminate\Database\Eloquent\Model;
 use Illuminate\Database\Eloquent\Relations\BelongsTo;
@@ -12,12 +13,13 @@ use Illuminate\Database\Eloquent\SoftDeletes;
 
 class ClientMedication extends Model
 {
-    use HasFactory;
     use AuditableChanges;
+    use HasFactory;
     use SoftDeletes;
 
     protected $fillable = [
         'client_id',
+        'created_by',
         'name',
         'dosage',
         'dose_amount',
@@ -44,6 +46,7 @@ class ClientMedication extends Model
         'review_date',
         'ceased_at',
         'ceased_reason',
+        'ceased_by',
         'instructions',
         'active',
         'state',
@@ -80,6 +83,16 @@ class ClientMedication extends Model
     public function client(): BelongsTo
     {
         return $this->belongsTo(Client::class);
+    }
+
+    public function createdByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'created_by');
+    }
+
+    public function ceasedByUser(): BelongsTo
+    {
+        return $this->belongsTo(User::class, 'ceased_by');
     }
 
     public function stock(): HasOne
@@ -223,8 +236,8 @@ class ClientMedication extends Model
      */
     public function isActive(): bool
     {
-        return $this->state === 'active' 
-            && $this->active 
+        return $this->state === 'active'
+            && $this->active
             && $this->superseded_by === null
             && $this->deleted_at === null
             && $this->isVerifiedForAdministration();
@@ -257,7 +270,10 @@ class ClientMedication extends Model
      */
     public function isExpiringSoon(int $days = 7): bool
     {
-        if (!$this->end_date) return false;
+        if (! $this->end_date) {
+            return false;
+        }
+
         return $this->end_date->diffInDays(now(), false) <= $days && $this->end_date->isFuture();
     }
 
@@ -269,13 +285,14 @@ class ClientMedication extends Model
         if ($this->dose_amount && $this->dose_unit) {
             return "{$this->dose_amount} {$this->dose_unit}";
         }
+
         return $this->dosage ?? '—';
     }
 
     /**
      * Get PRN administrations in last 24 hours
      */
-    public function getPrnLast24HoursAttribute(): \Illuminate\Database\Eloquent\Collection
+    public function getPrnLast24HoursAttribute(): Collection
     {
         return $this->administrations()
             ->where('status', 'given')
@@ -297,12 +314,17 @@ class ClientMedication extends Model
      */
     public function isPrnNearLimit(): bool
     {
-        if (!$this->is_prn || !$this->max_per_day) return false;
-        
+        if (! $this->is_prn || ! $this->max_per_day) {
+            return false;
+        }
+
         $maxPerDay = (int) filter_var($this->max_per_day, FILTER_SANITIZE_NUMBER_INT);
-        if ($maxPerDay <= 0) return false;
-        
+        if ($maxPerDay <= 0) {
+            return false;
+        }
+
         $current = $this->prnCountLast24Hours;
+
         return $current >= ($maxPerDay * 0.75); // 75% threshold
     }
 
@@ -311,11 +333,15 @@ class ClientMedication extends Model
      */
     public function isPrnOverLimit(): bool
     {
-        if (!$this->is_prn || !$this->max_per_day) return false;
-        
+        if (! $this->is_prn || ! $this->max_per_day) {
+            return false;
+        }
+
         $maxPerDay = (int) filter_var($this->max_per_day, FILTER_SANITIZE_NUMBER_INT);
-        if ($maxPerDay <= 0) return false;
-        
+        if ($maxPerDay <= 0) {
+            return false;
+        }
+
         return $this->prnCountLast24Hours >= $maxPerDay;
     }
 
@@ -332,12 +358,17 @@ class ClientMedication extends Model
      */
     public function getPrnRemainingAttribute(): ?int
     {
-        if (!$this->is_prn || !$this->max_per_day) return null;
-        
+        if (! $this->is_prn || ! $this->max_per_day) {
+            return null;
+        }
+
         $maxPerDay = (int) filter_var($this->max_per_day, FILTER_SANITIZE_NUMBER_INT);
-        if ($maxPerDay <= 0) return null;
-        
+        if ($maxPerDay <= 0) {
+            return null;
+        }
+
         $remaining = $maxPerDay - $this->prnCountLast24Hours;
+
         return max(0, $remaining);
     }
 
@@ -411,7 +442,7 @@ class ClientMedication extends Model
     public function getVersionHistory(): array
     {
         $history = $this->versions->toArray();
-        
+
         // Add current version
         array_unshift($history, [
             'version_number' => $this->version ?? 1,
@@ -421,7 +452,7 @@ class ClientMedication extends Model
             'changed_at' => $this->updated_at?->toIso8601String(),
             'is_current' => true,
         ]);
-        
+
         return $history;
     }
 
@@ -446,7 +477,7 @@ class ClientMedication extends Model
             'state' => 'ceased',
             'ceased_at' => $this->ceased_at,
             'ceased_reason' => $reason,
-            'change_reason' => 'Medication ceased: ' . $reason,
+            'change_reason' => 'Medication ceased: '.$reason,
             'changed_by' => $ceasedBy,
             'changed_at' => now(),
         ]);
@@ -471,7 +502,7 @@ class ClientMedication extends Model
             'dosage' => $this->dosage,
             'state' => 'paused',
             'paused_at' => $this->paused_at,
-            'change_reason' => 'Medication paused: ' . $reason,
+            'change_reason' => 'Medication paused: '.$reason,
             'changed_by' => $pausedBy,
             'changed_at' => now(),
         ]);

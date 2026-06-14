@@ -3,7 +3,7 @@
  * semantic tokens throughout. */
 import { cn } from '@/lib/utils';
 import { CalendarDays, ChevronDown, ChevronLeft, ChevronRight } from 'lucide-react';
-import { useEffect, useLayoutEffect, useRef, useState } from 'react';
+import { useEffect, useLayoutEffect, useRef, useState, type ReactNode } from 'react';
 import { createPortal } from 'react-dom';
 
 /** Parse a Y-m-d string into a local Date without timezone surprises. */
@@ -24,6 +24,10 @@ export function addDays(value: string, days: number): string {
 
 const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
 
+/** Default footer note (the meds board's wording). */
+const DEFAULT_CAPTION =
+    'Doses shown are for the selected day. Stock & CD checks always show today.';
+
 /**
  * The centre chip of the hero day stepper: shows the selected day and opens a
  * month-grid popover for jumping to any date.
@@ -31,16 +35,26 @@ const WEEKDAYS = ['Mo', 'Tu', 'We', 'Th', 'Fr', 'Sa', 'Su'];
  * The popover is rendered through a portal with `position: fixed`, anchored to
  * the trigger button — the same approach as the rostering WeekPicker — so it
  * escapes the hero footer's `overflow-hidden` (which would otherwise clip it).
+ *
+ * Shared component: used by the /meds/today board and the eMAR pages (charts,
+ * rounds, audit trail). Pass `caption` to override the footer note, or `null`
+ * to hide it.
  */
 export function DayPickerChip({
     date,
     isToday,
     onPick,
+    caption = DEFAULT_CAPTION,
+    label = 'pick day',
 }: {
     /** Selected day, Y-m-d. */
     date: string;
     isToday: boolean;
     onPick: (ymd: string) => void;
+    /** Footer note inside the popover. Pass `null` to hide it. */
+    caption?: ReactNode;
+    /** Trailing affordance text in the chip (default "pick day"). */
+    label?: string;
 }) {
     const [open, setOpen] = useState(false);
     const selected = parseYmd(date);
@@ -139,7 +153,8 @@ export function DayPickerChip({
                 className="inline-flex items-center gap-1.5 rounded-md border border-primary-foreground/35 bg-primary-foreground/20 px-3 py-1.5 text-xs font-semibold whitespace-nowrap text-primary-foreground hover:bg-primary-foreground/30"
             >
                 <CalendarDays className="h-3.5 w-3.5" />
-                {chipLabel} · pick day
+                {chipLabel}
+                {label ? ` · ${label}` : ''}
                 <ChevronDown className="h-3 w-3" />
             </button>
 
@@ -242,10 +257,11 @@ export function DayPickerChip({
                                   ),
                               )}
                           </div>
-                          <p className="mt-2 border-t border-border pt-2 text-[11px] text-muted-foreground">
-                              Doses shown are for the selected day. Stock &amp; CD
-                              checks always show today.
-                          </p>
+                          {caption ? (
+                              <p className="mt-2 border-t border-border pt-2 text-[11px] text-muted-foreground">
+                                  {caption}
+                              </p>
+                          ) : null}
                       </div>,
                       document.body,
                   )

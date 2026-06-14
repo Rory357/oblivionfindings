@@ -7,20 +7,20 @@ use App\Models\Client;
 use App\Models\ClientCondition;
 use App\Models\ClientControlledDrugDiscrepancy;
 use App\Models\ClientControlledDrugEntry;
-use App\Models\ClientDocument;
 use App\Models\ClientEmergencyContact;
 use App\Models\ClientMedicalProfile;
 use App\Models\ClientMedication;
 use App\Models\ClientMedicationAdministration;
 use App\Models\ClientMedicationStock;
 use App\Models\ServiceContext;
-use App\Models\TimelineEvent;
 use App\Models\User;
 use App\Services\EnhancedMarService;
 use App\Services\MedicationAlertService;
 use App\Services\MedicationIncidentIntegrationService;
 use App\Services\NotificationService;
+use App\Services\Timeline\TimelineEmitter;
 use App\Support\EmarUrl;
+use Carbon\Carbon;
 use Illuminate\Http\Request;
 use Illuminate\Support\Facades\Cache;
 
@@ -82,6 +82,7 @@ class ClientMedicalController extends Controller
     public function show(Request $request, Client $client)
     {
         $this->authorize('viewMedications', $client);
+
         return redirect()->to(EmarUrl::medications($client));
     }
 
@@ -169,10 +170,11 @@ class ClientMedicalController extends Controller
         try {
             $m = new ClientMedication;
             $m->client_id = $client->id;
+            $m->created_by = $user->id;
             $m->fill($this->buildMedicationPayload($data));
             $m->save();
 
-            app(\App\Services\Timeline\TimelineEmitter::class)->record([
+            app(TimelineEmitter::class)->record([
                 'source_type' => ClientMedication::class,
                 'source_id' => $m->id,
                 'occurred_at' => now(),
@@ -445,8 +447,8 @@ class ClientMedicalController extends Controller
         // require a reason even for "given".
         if (($data['status'] ?? 'given') === 'given' && ! empty($data['scheduled_for'])) {
             try {
-                $scheduled = \Carbon\Carbon::parse($data['scheduled_for']);
-                $adminAt = ! empty($data['administered_at']) ? \Carbon\Carbon::parse($data['administered_at']) : now();
+                $scheduled = Carbon::parse($data['scheduled_for']);
+                $adminAt = ! empty($data['administered_at']) ? Carbon::parse($data['administered_at']) : now();
 
                 $lateAfterMinutes = 30;
                 $earlyBeforeMinutes = 60;
@@ -480,7 +482,7 @@ class ClientMedicalController extends Controller
 
         try {
             if (($data['queued_offline'] ?? false) && ! $medication->is_prn && ! empty($data['scheduled_for'])) {
-                $scheduledFor = \Carbon\Carbon::parse($data['scheduled_for']);
+                $scheduledFor = Carbon::parse($data['scheduled_for']);
                 $conflictingAdministration = ClientMedicationAdministration::query()
                     ->where('client_id', $client->id)
                     ->where('client_medication_id', $medication->id)
@@ -519,7 +521,7 @@ class ClientMedicalController extends Controller
                     && ($result['safety_check']['blocked'] ?? false)
                     && $medication->fresh()->isPrnBlocked()
                 ) {
-                    $limitIncidentKey = 'emar:prn-over-limit:' . $client->id . ':' . $medication->id . ':' . now()->format('YmdHi');
+                    $limitIncidentKey = 'emar:prn-over-limit:'.$client->id.':'.$medication->id.':'.now()->format('YmdHi');
                     if (Cache::add($limitIncidentKey, true, now()->addMinutes(15))) {
                         app(MedicationIncidentIntegrationService::class)
                             ->handlePrnOverLimit($client, $medication->fresh(), $user->id);
@@ -546,16 +548,16 @@ class ClientMedicalController extends Controller
             $a = $result['administration'];
 
             $statusLabel = ucfirst(str_replace('_', ' ', $data['status']));
-            app(\App\Services\Timeline\TimelineEmitter::class)->record([
+            app(TimelineEmitter::class)->record([
                 'source_type' => ClientMedicationAdministration::class,
                 'source_id' => $a->id,
                 'occurred_at' => $a->administered_at ?? now(),
-                'type' => 'medication_' . $data['status'],
+                'type' => 'medication_'.$data['status'],
                 'actor_user_id' => $user->id,
                 'client_id' => $client->id,
                 'shift_id' => $data['shift_id'] ?? null,
                 'site_id' => $client->site_id,
-                'subject' => $statusLabel . ': ' . $medication->name . ($medication->dosage ? ' ' . $medication->dosage : ''),
+                'subject' => $statusLabel.': '.$medication->name.($medication->dosage ? ' '.$medication->dosage : ''),
                 'body' => $data['notes'] ?? null,
                 'meta' => array_filter([
                     'medication_name' => $medication->name,
@@ -694,7 +696,7 @@ class ClientMedicalController extends Controller
             $c->fill($data);
             $c->save();
 
-            app(\App\Services\Timeline\TimelineEmitter::class)->record([
+            app(TimelineEmitter::class)->record([
                 'source_type' => ClientCondition::class,
                 'source_id' => $c->id,
                 'occurred_at' => now(),

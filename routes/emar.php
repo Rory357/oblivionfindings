@@ -7,6 +7,7 @@ use App\Http\Controllers\Emar\EmarController;
 use App\Http\Controllers\Emar\EmarPdfController;
 use App\Http\Controllers\Emar\EmarReportController;
 use App\Http\Controllers\Emar\GuidedRoundController;
+use App\Http\Controllers\Emar\MedicationAuditEventController;
 use App\Http\Controllers\Emar\MedicationErrorController;
 use App\Http\Controllers\Emar\MedicationSettingsController;
 use App\Http\Controllers\Emar\RefusalFollowUpController;
@@ -259,6 +260,16 @@ Route::middleware(['auth'])->prefix('emar')->group(function () {
     Route::get('/audit/export', [MedicationAuditController::class, 'exportCsv'])
         ->middleware('permission:medications.reports.export')
         ->name('emar.audit.export');
+    // Per-event drawer actions (synthetic id → backing record; see controller).
+    Route::get('/audit/event/{id}/integrity', [MedicationAuditEventController::class, 'integrity'])
+        ->middleware('permission:medications.audit.view')
+        ->name('emar.audit.event.integrity');
+    Route::get('/audit/event/{id}/export', [MedicationAuditEventController::class, 'export'])
+        ->middleware('permission:medications.reports.export')
+        ->name('emar.audit.event.export');
+    Route::post('/audit/event/{id}/flag', [MedicationAuditEventController::class, 'flag'])
+        ->middleware('permission:medications.administer.record|clients.update')
+        ->name('emar.audit.event.flag');
 
     // Emergency access
     Route::get('/emergency-access', [EmergencyAccessController::class, 'index'])
